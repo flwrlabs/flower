@@ -136,7 +136,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
 .venv
 env/
 venv/
@@ -198,3 +197,4 @@ pyrightconfig.json
 
 # ruff Python linter
 .ruff_cache/
+config.bat
