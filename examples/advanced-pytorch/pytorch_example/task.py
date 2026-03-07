@@ -29,6 +29,7 @@ TRAIN_TRANSFORMS = Compose(
         Normalize(*FM_NORMALIZATION),
     ]
 )
+NUM_CLASSES = 10
 
 
 class Net(nn.Module):
@@ -75,17 +76,42 @@ def test(net, testloader, device):
     """Validate the model on the test set."""
     net.to(device)
     criterion = torch.nn.CrossEntropyLoss()
-    correct, loss = 0, 0.0
+    top1_correct, top3_correct, loss = 0, 0, 0.0
+    class_correct = torch.zeros(NUM_CLASSES, device=device, dtype=torch.long)
+    class_total = torch.zeros(NUM_CLASSES, device=device, dtype=torch.long)
     with torch.no_grad():
         for batch in testloader:
             images = batch["image"].to(device)
             labels = batch["label"].to(device)
             outputs = net(images)
             loss += criterion(outputs, labels).item()
-            correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
-    accuracy = correct / len(testloader.dataset)
+            top1_preds = torch.max(outputs, 1)[1]
+            top1_correct += (top1_preds == labels).sum().item()
+
+            top3_preds = torch.topk(outputs, k=3, dim=1).indices
+            top3_correct += (top3_preds == labels.unsqueeze(1)).any(dim=1).sum().item()
+
+            class_total += torch.bincount(labels, minlength=NUM_CLASSES)
+            class_correct += torch.bincount(
+                labels[top1_preds == labels], minlength=NUM_CLASSES
+            )
+
+    top1_accuracy = top1_correct / len(testloader.dataset)
+    top3_accuracy = top3_correct / len(testloader.dataset)
     loss = loss / len(testloader)
-    return loss, accuracy
+    class_correct_cpu = class_correct.cpu().tolist()
+    class_total_cpu = class_total.cpu().tolist()
+    class_accuracies = {
+        f"class_accuracy_{class_idx}": (
+            class_correct_cpu[class_idx] / class_total_cpu[class_idx]
+            if class_total_cpu[class_idx] > 0
+            else 0.0
+        )
+        for class_idx in range(NUM_CLASSES)
+    }
+    metrics = {"accuracy": top1_accuracy, "top3_accuracy": top3_accuracy}
+    metrics.update(class_accuracies)
+    return loss, metrics
 
 
 def apply_train_transforms(batch):
