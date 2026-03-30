@@ -44,7 +44,7 @@ Before we begin, ensure you have updated to Flower 1.28.
 
 .. code-block:: shell
 
-    $ pip install --U "flwr[simulation]"
+    $ pip install -U "flwr[simulation]"
     $ flwr --version # should show 1.28.x
 
 **********************************
@@ -93,8 +93,8 @@ following steps to update your Flower Configuration:
 
 3. Remove or comment out the simulation-specific settings under the
    ``[superlink.local]`` section (and any other connections you may have added that also
-   include ``options.`` fields). Then, add a new field containing ``address = ":local:"``.
-   The updated configuration should look like this:
+   include ``options.`` fields). Then, add a new field containing ``address =
+   ":local:"``. The updated configuration should look like this:
 
 .. code-block:: toml
     :caption: config.toml
