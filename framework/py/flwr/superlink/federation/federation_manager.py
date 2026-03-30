@@ -42,17 +42,6 @@ class FederationManager(ABC):
         self._linkstate = linkstate
 
     @abstractmethod
-    def report_run_usage(self, run_id: int | None) -> None:
-        """Report run usage if its status is finished.
-
-        Parameters
-        ----------
-        run_id : int | None
-            The run that just transitioned to a finished state, if any. ``None`` for
-            status updates that did not finish a run.
-        """
-
-    @abstractmethod
     def exists(self, federation: str) -> bool:
         """Check if a federation exists."""
 
@@ -331,4 +320,15 @@ class FederationManager(ABC):
             for the invitee.
         PermissionError
             If the caller is not an owner of the federation.
+        """
+
+    @abstractmethod
+    def report_run_usage(self, run_id: int | None) -> None:
+        """Report run usage if its status is finished.
+
+        Parameters
+        ----------
+        run_id : int | None
+            The run that just transitioned to a finished state, if any. ``None`` for
+            status updates that did not finish a run.
         """

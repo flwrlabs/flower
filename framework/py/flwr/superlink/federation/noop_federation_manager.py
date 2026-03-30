@@ -55,10 +55,6 @@ class NoOpFederationManager(FederationManager):
             self._simulation_config = SimulationConfig()
             self._simulation_config.CopyFrom(DEFAULT_SIMULATION_CONFIG)
 
-    def report_run_usage(self, run_id: int | None) -> None:
-        """Report run usage if its status is finished."""
-        _ = run_id
-
     def exists(self, federation: str) -> bool:
         """Check if a federation exists."""
         return federation == NOOP_FEDERATION
@@ -219,3 +215,7 @@ class NoOpFederationManager(FederationManager):
         raise UnsupportedError(
             "`revoke_invitation` is not supported by NoOpFederationManager."
         )
+
+    def report_run_usage(self, run_id: int | None) -> None:
+        """Report run usage if its status is finished."""
+        _ = run_id
