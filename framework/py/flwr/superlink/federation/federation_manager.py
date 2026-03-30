@@ -16,7 +16,7 @@
 
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from flwr.common.typing import Federation
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
@@ -320,4 +320,19 @@ class FederationManager(ABC):
             for the invitee.
         PermissionError
             If the caller is not an owner of the federation.
+        """
+
+    @abstractmethod
+    def can_execute(self, policy_request: dict[str, Any]) -> bool:
+        """Check if a subject can execute an action under a given context.
+
+        Parameters
+        ----------
+        policy_request : dict[str, Any]
+            Authorization envelope with ``subject``, ``action``, and ``context``.
+
+        Returns
+        -------
+        bool
+            ``True`` if the action is allowed, otherwise ``False``.
         """
