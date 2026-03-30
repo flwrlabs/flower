@@ -253,6 +253,67 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(status_code, grpc.StatusCode.FAILED_PRECONDITION)
         self.assertIn("unknown.key", details)
 
+    def test_start_run_denied_when_not_entitled(self) -> None:
+        """Test StartRun aborts when federation manager denies execution."""
+        request = StartRunRequest()
+        request.fab.hash_str = hashlib.sha256(b"test FAB content").hexdigest()
+        request.fab.content = b"test FAB content"
+        request.federation = NOOP_FEDERATION
+
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch.object(
+                self.state.federation_manager,
+                "can_execute",
+                return_value=False,
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.StartRun(request, context)
+
+        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
+
+    def test_start_run_calls_can_execute_with_expected_policy_request(self) -> None:
+        """Test StartRun calls can_execute with expected authorization envelope."""
+        fab_content = b"test FAB content 777"
+        request = StartRunRequest()
+        request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
+        request.fab.content = fab_content
+        request.federation = NOOP_FEDERATION
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+            ) as mock_get_fab_config,
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+            ) as mock_get_metadata_from_config,
+            patch.object(
+                self.state.federation_manager,
+                "can_execute",
+                return_value=True,
+            ) as mock_can_execute,
+        ):
+            mock_get_fab_config.return_value = {
+                "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
+            }
+            mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
+            _ = self.servicer.StartRun(request, Mock())
+
+        mock_can_execute.assert_called_once_with(
+            {
+                "subject": {"type": "account", "id": self.aid},
+                "action": "start_run",
+                "context": {
+                    "type": "start_run",
+                    "federation": NOOP_FEDERATION,
+                    "run_type": RunType.SERVER_APP.value,
+                },
+            }
+        )
+
     @parameterized.expand([(None,), (1,), (2,), (3,), (9,)])  # type: ignore
     def test_list_runs(self, limit: int | None) -> None:
         """Test List method of ControlServicer with --runs option."""

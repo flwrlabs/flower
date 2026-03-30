@@ -198,6 +198,21 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 resolved_federation_config.CopyFrom(sim_cfg)
                 resolved_federation_config.MergeFrom(request.override_federation_config)
 
+            policy_request = {
+                "subject": {"type": "account", "id": flwr_aid},
+                "action": "start_run",
+                "context": {
+                    "type": "start_run",
+                    "federation": federation,
+                    "run_type": run_type.value,
+                },
+            }
+            if not state.federation_manager.can_execute(policy_request):
+                raise FlowerError(
+                    ApiErrorCode.NO_PERMISSIONS,
+                    "You are not entitled to execute runs in this federation.",
+                )
+
         try:
             # Validate user config overrides matches keys in run config in FAB
             fab_config = get_fab_config(fab_file)
