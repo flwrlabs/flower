@@ -21,18 +21,38 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from typing import cast
+from unittest.mock import Mock, patch
 
-from flwr.cli.utils import (
-    build_pathspec,
-    get_sha256_hash,
-    load_gitignore_patterns,
-    validate_credentials_content,
+import click
+import grpc
+import pytest
+
+from flwr.cli.constant import (
+    LOCAL_CONTROL_API_ADDRESS,
+    LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
 )
+from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
 from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
     AUTHN_TYPE_JSON_KEY,
     FLWR_DIR,
     REFRESH_TOKEN_KEY,
+)
+from flwr.common.grpc import GRPC_MAX_MESSAGE_LENGTH
+from flwr.supercore.constant import MAX_DIR_DEPTH
+
+from .utils import (
+    build_pathspec,
+    collect_files,
+    depth_of,
+    filter_paths_for_publish,
+    flwr_cli_grpc_exc_handler,
+    get_executed_command,
+    get_sha256_hash,
+    init_channel_from_connection,
+    load_gitignore_patterns,
+    validate_credentials_content,
 )
 
 
@@ -158,3 +178,270 @@ def test_load_gitignore_patterns_with_pathspec() -> None:
 
     # Should not match normal files
     assert spec.match_file("good.py") is False
+
+
+def test_get_executed_command_single() -> None:
+    """Test get_executed_command with a two-word command (e.g., flwr ls)."""
+    root_group = click.Group("flwr")
+    ls_cmd = click.Command("ls")
+
+    with click.Context(root_group, info_name="flwr") as root_ctx:
+        with click.Context(ls_cmd, parent=root_ctx, info_name="ls"):
+            assert get_executed_command() == "flwr ls"
+
+
+def test_get_executed_command_nested() -> None:
+    """Test get_executed_command with nested commands (e.g., flwr federation list)."""
+    # Create parent group "flwr" with child group "federation" and command "list"
+    root_group = click.Group("flwr")
+    federation_group = click.Group("federation")
+    list_cmd = click.Command("list")
+
+    with click.Context(root_group, info_name="flwr") as root_ctx:
+        with click.Context(
+            federation_group, parent=root_ctx, info_name="federation"
+        ) as fed_ctx:
+            with click.Context(list_cmd, parent=fed_ctx, info_name="list"):
+                assert get_executed_command() == "flwr federation list"
+
+
+def test_init_channel_from_connection_uses_resolved_connection() -> None:
+    """Ensure resolved connection values are used for channel creation."""
+    unresolved = SuperLinkConnection(
+        name="local",
+        address=LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
+        options=SuperLinkSimulationOptions(num_supernodes=2),
+    )
+    resolved = SuperLinkConnection(
+        name="local",
+        address=LOCAL_CONTROL_API_ADDRESS,
+        insecure=True,
+        options=SuperLinkSimulationOptions(num_supernodes=2),
+    )
+    auth_plugin = Mock()
+    auth_plugin.load_tokens = Mock()
+
+    with patch(
+        "flwr.cli.utils.ensure_local_superlink", return_value=resolved
+    ) as mock_ensure:
+        with patch("flwr.cli.utils.load_certificate_in_connection", return_value=None):
+            with patch("flwr.cli.utils.create_channel") as mock_create:
+                channel = Mock()
+                mock_create.return_value = channel
+
+                ret = init_channel_from_connection(unresolved, auth_plugin)
+
+    assert ret is channel
+    mock_ensure.assert_called_once_with(unresolved)
+    auth_plugin.load_tokens.assert_called_once()
+
+    kwargs = mock_create.call_args.kwargs
+    assert kwargs["server_address"] == LOCAL_CONTROL_API_ADDRESS
+    assert kwargs["insecure"] is True
+    assert kwargs["root_certificates"] is None
+    assert kwargs["max_message_length"] == GRPC_MAX_MESSAGE_LENGTH
+    assert len(kwargs["interceptors"]) == 1
+    channel.subscribe.assert_called_once()
+
+
+def test_custom_grpc_err_handler() -> None:
+    """Test flwr_cli_grpc_exc_handler with a custom error handler."""
+
+    # Prepare
+    class CustomError(Exception):
+        """Custom error for testing."""
+
+    mock_handler = Mock(side_effect=CustomError)
+    grpc_error = grpc.RpcError()
+
+    # Execute & assert
+    with pytest.raises(CustomError):
+        with flwr_cli_grpc_exc_handler(mock_handler):
+            raise grpc_error
+
+    mock_handler.assert_called_once_with(grpc_error)
+
+
+@pytest.mark.parametrize(
+    ("rel", "expected"),
+    [
+        (Path("a.py"), 0),
+        (Path("d1/file.txt"), 1),
+        (Path("d1/d2/d3/f.txt"), 3),
+        (Path("d1/d2/d3/d4/d5/x"), 5),
+    ],
+)
+def test_depth_of(rel: Path, expected: int) -> None:
+    """Test the directory depth detection."""
+    assert depth_of(rel) == expected
+
+
+# === collect_files tests ===
+
+
+def test_collect_files_empty_dir(tmp_path: Path) -> None:
+    """Empty directory returns an empty dict."""
+    assert not collect_files(tmp_path)
+
+
+def test_collect_files_basic(tmp_path: Path) -> None:
+    """Files are collected with correct POSIX relative paths and absolute values."""
+    # Prepare
+    (tmp_path / "a.py").write_text("x", encoding="utf-8")
+    (tmp_path / "b.txt").write_text("y", encoding="utf-8")
+
+    # Execute
+    result = collect_files(tmp_path)
+
+    # Assert
+    assert set(result.keys()) == {"a.py", "b.txt"}
+    assert result["a.py"] == tmp_path / "a.py"
+    assert result["b.txt"] == tmp_path / "b.txt"
+
+
+def test_collect_files_ignores_symlinked_files(tmp_path: Path) -> None:
+    """Symlinked files are excluded from the collected files."""
+    # Prepare
+    real = tmp_path / "real.py"
+    real.write_text("real", encoding="utf-8")
+    link = tmp_path / "link.py"
+    link.symlink_to(real)
+
+    # Execute
+    result = collect_files(tmp_path)
+
+    # Assert
+    assert "real.py" in result
+    assert "link.py" not in result
+
+
+def test_collect_files_ignores_symlinked_dirs(tmp_path: Path) -> None:
+    """Symlinked directories are not traversed."""
+    # Prepare
+    # Create a real directory with a file outside the root
+    external = tmp_path / "external"
+    external.mkdir()
+    (external / "secret.py").write_text("s", encoding="utf-8")
+
+    # Root with a symlinked directory pointing to external
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "app.py").write_text("a", encoding="utf-8")
+    (root / "linked_dir").symlink_to(external)
+
+    # Execute
+    result = collect_files(root)
+
+    # Assert
+    assert "app.py" in result
+    assert "linked_dir/secret.py" not in result
+
+
+# === filter_paths_for_publish tests ===
+
+
+def _to_path_files(files: dict[str, bytes], tmp_path: Path) -> dict[str, Path]:
+    """Write bytes to disk and return a mapping of relative paths to Path objects."""
+    result: dict[str, Path] = {}
+    for name, content in files.items():
+        p = tmp_path / name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(content)
+        result[name] = p
+    return result
+
+
+@pytest.mark.parametrize(
+    ("files", "expected_keys"),
+    [
+        # Included extensions pass through
+        ({"app.py": b""}, {"app.py"}),
+        ({"pyproject.toml": b""}, {"pyproject.toml"}),
+        ({"README.md": b""}, {"README.md"}),
+        ({"config.yaml": b""}, {"config.yaml"}),
+        ({"config.yml": b""}, {"config.yml"}),
+        ({"data.json": b""}, {"data.json"}),
+        ({"data.jsonl": b""}, {"data.jsonl"}),
+        # Non-matching extensions are excluded
+        ({"image.png": b"", "app.py": b""}, {"app.py"}),
+        # Nested files work
+        ({"src/main.py": b""}, {"src/main.py"}),
+    ],
+)
+@pytest.mark.parametrize("use_paths", [False, True], ids=["bytes", "path"])
+def test_filter_paths_for_publish_include(
+    files: dict[str, bytes],
+    expected_keys: set[str],
+    use_paths: bool,
+    tmp_path: Path,
+) -> None:
+    """Files with included extensions are kept; others are dropped."""
+    # Prepare
+    input_files = cast(
+        dict[str, Path | bytes], _to_path_files(files, tmp_path) if use_paths else files
+    )
+    # Execute & assert
+    assert set(filter_paths_for_publish(input_files).keys()) == expected_keys
+
+
+@pytest.mark.parametrize(
+    "excluded_path",
+    [
+        "__pycache__/mod.py",
+        ".flwr/creds.json",
+    ],
+)
+@pytest.mark.parametrize("use_paths", [False, True], ids=["bytes", "path"])
+def test_filter_paths_for_publish_excludes(
+    excluded_path: str, use_paths: bool, tmp_path: Path
+) -> None:
+    """__pycache__ and .flwr paths are excluded."""
+    # Prepare
+    raw: dict[str, bytes] = {excluded_path: b"", "app.py": b""}
+    files = cast(
+        dict[str, Path | bytes], _to_path_files(raw, tmp_path) if use_paths else raw
+    )
+    # Execute & assert
+    assert set(filter_paths_for_publish(files).keys()) == {"app.py"}
+
+
+@pytest.mark.parametrize("use_paths", [False, True], ids=["bytes", "path"])
+def test_filter_paths_for_publish_respects_gitignore(
+    use_paths: bool, tmp_path: Path
+) -> None:
+    """Patterns in .gitignore cause matching files to be excluded."""
+    # Prepare
+    raw: dict[str, bytes] = {
+        ".gitignore": b"secret.py\n",
+        "app.py": b"",
+        "secret.py": b"",
+    }
+    files = cast(
+        dict[str, Path | bytes], _to_path_files(raw, tmp_path) if use_paths else raw
+    )
+    # Execute
+    result = filter_paths_for_publish(files)
+    # Assert
+    assert "secret.py" not in result
+    assert "app.py" in result
+
+
+@pytest.mark.parametrize("use_paths", [False, True], ids=["bytes", "path"])
+def test_filter_paths_for_publish_max_depth_exceeded(
+    use_paths: bool, tmp_path: Path
+) -> None:
+    """ValueError is raised when a file exceeds MAX_DIR_DEPTH."""
+    # Prepare
+    deep = "/".join(["d"] * (MAX_DIR_DEPTH + 1)) + "/f.py"
+    raw: dict[str, bytes] = {deep: b""}
+    files = cast(
+        dict[str, Path | bytes], _to_path_files(raw, tmp_path) if use_paths else raw
+    )
+    # Execute & assert
+    with pytest.raises(ValueError, match="exceeds the maximum directory depth"):
+        filter_paths_for_publish(files)
+
+
+def test_filter_paths_for_publish_empty() -> None:
+    """Empty input returns empty output."""
+    assert not filter_paths_for_publish({})

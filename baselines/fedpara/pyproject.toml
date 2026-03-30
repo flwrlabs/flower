@@ -10,7 +10,7 @@ license = "Apache-2.0"
 authors = ["Yahia Salaheldin Shaaban <yehia.salah.ms@alexu.edu.eg>", "Omar Mokhtar < >", "Roeia Amr < >"]
 readme = "README.md"
 homepage = "https://flower.ai"
-repository = "https://github.com/adap/flower"
+repository = "https://github.com/flwrlabs/flower"
 documentation = "https://flower.ai"
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -40,8 +40,8 @@ flwr = { extras = ["simulation"], version = "1.9.0" }
 hydra-core = "1.3.2" # don't change this
 matplotlib = "^3.7.2"
 tqdm = "^4.66.1"
-torch = { url = "https://download.pytorch.org/whl/cu117/torch-2.0.1%2Bcu117-cp310-cp310-linux_x86_64.whl" }
-torchvision = { url = "https://download.pytorch.org/whl/cu117/torchvision-0.15.2%2Bcu117-cp310-cp310-linux_x86_64.whl" }
+torch = { url = "https://download.pytorch.org/whl/cu126/torch-2.8.0%2Bcu126-cp310-cp310-manylinux_2_28_x86_64.whl" }
+torchvision = { url = "https://download.pytorch.org/whl/cu126/torchvision-0.23.0%2Bcu126-cp310-cp310-manylinux_2_28_x86_64.whl" }
 
 [tool.poetry.dev-dependencies]
 isort = "==5.13.2"
@@ -54,7 +54,7 @@ pytest = "==6.2.4"
 pytest-watch = "==4.2.0"
 ruff = "==0.4.5"
 types-requests = "==2.27.7"
-virtualenv = "20.26.6"
+virtualenv = "20.36.1"
 
 [tool.isort]
 line_length = 88

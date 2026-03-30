@@ -41,3 +41,20 @@ def test_aggregate_fit() -> None:
     assert actual_aggregated
     actual = actual_aggregated.to_numpy_ndarrays()[0]
     np.testing.assert_equal(actual, expected)
+
+
+def test_aggregate_fit_with_scalar_weights() -> None:
+    """Tests if FedMedian preserves 0-dim arrays."""
+    strategy = FedMedian()
+    replies = [
+        create_mock_reply(ArrayRecord([np.array(1.0)]), 1),
+        create_mock_reply(ArrayRecord([np.array(3.0)]), 1),
+        create_mock_reply(ArrayRecord([np.array(2.0)]), 1),
+    ]
+
+    actual_aggregated, _ = strategy.aggregate_train(1, replies)
+
+    assert actual_aggregated
+    actual = actual_aggregated.to_numpy_ndarrays()[0]
+    assert actual.shape == ()
+    np.testing.assert_equal(actual, np.array(2.0))

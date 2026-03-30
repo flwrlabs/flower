@@ -45,10 +45,35 @@ pip install -e .
 
 The dataset is divided into 50 partitions in an IID fashion, a partition is assigned to each ClientApp.
 We randomly sample a fraction (0.1) of the total nodes to participate in each round, for a total of `200` rounds.
-All settings are defined in `pyproject.toml`.
+All the Flower App settings are defined in `pyproject.toml`.
+
+Before proceeding you need to create a new SuperLink connection and define 50 virtual SuperNodes. To do this, let's first locate the Flower Configuration file and then edit it.
+
+Locate the Flower Configuration file:
+
+```shell
+flwr config list
+```
+
+```console
+# Example output:
+Flower Config file: /path/to/your/.flwr/config.toml
+SuperLink connections:
+ supergrid
+ local (default)
+```
+
+Add a new connection named `flowertune` and make it the default.
+
+```TOML
+[superlink.flowertune]
+options.num-supernodes = 50
+options.backend.client-resources.num-cpus = 6
+options.backend.client-resources.num-gpus = 1.0
+```
 
 > [!IMPORTANT]
-> Please note that `[tool.flwr.app.config.static]` and `options.num-supernodes` under `[tool.flwr.federations.local-simulation]` are not allowed to be modified for fair competition if you plan to participated in the [LLM leaderboard](https://flower.ai/benchmarks/llm-leaderboard).
+> Please note that `[tool.flwr.app.config.static]` are not allowed to be modified for fair competition if you plan to participated in the [LLM leaderboard](https://flower.ai/benchmarks/llm-leaderboard). Additionally, the number of supernodes (i.e. `options.num-supernodes`) must be 50.
 
 ## Running the challenge
 
@@ -74,7 +99,7 @@ We use Mistral-7B model with 4-bit quantization as default. The estimated VRAM c
 | :--------: | :--------: | :-------: | :-------: | :-------: |
 |    VRAM    | ~25.50 GB  | ~17.30 GB | ~22.80 GB | ~17.40 GB |
 
-You can adjust the CPU/GPU resources you assign to each of the clients based on your device, which are specified with `options.backend.client-resources.num-cpus` and `options.backend.client-resources.num-gpus` under `[tool.flwr.federations.local-simulation]` entry in `pyproject.toml`.
+You can adjust the CPU/GPU resources you assign to each of the clients based on your device, which are specified with `options.backend.client-resources.num-cpus` and `options.backend.client-resources.num-gpus` in your `flowertune` connection in your `config.toml`.
 
 ## Model saving
 

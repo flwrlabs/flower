@@ -15,7 +15,7 @@ This example shows how to use Flower's Simulation Engine to federate the finetun
 Start by cloning the example project:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
         && mv _tmp/examples/flowertune-vit . \
         && rm -rf _tmp \
         && cd flowertune-vit
@@ -49,10 +49,9 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 ### Run with the Simulation Engine
 
 > [!TIP]
-> This example runs faster when the `ClientApp`s have access to a GPU. If your system has one, you can make use of it by configuring the `backend.client-resources` component in `pyproject.toml`. If you want to try running the example with GPU right away, use the `local-simulation-gpu` federation as shown below. Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
+> This example runs faster when the `ClientApp`s have access to a GPU. If your system has one, you can make use of it by configuring the `backend.client-resources` component in your Flower Configuration. Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
 ```bash
-# Run with the default federation (CPU only)
 flwr run .
 ```
 
@@ -62,11 +61,20 @@ You can also override some of the settings for your `ClientApp` and `ServerApp` 
 flwr run . --run-config "num-server-rounds=5 batch-size=64"
 ```
 
-Run the project in the `local-simulation-gpu` federation that gives CPU and GPU resources to each `ClientApp`. By default, at most 5x`ClientApp` will run in parallel in the available GPU. You can tweak the degree of parallelism by adjusting the settings of this federation in the `pyproject.toml`.
+You can add a new connection in your Flower Configuration (find if via `flwr config list`):
+
+```TOML
+[superlink.local-gpu]
+options.num-supernodes = 10
+options.backend.client-resources.num-cpus = 2 # each ClientApp assumes to use 2CPUs
+options.backend.client-resources.num-gpus = 0.2 # at most 5 ClientApp will run in a given GPU
+```
+
+And then run the app
 
 ```bash
-# Run with the `local-simulation-gpu` federation
-flwr run . local-simulation-gpu
+# Run with the `local-gpu` connection
+flwr run . local-gpu
 ```
 
 ![](_static/central_evaluation.png)

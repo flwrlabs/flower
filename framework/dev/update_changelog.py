@@ -36,7 +36,7 @@ except ModuleNotFoundError:
     import tomli as tomllib
 
 
-REPO_NAME = "adap/flower"
+REPO_NAME = "flwrlabs/flower"
 ROOT_DIR = Path(__file__).parents[2]  # Path to the root of the repository
 CHANGELOG_FILE = ROOT_DIR / "framework" / "docs" / "source" / "ref-changelog.md"
 CHANGELOG_SECTION_HEADER = "### Changelog entry"
@@ -161,6 +161,9 @@ def _get_contributors_from_commits(api: Github, commits: list[Commit]) -> set[st
         for name in executor.map(lambda x: _get_user(*x), coauthor_names_emails):
             if name:
                 contributors.add(name)
+
+    # Remove Copilot from the contributors list if present
+    contributors.discard("Copilot")
     return contributors
 
 
@@ -331,7 +334,7 @@ def _update_changelog(prs: set[PullRequest], tag: str, new_tag: str) -> bool:
 def _check_repeated_prs(content: str) -> None:
     """Check for repeated PRs in the changelog."""
     found_pairs = re.findall(
-        r"\[#(\d+)\]\(https://github.com/adap/flower/pull/(\d+)\)", content
+        r"\[#(\d+)\]\(https://github.com/flwrlabs/flower/pull/(\d+)\)", content
     )
 
     count_prs = {}

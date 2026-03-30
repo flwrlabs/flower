@@ -2,24 +2,31 @@ name: "bootstrap"
 description: "Bootstrap Python environment (install and configure Python version and build tools)"
 inputs:
   python-version:
-    description: "Version range or exact version of Python or PyPy to use, using SemVer's version range syntax."
+    description: "Version range or exact version of Python to use, using SemVer's version range syntax."
     default: 3.10.19
   pip-version:
     description: "Version of pip to be installed using pip"
-    default: 25.3
+    default: 26.0.1
   setuptools-version:
     description: "Version of setuptools to be installed using pip"
-    default: 80.9.0
+    default: 82.0.0
   poetry-version:
     description: "Version of poetry to be installed using pip"
-    default: 2.1.3
+    default: 2.3.2
   poetry-skip:
     description: "Option to skip the poetry installation"
     required: false
     default: "false"
+  uv-version:
+    description: "Version of uv to install"
+    default: "0.10.7"
+  uv-skip:
+    description: "Option to skip the uv installation"
+    required: false
+    default: "true"
 outputs:
   python-version:
-    description: "Version range or exact version of Python or PyPy"
+    description: "Version range or exact version of Python"
     value: ${{ steps.versions.outputs.python-version }}
   pip-version:
     description: "Installed version of pip"
@@ -28,8 +35,11 @@ outputs:
     description: "Installed version of setuptools"
     value: ${{ steps.versions.outputs.setuptools-version }}
   poetry-version:
-    description: "Installed version of poetry"
+    description: "Requested version of poetry"
     value: ${{ steps.versions.outputs.poetry-version }}
+  uv-version:
+    description: "Requested version of uv"
+    value: ${{ steps.versions.outputs.uv-version }}
 runs:
   using: "composite"
   steps:
@@ -37,11 +47,16 @@ runs:
       uses: actions/setup-python@v6
       with:
         python-version: ${{ inputs.python-version }}
+    - name: Set up uv
+      if: ${{ inputs.uv-skip == 'false' }}
+      uses: astral-sh/setup-uv@v7
+      with:
+        version: ${{ inputs.uv-version }}
     - name: Install build tools
       run: |
+        python -m pip install -U pip==${{ inputs.pip-version }}
+        python -m pip install -U setuptools==${{ inputs.setuptools-version }}
         if ${{ inputs.poetry-skip == 'false' }}; then
-          python -m pip install -U pip==${{ inputs.pip-version }}
-          python -m pip install -U setuptools==${{ inputs.setuptools-version }}
           python -m pip install -U poetry==${{ inputs.poetry-version }}
           python -m poetry config virtualenvs.create false
         fi
@@ -53,3 +68,4 @@ runs:
         echo "pip-version=$(echo ${{ inputs.pip-version }})" >> $GITHUB_OUTPUT
         echo "setuptools-version=$(echo ${{ inputs.setuptools-version }})" >> $GITHUB_OUTPUT
         echo "poetry-version=$(echo ${{ inputs.poetry-version }})" >> $GITHUB_OUTPUT
+        echo "uv-version=$(echo ${{ inputs.uv-version }})" >> $GITHUB_OUTPUT

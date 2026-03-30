@@ -37,7 +37,7 @@ copyright = f"{datetime.date.today().year} Flower Labs GmbH"
 author = "The Flower Authors"
 
 # The full version, including alpha/beta/rc tags
-release = "1.26.0"
+release = "1.28.0"
 
 
 # -- General configuration ---------------------------------------------------
@@ -92,7 +92,7 @@ html_theme_options = {
     # Sphinx Book Theme
     #
     # https://sphinx-book-theme.readthedocs.io/en/latest/configure.html
-    # "repository_url": "https://github.com/adap/flower",
+    # "repository_url": "https://github.com/flwrlabs/flower",
     # "repository_branch": "main",
     # "path_to_docs": "doc/source/",
     # "home_page_in_toc": True,
@@ -121,7 +121,7 @@ html_css_files = ["custom.css"]
 nbsphinx_execute = "never"
 
 colab_link = (
-    "https://colab.research.google.com/github/adap/flower/blob/main/"
+    "https://colab.research.google.com/github/flwrlabs/flower/blob/main/"
     "framework/docs/source/{{ env.doc2path(env.docname, base=None) }}"
 )
 _open_in_colab_button = f"""

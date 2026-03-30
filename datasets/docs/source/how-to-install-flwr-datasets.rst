@@ -4,7 +4,7 @@ Installation
 Python Version
 --------------
 
-Flower Datasets requires `Python 3.9 <https://docs.python.org/3.9/>`_ or above.
+Flower Datasets requires `Python 3.10 <https://docs.python.org/3.10/>`_ or above.
 
 
 Install stable release (pip)
@@ -37,21 +37,21 @@ it becomes part of an official release.
 
 .. code-block:: bash
 
-  python -m pip install "flwr-datasets@git+https://github.com/adap/flower.git"\
+  python -m pip install "flwr-datasets@git+https://github.com/flwrlabs/flower.git"\
   "@TYPE-HERE-BRANCH-NAME#subdirectory=datasets"
 
 Similarly to the situation before, you can specify the ``vision`` or ``audio`` extra after the name of the library.
 
 .. code-block:: bash
 
-  python -m pip install "flwr-datasets[vision]@git+https://github.com/adap/flower.git"\
+  python -m pip install "flwr-datasets[vision]@git+https://github.com/flwrlabs/flower.git"\
   "@TYPE-HERE-BRANCH-NAME#subdirectory=datasets"
 
 e.g. for the main branch:
 
 .. code-block:: bash
 
-  python -m pip install "flwr-datasets@git+https://github.com/adap/flower.git"\
+  python -m pip install "flwr-datasets@git+https://github.com/flwrlabs/flower.git"\
   "@main#subdirectory=datasets"
 
 Since `flwr-datasets` is a part of the Flower repository, the `subdirectory` parameter (at the end of the URL) is used to specify the package location in the GitHub repo.
@@ -67,7 +67,7 @@ The following command can be used to verify if Flower Datasets was successfully 
 
 If everything works, it should print the version of Flower Datasets to the command line:
 
-.. code-block:: none
+.. parsed-literal::
 
-  0.5.0
+  |release|
 

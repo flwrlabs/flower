@@ -61,13 +61,15 @@ def load_data(partition_id: int, num_partitions: int):
     if fds is None:
         partitioner = IidPartitioner(num_partitions=num_partitions)
         fds = FederatedDataset(
-            dataset="mnist",
+            dataset="ylecun/mnist",
             partitioners={"train": partitioner},
         )
 
     dataset = fds.load_partition(partition_id, "train").with_format("numpy")
 
-    X, y = dataset["image"].reshape((len(dataset), -1)), dataset["label"]
+    batch = dataset[:]
+    X = batch["image"].reshape((len(dataset), -1))
+    y = batch["label"]
 
     # Split the on edge data: 80% train, 20% test
     X_train, X_test = X[: int(0.8 * len(X))], X[int(0.8 * len(X)) :]

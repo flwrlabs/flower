@@ -19,7 +19,7 @@ In this example, we will federate the training of a [Diffusion](https://arxiv.or
 Start by cloning the example project. We prepared a single-line command that you can copy into your shell which will checkout the example for you:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
 		&& mv _tmp/examples/quickstart-lerobot . \
 		&& rm -rf _tmp && cd quickstart-lerobot
 ```
@@ -62,24 +62,33 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 ### Run with the Simulation Engine
 
 > [!TIP]
-> This example runs much faster when the `ClientApp`s have access to a GPU. If your system has one, you might want to try running the example with GPU right away, use the `local-simulation-gpu` federation as shown below.
+> This example runs faster when the `ClientApp`s have access to a GPU. If your system has one, you can make use of it by configuring the `backend.client-resources` component in your Flower Configuration. Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
 ```bash
 # Run with the default federation (CPU only)
 flwr run .
 ```
 
-Run the project in the `local-simulation-gpu` federation that gives CPU and GPU resources to each `ClientApp`. By default, at most 2x`ClientApp` (using ~2 GB of VRAM each) will run in parallel in each available GPU. Note you can adjust the degree of parallelism but modifying the `client-resources` specification. Running with the settings as in the `pyproject.toml` it takes 1h in a 2x RTX 3090 machine.
+You can add a new connection in your Flower Configuration (find if via `flwr config list`):
+
+```TOML
+[superlink.local-gpu]
+options.num-supernodes = 10
+options.backend.client-resources.num-cpus = 4 # each ClientApp assumes to use 4CPUs
+options.backend.client-resources.num-gpus = 0.5 # at most 2 ClientApp will run in a given GPU (lower it to increase parallelism)
+```
+
+And then run the app
 
 ```bash
-# Run with the `local-simulation-gpu` federation
-flwr run . local-simulation-gpu
+# Run with the `local-gpu` settings
+flwr run . local-gpu
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example
 
 ```bash
-flwr run . local-simulation-gpu --run-config "num-server-rounds=5 fraction-fit=0.1"
+flwr run . local-gpu --run-config "num-server-rounds=5 fraction-fit=0.1"
 ```
 
 ### Result output

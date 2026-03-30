@@ -24,10 +24,9 @@ import urllib.request
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
 from enum import Enum, auto
-from pathlib import Path
 from typing import Any, cast
 
-from flwr.common.constant import FLWR_DIR
+from flwr.supercore.utils import get_flwr_home
 from flwr.supercore.version import package_name, package_version
 
 FLWR_TELEMETRY_ENABLED = os.getenv("FLWR_TELEMETRY_ENABLED", "1")
@@ -61,10 +60,6 @@ def log(msg: str | Exception) -> None:
     logging.getLogger(LOGGER_NAME).log(LOGGER_LEVEL, msg)
 
 
-def _get_home() -> Path:
-    return Path().home()
-
-
 def _get_partner_id() -> str:
     """Get partner ID."""
     partner_id = os.getenv("FLWR_TELEMETRY_PARTNER_ID")
@@ -82,19 +77,14 @@ def _get_source_id() -> str:
     source_id = "unavailable"
     # Check if .flwr in home exists
     try:
-        home = _get_home()
-    except RuntimeError:
-        # If the home directory can’t be resolved, RuntimeError is raised.
+        flwr_home = get_flwr_home()
+        # Create .flwr directory if it does not exist yet.
+        flwr_home.mkdir(parents=True, exist_ok=True)
+    except (RuntimeError, PermissionError):
+        # If the directory can’t be resolved or created, an error is raised.
         return source_id
 
-    flwr_dir = home.joinpath(FLWR_DIR)
-    # Create .flwr directory if it does not exist yet.
-    try:
-        flwr_dir.mkdir(parents=True, exist_ok=True)
-    except PermissionError:
-        return source_id
-
-    source_file = flwr_dir.joinpath("source")
+    source_file = flwr_home.joinpath("source")
 
     # If no source_file exists create one and write it
     if not source_file.exists():
@@ -166,10 +156,6 @@ class EventType(str, Enum):
     FLWR_CLIENTAPP_RUN_LEAVE = auto()
 
     # --- Simulation Engine ------------------------------------------------------------
-
-    # CLI: flower-simulation
-    CLI_FLOWER_SIMULATION_ENTER = auto()
-    CLI_FLOWER_SIMULATION_LEAVE = auto()
 
     # Python API: `run_simulation`
     PYTHON_API_RUN_SIMULATION_ENTER = auto()

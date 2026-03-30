@@ -8,7 +8,7 @@ version = "1.0.0"
 description = ""
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]>=1.25.0",
+    "flwr[simulation]>=1.27.0",
     "numpy>=1.26.0,<2",
     "faiss-cpu>=1.10.0",
     "tqdm>=4.67",
@@ -57,11 +57,3 @@ server-llm-hfpath = "HuggingFaceTB/SmolLM2-1.7B-Instruct"
 # Whether the server should use a GPU to load the llm and run the inference
 server-llm-use-gpu = "false"
 
-
-[tool.flwr.federations]
-default = "local-simulation"
-
-[tool.flwr.federations.local-simulation]
-options.num-supernodes = 2
-options.backend.client-resources.num-cpus = 2
-options.backend.client-resources.num-gpus = 0

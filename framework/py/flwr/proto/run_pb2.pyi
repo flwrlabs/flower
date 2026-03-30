@@ -66,6 +66,7 @@ class Run(google.protobuf.message.Message):
     BYTES_SENT_FIELD_NUMBER: builtins.int
     BYTES_RECV_FIELD_NUMBER: builtins.int
     CLIENTAPP_RUNTIME_FIELD_NUMBER: builtins.int
+    RUN_TYPE_FIELD_NUMBER: builtins.int
     run_id: builtins.int
     fab_id: builtins.str
     fab_version: builtins.str
@@ -79,6 +80,7 @@ class Run(google.protobuf.message.Message):
     bytes_sent: builtins.int
     bytes_recv: builtins.int
     clientapp_runtime: builtins.float
+    run_type: builtins.str
     @property
     def override_config(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, flwr.proto.transport_pb2.Scalar]: ...
     @property
@@ -101,9 +103,10 @@ class Run(google.protobuf.message.Message):
         bytes_sent: builtins.int = ...,
         bytes_recv: builtins.int = ...,
         clientapp_runtime: builtins.float = ...,
+        run_type: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["status", b"status"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["bytes_recv", b"bytes_recv", "bytes_sent", b"bytes_sent", "clientapp_runtime", b"clientapp_runtime", "fab_hash", b"fab_hash", "fab_id", b"fab_id", "fab_version", b"fab_version", "federation", b"federation", "finished_at", b"finished_at", "flwr_aid", b"flwr_aid", "override_config", b"override_config", "pending_at", b"pending_at", "run_id", b"run_id", "running_at", b"running_at", "starting_at", b"starting_at", "status", b"status"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["bytes_recv", b"bytes_recv", "bytes_sent", b"bytes_sent", "clientapp_runtime", b"clientapp_runtime", "fab_hash", b"fab_hash", "fab_id", b"fab_id", "fab_version", b"fab_version", "federation", b"federation", "finished_at", b"finished_at", "flwr_aid", b"flwr_aid", "override_config", b"override_config", "pending_at", b"pending_at", "run_id", b"run_id", "run_type", b"run_type", "running_at", b"running_at", "starting_at", b"starting_at", "status", b"status"]) -> None: ...
 
 global___Run = Run
 
@@ -201,63 +204,6 @@ class UpdateRunStatusResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___UpdateRunStatusResponse = UpdateRunStatusResponse
-
-@typing.final
-class GetRunStatusRequest(google.protobuf.message.Message):
-    """GetRunStatus"""
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    NODE_FIELD_NUMBER: builtins.int
-    RUN_IDS_FIELD_NUMBER: builtins.int
-    @property
-    def node(self) -> flwr.proto.node_pb2.Node: ...
-    @property
-    def run_ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
-    def __init__(
-        self,
-        *,
-        node: flwr.proto.node_pb2.Node | None = ...,
-        run_ids: collections.abc.Iterable[builtins.int] | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["node", b"node"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["node", b"node", "run_ids", b"run_ids"]) -> None: ...
-
-global___GetRunStatusRequest = GetRunStatusRequest
-
-@typing.final
-class GetRunStatusResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    @typing.final
-    class RunStatusDictEntry(google.protobuf.message.Message):
-        DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-        KEY_FIELD_NUMBER: builtins.int
-        VALUE_FIELD_NUMBER: builtins.int
-        key: builtins.int
-        @property
-        def value(self) -> global___RunStatus: ...
-        def __init__(
-            self,
-            *,
-            key: builtins.int = ...,
-            value: global___RunStatus | None = ...,
-        ) -> None: ...
-        def HasField(self, field_name: typing.Literal["value", b"value"]) -> builtins.bool: ...
-        def ClearField(self, field_name: typing.Literal["key", b"key", "value", b"value"]) -> None: ...
-
-    RUN_STATUS_DICT_FIELD_NUMBER: builtins.int
-    @property
-    def run_status_dict(self) -> google.protobuf.internal.containers.MessageMap[builtins.int, global___RunStatus]: ...
-    def __init__(
-        self,
-        *,
-        run_status_dict: collections.abc.Mapping[builtins.int, global___RunStatus] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["run_status_dict", b"run_status_dict"]) -> None: ...
-
-global___GetRunStatusResponse = GetRunStatusResponse
 
 @typing.final
 class GetFederationOptionsRequest(google.protobuf.message.Message):

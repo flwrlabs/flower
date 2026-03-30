@@ -21,6 +21,7 @@ from logging import INFO, WARN
 from typing import cast
 
 import flwr.common.recorddict_compat as compat
+from flwr.app.message_type import MessageType
 from flwr.common import (
     ArrayRecord,
     Code,
@@ -32,7 +33,7 @@ from flwr.common import (
     Message,
     log,
 )
-from flwr.common.constant import MessageType, MessageTypeLegacy
+from flwr.common.constant import MessageTypeLegacy
 
 from ..client_proxy import ClientProxy
 from ..compat.app_utils import start_update_client_manager_thread

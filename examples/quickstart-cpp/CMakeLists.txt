@@ -34,7 +34,7 @@ if(USE_LOCAL_FLWR)
 else()
   FetchContent_Declare(
     flwr_repo
-    GIT_REPOSITORY https://github.com/adap/flower.git
+    GIT_REPOSITORY https://github.com/flwrlabs/flower.git
     GIT_TAG        main
   )
 

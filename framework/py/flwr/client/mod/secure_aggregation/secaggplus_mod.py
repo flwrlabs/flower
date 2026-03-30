@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from logging import DEBUG, WARNING
 from typing import Any, cast
 
+from flwr.app.message_type import MessageType
 from flwr.client.typing import ClientAppCallable
 from flwr.common import (
     ConfigRecord,
@@ -31,7 +32,6 @@ from flwr.common import (
     parameters_to_ndarrays,
 )
 from flwr.common import recorddict_compat as compat
-from flwr.common.constant import MessageType
 from flwr.common.logger import log
 from flwr.common.secure_aggregation.crypto.shamir import create_shares
 from flwr.common.secure_aggregation.crypto.symmetric_encryption import (

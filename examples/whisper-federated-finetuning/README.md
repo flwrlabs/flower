@@ -24,7 +24,7 @@ This example can be run in three modes:
 Start by cloning the example project:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
         && mv _tmp/examples/whisper-federated-finetuning  . \
         && rm -rf _tmp \
         && cd whisper-federated-finetuning 
@@ -137,10 +137,34 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 
 ### Run with the Simulation Engine
 
-The run is defined in the `pyproject.toml` which: specifies the paths to `ClientApp` and `ServerApp` as well as their parameterization with configs in the `[tool.flwr.app.config]` block.
+The run is defined in the `pyproject.toml` which: specifies the paths to `ClientApp` and `ServerApp` as well as their parameterization with configs in the `[tool.flwr.app.config]` block. Before launching our simulation, we need to define a `SuperLink Connection` in the `Flower Configuration`. To do this, let's first locate the Flower Configuration file and then edit it.
+
+Locate the Flower Configuration file:
+
+```shell
+flwr config list
+```
+
+```console
+# Example output:
+Flower Config file: /path/to/your/.flwr/config.toml
+SuperLink connections:
+ supergrid
+ local (default)
+```
+
+Edit the `local` configuration so it looks like the following.
+
+```TOML
+[superlink.flowertune]
+options.num-supernodes = 422 # we are grouping 2112 speakers into groups of 5
+options.backend.client-resources.num-cpus = 4
+options.backend.client-resources.num-gpus = 0.0
+options.backend.init-args.log-to-driver = false # set to true to enable all logs from simulation engine
+```
 
 > [!NOTE]
-> By default, it will run on CPU only. On a MacBook Pro M2, running 3 rounds of Flower FL should take ~10 min. Assuming the dataset has already been downloaded. Running on GPU is recommended (for this use the `local-sim-gpu` federation, or continue reading). Also note that the logs from the `ClientApps` are been silenced. You can disable this by setting to `true` the entry `options.backend.init-args.log-to-driver` in the federation in `pyproject.toml` you are using. Read more about how Flower Simulations work in [the documentation](https://flower.ai/docs/framework/how-to-run-simulations.html).
+> By default, it will run on CPU only. On a MacBook Pro M2, running 3 rounds of Flower FL should take ~10 min. Assuming the dataset has already been downloaded. Running on GPU is recommended. Read more about how Flower Simulations work and how to make them use the GPU in [the documentation](https://flower.ai/docs/framework/how-to-run-simulations.html).
 
 ```shell
 # Run with default settings (21 clients per round out of 422)
@@ -162,13 +186,7 @@ INFO :                          (3, 2.5116721350250693)]}
 INFO :
 ```
 
-To run your `ClientApps` on GPU, you'll need to run it in another federation (see `local-sim-gpu` in `pyprojec.toml`). To adjust the degree of parallelism, consider updating the `option.backend` settings. `ClientApp` instances consume only 800MB of VRAM, which enables you to run several in parallel in the same GPU. By default, the command below will run `5xClientApp` in parallel for each GPU available.
-
-```shell
-# Run with GPU (21 clients per round out of 422)
-# (each active client gets allocated 20% available VRAM)
-flwr run . local-sim-gpu
-```
+To run your `ClientApps` on GPU, you'll need to define a new SuperLink connection in your Flower Configuration file that assigns GPU resources to your virtual clients. Check how to do this in the [Flower Simulation documentation](https://flower.ai/docs/framework/main/en/how-to-run-simulations.html#defining-clientapp-resources).
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
 
@@ -179,11 +197,7 @@ flwr run . --run-config "num-server-rounds=10 fraction-fit=0.2"
 
 With just 5 FL rounds, the global model should be reaching ~97% validation accuracy. A test accuracy of 96% can be reached with 10 rounds of FL training using the default hyperparameters. On an RTX 3090Ti, each round takes ~40-50s depending on the amount of data the clients selected in a round have.
 
-Run on GPU with central evaluation activated and for 10 rounds.
-
-```shell
-flwr run . local-sim-gpu --run-config "central-eval=true num-server-rounds=10"
-```
+Run on GPU with central evaluation activated and for 10 rounds by passing `--run-config "central-eval=true num-server-rounds=10"` to your `flwr run` command.
 
 ![Global validation accuracy FL with Whisper model](_static/whisper_flower_acc.png)
 
@@ -200,7 +214,7 @@ Running the exact same FL pipeline as in the simulation setting can be done with
 An obvious first step would be to generate N data partitions and assing each to a different `SuperNode`. Let's start with this step by means of the `preprocess.py` script. These are the steps we'll follow:
 
 1. Extract and save two partitions from the dataset. Each will be assigned to a different `SuperNode`.
-2. Modify the `client_fn` in `client_app.py` so it directly loads the partition specified when launching the `SuperNode`.
+2. Modify the `train` function in `client_app.py` so it directly loads the partition specified when launching the `SuperNode`.
 3. Copy the generate partition to the machine where the `SuperNode` is going to be executed.
 
 **1. Save a data partition**
@@ -218,8 +232,10 @@ Rename the `partition-id` key with something more meaningful such as `local-data
 ```python
 from whisper_example.dataset import load_data_from_disk
 
-def client_fn(context: Context):
+@app.train()
+def train(msg: Message, context: Context):
 
+    # ...
     # partition_id = context.node_config["partition-id"] # disable
     local_data = context.node_config["local-data"]  # new line
 
@@ -242,7 +258,15 @@ flower-supernode --superlink="<SUPERLINK-IP>:9092" \
 
 **4. Run your whipser app**
 
-Once your `SuperNodes` are connected to the `SuperLink`, start the run via `flwr run`, but this time point it to the `remote` federation. It is defined at the bottom of the `pyproject.toml`. You might want to update the `address` so it matches that of the machine where the `SuperLink` is running from.
+First, ensure you have a SuperLink connection defined in your Flower Configuration file. You can locate this file via `flwr config list`. Open it and create a new connection if you don't have it already. For example:
+
+```toml
+[superlink.remote]
+address = '127.0.0.1:9093' # IP:9093 of your superlink (assumed localhost superlink)
+insecure = true # Check the documentation to setup with SSL
+```
+
+Once your `SuperNodes` are connected to the `SuperLink`, start the run via `flwr run`, but this time point it to the `remote` connection:
 
 ```shell
 flwr run . remote
@@ -255,7 +279,7 @@ To launch a Flower `SuperNode` on a Raspberry Pi you'd typically follow the same
 First, ensure your Rasberry Pi has been setup correctly. You'll need either a Rasbperry Pi 4 or 5. Using the code as-is, RAM usage on the Raspberry Pi does not exceed 1.5GB. Note that unlike in the previous sections of this example, clients for Raspberry Pi work better when using PyTorch 1.13.1 (or earlier versions to PyTorch 2.0 in general).
 
 > [!TIP]
-> Follow the `Setup your Pi` section in the [examples/embedded-devices](https://github.com/adap/flower/tree/main/examples/embedded-devices#setting-up-a-raspberry-pi) example to set it up if you haven't done so already.
+> Follow the `Setup your Pi` section in the [examples/embedded-devices](https://github.com/flwrlabs/flower/tree/main/examples/embedded-devices#setting-up-a-raspberry-pi) example to set it up if you haven't done so already.
 
 Second, generate and copy the a single data partition to your raspbery pi. Do so from your development machine (e.g. your laptop) as shown earlier in the [Run with the Deployment Engine](#run-with-the-deployment-engine) section.
 

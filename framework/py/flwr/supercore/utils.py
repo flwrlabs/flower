@@ -16,10 +16,15 @@
 
 
 import json
+import os
 import re
+from pathlib import Path
+from typing import Any
 
 import requests
 
+from flwr.common.constant import FLWR_DIR, FLWR_HOME
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.supercore.version import package_version as flwr_version
 
 from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN
@@ -60,6 +65,17 @@ def int64_to_uint64(signed: int) -> int:
     if signed < 0:
         return signed + (1 << 64)
     return signed
+
+
+def get_flwr_home() -> Path:
+    """Get the Flower home directory path.
+
+    Returns FLWR_HOME environment variable if set, otherwise returns a default
+    subdirectory in the user's home directory.
+    """
+    if flwr_home := os.getenv(FLWR_HOME):
+        return Path(flwr_home)
+    return Path.home() / FLWR_DIR
 
 
 def parse_app_spec(app_spec: str) -> tuple[str, str | None]:
@@ -103,7 +119,7 @@ def parse_app_spec(app_spec: str) -> tuple[str, str | None]:
 def request_download_link(
     app_id: str, app_version: str | None, in_url: str, out_url: str
 ) -> tuple[str, list[dict[str, str]] | None]:
-    """Request a download link for the given app from the Flower Platform API.
+    """Request a download link for the given app from Flower Hub.
 
     Parameters
     ----------
@@ -181,6 +197,35 @@ def request_download_link(
     return str(data[out_url]), verifications
 
 
+def simulation_config_to_json(config: SimulationConfig) -> dict[str, Any]:
+    """Convert a simulation config protobuf to a JSON-serializable dictionary."""
+    payload: dict[str, Any] = {}
+    for field in config.DESCRIPTOR.fields:
+        if field.has_presence and not config.HasField(field.name):
+            payload[field.name] = None
+            continue
+        payload[field.name] = getattr(config, field.name)
+
+    return payload
+
+
+def simulation_config_from_json(payload: dict[str, Any]) -> SimulationConfig:
+    """Convert a JSON payload into a simulation config protobuf."""
+    config = SimulationConfig()
+    valid_fields = {field.name for field in config.DESCRIPTOR.fields}
+    unknown_fields = set(payload) - valid_fields
+    if unknown_fields:
+        field_names = ", ".join(sorted(unknown_fields))
+        raise ValueError(f"Unknown simulation config field(s): {field_names}")
+
+    for field_name, value in payload.items():
+        if value is None:
+            continue
+        setattr(config, field_name, value)
+
+    return config
+
+
 def humanize_duration(seconds: float) -> str:
     """Convert a duration in seconds to a human-friendly string.
 
@@ -240,3 +285,24 @@ def humanize_bytes(num_bytes: int) -> str:
         value /= 1024
 
     raise RuntimeError("Unreachable code")  # Make mypy happy
+
+
+def check_federation_format(federation: str) -> None:
+    """Check if the federation string is valid.
+
+    Parameters
+    ----------
+    federation : str
+        The federation string to check.
+
+    Raises
+    ------
+    ValueError
+        If the federation string is not valid. The expected
+        format is '@<account-name>/<federation-name>'.
+    """
+    if not re.match(r"^@[a-zA-Z0-9\-_]+/[a-zA-Z0-9\-_]+$", federation):
+        raise ValueError(
+            f"Invalid federation format: {federation}. "
+            f"Expected format: '@<account-name>/<federation-name>'."
+        )

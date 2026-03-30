@@ -44,7 +44,7 @@ def parse_address(address: str) -> tuple[str, int, bool | None] | None:
 
         port = int(raw_port)
 
-        if port > 65535 or port < 1:
+        if port > 65535 or port < 0:
             raise ValueError("Port number is invalid.")
 
         try:
@@ -82,6 +82,9 @@ def is_port_in_use(address: str) -> bool:
         return True
     host, port, is_v6 = parsed_address
 
+    if port == 0:  # OS will assign an unused port, no need to check for availability
+        return False
+
     if is_v6:
         protocol = socket.AF_INET6
     else:
@@ -100,3 +103,12 @@ def is_port_in_use(address: str) -> bool:
             return True
 
         return False
+
+
+def resolve_bind_address(address: str) -> str:
+    """Replace bind-all addresses (0.0.0.0, ::) with localhost (127.0.0.1, ::1)."""
+    if address.startswith("[::]"):
+        return address.replace("[::]", "[::1]", 1)
+    if address.startswith("0.0.0.0"):
+        return address.replace("0.0.0.0", "127.0.0.1", 1)
+    return address

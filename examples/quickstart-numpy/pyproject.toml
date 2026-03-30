@@ -9,12 +9,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-numpy"
-version = "1.0.0"
+version = "1.0.1"
 description = "Federated Learning with Numpy and Flower (Quickstart Example)"
 license = "Apache-2.0"
 # Dependencies for your Flower App
 dependencies = [
-    "flwr[simulation]>=1.25.0",
+    "flwr[simulation]>=1.27.0",
     "numpy>=2.0.2",
 ]
 
@@ -33,17 +33,3 @@ clientapp = "quickstart_numpy.client_app:app"
 # Custom config values accessible via `context.run_config`
 [tool.flwr.app.config]
 num-server-rounds = 3
-
-# Default federation to use when running the app
-[tool.flwr.federations]
-default = "local-simulation"
-
-# Local simulation federation with 10 virtual SuperNodes
-[tool.flwr.federations.local-simulation]
-options.num-supernodes = 10
-
-# Remote federation example for use with SuperLink
-[tool.flwr.federations.remote-federation]
-address = "<SUPERLINK-ADDRESS>:<PORT>"
-insecure = true  # Remove this line to enable TLS
-# root-certificates = "<PATH/TO/ca.crt>"  # For TLS setup

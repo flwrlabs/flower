@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "PyTorch Vertical FL with Flower"
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]>=1.25.0",
+    "flwr[simulation]>=1.27.0",
     "flwr-datasets>=0.5.0",
     "pandas==2.3.3",
     "numpy>=1.26.0",
@@ -32,10 +32,4 @@ learning-rate = 0.01
 out-feature-dim-clientapp = 64 # Output feature dimension for client app
 # ['Age', 'Sex', 'Fare','Siblings/Spouses Aboard', 'Name', 'Parents/Children Aboard', 'Pclass']
 feature-splits = "2,3,2" # Comma-separated number of features per client (they must add up to 7)
-                         # And there must be as many entries as num-supernodes configured below
-
-[tool.flwr.federations]
-default = "local-simulation"
-
-[tool.flwr.federations.local-simulation]
-options.num-supernodes = 3 # This must be equal to number of `feature-splits` entries
+                         # And there must be as many entries as num-supernode in the simulation

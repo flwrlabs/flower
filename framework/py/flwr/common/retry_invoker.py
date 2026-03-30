@@ -21,7 +21,7 @@ import threading
 import time
 from collections.abc import Callable, Generator, Iterable
 from dataclasses import dataclass
-from logging import INFO, WARN
+from logging import DEBUG, ERROR, INFO, WARN
 from typing import Any, cast
 
 import grpc
@@ -33,7 +33,6 @@ from flwr.common.typing import RunNotRunningException
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.fleet_pb2_grpc import FleetStub
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
-from flwr.proto.simulationio_pb2_grpc import SimulationIoStub
 
 
 def exponential(
@@ -318,7 +317,7 @@ class RetryInvoker:
                 return ret
 
 
-def _make_simple_grpc_retry_invoker() -> RetryInvoker:
+def make_simple_grpc_retry_invoker() -> RetryInvoker:
     """Create a simple gRPC retry invoker."""
     lock = threading.Lock()
     system_healthy = threading.Event()
@@ -334,8 +333,11 @@ def _make_simple_grpc_retry_invoker() -> RetryInvoker:
                 retry_state.tries,
             )
 
-    def _on_backoff(_: RetryState) -> None:
+    def _on_backoff(retry_state: RetryState) -> None:
         system_healthy.clear()
+        log(
+            DEBUG, "Connection attempt failed with exception: %s", retry_state.exception
+        )
 
     def _on_giveup(retry_state: RetryState) -> None:
         system_healthy.clear()
@@ -351,7 +353,12 @@ def _make_simple_grpc_retry_invoker() -> RetryInvoker:
         if e.code() == grpc.StatusCode.PERMISSION_DENIED:  # type: ignore
             raise RunNotRunningException
         if e.code() == grpc.StatusCode.UNAVAILABLE:  # type: ignore
-            return False
+            # Check if this is an SSL handshake failure - these should fail fast
+            details = str(e.details() if hasattr(e, "details") else "").lower()
+            if "handshake failed" in details:
+                log(ERROR, "SSL/TLS handshake error detected.")
+                return True  # Give up on SSL/TLS handshake errors
+            return False  # Retry on other UNAVAILABLE errors (network issues)
         return True
 
     def _wait(wait_time: float) -> None:
@@ -386,10 +393,8 @@ def _make_simple_grpc_retry_invoker() -> RetryInvoker:
     )
 
 
-def _wrap_stub(
-    stub: (
-        ServerAppIoStub | ClientAppIoStub | SimulationIoStub | FleetStub | GrpcAdapter
-    ),
+def wrap_stub(
+    stub: ServerAppIoStub | ClientAppIoStub | FleetStub | GrpcAdapter,
     retry_invoker: RetryInvoker,
 ) -> None:
     """Wrap a gRPC stub with a retry invoker."""

@@ -6,7 +6,7 @@ framework: [torch]
 
 # Federated AI with Embedded Devices using Flower
 
-This example will show you how Flower makes it very easy to run Federated Learning workloads on edge devices. Here we'll be showing how to use Raspberry Pi as Flower clients, or better said, `SuperNodes`. The FL workload (i.e. model, dataset and training loop) is mostly borrowed from the [quickstart-pytorch](https://github.com/adap/flower/tree/main/examples/quickstart-pytorch) example, but you could adjust it to follow [quickstart-tensorflow](https://github.com/adap/flower/tree/main/examples/quickstart-tensorflow) if you prefere using TensorFlow. The main difference compare to those examples is that here you'll learn how to use Flower's Deployment Engine to run FL across multiple embedded devices.
+This example will show you how Flower makes it very easy to run Federated Learning workloads on edge devices. Here we'll be showing how to use Raspberry Pi as Flower clients, or better said, `SuperNodes`. The FL workload (i.e. model, dataset and training loop) is mostly borrowed from the [quickstart-pytorch](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-pytorch) example, but you could adjust it to follow [quickstart-tensorflow](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-tensorflow) if you prefere using TensorFlow. The main difference compare to those examples is that here you'll learn how to use Flower's Deployment Engine to run FL across multiple embedded devices.
 
 ![Different was of running Flower FL on embedded devices](_static/diagram.png)
 
@@ -34,7 +34,7 @@ What follows is a step-by-step guide on how to setup your client/s and the serve
 Start with cloning this example on your laptop or desktop machine. We have prepared a single line which you can copy and execute:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git \
+git clone --depth=1 https://github.com/flwrlabs/flower.git \
           && mv flower/examples/embedded-devices . \
           && rm -rf flower && cd embedded-devices
 ```
@@ -77,7 +77,7 @@ pip install -e .
    - SSH into your Rapsberry Pi.
    - Follow the steps outlined in [Embedded Devices Setup](device_setup.md) to set it up for develpment. The objetive of this step is to have your Pi ready to join later as a Flower `SuperNode` to an existing federation.
 
-3. Run your Flower experiments following the steps in the [Running FL with Flower](https://github.com/adap/flower/tree/main/examples/embedded-devices#running-fl-training-with-flower) section.
+3. Run your Flower experiments following the steps in the [Running FL with Flower](https://github.com/flwrlabs/flower/tree/main/examples/embedded-devices#running-fl-training-with-flower) section.
 
 ## Embedded Federated AI
 
@@ -108,9 +108,6 @@ scp -r datasets/fashionmnist_part_1 <user>@<device-ip>:/path/to/home
 ### Launching the Flower `SuperLink`
 
 On your development machine, launch the `SuperLink`. You will connnect Flower `SuperNodes` to it in the next step.
-
-> [!NOTE]
-> If you decide to run the `SuperLink` in a different machine, you'll need to adjust the `address` under the `[tool.flwr.federations.embedded-federation]` tag in the `pyproject.toml`.
 
 ```shell
 flower-superlink --insecure
@@ -145,8 +142,35 @@ Repeat for each embedded device that you want to connect to the `SuperLink`.
 
 ### Run the Flower App
 
-With both the long-running server (`SuperLink`) and two `SuperNodes` up and running, we can now start run. Note that the command below points to a federation named `embedded-federation`. Its entry point is defined in the `pyproject.toml`. Run the following from your development machine where you have cloned this example to, e.g. your laptop.
+With both the long-running server (`SuperLink`) and two `SuperNodes` up and running, we can now start run. Let's first update the Flower Configuration file to add a new SuperLink connection.
+
+Locate your Flower configuration file by running:
+
+```shell
+flwr config list
+```
+
+```console
+# Example output:
+Flower Config file: /path/to/your/.flwr/config.toml
+SuperLink connections:
+ supergrid
+ local (default)
+```
+
+Open this configuration file and add a new SuperLink connection at the end:
+
+```TOML
+[superlink.embedded-federation]
+address = "127.0.0.1:9093" # ControlAPI of your SUPERLINK
+insecure = true
+```
+
+Finally, run your Flower App in your federation:
 
 ```shell
 flwr run . embedded-federation
 ```
+
+> [!TIP]
+> For more details about how to create a SuperLink connection please refer to the [How-To use Flower's Deployment Engine guide](https://flower.ai/docs/framework/how-to-run-flower-with-deployment-engine.html). Read more about the Flower Configuration file in [this guide](https://flower.ai/docs/framework/ref-flower-configuration.html).

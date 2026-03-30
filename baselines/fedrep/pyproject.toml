@@ -10,8 +10,8 @@ license = "Apache-2.0"
 dependencies = [
     "flwr[simulation]>=1.13.1",
     "flwr-datasets[vision]>=0.4.0",
-    "torch==2.6.0",
-    "torchvision==0.21.0",
+    "torch==2.8.0",
+    "torchvision==0.23.0",
 ]
 
 [tool.hatch.metadata]

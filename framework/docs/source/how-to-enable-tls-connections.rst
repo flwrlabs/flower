@@ -19,10 +19,11 @@ This guide describes how to establish secure TLS Superlink ↔ SuperNodes as wel
 .. tip::
 
     Checkout the `Flower Authentication
-    <https://github.com/adap/flower/tree/main/examples/flower-authentication>`_ example
-    for a complete self-contained example on how to setup TLS and (optionally) node
-    authentication. Check out the :doc:`how-to-authenticate-supernodes` guide to learn
-    more about adding an authentication layer to SuperLink ↔ SuperNode connections.
+    <https://github.com/flwrlabs/flower/tree/main/examples/supernode-authentication>`_
+    example for a complete self-contained example on how to setup TLS and (optionally)
+    node authentication. Check out the :doc:`how-to-authenticate-supernodes` guide to
+    learn more about adding an authentication layer to SuperLink ↔ SuperNode
+    connections.
 
 **************
  Certificates
@@ -42,7 +43,7 @@ top of this guide.
 .. code-block:: bash
 
     # In the example directory, generate the certificates
-    $ ./generate_cert.sh
+    $ python generate_creds.py
 
 This will generate the TLS certificates in a new ``certificates/`` directory. Copy this
 directory into the directory of your app (e.g. a directory generated earlier via ``flwr
@@ -94,7 +95,7 @@ launching the SuperNode is replacing ``--insecure`` with ``--root-certificates``
     $ flower-supernode \
         --root-certificates certificates/ca.crt \
         --superlink 127.0.0.1:9092 \
-        --clientappio-api-address 0.0.0.0:9094 \
+        --clientappio-api-address 127.0.0.1:9094 \
         --node-config="partition-id=0 num-partitions=2"
 
 .. dropdown:: Understand the command
@@ -110,7 +111,7 @@ to launch the second SuperNode.
     $ flower-supernode \
         --root-certificates certificates/ca.crt \
         --superlink 127.0.0.1:9092 \
-        --clientappio-api-address 0.0.0.0:9095 \
+        --clientappio-api-address 127.0.0.1:9095 \
         --node-config="partition-id=1 num-partitions=2"
 
 ************************
@@ -121,16 +122,16 @@ The `Flower CLI <ref-api-cli.html>`_ (e.g. ``flwr run`` command) is the way a us
 a data scientist) can interact with a deployed federation. The Flower CLI commands are
 processed by the SuperLink and therefore, if it has been configured to only operate on
 TLS conenction, the requests sent by the Flower CLI need to make use of a TLS
-certificate. To do so, replace the ``insecure = true`` field in the ``pyproject.toml``
-with a new field that reads the certificate:
+certificate. To do so, replace the ``insecure = true`` field in your Flower
+Configuration TOML file with a new field that reads the certificate:
 
 .. code-block:: toml
-    :caption: pyproject.toml
+    :caption: config.toml
     :emphasize-lines: 3,3
 
-    [tool.flwr.federations.local-deployment]
+    [superlink.local-deployment]
     address = "127.0.0.1:9093"
-    root-certificates = "./certificates/ca.crt"
+    root-certificates = "/absolute/path/to/certificates/ca.crt"
 
 Note that the path to the ``root-certificates`` is relative to the root of the project.
 Now, you can run the example by executing ``flwr run``:

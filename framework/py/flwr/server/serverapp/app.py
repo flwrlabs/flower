@@ -28,7 +28,6 @@ from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
 from flwr.common.args import add_args_flwr_app_common
 from flwr.common.config import (
-    get_flwr_dir,
     get_fused_config_from_dir,
     get_project_config,
     get_project_dir,
@@ -93,7 +92,6 @@ def flwr_serverapp() -> None:
             plugin_class=ServerAppExecPlugin,
             stub_class=ServerAppIoStub,
             appio_api_address=args.serverappio_api_address,
-            flwr_dir=args.flwr_dir,
             parent_pid=args.parent_pid,
             warn_run_once=args.run_once,
         )
@@ -110,7 +108,6 @@ def flwr_serverapp() -> None:
         serverappio_api_address=args.serverappio_api_address,
         log_queue=log_queue,
         token=args.token,
-        flwr_dir=args.flwr_dir,
         certificates=None,
         parent_pid=args.parent_pid,
     )
@@ -123,7 +120,6 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     serverappio_api_address: str,
     log_queue: Queue[str | None],
     token: str,
-    flwr_dir: str | None = None,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
 ) -> None:
@@ -133,7 +129,6 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         start_parent_process_monitor(parent_pid)
 
     # Initialize variables for exit handler
-    flwr_dir_ = get_flwr_dir(flwr_dir)
     log_uploader = None
     hash_run_id = None
     run = None
@@ -144,6 +139,10 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
+        # Set Grpc max retries to 1 to avoid blocking on exit
+        if grid:
+            grid._retry_invoker.max_tries = 1
+
         # Stop heartbeat sender
         if heartbeat_sender and heartbeat_sender.is_running:
             heartbeat_sender.stop()
@@ -154,10 +153,13 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
         # Update run status
         if run and run_status and grid:
-            run_status_proto = run_status_to_proto(run_status)
-            grid._stub.UpdateRunStatus(
-                UpdateRunStatusRequest(run_id=run.run_id, run_status=run_status_proto)
-            )
+            try:
+                req = UpdateRunStatusRequest(
+                    run_id=run.run_id, run_status=run_status_to_proto(run_status)
+                )
+                grid._stub.UpdateRunStatus(req)
+            except grpc.RpcError:
+                pass
 
         # Close the Grpc connection
         if grid:
@@ -192,7 +194,7 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
         hash_run_id = get_sha256_hash(run.run_id)
 
-        grid.set_run(run.run_id)
+        grid.set_run(run)
 
         # Start log uploader for this run
         log_uploader = start_log_uploader(
@@ -203,11 +205,11 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         )
 
         log(DEBUG, "[flwr-serverapp] Start FAB installation.")
-        install_from_fab(fab.content, flwr_dir=flwr_dir_, skip_prompt=True)
+        install_from_fab(fab.content, skip_prompt=True)
 
         fab_id, fab_version = get_fab_metadata(fab.content)
 
-        app_path = str(get_project_dir(fab_id, fab_version, fab.hash_str, flwr_dir_))
+        app_path = str(get_project_dir(fab_id, fab_version, fab.hash_str))
         config = get_project_config(app_path)
 
         # Obtain server app reference and the run config

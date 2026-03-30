@@ -5,14 +5,14 @@ on:
     branches:
       - main
     paths:
-      - 'intelligence/**/*'
-      - '.github/workflows/intelligence-*.yml'
+      - "intelligence/**/*"
+      - ".github/workflows/intelligence-*.yml"
   pull_request:
     branches:
       - main
     paths:
-      - 'intelligence/**/*'
-      - '.github/workflows/intelligence-*.yml'
+      - "intelligence/**/*"
+      - ".github/workflows/intelligence-*.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
@@ -29,14 +29,17 @@ jobs:
       - uses: actions/checkout@v5
       - name: Bootstrap
         uses: ./.github/actions/bootstrap
-      - name: Install dependencies (mandatory only)
+        with:
+          uv-skip: "false"
+          poetry-skip: "true"
+      - name: Install dependencies
         run: |
           cd dev
-          python -m poetry install --all-extras
+          uv sync --frozen
       - name: Check docs format
         run: |
           cd dev
-          docstrfmt --check ../intelligence/docs/source
+          uv run docstrfmt --check ../intelligence/docs/source
   build_ts_docs:
     runs-on: ubuntu-22.04
     name: Build TypeScript Docs
@@ -47,7 +50,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '22.14.0'
+          node-version: "22.14.0"
       - name: Install pnpm
         run: |
           npm install -g pnpm
@@ -69,6 +72,7 @@ jobs:
           path: intelligence/docs/source/ts-api-ref/
 
   build_swift_docs:
+    if: false
     runs-on: macos-14
     name: Build Swift Docs
     steps:
@@ -87,7 +91,11 @@ jobs:
         run: brew install sourcedocs
       - name: Build Swift docs
         run: |
-          sourcedocs generate --module-name FlowerIntelligence -- -scheme Flwr -destination 'platform=macOS'
+          (
+            mv FlowerIntelligenceExamples.xcodeproj FlowerIntelligenceExamples.xcodeproj.bak
+            trap 'mv FlowerIntelligenceExamples.xcodeproj.bak FlowerIntelligenceExamples.xcodeproj' EXIT
+            sourcedocs generate --module-name FlowerIntelligence -- -scheme flower -destination 'platform=macOS'
+          )
           mkdir -p intelligence/docs/source/swift-api-ref
           cp -r Documentation/Reference/* intelligence/docs/source/swift-api-ref/
           mv intelligence/docs/source/swift-api-ref/README.md intelligence/docs/source/swift-api-ref/index.md
@@ -113,8 +121,8 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: "temurin"
+          java-version: "17"
 
       - name: Build Kotlin docs
         run: |
@@ -128,47 +136,41 @@ jobs:
 
   build_and_deploy:
     runs-on: ubuntu-22.04
-    needs: [build_ts_docs, build_swift_docs, build_kt_docs]
+    needs: [build_ts_docs, build_kt_docs]
     name: Deploy Docs
     steps:
       - uses: actions/checkout@v5
-        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork }}
+        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
       - name: Bootstrap
-        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork }}
+        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         uses: ./.github/actions/bootstrap
       - name: Install pandoc
-        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork }}
+        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         run: sudo apt install pandoc
       - name: Install Flower dependencies (mandatory only)
-        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork }}
+        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         run: |
           cd framework
           python -m poetry install --extras "simulation"
       - name: Download TS docs
-        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork }}
+        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         uses: actions/download-artifact@v4
         with:
           name: ts-docs
           path: intelligence/docs/source/ts-api-ref/
-      - name: Download Swift docs
-        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork }}
-        uses: actions/download-artifact@v4
-        with:
-          name: swift-docs
-          path: intelligence/docs/source/swift-api-ref/
       - name: Download Kotlin docs
-        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork }}
+        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         uses: actions/download-artifact@v4
         with:
           name: kt-docs
           path: intelligence/docs/source/kt-api-ref/
       - name: Build final docs
-        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork }}
+        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         run: |
           cd intelligence/docs
           make html
       - name: Deploy docs
-        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork }}
+        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         env:
           AWS_DEFAULT_REGION: ${{ secrets.DOCS_AWS_DEFAULT_REGION }}
           AWS_ACCESS_KEY_ID: ${{ secrets.DOCS_AWS_ACCESS_KEY_ID }}

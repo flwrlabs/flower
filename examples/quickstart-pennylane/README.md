@@ -10,15 +10,18 @@ This tutorial demonstrates how to implement **Quantum Federated Learning** using
 
 ## Set up the project
 
-### Clone the project
+### Fetch the app
 
-Start by cloning the example project:
+Install Flower:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
-        && mv _tmp/examples/quickstart-pennylane . \
-        && rm -rf _tmp \
-        && cd quickstart-pennylane
+pip install flwr
+```
+
+Fetch the app:
+
+```shell
+flwr new @flwrlabs/quickstart-pennylane
 ```
 
 This will create a new directory called `quickstart-pennylane` with the following structure:
@@ -49,7 +52,7 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 ### Run with the Simulation Engine
 
 > [!TIP]
-> This example might run slower due to quantum circuit simulation. If your system has a GPU, you can use the `local-simulation-gpu` federation for better performance. Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more.
+> This example runs faster when the `ClientApp`s have access to a GPU. If your system has one, you can make use of it by configuring the `backend.client-resources` component in your Flower Configuration. Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
 ```bash
 flwr run .
@@ -59,13 +62,6 @@ You can also override some of the settings for your `ClientApp` and `ServerApp` 
 
 ```bash
 flwr run . --run-config "num-server-rounds=5 learning-rate=0.01"
-```
-
-Run the project in the `local-simulation-gpu` federation that gives CPU and GPU resources to each `ClientApp`. By default, at most 5x`ClientApp` will run in parallel in the available GPU. You can tweak the degree of parallelism by adjusting the settings of this federation in the `pyproject.toml`.
-
-```bash
-# Run with the `local-simulation-gpu` federation
-flwr run . local-simulation-gpu
 ```
 
 ### Run with the Deployment Engine

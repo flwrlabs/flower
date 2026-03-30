@@ -8,8 +8,8 @@ version = "1.0.0"
 description = "Federated Learning with PyTorch and Flower (Advanced Example)"
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]>=1.25.0",
-    "flwr-datasets[vision]>=0.5.0",
+    "flwr[simulation]>=1.27.0",
+    "flwr-datasets[vision]>=0.6.0",
     "torch>=2.8.0",
     "torchvision>=0.23.0",
     "wandb==0.17.8",
@@ -31,15 +31,3 @@ fraction-train = 0.25
 fraction-evaluate = 0.5
 local-epochs = 1
 server-device = "cpu"
-
-[tool.flwr.federations]
-default = "local-sim"
-
-[tool.flwr.federations.local-sim]
-options.num-supernodes = 50
-options.backend.client-resources.num-cpus = 2 # each ClientApp assumes to use 2CPUs
-options.backend.client-resources.num-gpus = 0.0 # ratio of VRAM a ClientApp has access to
-[tool.flwr.federations.local-sim-gpu]
-options.num-supernodes = 50
-options.backend.client-resources.num-cpus = 2
-options.backend.client-resources.num-gpus = 0.25

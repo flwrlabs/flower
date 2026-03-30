@@ -11,6 +11,7 @@ dependencies = [
     "flwr[simulation] @ {root:parent:parent:uri}",
     "fastai>=2.7.12,<3.0.0",
     "fastprogress==1.0.5",
+    "fastcore<1.12.2", # Remove this constraint once this issue is resolved. https://github.com/AnswerDotAI/fastcore/issues/751 
     "torch>=2.1.0,<3.0.0",
     "spacy==3.8.7",
     "numpy<2.0.0",

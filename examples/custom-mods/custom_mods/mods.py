@@ -5,10 +5,8 @@ import time
 from typing import cast
 
 import wandb
+from flwr.app import Context, Message, MessageType
 from flwr.client.typing import ClientAppCallable, Mod
-from flwr.common.constant import MessageType
-from flwr.common.context import Context
-from flwr.common.message import Message
 from torch.utils.tensorboard.writer import SummaryWriter
 
 

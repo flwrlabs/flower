@@ -656,16 +656,31 @@ With Flower running correctly, you can now follow the usual steps of using ``flw
 to create a new Flower app from a template, and ``flwr run`` to run your Flower app on
 the deployed SuperLink and SuperNode pods. Given that we deployed the OpenShift AI
 instance in the same namespace (``flower-openshift-demo``) as the SuperLink in the
-OpenShift cluster, the only change you need to make is to specify the SuperLink service
-name as the address in your ``pyproject.toml``:
+OpenShift cluster, the only change you need to make is to define a new SuperLink
+connection in the Flower Configuration file:
 
-.. code-block:: toml
+1. Run ``flwr config list`` to locate the Flower configuration file on your machine and
+   view available SuperLink connections.
 
-    # ... Existing code in pyproject.toml ...
+   .. code-block:: console
+       :emphasize-lines: 3
 
-    [tool.flwr.federations.remote]
-    address = "superlink-service:9093"  # use the service name created earlier
-    insecure = true
+         $ flwr config list
+
+         Flower Config file: /path/to/.flwr/config.toml
+         SuperLink connections:
+           supergrid
+           local (default)
+
+2. Open the Flower Configuration file (``config.toml``) and add a new SuperLink
+   connection at the end:
+
+   .. code-block:: toml
+       :caption: config.toml
+
+       [superlink.remote]
+       address = "superlink-service:9093"  # use the service name created earlier
+       insecure = true
 
 And finally, run your Flower app as usual with ``flwr run``:
 

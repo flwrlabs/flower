@@ -40,7 +40,8 @@ input[type='checkbox'] {
 }
 
 .toggle:checked + .lbl-toggle + .collapsible-content {
-  max-height: 100vh;
+  max-height: 45vh;
+  overflow-y: auto;
 }
 
 .toggle:checked + .lbl-toggle::before {
@@ -55,40 +56,39 @@ input[type='checkbox'] {
 .content-inner {
   padding-bottom: 1rem;
 }
+
+.content-inner ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.content-inner li a {
+  display: block;
+  padding: 0.5rem 1rem 0.5rem 2.2rem;
+  text-decoration: none;
+  color: inherit;
+}
 </style>
 
-<script>
-function checkPageExistence(versionName, current_language, pagename) {
-  var newUrl = `https://flower.ai/docs/framework/${versionName}/${current_language}/${pagename}.html`;
-  var fallbackUrl = `https://flower.ai/docs/framework/${versionName}/${current_language}/index.html#references`;
-
-  fetch(newUrl)
-    .then(response => {
-      if (response.ok) {
-        window.location.href = newUrl;
-      } else {
-        window.location.href = fallbackUrl;
-      }
-    })
-    .catch(error => {
-      console.error('Error:', error);
-      window.location.href = fallbackUrl;
-    });
-}
-</script>
-
-<div class="wrap-collabsible">
+<div class="wrap-collabsible"
+     data-flwr-versioning
+     data-docs-ui-metadata-url="{{ docs_ui_metadata_url }}"
+     data-current-version="{{ current_version.url }}"
+     data-current-version-label="{{ current_version.full_name }}"
+     data-current-language="{{ current_language }}"
+     data-pagename="{{ pagename }}"
+     data-docs-base-url="https://flower.ai/docs/framework">
   <input id="collapsible" class="toggle" type="checkbox">
   <label for="collapsible" class="lbl-toggle">Versions</label>
   <div class="collapsible-content">
     <div class="content-inner">
-      <ul>
+      <ul data-flwr-version-list>
         {%- for item in versions %}
         <li>
-          <a href="javascript:void(0);"
-             onclick="checkPageExistence('{{ item.name }}', '{{ current_language }}', '{{ pagename }}')"
-             style="text-decoration:none">
-             {{ item.name }}
+          <a href="https://flower.ai/docs/framework/{{ item.url|default(item.name) }}/{{ current_language }}/{{ pagename }}.html"
+             data-version-url="{{ item.url|default(item.name) }}">
+             {{ item.name|default(item.url) }}
           </a>
         </li>
         {%- endfor %}

@@ -26,14 +26,9 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.constant import HEARTBEAT_CALL_TIMEOUT, HEARTBEAT_DEFAULT_INTERVAL
 from flwr.common.grpc import create_channel, on_channel_state_change
-from flwr.common.inflatable_protobuf_utils import (
-    make_confirm_message_received_fn_protobuf,
-    make_pull_object_fn_protobuf,
-    make_push_object_fn_protobuf,
-)
 from flwr.common.logger import log
 from flwr.common.message import Message, remove_content_from_message
-from flwr.common.retry_invoker import RetryInvoker, _wrap_stub
+from flwr.common.retry_invoker import RetryInvoker, wrap_stub
 from flwr.common.serde import (
     fab_from_proto,
     message_from_proto,
@@ -62,6 +57,11 @@ from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.supercore.heartbeat import HeartbeatSender
+from flwr.supercore.inflatable.inflatable_protobuf_utils import (
+    make_confirm_message_received_fn_protobuf,
+    make_pull_object_fn_protobuf,
+    make_push_object_fn_protobuf,
+)
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 
 from .grpc_adapter import GrpcAdapter
@@ -136,7 +136,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
     confirm_message_received : Callable[[str], None]
     """
     if isinstance(root_certificates, str):
-        root_certificates = Path(root_certificates).read_bytes()
+        root_certificates = Path(root_certificates).expanduser().read_bytes()
 
     # Automatic node auth: generate keys if user didn't provide any
     self_registered = False
@@ -165,7 +165,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
     node: Node | None = None
 
     # Wrap stub
-    _wrap_stub(stub, retry_invoker)
+    wrap_stub(stub, retry_invoker)
     ###########################################################################
     # SuperNode functions
     ###########################################################################

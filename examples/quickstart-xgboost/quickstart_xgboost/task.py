@@ -1,5 +1,6 @@
 """quickstart_xgboost: A Flower / XGBoost app."""
 
+import numpy as np
 import xgboost as xgb
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner
@@ -19,10 +20,10 @@ def train_test_split(partition, test_fraction, seed):
 
 def transform_dataset_to_dmatrix(data):
     """Transform dataset to DMatrix format for xgboost."""
-    x = data["inputs"]
-    y = data["label"]
-    new_data = xgb.DMatrix(x, label=y)
-    return new_data
+    batch = data[:]
+    x = np.asarray(batch["inputs"], dtype=np.float32)
+    y = np.asarray(batch["label"], dtype=np.float32)
+    return xgb.DMatrix(x, label=y)
 
 
 fds = None  # Cache FederatedDataset

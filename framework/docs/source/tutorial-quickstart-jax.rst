@@ -15,9 +15,10 @@ create a virtual environment and run everything within a :doc:`virtualenv
 <contributor-how-to-set-up-a-virtual-env>`.
 
 Let's use ``flwr new`` to create a complete Flower+JAX project. It will generate all the
-files needed to run, by default with the Flower Simulation Engine, a federation of 50
-nodes using |fedavg|_. The MNIST dataset will be partitioned using |flowerdatasets|_'s
-|iidpartitioner|_.
+files needed to run a federation of 50 nodes using |fedavg|_. By default, the generated
+app uses a local simulation profile that ``flwr run`` submits to a managed local
+SuperLink, which then executes the run with the Flower Simulation Runtime. The MNIST
+dataset will be partitioned using |flowerdatasets|_'s |iidpartitioner|_.
 
 Now that we have a rough idea of what this example is about, let's get started. First,
 install Flower in your new environment:
@@ -25,7 +26,7 @@ install Flower in your new environment:
 .. code-block:: shell
 
     # In a new Python environment
-    $ pip install flwr
+    $ pip install flwr[simulation]
 
 Then, run the command below:
 
@@ -58,30 +59,21 @@ To run the project, do:
 
 .. code-block:: shell
 
-    # Run with default arguments
-    $ flwr run .
+    # Run with default arguments and stream logs
+    $ flwr run . --stream
 
-With default arguments you will see an output like this one:
+Plain ``flwr run .`` submits the run, prints the run ID, and returns without streaming
+logs. For the full local workflow, see :doc:`how-to-run-flower-locally`.
+
+With default arguments you will see streamed output like this:
 
 .. code-block:: shell
 
-    Loading project configuration...
-    Success
+    Successfully built flwrlabs.quickstart-jax.1-0-0.014c8eb3.fab
+    Starting local SuperLink on 127.0.0.1:39093...
+    Successfully started run 1859953118041441032
     INFO :      Starting FedAvg strategy:
     INFO :          ├── Number of rounds: 5
-    INFO :          ├── ArrayRecord (0.41 MB)
-    INFO :          ├── ConfigRecord (train): {'lr': 0.1}
-    INFO :          ├── ConfigRecord (evaluate): (empty!)
-    INFO :          ├──> Sampling:
-    INFO :          │       ├──Fraction: train (0.40) | evaluate ( 0.40)
-    INFO :          │       ├──Minimum nodes: train (2) | evaluate (2)
-    INFO :          │       └──Minimum available nodes: 2
-    INFO :          └──> Keys in records:
-    INFO :                  ├── Weighted by: 'num-examples'
-    INFO :                  ├── ArrayRecord key: 'arrays'
-    INFO :                  └── ConfigRecord key: 'config'
-    INFO :
-    INFO :
     INFO :      [ROUND 1/5]
     INFO :      configure_train: Sampled 20 nodes (out of 50)
     INFO :      aggregate_train: Received 20 results and 0 failures
@@ -89,64 +81,14 @@ With default arguments you will see an output like this one:
     INFO :      configure_evaluate: Sampled 20 nodes (out of 50)
     INFO :      aggregate_evaluate: Received 20 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'eval_loss': 1.3394, 'eval_acc': 0.4984}
-    INFO :
     INFO :      [ROUND 2/5]
-    INFO :      configure_train: Sampled 20 nodes (out of 50)
-    INFO :      aggregate_train: Received 20 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'train_loss': 1.4135, 'train_acc': 0.5531}
-    INFO :      configure_evaluate: Sampled 20 nodes (out of 50)
-    INFO :      aggregate_evaluate: Received 20 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'eval_loss': 1.1782, 'eval_acc': 0.6906}
-    INFO :
-    INFO :      [ROUND 3/5]
-    INFO :      configure_train: Sampled 20 nodes (out of 50)
-    INFO :      aggregate_train: Received 20 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'train_loss': 0.9190, 'train_acc': 0.7186}
-    INFO :      configure_evaluate: Sampled 20 nodes (out of 50)
-    INFO :      aggregate_evaluate: Received 20 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'eval_loss': 0.7702, 'eval_acc': 0.8094}
-    INFO :
-    INFO :      [ROUND 4/5]
-    INFO :      configure_train: Sampled 20 nodes (out of 50)
-    INFO :      aggregate_train: Received 20 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'train_loss': 0.5969, 'train_acc': 0.8295}
-    INFO :      configure_evaluate: Sampled 20 nodes (out of 50)
-    INFO :      aggregate_evaluate: Received 20 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'eval_loss': 0.3409, 'eval_acc': 0.916}
-    INFO :
+    INFO :      ...
     INFO :      [ROUND 5/5]
-    INFO :      configure_train: Sampled 20 nodes (out of 50)
-    INFO :      aggregate_train: Received 20 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'train_loss': 0.3680, 'train_acc': 0.8902}
-    INFO :      configure_evaluate: Sampled 20 nodes (out of 50)
-    INFO :      aggregate_evaluate: Received 20 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'eval_loss': 0.2366, 'eval_acc': 0.9359}
-    INFO :
+    INFO :      ...
     INFO :      Strategy execution finished in 60.58s
-    INFO :
     INFO :      Final results:
-    INFO :
-    INFO :          Global Arrays:
-    INFO :                  ArrayRecord (0.412 MB)
-    INFO :
-    INFO :          Aggregated ClientApp-side Train Metrics:
-    INFO :          { 1: {'train_acc': '2.8214e-01', 'train_loss': '2.1116e+00'},
-    INFO :            2: {'train_acc': '5.5307e-01', 'train_loss': '1.4135e+00'},
-    INFO :            3: {'train_acc': '7.1858e-01', 'train_loss': '9.1897e-01'},
-    INFO :            4: {'train_acc': '8.2946e-01', 'train_loss': '5.9692e-01'},
-    INFO :            5: {'train_acc': '8.9023e-01', 'train_loss': '3.6800e-01'}}
-    INFO :
-    INFO :          Aggregated ClientApp-side Evaluate Metrics:
-    INFO :          { 1: {'eval_acc': '4.9844e-01', 'eval_loss': '1.3394e+00'},
-    INFO :            2: {'eval_acc': '6.9062e-01', 'eval_loss': '1.1782e+00'},
-    INFO :            3: {'eval_acc': '8.0938e-01', 'eval_loss': '7.7016e-01'},
-    INFO :            4: {'eval_acc': '9.1602e-01', 'eval_loss': '3.4092e-01'},
-    INFO :            5: {'eval_acc': '9.3594e-01', 'eval_loss': '2.3663e-01'}}
-    INFO :
     INFO :          ServerApp-side Evaluate Metrics:
     INFO :          {}
-    INFO :
-
     Saving final model to disk...
 
 You can also override the parameters defined in the ``[tool.flwr.app.config]`` section
@@ -467,6 +409,11 @@ using ``np.savez()`` as shown above.
 Congratulations! You've successfully built and run your first federated learning system
 for JAX with Flower!
 
+.. tip::
+
+    Check the :doc:`how-to-run-simulations` documentation to learn more about how to
+    configure and run Flower simulations.
+
 .. note::
 
     Check the source code of the extended version of this tutorial in
@@ -490,7 +437,7 @@ for JAX with Flower!
 
 .. |quickstart_jax_link| replace:: ``examples/quickstart-jax``
 
-.. _quickstart_jax_link: https://github.com/adap/flower/tree/main/examples/quickstart-jax
+.. _quickstart_jax_link: https://github.com/flwrlabs/flower/tree/main/examples/quickstart-jax
 
 .. |message_link| replace:: ``Message``
 

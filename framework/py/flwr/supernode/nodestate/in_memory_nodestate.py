@@ -21,14 +21,14 @@ from threading import Lock, RLock
 
 from flwr.common import Context, Error, Message, now
 from flwr.common.constant import ErrorCode
-from flwr.common.inflatable import (
+from flwr.common.typing import Run
+from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS
+from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
+from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
     no_object_id_recompute,
 )
-from flwr.common.typing import Run
-from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS
-from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.object_store import ObjectStore
 
 from .nodestate import NodeState

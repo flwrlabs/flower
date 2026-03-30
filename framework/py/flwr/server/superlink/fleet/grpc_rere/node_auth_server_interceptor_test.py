@@ -25,7 +25,7 @@ from unittest.mock import patch
 import grpc
 from parameterized import parameterized
 
-from flwr.common import ConfigRecord, now
+from flwr.common import now
 from flwr.common.constant import (
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     NOOP_ACCOUNT_NAME,
@@ -69,7 +69,7 @@ from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=
 from flwr.server.app import _run_fleet_api_grpc_rere
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_res_message
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
 from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import (
@@ -255,7 +255,7 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
     def _create_dummy_run(self, running: bool = True) -> int:
         """Create a dummy run in linkstate and return the run_id."""
         run_id = self.state.create_run(
-            "", "", "", {}, NOOP_FEDERATION, ConfigRecord(), ""
+            "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
         )
         if running:
             self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))

@@ -33,7 +33,7 @@ class DiskFfs(Ffs):  # pylint: disable=R0904
         base_dir : str
             The base directory to store the objects.
         """
-        self.base_dir = Path(base_dir)
+        self.base_dir = Path(base_dir).expanduser()
 
     def put(self, content: bytes, meta: dict[str, str]) -> str:
         """Store bytes and metadata and return key (hash of content).

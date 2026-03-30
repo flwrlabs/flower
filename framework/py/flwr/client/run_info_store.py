@@ -18,13 +18,14 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from flwr.app.user_config import UserConfig
 from flwr.common import Context, RecordDict
 from flwr.common.config import (
     get_fused_config,
     get_fused_config_from_dir,
     get_fused_config_from_fab,
 )
-from flwr.common.typing import Fab, Run, UserConfig
+from flwr.common.typing import Fab, Run
 
 
 @dataclass()
@@ -52,7 +53,6 @@ class DeprecatedRunInfoStore:
         self,
         run_id: int,
         run: Run | None = None,
-        flwr_path: Path | None = None,
         app_dir: str | None = None,
         fab: Fab | None = None,
     ) -> None:
@@ -76,7 +76,7 @@ class DeprecatedRunInfoStore:
                         initial_run_config = get_fused_config_from_fab(fab.content, run)
                     else:
                         # Load pyproject.toml from installed FAB and fuse
-                        initial_run_config = get_fused_config(run, flwr_path)
+                        initial_run_config = get_fused_config(run)
                 else:
                     initial_run_config = {}
             self.run_infos[run_id] = RunInfo(

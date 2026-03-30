@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "On-device Federated Finetuning for Speech Classification"
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]>=1.25.0",
+    "flwr[simulation]>=1.27.0",
     "flwr-datasets[audio]>=0.5.0",
     "transformers>=4.53.0",
     "torch==2.8.0",
@@ -33,24 +33,3 @@ compile-model = false
 disable-tqdm = true
 central-eval = false
 remove-cols = "file,audio,label,is_unknown,speaker_id,utterance_id"
-
-[tool.flwr.federations]
-default = "local-sim"
-
-
-[tool.flwr.federations.local-sim]
-options.num-supernodes = 422 # we are grouping 2112 speakers into groups of 5
-options.backend.client-resources.num-cpus = 4
-options.backend.client-resources.num-gpus = 0.0
-options.backend.init-args.log-to-driver = false # set to true to enable all logs from simulation engine
-
-[tool.flwr.federations.local-sim-gpu]
-options.num-supernodes = 422 # we are grouping 2112 speakers into groups of 5
-options.backend.client-resources.num-cpus = 2
-options.backend.client-resources.num-gpus = 0.2
-options.backend.init-args.log-to-driver = false # set to true to enable all logs from simulation engine
-
-
-[tool.flwr.federations.remote]
-address = '127.0.0.1:9093' # IP:9093 of your superlink (assumed localhost superlink)
-insecure = true # Check the documentation to setup with SSL

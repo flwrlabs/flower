@@ -15,7 +15,6 @@
 """Public Flower App APIs."""
 
 
-from flwr.common.constant import MessageType
 from flwr.common.context import Context
 from flwr.common.message import Message
 from flwr.common.record import (
@@ -27,7 +26,9 @@ from flwr.common.record import (
 )
 
 from .error import Error
+from .message_type import MessageType
 from .metadata import Metadata
+from .user_config import UserConfig, UserConfigValue
 
 __all__ = [
     "Array",
@@ -40,4 +41,6 @@ __all__ = [
     "Metadata",
     "MetricRecord",
     "RecordDict",
+    "UserConfig",
+    "UserConfigValue",
 ]

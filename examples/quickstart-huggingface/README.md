@@ -54,18 +54,27 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 ### Run with the Simulation Engine
 
 > [!TIP]
-> This example runs faster when the `ClientApp`s have access to a GPU. If your system has one, you can make use of it by configuring the `backend.client-resources` component in `pyproject.toml`. If you want to try running the example with GPU right away, use the `local-simulation-gpu` federation as shown below. Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
+> This example runs faster when the `ClientApp`s have access to a GPU. If your system has one, you can make use of it by configuring the `backend.client-resources` component in your Flower Configuration. Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
 ```bash
 # Run with the default federation (CPU only)
 flwr run .
 ```
 
-Run the project in the `local-simulation-gpu` federation that gives CPU and GPU resources to each `ClientApp`. By default, at most 4x`ClientApp` (using ~1 GB of VRAM each) will run in parallel in each available GPU. Note you can adjust the degree of paralellism but modifying the `client-resources` specification.
+You can add a new connection in your Flower Configuration (find if via `flwr config list`):
+
+```TOML
+[superlink.local-gpu]
+options.num-supernodes = 100
+options.backend.client-resources.num-cpus = 4 # each ClientApp assumes to use 4CPUs
+options.backend.client-resources.num-gpus = 0.25 # at most 4 ClientApp will run in a given GPU (lower it to increase parallelism)
+```
+
+And then run the app
 
 ```bash
-# Run with the `local-simulation-gpu` federation
-flwr run . local-simulation-gpu
+# Run with the `local-gpu` settings
+flwr run . local-gpu
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example

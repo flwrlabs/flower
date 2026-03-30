@@ -52,7 +52,6 @@ To run the website using the `Dockerfile`, follow these steps:
 
 - **Approach:** Client component that sends questions to an API route.
 - **Functionality:**
-
   - Uses local state to maintain the chat log.
   - Calls the `/api/chat` endpoint which internally uses shared history (via `lib/chat.ts`) and the @flwr/flwr client.
   - Renders messages with Markdown formatting.
@@ -115,7 +114,6 @@ npm run dev
 If you encounter a CORS error while running the application locally, it means the browser is blocking requests to a different origin. To resolve this:
 
 1. **Use a Proxy**:
-
    - Configure a proxy in your `next.config.ts` to forward API requests to the correct origin:
 
    ```ts
@@ -136,5 +134,4 @@ If you encounter a CORS error while running the application locally, it means th
    ```
 
 2. **Temporary Workaround**:
-
    - Use a browser extension like "CORS Unblock" for testing purposes (not recommended for production).

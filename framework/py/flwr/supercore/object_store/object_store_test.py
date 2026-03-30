@@ -18,16 +18,22 @@
 import tempfile
 import unittest
 from abc import abstractmethod
+from typing import cast
 
 from parameterized import parameterized
+from sqlalchemy import Engine, inspect
 
-from flwr.common.inflatable import get_object_id, get_object_tree, iterate_object_tree
-from flwr.common.inflatable_test import CustomDataClass
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.supercore.inflatable.inflatable_object import (
+    get_object_id,
+    get_object_tree,
+    iterate_object_tree,
+)
+from flwr.supercore.inflatable.inflatable_object_test import CustomDataClass
 
 from .in_memory_object_store import InMemoryObjectStore
 from .object_store import NoObjectInStoreError, ObjectStore
-from .sqlite_object_store import SqliteObjectStore
+from .sql_object_store import SqlObjectStore
 
 
 class ObjectStoreTest(unittest.TestCase):
@@ -362,7 +368,7 @@ def _create_object_hierarchy() -> tuple[list[CustomDataClass], dict[str, bytes]]
     return objects, id_to_content
 
 
-class InMemoryStateTest(ObjectStoreTest):
+class InMemoryObjectStoreTest(ObjectStoreTest):
     """Test InMemoryObjectStore implementation."""
 
     __test__ = True
@@ -372,20 +378,28 @@ class InMemoryStateTest(ObjectStoreTest):
         return InMemoryObjectStore()
 
 
-class SqliteInMemoryObjectStoreTest(ObjectStoreTest):
-    """Test SqliteObjectStore implementation with in-memory database."""
+class SqlInMemoryObjectStoreTest(ObjectStoreTest):
+    """Test SqlObjectStore implementation with in-memory database."""
 
     __test__ = True
 
-    def object_store_factory(self) -> ObjectStore:
-        """Return SqliteObjectStore."""
-        store = SqliteObjectStore(":memory:")
+    def object_store_factory(self) -> SqlObjectStore:
+        """Return SqlObjectStore."""
+        store = SqlObjectStore(":memory:")
         store.initialize()
         return store
 
+    def test_in_memory_does_not_create_alembic_version(self) -> None:
+        """Ensure in-memory DB uses create_all without Alembic versioning."""
+        store = self.object_store_factory()
+        table_names = inspect(
+            cast(Engine, store._engine)  # pylint: disable=W0212
+        ).get_table_names()
+        self.assertNotIn("alembic_version", table_names)
 
-class SqliteFileBasedObjectStoreTest(ObjectStoreTest):
-    """Test SqliteObjectStore implementation with file-based database."""
+
+class SqlFileBasedObjectStoreTest(ObjectStoreTest):
+    """Test SqlObjectStore implementation with file-based database."""
 
     __test__ = True
 
@@ -399,8 +413,16 @@ class SqliteFileBasedObjectStoreTest(ObjectStoreTest):
         super().tearDown()
         self.temp_file.close()
 
-    def object_store_factory(self) -> ObjectStore:
-        """Return SqliteObjectStore."""
-        store = SqliteObjectStore(self.temp_file.name)
+    def object_store_factory(self) -> SqlObjectStore:
+        """Return SqlObjectStore."""
+        store = SqlObjectStore(self.temp_file.name)
         store.initialize()
         return store
+
+    def test_file_db_creates_alembic_version(self) -> None:
+        """Ensure file-based DBs run Alembic migrations."""
+        store = self.object_store_factory()
+        table_names = inspect(
+            cast(Engine, store._engine)  # pylint: disable=W0212
+        ).get_table_names()
+        self.assertIn("alembic_version", table_names)

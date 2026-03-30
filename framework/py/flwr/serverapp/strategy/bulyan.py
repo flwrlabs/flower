@@ -185,7 +185,13 @@ class Bulyan(FedAvg):
 
         # Convert to ArrayRecord
         arrays = ArrayRecord(
-            dict(zip(array_keys, map(Array, aggregated_ndarrays), strict=True))
+            dict(
+                zip(
+                    array_keys,
+                    (Array(np.asarray(arr)) for arr in aggregated_ndarrays),
+                    strict=True,
+                )
+            )
         )
 
         # Aggregate MetricRecords

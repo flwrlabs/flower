@@ -67,7 +67,7 @@ Save this file as ``account-auth-config.yaml``. Then pass it to the SuperLink vi
 
 .. code-block:: bash
 
-    ➜ flower-superlink \
+    $ flower-superlink \
         --account-auth-config=account-auth-config.yaml
         <other flags>
 
@@ -90,42 +90,46 @@ Save this file as ``account-auth-config.yaml``. Then pass it to the SuperLink vi
 
 Once a SuperLink with account authentication and authorization is up and running, an
 account can interface with it after installing the ``flwr`` PyPI package via the Flower
-CLI. Then, ensure that the ``enable-account-auth`` field is set to ``true`` in the
-federation section in the ``pyproject.toml`` of the Flower app you want to run:
+CLI. Configure the SuperLink connection in your Flower Configuration file (typically
+located at ``$HOME/.flwr/config.toml``):
 
 .. code-block:: toml
+    :caption: config.toml
 
-    [tool.flwr.federations]
-    default = "my-federation"
+    [superlink]
+    default = "my-prod-superlink"  # Set the default connection configuration
 
-    [tool.flwr.federations.my-federation]
-    address = "<SUPERLINK-ADDRESS>:9093"   # Address of the SuperLink Control API
-    root-certificates = "<PATH/TO/ca.crt>" # TLS certificate set for the SuperLink. Required for self-signed certificates.
-    enable-account-auth = true                # Enables the account auth mechanism on the `flwr` CLI side
+    [superlink.my-prod-superlink]
+    address = "<SUPERLINK-ADDRESS>:<CONTROL-API-PORT>"   # Address of the SuperLink Control API
+    root-certificate = "<PATH/TO/ca.crt>" # TLS certificate set for the SuperLink. Required for self-signed certificates.
 
 .. note::
 
-    Account authentication and authorization is only supported with TLS connections.
+    - Account authentication and authorization is only supported with TLS connections.
+    - Setting the default connection is optional. If you don't set your SuperLink as
+      default, you can specify the connection name explicitly in each command, for
+      example: ``flwr login my-prod-superlink``.
 
-Now, you need to login first before other CLI commands can be executed. Upon executing
-``flwr login``, a URL will be returned by the authentication plugin in the SuperLink.
-Click on it and authenticate directly against the OIDC provider.
+Learn more about the Flower Configuration file in the `Flower Configuration
+<ref-flower-configuration.html>`_ reference.
 
-.. code-block:: bash
+You need to login first before other CLI commands can be executed. Upon executing ``flwr
+login``, a URL will be returned by the authentication plugin in the SuperLink. Click on
+it and authenticate directly against the OIDC provider.
 
-    flwr login [APP] [FEDERATION]
-    Loading project configuration...
-    Success
-    Creating a new `.gitignore` with `.credentials` entry...
-    Please login with your account credentials here: https://account.flower.ai/realms/flower/device?user_code=...
+.. code-block:: console
+
+    $ flwr login
+    A browser window has been opened for you to log into your Flower account.
+    If it did not open automatically, use this URL:
+    https://account.flower.blue/realms/flower/device?user_code=...
     # [... follows URL and logs in ... in the meantime the CLI will wait ...]
     ✅ Login successful.
 
 Once the login is successful, the credentials returned by the OIDC provider via the
-SuperLink will be saved to the app's directory under
-``.flwr/.credentials/<federation-name>.json``. The tokens stored in this file will be
-sent transparently with each subsequent ``flwr`` CLI request to the SuperLink, and it
-will relay them to OIDC provider to perform the authentication checks.
+SuperLink will be stored locally. The tokens will be sent transparently with each
+subsequent ``flwr`` CLI request to the SuperLink, and it will relay them to the OIDC
+provider to perform the authentication checks.
 
 **************************************
  Run authorized ``flwr`` CLI commands
@@ -135,21 +139,18 @@ With the above steps completed, you can now run ``flwr`` CLI commands against a
 SuperLink setup with account authentication and authorization. For example, as an
 authorized account, you can run the ``flwr run`` command to start a Flower app:
 
-.. code-block:: bash
+.. code-block:: console
 
-    ➜ flwr run
-    Loading project configuration...
-    Success
+    $ flwr run
     🎊 Successfully built flwrlabs.myawesomeapp.1-0-0.014c8eb3.fab
     🎊 Successfully started run 1859953118041441032
 
 If the account does not have the necessary permissions to run the command, an error will
 be returned:
 
-.. code-block:: bash
+.. code-block:: console
 
-    ➜ flwr run
-    Loading project configuration...
-    Success
-    ❌ Permission denied.
-    Account not authorized
+    $ flwr run
+    ╭─ Error ──────────────────────────────────────────────────────────────────────────╮
+    │ Authentication failed. Please run `flwr login` to authenticate and try again.    │
+    ╰──────────────────────────────────────────────────────────────────────────────────╯

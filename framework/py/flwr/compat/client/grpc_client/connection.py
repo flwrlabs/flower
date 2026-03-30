@@ -25,6 +25,7 @@ from typing import cast
 
 from cryptography.hazmat.primitives.asymmetric import ec
 
+from flwr.app.message_type import MessageType
 from flwr.common import (
     DEFAULT_TTL,
     GRPC_MAX_MESSAGE_LENGTH,
@@ -36,7 +37,7 @@ from flwr.common import (
 )
 from flwr.common import recorddict_compat as compat
 from flwr.common import serde
-from flwr.common.constant import MessageType, MessageTypeLegacy
+from flwr.common.constant import MessageTypeLegacy
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
 from flwr.common.message import make_message

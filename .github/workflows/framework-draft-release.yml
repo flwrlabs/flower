@@ -3,14 +3,14 @@ name: Framework Draft Release
 on:
   push:
     tags:
-      - "v*.*.*"
+      - "framework-*.*.*"
 
 env:
   ARTIFACT_BUCKET: artifact.flower.ai
 
 jobs:
   publish:
-    if: ${{ github.repository == 'adap/flower' }}
+    if: ${{ github.repository == 'flwrlabs/flower' }}
     name: Publish draft
     runs-on: ubuntu-22.04
     steps:
@@ -27,7 +27,8 @@ jobs:
           wait-interval: 10
       - name: Download wheel
         run: |
-          tag_name=$(echo "${GITHUB_REF_NAME}" | cut -c2-)
+          # Strip "framework-" prefix from tag (e.g., `framework-1.27.0` -> `1.27.0`)
+          tag_name="${GITHUB_REF_NAME#framework-}"
           echo "TAG_NAME=$tag_name" >> "$GITHUB_ENV"
 
           wheel_name="flwr-${tag_name}-py3-none-any.whl"
@@ -36,11 +37,15 @@ jobs:
           tar_name="flwr-${tag_name}.tar.gz"
           echo "TAR_NAME=$tar_name" >> "$GITHUB_ENV"
 
-          wheel_url="https://${{ env.ARTIFACT_BUCKET }}/py/main/${GITHUB_SHA::7}/${wheel_name}"
-          tar_url="https://${{ env.ARTIFACT_BUCKET }}/py/main/${GITHUB_SHA::7}/${tar_name}"
+          # Derive release branch from tag (e.g., `1.27.0` -> `release/framework-1.27`)
+          release_series="${tag_name%.*}"
+          branch="release/framework-${release_series}"
 
-          curl $wheel_url --output $wheel_name
-          curl $tar_url --output $tar_name
+          wheel_url="https://${{ env.ARTIFACT_BUCKET }}/py/${branch}/${GITHUB_SHA::7}/${wheel_name}"
+          tar_url="https://${{ env.ARTIFACT_BUCKET }}/py/${branch}/${GITHUB_SHA::7}/${tar_name}"
+
+          curl --fail --location --silent --show-error "$wheel_url" --output "$wheel_name"
+          curl --fail --location --silent --show-error "$tar_url" --output "$tar_name"
       - name: Upload wheel
         env:
           AWS_DEFAULT_REGION: ${{ secrets.ARTIFACT_AWS_DEFAULT_REGION }}

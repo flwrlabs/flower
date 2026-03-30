@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-mlx"
-version = "1.0.0"
+version = "1.0.2"
 description = "Federated Learning with MLX and Flower (Quickstart Example)"
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]>=1.25.0",
-    "flwr-datasets[vision]>=0.5.0",
+    "flwr[simulation]>=1.27.0",
+    "flwr-datasets[vision]>=0.6.0",
     "mlx==0.29.4",
 ]
 
@@ -32,9 +32,3 @@ local-epochs = 1
 hidden-dim = 32
 batch-size = 256
 learning-rate = 0.1
-
-[tool.flwr.federations]
-default = "local-simulation"
-
-[tool.flwr.federations.local-simulation]
-options.num-supernodes = 10

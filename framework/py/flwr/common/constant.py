@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import os
+from typing import Final
 
 TRANSPORT_TYPE_GRPC_RERE = "grpc-rere"
 TRANSPORT_TYPE_GRPC_ADAPTER = "grpc-adapter"
@@ -78,17 +79,42 @@ FAB_HASH_TRUNCATION = 8
 FAB_MAX_SIZE = 10 * 1024 * 1024  # 10 MB
 FLWR_DIR = ".flwr"  # The default Flower directory: ~/.flwr/
 FLWR_HOME = "FLWR_HOME"  # If set, override the default Flower directory
+# FAB include and exclude keys in pyproject.toml
+FAB_INCLUDE_KEY = "fab-include"
+FAB_EXCLUDE_KEY = "fab-exclude"
 # FAB file include patterns (gitignore-style patterns)
 FAB_INCLUDE_PATTERNS = (
     "**/*.py",
     "**/*.toml",
     "**/*.md",
+    "**/*.yaml",
+    "**/*.yml",
+    "**/*.json",
+    "**/*.jsonl",
+    "/LICENSE",
 )
 # FAB file exclude patterns (gitignore-style patterns)
 FAB_EXCLUDE_PATTERNS = (
     f"{FLWR_DIR}/**",  # Exclude the .flwr directory
     "**/__pycache__/**",
     FAB_CONFIG_FILE,  # Exclude the original pyproject.toml
+    "**/*_test.py",
+    "**/test_*.py",
+    # Distribution / packaging
+    "build/**",
+    "eggs/**",
+    ".eggs/**",
+    "lib/**",
+    "lib64/**",
+    "parts/**",
+    "*.egg",
+    # Environments
+    ".venv/**",
+    "env/**",
+    "venv/**",
+    "ENV/**",
+    "env.bak/**",
+    "venv.bak/**",
 )
 
 # Constant for SuperLink
@@ -146,8 +172,6 @@ GRPC_RETRY_MAX_DELAY = 20  # Maximum delay duration between two consecutive retr
 GC_THRESHOLD = 200_000_000  # 200 MB
 
 # Constants for Inflatable
-HEAD_BODY_DIVIDER = b"\x00"
-HEAD_VALUE_DIVIDER = " "
 FLWR_PRIVATE_MAX_ARRAY_CHUNK_SIZE = int(
     os.getenv("FLWR_PRIVATE_MAX_ARRAY_CHUNK_SIZE", "5242880")
 )  # 5 MB
@@ -158,19 +182,6 @@ INT64_MAX_VALUE = 9223372036854775807  # (1 << 63) - 1
 # Constants for `flwr-serverapp` and `flwr-clientapp` CLI commands
 FLWR_APP_TOKEN_LENGTH = 128  # Length of the token used
 
-# Constants for object pushing and pulling
-FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PUSHES = int(
-    os.getenv("FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PUSHES", "2")
-)  # Default maximum number of concurrent pushes
-FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PULLS = int(
-    os.getenv("FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PULLS", "2")
-)  # Default maximum number of concurrent pulls
-PULL_MAX_TIME = 7200  # Default maximum time to wait for pulling objects
-PULL_MAX_TRIES_PER_OBJECT = 500  # Default maximum number of tries to pull an object
-PULL_INITIAL_BACKOFF = 1  # Initial backoff time for pulling objects
-PULL_BACKOFF_CAP = 10  # Maximum backoff time for pulling objects
-
-
 # ControlServicer constants
 RUN_ID_NOT_FOUND_MESSAGE = "Run ID not found"
 NO_ACCOUNT_AUTH_MESSAGE = "ControlServicer initialized without account authentication"
@@ -180,19 +191,7 @@ SUPERNODE_NOT_CREATED_FROM_CLI_MESSAGE = "Invalid SuperNode credentials"
 PUBLIC_KEY_ALREADY_IN_USE_MESSAGE = "Public key already in use"
 PUBLIC_KEY_NOT_VALID = "The provided public key is not valid"
 NODE_NOT_FOUND_MESSAGE = "Node ID not found for account"
-
-
-class MessageType:
-    """Message type."""
-
-    TRAIN = "train"
-    EVALUATE = "evaluate"
-    QUERY = "query"
-    SYSTEM = "system"
-
-    def __new__(cls) -> MessageType:
-        """Prevent instantiation."""
-        raise TypeError(f"{cls.__name__} cannot be instantiated.")
+FEDERATION_NOT_FOUND_MESSAGE = "Federation '%s' does not exist"
 
 
 class MessageTypeLegacy:
@@ -262,8 +261,8 @@ class SubStatus:
 class CliOutputFormat:
     """Define output format for `flwr` CLI commands."""
 
-    DEFAULT = "default"
-    JSON = "json"
+    DEFAULT: Final = "default"
+    JSON: Final = "json"
 
     def __new__(cls) -> CliOutputFormat:
         """Prevent instantiation."""
@@ -306,7 +305,7 @@ class ExecPluginType:
 
     CLIENT_APP = "clientapp"
     SERVER_APP = "serverapp"
-    SIMULATION = "simulation"
+    SIMULATION = "simulation"  # Deprecated
 
     def __new__(cls) -> ExecPluginType:
         """Prevent instantiation."""
@@ -321,4 +320,4 @@ class ExecPluginType:
 
 # Constants for No-op auth plugins
 NOOP_FLWR_AID = "<id:none>"
-NOOP_ACCOUNT_NAME = "<name:none>"
+NOOP_ACCOUNT_NAME = "none"

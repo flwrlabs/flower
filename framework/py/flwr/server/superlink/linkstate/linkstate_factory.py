@@ -16,6 +16,7 @@
 
 
 from logging import DEBUG
+from threading import Lock
 
 from flwr.common.logger import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
@@ -24,7 +25,7 @@ from flwr.superlink.federation import FederationManager
 
 from .in_memory_linkstate import InMemoryLinkState
 from .linkstate import LinkState
-from .sqlite_linkstate import SqliteLinkState
+from .sql_linkstate import SqlLinkState
 
 
 class LinkStateFactory:
@@ -51,25 +52,35 @@ class LinkStateFactory:
     ) -> None:
         self.database = database
         self.state_instance: LinkState | None = None
+        self._state_lock = Lock()
         self.federation_manager = federation_manager
         self.objectstore_factory = objectstore_factory
 
     def state(self) -> LinkState:
         """Return a State instance and create it, if necessary."""
-        # Get the ObjectStore instance
-        object_store = self.objectstore_factory.store()
+        # Fast return cached state if it exists
+        if self.state_instance is not None:
+            return self.state_instance
 
-        # InMemoryState
-        if self.database == FLWR_IN_MEMORY_DB_NAME:
-            if self.state_instance is None:
+        with self._state_lock:
+            if self.state_instance is not None:
+                return self.state_instance
+
+            # Get the ObjectStore instance
+            object_store = self.objectstore_factory.store()
+
+            # InMemoryState
+            if self.database == FLWR_IN_MEMORY_DB_NAME:
                 self.state_instance = InMemoryLinkState(
                     self.federation_manager, object_store
                 )
-            log(DEBUG, "Using InMemoryState")
-            return self.state_instance
+            # SqlLinkState
+            else:
+                state = SqlLinkState(
+                    self.database, self.federation_manager, object_store
+                )
+                state.initialize()
+                self.state_instance = state
 
-        # SqliteState
-        state = SqliteLinkState(self.database, self.federation_manager, object_store)
-        state.initialize()
-        log(DEBUG, "Using SqliteState")
-        return state
+            log(DEBUG, "Using %s", type(self.state_instance).__name__)
+            return self.state_instance

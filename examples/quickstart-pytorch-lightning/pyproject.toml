@@ -3,13 +3,13 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "pytorchlightning_example"
+name = "quickstart-pytorch-lightning"
 version = "1.0.0"
 description = "Federated Learning with PyTorch Lightning and Flower (Quickstart Example)"
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]>=1.25.0",
-    "flwr-datasets[vision]>=0.5.0",
+    "flwr[simulation]>=1.27.0",
+    "flwr-datasets[vision]>=0.6.0",
     "pytorch-lightning==2.5.5",
     "torch==2.8.0",
     "torchvision==0.23.0",
@@ -28,9 +28,3 @@ clientapp = "pytorchlightning_example.client_app:app"
 [tool.flwr.app.config]
 num-server-rounds = 3
 max-epochs = 1
-
-[tool.flwr.federations]
-default = "local-simulation"
-
-[tool.flwr.federations.local-simulation]
-options.num-supernodes = 4

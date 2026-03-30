@@ -4,11 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-sklearn"
-version = "1.0.0"
+version = "1.0.1"
 description = "Federated Learning with scikit-learn and Flower (Quickstart Example)"
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]>=1.25.0",
+    "flwr[simulation]>=1.27.0",
     "flwr-datasets[vision]>=0.5.0",
     "scikit-learn>=1.6.1",
 ]
@@ -27,9 +27,3 @@ clientapp = "sklearnexample.client_app:app"
 penalty = "l2"
 num-server-rounds = 25
 min-available-clients = 2
-
-[tool.flwr.federations]
-default = "local-simulation"
-
-[tool.flwr.federations.local-simulation]
-options.num-supernodes = 3

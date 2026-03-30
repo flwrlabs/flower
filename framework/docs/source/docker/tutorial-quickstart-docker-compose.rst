@@ -33,7 +33,7 @@ Before you start, make sure that:
    .. code-block:: bash
        :substitutions:
 
-       $ git clone --depth=1 --branch v|stable_flwr_version| https://github.com/adap/flower.git _tmp \
+       $ git clone --depth=1 --branch v|stable_flwr_version| https://github.com/flwrlabs/flower.git _tmp \
                    && mv _tmp/framework/docker/complete . \
                    && rm -rf _tmp && cd complete
 
@@ -89,14 +89,28 @@ Now that the Flower services have been started via Docker Compose, it is time to
 quickstart example.
 
 To ensure the ``flwr`` CLI connects to the SuperLink, you need to specify the SuperLink
-addresses in the ``pyproject.toml`` file.
+connection in your Flower configuration file.
 
-1. Add the following lines to the ``quickstart-pytorch/pyproject.toml``:
+1. Find the Flower Configuration TOML file in your machine. This file is automatically
+   create for your when you first use a Flower CLI command. Use ``flwr config list`` to
+   see available SuperLink connections as well as the path to the configuration file.
+
+   .. code-block:: console
+       :emphasize-lines: 3
+
+       $ flwr config list
+
+       Flower Config file: /path/to/.flwr/config.toml
+       SuperLink connections:
+         supergrid
+         local (default)
+
+2. Add the following lines to the ``config.toml``:
 
    .. code-block:: toml
-       :caption: quickstart-pytorch/pyproject.toml
+       :caption: config.toml
 
-       [tool.flwr.federations.local-deployment]
+       [superlink.local-deployment]
        address = "127.0.0.1:9093"
        insecure = true
 
@@ -231,14 +245,14 @@ service, ensuring that it maintains its state even after a restart.
 
        $ docker compose -f certs.yml run --rm --build gen-certs
 
-2. Add the following lines to the ``quickstart-pytorch/pyproject.toml``:
+2. Add a new SuperLink connection to your Flower Configuration file:
 
    .. code-block:: toml
-       :caption: quickstart-pytorch/pyproject.toml
+       :caption: config.toml
 
-       [tool.flwr.federations.local-deployment-tls]
+       [superlink.local-deployment-tls]
        address = "127.0.0.1:9093"
-       root-certificates = "../superlink-certificates/ca.crt"
+       root-certificates = "/absolute/path/to/superlink-certificates/ca.crt"
 
 3. Restart the services with TLS enabled:
 

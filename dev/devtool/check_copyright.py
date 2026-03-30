@@ -20,6 +20,7 @@ Example:
 
 
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -42,8 +43,11 @@ COPYRIGHT_FORMAT = """# Copyright {} Flower Labs GmbH. All Rights Reserved.
 # limitations under the License.
 # =============================================================================="""
 
+# Regex pattern to extract copyright year from file
+COPYRIGHT_PATTERN = re.compile(r"# Copyright (\d{4}) Flower Labs GmbH")
 
-def _get_file_creation_year(filepath: str) -> str:
+
+def _get_file_creation_year(filepath: str) -> int:
     result = subprocess.run(
         ["git", "log", "--diff-filter=A", "--format=%ai", "--", filepath],
         stdout=subprocess.PIPE,
@@ -53,11 +57,11 @@ def _get_file_creation_year(filepath: str) -> str:
 
     if not result.stdout:
         # Since the file is not in Git history, use the current year
-        return str(datetime.now().year)
+        return datetime.now().year
 
     date_str = result.stdout.splitlines()[-1]  # Get the first commit date
-    creation_year = date_str.split("-")[0]  # Extract the year
-    return creation_year
+    creation_year_str = date_str.split("-")[0]  # Extract the year
+    return int(creation_year_str)
 
 
 def _check_copyright(dir_list: list[str]) -> None:
@@ -69,11 +73,19 @@ def _check_copyright(dir_list: list[str]) -> None:
         dir_path = Path(valid_dir)
         for py_file in dir_path.glob("*.py"):
             creation_year = _get_file_creation_year(str(py_file.absolute()))
-            expected_copyright = COPYRIGHT_FORMAT.format(creation_year)
 
-            if expected_copyright not in py_file.read_text():
-                warning_message = "- " + str(py_file)
-                warning_list.append(warning_message)
+            # Extract copyright year from file content using regex
+            file_content = py_file.read_text()
+            match = COPYRIGHT_PATTERN.search(file_content)
+            copyright_year = int(match.group(1)) if match else None
+
+            # Allow copyright year to be creation year or one year before
+            if copyright_year in [creation_year, creation_year - 1]:
+                continue
+
+            # Warn if no copyright notice found or incorrect year
+            warning_message = "- " + str(py_file)
+            warning_list.append(warning_message)
 
     if len(warning_list) > 0:
         print("Missing or incorrect copyright notice in the following files:")
@@ -83,12 +95,12 @@ def _check_copyright(dir_list: list[str]) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 0:
-        raise Exception(  # pylint: disable=W0719
+    if len(sys.argv) < 2:
+        raise ValueError(
             "Please provide at least one directory path relative "
             "to your current working directory."
         )
-    for i, _ in enumerate(sys.argv):
-        abs_path: str = os.path.abspath(os.path.join(os.getcwd(), sys.argv[i]))
-        __, init_dirs = get_init_dir_list_and_warnings(abs_path)
+    for relative_path in sys.argv[1:]:
+        abs_path = os.path.abspath(os.path.join(os.getcwd(), relative_path))
+        _, init_dirs = get_init_dir_list_and_warnings(abs_path)
         _check_copyright(init_dirs)

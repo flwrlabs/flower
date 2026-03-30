@@ -37,6 +37,7 @@ message Run {
   uint64 bytes_sent = 13;
   uint64 bytes_recv = 14;
   double clientapp_runtime = 15;
+  string run_type = 16;
 }
 
 message RunStatus {
@@ -61,13 +62,6 @@ message UpdateRunStatusRequest {
   RunStatus run_status = 2;
 }
 message UpdateRunStatusResponse {}
-
-// GetRunStatus
-message GetRunStatusRequest {
-  Node node = 1;
-  repeated uint64 run_ids = 2;
-}
-message GetRunStatusResponse { map<uint64, RunStatus> run_status_dict = 1; }
 
 // Get Federation Options associated with run
 message GetFederationOptionsRequest { uint64 run_id = 1; }

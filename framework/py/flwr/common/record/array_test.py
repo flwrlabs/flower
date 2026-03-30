@@ -26,8 +26,12 @@ from unittest.mock import Mock
 import numpy as np
 from parameterized import parameterized
 
+from flwr.supercore.inflatable.inflatable_object import (
+    get_object_body,
+    get_object_type_from_object_content,
+)
+
 from ..constant import FLWR_PRIVATE_MAX_ARRAY_CHUNK_SIZE, SType
-from ..inflatable import get_object_body, get_object_type_from_object_content
 from ..typing import NDArray
 from .array import Array
 from .arraychunk import ArrayChunk

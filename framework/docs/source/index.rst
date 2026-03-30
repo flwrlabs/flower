@@ -95,6 +95,7 @@ ideas behind Flower and collaborative AI.
 
     explanation-federated-evaluation
     explanation-differential-privacy
+    explanation-ref-secure-aggregation-protocols
     explanation-flower-architecture
     explanation-flower-strategy-abstraction
 

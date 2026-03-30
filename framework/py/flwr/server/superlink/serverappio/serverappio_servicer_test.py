@@ -29,12 +29,6 @@ from flwr.common.constant import (
     SUPERLINK_NODE_ID,
     Status,
 )
-from flwr.common.inflatable import (
-    get_all_nested_objects,
-    get_object_id,
-    get_object_tree,
-    iterate_object_tree,
-)
 from flwr.common.message import get_message_to_descendant_id_mapping
 from flwr.common.serde import context_to_proto, message_from_proto, run_status_to_proto
 from flwr.common.serde_test import RecordMaker
@@ -83,9 +77,15 @@ from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
 from flwr.server.superlink.serverappio.serverappio_servicer import _raise_if
 from flwr.server.superlink.utils import _STATUS_TO_MSG
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
 from flwr.supercore.date import now
 from flwr.supercore.ffs import FfsFactory
+from flwr.supercore.inflatable.inflatable_object import (
+    get_all_nested_objects,
+    get_object_id,
+    get_object_tree,
+    iterate_object_tree,
+)
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
@@ -245,7 +245,14 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 
     def _create_dummy_run(self, running: bool = True, *, fab_hash: str = "") -> int:
         run_id = self.state.create_run(
-            "", "", fab_hash, {}, NOOP_FEDERATION, ConfigRecord(), ""
+            "",
+            "",
+            fab_hash,
+            {},
+            NOOP_FEDERATION,
+            None,
+            "",
+            RunType.SERVER_APP,
         )
         if running:
             self._transition_run_status(run_id, 2)

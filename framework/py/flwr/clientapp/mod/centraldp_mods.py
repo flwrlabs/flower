@@ -18,6 +18,8 @@
 from logging import ERROR, INFO
 from typing import cast
 
+import numpy as np
+
 from flwr.app import Error
 from flwr.clientapp.typing import ClientAppCallable
 from flwr.common import (
@@ -105,7 +107,7 @@ def fixedclipping_mod(
     # Replace outgoing ArrayRecord's Array while preserving their keys
     out_msg.content.array_records[new_array_record_key] = ArrayRecord(
         {
-            k: Array(v)
+            k: Array(np.asarray(v))
             for k, v in zip(
                 client_to_server_arrecord.keys(),
                 client_to_server_ndarrays,
@@ -192,7 +194,7 @@ def adaptiveclipping_mod(
     # Replace outgoing ArrayRecord's Array while preserving their keys
     out_msg.content.array_records[new_array_record_key] = ArrayRecord(
         {
-            k: Array(v)
+            k: Array(np.asarray(v))
             for k, v in zip(
                 client_to_server_arrecord.keys(),
                 client_to_server_ndarrays,

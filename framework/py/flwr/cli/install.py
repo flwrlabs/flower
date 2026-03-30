@@ -23,11 +23,14 @@ from io import BytesIO
 from pathlib import Path
 from typing import IO, Annotated
 
+import click
 import typer
 
-from flwr.common.config import get_flwr_dir, get_metadata_from_config
-from flwr.common.constant import FAB_HASH_TRUNCATION
+from flwr.common.config import get_metadata_from_config
+from flwr.common.constant import APP_DIR, FAB_HASH_TRUNCATION
+from flwr.supercore.utils import get_flwr_home
 
+from .archive_utils import safe_extract_zip
 from .config_utils import load_and_validate
 from .utils import get_sha256_hash
 
@@ -37,56 +40,39 @@ def install(
         Path | None,
         typer.Argument(metavar="source", help="The source FAB file to install."),
     ] = None,
-    flwr_dir: Annotated[
-        Path | None,
-        typer.Option(help="The desired install path."),
-    ] = None,
 ) -> None:
     """Install a Flower App Bundle.
 
-    It can be ran with a single FAB file argument:
+    It can be run with a single FAB file argument:
 
         ``flwr install ./target_project.fab``
 
-    The target install directory can be specified with ``--flwr-dir``:
+    Apps are installed to:
 
-        ``flwr install ./target_project.fab --flwr-dir ./docs/flwr``
-
-    This will install ``target_project`` to ``./docs/flwr/``. By default,
-    ``flwr-dir`` is equal to:
-
-        - ``$FLWR_HOME/`` if ``$FLWR_HOME`` is defined
-        - ``$XDG_DATA_HOME/.flwr/`` if ``$XDG_DATA_HOME`` is defined
-        - ``$HOME/.flwr/`` in all other cases
+        - ``$FLWR_HOME/apps/`` if ``$FLWR_HOME`` is defined
+        - ``$HOME/.flwr/apps/`` otherwise
     """
     if source is None:
         source = Path(typer.prompt("Enter the source FAB file"))
 
-    source = source.resolve()
+    source = source.expanduser().resolve()
     if not source.exists() or not source.is_file():
-        typer.secho(
-            f"❌ The source {source} does not exist or is not a file.",
-            fg=typer.colors.RED,
-            bold=True,
-            err=True,
+        raise click.ClickException(
+            f"The source {source} does not exist or is not a file."
         )
-        raise typer.Exit(code=1)
 
     if source.suffix != ".fab":
-        typer.secho(
-            f"❌ The source {source} is not a `.fab` file.",
-            fg=typer.colors.RED,
-            bold=True,
-            err=True,
-        )
-        raise typer.Exit(code=1)
+        raise click.ClickException(f"The source {source} is not a `.fab` file.")
 
-    install_from_fab(source, flwr_dir)
+    try:
+        install_from_fab(source)
+    except ValueError as e:
+        raise click.ClickException(str(e)) from None
 
 
 def install_from_fab(
     fab_file: Path | bytes,
-    flwr_dir: Path | None,
+    install_dir: Path | None = None,
     skip_prompt: bool = False,
 ) -> Path:
     """Install from a FAB file after extracting and validating.
@@ -95,7 +81,7 @@ def install_from_fab(
     ----------
     fab_file : Path | bytes
         Either a path to the FAB file or the FAB file content as bytes.
-    flwr_dir : Path | None
+    install_dir : Path | None
         Target installation directory, or None to use default.
     skip_prompt : bool
         If True, skip confirmation prompts. Default is False.
@@ -107,7 +93,7 @@ def install_from_fab(
 
     Raises
     ------
-    typer.Exit
+    click.ClickException
         If FAB format is invalid or hash verification fails.
     """
     fab_file_archive: Path | IO[bytes]
@@ -125,35 +111,23 @@ def install_from_fab(
 
     with tempfile.TemporaryDirectory() as tmpdir:
         with zipfile.ZipFile(fab_file_archive, "r") as zipf:
-            zipf.extractall(tmpdir)
             tmpdir_path = Path(tmpdir)
+            safe_extract_zip(zipf, tmpdir_path)
             info_dir = tmpdir_path / ".info"
             if not info_dir.exists():
-                typer.secho(
-                    "❌ FAB file has incorrect format.",
-                    fg=typer.colors.RED,
-                    bold=True,
-                    err=True,
-                )
-                raise typer.Exit(code=1)
+                raise click.ClickException("FAB file has incorrect format.")
 
             content_file = info_dir / "CONTENT"
 
             if not content_file.exists() or not _verify_hashes(
                 content_file.read_text(), tmpdir_path
             ):
-                typer.secho(
-                    "❌ File hashes couldn't be verified.",
-                    fg=typer.colors.RED,
-                    bold=True,
-                    err=True,
-                )
-                raise typer.Exit(code=1)
+                raise click.ClickException("File hashes couldn't be verified.")
 
             shutil.rmtree(info_dir)
 
             installed_path = validate_and_install(
-                tmpdir_path, fab_hash, fab_name, flwr_dir, skip_prompt
+                tmpdir_path, fab_hash, fab_name, install_dir, skip_prompt
             )
 
     return installed_path
@@ -164,7 +138,7 @@ def validate_and_install(
     project_dir: Path,
     fab_hash: str,
     fab_name: str | None,
-    flwr_dir: Path | None,
+    install_dir: Path | None,
     skip_prompt: bool = False,
 ) -> Path:
     """Validate the TOML file and install the project to the desired directory.
@@ -177,7 +151,7 @@ def validate_and_install(
         SHA-256 hash of the FAB file.
     fab_name : str | None
         Name of the FAB file, or None if installing from bytes.
-    flwr_dir : Path | None
+    install_dir : Path | None
         Target installation directory, or None to use default.
     skip_prompt : bool (default: False)
         If True, skip confirmation prompts.
@@ -189,19 +163,10 @@ def validate_and_install(
 
     Raises
     ------
-    typer.Exit
+    click.ClickException
         If configuration is invalid or metadata doesn't match.
     """
-    config, _, _ = load_and_validate(project_dir / "pyproject.toml", check_module=False)
-
-    if config is None:
-        typer.secho(
-            "❌ Invalid config inside FAB file.",
-            fg=typer.colors.RED,
-            bold=True,
-            err=True,
-        )
-        raise typer.Exit(code=1)
+    config, _ = load_and_validate(project_dir / "pyproject.toml", check_module=False)
 
     fab_id, version = get_metadata_from_config(config)
     publisher, project_name = fab_id.split("/")
@@ -210,14 +175,15 @@ def validate_and_install(
     if fab_name:
         _validate_fab_and_config_metadata(fab_name, config_metadata)
 
-    install_dir: Path = (
-        (get_flwr_dir() if not flwr_dir else flwr_dir)
-        / "apps"
+    install_base_dir = install_dir.expanduser() if install_dir else get_flwr_home()
+    install_path: Path = (
+        install_base_dir
+        / APP_DIR
         / f"{publisher}.{project_name}.{version}.{fab_hash[:FAB_HASH_TRUNCATION]}"
     )
-    if install_dir.exists():
+    if install_path.exists():
         if skip_prompt:
-            return install_dir
+            return install_path
         if not typer.confirm(
             typer.style(
                 f"\n💬 {project_name} version {version} is already installed, "
@@ -226,24 +192,24 @@ def validate_and_install(
                 bold=True,
             )
         ):
-            return install_dir
+            return install_path
 
-    install_dir.mkdir(parents=True, exist_ok=True)
+    install_path.mkdir(parents=True, exist_ok=True)
 
     # Move contents from source directory
     for item in project_dir.iterdir():
         if item.is_dir():
-            shutil.copytree(item, install_dir / item.name, dirs_exist_ok=True)
+            shutil.copytree(item, install_path / item.name, dirs_exist_ok=True)
         else:
-            shutil.copy2(item, install_dir / item.name)
+            shutil.copy2(item, install_path / item.name)
 
     typer.secho(
-        f"🎊 Successfully installed {project_name} to {install_dir}.",
+        f"Successfully installed {project_name} to {install_path}.",
         fg=typer.colors.GREEN,
         bold=True,
     )
 
-    return install_dir
+    return install_path
 
 
 def _verify_hashes(list_content: str, tmpdir: Path) -> bool:
@@ -283,7 +249,7 @@ def _validate_fab_and_config_metadata(
 
     Raises
     ------
-    typer.Exit
+    click.ClickException
         If filename format is incorrect or hash doesn't match.
     """
     publisher, project_name, version, fab_hash = config_metadata
@@ -299,33 +265,21 @@ def _validate_fab_and_config_metadata(
         != f"{publisher}.{project_name}.{version}"
         or len(fab_shorthash) != FAB_HASH_TRUNCATION  # Verify hash length
     ):
-        typer.secho(
-            "❌ FAB file has incorrect name. The file name must follow the format "
-            "`<publisher>.<project_name>.<version>.<8hexchars>.fab`.",
-            fg=typer.colors.RED,
-            bold=True,
-            err=True,
+        raise click.ClickException(
+            "FAB file has incorrect name. The file name must follow the format "
+            "`<publisher>.<project_name>.<version>.<8hexchars>.fab`."
         )
-        raise typer.Exit(code=1)
 
     # Verify hash is a valid hexadecimal
     try:
         _ = int(fab_shorthash, 16)
     except Exception as e:
-        typer.secho(
-            f"❌ FAB file has an invalid hexadecimal string `{fab_shorthash}`.",
-            fg=typer.colors.RED,
-            bold=True,
-            err=True,
-        )
-        raise typer.Exit(code=1) from e
+        raise click.ClickException(
+            f"FAB file has an invalid hexadecimal string `{fab_shorthash}`."
+        ) from e
 
     # Verify shorthash matches
     if fab_shorthash != fab_hash[:FAB_HASH_TRUNCATION]:
-        typer.secho(
-            "❌ The hash in the FAB file name does not match the hash of the FAB.",
-            fg=typer.colors.RED,
-            bold=True,
-            err=True,
+        raise click.ClickException(
+            "The hash in the FAB file name does not match the hash of the FAB."
         )
-        raise typer.Exit(code=1)

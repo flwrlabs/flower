@@ -20,12 +20,14 @@ import zipfile
 from pathlib import Path
 from typing import Annotated, cast
 
+import click
 import requests
 import typer
 
 from flwr.supercore.constant import PLATFORM_API_URL
 from flwr.supercore.utils import parse_app_spec, request_download_link
 
+from ..archive_utils import safe_extract_zip
 from ..utils import prompt_options, prompt_text
 
 
@@ -52,16 +54,12 @@ def new(
 ) -> None:
     """Create new Flower App."""
     if framework is not None or username is not None:
-        typer.secho(
-            "❌ The --framework and --username options are deprecated and will be "
+        raise click.ClickException(
+            "The --framework and --username options are deprecated and will be "
             "removed in future versions of Flower. Please provide an app specifier "
             "after `flwr new` instead, e.g., '@account_name/app_name' or "
-            "'@account_name/app_name==x.y.z'.",
-            fg=typer.colors.RED,
-            bold=True,
-            err=True,
+            "'@account_name/app_name==x.y.z'."
         )
-        raise typer.Exit(code=1)
 
     if app_spec is None:
         # Fetch recommended apps
@@ -141,47 +139,7 @@ def fetch_recommended_apps() -> list[dict[str, str]]:
         return cast(list[dict[str, str]], apps)
 
     except requests.RequestException as e:
-        typer.secho(
-            f"❌ Failed to fetch recommended apps: {e}",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(code=1) from e
-
-
-# Security: prevent zip-slip
-def _safe_extract_zip(zf: zipfile.ZipFile, dest_dir: Path) -> None:
-    """Extract ZIP file into destination directory."""
-    dest_dir = dest_dir.resolve()
-
-    def _is_within_directory(base: Path, target: Path) -> bool:
-        try:
-            target.relative_to(base)
-            return True
-        except ValueError:
-            return False
-
-    for member in zf.infolist():
-        # Skip directory placeholders;
-        # ZipInfo can represent them as names ending with '/'.
-        if member.is_dir():
-            target_path = (dest_dir / member.filename).resolve()
-            if not _is_within_directory(dest_dir, target_path):
-                raise ValueError(f"Unsafe path in zip: {member.filename}")
-            target_path.mkdir(parents=True, exist_ok=True)
-            continue
-
-        # Files
-        target_path = (dest_dir / member.filename).resolve()
-        if not _is_within_directory(dest_dir, target_path):
-            raise ValueError(f"Unsafe path in zip: {member.filename}")
-
-        # Ensure parent exists
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Extract
-        with zf.open(member, "r") as src, open(target_path, "wb") as dst:
-            dst.write(src.read())
+        raise click.ClickException(f"Failed to fetch recommended apps: {e}") from e
 
 
 def _download_zip_to_memory(presigned_url: str) -> io.BytesIO:
@@ -190,22 +148,12 @@ def _download_zip_to_memory(presigned_url: str) -> io.BytesIO:
         r = requests.get(presigned_url, timeout=60)
         r.raise_for_status()
     except requests.RequestException as e:
-        typer.secho(
-            f"ZIP download failed: {e}",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(code=1) from e
+        raise click.ClickException(f"ZIP download failed: {e}") from e
 
     buf = io.BytesIO(r.content)
     # Validate it's a zip
     if not zipfile.is_zipfile(buf):
-        typer.secho(
-            "Downloaded file is not a valid ZIP",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(code=1)
+        raise click.ClickException("Downloaded file is not a valid ZIP")
     buf.seek(0)
     return buf
 
@@ -216,8 +164,7 @@ def download_remote_app_via_api(app_spec: str) -> None:
     try:
         app_id, app_version = parse_app_spec(app_spec)
     except ValueError as e:
-        typer.secho(f"❌ {e}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(code=1) from e
+        raise click.ClickException(str(e)) from e
 
     app_name = app_id.split("/")[1]
 
@@ -242,8 +189,7 @@ def download_remote_app_via_api(app_spec: str) -> None:
     try:
         presigned_url, _ = request_download_link(app_id, app_version, url, "zip_url")
     except ValueError as e:
-        typer.secho(f"❌ {e}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(code=1) from e
+        raise click.ClickException(str(e)) from e
 
     typer.secho(
         "🔽 Downloading ZIP into memory...",
@@ -258,6 +204,6 @@ def download_remote_app_via_api(app_spec: str) -> None:
         bold=True,
     )
     with zipfile.ZipFile(zip_buf) as zf:
-        _safe_extract_zip(zf, Path.cwd())
+        safe_extract_zip(zf, Path.cwd())
 
     print_success_prompt(app_name)

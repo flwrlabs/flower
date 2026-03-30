@@ -1,0 +1,27 @@
+name: Check PR title format
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr_title_check:
+    runs-on: ubuntu-22.04
+    name: Title format
+    steps:
+      - uses: actions/checkout@v5
+      - name: Bootstrap
+        uses: ./.github/actions/bootstrap
+        with:
+          python-version: 3.13
+          poetry-skip: 'true'
+      - name: Check PR title format 
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: PYTHONPATH=dev python -m devtool.check_pr_title "$PR_TITLE"

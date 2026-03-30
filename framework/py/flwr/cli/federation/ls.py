@@ -15,101 +15,131 @@
 """Flower command line interface `federation list` command."""
 
 
-import io
-from pathlib import Path
-from typing import Annotated, cast
+from typing import Annotated, Any, Literal
 
 import typer
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from flwr.cli.config_utils import (
-    exit_if_no_address,
-    load_and_validate,
-    process_loaded_project_config,
-    validate_federation_in_project_config,
-)
-from flwr.common.constant import FAB_CONFIG_FILE, CliOutputFormat
-from flwr.common.logger import print_json_error, redirect_output, restore_output
+from flwr.cli.config_migration import migrate
+from flwr.cli.flower_config import read_superlink_connection
+from flwr.cli.ls import _get_status_style
+from flwr.common.constant import NOOP_ACCOUNT_NAME, CliOutputFormat
+from flwr.common.serde import run_from_proto
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ListFederationsRequest,
     ListFederationsResponse,
+    ShowFederationRequest,
+    ShowFederationResponse,
 )
 from flwr.proto.control_pb2_grpc import ControlStub
-from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.federation_pb2 import Federation, Member  # pylint: disable=E0611
+from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.supercore.utils import humanize_duration, simulation_config_to_json
 
-from ..utils import flwr_cli_grpc_exc_handler, init_channel, load_cli_auth_plugin
+from ..run_utils import RunRow, format_runs
+from ..utils import (
+    cli_output_handler,
+    flwr_cli_grpc_exc_handler,
+    init_channel_from_connection,
+    print_json_to_stdout,
+)
 
 
-def ls(  # pylint: disable=R0914, R0913, R0917
+def ls(  # pylint: disable=R0914, R0913, R0917, R0912
     ctx: typer.Context,
-    app: Annotated[
-        Path,
-        typer.Argument(help="Path of the Flower project"),
-    ] = Path("."),
-    federation: Annotated[
+    superlink: Annotated[
         str | None,
-        typer.Argument(help="Name of the federation"),
+        typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,
             help="Format output using 'default' view or 'json'",
         ),
     ] = CliOutputFormat.DEFAULT,
+    federation: Annotated[
+        str | None,
+        typer.Option(
+            "--federation",
+            case_sensitive=False,
+            help="Name of the federation to display",
+        ),
+    ] = None,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            help="Show additional details, including archived federations.",
+        ),
+    ] = False,
 ) -> None:
-    """List available federations."""
-    # Resolve command used (list or ls)
-    command_name = cast(str, ctx.command.name) if ctx.command else "ls"
+    """List available federations or details of a specific federation (alias: ls)."""
+    with cli_output_handler(output_format=output_format) as is_json:
+        # Migrate legacy usage if any
+        migrate(superlink, args=ctx.args)
 
-    suppress_output = output_format == CliOutputFormat.JSON
-    captured_output = io.StringIO()
-    try:
-        if suppress_output:
-            redirect_output(captured_output)
-        typer.secho("Loading project configuration... ", fg=typer.colors.BLUE)
-
-        pyproject_path = app / FAB_CONFIG_FILE if app else None
-        config, errors, warnings = load_and_validate(pyproject_path, check_module=False)
-        config = process_loaded_project_config(config, errors, warnings)
-        federation, federation_config = validate_federation_in_project_config(
-            federation, config
-        )
-        exit_if_no_address(federation_config, f"federation {command_name}")
+        # Read superlink connection configuration
+        superlink_connection = read_superlink_connection(superlink)
         channel = None
+
         try:
-            auth_plugin = load_cli_auth_plugin(app, federation, federation_config)
-            channel = init_channel(app, federation_config, auth_plugin)
+            channel = init_channel_from_connection(superlink_connection)
             stub = ControlStub(channel)
-            typer.echo("📄 Listing federations...")
-            federations = _list_federations(stub)
-            restore_output()
-            if output_format == CliOutputFormat.JSON:
-                Console().print_json(data=_to_json(federations))
+
+            if federation:
+                # Show specific federation details
+                members, nodes, runs, archived, simulation, config = _show_federation(
+                    stub, federation
+                )
+                archived_str = (
+                    "[bold yellow]ARCHIVED[/bold yellow] " if archived else ""
+                )
+                Console().print(
+                    f"📄 Showing {archived_str}federation "
+                    f"[bold]'{federation}'[/bold]...\n",
+                    highlight=False,
+                )
+                if is_json:
+                    print_json_to_stdout(
+                        _to_json(
+                            members=members,
+                            nodes=nodes,
+                            runs=runs,
+                            archived=archived,
+                            simulation=simulation,
+                            config=config,
+                        )
+                    )
+                else:
+
+                    Console().print(_to_members_table(members))
+                    if simulation:
+                        Console().print(_to_simulation_config_table(config))
+                    else:
+                        Console().print(_to_nodes_table(nodes))
+                    Console().print(_to_runs_table(runs))
             else:
-                Console().print(_to_table(federations))
+                # List federations
+                typer.echo("📄 Listing federations...")
+                federations = _list_federations(stub)
+
+                active = [f for f in federations if not f.archived]
+                archived_feds = [f for f in federations if f.archived]
+
+                if is_json:
+                    print_json_to_stdout(_to_json(federations=federations))
+                else:
+                    # If verbose, show archived federations after active ones
+                    shown = active + archived_feds if verbose else active
+                    Console().print(_to_table(shown))
         finally:
             if channel:
                 channel.close()
-    except (typer.Exit, Exception) as err:  # pylint: disable=broad-except
-        if suppress_output:
-            restore_output()
-            e_message = captured_output.getvalue()
-            print_json_error(e_message, err)
-        else:
-            typer.secho(
-                f"{err}",
-                fg=typer.colors.RED,
-                bold=True,
-                err=True,
-            )
-    finally:
-        if suppress_output:
-            restore_output()
-        captured_output.close()
 
 
 def _list_federations(stub: ControlStub) -> list[Federation]:
@@ -128,13 +158,278 @@ def _to_table(federations: list[Federation]) -> Table:
     table.add_column(
         Text("Federation", justify="center"), style="bright_black", no_wrap=True
     )
+    table.add_column(
+        Text("Description", justify="center"), style="bright_black", no_wrap=True
+    )
+    table.add_column(
+        Text("Runtime", justify="center"), style="bright_black", no_wrap=True
+    )
+    table.add_column(
+        Text("Status", justify="center"), style="bright_black", no_wrap=True
+    )
 
     for federation in federations:
-        table.add_row(federation.name)
+        if federation.archived:
+            style = "dim"
+            status = "archived"
+        else:
+            style = ""
+            status = "[green]active[/green]"
+        runtime = "simulation" if federation.simulation else "deployment"
+        table.add_row(
+            federation.name,
+            federation.description,
+            runtime,
+            status,
+            style=style,
+        )
 
     return table
 
 
-def _to_json(federations: list[Federation]) -> list[dict[str, str]]:
+def _to_json(  # pylint: disable=R0913,R0917
+    federations: list[Federation] | None = None,
+    members: list[Member] | None = None,
+    nodes: list[NodeInfo] | None = None,
+    runs: list[RunRow] | None = None,
+    archived: bool | None = None,
+    simulation: bool | None = None,
+    config: SimulationConfig | None = None,
+) -> dict[str, Any]:
     """Format the provided federations list to JSON serializable format."""
-    return [{"name": federation.name} for federation in federations]
+    if federations is not None:
+        return {
+            "federations": [
+                {
+                    "name": federation.name,
+                    "description": federation.description,
+                    "archived": federation.archived,
+                    "simulation": federation.simulation,
+                }
+                for federation in federations
+            ]
+        }
+
+    if members is None or nodes is None or runs is None:
+        return {"federation": {}}
+
+    members_list: list[dict[str, Any]] = []
+    nodes_list: list[dict[str, Any]] = []
+    runs_list: list[dict[str, Any]] = []
+
+    for member in members:
+        members_list.append({"member_id": member.account.name, "role": member.role})
+
+    for node in nodes:
+        nodes_list.append(
+            {
+                "node_id": f"{node.node_id}",
+                "owner": node.owner_name,
+                "status": node.status,
+            }
+        )
+
+    for run in runs:
+        runs_list.append(
+            {
+                "run_id": f"{run.run_id}",
+                "app": f"@{run.fab_id}=={run.fab_version}",
+                "status": run.status_text,
+                "elapsed": run.elapsed,
+            }
+        )
+
+    return {
+        "federation": {
+            "members": members_list,
+            "nodes": nodes_list,
+            "runs": runs_list,
+            "archived": archived,
+            "simulation": simulation,
+            "simulation-config": simulation_config_to_json(config) if config else None,
+        }
+    }
+
+
+def _show_federation(
+    stub: ControlStub, federation: str
+) -> tuple[list[Member], list[NodeInfo], list[RunRow], bool, bool, SimulationConfig]:
+    """Show federation details.
+
+    Parameters
+    ----------
+    stub : ControlStub
+        The gRPC stub for Control API communication.
+    federation : str
+        Name of the federation to show.
+
+    Returns
+    -------
+    tuple[list[Member], list[NodeInfo], list[RunRow], bool, bool, SimulationConfig]
+        A tuple containing (members, nodes, runs, archived, simulation, config).
+    """
+    with flwr_cli_grpc_exc_handler():
+        res: ShowFederationResponse = stub.ShowFederation(
+            ShowFederationRequest(federation_name=federation)
+        )
+
+    fed_proto = res.federation
+    runs = [run_from_proto(run_proto) for run_proto in fed_proto.runs]
+    formatted_runs = format_runs(runs, res.now)
+
+    return (
+        list(fed_proto.members),
+        list(fed_proto.nodes),
+        formatted_runs,
+        fed_proto.archived,
+        fed_proto.simulation,
+        fed_proto.config,
+    )
+
+
+def _to_members_table(members: list[Member]) -> Table:
+    """Format the provided list of federation members as a rich Table.
+
+    Parameters
+    ----------
+    members : list[Member]
+        List of Member proto objects.
+
+    Returns
+    -------
+    Table
+        Rich Table object with formatted member information.
+    """
+    table = Table(title="Federation Members", header_style="bold cyan", show_lines=True)
+
+    table.add_column(Text("Account Name", justify="center"), no_wrap=True)
+    table.add_column(Text("Role", justify="center"), no_wrap=True)
+
+    for member in members:
+        table.add_row(member.account.name, member.role)
+
+    return table
+
+
+def _to_nodes_table(nodes: list[NodeInfo]) -> Table:
+    """Format the provided list of federation nodes as a rich Table.
+
+    Parameters
+    ----------
+    nodes : list[NodeInfo]
+        List of NodeInfo objects containing node details.
+
+    Returns
+    -------
+    Table
+        Rich Table object with formatted node information.
+
+    Raises
+    ------
+    ValueError
+        If an unexpected node status is encountered.
+    """
+    table = Table(
+        title="SuperNodes in the Federation", header_style="bold cyan", show_lines=True
+    )
+
+    # Add columns
+    table.add_column(
+        Text("Node ID", justify="center"), style="bright_black", no_wrap=True
+    )
+    table.add_column(Text("Owner", justify="center"))
+    table.add_column(Text("Status", justify="center"))
+
+    for row in nodes:
+        owner_name = row.owner_name
+        status = row.status
+
+        if status == "online":
+            status_style = "green"
+        elif status == "offline":
+            status_style = "bright_yellow"
+        elif status == "unregistered":
+            continue
+        elif status == "registered":
+            status_style = "blue"
+        else:
+            raise ValueError(f"Unexpected node status '{status}'")
+
+        formatted_row = (
+            f"[bold]{row.node_id}[/bold]",
+            (
+                f"{owner_name}"
+                if owner_name != NOOP_ACCOUNT_NAME
+                else f"[dim]{owner_name}[/dim]"
+            ),
+            f"[{status_style}]{status}",
+        )
+        table.add_row(*formatted_row)
+
+    return table
+
+
+def _to_simulation_config_table(config: SimulationConfig) -> Table:
+    """Format the simulation configuration as a rich Table."""
+    table = Table(
+        title="Simulation Configuration",
+        header_style="bold cyan",
+        show_lines=True,
+    )
+
+    table.add_column(Text("Setting", justify="center"), style="bright_black")
+    table.add_column(Text("Key", justify="center"), style="bright_black")
+    table.add_column(Text("Value"), justify="right")
+
+    rows = [
+        ("Number of Simulated SuperNodes", "num_supernodes"),
+        ("ClientApp Resources (CPUs)", "client_resources_num_cpus"),
+        ("ClientApp Resources (GPUs)", "client_resources_num_gpus"),
+        ("Backend Name", "backend"),
+    ]
+
+    for name, key in rows:
+        table.add_row(
+            name,
+            Text(key.replace("_", "-"), style="bold magenta"),
+            str(getattr(config, key)),
+        )
+
+    return table
+
+
+def _to_runs_table(run_list: list[RunRow]) -> Table:
+    """Format the provided list of federation runs as a rich Table.
+
+    Parameters
+    ----------
+    run_list : list[RunRow]
+        List of RunRow objects containing run details.
+
+    Returns
+    -------
+    Table
+        Rich Table object with formatted run information.
+    """
+    table = Table(
+        title="Runs in the Federation", header_style="bold cyan", show_lines=True
+    )
+
+    # Add columns
+    table.add_column(Text("Run ID", justify="center"), no_wrap=True)
+    table.add_column(Text("App", justify="center"))
+    table.add_column(Text("Status", justify="center"))
+    table.add_column(Text("Elapsed", justify="center"), style="blue")
+
+    for row in run_list:
+        status_style = _get_status_style(row.status_text)
+
+        formatted_row = (
+            f"[bold]{row.run_id}[/bold]",
+            f"@{row.fab_id}=={row.fab_version}",
+            f"[{status_style}]{row.status_text}[/{status_style}]",
+            f"{humanize_duration(row.elapsed)}",
+        )
+        table.add_row(*formatted_row)
+
+    return table

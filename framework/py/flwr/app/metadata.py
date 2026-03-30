@@ -19,7 +19,10 @@ from __future__ import annotations
 
 from typing import cast
 
-from ..common.constant import MessageType, MessageTypeLegacy
+from flwr.app.message_type import MessageType
+from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE
+
+from ..common.constant import MessageTypeLegacy
 
 
 class Metadata:  # pylint: disable=too-many-instance-attributes
@@ -194,7 +197,7 @@ def validate_message_type(message_type: str) -> bool:
         MessageType.TRAIN,
         MessageType.EVALUATE,
         MessageType.QUERY,
-        MessageType.SYSTEM,
+        SYSTEM_MESSAGE_TYPE,
     }
     if message_type in valid_types:
         return True

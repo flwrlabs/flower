@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-tensorflow"
-version = "1.0.0"
+version = "1.0.2"
 description = "Federated Learning with Tensorflow/Keras and Flower (Quickstart Example)"
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]>=1.25.0",
-    "flwr-datasets[vision]>=0.5.0",
+    "flwr[simulation]>=1.27.0",
+    "flwr-datasets[vision]>=0.6.0",
     "tensorflow>=2.9.1, != 2.11.1 ; (platform_machine == \"x86_64\" or platform_machine == \"aarch64\")",
     "tensorflow-macos>=2.9.1, != 2.11.1 ; sys_platform == \"darwin\" and platform_machine == \"arm64\"",
 ]
@@ -30,13 +30,3 @@ batch-size = 32
 learning-rate = 0.005
 fraction-train = 0.5
 verbose = false
-
-[tool.flwr.federations]
-default = "local-simulation"
-
-[tool.flwr.federations.local-simulation]
-options.num-supernodes = 10
-
-[tool.flwr.federations.local-deployment]
-address = "127.0.0.1:9093"
-root-certificates = "./.cache/certificates/ca.crt"

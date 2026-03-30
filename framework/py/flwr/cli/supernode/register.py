@@ -15,26 +15,19 @@
 """Flower command line interface `supernode register` command."""
 
 
-import io
-import json
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
+import click
 import typer
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from rich.console import Console
 
-from flwr.cli.config_utils import (
-    exit_if_no_address,
-    load_and_validate,
-    process_loaded_project_config,
-    validate_federation_in_project_config,
-)
-from flwr.common.constant import FAB_CONFIG_FILE, CliOutputFormat
+from flwr.cli.config_migration import migrate
+from flwr.cli.flower_config import read_superlink_connection
+from flwr.common.constant import CliOutputFormat
 from flwr.common.exit import ExitCode, flwr_exit
-from flwr.common.logger import print_json_error, redirect_output, restore_output
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RegisterNodeRequest,
     RegisterNodeResponse,
@@ -42,26 +35,28 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.supercore.primitives.asymmetric import public_key_to_bytes, uses_nist_ec_curve
 
-from ..utils import flwr_cli_grpc_exc_handler, init_channel, load_cli_auth_plugin
+from ..utils import (
+    cli_output_handler,
+    flwr_cli_grpc_exc_handler,
+    init_channel_from_connection,
+    print_json_to_stdout,
+)
 
 
 def register(  # pylint: disable=R0914
+    ctx: typer.Context,
     public_key: Annotated[
         Path,
         typer.Argument(
             help="Path to a P-384 (or any other NIST EC curve) public key file.",
         ),
     ],
-    app: Annotated[
-        Path,
-        typer.Argument(help="Path of the Flower project"),
-    ] = Path("."),
-    federation: Annotated[
+    superlink: Annotated[
         str | None,
-        typer.Argument(help="Name of the federation"),
+        typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,
@@ -70,69 +65,33 @@ def register(  # pylint: disable=R0914
     ] = CliOutputFormat.DEFAULT,
 ) -> None:
     """Add a SuperNode to the federation."""
-    suppress_output = output_format == CliOutputFormat.JSON
-    captured_output = io.StringIO()
-
     # Load public key
-    public_key_path = Path(public_key)
-    public_key_bytes = try_load_public_key(public_key_path)
+    public_key_bytes = try_load_public_key(public_key.expanduser())
 
-    try:
-        if suppress_output:
-            redirect_output(captured_output)
+    with cli_output_handler(output_format=output_format) as is_json:
+        # Migrate legacy usage if any
+        migrate(superlink, args=ctx.args)
 
-        # Load and validate federation config
-        typer.secho("Loading project configuration... ", fg=typer.colors.BLUE)
-
-        pyproject_path = app / FAB_CONFIG_FILE if app else None
-        config, errors, warnings = load_and_validate(pyproject_path, check_module=False)
-        config = process_loaded_project_config(config, errors, warnings)
-        federation, federation_config = validate_federation_in_project_config(
-            federation, config
-        )
-        exit_if_no_address(federation_config, "supernode register")
-
+        # Read superlink connection configuration
+        superlink_connection = read_superlink_connection(superlink)
         channel = None
+
         try:
-            auth_plugin = load_cli_auth_plugin(app, federation, federation_config)
-            channel = init_channel(app, federation_config, auth_plugin)
-            stub = ControlStub(channel)  # pylint: disable=unused-variable # noqa: F841
+            channel = init_channel_from_connection(superlink_connection)
+            stub = ControlStub(channel)
 
             _register_node(
-                stub=stub, public_key=public_key_bytes, output_format=output_format
+                stub=stub,
+                public_key=public_key_bytes,
+                is_json=is_json,
             )
 
-        except ValueError as err:
-            typer.secho(
-                f"❌ {err}",
-                fg=typer.colors.RED,
-                bold=True,
-                err=True,
-            )
-            raise typer.Exit(code=1) from err
         finally:
             if channel:
                 channel.close()
 
-    except (typer.Exit, Exception) as err:  # pylint: disable=broad-except
-        if suppress_output:
-            restore_output()
-            e_message = captured_output.getvalue()
-            print_json_error(e_message, err)
-        else:
-            typer.secho(
-                f"{err}",
-                fg=typer.colors.RED,
-                bold=True,
-                err=True,
-            )
-    finally:
-        if suppress_output:
-            restore_output()
-        captured_output.close()
 
-
-def _register_node(stub: ControlStub, public_key: bytes, output_format: str) -> None:
+def _register_node(stub: ControlStub, public_key: bytes, is_json: bool) -> None:
     """Register a node."""
     with flwr_cli_grpc_exc_handler():
         response: RegisterNodeResponse = stub.RegisterNode(
@@ -143,31 +102,23 @@ def _register_node(stub: ControlStub, public_key: bytes, output_format: str) -> 
             f"✅ SuperNode {response.node_id} registered successfully.",
             fg=typer.colors.GREEN,
         )
-        if output_format == CliOutputFormat.JSON:
-            run_output = json.dumps(
+        if is_json:
+            print_json_to_stdout(
                 {
                     "success": True,
                     "node-id": response.node_id,
                 }
             )
-            restore_output()
-            Console().print_json(run_output)
     else:
-        typer.secho(
-            "❌ SuperNode couldn't be registered.", fg=typer.colors.RED, err=True
-        )
+        raise click.ClickException("SuperNode couldn't be registered.")
 
 
 def try_load_public_key(public_key_path: Path) -> bytes:
     """Try to load a public key from a file."""
     if not public_key_path.exists():
-        typer.secho(
-            f"❌ Public key file '{public_key_path}' does not exist.",
-            fg=typer.colors.RED,
-            bold=True,
-            err=True,
+        raise click.ClickException(
+            f"Public key file '{public_key_path}' does not exist."
         )
-        raise typer.Exit(code=1)
 
     with open(public_key_path, "rb") as key_file:
         try:

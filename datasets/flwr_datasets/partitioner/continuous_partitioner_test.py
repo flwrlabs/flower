@@ -179,7 +179,7 @@ class TestContinuousPartitionerFailure(unittest.TestCase):
         dataset = Dataset.from_dict(data)
         partitioner = ContinuousPartitioner(3, partition_by="missing", strictness=0.5)
         partitioner.dataset = dataset
-        with self.assertRaises(KeyError):
+        with self.assertRaises(ValueError):
             _ = partitioner.load_partition(0)
 
     def test_nan_value_in_column_raises(self) -> None:

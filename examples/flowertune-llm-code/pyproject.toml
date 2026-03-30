@@ -9,20 +9,20 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flowertune-llm-code"
-version = "1.0.0"
+version = "1.1.2"
 description = "Base App for the Code challenge in the FlowerTune LLM Leaderboard"
 license = "Apache-2.0"
 # Dependencies for your Flower App
 dependencies = [
-    "flwr[simulation]>=1.25.0",
-    "flwr-datasets>=0.5.0",
+    "flwr[simulation]>=1.27.0",
+    "flwr-datasets>=0.6.0",
     "torch==2.9.1",
     "trl==0.8.1",
-    "bitsandbytes==0.45.4",
+    "bitsandbytes==0.49.1",
     "scipy==1.13.0",
     "peft==0.6.2",
     "transformers==4.53.0",
-    "sentencepiece==0.2.0",
+    "sentencepiece==0.2.1",
     "omegaconf==2.3.0",
     "hf_transfer==0.1.8",
 ]
@@ -47,6 +47,7 @@ model.gradient-checkpointing = true
 model.lora.peft-lora-r = 32
 model.lora.peft-lora-alpha = 64
 train.save-every-round = 5
+train.dynamic-data-seed = false
 train.learning-rate-max = 5e-5
 train.learning-rate-min = 1e-6
 train.seq-length = 512
@@ -68,13 +69,3 @@ num-server-rounds = 200
 # Dataset config (static for FlowerTune LLM Leaderboard)
 [tool.flwr.app.config.static]
 dataset.name = "flwrlabs/code-alpaca-20k"
-
-# Default federation to use when running the app
-[tool.flwr.federations]
-default = "local-simulation"
-
-# Local simulation federation with 10 virtual SuperNodes
-[tool.flwr.federations.local-simulation]
-options.num-supernodes = 10
-options.backend.client-resources.num-cpus = 6
-options.backend.client-resources.num-gpus = 1.0

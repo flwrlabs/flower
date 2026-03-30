@@ -105,6 +105,83 @@ class ControlStub:
     ]
     """Show Federation"""
 
+    CreateFederation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CreateFederationRequest,
+        flwr.proto.control_pb2.CreateFederationResponse,
+    ]
+    """Create Federation"""
+
+    ArchiveFederation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ArchiveFederationRequest,
+        flwr.proto.control_pb2.ArchiveFederationResponse,
+    ]
+    """Archive Federation"""
+
+    AddNodeToFederation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.AddNodeToFederationRequest,
+        flwr.proto.control_pb2.AddNodeToFederationResponse,
+    ]
+    """Add SuperNode to Federation"""
+
+    RemoveNodeFromFederation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.RemoveNodeFromFederationRequest,
+        flwr.proto.control_pb2.RemoveNodeFromFederationResponse,
+    ]
+    """Remove SuperNode from Federation"""
+
+    RemoveAccountFromFederation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.RemoveAccountFromFederationRequest,
+        flwr.proto.control_pb2.RemoveAccountFromFederationResponse,
+    ]
+    """Remove Account from Federation"""
+
+    CreateInvitation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CreateInvitationRequest,
+        flwr.proto.control_pb2.CreateInvitationResponse,
+    ]
+    """Create Invitation"""
+
+    ListInvitations: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListInvitationsRequest,
+        flwr.proto.control_pb2.ListInvitationsResponse,
+    ]
+    """List Invitations"""
+
+    AcceptInvitation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.AcceptInvitationRequest,
+        flwr.proto.control_pb2.AcceptInvitationResponse,
+    ]
+    """Accept Invitation"""
+
+    RejectInvitation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.RejectInvitationRequest,
+        flwr.proto.control_pb2.RejectInvitationResponse,
+    ]
+    """Reject Invitation"""
+
+    RevokeInvitation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.RevokeInvitationRequest,
+        flwr.proto.control_pb2.RevokeInvitationResponse,
+    ]
+    """Revoke Invitation"""
+
+    ConfigureSimulationFederation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ConfigureSimulationFederationRequest,
+        flwr.proto.control_pb2.ConfigureSimulationFederationResponse,
+    ]
+    """Set Simulation Configuration"""
+
+    StreamRunEvents: grpc.UnaryStreamMultiCallable[
+        flwr.proto.control_pb2.StreamRunEventsRequest,
+        flwr.proto.control_pb2.StreamRunEventsResponse,
+    ]
+    """##############
+    Unused for now
+    ##############
+
+    Start run event stream
+    """
+
 class ControlAsyncStub:
     StartRun: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.StartRunRequest,
@@ -177,6 +254,83 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.ShowFederationResponse,
     ]
     """Show Federation"""
+
+    CreateFederation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CreateFederationRequest,
+        flwr.proto.control_pb2.CreateFederationResponse,
+    ]
+    """Create Federation"""
+
+    ArchiveFederation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ArchiveFederationRequest,
+        flwr.proto.control_pb2.ArchiveFederationResponse,
+    ]
+    """Archive Federation"""
+
+    AddNodeToFederation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.AddNodeToFederationRequest,
+        flwr.proto.control_pb2.AddNodeToFederationResponse,
+    ]
+    """Add SuperNode to Federation"""
+
+    RemoveNodeFromFederation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.RemoveNodeFromFederationRequest,
+        flwr.proto.control_pb2.RemoveNodeFromFederationResponse,
+    ]
+    """Remove SuperNode from Federation"""
+
+    RemoveAccountFromFederation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.RemoveAccountFromFederationRequest,
+        flwr.proto.control_pb2.RemoveAccountFromFederationResponse,
+    ]
+    """Remove Account from Federation"""
+
+    CreateInvitation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.CreateInvitationRequest,
+        flwr.proto.control_pb2.CreateInvitationResponse,
+    ]
+    """Create Invitation"""
+
+    ListInvitations: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListInvitationsRequest,
+        flwr.proto.control_pb2.ListInvitationsResponse,
+    ]
+    """List Invitations"""
+
+    AcceptInvitation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.AcceptInvitationRequest,
+        flwr.proto.control_pb2.AcceptInvitationResponse,
+    ]
+    """Accept Invitation"""
+
+    RejectInvitation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.RejectInvitationRequest,
+        flwr.proto.control_pb2.RejectInvitationResponse,
+    ]
+    """Reject Invitation"""
+
+    RevokeInvitation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.RevokeInvitationRequest,
+        flwr.proto.control_pb2.RevokeInvitationResponse,
+    ]
+    """Revoke Invitation"""
+
+    ConfigureSimulationFederation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ConfigureSimulationFederationRequest,
+        flwr.proto.control_pb2.ConfigureSimulationFederationResponse,
+    ]
+    """Set Simulation Configuration"""
+
+    StreamRunEvents: grpc.aio.UnaryStreamMultiCallable[
+        flwr.proto.control_pb2.StreamRunEventsRequest,
+        flwr.proto.control_pb2.StreamRunEventsResponse,
+    ]
+    """##############
+    Unused for now
+    ##############
+
+    Start run event stream
+    """
 
 class ControlServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -274,5 +428,106 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.ShowFederationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ShowFederationResponse]]:
         """Show Federation"""
+
+    @abc.abstractmethod
+    def CreateFederation(
+        self,
+        request: flwr.proto.control_pb2.CreateFederationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.CreateFederationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.CreateFederationResponse]]:
+        """Create Federation"""
+
+    @abc.abstractmethod
+    def ArchiveFederation(
+        self,
+        request: flwr.proto.control_pb2.ArchiveFederationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ArchiveFederationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ArchiveFederationResponse]]:
+        """Archive Federation"""
+
+    @abc.abstractmethod
+    def AddNodeToFederation(
+        self,
+        request: flwr.proto.control_pb2.AddNodeToFederationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.AddNodeToFederationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.AddNodeToFederationResponse]]:
+        """Add SuperNode to Federation"""
+
+    @abc.abstractmethod
+    def RemoveNodeFromFederation(
+        self,
+        request: flwr.proto.control_pb2.RemoveNodeFromFederationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.RemoveNodeFromFederationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.RemoveNodeFromFederationResponse]]:
+        """Remove SuperNode from Federation"""
+
+    @abc.abstractmethod
+    def RemoveAccountFromFederation(
+        self,
+        request: flwr.proto.control_pb2.RemoveAccountFromFederationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.RemoveAccountFromFederationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.RemoveAccountFromFederationResponse]]:
+        """Remove Account from Federation"""
+
+    @abc.abstractmethod
+    def CreateInvitation(
+        self,
+        request: flwr.proto.control_pb2.CreateInvitationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.CreateInvitationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.CreateInvitationResponse]]:
+        """Create Invitation"""
+
+    @abc.abstractmethod
+    def ListInvitations(
+        self,
+        request: flwr.proto.control_pb2.ListInvitationsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListInvitationsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListInvitationsResponse]]:
+        """List Invitations"""
+
+    @abc.abstractmethod
+    def AcceptInvitation(
+        self,
+        request: flwr.proto.control_pb2.AcceptInvitationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.AcceptInvitationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.AcceptInvitationResponse]]:
+        """Accept Invitation"""
+
+    @abc.abstractmethod
+    def RejectInvitation(
+        self,
+        request: flwr.proto.control_pb2.RejectInvitationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.RejectInvitationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.RejectInvitationResponse]]:
+        """Reject Invitation"""
+
+    @abc.abstractmethod
+    def RevokeInvitation(
+        self,
+        request: flwr.proto.control_pb2.RevokeInvitationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.RevokeInvitationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.RevokeInvitationResponse]]:
+        """Revoke Invitation"""
+
+    @abc.abstractmethod
+    def ConfigureSimulationFederation(
+        self,
+        request: flwr.proto.control_pb2.ConfigureSimulationFederationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ConfigureSimulationFederationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ConfigureSimulationFederationResponse]]:
+        """Set Simulation Configuration"""
+
+    @abc.abstractmethod
+    def StreamRunEvents(
+        self,
+        request: flwr.proto.control_pb2.StreamRunEventsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[collections.abc.Iterator[flwr.proto.control_pb2.StreamRunEventsResponse], collections.abc.AsyncIterator[flwr.proto.control_pb2.StreamRunEventsResponse]]:
+        """##############
+        Unused for now
+        ##############
+
+        Start run event stream
+        """
 
 def add_ControlServicer_to_server(servicer: ControlServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

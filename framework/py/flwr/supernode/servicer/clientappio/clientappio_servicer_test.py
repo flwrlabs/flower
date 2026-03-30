@@ -21,11 +21,6 @@ from unittest.mock import Mock
 from parameterized import parameterized
 
 from flwr.common import Context, typing
-from flwr.common.inflatable import (
-    get_all_nested_objects,
-    get_object_tree,
-    iterate_object_tree,
-)
 from flwr.common.message import make_message
 from flwr.common.serde import fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker
@@ -47,10 +42,12 @@ from flwr.proto.message_pb2 import (  # pylint:disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import Run as ProtoRun  # pylint:disable=E0611
-from flwr.supernode.runtime.run_clientapp import (
-    pull_clientappinputs,
-    push_clientappoutputs,
+from flwr.supercore.inflatable.inflatable_object import (
+    get_all_nested_objects,
+    get_object_tree,
+    iterate_object_tree,
 )
+from flwr.supernode.runtime.run_clientapp import pull_appinputs, push_appoutputs
 
 from .clientappio_servicer import ClientAppIoServicer
 
@@ -103,13 +100,13 @@ class TestClientAppIoServicer(unittest.TestCase):
             )
 
         self.mock_stub.PullObject.side_effect = pull_object_side_effect
-        self.mock_stub.PullClientAppInputs.return_value = mock_response
+        self.mock_stub.PullAppInputs.return_value = mock_response
 
         # Execute
-        message, context, run, fab = pull_clientappinputs(self.mock_stub, token="abc")
+        message, context, run, fab = pull_appinputs(self.mock_stub, token="abc")
 
         # Assert
-        self.mock_stub.PullClientAppInputs.assert_called_once()
+        self.mock_stub.PullAppInputs.assert_called_once()
         self.assertEqual(len(message.content.array_records), 3)
         self.assertEqual(len(message.content.metric_records), 2)
         self.assertEqual(len(message.content.config_records), 1)
@@ -136,9 +133,9 @@ class TestClientAppIoServicer(unittest.TestCase):
             run_config={"runconfig1": 6.1},
         )
 
-        # Prepare: Mock PushClientAppOutputs RPC call
+        # Prepare: Mock PushAppOutputs RPC call
         mock_response = PushAppOutputsResponse()
-        self.mock_stub.PushClientAppOutputs.return_value = mock_response
+        self.mock_stub.PushAppOutputs.return_value = mock_response
 
         # Prepare: Mock PushMessage RPC call
         object_tree = get_object_tree(message)
@@ -159,12 +156,12 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_stub.PushObject.side_effect = mock_push_object
 
         # Execute
-        _ = push_clientappoutputs(
+        _ = push_appoutputs(
             stub=self.mock_stub, token="abc", message=message, context=context
         )
 
         # Assert
-        self.mock_stub.PushClientAppOutputs.assert_called_once()
+        self.mock_stub.PushAppOutputs.assert_called_once()
         self.mock_stub.PushMessage.assert_called_once()
         self.assertSetEqual(pushed_obj_ids, set(all_obj_ids))
 

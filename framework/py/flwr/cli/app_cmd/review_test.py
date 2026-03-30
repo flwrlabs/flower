@@ -20,9 +20,9 @@ from __future__ import annotations
 import base64
 from typing import Any
 
+import click
 import pytest
 import requests
-import typer
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from flwr.common import now
@@ -86,7 +86,8 @@ def test_download_fab_success(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_download_fab_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test that _download_fab() exits with typer.Exit when the GET request fails."""
+    """Test that _download_fab() exits with click.ClickException when the GET request
+    fails."""
 
     class Boom(requests.RequestException):
         """Custom RequestException subclass used to simulate network errors in tests."""
@@ -98,7 +99,7 @@ def test_download_fab_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     # Patch requests.get to raise an exception
     monkeypatch.setattr(requests, "get", boom, raising=True)
 
-    with pytest.raises(typer.Exit) as exc:
+    with pytest.raises(click.ClickException) as exc:
         _download_fab("https://example.ai/fab")
 
     assert exc.value.exit_code == 1
@@ -153,7 +154,7 @@ def test_submit_review_success_and_errors(
         return FakeResp(ok=False, status=503, text="oops")
 
     monkeypatch.setattr(requests, "post", fake_post_fail, raising=True)
-    with pytest.raises(typer.Exit) as exc:
+    with pytest.raises(click.ClickException) as exc:
         _submit_review("@u/a", "1.2.3", b"sigbytes", 123, "TKN")
     assert exc.value.exit_code == 1
 
@@ -163,6 +164,6 @@ def test_submit_review_success_and_errors(
         raise requests.RequestException("boom")
 
     monkeypatch.setattr(requests, "post", fake_post_raise, raising=True)
-    with pytest.raises(typer.Exit) as exc:
+    with pytest.raises(click.ClickException) as exc:
         _submit_review("@u/a", "1.2.3", b"sigbytes", 123, "TKN")
     assert exc.value.exit_code == 1

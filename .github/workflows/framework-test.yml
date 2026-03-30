@@ -1,0 +1,80 @@
+name: Framework Python
+
+on:
+  push:
+    branches:
+      - main
+      - 'release/framework-*'
+  pull_request:
+    branches:
+      - main
+      - 'release/framework-*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLWR_TELEMETRY_ENABLED: 0
+
+jobs:
+  changes:
+    runs-on: ubuntu-22.04
+    outputs:
+      framework: ${{ steps.filter.outputs.framework }}
+      ex_bench: ${{ steps.filter.outputs.ex_bench }}  # Examples and Benchmarks
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Filter changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            framework:
+              - 'framework/**/*'
+              - 'dev/devtool/**'
+              - 'dev/pyproject.toml'
+              - 'dev/uv.lock'
+              - '.github/workflows/framework-test.yml'
+            ex_bench:
+              - 'examples/**/*'
+              - 'benchmarks/**/*'
+              - 'dev/test.sh'
+              - '.github/workflows/framework-test.yml'
+
+  test_core:
+    runs-on: ubuntu-22.04
+    needs: changes
+    strategy:
+      matrix:
+        # Latest version which comes cached in the host image can be found here:
+        # https://github.com/actions/runner-images/blob/main/images/linux/Ubuntu2204-Readme.md#python
+        # In case of a mismatch, the job has to download Python to install it.
+        python: ['3.10', '3.11', '3.12', '3.13']
+
+    name: Python ${{ matrix.python }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Bootstrap
+        if: ${{ needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true' }}
+        uses: ./.github/actions/bootstrap
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install dependencies
+        if: ${{ needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true' }}
+        run: |
+          cd framework 
+          python -m poetry install --all-extras
+      - name: Check if protos need recompilation
+        if: ${{ needs.changes.outputs.framework == 'true' }}
+        run: ./framework/dev/check-protos.sh
+      - name: Lint + Test (isort/black/docformatter/mypy/pylint/flake8/pytest)
+        if: ${{ needs.changes.outputs.framework == 'true' }}
+        run: ./framework/dev/test.sh
+      - name: Check benchmarks and examples
+        if: ${{ needs.changes.outputs.ex_bench == 'true' }}
+        run: ./dev/test.sh

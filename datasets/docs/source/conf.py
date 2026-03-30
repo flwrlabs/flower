@@ -17,6 +17,12 @@
 import datetime
 import os
 import sys
+from pathlib import Path
+
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 
 # Configuration file for the Sphinx documentation builder.
 #
@@ -36,8 +42,16 @@ project = "Flower Datasets"
 copyright = f"{datetime.date.today().year} Flower Labs GmbH"
 author = "The Flower Authors"
 
-# The full version, including alpha/beta/rc tags
-release = "0.5.0"
+# Read version from pyproject.toml (single source of truth)
+_pyproject_path = Path(__file__).parent.parent.parent / "pyproject.toml"
+with open(_pyproject_path, "rb") as f:
+    _pyproject = tomllib.load(f)
+release = _pyproject["project"]["version"]
+
+# Make version available as a substitution in rst files (e.g., |release|)
+rst_prolog = f"""
+.. |release| replace:: {release}
+"""
 
 
 # -- General configuration ---------------------------------------------------
@@ -54,6 +68,7 @@ extensions = [
     "sphinx.ext.graphviz",
     "sphinxarg.ext",
     "myst_parser",
+    "sphinx_click",
     "sphinx_copybutton",
     "sphinx_design",
     "sphinxcontrib.mermaid",
@@ -129,7 +144,7 @@ html_theme_options = {
     # Sphinx Book Theme
     #
     # https://sphinx-book-theme.readthedocs.io/en/latest/configure.html
-    # "repository_url": "https://github.com/adap/flower",
+    # "repository_url": "https://github.com/flwrlabs/flower",
     # "repository_branch": "main",
     # "path_to_docs": "doc/source/",
     # "home_page_in_toc": True,
@@ -161,7 +176,7 @@ _open_in_colab_button = """
 .. raw:: html
 
     <br/>
-    <a href="https://colab.research.google.com/github/adap/flower/blob/main/datasets/docs/source/{{ env.doc2path(env.docname, base=None) }}">
+    <a href="https://colab.research.google.com/github/flwrlabs/flower/blob/main/datasets/docs/source/{{ env.doc2path(env.docname, base=None) }}">
         <img alt="Open in Colab" src="https://colab.research.google.com/assets/colab-badge.svg"/>
     </a>
 """

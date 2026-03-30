@@ -32,7 +32,6 @@ jobs:
         run: |
           cd framework
           python -m poetry install
-          pip install sphinx==7.4.7
 
       - name: Install pandoc
         uses: nikeee/setup-pandoc@v1
@@ -71,14 +70,15 @@ jobs:
         if: steps.calculate_diff.outputs.additions > 228 && steps.calculate_diff.outputs.deletions > 60
         uses: ad-m/github-push-action@master
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.FLWRMACHINE_TOKEN }}
           branch: ${{ env.branch-name }}
 
       - name: Create Pull Request
         if: steps.calculate_diff.outputs.additions > 228 && steps.calculate_diff.outputs.deletions > 60
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # Use a machine-user token so pull_request workflows trigger for the created PR.
+          token: ${{ secrets.FLWRMACHINE_TOKEN }}
           branch: ${{ env.branch-name }}
           base: ${{ env.base-branch }}
           delete-branch: true

@@ -1,0 +1,20 @@
+##########################################
+ [105] SUPERLINK_DATABASE_SCHEMA_MISMATCH
+##########################################
+
+*************
+ Description
+*************
+
+The SuperLink was started with a database schema that does not match the expected
+baseline schema.
+
+This typically occurs when using a pre-Alembic database that requires migration that has
+been modified.
+
+****************
+ How to Resolve
+****************
+
+Back up your database and either migrate it manually to the baseline schema or start
+with a fresh database.

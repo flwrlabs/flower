@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -77,6 +77,35 @@ html_baseurl = "https://flower.ai/docs/intelligence/"
 html_theme_options = {
     "light_logo": "fi-light-mode.png",
     "dark_logo": "fi-dark-mode.png",
+    "light_css_variables": {
+        "color-announcement-background": "#17222d",
+        "color-announcement-text": "#ffffff",
+        # Left sidebar
+        "color-sidebar-link-text": "#5e5e5e",
+        "color-sidebar-link-text--top-level": "#404040",
+        "color-sidebar-item-background--hover": "#e5e5e5",
+        "color-sidebar-search-background": "#f2f2f2",
+        "color-sidebar-search-background--focus": "#e2e2e2",
+        "color-sidebar-background": "#f2f2f2",
+        # Right sidebar (On this page)
+        "color-toc-item-text--active": "#404040",
+    },
+    "dark_css_variables": {
+        "color-announcement-text": "#ffffff",
+        "color-announcement-background": "#17222d",
+        # Left sidebar
+        "color-sidebar-link-text": "#7c7c7c",
+        "color-sidebar-link-text--top-level": "#ababab",
+        "color-sidebar-item-background--hover": "#222222",
+        "color-sidebar-background": "#161616",
+        "color-sidebar-search-background": "#161616",
+        "color-sidebar-search-background--focus": "#1c1c1c",
+        # Right sidebar (On this page)
+        "color-toc-title-text": "#7c7c7c",
+        "color-toc-item-text": "#ababab",
+        "color-toc-item-text--hover": "#d2d2d2",
+        "color-toc-item-text--active": "#fff5bf",
+    },
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
@@ -93,7 +122,7 @@ _open_in_colab_button = """
 .. raw:: html
 
     <br/>
-    <a href="https://colab.research.google.com/github/adap/flower/blob/main/datasets/docs/source/{{ env.doc2path(env.docname, base=None) }}">
+    <a href="https://colab.research.google.com/github/flwrlabs/flower/blob/main/datasets/docs/source/{{ env.doc2path(env.docname, base=None) }}">
         <img alt="Open in Colab" src="https://colab.research.google.com/assets/colab-badge.svg"/>
     </a>
 """

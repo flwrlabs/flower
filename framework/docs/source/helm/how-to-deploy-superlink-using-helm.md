@@ -1,12 +1,8 @@
 ---
 myst:
   html_meta:
-    description: Deploy Flower's SuperLink Helm chart to set up federated 
-      learning servers. Default config mirrors official releases, enabling 
-      seamless deployment, evaluation.
-    property:og:description: Deploy Flower's SuperLink Helm chart to set up 
-      federated learning servers. Default config mirrors official releases, 
-      enabling seamless deployment, evaluation.
+    description: Deploy Flower's SuperLink Helm chart to set up federated learning servers. Default config mirrors official releases, enabling seamless deployment, evaluation.
+    property:og:description: Deploy Flower's SuperLink Helm chart to set up federated learning servers. Default config mirrors official releases, enabling seamless deployment, evaluation.
 ---
 
 # Deploy SuperLink using Helm
@@ -41,7 +37,7 @@ superexec:
 
 ## Run simulations in Kubernetes using the Simulation Plugin
 
-For more details, visit: [Run simulations](../how-to-run-simulations.rst#run-simulations) guide.
+For more details, visit the [Run simulations](../how-to-run-simulations.rst) guide.
 
 ```yaml
 superlink:
@@ -196,7 +192,7 @@ global:
 Explanation of Parameters:
 
 - `authn_type`: The authentication mechanism being used (e.g., oidc).
-- `auth_url`: The OpenID Connect authentication endpoint where users authenticate.
+- `authn_url`: The OpenID Connect authentication endpoint where users authenticate.
 - `token_url`: The URL for retrieving access tokens.
 - `validate_url`: The endpoint for validating account authentication.
 - `oidc_client_id`: The client ID issued by the authentication provider.
@@ -232,7 +228,7 @@ stringData:
 
 ### Configuring OpenFGA
 
-The flower-server chat component supports OpenFGA as a fine-grained authorization service,
+The Flower server chart component supports OpenFGA as a fine-grained authorization service,
 but it is disabled by default.
 
 To enable OpenFGA change the following value in your `values.yml` file:
@@ -276,7 +272,7 @@ type service
 
 :::
 
-:::{dropdown} User permissions file `tuples.fga`
+:::{dropdown} User permissions file `tuples.yaml`
 
 ```yaml
 - user: flwr_aid:<OIDC_SUB_1>
@@ -445,7 +441,7 @@ tls:
   existingSecret: ""
 ```
 
-See the [Ingress Configuration](###generate-a-certificate-via-ingress-annotations) section for more information.
+See the [Ingress Configuration](#generate-a-certificate-via-ingress-annotations) section for more information.
 
 ## Use an Existing TLS Certificate
 
@@ -707,10 +703,12 @@ global:
 | `global.affinity.nodeAffinity.type`                  | Default node affinity rules. Either: `none`, `soft` or `hard`     | `hard`             |
 | `global.affinity.nodeAffinity.matchExpressions`      | Default match expressions for node affinity                       | `[]`               |
 | `global.nodeAuth.enabled`                            | Enables or Disables Node-Authentication SuperLink \<-> SuperNode  | `false`            |
-| `global.nodeAuth.authListPublicKeys`                 | A list of ecdsa-sha2-nistp384 SuperNode keys                      | `[]`               |
-| `global.userAuth.enabled`                            | Enables or disables the user authentication plugin.               | `false`            |
-| `global.userAuth.config`                             | Set the user authentication configuration.                        | `{}`               |
-| `global.userAuth.existingSecret`                     | Existing secret with user authentication configuration.           | `""`               |
+| `global.accountAuth.enabled`                         | Enables or disables the user authentication plugin.               | `false`            |
+| `global.accountAuth.config`                          | Set the user authentication configuration.                        | `{}`               |
+| `global.accountAuth.existingSecret`                  | Existing secret with user authentication configuration.           | `""`               |
+| `global.federationsConfig.enabled`                   | Enables or disables the federations configuration plugin.         | `false`            |
+| `global.federationsConfig.config`                    | Set the federations configuration.                                | `{}`               |
+| `global.federationsConfig.existingSecret`            | Existing secret with federations configuration.                   | `""`               |
 | `global.license.enabled`                             | Enables or disables the configuration of the EE license.          | `true`             |
 | `global.license.key`                                 | The EE license key.                                               | `""`               |
 | `global.license.secretKey`                           | The name of the key inside the Kubernetes Secret                  | `FLWR_LICENSE_KEY` |
@@ -836,7 +834,7 @@ global:
 | `superlink.imagePullSecrets`                                   | SuperLink image pull secrets which overrides global.imagePullSecrets                                                    | `[]`                      |
 | `superlink.image.registry`                                     | SuperLink image registry                                                                                                | `registry.hub.docker.com` |
 | `superlink.image.repository`                                   | SuperLink image repository                                                                                              | `flwr/superlink-ee`       |
-| `superlink.image.tag`                                          | SuperLink image tag                                                                                                     | `1.21.0-ubuntu`           |
+| `superlink.image.tag`                                          | SuperLink image tag                                                                                                     | `1.26.1-ubuntu`           |
 | `superlink.image.digest`                                       | SuperLink image digest                                                                                                  | `""`                      |
 | `superlink.image.pullPolicy`                                   | SuperLink image pullPolicy which Components image pullPolicy                                                            | `IfNotPresent`            |
 | `superlink.networkPolicy.enabled`                              | Specifies whether a NetworkPolicy should be created                                                                     | `true`                    |
@@ -859,56 +857,57 @@ global:
 
 ### Component SuperExec
 
-| Name                                                    | Description                                                                                                       | Value                       |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| `superexec.name`                                        | Name of the SuperExec                                                                                             | `superexec-serverapp`       |
-| `superexec.enabled`                                     | Enable or disable SuperExec                                                                                       | `false`                     |
-| `superexec.superlink`                                   | Address of the SuperLink the SuperExec should connect to                                                          | `{}`                        |
-| `superexec.resources`                                   | Set container requests and limits for different resources like CPU or memory (essential for production workloads) | `{}`                        |
-| `superexec.volumes`                                     | Optionally specify list of volumes for the SuperExec pod(s)                                                       | `[]`                        |
-| `superexec.volumeMounts`                                | Allows to specify additional VolumeMounts                                                                         | `[]`                        |
-| `superexec.automountServiceAccountToken`                | Automount SA-Token into the pod.                                                                                  | `true`                      |
-| `superexec.serviceAccount.enabled`                      | Enable a service account for this component                                                                       | `true`                      |
-| `superexec.serviceAccount.annotations`                  | Annotations applied to enabled service account                                                                    | `{}`                        |
-| `superexec.serviceAccount.labels`                       | Labels applied to enabled service account                                                                         | `{}`                        |
-| `superexec.serviceAccount.automountServiceAccountToken` | Automount SA-Token                                                                                                | `true`                      |
-| `superexec.containerPorts.health`                       | Container port for SuperExec Health API                                                                           | `8081`                      |
-| `superexec.podSecurityContext`                          | Security settings that for the SuperExec Pods                                                                     | `{}`                        |
-| `superexec.livenessProbe.enabled`                       | Enable livenessProbe on SuperExec containers                                                                      | `true`                      |
-| `superexec.livenessProbe.initialDelaySeconds`           | Initial delay seconds for livenessProbe                                                                           | `0`                         |
-| `superexec.livenessProbe.periodSeconds`                 | Period seconds for livenessProbe                                                                                  | `10`                        |
-| `superexec.livenessProbe.timeoutSeconds`                | Timeout seconds for livenessProbe                                                                                 | `1`                         |
-| `superexec.livenessProbe.failureThreshold`              | Failure threshold for livenessProbe                                                                               | `3`                         |
-| `superexec.livenessProbe.successThreshold`              | Success threshold for livenessProbe                                                                               | `1`                         |
-| `superexec.readinessProbe.enabled`                      | Enable readinessProbe on SuperExec containers                                                                     | `true`                      |
-| `superexec.readinessProbe.initialDelaySeconds`          | Initial delay seconds for readinessProbe                                                                          | `0`                         |
-| `superexec.readinessProbe.periodSeconds`                | Period seconds for readinessProbe                                                                                 | `10`                        |
-| `superexec.readinessProbe.timeoutSeconds`               | Timeout seconds for readinessProbe                                                                                | `1`                         |
-| `superexec.readinessProbe.failureThreshold`             | Failure threshold for readinessProbe                                                                              | `3`                         |
-| `superexec.readinessProbe.successThreshold`             | Success threshold for readinessProbe                                                                              | `1`                         |
-| `superexec.replicas`                                    | The number of SuperExec pods to run                                                                               | `1`                         |
-| `superexec.labels`                                      | Extra labels for SuperExec pods                                                                                   | `{}`                        |
-| `superexec.extraArgs`                                   | Add extra arguments to the default arguments for the SuperExec                                                    | `[]`                        |
-| `superexec.nodeSelector`                                | Node labels for SuperExec pods which merges with global.nodeSelector                                              | `{}`                        |
-| `superexec.tolerations`                                 | Node tolerations for SuperExec pods which merges with global.tolerations                                          | `[]`                        |
-| `superexec.updateStrategy.type`                         | SuperExec deployment strategy type                                                                                | `RollingUpdate`             |
-| `superexec.updateStrategy.rollingUpdate`                | SuperExec deployment rolling update configuration parameters                                                      | `{}`                        |
-| `superexec.affinity`                                    | Node affinity for SuperExec pods which merges with global.affinity                                                | `{}`                        |
-| `superexec.env`                                         | Array with extra environment variables to add to SuperExec nodes which merges with global.env                     | `[]`                        |
-| `superexec.lifecycle`                                   | SuperExec container(s) to automate configuration before or after startup                                          | `{}`                        |
-| `superexec.annotations`                                 | Additional custom annotations for SuperExec                                                                       | `{}`                        |
-| `superexec.selectorLabels`                              | Extra selectorLabels for SuperExec pods                                                                           | `{}`                        |
-| `superexec.podAnnotations`                              | Annotations for SuperExec pods                                                                                    | `{}`                        |
-| `superexec.podLabels`                                   | Extra podLabels for SuperExec pods                                                                                | `{}`                        |
-| `superexec.imagePullSecrets`                            | SuperExec image pull secrets which overrides global.imagePullSecrets                                              | `[]`                        |
-| `superexec.image.registry`                              | SuperExec image registry                                                                                          | `registry.hub.docker.com`   |
-| `superexec.image.repository`                            | SuperExec image repository                                                                                        | `flwr/superexec`            |
-| `superexec.image.tag`                                   | Image tag of SuperExec                                                                                            | `1.21.0-py3.11-ubuntu24.04` |
-| `superexec.image.digest`                                | Image digest of SuperExec                                                                                         | `""`                        |
-| `superexec.image.pullPolicy`                            | Components image pullPolicy                                                                                       | `Always`                    |
-| `superexec.networkPolicy.enabled`                       | Specifies whether a NetworkPolicy should be created                                                               | `true`                      |
-| `superexec.networkPolicy.allowExternalEgress`           | Allow unrestricted egress traffic                                                                                 | `true`                      |
-| `superexec.networkPolicy.extraEgress`                   | Add extra ingress rules to the NetworkPolicy (ignored if allowExternalEgress=true)                                | `[]`                        |
+| Name                                                    | Description                                                                                                       | Value                     |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `superexec.name`                                        | Name of the SuperExec                                                                                             | `superexec-serverapp`     |
+| `superexec.enabled`                                     | Enable or disable SuperExec                                                                                       | `false`                   |
+| `superexec.pluginType`                                  | The type of plugin to use.                                                                                        | `serverapp`               |
+| `superexec.superlink`                                   | Address of the SuperLink the SuperExec should connect to                                                          | `{}`                      |
+| `superexec.resources`                                   | Set container requests and limits for different resources like CPU or memory (essential for production workloads) | `{}`                      |
+| `superexec.volumes`                                     | Optionally specify list of volumes for the SuperExec pod(s)                                                       | `[]`                      |
+| `superexec.volumeMounts`                                | Allows to specify additional VolumeMounts                                                                         | `[]`                      |
+| `superexec.automountServiceAccountToken`                | Automount SA-Token into the pod.                                                                                  | `true`                    |
+| `superexec.serviceAccount.enabled`                      | Enable a service account for this component                                                                       | `true`                    |
+| `superexec.serviceAccount.annotations`                  | Annotations applied to enabled service account                                                                    | `{}`                      |
+| `superexec.serviceAccount.labels`                       | Labels applied to enabled service account                                                                         | `{}`                      |
+| `superexec.serviceAccount.automountServiceAccountToken` | Automount SA-Token                                                                                                | `true`                    |
+| `superexec.containerPorts.health`                       | Container port for SuperExec Health API                                                                           | `8081`                    |
+| `superexec.podSecurityContext`                          | Security settings for the SuperExec Pods                                                                          | `{}`                      |
+| `superexec.livenessProbe.enabled`                       | Enable livenessProbe on SuperExec containers                                                                      | `true`                    |
+| `superexec.livenessProbe.initialDelaySeconds`           | Initial delay seconds for livenessProbe                                                                           | `0`                       |
+| `superexec.livenessProbe.periodSeconds`                 | Period seconds for livenessProbe                                                                                  | `10`                      |
+| `superexec.livenessProbe.timeoutSeconds`                | Timeout seconds for livenessProbe                                                                                 | `1`                       |
+| `superexec.livenessProbe.failureThreshold`              | Failure threshold for livenessProbe                                                                               | `3`                       |
+| `superexec.livenessProbe.successThreshold`              | Success threshold for livenessProbe                                                                               | `1`                       |
+| `superexec.readinessProbe.enabled`                      | Enable readinessProbe on SuperExec containers                                                                     | `true`                    |
+| `superexec.readinessProbe.initialDelaySeconds`          | Initial delay seconds for readinessProbe                                                                          | `0`                       |
+| `superexec.readinessProbe.periodSeconds`                | Period seconds for readinessProbe                                                                                 | `10`                      |
+| `superexec.readinessProbe.timeoutSeconds`               | Timeout seconds for readinessProbe                                                                                | `1`                       |
+| `superexec.readinessProbe.failureThreshold`             | Failure threshold for readinessProbe                                                                              | `3`                       |
+| `superexec.readinessProbe.successThreshold`             | Success threshold for readinessProbe                                                                              | `1`                       |
+| `superexec.replicas`                                    | The number of SuperExec pods to run                                                                               | `1`                       |
+| `superexec.labels`                                      | Extra labels for SuperExec pods                                                                                   | `{}`                      |
+| `superexec.extraArgs`                                   | Add extra arguments to the default arguments for the SuperExec                                                    | `[]`                      |
+| `superexec.nodeSelector`                                | Node labels for SuperExec pods which merges with global.nodeSelector                                              | `{}`                      |
+| `superexec.tolerations`                                 | Node tolerations for SuperExec pods which merges with global.tolerations                                          | `[]`                      |
+| `superexec.updateStrategy.type`                         | SuperExec deployment strategy type                                                                                | `RollingUpdate`           |
+| `superexec.updateStrategy.rollingUpdate`                | SuperExec deployment rolling update configuration parameters                                                      | `{}`                      |
+| `superexec.affinity`                                    | Node affinity for SuperExec pods which merges with global.affinity                                                | `{}`                      |
+| `superexec.env`                                         | Array with extra environment variables to add to SuperExec nodes which merges with global.env                     | `[]`                      |
+| `superexec.lifecycle`                                   | SuperExec container(s) to automate configuration before or after startup                                          | `{}`                      |
+| `superexec.annotations`                                 | Additional custom annotations for SuperExec                                                                       | `{}`                      |
+| `superexec.selectorLabels`                              | Extra selectorLabels for SuperExec pods                                                                           | `{}`                      |
+| `superexec.podAnnotations`                              | Annotations for SuperExec pods                                                                                    | `{}`                      |
+| `superexec.podLabels`                                   | Extra podLabels for SuperExec pods                                                                                | `{}`                      |
+| `superexec.imagePullSecrets`                            | SuperExec image pull secrets which overrides global.imagePullSecrets                                              | `[]`                      |
+| `superexec.image.registry`                              | SuperExec image registry                                                                                          | `registry.hub.docker.com` |
+| `superexec.image.repository`                            | SuperExec image repository                                                                                        | `flwr/superexec-ee`       |
+| `superexec.image.tag`                                   | Image tag of SuperExec                                                                                            | `1.26.1-ubuntu`           |
+| `superexec.image.digest`                                | Image digest of SuperExec                                                                                         | `""`                      |
+| `superexec.image.pullPolicy`                            | Components image pullPolicy                                                                                       | `Always`                  |
+| `superexec.networkPolicy.enabled`                       | Specifies whether a NetworkPolicy should be created                                                               | `true`                    |
+| `superexec.networkPolicy.allowExternalEgress`           | Allow unrestricted egress traffic                                                                                 | `true`                    |
+| `superexec.networkPolicy.extraEgress`                   | Add extra ingress rules to the NetworkPolicy (ignored if allowExternalEgress=true)                                | `[]`                      |
 
 ### Component OpenFGA
 

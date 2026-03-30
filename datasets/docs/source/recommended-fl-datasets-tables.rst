@@ -157,3 +157,20 @@ Text Datasets
    * - `bigbio/med_qa <https://huggingface.co/datasets/bigbio/med_qa>`_
      - train 10.1k; test 1.3k; validation 1.3k
      - Medical
+
+
+Multimodal Datasets
+~~~~~~~~~~~~~~~~~~~~
+
+.. list-table:: Multimodal Datasets
+   :widths: 40 20 20 20
+   :header-rows: 1
+
+   * - Name
+     - Size
+     - Modalities
+     - Category
+   * - `panitsasi/fedjam <https://huggingface.co/datasets/panitsasi/fedjam>`_
+     - 36k samples
+     - Spectrogram images + time-series KPIs
+     - Wireless jamming classification

@@ -1,9 +1,10 @@
-# Defines the PR title format to be used in the `check_pr_title.py` script
+# Defines the PR title format to be used in the `devtool.check_pr_title` script
 # and in the `update_changelog.py` script
 
 type = ["ci", "docs", "feat", "fix", "refactor", "break"]
 
 project = [
+    "devtool",
     "framework",
     "baselines",
     "datasets",
@@ -11,6 +12,7 @@ project = [
     "benchmarks",
     "glossary",
     "intelligence",
+    "hub",
 ]
 
 scope = "skip"

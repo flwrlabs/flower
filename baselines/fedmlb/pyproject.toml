@@ -10,7 +10,7 @@ license = "Apache-2.0"
 authors = ["Alessio Mora <alessio.mora@unibo.it>"]
 readme = "README.md"
 homepage = "https://flower.ai"
-repository = "https://github.com/adap/flower"
+repository = "https://github.com/flwrlabs/flower"
 documentation = "https://flower.ai"
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -55,7 +55,7 @@ pytest = "==6.2.4"
 pytest-watch = "==4.2.0"
 ruff = "==0.4.5"
 types-requests = "==2.27.7"
-virtualenv = "==20.21.0"
+virtualenv = "==20.36.1"
 
 [tool.isort]
 line_length = 88

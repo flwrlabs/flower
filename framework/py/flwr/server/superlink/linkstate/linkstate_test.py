@@ -27,15 +27,8 @@ from uuid import uuid4
 
 from parameterized import parameterized
 
-from flwr.common import (
-    DEFAULT_TTL,
-    ConfigRecord,
-    Context,
-    Error,
-    Message,
-    RecordDict,
-    now,
-)
+from flwr.app.user_config import UserConfig
+from flwr.common import DEFAULT_TTL, Context, Error, Message, RecordDict, now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     RUN_FAILURE_DETAILS_NO_HEARTBEAT,
@@ -45,7 +38,8 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.common.typing import RunStatus, UserConfig
+from flwr.common.typing import RunStatus
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
 from flwr.proto.message_pb2 import Message as ProtoMessage
@@ -53,12 +47,8 @@ from flwr.proto.message_pb2 import Metadata as ProtoMetadata
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 
 # pylint: enable=E0611
-from flwr.server.superlink.linkstate import (
-    InMemoryLinkState,
-    LinkState,
-    SqliteLinkState,
-)
-from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus
+from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
+from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, RunType
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
@@ -81,8 +71,8 @@ class StateTest(CoreStateTest):
         _, public_key = generate_key_pairs()
         return public_key_to_bytes(public_key)
 
-    def test_create_and_get_run(self) -> None:
-        """Test if create_run and get_run work correctly."""
+    def test_create_and_get_run_info(self) -> None:
+        """Test if create_run and get_run_info work correctly."""
         # Prepare
         state: LinkState = self.state_factory()
         run_id = state.create_run(
@@ -91,102 +81,200 @@ class StateTest(CoreStateTest):
             "9f86d08",
             {"test_key": "test_value"},
             "health-federation",
-            ConfigRecord(),
+            None,
             "i1r9f",
+            RunType.SERVER_APP,
         )
 
         # Execute
-        run = state.get_run(run_id)
+        run = state.get_run_info(run_ids=[run_id])[0]
 
         # Assert
-        assert run is not None
         assert run.run_id == run_id
         assert run.fab_hash == "9f86d08"
         assert run.federation == "health-federation"
         assert run.override_config["test_key"] == "test_value"
         assert run.flwr_aid == "i1r9f"
 
-    def test_get_all_run_ids(self) -> None:
-        """Test if get_run_ids works correctly."""
+    def test_get_run_info_without_filters_returns_all_runs(self) -> None:
+        """Test get_run_info returns all runs when no filter is provided."""
+        # Prepare
+        state = self.state_factory()
+        run_id1 = create_dummy_run(state, flwr_aid="aid-1", federation="federation-1")
+        run_id2 = create_dummy_run(state, flwr_aid="aid-2", federation="federation-2")
+
+        # Execute
+        runs = state.get_run_info()
+
+        # Assert
+        self.assertSetEqual({run.run_id for run in runs}, {run_id1, run_id2})
+
+    def test_get_run_info_filter_by_run_ids(self) -> None:
+        """Test get_run_info filters correctly by run_ids."""
         # Prepare
         state = self.state_factory()
         run_id1 = create_dummy_run(state)
-        run_id2 = create_dummy_run(state)
+        _ = create_dummy_run(state)
+        run_id3 = create_dummy_run(state)
 
         # Execute
-        run_ids = state.get_run_ids(None)
+        runs = state.get_run_info(run_ids=[run_id1, run_id3])
 
         # Assert
-        assert run_id1 in run_ids
-        assert run_id2 in run_ids
+        self.assertSetEqual({run.run_id for run in runs}, {run_id1, run_id3})
 
-    def test_get_all_run_ids_empty(self) -> None:
-        """Test if get_run_ids works correctly when no runs are present."""
+    def test_get_run_info_filter_logic(self) -> None:
+        """Test get_run_info ORs within each filter and ANDs across filters."""
         # Prepare
         state = self.state_factory()
 
+        _ = create_dummy_run(state, flwr_aid="aid-1", federation="federation-a")
+        run_id2 = create_dummy_run(state, flwr_aid="aid-1", federation="federation-b")
+        run_id3 = create_dummy_run(state, flwr_aid="aid-2", federation="federation-a")
+        run_id4 = create_dummy_run(state, flwr_aid="aid-2", federation="federation-b")
+
+        transition_run_status(state, run_id2, 1)  # STARTING
+        transition_run_status(state, run_id3, 1)  # STARTING
+        transition_run_status(state, run_id4, 2)  # RUNNING
+
         # Execute
-        run_ids = state.get_run_ids(None)
+        runs = state.get_run_info(
+            statuses=[Status.STARTING, Status.RUNNING],
+            flwr_aids=["aid-2"],
+            federations=["federation-a", "federation-b"],
+        )
 
         # Assert
-        assert len(run_ids) == 0
+        self.assertSetEqual({run.run_id for run in runs}, {run_id3, run_id4})
 
-    def test_get_run_ids_with_flwr_aid(self) -> None:
-        """When a specific flwr_aid is passed, only its run_ids are returned."""
+    def test_get_run_info_filter_by_statuses(self) -> None:
+        """Test get_run_info filters correctly by statuses only."""
+        # Prepare
         state = self.state_factory()
+        pending_run_id = create_dummy_run(state)
+        starting_run_id = create_dummy_run(state)
+        running_run_id = create_dummy_run(state)
+        finished_run_id = create_dummy_run(state)
 
-        # Prepare - Create three runs with different flwr_aid values
-        run_id1 = create_dummy_run(state, flwr_aid="userA")
-        run_id2 = create_dummy_run(state, flwr_aid="userB")
-        run_id3 = create_dummy_run(state, flwr_aid="userA")
+        transition_run_status(state, starting_run_id, 1)
+        transition_run_status(state, running_run_id, 2)
+        transition_run_status(state, finished_run_id, 3)
 
-        # Execute - Only the runs for "userA" should be returned
-        result_userA = state.get_run_ids("userA")
+        expected_runs = {
+            Status.PENDING: {pending_run_id},
+            Status.STARTING: {starting_run_id},
+            Status.RUNNING: {running_run_id},
+            Status.FINISHED: {finished_run_id},
+        }
 
-        # Assert
-        assert result_userA == {run_id1, run_id3}
+        # Execute & Assert
+        for status, expected_run_ids in expected_runs.items():
+            with self.subTest(status=status):
+                runs = state.get_run_info(statuses=[status])
+                self.assertSetEqual(
+                    {run.run_id for run in runs},
+                    expected_run_ids,
+                )
 
-        # Execute - Only the run for "userB" should be returned
-        result_userB = state.get_run_ids("userB")
-
-        # Assert
-        assert result_userB == {run_id2}
-
-    def test_get_run_ids_with_unknown_flwr_aid(self) -> None:
-        """If an unknown flwr_aid is passed, get_run_ids returns an empty set."""
+    def test_get_run_info_filter_by_federations(self) -> None:
+        """Test get_run_info filters correctly by federations only."""
+        # Prepare
         state = self.state_factory()
+        run_id1 = create_dummy_run(state, federation="federation-a")
+        _ = create_dummy_run(state, federation="federation-b")
+        run_id3 = create_dummy_run(state, federation="federation-a")
 
-        # Prepare - Seed with one run under "existing"
-        existing_id = create_dummy_run(state, flwr_aid="existing")
-
-        # Execute - Query with a flwr_aid that has no runs
-        result = state.get_run_ids("nonexistent")
+        # Execute
+        runs = state.get_run_info(federations=["federation-a"])
 
         # Assert
-        assert result == set()
+        self.assertSetEqual({run.run_id for run in runs}, {run_id1, run_id3})
 
-        # Sanity check that the existing run is still retrievable by its own aid
-        assert state.get_run_ids("existing") == {existing_id}
+    def test_get_run_info_filter_by_flwr_aids(self) -> None:
+        """Test get_run_info filters correctly by flwr_aids only."""
+        # Prepare
+        state = self.state_factory()
+        run_id1 = create_dummy_run(state, flwr_aid="aid-1")
+        _ = create_dummy_run(state, flwr_aid="aid-2")
+        run_id3 = create_dummy_run(state, flwr_aid="aid-1")
 
-    def test_get_pending_run_id(self) -> None:
-        """Test if get_pending_run_id works correctly."""
+        # Execute
+        runs = state.get_run_info(flwr_aids=["aid-1"])
+
+        # Assert
+        self.assertSetEqual({run.run_id for run in runs}, {run_id1, run_id3})
+
+    def test_get_run_info_filter_by_nonexistent_run_ids(self) -> None:
+        """Test get_run_info returns empty for non-existent run_ids."""
         # Prepare
         state = self.state_factory()
         _ = create_dummy_run(state)
-        run_id2 = create_dummy_run(state)
-        state.update_run_status(run_id2, RunStatus(Status.STARTING, "", ""))
 
         # Execute
-        pending_run_id = state.get_pending_run_id()
-        assert pending_run_id is not None
-        run_status_dict = state.get_run_status({pending_run_id})
-        assert run_status_dict[pending_run_id].status == Status.PENDING
+        runs = state.get_run_info(run_ids=[999999])
 
-        # Change state
-        state.update_run_status(pending_run_id, RunStatus(Status.STARTING, "", ""))
-        # Attempt get pending run
-        pending_run_id = state.get_pending_run_id()
-        assert pending_run_id is None
+        # Assert
+        self.assertEqual(list(runs), [])
+
+    def test_get_run_info_order_by_pending_at_and_limit(self) -> None:
+        """Test get_run_info ordering by pending_at and applying limit."""
+        # Prepare
+        state = self.state_factory()
+        run_id1 = create_dummy_run(state)
+        time.sleep(1e-6)
+        run_id2 = create_dummy_run(state)
+        time.sleep(1e-6)
+        run_id3 = create_dummy_run(state)
+        run_ids = [run_id1, run_id2, run_id3]
+
+        # Execute
+        ascending_runs = state.get_run_info(order_by="pending_at", ascending=True)
+        descending_runs = state.get_run_info(order_by="pending_at", ascending=False)
+        limited_runs = state.get_run_info(
+            order_by="pending_at", ascending=True, limit=2
+        )
+
+        # Assert
+        self.assertEqual([run.run_id for run in ascending_runs], run_ids)
+        self.assertEqual([run.run_id for run in descending_runs], run_ids[::-1])
+        self.assertEqual([run.run_id for run in limited_runs], run_ids[:2])
+
+    @parameterized.expand([(1,), (2,), (9999,)])  # type: ignore
+    def test_get_run_info_limit_without_order_by(self, limit: int) -> None:
+        """Test get_run_info applies limit when no order_by is specified."""
+        # Prepare
+        state = self.state_factory()
+        run_ids = {create_dummy_run(state) for _ in range(3)}
+        expected_count = min(limit, len(run_ids))
+
+        # Execute
+        runs = state.get_run_info(limit=limit)
+        returned_run_ids = {run.run_id for run in runs}
+
+        # Assert
+        self.assertEqual(len(runs), expected_count)
+        self.assertEqual(len(returned_run_ids), expected_count)
+        self.assertTrue(returned_run_ids.issubset(run_ids))
+
+    def test_get_run_info_empty_filters(self) -> None:
+        """Test get_run_info returns empty when any filter list is empty."""
+        # Prepare
+        state = self.state_factory()
+        _ = create_dummy_run(state, flwr_aid="aid-1", federation="federation-a")
+        _ = create_dummy_run(state, flwr_aid="aid-2", federation="federation-b")
+
+        # Execute & Assert
+        runs_statuses_empty = state.get_run_info(statuses=[])
+        self.assertEqual(list(runs_statuses_empty), [])
+
+        runs_flwr_aids_empty = state.get_run_info(flwr_aids=[])
+        self.assertEqual(list(runs_flwr_aids_empty), [])
+
+        runs_federations_empty = state.get_run_info(federations=[])
+        self.assertEqual(list(runs_federations_empty), [])
+
+        runs_run_ids_empty = state.get_run_info(run_ids=[])
+        self.assertEqual(list(runs_run_ids_empty), [])
 
     def test_get_and_update_run_status(self) -> None:
         """Test if get_run_status and update_run_status work correctly."""
@@ -207,7 +295,7 @@ class StateTest(CoreStateTest):
         assert status2.status == Status.RUNNING
 
     @parameterized.expand(
-        [("get_run",), ("get_run_status",), ("update_run_status",)]
+        [("get_run_info",), ("get_run_status",), ("update_run_status",)]
     )  # type: ignore
     def test_run_failed_due_to_heartbeat(self, test_method: str) -> None:
         """Test methods work correctly when the run has no heartbeat."""
@@ -224,9 +312,8 @@ class StateTest(CoreStateTest):
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = patched_dt
 
-            if test_method == "get_run":
-                run = state.get_run(run_id)
-                assert run is not None
+            if test_method == "get_run_info":
+                run = state.get_run_info(run_ids=[run_id])[0]
                 status = run.status
             elif test_method == "get_run_status":
                 status = state.get_run_status({run_id})[run_id]
@@ -698,12 +785,11 @@ class StateTest(CoreStateTest):
         with self.assertRaises(ValueError):
             state.create_node("fake_aid2", "fake_name", public_key, 10)
         retrieved_nodes = state.get_node_info()
-        retrieved_public_key = state.get_node_public_key(node_id)
 
         # Assert
         assert len(retrieved_nodes) == 1
         assert retrieved_nodes[0].node_id == node_id
-        assert retrieved_public_key == public_key
+        assert retrieved_nodes[0].public_key == public_key
 
         # Assert node_ids and public_key_to_node_id are synced
         if isinstance(state, InMemoryLinkState):
@@ -864,25 +950,6 @@ class StateTest(CoreStateTest):
         # Test failed deactivation when UNREGISTERED
         state.delete_node("mock_flwr_aid", node_id)
         assert not state.deactivate_node(node_id)
-
-    def test_delete_node_public_key(self) -> None:
-        """Test deleting a client node with public key."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        public_key = b"mock"
-        run_id = create_dummy_run(state)
-        node_id = state.create_node(
-            "fake_aid", "fake_name", public_key, heartbeat_interval=10
-        )
-
-        # Execute
-        state.delete_node("fake_aid", node_id)
-        retrieved_node_ids = state.get_nodes(run_id)
-        with self.assertRaises(ValueError):
-            _ = state.get_node_public_key(node_id)
-
-        # Assert
-        assert len(retrieved_node_ids) == 0
 
     def test_get_nodes_invalid_run_id(self) -> None:
         """Test retrieving all node_ids with invalid run_id."""
@@ -1580,7 +1647,7 @@ class StateTest(CoreStateTest):
         run_id = create_dummy_run(state)
         log_entry = "Log entry"
         state.add_serverapp_log(run_id, log_entry)
-        timestamp = now().timestamp()
+        timestamp = now().timestamp() + 0.001  # Ensure timestamp is after the log entry
 
         # Execute
         retrieved_logs, latest = state.get_serverapp_log(
@@ -1591,24 +1658,28 @@ class StateTest(CoreStateTest):
         assert latest == 0
         assert retrieved_logs == ""
 
-    def test_create_run_with_and_without_federation_options(self) -> None:
-        """Test that the recording and fetching of federation options works."""
+    def test_create_run_with_and_without_federation_config(self) -> None:
+        """Test that run federation config is stored on the run."""
         # Prepare
         state = self.state_factory()
-        # A run w/ federation options
-        fed_options = ConfigRecord({"setting-a": 123, "setting-b": [4, 5, 6]})
-        run_id = create_dummy_run(state, federation_options=fed_options)
+        federation_config = SimulationConfig(num_supernodes=3, backend="ray")
+        run_id = create_dummy_run(
+            state,
+            federation_config=federation_config,
+            run_type=RunType.SIMULATION,
+        )
         state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
+        second_run_id = create_dummy_run(state)
 
         # Execute
-        fed_options_fetched = state.get_federation_options(run_id=run_id)
+        run_info = state.get_run_info(run_ids=[run_id])[0]
+        second_run_info = state.get_run_info(run_ids=[second_run_id])[0]
 
         # Assert
-        assert fed_options_fetched == fed_options
-
-        # Generate a run_id that doesn't exist. Then check None is returned
-        unique_int = next(num for num in range(0, 1) if num not in {run_id})
-        assert state.get_federation_options(run_id=unique_int) is None
+        assert run_info.run_type == RunType.SIMULATION
+        assert state.get_federation_config(run_id) == federation_config
+        assert second_run_info.run_type == RunType.SERVER_APP
+        assert state.get_federation_config(second_run_id) is None
 
     def test_set_linkstate_of_federation_manager(self) -> None:
         """Test that setting the LinkState of the FederationManager works."""
@@ -1624,10 +1695,9 @@ class StateTest(CoreStateTest):
 
         # Execute
         state.store_traffic(run_id, bytes_sent=1000, bytes_recv=2000)
-        run = state.get_run(run_id)
+        run = state.get_run_info(run_ids=[run_id])[0]
 
         # Assert
-        assert run is not None
         assert run.bytes_sent == 1000
         assert run.bytes_recv == 2000
 
@@ -1642,10 +1712,9 @@ class StateTest(CoreStateTest):
         state.store_traffic(run_id, bytes_sent=1000, bytes_recv=500)
         state.store_traffic(run_id, bytes_sent=2000, bytes_recv=1500)
         state.store_traffic(run_id, bytes_sent=500, bytes_recv=1000)
-        run = state.get_run(run_id)
+        run = state.get_run_info(run_ids=[run_id])[0]
 
         # Assert
-        assert run is not None
         assert run.bytes_sent == 3500
         assert run.bytes_recv == 3000
 
@@ -1672,8 +1741,7 @@ class StateTest(CoreStateTest):
             state.store_traffic(run_id, bytes_sent=bytes_sent, bytes_recv=bytes_recv)
 
         # Verify traffic was not updated
-        run = state.get_run(run_id)
-        assert run is not None
+        run = state.get_run_info(run_ids=[run_id])[0]
         assert run.bytes_sent == 1000
         assert run.bytes_recv == 2000
 
@@ -1698,8 +1766,7 @@ class StateTest(CoreStateTest):
             state.store_traffic(run_id, bytes_sent=0, bytes_recv=0)
 
         assert "cannot be zero" in str(context.exception)
-        run = state.get_run(run_id)
-        assert run is not None
+        run = state.get_run_info(run_ids=[run_id])[0]
         assert run.bytes_sent == 0
         assert run.bytes_recv == 0
 
@@ -1794,8 +1861,9 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     fab_hash: str | None = "mock_fab_hash",
     override_config: UserConfig | None = None,
     federation: str = NOOP_FEDERATION,
-    federation_options: ConfigRecord | None = None,
+    federation_config: SimulationConfig | None = None,
     flwr_aid: str | None = "mock_flwr_aid",
+    run_type: str = RunType.SERVER_APP,
 ) -> int:
     """Create a dummy run."""
     return state.create_run(
@@ -1804,8 +1872,9 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
         fab_hash=fab_hash,
         override_config=override_config or {},
         federation=federation,
-        federation_options=federation_options or ConfigRecord(),
+        federation_config=federation_config,
         flwr_aid=flwr_aid,
+        run_type=run_type,
     )
 
 
@@ -1831,60 +1900,38 @@ class InMemoryStateTest(StateTest):
         self.assertSetEqual(state.owner_to_node_ids["aid2"], {node_id3})
 
 
-class SqliteInMemoryStateTest(StateTest, unittest.TestCase):
-    """Test SqliteState implemenation with in-memory database."""
+class SqlInMemoryStateTest(StateTest, unittest.TestCase):
+    """Test SqlLinkState implementation with in-memory database."""
 
     __test__ = True
 
-    def state_factory(self) -> SqliteLinkState:
-        """Return SqliteState with in-memory database."""
-        state = SqliteLinkState(
-            ":memory:",
+    def state_factory(self) -> SqlLinkState:
+        """Return SqlLinkState with in-memory database."""
+        state = SqlLinkState(
+            database_path=":memory:",
             federation_manager=NoOpFederationManager(),
             object_store=ObjectStoreFactory().store(),
         )
         state.initialize()
         return state
 
-    def test_initialize(self) -> None:
-        """Test initialization."""
-        # Prepare
-        state = self.state_factory()
 
-        # Execute
-        result = state.query("SELECT name FROM sqlite_schema;")
-
-        # Assert
-        assert len(result) == 20
-
-
-class SqliteFileBasedTest(StateTest, unittest.TestCase):
-    """Test SqliteState implemenation with file-based database."""
+class SqlFileBasedTest(StateTest, unittest.TestCase):
+    """Test SqlLinkState implementation with file-based database."""
 
     __test__ = True
 
-    def state_factory(self) -> SqliteLinkState:
-        """Return SqliteState with file-based database."""
+    def state_factory(self) -> SqlLinkState:
+        """Return SqlLinkState with file-based database."""
         # pylint: disable-next=consider-using-with,attribute-defined-outside-init
         self.tmp_file = tempfile.NamedTemporaryFile()
-        state = SqliteLinkState(
+        state = SqlLinkState(
             database_path=self.tmp_file.name,
             federation_manager=NoOpFederationManager(),
             object_store=ObjectStoreFactory().store(),
         )
         state.initialize()
         return state
-
-    def test_initialize(self) -> None:
-        """Test initialization."""
-        # Prepare
-        state = self.state_factory()
-
-        # Execute
-        result = state.query("SELECT name FROM sqlite_schema;")
-
-        # Assert
-        assert len(result) == 20
 
 
 if __name__ == "__main__":

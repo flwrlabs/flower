@@ -77,7 +77,7 @@ git lfs install
 Start by cloning the example project:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
         && mv _tmp/examples/fedrag . \
         && rm -rf _tmp \
         && cd fedrag
@@ -127,11 +127,37 @@ All corpora used in this work were derived from the MedRAG toolkit [[4]](#ref4).
 
 ## Run with Simulation Engine
 
+This example is designed to run with two virtual clients. Let's first locate the Flower Configuration file and modify one of the existing connections to make use of two nodes.
+
+Locate your Flower configuration file by running:
+
+```shell
+flwr config list
+```
+
+```console
+# Example output:
+Flower Config file: /path/to/your/.flwr/config.toml
+SuperLink connections:
+ supergrid
+ local (default)
+```
+
+Modify the `local` connection so it has two supernodes:
+
+```TOML
+[superlink.local]
+options.num-supernodes = 2
+```
+
 From the top-level directory for this example, launch the simulation:
 
 ```bash
 flwr run .
 ```
+
+> [!TIP]
+> Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
 ## Expected Results
 

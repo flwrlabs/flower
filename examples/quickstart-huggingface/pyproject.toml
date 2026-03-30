@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-huggingface"
-version = "1.0.0"
+version = "1.0.1"
 description = "Federated Learning with Hugginface Transformers and Flower (Quickstart Example)"
 license = "Apache-2.0"
 authors = [
@@ -12,12 +12,11 @@ authors = [
     { name = "Kaushik Amar Das", email = "kaushik.das@iiitg.ac.in" },
 ]
 dependencies = [
-    "flwr[simulation]>=1.25.0",
-    "flwr-datasets>=0.5.0",
+    "flwr[simulation]>=1.27.0",
+    "flwr-datasets>=0.6.0",
     "torch==2.8.0",
     "transformers>=4.30.0,<5.0",
     "evaluate>=0.4.0,<1.0",
-    "datasets>=2.0.0, <3.0",
     "scikit-learn>=1.3.1, <2.0",
 ]
 
@@ -36,14 +35,3 @@ num-server-rounds = 3
 model-name = "prajjwal1/bert-tiny"
 fraction-train = 0.05
 fraction-evaluate = 0.1
-
-[tool.flwr.federations]
-default = "local-simulation"
-
-[tool.flwr.federations.local-simulation]
-options.num-supernodes = 100
-
-[tool.flwr.federations.local-simulation-gpu]
-options.num-supernodes = 100
-options.backend.client-resources.num-cpus = 4 # each ClientApp assumes to use 4CPUs
-options.backend.client-resources.num-gpus = 0.25 # at most 4 ClientApp will run in a given GPU (lower it to increase parallelism)

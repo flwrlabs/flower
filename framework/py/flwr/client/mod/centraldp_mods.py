@@ -17,10 +17,10 @@
 
 from logging import INFO
 
+from flwr.app.message_type import MessageType
 from flwr.client.typing import ClientAppCallable
 from flwr.common import ndarrays_to_parameters, parameters_to_ndarrays
 from flwr.common import recorddict_compat as compat
-from flwr.common.constant import MessageType
 from flwr.common.context import Context
 from flwr.common.differential_privacy import (
     compute_adaptive_clip_model_update,

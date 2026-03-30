@@ -52,6 +52,11 @@ class SimulationIoStub(object):
                 request_serializer=flwr_dot_proto_dot_run__pb2.GetRunRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_run__pb2.GetRunResponse.FromString,
                 _registered_method=True)
+        self.SendAppHeartbeat = channel.unary_unary(
+                '/flwr.proto.SimulationIo/SendAppHeartbeat',
+                request_serializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatResponse.FromString,
+                _registered_method=True)
         self.PullAppInputs = channel.unary_unary(
                 '/flwr.proto.SimulationIo/PullAppInputs',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.PullAppInputsRequest.SerializeToString,
@@ -77,23 +82,17 @@ class SimulationIoStub(object):
                 request_serializer=flwr_dot_proto_dot_run__pb2.GetFederationOptionsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_run__pb2.GetFederationOptionsResponse.FromString,
                 _registered_method=True)
-        self.GetRunStatus = channel.unary_unary(
-                '/flwr.proto.SimulationIo/GetRunStatus',
-                request_serializer=flwr_dot_proto_dot_run__pb2.GetRunStatusRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_run__pb2.GetRunStatusResponse.FromString,
-                _registered_method=True)
-        self.SendAppHeartbeat = channel.unary_unary(
-                '/flwr.proto.SimulationIo/SendAppHeartbeat',
-                request_serializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatResponse.FromString,
-                _registered_method=True)
 
 
 class SimulationIoServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def ListAppsToLaunch(self, request, context):
-        """List runs to launch
+        """///////////////////////////////////////////////////////////////////////////
+        General *AppIo endpoints for SuperExec processes
+        ///////////////////////////////////////////////////////////////////////////
+
+        List runs to launch
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -107,28 +106,43 @@ class SimulationIoServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def GetRun(self, request, context):
-        """Get run details
+        """///////////////////////////////////////////////////////////////////////////
+        General *AppIo endpoints for App Executor processes
+        ///////////////////////////////////////////////////////////////////////////
+
+        Get run details
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SendAppHeartbeat(self, request, context):
+        """App heartbeat
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def PullAppInputs(self, request, context):
-        """Pull Simulation inputs
+        """Pull app inputs
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def PushAppOutputs(self, request, context):
-        """Push Simulation outputs
+        """Push app outputs
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def UpdateRunStatus(self, request, context):
-        """Update the status of a given run
+        """///////////////////////////////////////////////////////////////////////////
+        Specific endpoints shared by ServerAppIo and SimulationIo
+        ///////////////////////////////////////////////////////////////////////////
+
+        Update the status of a given run
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -142,21 +156,11 @@ class SimulationIoServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def GetFederationOptions(self, request, context):
-        """Get Federation Options
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        """///////////////////////////////////////////////////////////////////////////
+        Specific endpoints for SimulationIo
+        ///////////////////////////////////////////////////////////////////////////
 
-    def GetRunStatus(self, request, context):
-        """Get Run Status
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def SendAppHeartbeat(self, request, context):
-        """App heartbeat
+        Get Federation Options
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -179,6 +183,11 @@ def add_SimulationIoServicer_to_server(servicer, server):
                     servicer.GetRun,
                     request_deserializer=flwr_dot_proto_dot_run__pb2.GetRunRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_run__pb2.GetRunResponse.SerializeToString,
+            ),
+            'SendAppHeartbeat': grpc.unary_unary_rpc_method_handler(
+                    servicer.SendAppHeartbeat,
+                    request_deserializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatResponse.SerializeToString,
             ),
             'PullAppInputs': grpc.unary_unary_rpc_method_handler(
                     servicer.PullAppInputs,
@@ -204,16 +213,6 @@ def add_SimulationIoServicer_to_server(servicer, server):
                     servicer.GetFederationOptions,
                     request_deserializer=flwr_dot_proto_dot_run__pb2.GetFederationOptionsRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_run__pb2.GetFederationOptionsResponse.SerializeToString,
-            ),
-            'GetRunStatus': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetRunStatus,
-                    request_deserializer=flwr_dot_proto_dot_run__pb2.GetRunStatusRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_run__pb2.GetRunStatusResponse.SerializeToString,
-            ),
-            'SendAppHeartbeat': grpc.unary_unary_rpc_method_handler(
-                    servicer.SendAppHeartbeat,
-                    request_deserializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -297,6 +296,33 @@ class SimulationIo(object):
             '/flwr.proto.SimulationIo/GetRun',
             flwr_dot_proto_dot_run__pb2.GetRunRequest.SerializeToString,
             flwr_dot_proto_dot_run__pb2.GetRunResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SendAppHeartbeat(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.SimulationIo/SendAppHeartbeat',
+            flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatRequest.SerializeToString,
+            flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -432,60 +458,6 @@ class SimulationIo(object):
             '/flwr.proto.SimulationIo/GetFederationOptions',
             flwr_dot_proto_dot_run__pb2.GetFederationOptionsRequest.SerializeToString,
             flwr_dot_proto_dot_run__pb2.GetFederationOptionsResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def GetRunStatus(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/flwr.proto.SimulationIo/GetRunStatus',
-            flwr_dot_proto_dot_run__pb2.GetRunStatusRequest.SerializeToString,
-            flwr_dot_proto_dot_run__pb2.GetRunStatusResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def SendAppHeartbeat(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/flwr.proto.SimulationIo/SendAppHeartbeat',
-            flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatRequest.SerializeToString,
-            flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatResponse.FromString,
             options,
             channel_credentials,
             insecure,

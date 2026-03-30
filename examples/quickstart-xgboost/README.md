@@ -10,7 +10,7 @@ This example demonstrates how to perform EXtreme Gradient Boosting (XGBoost) wit
 We use [HIGGS](https://archive.ics.uci.edu/dataset/280/higgs) dataset for this example to perform a binary classification task.
 Tree-based with bagging method is used for aggregation on the server.
 
-This project provides a minimal code example to enable you to get started quickly. For a more comprehensive code example, take a look at [xgboost-comprehensive](https://github.com/adap/flower/tree/main/examples/xgboost-comprehensive).
+This project provides a minimal code example to enable you to get started quickly. For a more comprehensive code example, take a look at [xgboost-comprehensive](https://github.com/flwrlabs/flower/tree/main/examples/xgboost-comprehensive).
 
 ## Set up the project
 

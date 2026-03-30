@@ -307,12 +307,26 @@ using the *clientapp* plugin, pass ``--appio-api-address`` pointing to the Super
  Step 6: Run the Quickstart Project
 ************************************
 
-1. Add the following lines to the ``pyproject.toml``:
+1. Find the Flower Configuration TOML file in your machine. This file is automatically
+   create for your when you first use a Flower CLI command. Use ``flwr config list`` to
+   see available SuperLink connections as well as the path to the configuration file.
+
+   .. code-block:: console
+       :emphasize-lines: 3
+
+       $ flwr config list
+
+       Flower Config file: /path/to/.flwr/config.toml
+       SuperLink connections:
+         supergrid
+         local (default)
+
+2. Add the following lines to the ``config.toml`` to add a new SuperLink connection:
 
    .. code-block:: toml
-       :caption: pyproject.toml
+       :caption: config.toml
 
-       [tool.flwr.federations.local-deployment]
+       [superlink.local-deployment]
        address = "127.0.0.1:9093"
        insecure = true
 

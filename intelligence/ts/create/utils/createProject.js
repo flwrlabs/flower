@@ -21,7 +21,7 @@ export const init = async (projectName, requestedPackage) => {
     const currentDir = process.cwd();
     const destination = path.join(currentDir, projectName);
     const tempDir = path.join(currentDir, `temp-${projectName}`);
-    const fullURL = `https://github.com/adap/flower.git`;
+    const fullURL = `https://github.com/flwrlabs/flower.git`;
 
     console.log(chalk.gray('Cloning template repository into a temporary folder...'));
     execSync(`git clone --depth 1 ${fullURL} ${tempDir}`, {

@@ -108,7 +108,7 @@ class NodeAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
     def _wrap_method_handler(
         self,
         method_handler: grpc.RpcMethodHandler,
-        expected_public_key: bytes,
+        received_public_key: bytes,
     ) -> grpc.RpcMethodHandler:
         def _generic_method_handler(
             request: GrpcMessage,
@@ -117,21 +117,22 @@ class NodeAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             # Note: This function runs in a different thread
             # than the `intercept_service` function.
 
-            # Retrieve the public key
-            if isinstance(request, (RegisterNodeFleetRequest | ActivateNodeRequest)):
-                actual_public_key = request.public_key
-            else:
+            # Skip registration and activation requests
+            if not isinstance(request, (RegisterNodeFleetRequest, ActivateNodeRequest)):
+                # Retrieve the node ID from the request
                 if hasattr(request, "node"):
-                    node_id = request.node.node_id
+                    received_node_id = request.node.node_id
                 else:
-                    node_id = request.node_id  # type: ignore[attr-defined]
-                actual_public_key = self.state_factory.state().get_node_public_key(
-                    node_id
+                    received_node_id = request.node_id  # type: ignore[attr-defined]
+
+                # Get the actual node ID based on the received public key
+                node_id = self.state_factory.state().get_node_id_by_public_key(
+                    received_public_key
                 )
 
-            # Verify the public key
-            if actual_public_key != expected_public_key:
-                context.abort(grpc.StatusCode.UNAUTHENTICATED, "Invalid node ID")
+                # Verify that the received node ID matches the actual node ID
+                if received_node_id != node_id:
+                    context.abort(grpc.StatusCode.UNAUTHENTICATED, "Invalid node ID")
 
             response: GrpcMessage = method_handler.unary_unary(request, context)
             return response

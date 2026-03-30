@@ -12,12 +12,18 @@ This example uses [Flower Datasets](https://flower.ai/docs/datasets/) to downloa
 
 ## Set up the project
 
-### Clone the project
+### Fetch the app
 
-Start by cloning the example project:
+Install Flower:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git && mv flower/examples/fl-tabular . && rm -rf flower && cd fl-tabular
+pip install flwr
+```
+
+Fetch the app:
+
+```shell
+flwr new @flwrlabs/fl-tabular
 ```
 
 This will create a new directory called `fl-tabular` containing the following files:
@@ -52,6 +58,31 @@ fewer components to be launched manually. By default, `flwr run` will make use o
 
 > [!NOTE]
 > Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
+
+This example is designed to run with five virtual clients. Let's first locate the Flower Configuration file and edit one of the existing connections to make it use five nodes.
+
+Locate the Flower Configuration file:
+
+```shell
+flwr config list
+```
+
+```console
+# Example output:
+Flower Config file: /path/to/your/.flwr/config.toml
+SuperLink connections:
+ supergrid
+ local (default)
+```
+
+Modify the `local` connection so it has five supernodes:
+
+```TOML
+[superlink.local]
+options.num-supernodes = 5
+```
+
+Finally, let's run the app:
 
 ```bash
 flwr run .

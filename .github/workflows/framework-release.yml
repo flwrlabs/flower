@@ -13,7 +13,7 @@ env:
 
 jobs:
   publish:
-    if: ${{ github.repository == 'adap/flower' }}
+    if: ${{ github.repository == 'flwrlabs/flower' }}
     name: Publish release
     runs-on: ubuntu-22.04
     outputs:
@@ -33,14 +33,15 @@ jobs:
         GITHUB_REF: ${{ github.ref }}
       working-directory: framework
       run: |
-        TAG_NAME=$(echo "${GITHUB_REF_NAME}" | cut -c2-)
-        echo "flwr-version=$TAG_NAME" >> "$GITHUB_OUTPUT"
+        # Strip "framework-" prefix from tag (e.g., `framework-1.27.0` -> `1.27.0`)
+        tag_name="${GITHUB_REF_NAME#framework-}"
+        echo "flwr-version=$tag_name" >> "$GITHUB_OUTPUT"
 
-        wheel_name="flwr-${TAG_NAME}-py3-none-any.whl"
-        tar_name="flwr-${TAG_NAME}.tar.gz"
+        wheel_name="flwr-${tag_name}-py3-none-any.whl"
+        tar_name="flwr-${tag_name}.tar.gz"
 
-        wheel_url="https://${{ env.ARTIFACT_BUCKET }}/py/release/v${TAG_NAME}/${wheel_name}"
-        tar_url="https://${{ env.ARTIFACT_BUCKET }}/py/release/v${TAG_NAME}/${tar_name}"
+        wheel_url="https://${{ env.ARTIFACT_BUCKET }}/py/release/v${tag_name}/${wheel_name}"
+        tar_url="https://${{ env.ARTIFACT_BUCKET }}/py/release/v${tag_name}/${tar_name}"
 
         mkdir -p dist
 
@@ -50,7 +51,7 @@ jobs:
         python -m poetry publish -u __token__ -p ${{ secrets.PYPI_TOKEN_RELEASE_FLWR }}
 
   parameters:
-    if: ${{ github.repository == 'adap/flower' }}
+    if: ${{ github.repository == 'flwrlabs/flower' }}
     name: Collect docker build parameters
     runs-on: ubuntu-22.04
     timeout-minutes: 10
@@ -76,7 +77,7 @@ jobs:
            echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
 
   build-base-images:
-    if: ${{ github.repository == 'adap/flower' }}
+    if: ${{ github.repository == 'flwrlabs/flower' }}
     name: Build base images
     uses: ./.github/workflows/_docker-build.yml
     needs: parameters
@@ -96,7 +97,7 @@ jobs:
       dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
 
   build-binary-images:
-    if: ${{ github.repository == 'adap/flower' }}
+    if: ${{ github.repository == 'flwrlabs/flower' }}
     name: Build binary images
     uses: ./.github/workflows/_docker-build.yml
     needs: [parameters, build-base-images]

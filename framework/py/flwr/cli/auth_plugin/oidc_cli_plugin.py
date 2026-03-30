@@ -15,26 +15,26 @@
 """Flower CLI account auth plugin for OIDC."""
 
 
-import json
 import time
+import webbrowser
 from collections.abc import Sequence
-from pathlib import Path
-from typing import Any
 
+import click
 import typer
 
-from flwr.common.constant import (
-    ACCESS_TOKEN_KEY,
-    AUTHN_TYPE_JSON_KEY,
-    REFRESH_TOKEN_KEY,
-    AuthnType,
+from flwr.cli.constant import (
+    ACCESS_TOKEN_STORE_KEY,
+    AUTHN_TYPE_STORE_KEY,
+    REFRESH_TOKEN_STORE_KEY,
 )
+from flwr.common.constant import ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, AuthnType
 from flwr.common.typing import AccountAuthCredentials, AccountAuthLoginDetails
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetAuthTokensRequest,
     GetAuthTokensResponse,
 )
 from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.credential_store import get_credential_store
 
 from .auth_plugin import CliAuthPlugin, LoginError
 
@@ -46,10 +46,11 @@ class OidcCliPlugin(CliAuthPlugin):
     access to Flower SuperLink.
     """
 
-    def __init__(self, credentials_path: Path):
+    def __init__(self, host: str):
         self.access_token: str | None = None
         self.refresh_token: str | None = None
-        self.credentials_path = credentials_path
+        self.host = host
+        self.store = get_credential_store()
 
     @staticmethod
     def login(
@@ -75,11 +76,17 @@ class OidcCliPlugin(CliAuthPlugin):
         LoginError
             If authentication times out.
         """
+        # Prompt user to login via browser
+        webbrowser.open(login_details.verification_uri_complete)
         typer.secho(
-            "Please log into your Flower account here: "
+            "A browser window has been opened for you to "
+            "log into your Flower account.\n"
+            "If it did not open automatically, use this URL:\n"
             f"{login_details.verification_uri_complete}",
             fg=typer.colors.BLUE,
         )
+
+        # Wait for user to complete login
         start_time = time.time()
         time.sleep(login_details.interval)
 
@@ -102,45 +109,38 @@ class OidcCliPlugin(CliAuthPlugin):
         raise LoginError("Process timed out.")
 
     def store_tokens(self, credentials: AccountAuthCredentials) -> None:
-        """Store authentication tokens to the `credentials_path`.
+        """Store authentication tokens to the credential store."""
+        host = self.host
+        # Retrieve tokens
+        access_token = credentials.access_token
+        refresh_token = credentials.refresh_token
 
-        The credentials, including tokens, will be saved as a JSON file
-        at `credentials_path`.
-        """
-        self.access_token = credentials.access_token
-        self.refresh_token = credentials.refresh_token
-        json_dict = {
-            AUTHN_TYPE_JSON_KEY: AuthnType.OIDC,
-            ACCESS_TOKEN_KEY: credentials.access_token,
-            REFRESH_TOKEN_KEY: credentials.refresh_token,
-        }
+        # Store tokens in the credential store
+        self.store.set(AUTHN_TYPE_STORE_KEY % host, AuthnType.OIDC.encode("utf-8"))
+        self.store.set(ACCESS_TOKEN_STORE_KEY % host, access_token.encode("utf-8"))
+        self.store.set(REFRESH_TOKEN_STORE_KEY % host, refresh_token.encode("utf-8"))
 
-        with open(self.credentials_path, "w", encoding="utf-8") as file:
-            json.dump(json_dict, file, indent=4)
+        # Update internal state
+        self.access_token = access_token
+        self.refresh_token = refresh_token
 
     def load_tokens(self) -> None:
-        """Load authentication tokens from the `credentials_path`."""
-        with open(self.credentials_path, encoding="utf-8") as file:
-            json_dict: dict[str, Any] = json.load(file)
-            access_token = json_dict.get(ACCESS_TOKEN_KEY)
-            refresh_token = json_dict.get(REFRESH_TOKEN_KEY)
+        """Load authentication tokens from the credential store."""
+        access_token_bytes = self.store.get(ACCESS_TOKEN_STORE_KEY % self.host)
+        refresh_token_bytes = self.store.get(REFRESH_TOKEN_STORE_KEY % self.host)
 
-        if isinstance(access_token, str) and isinstance(refresh_token, str):
-            self.access_token = access_token
-            self.refresh_token = refresh_token
+        if access_token_bytes is not None and refresh_token_bytes is not None:
+            self.access_token = access_token_bytes.decode("utf-8")
+            self.refresh_token = refresh_token_bytes.decode("utf-8")
 
     def write_tokens_to_metadata(
         self, metadata: Sequence[tuple[str, str | bytes]]
     ) -> Sequence[tuple[str, str | bytes]]:
         """Write authentication tokens to the provided metadata."""
         if self.access_token is None or self.refresh_token is None:
-            typer.secho(
-                "❌ Missing authentication tokens. Please login first.",
-                fg=typer.colors.RED,
-                bold=True,
-                err=True,
+            raise click.ClickException(
+                "Missing authentication tokens. Please login first."
             )
-            raise typer.Exit(code=1)
 
         return list(metadata) + [
             (ACCESS_TOKEN_KEY, self.access_token),

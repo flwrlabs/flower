@@ -24,24 +24,12 @@ from flwr.cli.install import install_from_fab
 from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
 from flwr.common import Context, Message
-from flwr.common.config import get_flwr_dir
 from flwr.common.constant import ErrorCode
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
-from flwr.common.inflatable import (
-    get_all_nested_objects,
-    get_object_tree,
-    no_object_id_recompute,
-)
-from flwr.common.inflatable_protobuf_utils import (
-    make_confirm_message_received_fn_protobuf,
-    make_pull_object_fn_protobuf,
-    make_push_object_fn_protobuf,
-)
-from flwr.common.inflatable_utils import pull_and_inflate_object_from_tree, push_objects
 from flwr.common.logger import log
 from flwr.common.message import remove_content_from_message
-from flwr.common.retry_invoker import _make_simple_grpc_retry_invoker, _wrap_stub
+from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -64,13 +52,26 @@ from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
+from flwr.supercore.inflatable.inflatable_object import (
+    get_all_nested_objects,
+    get_object_tree,
+    no_object_id_recompute,
+)
+from flwr.supercore.inflatable.inflatable_protobuf_utils import (
+    make_confirm_message_received_fn_protobuf,
+    make_pull_object_fn_protobuf,
+    make_push_object_fn_protobuf,
+)
+from flwr.supercore.inflatable.inflatable_utils import (
+    pull_and_inflate_object_from_tree,
+    push_objects,
+)
 from flwr.supercore.utils import mask_string
 
 
 def run_clientapp(  # pylint: disable=R0913, R0914, R0917
     clientappio_api_address: str,
     token: str,
-    flwr_dir: str | None = None,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
 ) -> None:
@@ -99,31 +100,28 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
         exit_handlers=[on_exit],
     )
 
-    # Resolve directory where FABs are installed
-    flwr_dir_ = get_flwr_dir(flwr_dir)
     try:
         stub = ClientAppIoStub(channel)
-        _wrap_stub(stub, _make_simple_grpc_retry_invoker())
+        wrap_stub(stub, make_simple_grpc_retry_invoker())
 
         # Start app heartbeat
         heartbeat_sender = HeartbeatSender(make_app_heartbeat_fn_grpc(stub, token))
         heartbeat_sender.start()
 
         # Pull Message, Context, Run and (optional) FAB from SuperNode
-        message, context, run, fab = pull_clientappinputs(stub=stub, token=token)
+        message, context, run, fab = pull_appinputs(stub=stub, token=token)
 
         try:
 
             # Install FAB, if provided
             if fab:
                 log(DEBUG, "[flwr-clientapp] Start FAB installation.")
-                install_from_fab(fab.content, flwr_dir=flwr_dir_, skip_prompt=True)
+                install_from_fab(fab.content, skip_prompt=True)
 
             load_client_app_fn = get_load_client_app_fn(
                 default_app_ref="",
                 app_path=None,
                 multi_app=True,
-                flwr_dir=str(flwr_dir_),
             )
 
             # Load ClientApp
@@ -152,7 +150,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
             reply_message = Message(Error(code=e_code, reason=reason), reply_to=message)
 
         # Push Message and Context to SuperNode
-        _ = push_clientappoutputs(
+        _ = push_appoutputs(
             stub=stub, token=token, message=reply_message, context=context
         )
 
@@ -165,15 +163,15 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
     )
 
 
-def pull_clientappinputs(
+def pull_appinputs(
     stub: ClientAppIoStub, token: str
 ) -> tuple[Message, Context, Run, Fab | None]:
-    """Pull ClientAppInputs from SuperNode."""
+    """Pull AppInputs from SuperNode."""
     masked_token = mask_string(token)
-    log(INFO, "[flwr-clientapp] Pull `ClientAppInputs` for token %s", masked_token)
+    log(INFO, "[flwr-clientapp] Pull `AppInputs` for token %s", masked_token)
     try:
         # Pull Context, Run and (optional) FAB
-        res: PullAppInputsResponse = stub.PullClientAppInputs(
+        res: PullAppInputsResponse = stub.PullAppInputs(
             PullAppInputsRequest(token=token)
         )
         context = context_from_proto(res.context)
@@ -201,16 +199,16 @@ def pull_clientappinputs(
         message.metadata.__dict__["_message_id"] = object_tree.object_id
         return message, context, run, fab
     except grpc.RpcError as e:
-        log(ERROR, "[PullClientAppInputs] gRPC error occurred: %s", str(e))
+        log(ERROR, "[PullAppInputs] gRPC error occurred: %s", str(e))
         raise e
 
 
-def push_clientappoutputs(
+def push_appoutputs(
     stub: ClientAppIoStub, token: str, message: Message, context: Context
 ) -> PushAppOutputsResponse:
-    """Push ClientAppOutputs to SuperNode."""
+    """Push AppOutputs to SuperNode."""
     masked_token = mask_string(token)
-    log(INFO, "[flwr-clientapp] Push `ClientAppOutputs` for token %s", masked_token)
+    log(INFO, "[flwr-clientapp] Push `AppOutputs` for token %s", masked_token)
     # Set message ID
     message.metadata.__dict__["_message_id"] = message.object_id
     proto_message = message_to_proto(remove_content_from_message(message))
@@ -250,10 +248,10 @@ def push_clientappoutputs(
             )
 
         # Push Context
-        res: PushAppOutputsResponse = stub.PushClientAppOutputs(
+        res: PushAppOutputsResponse = stub.PushAppOutputs(
             PushAppOutputsRequest(token=token, context=proto_context)
         )
         return res
     except grpc.RpcError as e:
-        log(ERROR, "[PushClientAppOutputs] gRPC error occurred: %s", str(e))
+        log(ERROR, "[PushAppOutputs] gRPC error occurred: %s", str(e))
         raise e

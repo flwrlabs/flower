@@ -334,7 +334,7 @@ def _mock_speach_commands(num_rows: int) -> Dataset:
     features = Features(
         {
             "audio": datasets.Audio(
-                sampling_rate=sampling_rate, mono=True, decode=True
+                sampling_rate=sampling_rate, num_channels=1, decode=True
             ),
             "is_unknown": Value(dtype="bool"),
             "speaker_id": Value(dtype="string"),

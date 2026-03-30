@@ -199,19 +199,40 @@ Run Flower App
 ==============
 
 Finally, after all running Flower processes have been initialized on the Microsoft Azure
-cluster, in our local machine, we first need to install Flower and can create a project
-with a similar structure as the one we have in the server and the clients, or copy the
-project structure from one of them. Once we have the project locally, we can open the
-``pyproject.toml`` file, and then add the following sections:
+cluster, in our local machine, we first need to install Flower and create a Flower App.
 
 .. code-block:: bash
 
-    [tool.flwr.federations]
-    default = "my-federation"  # replaced the default value with "my-federation"
+    # Install flower
+    pip install -U flwr
 
-    [tool.flwr.federations.my-federation]  # replaced name with "my-federation"
-    address = "SUPERLINK_PUBLIC_IP:9093"  # Address of the SuperLink Control API
-    insecure = true
+    # This creates a basic Flower App using the numpy framework
+    flwr new @flwrlabs/quickstart-numpy
+
+Next, we need to create a new SuperLink connection in the Flower Configuration file:
+
+1. Run ``flwr config list`` to locate the Flower configuration file on your machine and
+   view available SuperLink connections.
+
+   .. code-block:: console
+       :emphasize-lines: 3
+
+         $ flwr config list
+
+         Flower Config file: /path/to/.flwr/config.toml
+         SuperLink connections:
+           supergrid
+           local (default)
+
+2. Open the Flower Configuration file (``config.toml``) and add a new SuperLink
+   connection at the end:
+
+   .. code-block:: toml
+       :caption: config.toml
+
+       [superlink.my-federation]
+       address = "SUPERLINK_PUBLIC_IP:9093"  # Address of the SuperLink Control API
+       insecure = true
 
 Then from our local machine we need to run ``flwr run . my-federation``.
 

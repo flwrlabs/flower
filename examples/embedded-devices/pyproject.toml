@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "Federated AI with Embedded Devices using Flower"
 license = "Apache-2.0"
 dependencies = [
-    "flwr>=1.25.0",
+    "flwr>=1.27.0",
     "flwr-datasets[vision]>=0.5.0",
     "torch==2.8.0",
     "torchvision==0.23.0",
@@ -36,10 +36,3 @@ fraction-evaluate = 0.5
 local-epochs = 1
 learning-rate = 0.1
 batch-size = 32
-
-[tool.flwr.federations]
-default = "embedded-federation"
-
-[tool.flwr.federations.embedded-federation]
-address = "127.0.0.1:9093"
-insecure = true

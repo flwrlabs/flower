@@ -8,8 +8,8 @@ version = "1.0.0"
 description = "Federated Learning with XGBoost and Flower (Comprehensive Example)"
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]>=1.25.0",
-    "flwr-datasets>=0.5.0",
+    "flwr[simulation]>=1.27.0",
+    "flwr-datasets>=0.6.0",
     "xgboost>=2.0.0",
 ]
 
@@ -45,10 +45,3 @@ params.nthread = 16
 params.num-parallel-tree = 1
 params.subsample = 1
 params.tree-method = "hist"
-
-[tool.flwr.federations]
-default = "local-simulation"
-
-[tool.flwr.federations.local-simulation]
-options.num-supernodes = 5
-options.backend.client-resources.num-cpus = 2

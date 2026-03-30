@@ -19,11 +19,11 @@ from collections.abc import Callable, Iterable
 from logging import INFO
 from typing import cast
 
+from flwr.app import MessageType
 from flwr.common import (
     ArrayRecord,
     ConfigRecord,
     Message,
-    MessageType,
     MetricRecord,
     RecordDict,
     log,

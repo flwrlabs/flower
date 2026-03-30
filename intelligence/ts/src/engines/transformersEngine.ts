@@ -13,31 +13,35 @@
 // limitations under the License.
 // =============================================================================
 
+import type { ProgressInfo, TextGenerationConfig } from '@huggingface/transformers';
 import {
   InterruptableStoppingCriteria,
+  pipeline,
   StoppingCriteriaList,
   Tensor,
   TextGenerationPipeline,
   TextStreamer,
-  pipeline,
 } from '@huggingface/transformers';
 
-import type { ProgressInfo, TextGenerationConfig } from '@huggingface/transformers';
+import { getAvailableRAM } from '../env';
 import {
+  ChatResponseResult,
   FailureCode,
   Message,
-  Result,
   Progress,
-  ChatResponseResult,
   ResponseFormat,
+  Result,
 } from '../typing';
-
-import { getAvailableRAM } from '../env';
-import { BaseEngine } from './engine';
 import { getEngineModelConfig } from './common/model';
+import { BaseEngine } from './engine';
 
 const stoppingCriteria = new InterruptableStoppingCriteria();
 const choice = 0;
+const textGenerationPipeline = pipeline as (
+  task: 'text-generation',
+  model: string,
+  options?: { dtype?: DTYPE }
+) => Promise<TextGenerationPipeline>;
 
 export class TransformersEngine extends BaseEngine {
   private generationPipelines: Record<string, TextGenerationPipeline> = {};
@@ -67,9 +71,15 @@ export class TransformersEngine extends BaseEngine {
         const modelElems = modelConfigRes.value.name.split('|');
         const modelId = modelElems[0];
 
-        this.generationPipelines.model = await pipeline('text-generation', modelId, {
-          ...(modelElems.length > 1 && { dtype: modelElems[1] as DTYPE }),
-        });
+        const pipelineOptions: { dtype?: DTYPE } = {};
+        if (modelElems.length > 1) {
+          pipelineOptions.dtype = modelElems[1] as DTYPE;
+        }
+        this.generationPipelines.model = await textGenerationPipeline(
+          'text-generation',
+          modelId,
+          pipelineOptions
+        );
       }
       const tokenizer = this.generationPipelines.model.tokenizer;
       const modelInstance = this.generationPipelines.model.model;
@@ -119,7 +129,7 @@ export class TransformersEngine extends BaseEngine {
 
       let promptLengths: number[] | undefined;
       const inputIds = inputs.input_ids as Tensor;
-      const inputDim = inputIds.dims.at(-1);
+      const inputDim = inputIds.dims[inputIds.dims.length - 1];
       if (typeof inputDim === 'number' && inputDim > 0) {
         promptLengths = tokenizer
           .batch_decode(inputIds, { skip_special_tokens: true })
@@ -166,7 +176,10 @@ export class TransformersEngine extends BaseEngine {
         const modelElems = modelConfigRes.value.name.split('|');
         const modelId = modelElems[0];
 
-        this.generationPipelines.model = await pipeline('text-generation', modelId, {
+        const pipelineOptions: {
+          dtype?: DTYPE;
+          progress_callback: (progressInfo: ProgressInfo) => void;
+        } = {
           progress_callback: (progressInfo: ProgressInfo) => {
             let percentage = 0;
             let total = 0;
@@ -188,8 +201,15 @@ export class TransformersEngine extends BaseEngine {
               description,
             });
           },
-          ...(modelElems.length > 1 && { dtype: modelElems[1] as DTYPE }),
-        });
+        };
+        if (modelElems.length > 1) {
+          pipelineOptions.dtype = modelElems[1] as DTYPE;
+        }
+        this.generationPipelines.model = await textGenerationPipeline(
+          'text-generation',
+          modelId,
+          pipelineOptions
+        );
       }
       return { ok: true, value: undefined };
     } catch (error) {

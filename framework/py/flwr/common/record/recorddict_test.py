@@ -37,8 +37,11 @@ from flwr.common.typing import (
     NDArrays,
     Parameters,
 )
+from flwr.supercore.inflatable.inflatable_object import (
+    get_object_body,
+    get_object_type_from_object_content,
+)
 
-from ..inflatable import get_object_body, get_object_type_from_object_content
 from ..serde import config_record_to_proto, metric_record_to_proto
 from . import Array, ArrayRecord, ConfigRecord, MetricRecord, RecordDict
 

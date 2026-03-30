@@ -24,6 +24,10 @@ import "flwr/proto/appio.proto";
 
 service SimulationIo {
 
+  /////////////////////////////////////////////////////////////////////////////
+  // General *AppIo endpoints for SuperExec processes
+  /////////////////////////////////////////////////////////////////////////////
+
   // List runs to launch
   rpc ListAppsToLaunch(ListAppsToLaunchRequest)
       returns (ListAppsToLaunchResponse) {}
@@ -31,14 +35,26 @@ service SimulationIo {
   // Request token for a run
   rpc RequestToken(RequestTokenRequest) returns (RequestTokenResponse) {}
 
+  /////////////////////////////////////////////////////////////////////////////
+  // General *AppIo endpoints for App Executor processes
+  /////////////////////////////////////////////////////////////////////////////
+
   // Get run details
   rpc GetRun(GetRunRequest) returns (GetRunResponse) {}
 
-  // Pull Simulation inputs
+  // App heartbeat
+  rpc SendAppHeartbeat(SendAppHeartbeatRequest)
+      returns (SendAppHeartbeatResponse) {}
+
+  // Pull app inputs
   rpc PullAppInputs(PullAppInputsRequest) returns (PullAppInputsResponse) {}
 
-  // Push Simulation outputs
+  // Push app outputs
   rpc PushAppOutputs(PushAppOutputsRequest) returns (PushAppOutputsResponse) {}
+
+  /////////////////////////////////////////////////////////////////////////////
+  // Specific endpoints shared by ServerAppIo and SimulationIo
+  /////////////////////////////////////////////////////////////////////////////
 
   // Update the status of a given run
   rpc UpdateRunStatus(UpdateRunStatusRequest)
@@ -47,14 +63,11 @@ service SimulationIo {
   // Push ServerApp logs
   rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
 
+  /////////////////////////////////////////////////////////////////////////////
+  // Specific endpoints for SimulationIo
+  /////////////////////////////////////////////////////////////////////////////
+
   // Get Federation Options
   rpc GetFederationOptions(GetFederationOptionsRequest)
       returns (GetFederationOptionsResponse) {}
-
-  // Get Run Status
-  rpc GetRunStatus(GetRunStatusRequest) returns (GetRunStatusResponse) {}
-
-  // App heartbeat
-  rpc SendAppHeartbeat(SendAppHeartbeatRequest)
-      returns (SendAppHeartbeatResponse) {}
 }

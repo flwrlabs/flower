@@ -15,45 +15,38 @@
 """Flower command line interface `supernode unregister` command."""
 
 
-import io
-import json
-from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
-from rich.console import Console
 
-from flwr.cli.config_utils import (
-    exit_if_no_address,
-    load_and_validate,
-    process_loaded_project_config,
-    validate_federation_in_project_config,
-)
-from flwr.common.constant import FAB_CONFIG_FILE, CliOutputFormat
-from flwr.common.logger import print_json_error, redirect_output, restore_output
+from flwr.cli.config_migration import migrate
+from flwr.cli.flower_config import read_superlink_connection
+from flwr.common.constant import CliOutputFormat
 from flwr.proto.control_pb2 import UnregisterNodeRequest  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
 
-from ..utils import flwr_cli_grpc_exc_handler, init_channel, load_cli_auth_plugin
+from ..utils import (
+    cli_output_handler,
+    flwr_cli_grpc_exc_handler,
+    init_channel_from_connection,
+    print_json_to_stdout,
+)
 
 
 def unregister(  # pylint: disable=R0914
+    ctx: typer.Context,
     node_id: Annotated[
         int,
         typer.Argument(
             help="ID of the SuperNode to remove.",
         ),
     ],
-    app: Annotated[
-        Path,
-        typer.Argument(help="Path of the Flower project"),
-    ] = Path("."),
-    federation: Annotated[
+    superlink: Annotated[
         str | None,
-        typer.Argument(help="Name of the federation"),
+        typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,
@@ -62,66 +55,29 @@ def unregister(  # pylint: disable=R0914
     ] = CliOutputFormat.DEFAULT,
 ) -> None:
     """Unregister a SuperNode from the federation."""
-    suppress_output = output_format == CliOutputFormat.JSON
-    captured_output = io.StringIO()
+    with cli_output_handler(output_format=output_format) as is_json:
+        # Migrate legacy usage if any
+        migrate(superlink, args=ctx.args)
 
-    try:
-        if suppress_output:
-            redirect_output(captured_output)
-
-        # Load and validate federation config
-        typer.secho("Loading project configuration... ", fg=typer.colors.BLUE)
-
-        pyproject_path = app / FAB_CONFIG_FILE if app else None
-        config, errors, warnings = load_and_validate(pyproject_path, check_module=False)
-        config = process_loaded_project_config(config, errors, warnings)
-        federation, federation_config = validate_federation_in_project_config(
-            federation, config
-        )
-        exit_if_no_address(federation_config, "supernode unregister")
-
+        # Read superlink connection configuration
+        superlink_connection = read_superlink_connection(superlink)
         channel = None
+
         try:
-            auth_plugin = load_cli_auth_plugin(app, federation, federation_config)
-            channel = init_channel(app, federation_config, auth_plugin)
-            stub = ControlStub(channel)  # pylint: disable=unused-variable # noqa: F841
+            channel = init_channel_from_connection(superlink_connection)
+            stub = ControlStub(channel)
 
-            _unregister_node(stub=stub, node_id=node_id, output_format=output_format)
+            _unregister_node(stub=stub, node_id=node_id, is_json=is_json)
 
-        except ValueError as err:
-            typer.secho(
-                f"❌ {err}",
-                fg=typer.colors.RED,
-                bold=True,
-                err=True,
-            )
-            raise typer.Exit(code=1) from err
         finally:
             if channel:
                 channel.close()
-
-    except (typer.Exit, Exception) as err:  # pylint: disable=broad-except
-        if suppress_output:
-            restore_output()
-            e_message = captured_output.getvalue()
-            print_json_error(e_message, err)
-        else:
-            typer.secho(
-                f"{err}",
-                fg=typer.colors.RED,
-                bold=True,
-                err=True,
-            )
-    finally:
-        if suppress_output:
-            restore_output()
-        captured_output.close()
 
 
 def _unregister_node(
     stub: ControlStub,
     node_id: int,
-    output_format: str,
+    is_json: bool,
 ) -> None:
     """Unregister a SuperNode from the federation."""
     with flwr_cli_grpc_exc_handler():
@@ -129,12 +85,10 @@ def _unregister_node(
     typer.secho(
         f"✅ SuperNode {node_id} unregistered successfully.", fg=typer.colors.GREEN
     )
-    if output_format == CliOutputFormat.JSON:
-        run_output = json.dumps(
+    if is_json:
+        print_json_to_stdout(
             {
                 "success": True,
                 "node-id": node_id,
             }
         )
-        restore_output()
-        Console().print_json(run_output)

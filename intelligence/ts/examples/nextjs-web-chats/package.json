@@ -10,22 +10,23 @@
   },
   "dependencies": {
     "@flwr/flwr": "^0.2.5",
-    "@tailwindcss/typography": "^0.5.16",
-    "next": "15.4.10",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
+    "@tailwindcss/typography": "^0.5.19",
+    "next": "16.1.7",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^22",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "15.2.4",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "@eslint/eslintrc": "^3.3.3",
+    "@tailwindcss/postcss": "^4.1.18",
+    "@types/node": "^22.19.7",
+    "@types/react": "^19.2.10",
+    "@types/react-dom": "^19.2.3",
+    "baseline-browser-mapping": "^2.9.19",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "16.1.7",
+    "tailwindcss": "^4.1.18",
+    "typescript": "^5.9.3"
   }
 }

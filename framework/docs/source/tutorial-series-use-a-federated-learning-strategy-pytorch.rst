@@ -39,9 +39,9 @@ using the Flower framework, Flower Datasets, and PyTorch.
 
 .. tip::
 
-    `Star Flower on GitHub <https://github.com/adap/flower>`__ ⭐️ and join the Flower
-    community on Flower Discuss and the Flower Slack to connect, ask questions, and get
-    help:
+    `Star Flower on GitHub <https://github.com/flwrlabs/flower>`__ ⭐️ and join the
+    Flower community on Flower Discuss and the Flower Slack to connect, ask questions,
+    and get help:
 
     - `Join Flower Discuss <https://discuss.flower.ai/>`__ We'd love to hear from you in
       the ``Introduction`` topic! If anything is unclear, post in ``Flower Help -
@@ -155,7 +155,7 @@ Next, run the training with the following command:
 
 .. code-block:: shell
 
-    $ flwr run .
+    $ flwr run . --stream
 
 **************************************
  Server-side parameter **evaluation**
@@ -253,7 +253,7 @@ Finally, we run the simulation.
 
 .. code-block:: shell
 
-    $ flwr run .
+    $ flwr run . --stream
 
 You'll note that the server logs the metrics returned by the callback after each round.
 Also, at the end of the run, note the ``ServerApp-side Evaluate Metrics`` shown:
@@ -304,8 +304,8 @@ see how this looks like in code. Create a new file called ``custom_strategy.py``
             """Configure the next round of federated training and maybe do LR decay."""
             # Decrease learning rate by a factor of 0.5 every 5 rounds
             if server_round % 5 == 0 and server_round > 0:
-                config["learning-rate"] *= 0.5
-                print("LR decreased to:", config["learning-rate"])
+                config["lr"] *= 0.5
+                print("LR decreased to:", config["lr"])
             # Pass the updated config and the rest of arguments to the parent class
             return super().configure_train(server_round, arrays, config, grid)
 
@@ -317,7 +317,7 @@ rounds to 15 to see the learning rate decay in action.
 
 .. code-block:: shell
 
-    $ flwr run . --run-config="num-server-rounds=15"
+    $ flwr run . --stream --run-config="num-server-rounds=15"
 
 You'll note that in the ``configure_train`` stage of rounds 5 and 10, the learning rate
 is decreased by a factor of 0.5 and the new learning rate is printed to the terminal.
@@ -354,12 +354,13 @@ Congratulations! You have created your first custom strategy adding dynamism to 
 ****************************
 
 As a last step in this tutorial, let's see how we can use Flower to experiment with a
-large number of clients. In the ``pyproject.toml``, increase the number of SuperNodes to
-1000:
+large number of clients. Locate your Flower Configuration file (use ``flwr config
+list``) and increase the number of SuperNodes to 1000:
 
 .. code-block:: toml
 
-    [tool.flwr.federations.local-simulation]
+    [superlink.local]
+    address = ":local:"
     options.num-supernodes = 1000
 
 Note that we can reuse the ``ClientApp`` for different ``num-supernodes`` since the
@@ -371,7 +372,7 @@ that the number of training examples on each client is quite small, we should pr
 train the model a bit longer, so we configure the clients to perform 3 local training
 epochs. We should also adjust the fraction of clients selected for training during each
 round (we don't want all 1000 clients participating in every round), so we add
-``franction-train = 0.025`` and adjust ``fraction_evaluate`` to ``0.05``, which means
+``fraction-train = 0.025`` and adjust ``fraction-evaluate`` to ``0.05``, which means
 that only 2.5% of available clients will be selected for training each round (so 25
 clients) and 5% of them for evaluation (so 50 clients). We can add and adjust values in
 the ``pyproject.toml`` for ease of experimentation:
@@ -380,7 +381,7 @@ the ``pyproject.toml`` for ease of experimentation:
 
     [tool.flwr.app.config]
     num-server-rounds = 3
-    franction-train = 0.025  # <-- new
+    fraction-train = 0.025  # <-- new
     fraction-evaluate = 0.05 # <-- updated
     local-epochs = 1
     learning-rate = 0.1
@@ -396,7 +397,7 @@ following:
         """Main entry point for the ServerApp."""
 
         # ... unchanged
-        fraction_train: float = context.run_config["franction-train"]
+        fraction_train: float = context.run_config["fraction-train"]
         # Initialize FedAdagrad strategy
         strategy = CustomFedAdagrad(
             fraction_train=fraction_train,
@@ -412,7 +413,7 @@ Finally, run the simulation with the following command:
 
 .. code-block:: shell
 
-    $ flwr run .
+    $ flwr run . --stream
 
 *******
  Recap
@@ -425,9 +426,8 @@ so little code, right?
 
 In the later sections, we've seen how we can communicate arbitrary values between server
 and clients to fully customize client-side execution. With that capability, we built a
-large-scale Federated Learning simulation using the Flower Virtual Client Engine and ran
-an experiment involving 1000 clients in the same workload — all in the same Flower
-project!
+large-scale Federated Learning simulation using the Flower Simulation Runtime and ran an
+experiment involving 1000 clients in the same workload — all in the same Flower project!
 
 ************
  Next steps

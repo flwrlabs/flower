@@ -33,6 +33,7 @@ class ExitCode:
     SUPERLINK_LICENSE_MISSING = 102
     SUPERLINK_LICENSE_URL_INVALID = 103
     SUPERLINK_INVALID_ARGS = 104
+    SUPERLINK_DATABASE_SCHEMA_MISMATCH = 105
 
     # ServerApp-specific exit codes (200-299)
     SERVERAPP_STRATEGY_PRECONDITION_UNMET = 200
@@ -60,6 +61,7 @@ class ExitCode:
 
     # Simulation exit codes (700-799)
     SIMULATION_EXCEPTION = 700
+    SIMULATION_MISSING_EXTRA = 701
 
     def __new__(cls) -> ExitCode:
         """Prevent instantiation."""
@@ -90,6 +92,11 @@ EXIT_CODE_HELP = {
     ExitCode.SUPERLINK_INVALID_ARGS: (
         "Invalid arguments provided to SuperLink. Use `--help` check for the correct "
         "usage. Alternatively, check the documentation."
+    ),
+    ExitCode.SUPERLINK_DATABASE_SCHEMA_MISMATCH: (
+        "The database schema does not match the expected schema for this version of "
+        "SuperLink. Please refer to the documentation for guidance on how to resolve "
+        "this issue."
     ),
     # ServerApp-specific exit codes (200-299)
     ExitCode.SERVERAPP_STRATEGY_PRECONDITION_UNMET: (
@@ -157,4 +164,11 @@ To use the REST API, install `flwr` with the `rest` extra:
     ExitCode.SIMULATION_EXCEPTION: (
         "An unhandled exception occurred when running the simulation."
     ),
+    ExitCode.SIMULATION_MISSING_EXTRA: """
+Extra dependencies required for simulation are missing.
+
+To use simulation with the Ray backend, install `flwr` with the `simulation` extra:
+
+    `pip install "flwr[simulation]"`.
+""",
 }

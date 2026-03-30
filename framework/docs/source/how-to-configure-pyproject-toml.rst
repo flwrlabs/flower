@@ -1,6 +1,6 @@
-:og:description: Learn how to configure your Flower app using the pyproject.toml file, including dependencies, components, runtime settings, and federation setup.
+:og:description: Learn how to configure your Flower app using the pyproject.toml file, including dependencies, components and runtime settings.
 .. meta::
-    :description: Learn how to configure your Flower app using the pyproject.toml file, including dependencies, components, runtime settings, and federation setup.
+    :description: Learn how to configure your Flower app using the pyproject.toml file, including dependencies, components and runtime settings.
 
 ##############################
  Configure ``pyproject.toml``
@@ -8,7 +8,7 @@
 
 All Flower Apps need a ``pyproject.toml``. When you create a new Flower App using ``flwr
 new``, a ``pyproject.toml`` file is generated. This file defines your app's
-dependencies, configuration, and federation setup.
+dependencies, and configuration setup.
 
 A complete ``pyproject.toml`` file, for example, looks like this:
 
@@ -43,12 +43,6 @@ A complete ``pyproject.toml`` file, for example, looks like this:
         [tool.flwr.app.config]
         num-server-rounds = 3
         any-name-you-like = "any value supported by TOML"
-
-        [tool.flwr.federations]
-        default = "local-simulation"
-
-        [tool.flwr.federations.local-simulation]
-        options.num-supernodes = 10
 
 Here are a few key sections to look out for:
 
@@ -137,81 +131,23 @@ Access these values in your code using ``context.run_config``. For example:
 
     server_rounds = context.run_config["num-server-rounds"]
 
+.. tip::
+
+    You can also override the ``run_config`` values by passing the ``--run-config`` flag
+    followed by key-value pairs when executing ``flwr run``. See the
+    |flwr_run_cli_link|_ for more details.
+
 **************************
  Federation Configuration
 **************************
 
-.. code-block:: toml
+.. note::
 
-    [tool.flwr.federations]
-    default = "your-federation-name"
+    What was previously called "federation config" for SuperLink connections in
+    ``pyproject.toml`` has been renamed and moved. These settings are now **SuperLink
+    connection configuration** and are defined in the Flower configuration file. Refer
+    to the `Flower Configuration <ref-flower-configuration.html>`_ for more information.
 
-    [tool.flwr.federations.your-federation-name]
-    ...  # Federation-specific options
+.. |flwr_run_cli_link| replace:: ``flwr run`` CLI documentation
 
-.. dropdown:: Understanding each field
-
-    .. note::
-
-        \* Required fields
-
-    - ``default``\*: The name of the federation to use when running your app with ``flwr run`` without explicitly specifying a federation.
-
-Federations allow you to define how your app will run in different environments. You can
-configure multiple federations, such as local simulations or remote deployments, within
-the ``[tool.flwr.federations]`` section.
-
-Local Simulation Example
-========================
-
-.. code-block:: toml
-
-    [tool.flwr.federations.local-simulation]
-    options.num-supernodes = 10
-
-When using ``flwr new``, a federation named ``"local-simulation"`` is included and set
-as the default. The example above sets up a local simulation federation with 10 virtual
-SuperNodes using ``options.num-supernodes = 10``.
-
-Learn more in the `How to Run Simulations
-<https://flower.ai/docs/framework/how-to-run-simulations.html>`_ guide.
-
-Remote Deployment Example
-=========================
-
-You can also configure federations for remote deployment. For example:
-
-.. code-block:: toml
-
-    [tool.flwr.federations.remote-deployment]
-    address = "<SUPERLINK-ADDRESS>:<PORT>"
-    root-certificate = "path/to/root/cert.pem"  # Optional, for TLS
-    # insecure = true  # Disable TLS (not recommended for production)
-
-.. dropdown:: Understanding each field
-
-    .. note::
-
-        \* Required fields
-
-    - ``address``\*: The address of the SuperLink Control API to connect to.
-    - ``root-certificate``: Path to the root certificate file for TLS. Ignored if ``insecure`` is ``true``. If omitted, Flower uses the default gRPC root certificate.
-    - ``insecure``: Set to ``true`` to disable TLS (not recommended for production). Defaults to ``false``, if omitted.
-
-Refer to the `deployment documentation <https://flower.ai/docs/framework/deploy.html>`_
-for TLS setup and advanced configurations.
-
-Running a Federation
-====================
-
-To run a specific federation, use the following command:
-
-.. code-block:: shell
-
-    flwr run <path-to-your-app> <your-federation-name>
-
-Both positional arguments—the app path and the federation name—are optional. If omitted,
-the current directory is used as the app path, and the default federation specified in
-the ``pyproject.toml`` file is used.
-
-You can run ``flwr run --help`` for more details.
+.. _flwr_run_cli_link: ref-api-cli.html#flwr-run

@@ -24,6 +24,10 @@ import "flwr/proto/appio.proto";
 
 service ClientAppIo {
 
+  /////////////////////////////////////////////////////////////////////////////
+  // General *AppIo endpoints for SuperExec processes
+  /////////////////////////////////////////////////////////////////////////////
+
   // Get run IDs with pending messages
   rpc ListAppsToLaunch(ListAppsToLaunchRequest)
       returns (ListAppsToLaunchResponse) {}
@@ -31,26 +35,26 @@ service ClientAppIo {
   // Request token
   rpc RequestToken(RequestTokenRequest) returns (RequestTokenResponse) {}
 
+  /////////////////////////////////////////////////////////////////////////////
+  // General *AppIo endpoints for App Executor processes
+  /////////////////////////////////////////////////////////////////////////////
+
   // Get run details
   rpc GetRun(GetRunRequest) returns (GetRunResponse) {}
-
-  // Pull client app inputs
-  rpc PullClientAppInputs(PullAppInputsRequest)
-      returns (PullAppInputsResponse) {}
-
-  // Push client app outputs
-  rpc PushClientAppOutputs(PushAppOutputsRequest)
-      returns (PushAppOutputsResponse) {}
-
-  // Push Message
-  rpc PushMessage(PushAppMessagesRequest) returns (PushAppMessagesResponse) {}
-
-  // Pull Message
-  rpc PullMessage(PullAppMessagesRequest) returns (PullAppMessagesResponse) {}
 
   // App heartbeat
   rpc SendAppHeartbeat(SendAppHeartbeatRequest)
       returns (SendAppHeartbeatResponse) {}
+
+  // Pull app inputs
+  rpc PullAppInputs(PullAppInputsRequest) returns (PullAppInputsResponse) {}
+
+  // Push app outputs
+  rpc PushAppOutputs(PushAppOutputsRequest) returns (PushAppOutputsResponse) {}
+
+  /////////////////////////////////////////////////////////////////////////////
+  // Specific endpoints shared by ServerAppIo and ClientAppIo
+  /////////////////////////////////////////////////////////////////////////////
 
   // Push Object
   rpc PushObject(PushObjectRequest) returns (PushObjectResponse) {}
@@ -61,4 +65,14 @@ service ClientAppIo {
   // Confirm Message Received
   rpc ConfirmMessageReceived(ConfirmMessageReceivedRequest)
       returns (ConfirmMessageReceivedResponse) {}
+
+  /////////////////////////////////////////////////////////////////////////////
+  // Specific endpoints for ClientAppIo
+  /////////////////////////////////////////////////////////////////////////////
+
+  // Push Message
+  rpc PushMessage(PushAppMessagesRequest) returns (PushAppMessagesResponse) {}
+
+  // Pull Message
+  rpc PullMessage(PullAppMessagesRequest) returns (PullAppMessagesResponse) {}
 }

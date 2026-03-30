@@ -20,7 +20,7 @@ The background thread is established via the `WorkManager` library of Android, t
 Start by cloning the example project. We prepared a single-line command that you can copy into your shell which will checkout the example for you:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git && mv flower/examples/android . && rm -rf flower && cd android
+git clone --depth=1 https://github.com/flwrlabs/flower.git && mv flower/examples/android . && rm -rf flower && cd android
 ```
 
 ### Installing Dependencies

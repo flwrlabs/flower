@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "quickstart_pennylane"
+name = "quickstart-pennylane"
 version = "1.0.0"
 description = "Quantum Federated Learning with PennyLane and Flower"
 license = "Apache-2.0"
@@ -14,8 +14,8 @@ authors = [
     { name = "Alan Yi", email = "yi161@purdue.edu" }
 ]
 dependencies = [
-    "flwr[simulation]>=1.25.0",
-    "flwr-datasets[vision]>=0.5.0",
+    "flwr[simulation]>=1.27.0",
+    "flwr-datasets[vision]>=0.6.0",
     "torch==2.8.0",
     "torchvision==0.23.0",
     "pennylane==0.41.1",
@@ -43,14 +43,3 @@ fraction-evaluate = 0.5
 # Quantum circuit configuration
 n-qubits = 4
 n-layers = 3
-
-[tool.flwr.federations]
-default = "local-simulation"
-
-[tool.flwr.federations.local-simulation]
-options.num-supernodes = 10
-
-[tool.flwr.federations.local-simulation-gpu]
-options.num-supernodes = 10
-options.backend.client-resources.num-cpus = 2
-options.backend.client-resources.num-gpus = 0.2

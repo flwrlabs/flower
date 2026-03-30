@@ -17,8 +17,9 @@
 
 from dataclasses import dataclass
 
+from flwr.app.user_config import UserConfig
+
 from .record import RecordDict
-from .typing import UserConfig
 
 
 @dataclass
