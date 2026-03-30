@@ -28,6 +28,10 @@ import click
 import grpc
 import pytest
 
+from flwr.cli.constant import (
+    LOCAL_CONTROL_API_ADDRESS,
+    LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
+)
 from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
 from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
@@ -205,11 +209,12 @@ def test_init_channel_from_connection_uses_resolved_connection() -> None:
     """Ensure resolved connection values are used for channel creation."""
     unresolved = SuperLinkConnection(
         name="local",
+        address=LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
         options=SuperLinkSimulationOptions(num_supernodes=2),
     )
     resolved = SuperLinkConnection(
         name="local",
-        address="127.0.0.1:9093",
+        address=LOCAL_CONTROL_API_ADDRESS,
         insecure=True,
         options=SuperLinkSimulationOptions(num_supernodes=2),
     )
@@ -231,7 +236,7 @@ def test_init_channel_from_connection_uses_resolved_connection() -> None:
     auth_plugin.load_tokens.assert_called_once()
 
     kwargs = mock_create.call_args.kwargs
-    assert kwargs["server_address"] == "127.0.0.1:9093"
+    assert kwargs["server_address"] == LOCAL_CONTROL_API_ADDRESS
     assert kwargs["insecure"] is True
     assert kwargs["root_certificates"] is None
     assert kwargs["max_message_length"] == GRPC_MAX_MESSAGE_LENGTH

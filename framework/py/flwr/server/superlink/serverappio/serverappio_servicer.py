@@ -23,7 +23,6 @@ from flwr.common import Message
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.logger import log
 from flwr.common.serde import (
-    config_record_to_proto,
     context_from_proto,
     context_to_proto,
     fab_to_proto,
@@ -340,6 +339,7 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
                     context=context_to_proto(serverapp_ctxt),
                     run=run_to_proto(run),
                     fab=fab_to_proto(fab),
+                    federation_config=state.get_federation_config(run_id),
                 )
 
         # Raise an exception if the Run or Fab is not found,
@@ -420,18 +420,7 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
     ) -> GetFederationOptionsResponse:
         """Get Federation Options associated with a run."""
         log(DEBUG, "ServerAppIoServicer.GetFederationOptions")
-        state = self.state_factory.state()
-
-        federation_options = state.get_federation_options(request.run_id)
-        if federation_options is None:
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION,
-                "Expected federation options to be set, but none available.",
-            )
-            return GetFederationOptionsResponse()
-        return GetFederationOptionsResponse(
-            federation_options=config_record_to_proto(federation_options)
-        )
+        raise NotImplementedError("To be removed")
 
     def SendAppHeartbeat(
         self, request: SendAppHeartbeatRequest, context: grpc.ServicerContext

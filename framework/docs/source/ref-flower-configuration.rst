@@ -68,6 +68,7 @@ clearer naming.
     default = "local"
 
     [superlink.local]
+    address = ":local:"
     options.num-supernodes = 10
 
     [superlink.local-poc]
@@ -79,8 +80,12 @@ clearer naming.
 - ``[superlink]`` section defines which connection configuration to use by default
 - ``default = "local"`` means the ``superlink.local`` configuration will be used when
   you don't specify a connection explicitly in your ``flwr`` commands
-- ``[superlink.local]`` defines a local simulation configuration with 10 virtual
-  SuperNodes
+- ``[superlink.local]`` defines a managed local SuperLink profile. The special address
+  value ``":local:"`` tells Flower to launch or reuse the background local SuperLink on
+  demand with its default on-disk state. The alternative value ``":local-in-memory:"``
+  starts the managed local SuperLink with an in-memory database instead. The SuperLink
+  will run simulations using the default configuration of the :doc:`Simulation Runtime
+  <how-to-run-simulations>`.
 - ``[superlink.local-poc]`` defines a configuration for connecting to a locally running
   SuperLink at address ``127.0.0.1:9093``
 
@@ -120,6 +125,7 @@ testing before deploying to real distributed environments.
 .. code-block:: toml
 
     [superlink.local]
+    address = ":local:"
     options.num-supernodes = 10
 
 This creates a managed local SuperLink profile that runs 10 virtual SuperNodes through
@@ -130,6 +136,7 @@ the simulation runtime.
 .. code-block:: toml
 
     [superlink.local-custom-resources]
+    address = ":local:"
     options.num-supernodes = 100
     options.backend.client-resources.num-cpus = 1
     options.backend.client-resources.num-gpus = 0.1
@@ -138,20 +145,36 @@ This creates a managed local SuperLink profile with 100 virtual SuperNodes, wher
 is allocated 1 CPU and 10% of a GPU. This is useful when you want to control resource
 distribution or simulate resource-constrained environments.
 
+.. _flower-config-local-in-memory:
+
+**Simulation with in-memory local state**
+
+.. code-block:: toml
+
+    [superlink.local-in-memory]
+    address = ":local-in-memory:"
+
+This creates a managed local SuperLink profile that keeps its database in memory instead
+of on disk. This can be useful on networked filesystems where SQLite locking or
+performance issues can occur. The tradeoff is that local run history and logs are lost
+when the managed local SuperLink is shut down.
+
 **When to use each**
 
 - Use the basic configuration for quick testing with default resource allocation
 - Use custom resources when you need to simulate specific hardware constraints or want
   to control how many virtual SuperNodes can run in parallel based on your machine's
   resources
+- Use ``address = ":local-in-memory:"`` when the managed local SuperLink runs on a
+  filesystem where SQLite performs poorly, such as some network drives or HPC storage
 
 Learn more in the `How to Run Simulations
 <https://flower.ai/docs/framework/how-to-run-simulations.html>`_ guide about other
 optional parameters you can use to configure your local simulation.
 
-When you use a local simulation profile (``options.*``), Flower CLI commands that
-communicate with SuperLink use the Control API. If the profile has no explicit
-``address``, Flower starts a managed local SuperLink automatically when needed and
+When you use a local simulation profile with ``address = ":local:"`` or ``address =
+":local-in-memory:"``, Flower CLI commands that communicate with SuperLink use the
+Control API. Flower starts a managed local SuperLink automatically when needed and
 reuses it across ``flwr run``, ``flwr list``, ``flwr log``, and ``flwr stop``. See
 :doc:`how-to-run-flower-locally` for the full local workflow, background process
 behavior, and runtime file locations.

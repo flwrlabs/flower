@@ -87,7 +87,7 @@ erDiagram
     VARCHAR fab_id "nullable"
     VARCHAR fab_version "nullable"
     VARCHAR federation "nullable"
-    BLOB federation_options "nullable"
+    VARCHAR federation_config "nullable"
     VARCHAR finished_at "nullable"
     VARCHAR flwr_aid "nullable"
     VARCHAR override_config "nullable"

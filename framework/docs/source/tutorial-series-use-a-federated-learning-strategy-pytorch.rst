@@ -360,6 +360,7 @@ list``) and increase the number of SuperNodes to 1000:
 .. code-block:: toml
 
     [superlink.local]
+    address = ":local:"
     options.num-supernodes = 1000
 
 Note that we can reuse the ``ClientApp`` for different ``num-supernodes`` since the

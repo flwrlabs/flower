@@ -9,7 +9,8 @@ integration with other tools.
 
     JSON output is available for the commands documented here because they operate
     through the SuperLink Control API. This includes remote SuperLinks as well as the
-    managed local SuperLink used by local simulation profiles.
+    managed local SuperLink used by local simulation profiles marked with ``address =
+    ":local:"``.
 
 This guide shows JSON output for:
 

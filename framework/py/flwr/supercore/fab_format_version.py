@@ -88,7 +88,7 @@ def _get_declared_license_file(config: dict[str, Any]) -> str | None:
 
     if isinstance(license_entry, str):
         raise ValueError(
-            "fab_format_version = 1 requires [project].license to be "
+            "fab-format-version = 1 requires [project].license to be "
             '{ file = "LICENSE" } or { file = "LICENSE.md" }.'
         )
 
@@ -97,13 +97,13 @@ def _get_declared_license_file(config: dict[str, Any]) -> str | None:
 
     if "text" in license_entry:
         raise ValueError(
-            "fab_format_version = 1 requires [project].license to reference "
+            "fab-format-version = 1 requires [project].license to reference "
             "a root-level license file, not inline text."
         )
 
     if "file" not in license_entry:
         raise ValueError(
-            "fab_format_version = 1 requires [project].license to be "
+            "fab-format-version = 1 requires [project].license to be "
             '{ file = "LICENSE" } or { file = "LICENSE.md" }.'
         )
 
@@ -113,7 +113,7 @@ def _get_declared_license_file(config: dict[str, Any]) -> str | None:
 
     if license_file not in {"LICENSE", "LICENSE.md"}:
         raise ValueError(
-            "fab_format_version = 1 requires [project].license.file to be "
+            "fab-format-version = 1 requires [project].license.file to be "
             '"LICENSE" or "LICENSE.md".'
         )
 
@@ -121,11 +121,11 @@ def _get_declared_license_file(config: dict[str, Any]) -> str | None:
 
 
 def _require_license_file(config: dict[str, Any]) -> str:
-    """Return the required license file declaration for `fab_format_version = 1`."""
+    """Return the required license file declaration for `fab-format-version = 1`."""
     license_file = _get_declared_license_file(config)
     if license_file is None:
         raise ValueError(
-            "fab_format_version = 1 requires [project].license to be "
+            "fab-format-version = 1 requires [project].license to be "
             '{ file = "LICENSE" } or { file = "LICENSE.md" }.'
         )
     return license_file
@@ -147,7 +147,7 @@ def _derive_flwr_version_min(requirement: Requirement) -> Version:
     if lower_bound is None:
         raise ValueError(
             'Invalid "flwr" dependency specifier: an inclusive lower bound declared '
-            'with ">=" is required for fab_format_version = 1.'
+            'with ">=" is required for fab-format-version = 1.'
         )
 
     return lower_bound
@@ -168,43 +168,43 @@ def _get_flwr_app_config(config: dict[str, Any]) -> dict[str, Any]:
 
 
 def _resolve_fab_format_version(app_config: dict[str, Any]) -> int:
-    """Resolve and validate `fab_format_version` from app config."""
-    fab_format_version = app_config.get("fab_format_version", 0)
+    """Resolve and validate `fab-format-version` from app config."""
+    fab_format_version = app_config.get("fab-format-version", 0)
     if (
         not isinstance(fab_format_version, int)
         or isinstance(fab_format_version, bool)
         or fab_format_version < 0
     ):
         raise ValueError(
-            "Invalid [tool.flwr.app].fab_format_version: expected a non-negative "
+            "Invalid [tool.flwr.app].fab-format-version: expected a non-negative "
             "integer."
         )
     return fab_format_version
 
 
 def _parse_flwr_target_version(app_config: dict[str, Any]) -> Version | None:
-    """Parse optional `flwr_version_target` from app config."""
-    target_raw = app_config.get("flwr_version_target")
+    """Parse optional `flwr-version-target` from app config."""
+    target_raw = app_config.get("flwr-version-target")
     if target_raw is not None and not isinstance(target_raw, str):
         raise ValueError(
-            "Invalid [tool.flwr.app].flwr_version_target: expected a string."
+            "Invalid [tool.flwr.app].flwr-version-target: expected a string."
         )
 
     if isinstance(target_raw, str):
         return _parse_version(
             target_raw,
-            "[tool.flwr.app].flwr_version_target",
+            "[tool.flwr.app].flwr-version-target",
         )
     return None
 
 
 def _require_flwr_target_version(app_config: dict[str, Any]) -> Version:
-    """Parse required `flwr_version_target` from app config."""
+    """Parse required `flwr-version-target` from app config."""
     target_version = _parse_flwr_target_version(app_config)
     if target_version is None:
         raise ValueError(
-            "Missing [tool.flwr.app].flwr_version_target for "
-            "fab_format_version >= 1."
+            "Missing [tool.flwr.app].flwr-version-target for "
+            "fab-format-version >= 1."
         )
     return target_version
 
@@ -213,13 +213,13 @@ def _validate_target_against_lower_bound(
     target_version: Version | None,
     lower_bound: Version | None,
 ) -> None:
-    """Ensure `flwr_version_target` respects the derived lower bound, if any."""
+    """Ensure `flwr-version-target` respects the derived lower bound, if any."""
     if target_version is None or lower_bound is None:
         return
 
     if target_version < lower_bound:
         raise ValueError(
-            "Invalid [tool.flwr.app].flwr_version_target: must be greater than or "
+            "Invalid [tool.flwr.app].flwr-version-target: must be greater than or "
             'equal to the declared "flwr" dependency lower bound.'
         )
 
@@ -238,15 +238,13 @@ def _build_fab_metadata(
 
 
 def _normalize_and_validate_fab_format_v0(config: dict[str, Any]) -> FabFormatMetadata:
-    """Derive best-effort compatibility metadata for `fab_format_version = 0`.
+    """Derive best-effort compatibility metadata for `fab-format-version = 0`.
 
     - `flwr` dependency is optional.
-    - `flwr_version_target` is optional.
+    - `flwr-version-target` is ignored.
     - Compatibility minimum is derived from the highest declared `>=` specifier.
     - All non-`>=` specifiers are ignored for metadata derivation.
     """
-    app_config = _get_flwr_app_config(config)
-    target_version = _parse_flwr_target_version(app_config)
     requirement = _get_flwr_requirement(config)
     lower_bound: Version | None = None
 
@@ -256,12 +254,11 @@ def _normalize_and_validate_fab_format_v0(config: dict[str, Any]) -> FabFormatMe
         except ValueError:
             lower_bound = None
 
-    _validate_target_against_lower_bound(target_version, lower_bound)
-    return _build_fab_metadata(0, target_version, lower_bound)
+    return _build_fab_metadata(0, None, lower_bound)
 
 
 def _normalize_and_validate_fab_format_v1(config: dict[str, Any]) -> FabFormatMetadata:
-    """Require and derive strict metadata for `fab_format_version = 1`.
+    """Require and derive strict metadata for `fab-format-version = 1`.
 
     - `[project].license` must reference a root-level license file.
     - `flwr` dependency is required.
@@ -269,7 +266,7 @@ def _normalize_and_validate_fab_format_v1(config: dict[str, Any]) -> FabFormatMe
       `>=`.
     - The highest declared `>=` specifier is used as the derived lower bound.
     - All non-`>=` specifiers are ignored for metadata derivation.
-    - `flwr_version_target` is required and must be greater than or equal to the
+    - `flwr-version-target` is required and must be greater than or equal to the
       derived lower bound.
     """
     app_config = _get_flwr_app_config(config)
@@ -279,7 +276,7 @@ def _normalize_and_validate_fab_format_v1(config: dict[str, Any]) -> FabFormatMe
     if requirement is None:
         raise ValueError(
             'Missing "flwr" dependency in [project].dependencies for '
-            "fab_format_version >= 1."
+            "fab-format-version >= 1."
         )
 
     lower_bound = _derive_flwr_version_min(requirement)
@@ -290,7 +287,7 @@ def _normalize_and_validate_fab_format_v1(config: dict[str, Any]) -> FabFormatMe
 def _validate_fab_format_v0_contents(
     _config: dict[str, Any], _filtered_paths: list[str]
 ) -> None:
-    """Validate the final FAB contents for `fab_format_version = 0`."""
+    """Validate the final FAB contents for `fab-format-version = 0`."""
     # Reserved for future file-level FAB format rules.
     return None
 
@@ -298,11 +295,11 @@ def _validate_fab_format_v0_contents(
 def _validate_fab_format_v1_contents(
     config: dict[str, Any], filtered_paths: list[str]
 ) -> None:
-    """Validate the final FAB contents for `fab_format_version = 1`."""
+    """Validate the final FAB contents for `fab-format-version = 1`."""
     license_file = _require_license_file(config)
     if license_file not in filtered_paths:
         raise ValueError(
-            "fab_format_version = 1 requires the declared [project].license.file "
+            "fab-format-version = 1 requires the declared [project].license.file "
             "to be included in the FAB."
         )
 
@@ -310,7 +307,7 @@ def _validate_fab_format_v1_contents(
 def normalize_and_validate_fab_format(
     config: dict[str, Any],
 ) -> FabFormatMetadata:
-    """Normalize FAB metadata in config and validate `fab_format_version` rules."""
+    """Normalize FAB metadata in config and validate `fab-format-version` rules."""
     app_config = _get_flwr_app_config(config)
     fab_format_version = _resolve_fab_format_version(app_config)
     if fab_format_version == 0:
@@ -319,7 +316,7 @@ def normalize_and_validate_fab_format(
         return _normalize_and_validate_fab_format_v1(config)
 
     raise ValueError(
-        f"Unsupported [tool.flwr.app].fab_format_version: {fab_format_version}."
+        f"Unsupported [tool.flwr.app].fab-format-version: {fab_format_version}."
     )
 
 
@@ -337,5 +334,5 @@ def validate_fab_files_for_format(
         return
 
     raise ValueError(
-        f"Unsupported [tool.flwr.app].fab_format_version: {fab_format_version}."
+        f"Unsupported [tool.flwr.app].fab-format-version: {fab_format_version}."
     )
