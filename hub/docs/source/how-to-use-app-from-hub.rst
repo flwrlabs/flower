@@ -104,5 +104,5 @@ In this case, the SuperLink downloads the app from Flower Hub and distributes th
 
 .. note::
    Remote Flower Hub runs can be rejected before download if the app's declared Flower
-   version compatibility does not match the Flower version used by the client.
+   version compatibility does not match the Flower version used by the SuperNodes.
    See :doc:`fab-format-version`.
