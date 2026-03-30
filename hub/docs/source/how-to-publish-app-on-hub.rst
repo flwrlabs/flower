@@ -284,8 +284,7 @@ After logging in, publish your app:
    If your app uses :code:`fab-format-version = 1`, Flower Hub validates the Flower
    version metadata and license-file requirements during this server-side build.
    This means publish upload rules and FAB packaging rules are related but not identical.
-   For details on FAB packaging, see the Flower Framework CLI reference for :code:`flwr build`:
-   `https://flower.ai/docs/framework/ref-api-cli.html <https://flower.ai/docs/framework/ref-api-cli.html>`_.
+   For details on FAB packaging, see the Flower Framework CLI reference for `flwr build <https://flower.ai/docs/framework/ref-api-cli.html#flwr-build>`_.
 
 🎉 That's it! Your app is now live on Flower Hub.
 
