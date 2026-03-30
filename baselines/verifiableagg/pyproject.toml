@@ -122,7 +122,6 @@ clientapp = "verifiableagg.client_app:app"
 
 [tool.flwr.app.config]
 num-server-rounds = 5
-num-clients = 8
 fraction-train = 1.0
 fraction-evaluate = 1.0
 local-epochs = 1
