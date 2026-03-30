@@ -1,0 +1,30 @@
+// Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+// ==============================================================================
+
+syntax = "proto3";
+
+package flwr.proto;
+
+message SimulationConfig {
+  optional uint32 num_supernodes = 1;
+  optional uint32 client_resources_num_cpus = 2;
+  optional float client_resources_num_gpus = 3;
+  optional string backend = 4;
+  optional bool verbose = 5;
+  optional uint32 init_args_num_cpus = 6;
+  optional uint32 init_args_num_gpus = 7;
+  optional string init_args_logging_level = 8;
+  optional bool init_args_log_to_driver = 9;
+}

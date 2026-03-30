@@ -28,15 +28,7 @@ from uuid import uuid4
 from parameterized import parameterized
 
 from flwr.app.user_config import UserConfig
-from flwr.common import (
-    DEFAULT_TTL,
-    ConfigRecord,
-    Context,
-    Error,
-    Message,
-    RecordDict,
-    now,
-)
+from flwr.common import DEFAULT_TTL, Context, Error, Message, RecordDict, now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     RUN_FAILURE_DETAILS_NO_HEARTBEAT,
@@ -47,6 +39,7 @@ from flwr.common.constant import (
 )
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.common.typing import RunStatus
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
 from flwr.proto.message_pb2 import Message as ProtoMessage
@@ -88,7 +81,7 @@ class StateTest(CoreStateTest):
             "9f86d08",
             {"test_key": "test_value"},
             "health-federation",
-            ConfigRecord(),
+            None,
             "i1r9f",
             RunType.SERVER_APP,
         )
@@ -1665,33 +1658,28 @@ class StateTest(CoreStateTest):
         assert latest == 0
         assert retrieved_logs == ""
 
-    def test_create_run_with_and_without_federation_options(self) -> None:
-        """Test that the recording and fetching of federation options works."""
+    def test_create_run_with_and_without_federation_config(self) -> None:
+        """Test that run federation config is stored on the run."""
         # Prepare
         state = self.state_factory()
-        # A run w/ federation options
-        fed_options = ConfigRecord({"setting-a": 123, "setting-b": [4, 5, 6]})
+        federation_config = SimulationConfig(num_supernodes=3, backend="ray")
         run_id = create_dummy_run(
             state,
-            federation_options=fed_options,
+            federation_config=federation_config,
             run_type=RunType.SIMULATION,
         )
         state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
         second_run_id = create_dummy_run(state)
 
         # Execute
-        fed_options_fetched = state.get_federation_options(run_id=run_id)
         run_info = state.get_run_info(run_ids=[run_id])[0]
         second_run_info = state.get_run_info(run_ids=[second_run_id])[0]
 
         # Assert
-        assert fed_options_fetched == fed_options
         assert run_info.run_type == RunType.SIMULATION
+        assert state.get_federation_config(run_id) == federation_config
         assert second_run_info.run_type == RunType.SERVER_APP
-
-        # Generate a run_id that doesn't exist. Then check None is returned
-        unique_int = next(num for num in range(0, 1) if num not in {run_id})
-        assert state.get_federation_options(run_id=unique_int) is None
+        assert state.get_federation_config(second_run_id) is None
 
     def test_set_linkstate_of_federation_manager(self) -> None:
         """Test that setting the LinkState of the FederationManager works."""
@@ -1873,7 +1861,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     fab_hash: str | None = "mock_fab_hash",
     override_config: UserConfig | None = None,
     federation: str = NOOP_FEDERATION,
-    federation_options: ConfigRecord | None = None,
+    federation_config: SimulationConfig | None = None,
     flwr_aid: str | None = "mock_flwr_aid",
     run_type: str = RunType.SERVER_APP,
 ) -> int:
@@ -1884,7 +1872,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
         fab_hash=fab_hash,
         override_config=override_config or {},
         federation=federation,
-        federation_options=federation_options or ConfigRecord(),
+        federation_config=federation_config,
         flwr_aid=flwr_aid,
         run_type=run_type,
     )

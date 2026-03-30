@@ -24,7 +24,7 @@ from typing import Any
 import requests
 
 from flwr.common.constant import FLWR_DIR, FLWR_HOME
-from flwr.proto.federation_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.supercore.version import package_version as flwr_version
 
 from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN

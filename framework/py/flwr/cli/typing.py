@@ -47,7 +47,7 @@ class SimulationInitArgs:
     num_cpus: int | None = None
     num_gpus: int | None = None
     logging_level: str | None = None
-    log_to_drive: bool | None = None
+    log_to_driver: bool | None = None
 
     def __post_init__(self) -> None:
         """Validate initialization arguments."""
@@ -57,8 +57,8 @@ class SimulationInitArgs:
             raise ValueError("init-args.num-gpus must be an integer.")
         if self.logging_level is not None and not isinstance(self.logging_level, str):
             raise ValueError("init-args.logging-level must be a string.")
-        if self.log_to_drive is not None and not isinstance(self.log_to_drive, bool):
-            raise ValueError("init-args.log-to-drive must be a boolean.")
+        if self.log_to_driver is not None and not isinstance(self.log_to_driver, bool):
+            raise ValueError("init-args.log-to-driver must be a boolean.")
 
 
 @dataclass

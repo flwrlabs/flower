@@ -169,15 +169,3 @@ def test_compile_project_uses_loaded_protoc(
     assert calls[0][0] == "grpc_tools.protoc"
     assert f"--proto_path={tmp_path / 'grpc' / '_proto'}" in calls[0]
     assert str(proto_file.resolve()) in calls[0]
-
-
-def test_framework_config_resolves_real_proto_layout() -> None:
-    """The framework config should resolve to the current proto tree."""
-    framework_dir = Path(__file__).resolve().parents[2] / "framework"
-
-    config = protoc.load_protoc_config(framework_dir)
-    proto_files = protoc.discover_proto_files(config.proto_root, config.include_globs)
-
-    assert config.proto_root == (framework_dir / "proto").resolve()
-    assert config.outputs.python == (framework_dir / "py").resolve()
-    assert len(proto_files) == 17

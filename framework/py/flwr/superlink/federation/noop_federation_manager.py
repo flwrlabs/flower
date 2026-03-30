@@ -19,11 +19,11 @@ from typing import cast
 
 from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.common.typing import Federation
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import (  # pylint: disable=E0611
     Account,
     Invitation,
     Member,
-    SimulationConfig,
 )
 from flwr.supercore.constant import (
     DEFAULT_SIMULATION_CONFIG,
@@ -52,7 +52,8 @@ class NoOpFederationManager(FederationManager):
         self._simulation = simulation
         self._simulation_config: SimulationConfig | None = None
         if self._simulation:
-            self._simulation_config = DEFAULT_SIMULATION_CONFIG
+            self._simulation_config = SimulationConfig()
+            self._simulation_config.CopyFrom(DEFAULT_SIMULATION_CONFIG)
 
     def exists(self, federation: str) -> bool:
         """Check if a federation exists."""
@@ -139,8 +140,7 @@ class NoOpFederationManager(FederationManager):
                 ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION,
                 f"Cannot set simulation configuration for federation '{federation}'.",
             ) from None
-        self._simulation_config = SimulationConfig()
-        self._simulation_config.CopyFrom(config)
+        cast(SimulationConfig, self._simulation_config).MergeFrom(config)
 
     def create_federation(
         self,

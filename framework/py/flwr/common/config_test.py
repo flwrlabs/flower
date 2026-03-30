@@ -504,21 +504,21 @@ def test_validate_pyproject_toml() -> None:
 
 
 def test_validate_pyproject_toml_with_fab_format_version_derives_metadata() -> None:
-    """Test fab_format_version=1 succeeds without mutating authored metadata."""
+    """Test fab-format-version=1 succeeds without mutating authored metadata."""
     config: dict[str, Any] = {
         "project": {
             "name": "fedgpt",
             "version": "1.0.0",
             "description": "",
-            "license": "",
+            "license": {"file": "LICENSE"},
             "dependencies": ["flwr[simulation]>=1.26.0,<=1.28.0"],
         },
         "tool": {
             "flwr": {
                 "app": {
                     "publisher": "flwrlabs",
-                    "fab_format_version": 1,
-                    "flwr_version_target": "1.27.0",
+                    "fab-format-version": 1,
+                    "flwr-version-target": "1.27.0",
                     "components": {
                         "serverapp": "flwr.cli.run:run",
                         "clientapp": "flwr.cli.run:run",
@@ -536,20 +536,21 @@ def test_validate_pyproject_toml_with_fab_format_version_derives_metadata() -> N
 
 
 def test_v1_fab_format_requires_flwr_dependency() -> None:
-    """Test fab_format_version=1 requires a flwr dependency."""
+    """Test fab-format-version=1 requires a flwr dependency."""
     config = {
         "project": {
             "name": "fedgpt",
             "version": "1.0.0",
             "description": "",
-            "license": "",
+            "license": {"file": "LICENSE"},
             "dependencies": ["numpy>=1.26.0"],
         },
         "tool": {
             "flwr": {
                 "app": {
                     "publisher": "flwrlabs",
-                    "fab_format_version": 1,
+                    "fab-format-version": 1,
+                    "flwr-version-target": "1.27.0",
                     "components": {
                         "serverapp": "flwr.cli.run:run",
                         "clientapp": "flwr.cli.run:run",
@@ -568,20 +569,21 @@ def test_v1_fab_format_requires_flwr_dependency() -> None:
 
 
 def test_v1_fab_format_rejects_exclusive_lower_bound() -> None:
-    """Test fab_format_version=1 rejects exclusive lower bounds."""
+    """Test fab-format-version=1 rejects exclusive lower bounds."""
     config = {
         "project": {
             "name": "fedgpt",
             "version": "1.0.0",
             "description": "",
-            "license": "",
+            "license": {"file": "LICENSE"},
             "dependencies": ["flwr>1.26.0"],
         },
         "tool": {
             "flwr": {
                 "app": {
                     "publisher": "flwrlabs",
-                    "fab_format_version": 1,
+                    "fab-format-version": 1,
+                    "flwr-version-target": "1.27.0",
                     "components": {
                         "serverapp": "flwr.cli.run:run",
                         "clientapp": "flwr.cli.run:run",
@@ -596,6 +598,103 @@ def test_v1_fab_format_rejects_exclusive_lower_bound() -> None:
     assert not is_valid
     assert len(errors) == 1
     assert "inclusive lower bound" in errors[0]
+    assert not warnings
+
+
+def test_v1_fab_format_rejects_target_outside_declared_range() -> None:
+    """Test fab-format-version=1 rejects targets outside the flwr specifier."""
+    config = {
+        "project": {
+            "name": "fedgpt",
+            "version": "1.0.0",
+            "description": "",
+            "license": {"file": "LICENSE"},
+            "dependencies": ["flwr>=1.26.0,<1.28.0"],
+        },
+        "tool": {
+            "flwr": {
+                "app": {
+                    "publisher": "flwrlabs",
+                    "fab-format-version": 1,
+                    "flwr-version-target": "2.0.0",
+                    "components": {
+                        "serverapp": "flwr.cli.run:run",
+                        "clientapp": "flwr.cli.run:run",
+                    },
+                },
+            },
+        },
+    }
+
+    is_valid, errors, warnings = validate_config(config)
+
+    assert not is_valid
+    assert len(errors) == 1
+    assert 'must satisfy the declared "flwr" dependency specifier' in errors[0]
+    assert not warnings
+
+
+def test_v1_fab_format_accepts_additional_specifiers_with_lower_bound() -> None:
+    """Test fab-format-version=1 accepts extra specifiers when `>=` is present."""
+    config = {
+        "project": {
+            "name": "fedgpt",
+            "version": "1.0.0",
+            "description": "",
+            "license": {"file": "LICENSE"},
+            "dependencies": ["flwr>=1.26.0,==1.27.0"],
+        },
+        "tool": {
+            "flwr": {
+                "app": {
+                    "publisher": "flwrlabs",
+                    "fab-format-version": 1,
+                    "flwr-version-target": "1.27.0",
+                    "components": {
+                        "serverapp": "flwr.cli.run:run",
+                        "clientapp": "flwr.cli.run:run",
+                    },
+                },
+            },
+        },
+    }
+
+    is_valid, errors, warnings = validate_config(config)
+
+    assert is_valid
+    assert not errors
+    assert not warnings
+
+
+def test_v1_fab_format_requires_target_version() -> None:
+    """Test fab-format-version=1 requires flwr-version-target."""
+    config = {
+        "project": {
+            "name": "fedgpt",
+            "version": "1.0.0",
+            "description": "",
+            "license": {"file": "LICENSE"},
+            "dependencies": ["flwr>=1.26.0"],
+        },
+        "tool": {
+            "flwr": {
+                "app": {
+                    "publisher": "flwrlabs",
+                    "fab-format-version": 1,
+                    "components": {
+                        "serverapp": "flwr.cli.run:run",
+                        "clientapp": "flwr.cli.run:run",
+                    },
+                },
+            },
+        },
+    }
+
+    is_valid, errors, warnings = validate_config(config)
+
+    assert not is_valid
+    assert len(errors) == 1
+    assert "flwr-version-target" in errors[0]
     assert not warnings
 
 

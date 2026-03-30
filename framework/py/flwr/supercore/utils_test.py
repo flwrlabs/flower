@@ -22,7 +22,7 @@ import pytest
 import requests
 from parameterized import parameterized
 
-from flwr.proto.federation_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 from .utils import (
     humanize_bytes,

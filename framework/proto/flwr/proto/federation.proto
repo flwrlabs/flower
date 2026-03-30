@@ -18,6 +18,7 @@ syntax = "proto3";
 package flwr.proto;
 import "flwr/proto/run.proto";
 import "flwr/proto/node.proto";
+import "flwr/proto/federation_config.proto";
 
 message Account {
   string id = 1;
@@ -47,16 +48,4 @@ message Invitation {
   string status = 4;
   string created_at = 5;
   string status_changed_at = 6;
-}
-
-message SimulationConfig {
-  optional uint32 num_supernodes = 1;
-  optional uint32 client_resources_num_cpus = 2;
-  optional float client_resources_num_gpus = 3;
-  optional string backend = 4;
-  optional bool verbose = 5;
-  optional uint32 init_args_num_cpus = 6;
-  optional uint32 init_args_num_gpus = 7;
-  optional string init_args_logging_level = 8;
-  optional bool init_args_log_to_driver = 9;
 }

@@ -38,8 +38,8 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.record import ConfigRecord
 from flwr.common.typing import Run, RunStatus
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.server.utils.validator import validate_message
 from flwr.supercore.constant import NodeStatus
@@ -47,14 +47,17 @@ from flwr.supercore.corestate.sql_corestate import SqlCoreState
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
-from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
+from flwr.supercore.utils import (
+    int64_to_uint64,
+    simulation_config_from_json,
+    simulation_config_to_json,
+    uint64_to_int64,
+)
 from flwr.superlink.federation import FederationManager
 
 from .linkstate import LinkState
 from .utils import (
     check_node_availability_for_in_message,
-    configrecord_from_bytes,
-    configrecord_to_bytes,
     context_from_bytes,
     context_to_bytes,
     convert_sint64_values_in_dict_to_uint64,
@@ -780,14 +783,14 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         node_id = int64_to_uint64(rows[0]["node_id"])
         return node_id
 
-    def create_run(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def create_run(  # pylint: disable=R0913, R0914, R0917
         self,
         fab_id: str | None,
         fab_version: str | None,
         fab_hash: str | None,
         override_config: UserConfig,
         federation: str,
-        federation_options: ConfigRecord,
+        federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         run_type: str,
     ) -> int:
@@ -798,6 +801,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # Convert the uint64 value to sint64 for SQLite
         sint64_run_id = uint64_to_int64(uint64_run_id)
 
+        # Convert federation_config to JSON string for storage
+        fed_config_json = None
+        if federation_config:
+            fed_config_json = json.dumps(simulation_config_to_json(federation_config))
+
         with self.session():
             # Check conflicts
             query = "SELECT COUNT(*) as cnt FROM run WHERE run_id = :run_id"
@@ -805,15 +813,15 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             if rows[0]["cnt"] == 0:
                 query = """
                     INSERT INTO run
-                    (run_id, fab_id, fab_version,
-                    fab_hash, override_config, federation, federation_options, run_type,
-                    pending_at, starting_at, running_at, finished_at, sub_status,
-                    details, flwr_aid, bytes_sent, bytes_recv, clientapp_runtime)
+                    (run_id, fab_id, fab_version, fab_hash, override_config, federation,
+                    federation_config, run_type, pending_at, starting_at, running_at,
+                    finished_at, usage_reported_at, sub_status, details, flwr_aid,
+                    bytes_sent, bytes_recv, clientapp_runtime)
                     VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
-                    :federation, :federation_options, :run_type, :pending_at,
-                    :starting_at,
-                    :running_at, :finished_at, :sub_status, :details, :flwr_aid,
-                    :bytes_sent, :bytes_recv, :clientapp_runtime)
+                    :federation, :federation_config, :run_type, :pending_at,
+                    :starting_at, :running_at, :finished_at, :usage_reported_at,
+                    :sub_status, :details, :flwr_aid, :bytes_sent, :bytes_recv,
+                    :clientapp_runtime)
                 """
                 override_config_json = json.dumps(override_config)
                 params = {
@@ -823,7 +831,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     "fab_hash": fab_hash or "",
                     "override_config": override_config_json,
                     "federation": federation,
-                    "federation_options": configrecord_to_bytes(federation_options),
+                    "federation_config": fed_config_json,
                     "run_type": run_type,
                     "pending_at": now().isoformat(),
                     "starting_at": "",
@@ -835,6 +843,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     "bytes_sent": 0,
                     "bytes_recv": 0,
                     "clientapp_runtime": 0.0,
+                    "usage_reported_at": "",
                 }
                 self.query(query, params)
                 return uint64_run_id
@@ -973,6 +982,21 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             for row in rows
         }
 
+    def get_federation_config(self, run_id: int) -> SimulationConfig | None:
+        """Get the resolved federation configuration for the specified `run_id`."""
+        query = "SELECT federation_config FROM run WHERE run_id = :run_id"
+        sint64_run_id = uint64_to_int64(run_id)
+        rows = self.query(query, {"run_id": sint64_run_id})
+        if not rows:
+            log(ERROR, "`run_id` invalid for fetching resolved federation config")
+            return None
+
+        fed_config_json = rows[0]["federation_config"]
+        if fed_config_json is None:
+            return None
+
+        return simulation_config_from_json(json.loads(fed_config_json))
+
     def update_run_status(self, run_id: int, new_status: RunStatus) -> bool:
         """Update the status of the run with the specified `run_id`."""
         # Clean up expired tokens; this will flag inactive runs as needed
@@ -1042,21 +1066,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             }
             self.query(query % timestamp_fld, params)
         return True
-
-    def get_federation_options(self, run_id: int) -> ConfigRecord | None:
-        """Retrieve the federation options for the specified `run_id`."""
-        # Convert the uint64 value to sint64 for SQLite
-        sint64_run_id = uint64_to_int64(run_id)
-        query = "SELECT federation_options FROM run WHERE run_id = :run_id"
-        rows = self.query(query, {"run_id": sint64_run_id})
-
-        # Check if the run_id exists
-        if not rows:
-            log(ERROR, "`run_id` is invalid")
-            return None
-
-        row = rows[0]
-        return configrecord_from_bytes(row["federation_options"])
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float

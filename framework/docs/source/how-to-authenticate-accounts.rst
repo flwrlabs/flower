@@ -142,7 +142,6 @@ authorized account, you can run the ``flwr run`` command to start a Flower app:
 .. code-block:: console
 
     $ flwr run
-    🎊 Successfully built flwrlabs.myawesomeapp.1-0-0.014c8eb3.fab
     🎊 Successfully started run 1859953118041441032
 
 If the account does not have the necessary permissions to run the command, an error will

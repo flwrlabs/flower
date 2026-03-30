@@ -19,6 +19,7 @@ limitations under the License.
 
 import builtins
 import collections.abc
+import flwr.proto.federation_config_pb2
 import flwr.proto.node_pb2
 import flwr.proto.run_pb2
 import google.protobuf.descriptor
@@ -94,7 +95,7 @@ class Federation(google.protobuf.message.Message):
         """Added in v1.27.0"""
 
     @property
-    def config(self) -> global___SimulationConfig:
+    def config(self) -> flwr.proto.federation_config_pb2.SimulationConfig:
         """Added in v1.28.0"""
 
     def __init__(
@@ -107,7 +108,7 @@ class Federation(google.protobuf.message.Message):
         members: collections.abc.Iterable[global___Member] | None = ...,
         archived: builtins.bool = ...,
         simulation: builtins.bool = ...,
-        config: global___SimulationConfig | None = ...,
+        config: flwr.proto.federation_config_pb2.SimulationConfig | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["config", b"config"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing.Literal["archived", b"archived", "config", b"config", "description", b"description", "members", b"members", "name", b"name", "nodes", b"nodes", "runs", b"runs", "simulation", b"simulation"]) -> None: ...
@@ -146,61 +147,3 @@ class Invitation(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "federation_name", b"federation_name", "invitee", b"invitee", "inviter", b"inviter", "status", b"status", "status_changed_at", b"status_changed_at"]) -> None: ...
 
 global___Invitation = Invitation
-
-@typing.final
-class SimulationConfig(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    NUM_SUPERNODES_FIELD_NUMBER: builtins.int
-    CLIENT_RESOURCES_NUM_CPUS_FIELD_NUMBER: builtins.int
-    CLIENT_RESOURCES_NUM_GPUS_FIELD_NUMBER: builtins.int
-    BACKEND_FIELD_NUMBER: builtins.int
-    VERBOSE_FIELD_NUMBER: builtins.int
-    INIT_ARGS_NUM_CPUS_FIELD_NUMBER: builtins.int
-    INIT_ARGS_NUM_GPUS_FIELD_NUMBER: builtins.int
-    INIT_ARGS_LOGGING_LEVEL_FIELD_NUMBER: builtins.int
-    INIT_ARGS_LOG_TO_DRIVER_FIELD_NUMBER: builtins.int
-    num_supernodes: builtins.int
-    client_resources_num_cpus: builtins.int
-    client_resources_num_gpus: builtins.float
-    backend: builtins.str
-    verbose: builtins.bool
-    init_args_num_cpus: builtins.int
-    init_args_num_gpus: builtins.int
-    init_args_logging_level: builtins.str
-    init_args_log_to_driver: builtins.bool
-    def __init__(
-        self,
-        *,
-        num_supernodes: builtins.int | None = ...,
-        client_resources_num_cpus: builtins.int | None = ...,
-        client_resources_num_gpus: builtins.float | None = ...,
-        backend: builtins.str | None = ...,
-        verbose: builtins.bool | None = ...,
-        init_args_num_cpus: builtins.int | None = ...,
-        init_args_num_gpus: builtins.int | None = ...,
-        init_args_logging_level: builtins.str | None = ...,
-        init_args_log_to_driver: builtins.bool | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_backend", b"_backend", "_client_resources_num_cpus", b"_client_resources_num_cpus", "_client_resources_num_gpus", b"_client_resources_num_gpus", "_init_args_log_to_driver", b"_init_args_log_to_driver", "_init_args_logging_level", b"_init_args_logging_level", "_init_args_num_cpus", b"_init_args_num_cpus", "_init_args_num_gpus", b"_init_args_num_gpus", "_num_supernodes", b"_num_supernodes", "_verbose", b"_verbose", "backend", b"backend", "client_resources_num_cpus", b"client_resources_num_cpus", "client_resources_num_gpus", b"client_resources_num_gpus", "init_args_log_to_driver", b"init_args_log_to_driver", "init_args_logging_level", b"init_args_logging_level", "init_args_num_cpus", b"init_args_num_cpus", "init_args_num_gpus", b"init_args_num_gpus", "num_supernodes", b"num_supernodes", "verbose", b"verbose"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_backend", b"_backend", "_client_resources_num_cpus", b"_client_resources_num_cpus", "_client_resources_num_gpus", b"_client_resources_num_gpus", "_init_args_log_to_driver", b"_init_args_log_to_driver", "_init_args_logging_level", b"_init_args_logging_level", "_init_args_num_cpus", b"_init_args_num_cpus", "_init_args_num_gpus", b"_init_args_num_gpus", "_num_supernodes", b"_num_supernodes", "_verbose", b"_verbose", "backend", b"backend", "client_resources_num_cpus", b"client_resources_num_cpus", "client_resources_num_gpus", b"client_resources_num_gpus", "init_args_log_to_driver", b"init_args_log_to_driver", "init_args_logging_level", b"init_args_logging_level", "init_args_num_cpus", b"init_args_num_cpus", "init_args_num_gpus", b"init_args_num_gpus", "num_supernodes", b"num_supernodes", "verbose", b"verbose"]) -> None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_backend", b"_backend"]) -> typing.Literal["backend"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_client_resources_num_cpus", b"_client_resources_num_cpus"]) -> typing.Literal["client_resources_num_cpus"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_client_resources_num_gpus", b"_client_resources_num_gpus"]) -> typing.Literal["client_resources_num_gpus"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_init_args_log_to_driver", b"_init_args_log_to_driver"]) -> typing.Literal["init_args_log_to_driver"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_init_args_logging_level", b"_init_args_logging_level"]) -> typing.Literal["init_args_logging_level"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_init_args_num_cpus", b"_init_args_num_cpus"]) -> typing.Literal["init_args_num_cpus"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_init_args_num_gpus", b"_init_args_num_gpus"]) -> typing.Literal["init_args_num_gpus"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_num_supernodes", b"_num_supernodes"]) -> typing.Literal["num_supernodes"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_verbose", b"_verbose"]) -> typing.Literal["verbose"] | None: ...
-
-global___SimulationConfig = SimulationConfig

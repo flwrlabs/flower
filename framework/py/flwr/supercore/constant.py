@@ -21,7 +21,7 @@ import os
 from enum import Enum
 
 from flwr.common.constant import FLWR_DIR, NOOP_ACCOUNT_NAME
-from flwr.proto.federation_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # Constants for Inflatable
 HEAD_BODY_DIVIDER = b"\x00"
