@@ -77,7 +77,12 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
+from flwr.supercore.constant import (
+    ActionType,
+    FLWR_IN_MEMORY_DB_NAME,
+    NOOP_FEDERATION,
+    RunType,
+)
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.ffs import FfsFactory
@@ -275,8 +280,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
 
-    def test_start_run_calls_can_execute_with_expected_policy_request(self) -> None:
-        """Test StartRun calls can_execute with expected authorization envelope."""
+    def test_start_run_calls_can_execute_with_expected_args(self) -> None:
+        """Test StartRun calls can_execute with expected typed arguments."""
         fab_content = b"test FAB content 777"
         request = StartRunRequest()
         request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
@@ -303,15 +308,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             _ = self.servicer.StartRun(request, Mock())
 
         mock_can_execute.assert_called_once_with(
-            {
-                "subject": {"type": "account", "id": self.aid},
-                "action": "start_run",
-                "context": {
-                    "type": "start_run",
-                    "federation": NOOP_FEDERATION,
-                    "run_type": RunType.SERVER_APP.value,
-                },
-            }
+            self.aid,
+            ActionType.START_RUN,
+            NOOP_FEDERATION,
+            RunType.SERVER_APP,
         )
 
     @parameterized.expand([(None,), (1,), (2,), (3,), (9,)])  # type: ignore

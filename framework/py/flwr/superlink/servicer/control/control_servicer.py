@@ -109,7 +109,12 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
-from flwr.supercore.constant import NOOP_FEDERATION, PLATFORM_API_URL, RunType
+from flwr.supercore.constant import (
+    ActionType,
+    NOOP_FEDERATION,
+    PLATFORM_API_URL,
+    RunType,
+)
 from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
 from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
@@ -198,16 +203,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 resolved_federation_config.CopyFrom(sim_cfg)
                 resolved_federation_config.MergeFrom(request.override_federation_config)
 
-            policy_request = {
-                "subject": {"type": "account", "id": flwr_aid},
-                "action": "start_run",
-                "context": {
-                    "type": "start_run",
-                    "federation": federation,
-                    "run_type": run_type.value,
-                },
-            }
-            if not state.federation_manager.can_execute(policy_request):
+            if not state.federation_manager.can_execute(
+                flwr_aid, ActionType.START_RUN, federation, run_type
+            ):
                 raise FlowerError(
                     ApiErrorCode.NO_PERMISSIONS,
                     "You are not entitled to execute runs in this federation.",
