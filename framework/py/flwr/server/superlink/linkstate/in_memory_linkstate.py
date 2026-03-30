@@ -722,6 +722,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             run_record.run.status = new_status
             return True
 
+    def _report_run_usage(self, run_id: int | None) -> None:
+        """Attempt usage reporting for newly finished and failed-unreported runs."""
+        raise NotImplementedError()
+
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
     ) -> bool:
