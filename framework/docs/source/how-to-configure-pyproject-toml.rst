@@ -104,8 +104,9 @@ SuperLink and SuperNodes.
 
 Both fields are optional. When omitted, Flower uses sensible built-in defaults that
 include common source files (``*.py``, ``*.toml``, ``*.md``, ``*.yaml``, ``*.yml``,
-``*.json``, ``*.jsonl``, and the top-level ``LICENSE`` file (``/LICENSE``)) while excluding
-virtual environments, build artifacts, ``__pycache__`` directories, and test files.
+``*.json``, ``*.jsonl``, and the top-level ``LICENSE`` file (``/LICENSE``)) while
+excluding virtual environments, build artifacts, ``__pycache__`` directories, and test
+files.
 
 .. code-block:: toml
 
