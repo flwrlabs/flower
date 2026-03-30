@@ -21,7 +21,7 @@ Current Versions
 
 Flower currently recognizes the following FAB format versions:
 
-- Missing :code:`fab-format-version` or :code:`fab-format-version = 0`
+- Missing :code:`fab-format-version` or :code:`fab-format-version = 0`: 
   Legacy behavior. Flower does not require newer FAB format fields and may
   derive limited compatibility metadata when possible.
 - :code:`fab-format-version = 1`: 
