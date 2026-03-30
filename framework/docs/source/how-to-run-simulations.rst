@@ -219,7 +219,7 @@ allocation unchanged. You would run:
     single string and without the ``--`` prefix.
 
 Understanding Simulation Runtime resource assignment
-===================================================
+====================================================
 
 Let's see how the above configuration, i.e. 1x CPU and 25% of a GPU per ``ClientApp``,
 results in a different number of ``ClientApps`` running in parallel depending on the
