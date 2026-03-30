@@ -22,7 +22,7 @@ import time
 import unittest
 from abc import abstractmethod
 from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 from uuid import uuid4
 
 from parameterized import parameterized
@@ -52,7 +52,6 @@ from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, RunType
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
-from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
 
 
@@ -400,109 +399,32 @@ class StateTest(CoreStateTest):
         for run_status in run_statuses:
             assert not state.update_run_status(run_id, run_status)
 
-    def test_usage_reported_at_set_on_success(self) -> None:
-        """Test successful report sets usage_reported_at."""
+    def test_usage_report_hook_called_on_finished_transition(self) -> None:
+        """Test report_run_usage hook receives finished run ID."""
+        # Prepare
         state = self.state_factory()
-        # pylint: disable-next=protected-access
-        state._federation_manager = Mock()  # type: ignore[attr-defined]
         run_id = create_dummy_run(state)
-        assert state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-        assert state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
+        state.federation_manager.report_run_usage = Mock()  # type: ignore
+        # Execute
+        transition_run_status(state, run_id, 3)
+        # Assert
+        state.federation_manager.report_run_usage.assert_any_call(run_id)
 
-        with (
-            patch(
-                "flwr.server.superlink.linkstate.in_memory_linkstate.post_entitlement_report",
-                return_value=True,
-            ) as mock_in_memory,
-            patch(
-                "flwr.server.superlink.linkstate.sql_linkstate.post_entitlement_report",
-                return_value=True,
-            ) as mock_sql,
-        ):
-            assert state.update_run_status(
-                run_id,
-                RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
-            )
-
-        mock_report = (
-            mock_in_memory if isinstance(state, InMemoryLinkState) else mock_sql
-        )
-        assert mock_report.call_count == 1
-        assert _get_usage_reported_at(state, run_id) != ""
-
-    def test_usage_report_retry_for_failed_runs(self) -> None:
-        """Test failed unreported runs are retried on subsequent status updates."""
+    @parameterized.expand([(1,), (2,)])  # type: ignore
+    def test_usage_report_hook_called_on_non_finished_transition(
+        self, num_transitions: int
+    ) -> None:
+        """Test report_run_usage hook receives None for non-finished transitions."""
+        # Prepare
         state = self.state_factory()
-        # pylint: disable-next=protected-access
-        state._federation_manager = Mock()  # type: ignore[attr-defined]
-        run_id1 = create_dummy_run(state)
-        assert state.update_run_status(run_id1, RunStatus(Status.STARTING, "", ""))
-        assert state.update_run_status(run_id1, RunStatus(Status.RUNNING, "", ""))
-
-        with (
-            patch(
-                "flwr.server.superlink.linkstate.in_memory_linkstate.post_entitlement_report",
-                return_value=False,
-            ),
-            patch(
-                "flwr.server.superlink.linkstate.sql_linkstate.post_entitlement_report",
-                return_value=False,
-            ),
-        ):
-            assert state.update_run_status(
-                run_id1,
-                RunStatus(Status.FINISHED, SubStatus.FAILED, "mock failure"),
-            )
-        assert _get_usage_reported_at(state, run_id1) == ""
-
-        run_id2 = create_dummy_run(state)
-        with (
-            patch(
-                "flwr.server.superlink.linkstate.in_memory_linkstate.post_entitlement_report",
-                return_value=True,
-            ) as mock_in_memory,
-            patch(
-                "flwr.server.superlink.linkstate.sql_linkstate.post_entitlement_report",
-                return_value=True,
-            ) as mock_sql,
-        ):
-            assert state.update_run_status(run_id2, RunStatus(Status.STARTING, "", ""))
-
-        mock_report = (
-            mock_in_memory if isinstance(state, InMemoryLinkState) else mock_sql
-        )
-        assert mock_report.call_count >= 1
-        assert _get_usage_reported_at(state, run_id1) != ""
-
-    def test_usage_report_deduplicates_candidates(self) -> None:
-        """Test newly finished failed run is reported only once per update call."""
-        state = self.state_factory()
-        # pylint: disable-next=protected-access
-        state._federation_manager = Mock()  # type: ignore[attr-defined]
         run_id = create_dummy_run(state)
-        assert state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-        assert state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
-
-        with (
-            patch(
-                "flwr.server.superlink.linkstate.in_memory_linkstate.post_entitlement_report",
-                return_value=True,
-            ) as mock_in_memory,
-            patch(
-                "flwr.server.superlink.linkstate.sql_linkstate.post_entitlement_report",
-                return_value=True,
-            ) as mock_sql,
-        ):
-            assert state.update_run_status(
-                run_id,
-                RunStatus(Status.FINISHED, SubStatus.FAILED, "mock failure"),
-            )
-
-        mock_report = (
-            mock_in_memory if isinstance(state, InMemoryLinkState) else mock_sql
+        state.federation_manager.report_run_usage = Mock()  # type: ignore
+        # Execute
+        transition_run_status(state, run_id, num_transitions)
+        # Assert
+        state.federation_manager.report_run_usage.assert_has_calls(
+            [call(None)] * num_transitions
         )
-        assert mock_report.call_count == 1
-        assert _get_usage_reported_at(state, run_id) != ""
 
     def test_get_message_ins_empty(self) -> None:
         """Validate that a new state has no input Messages."""
@@ -1941,19 +1863,6 @@ def transition_run_status(state: LinkState, run_id: int, num_transitions: int) -
         state.update_run_status(
             run_id, RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
         )
-
-
-def _get_usage_reported_at(state: LinkState, run_id: int) -> str:
-    """Return usage_reported_at value for the provided run."""
-    if isinstance(state, InMemoryLinkState):
-        return state.run_ids[run_id].usage_reported_at
-    if isinstance(state, SqlLinkState):
-        rows = state.query(
-            "SELECT usage_reported_at FROM run WHERE run_id = :run_id",
-            {"run_id": uint64_to_int64(run_id)},
-        )
-        return str(rows[0]["usage_reported_at"]) if rows else ""
-    raise AssertionError(f"Unknown state type: {type(state)}")
 
 
 def create_dummy_node(

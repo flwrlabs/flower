@@ -493,27 +493,3 @@ class LinkState(CoreState):  # pylint: disable=R0904
         runtime : float
             The runtime in seconds to add to the `run_id`'s cumulative total.
         """
-
-    @abc.abstractmethod
-    def _report_run_usage(self, run_id: int | None) -> None:
-        """Attempt usage reporting for newly finished and failed-unreported runs.
-
-        This method reports usage for a set of candidate run IDs consisting of:
-
-        - All runs whose sub-status is ``FAILED`` and whose usage has not yet been
-          reported (i.e. ``usage_reported_at`` is unset). These are retried from
-          previous failed reporting attempts.
-        - The run specified by ``run_id``, if provided (i.e. the run that just
-          transitioned to a finished state in the current call).
-
-        For each candidate, ``post_entitlement_report`` is called. On success,
-        ``usage_reported_at`` is set to the current timestamp to prevent duplicate
-        reports.
-
-        Parameters
-        ----------
-        run_id : int or None
-            The identifier of the run that just finished, or ``None`` if no new run
-            finished in the current call (e.g. when only retrying previously failed
-            reports).
-        """

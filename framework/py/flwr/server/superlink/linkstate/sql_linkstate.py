@@ -53,9 +53,8 @@ from flwr.supercore.utils import (
     simulation_config_to_json,
     uint64_to_int64,
 )
-from flwr.superlink.federation import FederationManager, NoOpFederationManager
+from flwr.superlink.federation import FederationManager
 
-from .entitlement import post_entitlement_report
 from .linkstate import LinkState
 from .utils import (
     check_node_availability_for_in_message,
@@ -1067,53 +1066,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             }
             self.query(query % timestamp_fld, params)
 
-        if not isinstance(self.federation_manager, NoOpFederationManager):
-            self._report_run_usage(
-                run_id=(run_id if new_status.status == Status.FINISHED else None)
-            )
+        self.federation_manager.report_run_usage(
+            run_id if new_status.status == Status.FINISHED else None
+        )
         return True
-
-    def _get_failed_unreported_run_ids(self) -> set[int]:
-        """Return run IDs with failed sub-status and unset usage report state."""
-        rows = self.query(
-            """
-            SELECT run_id
-            FROM run
-            WHERE sub_status = :failed
-            AND usage_reported_at = :unset
-            """,
-            {"failed": SubStatus.FAILED, "unset": ""},
-        )
-        return {int64_to_uint64(row["run_id"]) for row in rows}
-
-    def _mark_usage_reported(self, run_id: int) -> None:
-        """Set usage_reported_at for the provided run ID."""
-        self.query(
-            """
-            UPDATE run
-            SET usage_reported_at = :usage_reported_at
-            WHERE run_id = :run_id
-            AND usage_reported_at = :unset
-            """,
-            {
-                "usage_reported_at": now().isoformat(),
-                "run_id": uint64_to_int64(run_id),
-                "unset": "",
-            },
-        )
-
-    def _report_run_usage(self, run_id: int | None) -> None:
-        """Attempt usage reporting for newly finished and failed-unreported runs."""
-        candidate_run_ids = self._get_failed_unreported_run_ids()
-        if run_id is not None:
-            candidate_run_ids.add(run_id)
-
-        for candidate_run_id in candidate_run_ids:
-            runs = self.get_run_info(run_ids=[candidate_run_id])
-            if not runs:
-                continue
-            if post_entitlement_report(runs[0]):
-                self._mark_usage_reported(candidate_run_id)
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
