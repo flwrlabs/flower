@@ -26,10 +26,10 @@ from flwr.proto.federation_pb2 import (  # pylint: disable=E0611
     Member,
 )
 from flwr.supercore.constant import (
-    ActionType,
     DEFAULT_SIMULATION_CONFIG,
     NOOP_FEDERATION,
     NOOP_FEDERATION_DESCRIPTION,
+    ActionType,
     RunType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
