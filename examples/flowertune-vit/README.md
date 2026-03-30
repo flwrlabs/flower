@@ -61,7 +61,7 @@ You can also override some of the settings for your `ClientApp` and `ServerApp` 
 flwr run . --run-config "num-server-rounds=5 batch-size=64" --stream
 ```
 
-To configure your SuperLink to use a GPU for simulations when running the `ClientApp`, use the ``flwr federation simuiation-config` command.
+To configure your SuperLink to use a GPU for simulations when running the `ClientApp`, use the `flwr federation simulation-config` command.
 
 ```bash
 flwr federation simulation-config \

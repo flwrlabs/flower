@@ -156,7 +156,7 @@ flwr federation simulation-config \
 flwr run . --stream
 ```
 
-You can expect a summary at then showing federated metrics (i.e. the average training accuracy and loss across clients sampled in a round) looking like this:
+You can expect a summary at the end showing federated metrics (i.e. the average training accuracy and loss across clients sampled in a round) looking like this:
 
 ```shell
 INFO :      [SUMMARY]

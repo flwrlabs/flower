@@ -67,7 +67,7 @@ You can also override some of the settings for your `ClientApp` and `ServerApp` 
 flwr run . --run-config "num-server-rounds=5 learning-rate=0.25"  --stream
 ```
 
-To adapt the example for a practial usage, set `is-demo=false` like shown below. You might want to adjust the `num-shares` and `reconstruction-threshold` settings to suit your requirements. You can override those via `--run-config` as well.
+To adapt the example for a practical usage, set `is-demo=false` like shown below. You might want to adjust the `num-shares` and `reconstruction-threshold` settings to suit your requirements. You can override those via `--run-config` as well.
 
 ```bash
 flwr run . --run-config is-demo=false  --stream

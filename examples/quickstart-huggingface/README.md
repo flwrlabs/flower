@@ -83,7 +83,7 @@ flwr run .  --stream
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example
 
 ```bash
-flwr run --run-config "num-server-rounds=5 fraction-train=0.1"  --stream
+flwr run . --run-config "num-server-rounds=5 fraction-train=0.1"  --stream
 ```
 
 > [!TIP]
