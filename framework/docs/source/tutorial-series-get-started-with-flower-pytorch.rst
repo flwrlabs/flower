@@ -612,9 +612,10 @@ Behind the scenes
 
 So how does this work? How does Flower execute this simulation?
 
-When we execute ``flwr run`` against the default local profile, Flower submits the run
-to the managed local SuperLink selected by ``address = ":local:"`` and tells it that
-there are 10 clients (where each SuperNode launches one ``ClientApp``).
+When we execute ``flwr run`` against the default local connection configuration (for
+example, the one with ``address = ":local:"``), Flower submits the run to the managed
+local SuperLink. By default, the local SuperLink will configure the simulation runtime
+to use 10 clients. Each will run an instance of the ``ClientApp`` we defined earlier.
 
 The local SuperLink then starts the ``ServerApp`` and asks it to issue instructions to
 those nodes using the ``FedAvg`` strategy. In this example, ``FedAvg`` is configured
