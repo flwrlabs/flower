@@ -139,6 +139,77 @@ Rules:
    Support for additional file formats is planned for future releases.
 
 
+Understand Which Files Are Uploaded
+------------------------------------
+
+Flower Hub stores your app as a *project* — the full source that others can browse,
+clone, and build on. This is intentionally broader than a FAB: project files like
+:code:`.gitignore` and :code:`.editorconfig` are included so that anyone who pulls your
+app can reproduce your development environment, even though those files are never
+packaged into a FAB for a federation run. Think of what you upload as the source of
+truth, and the FAB as the runtime-optimised subset derived from it.
+
+When you run :code:`flwr app publish`, Flower collects files from your app directory,
+filters them, and validates the result before sending anything to Flower Hub.
+
+**Collecting files**
+
+Flower recursively walks your app directory without following symlinks. Files more than
+**10 directory levels** deep are not collected.
+
+**Filtering**
+
+**Allowed file types** (``APP_PUBLISH_INCLUDE_PATTERNS``):
+
+These are the file types that make up a typical Flower app, plus a small set of
+non-content files that are useful on Flower Hub (dotfiles and license files):
+
+.. code-block:: text
+
+    **/*.py           Python source files
+    **/*.toml         TOML configuration files
+    **/*.md           Markdown documentation
+    **/*.yaml         YAML configuration files
+    **/*.yml          YAML configuration files (alternate extension)
+    **/*.json         JSON data files
+    **/*.jsonl        JSON Lines data files
+    /.gitignore       Root-level gitignore file
+    **/.editorconfig  Editor configuration files
+    /LICENSE          Root-level license file
+    /LICENSE.md       Root-level license file (Markdown)
+
+**Always excluded** (``APP_PUBLISH_EXCLUDE_PATTERNS``):
+
+These paths are never uploaded — they are Flower internals and regenerated cache
+directories that have no place on Flower Hub:
+
+.. code-block:: text
+
+    .flwr/**           Flower internal directory
+    **/__pycache__/**  Python bytecode cache
+
+After the type filter, your :code:`.gitignore` patterns are applied. Any file dropped at
+this stage is printed as a warning so you can see exactly what was left out.
+
+**Validation**
+
+Once the file set is ready, Flower checks each file is valid UTF-8, then verifies:
+
+- at most **1,000 files**
+- no single file larger than **1 MB**
+- total size no more than **10 MB**
+
+If everything passes, you will see a confirmation before the upload begins. If any
+check fails, Flower raises an error before sending anything to Flower Hub.
+
+.. note::
+
+    :code:`flwr app publish` uploads your source files directly — Flower Hub builds the
+    FAB server-side. Publish rules and FAB packaging rules (:code:`flwr build`) are
+    related but not identical: publish includes a few extra types like
+    :code:`.gitignore` and :code:`.editorconfig` that are not bundled into a FAB.
+
+
 Create a Flower Account
 -----------------------
 
