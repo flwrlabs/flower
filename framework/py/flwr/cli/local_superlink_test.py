@@ -104,6 +104,24 @@ def test_local_config_is_preserved_when_endpoint_available() -> None:
     mock_start.assert_not_called()
 
 
+def test_options_only_connection_warns_and_uses_local_magic_address() -> None:
+    """Options-only local simulation config is deprecated and mapped to `:local:`."""
+    connection = SuperLinkConnection(
+        name="local",
+        options=SuperLinkSimulationOptions(num_supernodes=2),
+    )
+
+    with patch(_IS_STARTED_PATH, return_value=True) as mock_is_started:
+        with patch(_START_PATH) as mock_start:
+            resolved = ensure_local_superlink(connection)
+
+    assert resolved.address == LOCAL_CONTROL_API_ADDRESS
+    assert resolved.insecure is True
+    assert resolved.root_certificates is None
+    mock_is_started.assert_called_once()
+    mock_start.assert_not_called()
+
+
 def test_start_local_superlink_uses_builtin_log_rotation(tmp_path: Path) -> None:
     """Start command should include built-in SuperLink log rotation flags."""
     # Prepare
