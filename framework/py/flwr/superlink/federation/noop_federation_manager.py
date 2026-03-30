@@ -15,7 +15,7 @@
 """NoOp implementation of FederationManager."""
 
 
-from typing import Any, cast
+from typing import cast
 
 from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.common.typing import Federation
@@ -26,9 +26,11 @@ from flwr.proto.federation_pb2 import (  # pylint: disable=E0611
     Member,
 )
 from flwr.supercore.constant import (
+    ActionType,
     DEFAULT_SIMULATION_CONFIG,
     NOOP_FEDERATION,
     NOOP_FEDERATION_DESCRIPTION,
+    RunType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 
@@ -216,7 +218,9 @@ class NoOpFederationManager(FederationManager):
             "`revoke_invitation` is not supported by NoOpFederationManager."
         )
 
-    def can_execute(self, policy_request: dict[str, Any]) -> bool:
+    def can_execute(
+        self, flwr_aid: str, action: ActionType, federation: str, run_type: RunType
+    ) -> bool:
         """Allow all actions in no-op mode."""
-        _ = policy_request
+        _ = (flwr_aid, action, federation, run_type)
         return True

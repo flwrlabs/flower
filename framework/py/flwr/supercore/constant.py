@@ -155,6 +155,12 @@ class InvitationStatus(str, Enum):
     EXPIRED = "expired"
 
 
+class ActionType(str, Enum):
+    """Supported control action types."""
+
+    START_RUN = "start_run"
+
+
 class RunType(str, Enum):
     """Supported run types."""
 
