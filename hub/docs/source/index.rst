@@ -33,6 +33,8 @@ Explore the available applications on Flower Hub and contribute your own federat
 Explanations
 ~~~~~~~~~~~~
 
+Explanations provide detailed insights into specific concepts, features, or components of Flower Hub.
+
 .. toctree::
   :maxdepth: 1
   :caption: Explanations
