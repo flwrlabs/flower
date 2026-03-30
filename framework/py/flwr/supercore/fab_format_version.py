@@ -209,18 +209,25 @@ def _require_flwr_target_version(app_config: dict[str, Any]) -> Version:
     return target_version
 
 
-def _validate_target_against_lower_bound(
+def _validate_target_against_requirement(
     target_version: Version | None,
+    requirement: Requirement | None,
     lower_bound: Version | None,
 ) -> None:
-    """Ensure `flwr-version-target` respects the derived lower bound, if any."""
-    if target_version is None or lower_bound is None:
+    """Ensure `flwr-version-target` satisfies the declared `flwr` requirement."""
+    if target_version is None or requirement is None:
         return
 
-    if target_version < lower_bound:
+    if lower_bound is not None and target_version < lower_bound:
         raise ValueError(
             "Invalid [tool.flwr.app].flwr-version-target: must be greater than or "
             'equal to the declared "flwr" dependency lower bound.'
+        )
+
+    if target_version not in requirement.specifier:
+        raise ValueError(
+            "Invalid [tool.flwr.app].flwr-version-target: must satisfy the "
+            'declared "flwr" dependency specifier.'
         )
 
 
@@ -266,8 +273,9 @@ def _normalize_and_validate_fab_format_v1(config: dict[str, Any]) -> FabFormatMe
       `>=`.
     - The highest declared `>=` specifier is used as the derived lower bound.
     - All non-`>=` specifiers are ignored for metadata derivation.
-    - `flwr-version-target` is required and must be greater than or equal to the
-      derived lower bound.
+    - `flwr-version-target` is required, must be greater than or equal to the
+      derived lower bound, and must satisfy the declared `flwr` dependency
+      specifier.
     """
     app_config = _get_flwr_app_config(config)
     target_version = _require_flwr_target_version(app_config)
@@ -280,7 +288,7 @@ def _normalize_and_validate_fab_format_v1(config: dict[str, Any]) -> FabFormatMe
         )
 
     lower_bound = _derive_flwr_version_min(requirement)
-    _validate_target_against_lower_bound(target_version, lower_bound)
+    _validate_target_against_requirement(target_version, requirement, lower_bound)
     return _build_fab_metadata(1, target_version, lower_bound)
 
 
