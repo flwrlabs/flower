@@ -54,7 +54,7 @@ Before we begin, ensure you have updated to Flower 1.28.
 The main update in your Flower Configuration is to remove or comment simulation-specific
 settings (i.e. those starting with ``options.``). These settings are now defined at the
 ``SuperLink`` level and will apply to all simulation runs using that SuperLink.
-Additionally, a new field ``address`` needs to be added. It will be used for launcing a
+Additionally, a new field ``address`` needs to be added. It will be used for launching a
 managed ``SuperLink`` on demand. Let's see how to do this with an example. Use the
 following steps to update your Flower Configuration:
 
@@ -93,8 +93,8 @@ following steps to update your Flower Configuration:
 
 3. Remove or comment out the simulation-specific settings under the
    ``[superlink.local]`` section (and any other connections you may have added that also
-   include ``options.`` fields). Then, add a new field containing ``address =
-   ":local:"``. The updated configuration should look like this:
+   include ``options.`` fields). Then, add a new field containing ``address = ":local:"``.
+   The updated configuration should look like this:
 
 .. code-block:: toml
     :caption: config.toml
@@ -160,5 +160,5 @@ configuration of your managed local SuperLink with the following command:
 
 As you can see, the current configuration is the same as the one we had before in the
 Flower Configuration file ``config.toml``. To change any of these settings, refer to the
-`` Customize the Simulation Runtime`` section in the :doc:`Flower Simulation Runtime
+``Customize the Simulation Runtime`` section in the :doc:`Flower Simulation Runtime
 reference <how-to-run-simulations>` guide.
