@@ -16,11 +16,12 @@
 
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from flwr.common.typing import Federation
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Invitation  # pylint: disable=E0611
+from flwr.supercore.constant import ActionType, RunType
 
 if TYPE_CHECKING:
     from flwr.server.superlink.linkstate.linkstate import LinkState
@@ -323,13 +324,21 @@ class FederationManager(ABC):
         """
 
     @abstractmethod
-    def can_execute(self, policy_request: dict[str, Any]) -> bool:
-        """Check if a subject can execute an action under a given context.
+    def can_execute(
+        self, flwr_aid: str, action: ActionType, federation: str, run_type: RunType
+    ) -> bool:
+        """Check if an account can execute an action under a given context.
 
         Parameters
         ----------
-        policy_request : dict[str, Any]
-            Authorization envelope with ``subject``, ``action``, and ``context``.
+        flwr_aid : str
+            Flower account ID of the subject.
+        action : ActionType
+            The action to authorize.
+        federation : str
+            Target federation name.
+        run_type : RunType
+            The run type relevant to the action.
 
         Returns
         -------

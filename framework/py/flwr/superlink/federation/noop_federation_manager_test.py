@@ -25,9 +25,11 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.constant import (
+    ActionType,
     DEFAULT_SIMULATION_CONFIG,
     NOOP_FEDERATION,
     NOOP_FEDERATION_DESCRIPTION,
+    RunType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 
@@ -239,15 +241,10 @@ def test_can_execute() -> None:
     manager = NoOpFederationManager()
 
     allowed = manager.can_execute(
-        {
-            "subject": {"type": "account", "id": NOOP_FLWR_AID},
-            "action": "start_run",
-            "context": {
-                "type": "start_run",
-                "federation": NOOP_FEDERATION,
-                "run_type": "serverapp",
-            },
-        }
+        NOOP_FLWR_AID,
+        ActionType.START_RUN,
+        NOOP_FEDERATION,
+        RunType.SERVER_APP,
     )
 
     assert allowed is True
