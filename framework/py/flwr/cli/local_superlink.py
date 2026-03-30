@@ -37,7 +37,8 @@ from .constant import (
     CONTROL_API_PROBE_INTERVAL,
     CONTROL_API_PROBE_TIMEOUT,
     LOCAL_CONTROL_API_ADDRESS,
-    LOCAL_SERVERAPPIO_API_ADDRESS,
+    LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
+    LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY,
     LOCAL_SUPERLINK_STARTUP_TIMEOUT,
 )
 from .typing import SuperLinkConnection
@@ -46,18 +47,18 @@ from .typing import SuperLinkConnection
 def ensure_local_superlink(connection: SuperLinkConnection) -> SuperLinkConnection:
     """Ensure local SuperLink availability for local simulation connections.
 
-    If the provided connection represents a local simulation configuration without an
-    explicit address, this helper lazily starts a managed local SuperLink (simulation
-    mode) when no Control API endpoint is available.
+    If the provided connection uses one of the local SuperLink magic addresses, this
+    helper lazily starts a managed local SuperLink (simulation mode) when no Control API
+    endpoint is available.
 
     Connections with an explicit address are treated as user-managed and returned
     unchanged.
     """
-    if connection.options is None:
-        return connection
-
-    # Options-only local profile (for example: [superlink.local] with options.* only).
-    if connection.address is None:
+    _check_deprecated_option_only_usage(connection)  # Backwards compatibility check
+    if connection.address in (
+        LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
+        LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY,
+    ):
         runtime_connection = SuperLinkConnection(
             name=connection.name,
             address=LOCAL_CONTROL_API_ADDRESS,
@@ -67,7 +68,9 @@ def ensure_local_superlink(connection: SuperLinkConnection) -> SuperLinkConnecti
             options=connection.options,
         )
         if not _is_local_superlink_started():
-            _start_local_superlink()
+            _start_local_superlink(
+                connection.address == LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY
+            )
         return runtime_connection
 
     # Explicit addresses are user-managed.
@@ -99,7 +102,7 @@ def _is_local_superlink_started() -> bool:
         channel.close()
 
 
-def _start_local_superlink() -> None:
+def _start_local_superlink(in_memory: bool = False) -> None:
     """Start a managed local SuperLink in simulation mode and wait for readiness."""
     database_path, storage_dir, log_file_path = _get_local_superlink_paths()
 
@@ -116,10 +119,8 @@ def _start_local_superlink() -> None:
         ISOLATION_MODE_SUBPROCESS,
         "--control-api-address",
         LOCAL_CONTROL_API_ADDRESS,
-        "--simulationio-api-address",
-        LOCAL_SERVERAPPIO_API_ADDRESS,
-        "--database",
-        str(database_path),
+        "--serverappio-api-address",
+        "127.0.0.1:0",  # Let the OS choose a free port
         "--storage-dir",
         str(storage_dir),
         "--log-file",
@@ -129,6 +130,8 @@ def _start_local_superlink() -> None:
         "--log-rotation-backup-count",
         "7",
     ]
+    if not in_memory:
+        command += ["--database", str(database_path)]
 
     # Keep process detached and rely on SuperLink's file logging/rotation.
     try:
@@ -170,3 +173,20 @@ def _start_local_superlink() -> None:
         f"{LOCAL_SUPERLINK_STARTUP_TIMEOUT:.0f}s. "
         f"See logs at {log_file_path}."
     )
+
+
+def _check_deprecated_option_only_usage(connection: SuperLinkConnection) -> None:
+    """Check for deprecated usage of `options.` fields without `address`.
+
+    Warn users about deprecated connection configurations that rely solely on `options.`
+    fields and set `connection.address` to `LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE`.
+    """
+    if connection.address is None and connection.options is not None:
+        typer.secho(
+            "⚠️ Warning: SuperLink connection configuration using only "
+            "`options.` fields is deprecated for local simulations. Update "
+            f"connection `{connection.name}` to set `address = "
+            f'"{LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE}"`.',
+            fg=typer.colors.YELLOW,
+        )
+        connection.address = LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE

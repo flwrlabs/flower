@@ -29,10 +29,8 @@ from parameterized import parameterized
 from flwr.cli.constant import (
     DEFAULT_FLOWER_CONFIG_TOML,
     FLOWER_CONFIG_FILE,
-    SimulationBackendConfigTomlKey,
-    SimulationClientResourcesTomlKey,
+    LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
     SuperLinkConnectionTomlKey,
-    SuperLinkSimulationOptionsTomlKey,
 )
 from flwr.cli.typing import (
     SimulationBackendConfig,
@@ -41,7 +39,6 @@ from flwr.cli.typing import (
     SuperLinkSimulationOptions,
 )
 from flwr.common.constant import FLWR_HOME
-from flwr.supercore.constant import DEFAULT_SIMULATION_CONFIG
 
 from .flower_config import (
     init_flwr_config,
@@ -94,31 +91,9 @@ class TestInitFlwrConfig(unittest.TestCase):
         # 4. Check [superlink.local]
         self.assertIn("local", superlink)
         local = superlink["local"]
-
-        # In TOML `options.num-supernodes = 10` creates a nested dict
-        self.assertIn(SuperLinkConnectionTomlKey.OPTIONS, local)
-        options = local[SuperLinkConnectionTomlKey.OPTIONS]
         self.assertEqual(
-            options[SuperLinkSimulationOptionsTomlKey.NUM_SUPERNODES],
-            DEFAULT_SIMULATION_CONFIG.num_supernodes,
-        )
-
-        # options.backend...
-        self.assertIn(SuperLinkSimulationOptionsTomlKey.BACKEND, options)
-        backend = options[SuperLinkSimulationOptionsTomlKey.BACKEND]
-
-        # ...client-resources...
-        self.assertIn(SimulationBackendConfigTomlKey.CLIENT_RESOURCES, backend)
-        resources = backend[SimulationBackendConfigTomlKey.CLIENT_RESOURCES]
-
-        # ...num-cpus / num-gpus
-        self.assertEqual(
-            resources[SimulationClientResourcesTomlKey.NUM_CPUS],
-            DEFAULT_SIMULATION_CONFIG.client_resources_num_cpus,
-        )
-        self.assertEqual(
-            resources[SimulationClientResourcesTomlKey.NUM_GPUS],
-            DEFAULT_SIMULATION_CONFIG.client_resources_num_gpus,
+            local[SuperLinkConnectionTomlKey.ADDRESS],
+            LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
         )
 
     def test_init_flwr_config_does_not_overwrite(self) -> None:
@@ -199,12 +174,28 @@ class TestSuperLinkConnection(unittest.TestCase):
             (
                 "local",
                 {
-                    SuperLinkConnectionTomlKey.OPTIONS: {
-                        "num-supernodes": 10,
-                    }
+                    SuperLinkConnectionTomlKey.ADDRESS: (
+                        LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE
+                    ),
                 },
                 SuperLinkConnection(
                     name="local",
+                    address=LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
+                ),
+            ),
+            (
+                "local-with-options",
+                {
+                    SuperLinkConnectionTomlKey.ADDRESS: (
+                        LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE
+                    ),
+                    SuperLinkConnectionTomlKey.OPTIONS: {
+                        "num-supernodes": 10,
+                    },
+                },
+                SuperLinkConnection(
+                    name="local-with-options",
+                    address=LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
                     options=SuperLinkSimulationOptions(
                         num_supernodes=10,
                     ),
@@ -529,6 +520,7 @@ class TestSuperLinkConnection(unittest.TestCase):
             default = "local-sim"
 
             [superlink.local-sim]
+            address = ":local:"
             options.num-supernodes = 2
             options.verbose = true
             options.backend.client-resources.num-cpus = 2.0
@@ -544,7 +536,7 @@ class TestSuperLinkConnection(unittest.TestCase):
             # Assert
             assert config is not None
             self.assertEqual(config.name, "local-sim")
-            self.assertIsNone(config.address)
+            self.assertEqual(config.address, LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE)
             assert config.options is not None
             self.assertEqual(config.options.num_supernodes, 2)
             assert config.options.backend is not None
@@ -569,6 +561,7 @@ class TestSuperLinkConnection(unittest.TestCase):
             default = 'local-sim'
 
             [superlink.local-sim]
+            address = ':local:'
             options.num-supernodes = 2
             options.backend.client-resources.num-cpus = 2.0
             options.backend.unknown-key = "unexpected"
@@ -582,6 +575,7 @@ class TestSuperLinkConnection(unittest.TestCase):
             # that don't align with the scheema
             expected_config = SuperLinkConnection(
                 name="local-sim",
+                address=LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
                 options=SuperLinkSimulationOptions(
                     num_supernodes=2,
                     backend=SimulationBackendConfig(
