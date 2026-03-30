@@ -30,18 +30,6 @@ With Flower Hub, you can:
 Explore the available applications on Flower Hub and contribute your own federated apps to help grow the ecosystem.
 
 
-Explanations
-~~~~~~~~~~~~
-
-Explanations provide detailed insights into specific concepts, features, or components of Flower Hub.
-
-.. toctree::
-  :maxdepth: 1
-  :caption: Explanations
-
-  fab-format-version
-
-
 How-to guides
 ~~~~~~~~~~~~~
 
@@ -53,3 +41,15 @@ How-to guides provide step-by-step instructions to help you accomplish specific 
 
   how-to-use-app-from-hub
   how-to-publish-app-on-hub
+
+
+Explanations
+~~~~~~~~~~~~
+
+Explanations provide detailed insights into specific concepts, features, or components of Flower Hub.
+
+.. toctree::
+  :maxdepth: 1
+  :caption: Explanations
+
+  fab-format-version
