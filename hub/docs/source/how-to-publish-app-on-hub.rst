@@ -142,19 +142,10 @@ Rules:
    :code:`license = { file = "LICENSE" }` or
    :code:`license = { file = "LICENSE.md" }`.
 
-
 .. warning::
    The :code:`name` and :code:`description` are publicly visible on Flower Hub.
    Choose them carefully to ensure your app is clear, descriptive, and easy to discover.
    The :code:`name` **cannot be changed** after the first publication, so make sure it is final before releasing your app.
-
-.. note::
-   Flower Hub currently supports the following *content* file formats: :code:`.py`, :code:`.toml`, :code:`.md`, :code:`.yaml`, :code:`.yml`, :code:`.json`, and :code:`.jsonl`.
-   In addition, certain non-content files are supported, including root-level license files :code:`LICENSE` and :code:`LICENSE.md`, as well as common dotfiles such as :code:`.gitignore` and :code:`.editorconfig`.
-   Before publishing, ensure that all required files for your app (e.g., source code, metadata, README) are included in the app directory.
-
-   Support for additional file formats is planned for future releases.
-
 
 Understand Which Files Are Uploaded
 ------------------------------------
@@ -164,7 +155,7 @@ clone, and build on. This is intentionally broader than a FAB: project files lik
 :code:`.gitignore` and :code:`.editorconfig` are included so that anyone who pulls your
 app can reproduce your development environment, even though those files are never
 packaged into a FAB for a federation run. Think of what you upload as the source of
-truth, and the FAB as the runtime-optimised subset derived from it.
+truth, and the FAB as the runtime-optimized subset derived from it.
 
 When you run :code:`flwr app publish`, Flower collects files from your app directory,
 filters them, and validates the result before sending anything to Flower Hub.
@@ -220,12 +211,13 @@ If everything passes, you will see a confirmation before the upload begins. If a
 check fails, Flower raises an error before sending anything to Flower Hub.
 
 .. note::
+   Before publishing, ensure that all required files for your app (for example,
+   source code, metadata, and the README) are included in the app directory.
 
-    :code:`flwr app publish` uploads your source files directly — Flower Hub builds the
-    FAB server-side. Publish rules and FAB packaging rules (:code:`flwr build`) are
-    related but not identical: publish includes a few extra types like
-    :code:`.gitignore` and :code:`.editorconfig` that are not bundled into a FAB.
-
+   The :code:`flwr app publish` command uploads your source files directly, and
+   Flower Hub builds the FAB on the server. Note that publish rules and FAB
+   packaging rules (:code:`flwr build`) are related but not identical. For more
+   details, see the `configuration documentation <https://flower.ai/docs/framework/how-to-configure-pyproject-toml.html>`_.
 
 Create a Flower Account
 -----------------------
