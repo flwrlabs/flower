@@ -15,6 +15,7 @@ A complete ``pyproject.toml`` file, for example, looks like this:
 .. dropdown:: Example ``pyproject.toml``
 
     .. code-block:: toml
+        :substitutions:
 
         [build-system]
         requires = ["hatchling"]
@@ -26,7 +27,7 @@ A complete ``pyproject.toml`` file, for example, looks like this:
         description = "A Flower app example"
         license = "Apache-2.0"
         dependencies = [
-            "flwr[simulation]>=1.28.0",
+            "flwr[simulation]>=|stable_flwr_version|",
             "numpy>=2.0.2",
         ]
 
@@ -53,6 +54,7 @@ Here are a few key sections to look out for:
 *******************************
 
 .. code-block:: toml
+    :substitutions:
 
     [project]
     name = "your-flower-app-name"
@@ -60,14 +62,14 @@ Here are a few key sections to look out for:
     description = ""
     license = "Apache-2.0"
     dependencies = [
-        "flwr[simulation]>=1.28.0",
+        "flwr[simulation]>=|stable_flwr_version|",
         "numpy>=2.0.2",
     ]
 
     [tool.flwr.app]
     publisher = "your-name-or-organization"
-    fab-include = ["src/**/*.py", "conf/*.yaml"]    # Optional
-    fab-exclude = ["src/scratch.py"]                # Optional
+    fab-include = ["path/to/include_file.py"]  # Optional
+    fab-exclude = ["path/to/exclude_file.py"]  # Optional
 
 .. dropdown:: Understanding each field
 
@@ -111,6 +113,7 @@ files.
 .. code-block:: toml
 
     [tool.flwr.app]
+    publisher = "your-name-or-organization"
     fab-include = ["src/**/*.py", "conf/*.yaml"]    # Optional
     fab-exclude = ["src/scratch.py"]                # Optional
 
