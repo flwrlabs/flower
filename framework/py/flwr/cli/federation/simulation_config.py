@@ -126,15 +126,22 @@ def simulation_config(  # pylint: disable=R0913,R0917,W0613
         ),
     ] = DEFAULT_SIMULATION_CONFIG.init_args_logging_level,
     init_args_log_to_driver: Annotated[
-        bool,
+        Literal["true", "false"] | None,
         typer.Option(
             "--init-args-log-to-driver",
+            case_sensitive=False,
             help="Whether to propagate logs from Simulation Runtime upwards.",
         ),
-    ] = DEFAULT_SIMULATION_CONFIG.init_args_log_to_driver,
+    ] = None,
 ) -> None:
     """Configure a Federation using the Simulation Runtime."""
     with cli_output_control_stub(superlink, output_format) as (stub, is_json):
+
+        log_to_driver = (
+            init_args_log_to_driver == "true"
+            if init_args_log_to_driver is not None
+            else None
+        )
         request = ConfigureSimulationFederationRequest(
             federation_name=federation or "",
             config=SimulationConfig(
@@ -146,7 +153,7 @@ def simulation_config(  # pylint: disable=R0913,R0917,W0613
                 init_args_num_cpus=init_args_num_cpus,
                 init_args_num_gpus=init_args_num_gpus,
                 init_args_logging_level=init_args_logging_level,
-                init_args_log_to_driver=init_args_log_to_driver,
+                init_args_log_to_driver=log_to_driver,
             ),
         )
         _ = is_json
