@@ -189,8 +189,8 @@ def test_build_fab_from_files_rejects_unsupported_flwr_specifier() -> None:
         build_fab_from_files(files)
 
 
-def test_build_fab_from_files_ignores_upper_bound_for_version_one() -> None:
-    """Test build derives only the lower bound for fab-format-version=1."""
+def test_build_fab_from_files_rejects_target_outside_declared_range() -> None:
+    """Test build fails when the target does not satisfy the flwr specifier."""
     files = _make_files(
         'license = { file = "LICENSE" }\n'
         'dependencies = ["flwr>=1.26.0,<1.28.0"]\n'
@@ -199,11 +199,8 @@ def test_build_fab_from_files_ignores_upper_bound_for_version_one() -> None:
         **{"client.py": _DUMMY_PY, "LICENSE": b"Apache-2.0\n"},
     )
 
-    _, metadata = build_fab_from_files(files)
-
-    assert metadata.fab_format_version == 1
-    assert metadata.flwr_version_min == "1.26.0"
-    assert metadata.flwr_version_target == "2.0.0"
+    with pytest.raises(ValueError, match='must satisfy the declared "flwr"'):
+        build_fab_from_files(files)
 
 
 def test_build_fab_from_files_uses_highest_inclusive_lower_bound() -> None:

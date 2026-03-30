@@ -601,8 +601,8 @@ def test_v1_fab_format_rejects_exclusive_lower_bound() -> None:
     assert not warnings
 
 
-def test_v1_fab_format_ignores_upper_bound_when_validating_target() -> None:
-    """Test fab-format-version=1 ignores upper bounds for target validation."""
+def test_v1_fab_format_rejects_target_outside_declared_range() -> None:
+    """Test fab-format-version=1 rejects targets outside the flwr specifier."""
     config = {
         "project": {
             "name": "fedgpt",
@@ -628,8 +628,9 @@ def test_v1_fab_format_ignores_upper_bound_when_validating_target() -> None:
 
     is_valid, errors, warnings = validate_config(config)
 
-    assert is_valid
-    assert not errors
+    assert not is_valid
+    assert len(errors) == 1
+    assert 'must satisfy the declared "flwr" dependency specifier' in errors[0]
     assert not warnings
 
 
