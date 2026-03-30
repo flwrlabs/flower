@@ -192,7 +192,7 @@ you put in ``fab-include`` or ``fab-exclude`` — and these cannot be overridden
 defined in ``flwr.common.constant`` as ``FAB_INCLUDE_PATTERNS`` and
 ``FAB_EXCLUDE_PATTERNS``.
 
-**Always included** (``FAB_INCLUDE_PATTERNS``):
+**Allowed file types** (``FAB_INCLUDE_PATTERNS``):
 
 These are the file types that make up a typical Flower app — source code, configuration,
 documentation, and data descriptors. Anything outside this set (for example, ``.txt`` or

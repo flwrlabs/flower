@@ -159,7 +159,7 @@ Flower recursively walks your app directory without following symlinks. Files mo
 
 **Filtering**
 
-**Always included** (``APP_PUBLISH_INCLUDE_PATTERNS``):
+**Allowed file types** (``APP_PUBLISH_INCLUDE_PATTERNS``):
 
 These are the file types that make up a typical Flower app, plus a small set of
 non-content files that are useful on Flower Hub (dotfiles and license files):
