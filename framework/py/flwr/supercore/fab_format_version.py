@@ -215,10 +215,10 @@ def _validate_target_against_requirement(
     lower_bound: Version | None,
 ) -> None:
     """Ensure `flwr-version-target` satisfies the declared `flwr` requirement."""
-    if target_version is None or requirement is None or lower_bound is None:
+    if target_version is None or requirement is None:
         return
 
-    if target_version < lower_bound:
+    if lower_bound is not None and target_version < lower_bound:
         raise ValueError(
             "Invalid [tool.flwr.app].flwr-version-target: must be greater than or "
             'equal to the declared "flwr" dependency lower bound.'
