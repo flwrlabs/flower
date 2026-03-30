@@ -43,7 +43,7 @@ def _handle_none_field(cfg: SimulationConfig, field_name: str) -> Any:
     return getattr(cfg, field_name)
 
 
-def simulation_config(  # pylint: disable=R0913,R0917,W0613
+def simulation_config(  # pylint: disable=R0913,R0917,W0613,R0914
     federation: Annotated[
         str | None,
         typer.Argument(
