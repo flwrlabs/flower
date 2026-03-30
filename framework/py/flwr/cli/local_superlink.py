@@ -54,6 +54,7 @@ def ensure_local_superlink(connection: SuperLinkConnection) -> SuperLinkConnecti
     Connections with an explicit address are treated as user-managed and returned
     unchanged.
     """
+    _check_deprecated_option_only_usage(connection)  # Backwards compatibility check
     if connection.address in (
         LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
         LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY,
@@ -172,3 +173,20 @@ def _start_local_superlink(in_memory: bool = False) -> None:
         f"{LOCAL_SUPERLINK_STARTUP_TIMEOUT:.0f}s. "
         f"See logs at {log_file_path}."
     )
+
+
+def _check_deprecated_option_only_usage(connection: SuperLinkConnection) -> None:
+    """Check for deprecated usage of `options.` fields without `address`.
+
+    Warn users about deprecated connection configurations that rely solely on `options.`
+    fields and set `connection.address` to `LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE`.
+    """
+    if connection.address is None and connection.options is not None:
+        typer.secho(
+            "⚠️ Warning: SuperLink connection configuration using only "
+            "`options.` fields is deprecated for local simulations. Update "
+            f"connection `{connection.name}` to set `address = "
+            f'"{LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE}"`.',
+            fg=typer.colors.YELLOW,
+        )
+        connection.address = LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE
