@@ -148,7 +148,7 @@ Rules:
    The :code:`name` **cannot be changed** after the first publication, so make sure it is final before releasing your app.
 
 Understand Which Files Are Uploaded
-------------------------------------
+-----------------------------------
 
 Flower Hub stores your app as a *project* — the full source that others can browse,
 clone, and build on. This is intentionally broader than a FAB: project files like
@@ -160,12 +160,14 @@ truth, and the FAB as the runtime-optimized subset derived from it.
 When you run :code:`flwr app publish`, Flower collects files from your app directory,
 filters them, and validates the result before sending anything to Flower Hub.
 
-**Collecting files**
+Collecting Files
+~~~~~~~~~~~~~~~~
 
 Flower recursively walks your app directory without following symlinks. Files more than
 **10 directory levels** deep are not collected.
 
-**Filtering**
+Filtering
+~~~~~~~~~
 
 **Allowed file types** (``APP_PUBLISH_INCLUDE_PATTERNS``):
 
@@ -199,7 +201,8 @@ directories that have no place on Flower Hub:
 After the type filter, your :code:`.gitignore` patterns are applied. Any file dropped at
 this stage is printed as a warning so you can see exactly what was left out.
 
-**Validation**
+Validation
+~~~~~~~~~~
 
 Once the file set is ready, Flower checks each file is valid UTF-8, then verifies:
 
@@ -212,7 +215,8 @@ check fails, Flower raises an error before sending anything to Flower Hub.
 
 .. note::
    Before publishing, ensure that all required files for your app (for example,
-   source code, metadata, and the README) are included in the app directory.
+   source code, metadata, and the README) are included in the app directory and
+   conform to the allowed file types defined above.
 
    The :code:`flwr app publish` command uploads your source files directly, and
    Flower Hub builds the FAB on the server. Note that publish rules and FAB
@@ -226,7 +230,7 @@ If you don't already have one, create a Flower account at: `https://flower.ai/ <
 
 Click **Sign Up** in the top-right corner and follow the instructions. Make sure the username is the same as the publisher name defined in your app's :code:`pyproject.toml`.
 
-Publishing on behalf of an organization?
+Publishing on Behalf of an Organization?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Since organization accounts are not yet officially supported, please:
