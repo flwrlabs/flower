@@ -85,8 +85,8 @@ Here are a few key sections to look out for:
     - ``license``: The license your app is distributed under (e.g., Apache-2.0).
     - ``dependencies``\*: A list of Python packages required to run your app.
     - ``publisher``\*: The name of the person or organization publishing the app.
-    - ``fab-include``: A list of file patterns (GitIgnore-style) to include in the Flower App Bundle.
-    - ``fab-exclude``: A list of file patterns (GitIgnore-style) to exclude from the Flower App Bundle.
+    - ``fab-include``: A list of gitignore-style patterns to include in the Flower App Bundle. See next section for details.
+    - ``fab-exclude``: A list of gitignore-style patterns to exclude from the Flower App Bundle. See next section for details.
 
 Specify the metadata, including the app name, version, etc., in these sections. Add any
 Python packages your app needs under ``dependencies``. These will be installed when you
@@ -104,11 +104,10 @@ The ``fab-include`` and ``fab-exclude`` fields let you control which files end u
 your Flower App Bundle (FAB) — the package that carries your application code to the
 SuperLink and SuperNodes.
 
-Both fields are optional. When omitted, Flower uses sensible built-in defaults that
-include common source files (``*.py``, ``*.toml``, ``*.md``, ``*.yaml``, ``*.yml``,
-``*.json``, ``*.jsonl``, and the top-level ``LICENSE`` file (``/LICENSE``)) while
-excluding virtual environments, build artifacts, ``__pycache__`` directories, and test
-files.
+Both fields are optional. When omitted, Flower uses sensible `built-in defaults
+<built-in defaults for fab included/excluded files_>`_ that include common source files
+and the top-level ``LICENSE`` file (``/LICENSE``) while excluding virtual environments,
+build artifacts, ``__pycache__`` directories, and test files.
 
 .. code-block:: toml
 
@@ -117,9 +116,25 @@ files.
     fab-include = ["src/**/*.py", "conf/*.yaml"]    # Optional
     fab-exclude = ["src/scratch.py"]                # Optional
 
-When you do specify ``fab-include`` or ``fab-exclude``, every pattern must match at
-least one file — Flower will raise an error for unresolved patterns so you can catch
-typos early. Patterns follow the same syntax as ``.gitignore``.
+.. dropdown:: Understanding each field
+
+    - ``fab-include``: A list of gitignore-style patterns that narrows the FAB to only
+      the files you want. When set, Flower starts with an empty candidate set and adds
+      only files that match at least one of your patterns. The built-in constraints are
+      then applied on top — if any of your patterns would pull in an unsupported file
+      type (e.g. ``.txt`` or a binary), Flower raises an error listing the offending
+      files so you can fix or remove the pattern.
+    - ``fab-exclude``: A list of gitignore-style patterns that removes specific files
+      from the FAB. Files that match at least one of your patterns are dropped before
+      the built-in constraints run, so you can safely exclude anything the defaults
+      would otherwise keep.
+
+    .. note ::
+
+        Both fields are optional. Omit a field entirely to rely on the built-in
+        defaults — setting it to an empty list is an error. Every pattern you provide
+        must match at least one file; Flower raises an error at build time for
+        unresolved patterns, keeping typos from silently changing your bundle.
 
 Flower applies filtering in two stages:
 
@@ -160,6 +175,74 @@ types (e.g., ``.txt``) — Flower will flag any such conflicts with a clear erro
     will contain ``pyproject.toml``, ``your_module/client_app.py``,
     ``your_module/server_app.py``, and ``conf/config.yaml`` — but not
     ``your_module/scratch.py`` or ``README.md``.
+
+***************************************************
+ Built-in Defaults for FAB Included/Excluded Files
+***************************************************
+
+A FAB is a structured package consumed by the SuperLink and SuperNodes, and they only
+know how to work with certain file types. Allowing arbitrary file types into a FAB would
+not only break compatibility across the federation and bloat bundle sizes, but also
+create a security risk — sensitive files like credentials, private keys, or environment
+configs could accidentally be packaged and distributed to every SuperNode in the
+federation. That is why Flower enforces a set of built-in patterns on top of whatever
+you put in ``fab-include`` or ``fab-exclude`` — and these cannot be overridden. They are
+defined in ``flwr.common.constant`` as ``FAB_INCLUDE_PATTERNS`` and
+``FAB_EXCLUDE_PATTERNS``.
+
+**Always included (``FAB_INCLUDE_PATTERNS``):**
+
+These are the file types that make up a typical Flower app — source code, configuration,
+documentation, and data descriptors. Anything outside this set (for example, ``.txt`` or
+binary files) is not a recognised FAB file type and cannot be included.
+
+.. code-block:: text
+
+    **/*.py        Python source files
+    **/*.toml      TOML configuration files
+    **/*.md        Markdown documentation
+    **/*.yaml      YAML configuration files
+    **/*.yml       YAML configuration files (alternate extension)
+    **/*.json      JSON data files
+    **/*.jsonl     JSON Lines data files
+    /LICENSE       Top-level license file
+
+**Always excluded (``FAB_EXCLUDE_PATTERNS``):**
+
+These are paths that should never travel across the network: generated artefacts that
+can be reproduced locally (caches, build outputs, packaging directories), virtual
+environments that are machine-specific, test files that are not needed at runtime, and
+Flower's own internal directory.
+
+.. code-block:: text
+
+    .flwr/**           Flower internal directory
+    **/__pycache__/**  Python bytecode cache
+    pyproject.toml     Re-serialized separately; the original is never bundled as-is
+    **/*_test.py       Test files
+    **/test_*.py       Test files
+    build/**           Build output
+    eggs/**            Egg build artifacts
+    .eggs/**
+    lib/**
+    lib64/**
+    parts/**
+    *.egg
+    .venv/**           Virtual environments
+    env/**
+    venv/**
+    ENV/**
+    env.bak/**
+    venv.bak/**
+
+.. note::
+
+    If you use ``fab-include`` to add a file that does not match any of the built-in
+    include patterns (for example, a ``.txt`` file), Flower will raise an error and list
+    the conflicting files. The fix is to remove those patterns from ``fab-include``.
+    Files that *do* match the built-in includes but are also matched by the built-in
+    excludes (for example, a ``*.py`` file inside ``.venv/``) are silently dropped —
+    this is expected behaviour.
 
 ****************
  App Components
