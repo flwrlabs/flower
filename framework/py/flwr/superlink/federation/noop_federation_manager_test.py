@@ -47,6 +47,15 @@ def test_get_details_with_valid_federation() -> None:
         backend="ray",
         verbose=True,
     )
+    expected_config = SimulationConfig(
+        num_supernodes=12,
+        client_resources_num_cpus=3,
+        client_resources_num_gpus=1.0,
+        backend="ray",
+        verbose=True,
+        init_args_logging_level=DEFAULT_SIMULATION_CONFIG.init_args_logging_level,
+        init_args_log_to_driver=DEFAULT_SIMULATION_CONFIG.init_args_log_to_driver,
+    )
     manager.set_simulation_config(NOOP_FLWR_AID, NOOP_FEDERATION, config)
 
     # Mock data
@@ -127,7 +136,7 @@ def test_get_details_with_valid_federation() -> None:
     assert mock_run_1 in result.runs and mock_run_2 in result.runs
     assert result.archived is False
     assert result.simulation is True
-    assert result.config == config
+    assert result.config == expected_config
 
 
 def test_get_details_with_invalid_federation() -> None:
@@ -319,9 +328,53 @@ def test_get_federations_returns_stored_simulation_config() -> None:
         backend="ray",
         verbose=True,
     )
+    expected_config = SimulationConfig(
+        num_supernodes=12,
+        client_resources_num_cpus=3,
+        client_resources_num_gpus=1.0,
+        backend="ray",
+        verbose=True,
+        init_args_logging_level=DEFAULT_SIMULATION_CONFIG.init_args_logging_level,
+        init_args_log_to_driver=DEFAULT_SIMULATION_CONFIG.init_args_log_to_driver,
+    )
 
     manager.set_simulation_config(NOOP_FLWR_AID, NOOP_FEDERATION, config)
 
     federations = manager.get_federations(NOOP_FLWR_AID)
 
-    assert federations[0].config == config
+    assert federations[0].config == expected_config
+
+
+def test_set_simulation_config_does_not_override_unset_fields() -> None:
+    """Test that partial updates don't clear fields not included in the update.
+
+    Setting only `num_supernodes` must not reset other fields (e.g.
+    `client_resources_num_cpus`, `backend`) back to their unset/default values.
+    """
+    manager = NoOpFederationManager(simulation=True)
+
+    # Establish a fully-specified baseline
+    full_config = SimulationConfig(
+        num_supernodes=10,
+        client_resources_num_cpus=4,
+        client_resources_num_gpus=1.0,
+        backend="ray",
+        verbose=True,
+    )
+    manager.set_simulation_config(NOOP_FLWR_AID, NOOP_FEDERATION, full_config)
+
+    # Apply a partial update that only changes num_supernodes
+    partial_config = SimulationConfig(num_supernodes=99)
+    manager.set_simulation_config(NOOP_FLWR_AID, NOOP_FEDERATION, partial_config)
+
+    result = manager.get_simulation_config(NOOP_FEDERATION)
+    assert result is not None
+
+    # The updated field should reflect the new value
+    assert result.num_supernodes == 99
+
+    # All other fields must be preserved from the previous full_config
+    assert result.client_resources_num_cpus == 4
+    assert result.client_resources_num_gpus == 1.0
+    assert result.backend == "ray"
+    assert result.verbose is True
