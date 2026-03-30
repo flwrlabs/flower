@@ -216,7 +216,7 @@ check fails, Flower raises an error before sending anything to Flower Hub.
 .. note::
    Before publishing, ensure that all required files for your app (for example,
    source code, metadata, and the README) are included in the app directory and
-   conform to the allowed file types defined above.
+   conform to the **allowed file types** defined above.
 
    The :code:`flwr app publish` command uploads your source files directly, and
    Flower Hub builds the FAB on the server. Note that publish rules and FAB
