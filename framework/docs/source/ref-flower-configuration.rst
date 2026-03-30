@@ -15,7 +15,7 @@
 
 .. note::
 
-    From Flower 1.28.0 onwards, it isn't recommended to defined Simulation Runtime
+    From Flower 1.28.0 onwards, it isn't recommended to define Simulation Runtime
     settings (i.e. fields starting with ``options.``) in the Flower Configuration. Check
     the :doc:`Simulation Runtime documentation <how-to-run-simulations>` for the
     recommended way to configure simulations.

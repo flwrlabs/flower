@@ -355,7 +355,7 @@ Congratulations! You have created your first custom strategy adding dynamism to 
 
 As a last step in this tutorial, let's see how we can use Flower to experiment with a
 large number of clients. The most straightforward way to do this is by overriding the
-default Simulation Runtime configuraiton via the ``--federation-options`` flag:
+default Simulation Runtime configuration via the ``--federation-options`` flag:
 
 .. code-block:: shell
 

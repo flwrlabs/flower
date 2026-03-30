@@ -203,7 +203,7 @@ Per-run override of Simulation Runtime Configuration
 
 Sometimes, you might want to override the default simulation configuration for a
 specific run. You can do so by passing the same options as above to |flwr_run_link|_ but
-using the `--federation-options` flag, and expressed as a single string. For example,
+using the `--federation-config` flag, and expressed as a single string. For example,
 let's say you want to run a single simulation with 256 ``SuperNodes`` instead of the now
 default 100, reduce the number of CPUs per ``ClientApp`` to 1 and leave the GPU
 allocation unchanged. You would run:
@@ -218,7 +218,7 @@ allocation unchanged. You would run:
     ``flwr federation simulation-config`` using the same syntax but expressed as a
     single string and without the ``--`` prefix.
 
-Understading Simulation Runtime resource assignemnt
+Understanding Simulation Runtime resource assignment
 ===================================================
 
 Let's see how the above configuration, i.e. 1x CPU and 25% of a GPU per ``ClientApp``,
@@ -266,7 +266,7 @@ Configuration <ref-flower-configuration>` by passing a value to the ``init-args`
 
     flwr federation simulation-config --init-args-num-cpus 1 --init-args-num-gpus 0
 
-With the above setup, the Backend will be initialized with a single CPU and GPU.
+With the above setup, the Backend will be initialized with a single CPU and no GPUs.
 Therefore, even if more CPUs and GPUs are available in your system, they will not be
 used for the simulation. The example above results in a single ``ClientApp`` running at
 any given point.

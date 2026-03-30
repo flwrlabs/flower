@@ -30,7 +30,7 @@ different directory.
 ****************************
 
 On the first command that needs the local Control API (e.g. ``flwr run``, ``flwr list``,
-etc), Flower starts a local ``flower-superlink`` process automatically. That process:
+etc.), Flower starts a local ``flower-superlink`` process automatically. That process:
 
 - listens on ``127.0.0.1:39093`` for the Control API
 - binds ServerAppIo to a free local port chosen by the OS
