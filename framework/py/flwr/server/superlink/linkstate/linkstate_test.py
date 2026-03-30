@@ -403,6 +403,8 @@ class StateTest(CoreStateTest):
     def test_usage_reported_at_set_on_success(self) -> None:
         """Test successful report sets usage_reported_at."""
         state = self.state_factory()
+        # pylint: disable-next=protected-access
+        state._federation_manager = Mock()  # type: ignore[attr-defined]
         run_id = create_dummy_run(state)
         assert state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
         assert state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
@@ -431,6 +433,8 @@ class StateTest(CoreStateTest):
     def test_usage_report_retry_for_failed_runs(self) -> None:
         """Test failed unreported runs are retried on subsequent status updates."""
         state = self.state_factory()
+        # pylint: disable-next=protected-access
+        state._federation_manager = Mock()  # type: ignore[attr-defined]
         run_id1 = create_dummy_run(state)
         assert state.update_run_status(run_id1, RunStatus(Status.STARTING, "", ""))
         assert state.update_run_status(run_id1, RunStatus(Status.RUNNING, "", ""))
@@ -473,6 +477,8 @@ class StateTest(CoreStateTest):
     def test_usage_report_deduplicates_candidates(self) -> None:
         """Test newly finished failed run is reported only once per update call."""
         state = self.state_factory()
+        # pylint: disable-next=protected-access
+        state._federation_manager = Mock()  # type: ignore[attr-defined]
         run_id = create_dummy_run(state)
         assert state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
         assert state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
@@ -1946,7 +1952,7 @@ def _get_usage_reported_at(state: LinkState, run_id: int) -> str:
             "SELECT usage_reported_at FROM run WHERE run_id = :run_id",
             {"run_id": uint64_to_int64(run_id)},
         )
-        return rows[0]["usage_reported_at"] if rows else ""
+        return str(rows[0]["usage_reported_at"]) if rows else ""
     raise AssertionError(f"Unknown state type: {type(state)}")
 
 
