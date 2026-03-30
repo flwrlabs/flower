@@ -85,8 +85,8 @@ Here are a few key sections to look out for:
     - ``license``: The license your app is distributed under (e.g., Apache-2.0).
     - ``dependencies``\*: A list of Python packages required to run your app.
     - ``publisher``\*: The name of the person or organization publishing the app.
-    - ``fab-include``: A list of gitignore-style patterns to include in the Flower App Bundle. See next section for details.
-    - ``fab-exclude``: A list of gitignore-style patterns to exclude from the Flower App Bundle. See next section for details.
+    - ``fab-include``: A list of gitignore-style patterns to include in the Flower App Bundle. See `Defining Included/Excluded Files`_ for details.
+    - ``fab-exclude``: A list of gitignore-style patterns to exclude from the Flower App Bundle. See `Defining Included/Excluded Files`_ for details.
 
 Specify the metadata, including the app name, version, etc., in these sections. Add any
 Python packages your app needs under ``dependencies``. These will be installed when you
@@ -190,11 +190,11 @@ you put in ``fab-include`` or ``fab-exclude`` — and these cannot be overridden
 defined in ``flwr.common.constant`` as ``FAB_INCLUDE_PATTERNS`` and
 ``FAB_EXCLUDE_PATTERNS``.
 
-**Always included (``FAB_INCLUDE_PATTERNS``):**
+**Always included** (``FAB_INCLUDE_PATTERNS``):
 
 These are the file types that make up a typical Flower app — source code, configuration,
 documentation, and data descriptors. Anything outside this set (for example, ``.txt`` or
-binary files) is not a recognised FAB file type and cannot be included.
+binary files) is not a recognised FAB file type and cannot be included:
 
 .. code-block:: text
 
@@ -207,12 +207,12 @@ binary files) is not a recognised FAB file type and cannot be included.
     **/*.jsonl     JSON Lines data files
     /LICENSE       Top-level license file
 
-**Always excluded (``FAB_EXCLUDE_PATTERNS``):**
+**Always excluded** (``FAB_EXCLUDE_PATTERNS``):
 
 These are paths that should never travel across the network: generated artefacts that
 can be reproduced locally (caches, build outputs, packaging directories), virtual
 environments that are machine-specific, test files that are not needed at runtime, and
-Flower's own internal directory.
+Flower's own internal directory:
 
 .. code-block:: text
 
