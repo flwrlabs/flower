@@ -445,7 +445,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             )
             ret.update(tmp_ret_dict)
 
-            # Atomically claim all eligible reply Messages.
+            # Atomically claim all eligible reply Messages
             placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
             delivered_at = now().isoformat()
             query = f"""
