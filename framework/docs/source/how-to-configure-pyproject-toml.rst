@@ -139,9 +139,9 @@ build artifacts, ``__pycache__`` directories, and test files.
 Flower applies filtering in two stages:
 
 1. **Publish filter** — Files are first narrowed to supported types, and any patterns in
-   your ``.gitignore`` are applied to remove ignored files. Refer to the
-   `Flower Hub documentation <https://flower.ai/docs/hub/how-to-publish-app-on-hub.html>`_
-   for more details on how this works when you publish an app to Flower Hub.
+   your ``.gitignore`` are applied to remove ignored files. Refer to the `Flower Hub
+   documentation <https://flower.ai/docs/hub/how-to-publish-app-on-hub.html>`_ for more
+   details on how this works when you publish an app to Flower Hub.
 2. **FAB filter** — Your ``fab-include`` and ``fab-exclude`` patterns are applied next,
    followed by non-overridable built-in constraints that enforce supported file types
    and exclude directories like ``.venv/`` or ``__pycache__/``.
