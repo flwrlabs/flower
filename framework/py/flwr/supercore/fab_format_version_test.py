@@ -200,8 +200,8 @@ def test_v1_fab_format_accepts_additional_non_lower_bound_specifiers() -> None:
     assert metadata.flwr_version_target == "1.27.0"
 
 
-def test_v1_fab_format_ignores_upper_bounds() -> None:
-    """Test fab-format-version=1 ignores upper bounds during validation."""
+def test_v1_fab_format_rejects_target_outside_declared_range() -> None:
+    """Test fab-format-version=1 rejects targets outside the flwr specifier."""
     config: dict[str, Any] = {
         "project": {
             "name": "fedgpt",
@@ -220,11 +220,8 @@ def test_v1_fab_format_ignores_upper_bounds() -> None:
         },
     }
 
-    metadata = normalize_and_validate_fab_format(config)
-
-    assert metadata.fab_format_version == 1
-    assert metadata.flwr_version_min == "1.26.0"
-    assert metadata.flwr_version_target == "2.1.0"
+    with pytest.raises(ValueError, match='must satisfy the declared "flwr"'):
+        normalize_and_validate_fab_format(config)
 
 
 def test_v1_fab_format_rejects_missing_inclusive_lower_bound() -> None:
