@@ -107,7 +107,7 @@ DEFAULT_SIMULATION_CONFIG = SimulationConfig(
     init_args_num_cpus=None,
     init_args_num_gpus=None,
     init_args_logging_level="WARNING",
-    init_args_log_to_driver=True,
+    init_args_log_to_driver=None,
 )
 
 # Constants for exit handling
