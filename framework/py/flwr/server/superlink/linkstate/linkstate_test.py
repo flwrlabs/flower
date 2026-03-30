@@ -52,6 +52,7 @@ from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, RunType
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
+from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
 
 
@@ -398,6 +399,104 @@ class StateTest(CoreStateTest):
         ]
         for run_status in run_statuses:
             assert not state.update_run_status(run_id, run_status)
+
+    def test_usage_reported_at_set_on_success(self) -> None:
+        """Test successful report sets usage_reported_at."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        assert state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
+        assert state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
+
+        with (
+            patch(
+                "flwr.server.superlink.linkstate.in_memory_linkstate.post_entitlement_report",
+                return_value=True,
+            ) as mock_in_memory,
+            patch(
+                "flwr.server.superlink.linkstate.sql_linkstate.post_entitlement_report",
+                return_value=True,
+            ) as mock_sql,
+        ):
+            assert state.update_run_status(
+                run_id,
+                RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
+            )
+
+        mock_report = (
+            mock_in_memory if isinstance(state, InMemoryLinkState) else mock_sql
+        )
+        assert mock_report.call_count == 1
+        assert _get_usage_reported_at(state, run_id) != ""
+
+    def test_usage_report_retry_for_failed_runs(self) -> None:
+        """Test failed unreported runs are retried on subsequent status updates."""
+        state = self.state_factory()
+        run_id1 = create_dummy_run(state)
+        assert state.update_run_status(run_id1, RunStatus(Status.STARTING, "", ""))
+        assert state.update_run_status(run_id1, RunStatus(Status.RUNNING, "", ""))
+
+        with (
+            patch(
+                "flwr.server.superlink.linkstate.in_memory_linkstate.post_entitlement_report",
+                return_value=False,
+            ),
+            patch(
+                "flwr.server.superlink.linkstate.sql_linkstate.post_entitlement_report",
+                return_value=False,
+            ),
+        ):
+            assert state.update_run_status(
+                run_id1,
+                RunStatus(Status.FINISHED, SubStatus.FAILED, "mock failure"),
+            )
+        assert _get_usage_reported_at(state, run_id1) == ""
+
+        run_id2 = create_dummy_run(state)
+        with (
+            patch(
+                "flwr.server.superlink.linkstate.in_memory_linkstate.post_entitlement_report",
+                return_value=True,
+            ) as mock_in_memory,
+            patch(
+                "flwr.server.superlink.linkstate.sql_linkstate.post_entitlement_report",
+                return_value=True,
+            ) as mock_sql,
+        ):
+            assert state.update_run_status(run_id2, RunStatus(Status.STARTING, "", ""))
+
+        mock_report = (
+            mock_in_memory if isinstance(state, InMemoryLinkState) else mock_sql
+        )
+        assert mock_report.call_count >= 1
+        assert _get_usage_reported_at(state, run_id1) != ""
+
+    def test_usage_report_deduplicates_candidates(self) -> None:
+        """Test newly finished failed run is reported only once per update call."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        assert state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
+        assert state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
+
+        with (
+            patch(
+                "flwr.server.superlink.linkstate.in_memory_linkstate.post_entitlement_report",
+                return_value=True,
+            ) as mock_in_memory,
+            patch(
+                "flwr.server.superlink.linkstate.sql_linkstate.post_entitlement_report",
+                return_value=True,
+            ) as mock_sql,
+        ):
+            assert state.update_run_status(
+                run_id,
+                RunStatus(Status.FINISHED, SubStatus.FAILED, "mock failure"),
+            )
+
+        mock_report = (
+            mock_in_memory if isinstance(state, InMemoryLinkState) else mock_sql
+        )
+        assert mock_report.call_count == 1
+        assert _get_usage_reported_at(state, run_id) != ""
 
     def test_get_message_ins_empty(self) -> None:
         """Validate that a new state has no input Messages."""
@@ -1836,6 +1935,19 @@ def transition_run_status(state: LinkState, run_id: int, num_transitions: int) -
         state.update_run_status(
             run_id, RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
         )
+
+
+def _get_usage_reported_at(state: LinkState, run_id: int) -> str:
+    """Return usage_reported_at value for the provided run."""
+    if isinstance(state, InMemoryLinkState):
+        return state.run_ids[run_id].usage_reported_at
+    if isinstance(state, SqlLinkState):
+        rows = state.query(
+            "SELECT usage_reported_at FROM run WHERE run_id = :run_id",
+            {"run_id": uint64_to_int64(run_id)},
+        )
+        return rows[0]["usage_reported_at"] if rows else ""
+    raise AssertionError(f"Unknown state type: {type(state)}")
 
 
 def create_dummy_node(

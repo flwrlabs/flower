@@ -44,8 +44,9 @@ from flwr.server.utils import validate_message
 from flwr.supercore.constant import NodeStatus
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.object_store.object_store import ObjectStore
-from flwr.superlink.federation import FederationManager
+from flwr.superlink.federation import FederationManager, NoOpFederationManager
 
+from .entitlement import post_entitlement_report
 from .utils import (
     check_node_availability_for_in_message,
     generate_rand_int_from_bytes,
@@ -720,11 +721,41 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             elif new_status.status == Status.FINISHED:
                 run_record.run.finished_at = current.isoformat()
             run_record.run.status = new_status
-            return True
+
+        if not isinstance(self.federation_manager, NoOpFederationManager):
+            self._report_run_usage(
+                run_id=(run_id if new_status.status == Status.FINISHED else None)
+            )
+        return True
 
     def _report_run_usage(self, run_id: int | None) -> None:
         """Attempt usage reporting for newly finished and failed-unreported runs."""
-        raise NotImplementedError()
+        with self.lock:
+            candidate_run_ids = {
+                run_id_
+                for run_id_, run_record in self.run_ids.items()
+                if (
+                    run_record.run.status.sub_status == SubStatus.FAILED
+                    and run_record.usage_reported_at == ""
+                )
+            }
+            if run_id is not None:
+                candidate_run_ids.add(run_id)
+
+        for candidate_run_id in candidate_run_ids:
+            with self.lock:
+                run_record = self.run_ids.get(candidate_run_id)
+                if run_record is None:
+                    continue
+
+            with run_record.lock:
+                if run_record.usage_reported_at != "":
+                    continue
+                run = run_record.run
+
+            if post_entitlement_report(run):
+                with run_record.lock:
+                    run_record.usage_reported_at = now().isoformat()
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
