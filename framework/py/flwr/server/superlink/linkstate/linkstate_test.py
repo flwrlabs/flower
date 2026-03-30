@@ -23,7 +23,7 @@ import threading
 import time
 import unittest
 from abc import abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 from uuid import uuid4
@@ -1927,28 +1927,16 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
 
     def state_factory(self) -> SqlLinkState:
         """Return SqlLinkState with file-based database."""
-        # pylint: disable-next=consider-using-with,attribute-defined-outside-init
-        self.tmp_file = tempfile.NamedTemporaryFile()
+        # pylint: disable-next=attribute-defined-outside-init
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp_dir.cleanup)
         state = SqlLinkState(
-            database_path=self.tmp_file.name,
+            database_path=os.path.join(self.tmp_dir.name, "state.db"),
             federation_manager=NoOpFederationManager(),
             object_store=ObjectStoreFactory().store(),
         )
         state.initialize()
         return state
-
-    @staticmethod
-    def _count_successful_replies(results: list[list[Message] | None]) -> int:
-        """Count non-error reply Messages from concurrent pull results."""
-        count = 0
-        for message_list in results:
-            if message_list is None:
-                continue
-            typed_message_list: list[Message] = message_list
-            for message in typed_message_list:
-                if not message.has_error():
-                    count += 1
-        return count
 
     @staticmethod
     def _create_shared_sql_states(
@@ -1971,26 +1959,28 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
 
     @staticmethod
     def _run_in_parallel(
-        state_0: SqlLinkState,
-        state_1: SqlLinkState,
-        fn: Callable[[SqlLinkState], list[Message]],
+        fns: Iterable[Callable[[], list[Message]]],
         timeout: float = _CONCURRENT_TEST_TIMEOUT,
     ) -> list[list[Message]]:
-        """Run the same pull function concurrently on two replicas."""
-        barrier = threading.Barrier(3)
-        results: list[list[Message] | None] = [None, None]
+        """Run callables concurrently and return their results."""
+        runnables = list(fns)
+        if not runnables:
+            raise AssertionError("`fns` must not be empty")
+
+        barrier = threading.Barrier(len(runnables) + 1)
+        results: list[list[Message] | None] = [None] * len(runnables)
         exceptions: list[Exception] = []
 
-        def _run(idx: int, state: SqlLinkState) -> None:
+        def _run(idx: int, fn: Callable[[], list[Message]]) -> None:
             try:
                 barrier.wait(timeout=timeout)
-                results[idx] = fn(state)
+                results[idx] = fn()
             except Exception as ex:  # pylint: disable=broad-exception-caught
                 exceptions.append(ex)
 
         threads = [
-            threading.Thread(target=_run, args=(0, state_0)),
-            threading.Thread(target=_run, args=(1, state_1)),
+            threading.Thread(target=_run, args=(idx, fn))
+            for idx, fn in enumerate(runnables)
         ]
         for thread in threads:
             thread.start()
@@ -2030,9 +2020,10 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
             assert state_0.store_message_ins(message=msg)
 
             results = self._run_in_parallel(
-                state_0,
-                state_1,
-                lambda state: state.get_message_ins(node_id=node_id, limit=1),
+                [
+                    lambda: state_0.get_message_ins(node_id=node_id, limit=1),
+                    lambda: state_1.get_message_ins(node_id=node_id, limit=1),
+                ]
             )
             claimed = [msgs for msgs in results if msgs]
             assert len(claimed) == 1
@@ -2061,39 +2052,15 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
             msg_res.metadata.__dict__["_message_id"] = str(uuid4())
             assert state_0.store_message_res(msg_res)
 
-            barrier = threading.Barrier(3)
-            results: list[list[Message] | None] = [None, None]
-            exceptions: list[Exception] = []
-
-            def pull_res(idx: int, state: SqlLinkState) -> None:
-                try:
-                    barrier.wait(timeout=self._CONCURRENT_TEST_TIMEOUT)
-                    results[idx] = state.get_message_res(
-                        {pulled_ins.metadata.message_id}
-                    )
-                except Exception as ex:  # pylint: disable=broad-exception-caught
-                    exceptions.append(ex)
-
-            threads = [
-                threading.Thread(target=pull_res, args=(0, state_0)),
-                threading.Thread(target=pull_res, args=(1, state_1)),
-            ]
-            for thread in threads:
-                thread.start()
-            try:
-                barrier.wait(timeout=self._CONCURRENT_TEST_TIMEOUT)
-            except threading.BrokenBarrierError as ex:
-                exceptions.append(ex)
-            for thread in threads:
-                thread.join(timeout=self._CONCURRENT_TEST_TIMEOUT)
-            alive_threads = [thread for thread in threads if thread.is_alive()]
-            if alive_threads:
-                self.fail("Timed out waiting for concurrent pull_res threads to finish")
-
-            if exceptions:
-                raise exceptions[0]
-            assert all(message_list is not None for message_list in results)
-            assert self._count_successful_replies(results) == 1
+            msg_id = pulled_ins.metadata.message_id
+            results = self._run_in_parallel(
+                [
+                    lambda: state_0.get_message_res({msg_id}),
+                    lambda: state_1.get_message_res({msg_id}),
+                ],
+                timeout=self._CONCURRENT_TEST_TIMEOUT,
+            )
+            assert sum(len(res) for res in results) == 1
 
     # pylint: disable-next=too-many-locals
     def test_get_message_ins_distributes_available_work_under_contention(self) -> None:
@@ -2118,9 +2085,10 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
             assert state_0.store_message_ins(message=msg_1)
 
             results = self._run_in_parallel(
-                state_0,
-                state_1,
-                lambda state: state.get_message_ins(node_id=node_id, limit=1),
+                [
+                    lambda: state_0.get_message_ins(node_id=node_id, limit=1),
+                    lambda: state_1.get_message_ins(node_id=node_id, limit=1),
+                ]
             )
             claimed_messages = [msgs for msgs in results if msgs]
             assert len(claimed_messages) == 2

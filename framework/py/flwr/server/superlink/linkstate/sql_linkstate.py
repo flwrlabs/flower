@@ -256,38 +256,41 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         sint64_node_id = uint64_to_int64(node_id)
 
         with self.session():
-            delivered_at = now().isoformat()
-            params: dict[str, str | int] = {
+            current_time = now()
+            current = current_time.timestamp()
+            delivered_at = current_time.isoformat()
+            params: dict[str, str | int | float] = {
                 "node_id": sint64_node_id,
+                "current": current,
                 "delivered_at": delivered_at,
             }
 
+            common_condition = """
+                dst_node_id = :node_id
+                AND delivered_at = ''
+                AND (created_at + ttl) > :current
+            """
             if limit is None:
-                query = """
-                    UPDATE message_ins
-                    SET delivered_at = :delivered_at
-                    WHERE dst_node_id = :node_id
-                    AND delivered_at = ''
-                    AND (created_at + ttl) > CAST(strftime('%s', 'now') AS REAL)
-                    RETURNING *
-                """
+                condition = common_condition
             else:
-                query = """
-                    UPDATE message_ins
-                    SET delivered_at = :delivered_at
-                    WHERE message_id IN (
+                condition = f"""
+                    message_id IN (
                         SELECT message_id
                         FROM message_ins
-                        WHERE dst_node_id = :node_id
-                        AND delivered_at = ''
-                        AND (created_at + ttl) > CAST(strftime('%s', 'now') AS REAL)
+                        WHERE {common_condition}
                         ORDER BY rowid
                         LIMIT :limit
                     )
                     AND delivered_at = ''
-                    RETURNING *
                 """
                 params["limit"] = limit
+
+            query = f"""
+                UPDATE message_ins
+                SET delivered_at = :delivered_at
+                WHERE {condition}
+                RETURNING *
+            """
 
             rows = self.query(query, params)
             message_ids: set[str] = {row["message_id"] for row in rows}
