@@ -1888,6 +1888,7 @@ def _claim_running_in_separate_process(
     run_id: int,
     start_event: Any,
     result_queue: Any,
+    timeout: float,
 ) -> None:
     """Try to claim STARTING -> RUNNING in a dedicated process."""
     state = SqlLinkState(
@@ -1896,7 +1897,7 @@ def _claim_running_in_separate_process(
         object_store=ObjectStoreFactory().store(),
     )
     state.initialize()
-    if not start_event.wait(timeout=5.0):
+    if not start_event.wait(timeout=timeout):
         result_queue.put((False, "start-event-timeout"))
         return
     try:
@@ -2135,16 +2136,16 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
             ctx = multiprocessing.get_context("spawn")
             start_event = ctx.Event()
             result_queue = ctx.Queue()
-            timeout = 5.0
+            timeout = self._CONCURRENT_TEST_TIMEOUT
 
             processes = [
                 ctx.Process(
                     target=_claim_running_in_separate_process,
-                    args=(db_path, run_id, start_event, result_queue),
+                    args=(db_path, run_id, start_event, result_queue, timeout),
                 ),
                 ctx.Process(
                     target=_claim_running_in_separate_process,
-                    args=(db_path, run_id, start_event, result_queue),
+                    args=(db_path, run_id, start_event, result_queue, timeout),
                 ),
             ]
             for proc in processes:
@@ -2156,6 +2157,10 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
 
             alive_processes = [proc for proc in processes if proc.is_alive()]
             if alive_processes:
+                for proc in alive_processes:
+                    proc.terminate()
+                for proc in alive_processes:
+                    proc.join(timeout=1.0)
                 self.fail(
                     f"Concurrent run-claim test timed out; {len(alive_processes)} "
                     f"process(es) still alive after {timeout} seconds."
@@ -2166,7 +2171,7 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
             results: list[bool] = []
             errors: list[str] = []
             for _ in processes:
-                result, error = result_queue.get(timeout=1.0)
+                result, error = result_queue.get(timeout=timeout)
                 results.append(result)
                 if error is not None:
                     errors.append(error)
