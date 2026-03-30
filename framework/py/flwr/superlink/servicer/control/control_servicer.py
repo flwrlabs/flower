@@ -52,7 +52,6 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.logger import log
-from flwr.common.record import ConfigRecord
 from flwr.common.serde import run_to_proto, user_config_from_proto
 from flwr.common.typing import AccountInfo, Fab, Run, RunStatus
 from flwr.proto import control_pb2_grpc  # pylint: disable=E0611
@@ -106,6 +105,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     UnregisterNodeRequest,
     UnregisterNodeResponse,
 )
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
@@ -149,16 +149,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
         ffs = self.ffs_factory.ffs()
 
-        # Temporarily convert back to ConfigRecord for compatibility
-        sim_cfg = request.override_federation_config
-        federation_config = ConfigRecord(
-            {
-                "num-supernodes": sim_cfg.num_supernodes,
-                "backend.client-resources.num-cpus": sim_cfg.client_resources_num_cpus,
-                "backend.client-resources.num-gpus": sim_cfg.client_resources_num_gpus,
-            }
-        )
-
         verification_dict: dict[str, str] = {}
         if request.app_spec:
             fab_file, verification_dict = _get_remote_fab(
@@ -198,10 +188,15 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     f"federation '{federation}'.",
                 )
 
-            # Derive run type based on the presence of simulation config
+            # Derive run type based on the presence of simulation config and apply
+            # federation config overrides
             run_type = RunType.SERVER_APP
-            if state.federation_manager.get_simulation_config(federation) is not None:
+            resolved_federation_config = None
+            if sim_cfg := state.federation_manager.get_simulation_config(federation):
                 run_type = RunType.SIMULATION
+                resolved_federation_config = SimulationConfig()
+                resolved_federation_config.CopyFrom(sim_cfg)
+                resolved_federation_config.MergeFrom(request.override_federation_config)
 
         try:
             # Validate user config overrides matches keys in run config in FAB
@@ -229,7 +224,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 fab_hash,
                 override_config,
                 federation,
-                federation_config,
+                resolved_federation_config,
                 flwr_aid,
                 run_type,
             )
@@ -848,9 +843,19 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         with rpc_error_translator(context, rpc_name):
+            federation = request.federation_name or NOOP_FEDERATION
+            if not state.federation_manager.exists(federation):
+                if request.federation_name:
+                    raise FlowerError(
+                        ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION,
+                        f"Federation '{federation}' not found or has been archived.",
+                    )
+                raise FlowerError(
+                    ApiErrorCode.FEDERATION_NOT_SPECIFIED, "No federation specified."
+                )
             state.federation_manager.set_simulation_config(
                 flwr_aid=_get_flwr_aid(context),
-                federation=request.federation_name,
+                federation=federation,
                 config=request.config,
             )
 

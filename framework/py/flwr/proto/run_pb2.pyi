@@ -19,7 +19,6 @@ limitations under the License.
 
 import builtins
 import collections.abc
-import flwr.proto.federation_config_pb2
 import flwr.proto.node_pb2
 import flwr.proto.recorddict_pb2
 import flwr.proto.transport_pb2
@@ -68,7 +67,6 @@ class Run(google.protobuf.message.Message):
     BYTES_RECV_FIELD_NUMBER: builtins.int
     CLIENTAPP_RUNTIME_FIELD_NUMBER: builtins.int
     RUN_TYPE_FIELD_NUMBER: builtins.int
-    FEDERATION_CONFIG_FIELD_NUMBER: builtins.int
     run_id: builtins.int
     fab_id: builtins.str
     fab_version: builtins.str
@@ -87,8 +85,6 @@ class Run(google.protobuf.message.Message):
     def override_config(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, flwr.proto.transport_pb2.Scalar]: ...
     @property
     def status(self) -> global___RunStatus: ...
-    @property
-    def federation_config(self) -> flwr.proto.federation_config_pb2.SimulationConfig: ...
     def __init__(
         self,
         *,
@@ -108,10 +104,9 @@ class Run(google.protobuf.message.Message):
         bytes_recv: builtins.int = ...,
         clientapp_runtime: builtins.float = ...,
         run_type: builtins.str = ...,
-        federation_config: flwr.proto.federation_config_pb2.SimulationConfig | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["federation_config", b"federation_config", "status", b"status"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["bytes_recv", b"bytes_recv", "bytes_sent", b"bytes_sent", "clientapp_runtime", b"clientapp_runtime", "fab_hash", b"fab_hash", "fab_id", b"fab_id", "fab_version", b"fab_version", "federation", b"federation", "federation_config", b"federation_config", "finished_at", b"finished_at", "flwr_aid", b"flwr_aid", "override_config", b"override_config", "pending_at", b"pending_at", "run_id", b"run_id", "run_type", b"run_type", "running_at", b"running_at", "starting_at", b"starting_at", "status", b"status"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["status", b"status"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["bytes_recv", b"bytes_recv", "bytes_sent", b"bytes_sent", "clientapp_runtime", b"clientapp_runtime", "fab_hash", b"fab_hash", "fab_id", b"fab_id", "fab_version", b"fab_version", "federation", b"federation", "finished_at", b"finished_at", "flwr_aid", b"flwr_aid", "override_config", b"override_config", "pending_at", b"pending_at", "run_id", b"run_id", "run_type", b"run_type", "running_at", b"running_at", "starting_at", b"starting_at", "status", b"status"]) -> None: ...
 
 global___Run = Run
 

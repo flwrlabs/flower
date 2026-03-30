@@ -30,12 +30,7 @@ from flwr.common.constant import (
     Status,
 )
 from flwr.common.message import get_message_to_descendant_id_mapping
-from flwr.common.serde import (
-    config_record_from_proto,
-    context_to_proto,
-    message_from_proto,
-    run_status_to_proto,
-)
+from flwr.common.serde import context_to_proto, message_from_proto, run_status_to_proto
 from flwr.common.serde_test import RecordMaker
 from flwr.common.typing import RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
@@ -70,8 +65,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import (  # pylint: disable=E0611
-    GetFederationOptionsRequest,
-    GetFederationOptionsResponse,
     UpdateRunStatusRequest,
     UpdateRunStatusResponse,
 )
@@ -207,11 +200,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=SendAppHeartbeatRequest.SerializeToString,
             response_deserializer=SendAppHeartbeatResponse.FromString,
         )
-        self._get_federation_options = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/GetFederationOptions",
-            request_serializer=GetFederationOptionsRequest.SerializeToString,
-            response_deserializer=GetFederationOptionsResponse.FromString,
-        )
         self._push_object = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/PushObject",
             request_serializer=PushObjectRequest.SerializeToString,
@@ -262,7 +250,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             fab_hash,
             {},
             NOOP_FEDERATION,
-            ConfigRecord(),
+            None,
             "",
             RunType.SERVER_APP,
         )
@@ -906,48 +894,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Assert: Only one token is issued
         assert response1.token != ""
         assert response2.token == ""
-
-    def test_get_federation_options(self) -> None:
-        """Test `GetFederationOptions`."""
-        # Prepare
-        federation_options = ConfigRecord({"num-supernodes": 3, "backend": "ray"})
-        run_id = self.state.create_run(
-            "",
-            "",
-            "",
-            {},
-            NOOP_FEDERATION,
-            federation_options,
-            "",
-            RunType.SIMULATION,
-        )
-        request = GetFederationOptionsRequest(run_id=run_id)
-
-        # Execute
-        response, call = self._get_federation_options.with_call(request=request)
-
-        # Assert
-        assert isinstance(response, GetFederationOptionsResponse)
-        assert grpc.StatusCode.OK == call.code()
-        assert (
-            config_record_from_proto(response.federation_options) == federation_options
-        )
-
-    def test_get_federation_options_not_successful_for_unknown_run_id(
-        self,
-    ) -> None:
-        """Test `GetFederationOptions` failure for an unknown run_id."""
-        # Prepare
-        request = GetFederationOptionsRequest(run_id=2**63 - 1)
-
-        # Execute & Assert
-        with self.assertRaises(grpc.RpcError) as err:
-            self._get_federation_options.with_call(request=request)
-        assert err.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
-        assert (
-            err.exception.details()
-            == "Expected federation options to be set, but none available."
-        )
 
     def test_run_status_transitions(self) -> None:
         """Test `RequestToken` and `PullAppInputs` transitions run status from PENDING

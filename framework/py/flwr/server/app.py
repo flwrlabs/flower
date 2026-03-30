@@ -419,7 +419,9 @@ def run_superlink() -> None:
 
     # Launch SuperExec if isolation mode is subprocess
     if args.isolation == ISOLATION_MODE_SUBPROCESS:
-        appio_address = resolve_bind_address(serverappio_address)
+        # bound_address contains the actual address when the port is set to :0
+        # which means let the OS choose a free port.
+        appio_address = resolve_bind_address(serverappio_server.bound_address)
         command = ["flower-superexec", "--insecure"]
         command += ["--appio-api-address", appio_address]
         command += ["--plugin-type", ExecPluginType.SERVER_APP]

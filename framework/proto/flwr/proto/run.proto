@@ -19,7 +19,6 @@ package flwr.proto;
 
 import "flwr/proto/node.proto";
 import "flwr/proto/recorddict.proto";
-import "flwr/proto/federation_config.proto";
 import "flwr/proto/transport.proto";
 
 message Run {
@@ -39,7 +38,6 @@ message Run {
   uint64 bytes_recv = 14;
   double clientapp_runtime = 15;
   string run_type = 16;
-  SimulationConfig federation_config = 17;
 }
 
 message RunStatus {
