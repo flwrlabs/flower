@@ -254,58 +254,14 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         sint64_node_id = uint64_to_int64(node_id)
 
         with self.session():
-            current_time = now()
-            current = current_time.timestamp()
-            delivered_at = current_time.isoformat()
-            params: dict[str, str | int | float] = {
-                "node_id": sint64_node_id,
-                "current": current,
-                "delivered_at": delivered_at,
-            }
-
-            common_condition = """
-                dst_node_id = :node_id
-                AND delivered_at = ''
-                AND (created_at + ttl) > :current
-            """
-            if limit is None:
-                condition = common_condition
-            else:
-                condition = f"""
-                    message_id IN (
-                        SELECT message_id
-                        FROM message_ins
-                        WHERE {common_condition}
-                        ORDER BY rowid
-                        LIMIT :limit
-                    )
-                    AND delivered_at = ''
-                """
-                params["limit"] = limit
-
-            query = f"""
-                UPDATE message_ins
-                SET delivered_at = :delivered_at
-                WHERE {condition}
-                RETURNING *
-            """
-
-            rows = self.query(query, params)
+            rows = self._claim_message_ins_rows(sint64_node_id, limit)
             message_ids: set[str] = {row["message_id"] for row in rows}
             self._check_stored_messages(message_ids)
 
             # _check_stored_messages can delete claimed Messages if they became invalid
             # (for example, node removed from federation), so re-read current rows.
             if message_ids:
-                placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
-                query = f"""
-                    SELECT *
-                    FROM message_ins
-                    WHERE message_id IN ({placeholders})
-                    ORDER BY rowid
-                """
-                params = {f"mid_{i}": msg_id for i, msg_id in enumerate(message_ids)}
-                rows = self.query(query, params)
+                rows = self._load_message_ins_rows(message_ids)
 
             for row in rows:
                 # Convert values from sint64 to uint64
@@ -316,6 +272,55 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         result = [dict_to_message(dict(row)) for row in rows]
 
         return result
+
+    def _claim_message_ins_rows(
+        self, sint64_node_id: int, limit: int | None
+    ) -> list[dict[str, Any]]:
+        """Atomically claim eligible instruction Messages for a node."""
+        current_time = now()
+        params: dict[str, str | int | float] = {
+            "node_id": sint64_node_id,
+            "current": current_time.timestamp(),
+            "delivered_at": current_time.isoformat(),
+        }
+        common_condition = """
+            dst_node_id = :node_id
+            AND delivered_at = ''
+            AND (created_at + ttl) > :current
+        """
+        condition = common_condition
+        if limit is not None:
+            condition = f"""
+                message_id IN (
+                    SELECT message_id
+                    FROM message_ins
+                    WHERE {common_condition}
+                    ORDER BY rowid
+                    LIMIT :limit
+                )
+                AND delivered_at = ''
+            """
+            params["limit"] = limit
+
+        query = f"""
+            UPDATE message_ins
+            SET delivered_at = :delivered_at
+            WHERE {condition}
+            RETURNING *
+        """
+        return self.query(query, params)
+
+    def _load_message_ins_rows(self, message_ids: set[str]) -> list[dict[str, Any]]:
+        """Load instruction Messages by IDs."""
+        placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
+        query = f"""
+            SELECT *
+            FROM message_ins
+            WHERE message_id IN ({placeholders})
+            ORDER BY rowid
+        """
+        params = {f"mid_{i}": msg_id for i, msg_id in enumerate(message_ids)}
+        return self.query(query, params)
 
     def store_message_res(self, message: Message) -> str | None:
         """Store one Message."""

@@ -19,6 +19,7 @@
 import multiprocessing
 import os
 import secrets
+import shutil
 import tempfile
 import threading
 import time
@@ -1953,11 +1954,10 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
 
     def state_factory(self) -> SqlLinkState:
         """Return SqlLinkState with file-based database."""
-        # pylint: disable-next=attribute-defined-outside-init
-        self.tmp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(self.tmp_dir.cleanup)
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir, True)
         state = SqlLinkState(
-            database_path=os.path.join(self.tmp_dir.name, "state.db"),
+            database_path=os.path.join(tmp_dir, "state.db"),
             federation_manager=NoOpFederationManager(),
             object_store=ObjectStoreFactory().store(),
         )
