@@ -1,7 +1,7 @@
 FAB Format Version
 ==================
 
-Flower apps can declare a FAB format version in :code:`pyproject.toml` under
+Flower apps can declare a Flower App Bundle (`FAB <https://flower.ai/docs/framework/ref-api-cli.html#flwr-build>`_) format version in :code:`pyproject.toml` under
 :code:`[tool.flwr.app]`.
 
 The FAB format version defines which build-time rules apply to the app.
