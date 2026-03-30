@@ -64,8 +64,6 @@ from .utils import (
     convert_uint64_values_in_dict_to_sint64,
     dict_to_message,
     generate_rand_int_from_bytes,
-    has_valid_sub_status,
-    is_valid_transition,
     message_to_dict,
     verify_found_message_replies,
     verify_message_ids,
@@ -1002,70 +1000,44 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # Clean up expired tokens; this will flag inactive runs as needed
         self._cleanup_expired_tokens()
 
-        with self.session():
-            # Convert the uint64 value to sint64 for SQLite
-            sint64_run_id = uint64_to_int64(run_id)
-            query = "SELECT * FROM run WHERE run_id = :run_id"
-            rows = self.query(query, {"run_id": sint64_run_id})
+        # Determine the timestamp field and conditions based on the new status
+        ts_fld = ""
+        ts_con = ""
+        if new_status.status == Status.STARTING:
+            ts_fld = "starting_at"
+            # Condition: current status is PENDING
+            ts_con = "starting_at = '' AND finished_at = ''"
+        elif new_status.status == Status.RUNNING:
+            ts_fld = "running_at"
+            # Condition: current status is STARTING
+            ts_con = "starting_at != '' AND running_at = '' AND finished_at = ''"
+        elif new_status.status == Status.FINISHED:
+            ts_fld = "finished_at"
+            # Condition: current status is not FINISHED
+            ts_con = "finished_at = ''"
+            if new_status.sub_status == SubStatus.COMPLETED:
+                # For COMPLETED runs, ensure they are currently RUNNING
+                ts_con += " AND running_at != ''"
+        else:
+            return False  # Cannot update to PENDING
 
-            # Check if the run_id exists
-            if not rows:
-                log(ERROR, "`run_id` is invalid")
-                return False
+        # Prepare the query and parameters
+        query = f"""
+            UPDATE run SET {ts_fld} = :timestamp,
+            sub_status = :sub_status, details = :details
+            WHERE run_id = :run_id AND {ts_con}
+            RETURNING run_id
+        """
+        params = {
+            "timestamp": now().isoformat(),
+            "sub_status": new_status.sub_status,
+            "details": new_status.details,
+            "run_id": uint64_to_int64(run_id),
+        }
 
-            # Check if the status transition is valid
-            row = rows[0]
-            current_status = RunStatus(
-                status=determine_run_status(row),
-                sub_status=row["sub_status"],
-                details=row["details"],
-            )
-            if not is_valid_transition(current_status, new_status):
-                log(
-                    ERROR,
-                    'Invalid status transition: from "%s" to "%s"',
-                    current_status.status,
-                    new_status.status,
-                )
-                return False
-
-            # Check if the sub-status is valid
-            if not has_valid_sub_status(current_status):
-                log(
-                    ERROR,
-                    'Invalid sub-status "%s" for status "%s"',
-                    current_status.sub_status,
-                    current_status.status,
-                )
-                return False
-
-            # Update the status
-            query = """
-                UPDATE run SET %s = :timestamp,
-                sub_status = :sub_status, details = :details
-                WHERE run_id = :run_id
-            """
-
-            # Prepare data for query
-            current = now()
-
-            # Determine the timestamp field based on the new status
-            timestamp_fld = ""
-            if new_status.status == Status.STARTING:
-                timestamp_fld = "starting_at"
-            elif new_status.status == Status.RUNNING:
-                timestamp_fld = "running_at"
-            elif new_status.status == Status.FINISHED:
-                timestamp_fld = "finished_at"
-
-            params = {
-                "timestamp": current.isoformat(),
-                "sub_status": new_status.sub_status,
-                "details": new_status.details,
-                "run_id": sint64_run_id,
-            }
-            self.query(query % timestamp_fld, params)
-        return True
+        # Update the status
+        rows = self.query(query, params)
+        return len(rows) > 0
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float

@@ -16,12 +16,15 @@
 # pylint: disable=invalid-name, too-many-lines, R0904, R0913
 
 
+import multiprocessing
+import os
 import secrets
 import tempfile
 import time
 import unittest
 from abc import abstractmethod
 from datetime import datetime, timedelta, timezone
+from typing import Any
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
@@ -1878,6 +1881,29 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     )
 
 
+def _claim_running_in_separate_process(
+    database_path: str,
+    run_id: int,
+    start_event: Any,
+    result_queue: Any,
+) -> None:
+    """Try to claim STARTING -> RUNNING in a dedicated process."""
+    state = SqlLinkState(
+        database_path=database_path,
+        federation_manager=NoOpFederationManager(),
+        object_store=ObjectStoreFactory().store(),
+    )
+    state.initialize()
+    if not start_event.wait(timeout=5.0):
+        result_queue.put((False, "start-event-timeout"))
+        return
+    try:
+        result = state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
+        result_queue.put((result, None))
+    except Exception as ex:  # pylint: disable=broad-exception-caught
+        result_queue.put((False, repr(ex)))
+
+
 class InMemoryStateTest(StateTest):
     """Test InMemoryState implementation."""
 
@@ -1932,6 +1958,78 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
         )
         state.initialize()
         return state
+
+    @staticmethod
+    def _create_shared_sql_states(
+        database_path: str,
+    ) -> tuple[SqlLinkState, SqlLinkState]:
+        """Create two SqlLinkState replicas sharing the same SQLite file."""
+        state_0 = SqlLinkState(
+            database_path=database_path,
+            federation_manager=NoOpFederationManager(),
+            object_store=ObjectStoreFactory().store(),
+        )
+        state_1 = SqlLinkState(
+            database_path=database_path,
+            federation_manager=NoOpFederationManager(),
+            object_store=ObjectStoreFactory().store(),
+        )
+        state_0.initialize()
+        state_1.initialize()
+        return state_0, state_1
+
+    # pylint: disable-next=too-many-locals
+    def test_update_run_status_running_claim_is_atomic_across_replicas(self) -> None:
+        """Ensure only one replica can claim STARTING -> RUNNING transition."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "shared.db")
+            state_0, _ = self._create_shared_sql_states(db_path)
+            run_id = create_dummy_run(state_0)
+            assert state_0.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
+
+            ctx = multiprocessing.get_context("spawn")
+            start_event = ctx.Event()
+            result_queue = ctx.Queue()
+            timeout = 5.0
+
+            processes = [
+                ctx.Process(
+                    target=_claim_running_in_separate_process,
+                    args=(db_path, run_id, start_event, result_queue),
+                ),
+                ctx.Process(
+                    target=_claim_running_in_separate_process,
+                    args=(db_path, run_id, start_event, result_queue),
+                ),
+            ]
+            for proc in processes:
+                proc.start()
+            # Release both processes to claim at (roughly) the same time.
+            start_event.set()
+            for proc in processes:
+                proc.join(timeout=timeout)
+
+            alive_processes = [proc for proc in processes if proc.is_alive()]
+            if alive_processes:
+                self.fail(
+                    f"Concurrent run-claim test timed out; {len(alive_processes)} "
+                    f"process(es) still alive after {timeout} seconds."
+                )
+            for proc in processes:
+                assert proc.exitcode == 0
+
+            results: list[bool] = []
+            errors: list[str] = []
+            for _ in processes:
+                result, error = result_queue.get(timeout=1.0)
+                results.append(result)
+                if error is not None:
+                    errors.append(error)
+            if errors:
+                self.fail(f"Concurrent run-claim process failed: {errors[0]}")
+
+            assert results.count(True) == 1
+            assert results.count(False) == 1
 
 
 if __name__ == "__main__":
