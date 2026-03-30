@@ -234,6 +234,25 @@ def test_has_node() -> None:
         manager.has_node(999, "any_federation")
 
 
+def test_can_execute() -> None:
+    """Test can_execute method always returns True."""
+    manager = NoOpFederationManager()
+
+    allowed = manager.can_execute(
+        {
+            "subject": {"type": "account", "id": NOOP_FLWR_AID},
+            "action": "start_run",
+            "context": {
+                "type": "start_run",
+                "federation": NOOP_FEDERATION,
+                "run_type": "serverapp",
+            },
+        }
+    )
+
+    assert allowed is True
+
+
 def test_get_federations() -> None:
     """Test get_federations method returns NOOP_FEDERATION."""
     # Prepare
