@@ -10,7 +10,7 @@ When reviewing or generating code, apply this checklist:
 
 2. Simplicity
    - Prefer less code when readability and correctness are preserved.
-   - Suggest idiomatic Python only if it makes the result easier to understand.
+   - Suggest idiomatic code for the language in that module only if it makes the result easier to understand.
    - Avoid "clever" one-liners that reduce maintainability.
 
 3. Readability
