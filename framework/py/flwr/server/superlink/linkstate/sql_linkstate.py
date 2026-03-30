@@ -1039,9 +1039,12 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         rows = self.query(query, params)
 
         if len(rows) > 0:
-            self.federation_manager.report_run_usage(
-                run_id if new_status.status == Status.FINISHED else None
-            )
+            try:
+                self.federation_manager.report_run_usage(
+                    run_id if new_status.status == Status.FINISHED else None
+                )
+            except Exception as exc:  # pylint: disable=broad-except
+                log(WARNING, "Failed to report run usage: %s", exc)
             return True
         return False
 
