@@ -65,8 +65,8 @@ To configure your SuperLink to use a GPU for simulations when running the `Clien
 
 ```bash
 flwr federation simulation-config \
-        --client-resources-num-cpus=2 \ # each ClientApp assumes to use 2CPUs
-        --client-resources-num-gpus=0.2 # at most 5 ClientApp will run in a given GPU
+    --client-resources-num-cpus=2 \ # each ClientApp assumes to use 2CPUs
+--client-resources-num-gpus=0.2 # at most 5 ClientApp will run in a given GPU
 ```
 
 And then run the app

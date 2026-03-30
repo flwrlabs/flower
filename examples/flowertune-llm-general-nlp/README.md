@@ -51,9 +51,9 @@ This app is designed to run with 20 virtual `SuperNodes` which have GPU-enabled 
 
 ```bash
 flwr federation simulation-config \
-        --num-supernodes=20 \
-        --client-resources-num-cpus=6 \
-        --client-resources-num-gpus=1.0
+    --num-supernodes=20 \
+    --client-resources-num-cpus=6 \
+    --client-resources-num-gpus=1.0
 ```
 
 > [!IMPORTANT]

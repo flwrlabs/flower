@@ -65,8 +65,8 @@ flwr run .  --stream
 
 ```bash
 flwr federation simulation-config \
-        --client-resources-num-cpus=4 \ # each ClientApp assumes to use 4CPUs
-        --client-resources-num-gpus=0.25  # at most 4 ClientApp will run in a given GPU
+    --client-resources-num-cpus=4 \ # each ClientApp assumes to use 4CPUs
+--client-resources-num-gpus=0.25  # at most 4 ClientApp will run in a given GPU
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
