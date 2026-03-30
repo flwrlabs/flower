@@ -324,11 +324,11 @@ class FederationManager(ABC):
 
     @abstractmethod
     def report_run_usage(self, run_id: int | None) -> None:
-        """Report run usage if its status is finished.
+        """Hook called on successful run status transitions.
 
         Parameters
         ----------
         run_id : int | None
             The run that just transitioned to a finished state, if any. ``None`` for
-            status updates that did not finish a run.
+            successful status updates that did not finish a run.
         """
