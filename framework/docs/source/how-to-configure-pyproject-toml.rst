@@ -83,8 +83,8 @@ Here are a few key sections to look out for:
     - ``license``: The license your app is distributed under (e.g., Apache-2.0).
     - ``dependencies``\*: A list of Python packages required to run your app.
     - ``publisher``\*: The name of the person or organization publishing the app.
-    - ``fab-include``: A list of file paths to include in the Flower App Bundle.
-    - ``fab-exclude``: A list of file paths to exclude from the Flower App Bundle.
+    - ``fab-include``: A list of file patterns (GitIgnore-style) to include in the Flower App Bundle.
+    - ``fab-exclude``: A list of file patterns (GitIgnore-style) to exclude from the Flower App Bundle.
 
 Specify the metadata, including the app name, version, etc., in these sections. Add any
 Python packages your app needs under ``dependencies``. These will be installed when you
