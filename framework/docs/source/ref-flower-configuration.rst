@@ -132,7 +132,7 @@ testing before deploying to real distributed environments.
     address = ":local:"
 
 This creates a managed local SuperLink profile using the default simulation
-configuration, which involves running 10 virtual SuperNodes through the simulation
+configuration, which involves running 10 simulated SuperNodes through the simulation
 runtime. Check the :doc:`Simulation Runtime docs <how-to-run-simulations>` to learn how
 to customize the number of SuperNodes and resources (CPU/GPU) allocated to your
 simulations.

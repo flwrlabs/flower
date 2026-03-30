@@ -155,7 +155,7 @@ The complete list of examples can be found in `the Flower GitHub
  Customize the Simulation Runtime
 **********************************
 
-By default, the ``Simulation Runtime`` simulates a cohort of 10 ``SuperNodes`` and
+By default, the Simulation Runtime simulates a cohort of 10 SuperNodes and
 assigns two CPU cores to each backend worker. This means that if your system has 12 CPU
 cores, six backend workers can be running in parallel, each executing a different
 ``ClientApp`` instance.
@@ -178,7 +178,7 @@ Customizing resources can be done in two ways: either by changing the default si
 configuration used by your local SuperLink; or by overriding the simulation
 configuration on a per-run basis. Let's see how to do both.
 
-Permanently set Simulation Runtime Configuration
+Permanently set Simulation Runtime configuration
 ================================================
 
 The |flwr_fed_sim_config_link|_ command allows you to permanently set the default
@@ -198,7 +198,7 @@ Then, for every subsequent runs, the SuperLink will use the above configuration 
 default. Use ``flwr federation simulation-config --help`` to see all the options you can
 set.
 
-Per-run override of Simulation Runtime Configuration
+Per-run override of Simulation Runtime configuration
 ====================================================
 
 Sometimes, you might want to override the default simulation configuration for a
