@@ -815,12 +815,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     INSERT INTO run
                     (run_id, fab_id, fab_version, fab_hash, override_config, federation,
                     federation_config, run_type, pending_at, starting_at, running_at,
-                    finished_at, sub_status, details, flwr_aid, bytes_sent, bytes_recv,
-                    clientapp_runtime)
+                    finished_at, usage_reported_at, sub_status, details, flwr_aid,
+                    bytes_sent, bytes_recv, clientapp_runtime)
                     VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
                     :federation, :federation_config, :run_type, :pending_at,
-                    :starting_at, :running_at, :finished_at, :sub_status, :details,
-                    :flwr_aid, :bytes_sent, :bytes_recv, :clientapp_runtime)
+                    :starting_at, :running_at, :finished_at, :usage_reported_at,
+                    :sub_status, :details, :flwr_aid, :bytes_sent, :bytes_recv,
+                    :clientapp_runtime)
                 """
                 override_config_json = json.dumps(override_config)
                 params = {
@@ -842,6 +843,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     "bytes_sent": 0,
                     "bytes_recv": 0,
                     "clientapp_runtime": 0.0,
+                    "usage_reported_at": "",
                 }
                 self.query(query, params)
                 return uint64_run_id

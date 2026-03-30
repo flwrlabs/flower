@@ -13,6 +13,13 @@
     the `federations` section in the `pyproject.toml` file of Flower Apps in older
     versions.
 
+.. note::
+
+    From Flower 1.28.0 onwards, it isn't recommended to define Simulation Runtime
+    settings (i.e. fields starting with ``options.``) in the Flower Configuration. Check
+    the :doc:`Simulation Runtime documentation <how-to-run-simulations>` for the
+    recommended way to configure simulations.
+
 **What is it?**
 
 The Flower Configuration is a system for managing SuperLink connections, stored in a
@@ -69,7 +76,6 @@ clearer naming.
 
     [superlink.local]
     address = ":local:"
-    options.num-supernodes = 10
 
     [superlink.local-poc]
     address = "127.0.0.1:9093"
@@ -89,9 +95,7 @@ clearer naming.
 - ``[superlink.local-poc]`` defines a configuration for connecting to a locally running
   SuperLink at address ``127.0.0.1:9093``
 
-Connection configuration names must be unique and use the ``superlink.`` prefix. The
-type of options you specify depends on whether you're configuring a simulation
-(``options.num-supernodes``) or a deployment (``address``, ``insecure``).
+Connection configuration names must be unique and use the ``superlink.`` prefix.
 
 **************************
  Listing your connections
@@ -126,24 +130,12 @@ testing before deploying to real distributed environments.
 
     [superlink.local]
     address = ":local:"
-    options.num-supernodes = 10
 
-This creates a managed local SuperLink profile that runs 10 virtual SuperNodes through
-the simulation runtime.
-
-**Simulation with custom resources**
-
-.. code-block:: toml
-
-    [superlink.local-custom-resources]
-    address = ":local:"
-    options.num-supernodes = 100
-    options.backend.client-resources.num-cpus = 1
-    options.backend.client-resources.num-gpus = 0.1
-
-This creates a managed local SuperLink profile with 100 virtual SuperNodes, where each
-is allocated 1 CPU and 10% of a GPU. This is useful when you want to control resource
-distribution or simulate resource-constrained environments.
+This creates a managed local SuperLink profile using the default simulation
+configuration, which involves running 10 simulated SuperNodes through the simulation
+runtime. Check the :doc:`Simulation Runtime docs <how-to-run-simulations>` to learn how
+to customize the number of SuperNodes and resources (CPU/GPU) allocated to your
+simulations.
 
 .. _flower-config-local-in-memory:
 
@@ -161,10 +153,8 @@ when the managed local SuperLink is shut down.
 
 **When to use each**
 
-- Use the basic configuration for quick testing with default resource allocation
-- Use custom resources when you need to simulate specific hardware constraints or want
-  to control how many virtual SuperNodes can run in parallel based on your machine's
-  resources
+- Use the basic configuration for most local development and testing scenarios,
+  especially when you want to keep a history of your runs and logs on disk.
 - Use ``address = ":local-in-memory:"`` when the managed local SuperLink runs on a
   filesystem where SQLite performs poorly, such as some network drives or HPC storage
 
