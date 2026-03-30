@@ -121,6 +121,12 @@ about this in the :doc:`Run Flower Locally with a Managed SuperLink
  Using custom settings for simulations
 ***************************************
 
+.. note::
+
+    This guide assumes you don't have a local SuperLink running. If you do, please stop
+    it. If you aren't sure, please refer to the :ref:`section on stopping a local
+    SuperLink <stop-background-local-superlink>`.
+
 In the section above we removed the simulation-specific settings from the Flower
 Configuration. Now, you may be wondering how to configure the number of virtual
 SuperNodes or client resources for your simulations. First, you can inspect whether your
