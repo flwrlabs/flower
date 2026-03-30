@@ -103,9 +103,9 @@ def validate_row(row, ctrl, invalid, max_year, disch_col, valid_col, gap):
     #print(gap)
     pred_year = (row[disch_col] + gap).year
     if max_year < pred_year and pred_year > row[valid_col]:
-        invalid = invalid.append(row)
+        invalid = pd.concat([invalid, row.to_frame().T], ignore_index=True)
     else:
-        ctrl = ctrl.append(row)
+        ctrl = pd.concat([ctrl, row.to_frame().T], ignore_index=True)
     return ctrl, invalid
 
 

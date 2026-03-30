@@ -4,6 +4,7 @@ from flwr.app import ArrayRecord, ConfigRecord, Context, MetricRecord
 from flwr.serverapp import Grid, ServerApp
 from flwr.serverapp.strategy import FedAvg
 import torch
+from functools import partial
 
 from fedomop.task_utils import (create_instantiate_parameters, 
                                 get_train_and_test_modules, 
@@ -13,7 +14,7 @@ from fedomop.task_utils import (create_instantiate_parameters,
 
 from fedomop.log_utils import config_json_file, save_metrics_as_json
 
-from result_visualization import plot_metrics
+from fedomop.result_visualization import plot_metrics
 
 # Create Flower ServerApp
 app = ServerApp()
@@ -53,7 +54,7 @@ def main(grid: Grid, context: Context) -> None:
                                    "epochs": context.run_config["local-epochs"],
                                    "weight_decay": context.run_config["weight_decay"]}),
         num_rounds=num_rounds,
-        evaluate_fn=global_evaluate,
+        evaluate_fn=partial(global_evaluate, dataset=dataset, model_cls=model_cls),
     )
 
     save_metrics_as_json(res_save_path, result)
@@ -64,13 +65,9 @@ def main(grid: Grid, context: Context) -> None:
     print("\n Plotting results")
     plot_metrics(res_save_path)
 
-def global_evaluate(server_round: int, arrays: ArrayRecord) -> MetricRecord:
+def global_evaluate(server_round: int, arrays: ArrayRecord, dataset: str, model_cls: str) -> MetricRecord:
     """Evaluate model on central data."""
-
-    
-    dataset = "mimiciv" #HARDCODED FOR APP
-    model_cls = "ResMLP" #HARDCODED FOR APP
-    
+        
     # Load the model and initialize it with the received weights
     model = create_instantiate_parameters(dataset, model_cls)
     model.load_state_dict(arrays.to_torch_state_dict())

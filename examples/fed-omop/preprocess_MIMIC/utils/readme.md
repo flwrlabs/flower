@@ -11,8 +11,9 @@
   
 - **uom_conversion.py**
   unit conversion to highest frequency unit for each itemid in labevents and chartevents data
-  Used as cleaning preocess in **Block 2** in **mainPipeline.ipynb**
-  
+  Used as cleaning process in **Block 2** in **mainPipeline.ipynb**.
+
+
 - **labs_preprocess_util.py**
-  finds the missing admission ids in labevents data by placinf timestamp of labevent between the admission and discharge time of the admission for the patient.
-  Used as cleaning preocess in **Block 2** in **mainPipeline.ipynb**
+  finds the missing admission ids in labevents data by placing timestamp of labevent  between the admission and discharge time of the admission for the patient.
+  Used as cleaning process in **Block 2** in **mainPipeline.ipynb**

@@ -11,7 +11,7 @@ from sklearn.preprocessing import MultiLabelBinarizer
 
 ########################## GENERAL ##########################
 def dataframe_from_csv(path, compression='gzip', header=0, index_col=0, chunksize=None):
-    return pd.read_csv(path, compression=compression, header=header, index_col=index_col, chunksize=None)
+    return pd.read_csv(path, compression=compression, header=header, index_col=index_col, chunksize=chunksize)
 
 def read_admissions_table(mimic4_path):
     admits = dataframe_from_csv(os.path.join(mimic4_path, 'core/admissions.csv.gz'))

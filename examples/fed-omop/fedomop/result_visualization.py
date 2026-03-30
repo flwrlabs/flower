@@ -52,9 +52,3 @@ def plot_metrics(path):
     base = os.path.splitext(os.path.basename(path))[0]
     filename = f"plot_{base}.png"
     plt.savefig(filename, dpi=300, bbox_inches="tight")
-
-    plt.show()
-
-
-# usage
-#plot_metrics("/export/home/manjah/mimic-pfed/results/mimiciv/10_clients/10_rounds/result-2026-03-17-14-28-03.json")

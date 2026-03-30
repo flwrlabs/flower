@@ -250,7 +250,8 @@ class Generator():
             self.proc=self.proc.sort_values(by=['start_time'])
         
         t=0
-        for i in tqdm(range(0,self.los,bucket)): 
+        for i in tqdm(range(0,self.los,bucket)):
+             
             ###MEDS
             if(self.feat_med):
                 sub_meds=self.meds[(self.meds['start_time']>=i) & (self.meds['start_time']<i+bucket)].groupby(['hadm_id','drug_name']).agg({'stop_time':'max','subject_id':'max','dose_val_rx':np.nanmean})
@@ -297,7 +298,7 @@ class Generator():
             self.proc_per_adm=f2_proc.groupby('hadm_id').sum().reset_index()[0].max()        
             self.proclength_per_adm=final_proc.groupby('hadm_id').size().max()
             
-       ###LABS
+        ###LABS
         if(self.feat_lab):
             f2_labs=final_labs.groupby(['hadm_id','itemid']).size()
             self.labs_per_adm=f2_labs.groupby('hadm_id').sum().reset_index()[0].max()        

@@ -18,8 +18,13 @@ dependencies = [
     "flwr-datasets[vision]>=0.6.0",
     "scikit-learn==1.7.2",
     "omegaconf",
-    "imblearn",
-    "numpy"
+    "imbalanced-learn>=0.12.",
+    "numpy",
+    "pandas",
+    "tqdm",
+    "joblib",
+    "matplotlib",
+    "datasets",
 ]
 
 [tool.flwr.app]

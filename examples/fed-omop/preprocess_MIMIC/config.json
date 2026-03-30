@@ -16,7 +16,7 @@
   "Outliers_threshold_left": 0,
   "Time_window_size": 24,
   "Time_window_bucket_size": 1,
-  "Missing_values_management": "mean",
+  "Missing_values_management": "FF_mean",
   "Oversampling": true,
-  "Concatenation": false
+  "Concatenate": false
 }
