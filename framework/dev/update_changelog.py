@@ -89,11 +89,6 @@ class ReleaseTag:
         """Return the version string used in changelog headings."""
         return f"v{self.version}"
 
-    @property
-    def next_changelog_version(self) -> str:
-        """Return the next minor version string for the changelog."""
-        return f"v{self.version.major}.{self.version.minor + 1}.0"
-
 
 def _parse_release_tag(tag: str) -> Optional[ReleaseTag]:
     """Parse a supported git release tag."""
@@ -447,7 +442,9 @@ def main() -> None:
 
     # Update the changelog
     print("Updating the changelog...")
-    new_changelog_version = latest_release_tag.next_changelog_version
+    new_changelog_version = (
+        f"v{latest_release_tag.version.major}.{latest_release_tag.version.minor + 1}.0"
+    )
     if _update_changelog(
         prs,
         latest_release_tag.changelog_version,
