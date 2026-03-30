@@ -1,6 +1,197 @@
 # Changelog
 
-## Unreleased
+## v1.28.0 (2026-03-30)
+
+### Thanks to our contributors
+
+We would like to give our special thanks to all the contributors who made the new version of Flower possible (in `git shortlog` order):
+
+`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Heng Pan`, `Javier`, `Patrick Foley`, `Micah Sheller`, `Mohammad Naseri`, `Taner Topal`, `William Lindskog`, `Yan Gao`, `xiaoyanshen799` <!---TOKEN_v1.28.0-->
+
+
+
+### --version for flower-*
+
+- **feat(framework): Add** `--version` **flag to** `flower-superlink` **,** `flower-supernode` **and** `flower-superexec` ([#6781](https://github.com/flwrlabs/flower/pull/6781))
+
+
+### Port 0
+
+- **feat(framework): Support port** `0` **for OS-assigned random unused port** ([#6795](https://github.com/flwrlabs/flower/pull/6795))
+
+### FlowerTune
+- **feat(examples): Add dynamic data seed option for flowertune-llm examples** ([#6831](https://github.com/flwrlabs/flower/pull/6831))
+
+### Documentation improvements
+- **docs(framework): Fix typo in PyTorch tutorial (franction -> fraction)** ([#6838](https://github.com/flwrlabs/flower/pull/6838))
+- **docs(framework:skip): Update source texts for translations (auto)** ([#6834](https://github.com/flwrlabs/flower/pull/6834))
+- **docs(framework:skip): Update source texts for translations (auto)** ([#6771](https://github.com/flwrlabs/flower/pull/6771))
+- **docs(framework:skip): Update source texts for translations (auto)** ([#6742](https://github.com/flwrlabs/flower/pull/6742))
+
+
+### Bug fix
+- **fix(framework): Handle scalar arrays in strategies and mods** ([#6783](https://github.com/flwrlabs/flower/pull/6783))
+
+
+### Incompatible changes
+
+- **refactor(framework): Deprecate** `run_simulation` **entrypoint** ([#6752](https://github.com/flwrlabs/flower/pull/6752))
+
+### Unknown changes
+
+- **build(deps): Bump next from 16.1.6 to 16.1.7 in /intelligence/ts/examples/nextjs-web-chats** ([#6784](https://github.com/flwrlabs/flower/pull/6784))
+
+- **Update text and language files** ([#6749](https://github.com/flwrlabs/flower/pull/6749))
+
+- **build(deps): Bump tar from 7.5.10 to 7.5.11 in /intelligence/ts** ([#6746](https://github.com/flwrlabs/flower/pull/6746))
+
+
+### multi-federation
+
+- **refactor(framework): Adjust error message for unsuccessful Flower CLI interactions with a federation** ([#6789](https://github.com/flwrlabs/flower/pull/6789))
+
+- **refactor(framework): Stop run on account removed from federation** ([#6778](https://github.com/flwrlabs/flower/pull/6778))
+
+- **refactor(framework): Stop runs when federation is archived** ([#6777](https://github.com/flwrlabs/flower/pull/6777))
+
+- **refactor(framework): Add** `SUPERNODE_ALREADY_IN_FEDERATION` **error** ([#6772](https://github.com/flwrlabs/flower/pull/6772))
+
+- **refactor(framework): Complete** `remove-account` **implementation** ([#6764](https://github.com/flwrlabs/flower/pull/6764))
+
+- **feat(framework): Add** `remove-account` **protos and CLI foundation** ([#6757](https://github.com/flwrlabs/flower/pull/6757))
+
+- **refactor(framework): Add** `remove_account` **method to** `FederationManager` ([#6759](https://github.com/flwrlabs/flower/pull/6759))
+
+
+### One SuperLink Two Runtimes
+
+- **refactor(framework): Use** `NOOP_FEDERATION` **if federation unset for** `flwr federation simulation-config` ([#6883](https://github.com/flwrlabs/flower/pull/6883))
+- **docs(framework): Update simulation and flower config docs to new system** ([#6882](https://github.com/flwrlabs/flower/pull/6882))
+- **feat(framework): Add** `--federation-config` **back and use** `SimulationConfig` **for federation config overrides** ([#6860](https://github.com/flwrlabs/flower/pull/6860))
+- **feat(framework): Persist and apply federation config overrides per run** ([#6867](https://github.com/flwrlabs/flower/pull/6867))
+
+- **feat(framework): Add** `federation_config: SimulationConfig` **to** `PullAppInputsResponse` ([#6865](https://github.com/flwrlabs/flower/pull/6865))
+
+- **refactor(framework): Rename** `backend_name` **to** `backend` **in** `SimulationConfig` **for consistency and make all fields optional** ([#6857](https://github.com/flwrlabs/flower/pull/6857))
+- **refactor(framework): Move** `SimulationConfig` **to a separate proto file** ([#6861](https://github.com/flwrlabs/flower/pull/6861))
+
+- **refactor(framework): Enhance simulation configuration in** `flwr federation ls` ([#6859](https://github.com/flwrlabs/flower/pull/6859))
+
+- **refactor(framework): Use** `NOOP_FEDERATION` **in Simulation Engine always** ([#6858](https://github.com/flwrlabs/flower/pull/6858))
+
+- **refactor(framework): Complete** `flwr federation simulation-config` **command** ([#6846](https://github.com/flwrlabs/flower/pull/6846))
+
+- **feat(framework): Derive** `run_type` **from federation** ([#6848](https://github.com/flwrlabs/flower/pull/6848))
+
+- **refactor(framework): Tweak** `FederationManager.get/set_simulation_config` **behaviours** ([#6837](https://github.com/flwrlabs/flower/pull/6837))
+
+- **refactor(framework): Implement storing/fetching of** `SimulationConfig` **from federation manager** ([#6829](https://github.com/flwrlabs/flower/pull/6829))
+
+- **refactor(framework): Define defaults for** `SimulationConfig` **as constants and create utility module** ([#6826](https://github.com/flwrlabs/flower/pull/6826))
+
+- **feat(framework): Allow** `ServerAppExecPlugin` **to support both** `flwr-serverapp` **and** `flwr-simulation` ([#6806](https://github.com/flwrlabs/flower/pull/6806))
+
+- **feat(framework): Introduce** `flwr federation simulation-config` **components** ([#6821](https://github.com/flwrlabs/flower/pull/6821))
+- **feat(framework): Add run type metadata to runs** ([#6791](https://github.com/flwrlabs/flower/pull/6791))
+
+- **refactor(framework): Return federation runtime type and set it for** `NoOpFederationManager` **from flag** ([#6820](https://github.com/flwrlabs/flower/pull/6820))
+- **refactor(framework): Replace SimulationIo usage with ServerAppIo** ([#6790](https://github.com/flwrlabs/flower/pull/6790))
+
+- **refactor(framework): Capture** `simulation` **flag for federation creation** ([#6813](https://github.com/flwrlabs/flower/pull/6813))
+- **feat(framework): Add ServerAppIo GetFederationOptions RPC** ([#6787](https://github.com/flwrlabs/flower/pull/6787))
+
+
+### token auth
+
+- **feat(framework): Add authn interceptors for appio interface** ([#6776](https://github.com/flwrlabs/flower/pull/6776))
+
+
+### new version check
+
+- **fix(framework): Skip** `flwr` **update check for json output** ([#6833](https://github.com/flwrlabs/flower/pull/6833))
+
+- **feat(framework): Add startup update checks for** `flwr` ([#6788](https://github.com/flwrlabs/flower/pull/6788))
+
+- **feat(framework): Add startup update checks for** `SuperLink` **,** `SuperNode` **, and** `SuperExec` ([#6786](https://github.com/flwrlabs/flower/pull/6786))
+
+
+### FAB inclusion/exclusion rules
+
+- **fix(framework): Use kebab-case for FAB metadata keys in** `pyproject.toml` ([#6872](https://github.com/flwrlabs/flower/pull/6872))
+- **feat(framework): Extend FAB exclude patterns** ([#6804](https://github.com/flwrlabs/flower/pull/6804))
+- **docs(framework): Add guide for defining FAB include/exclude and app publishing include/exclude** ([#6885](https://github.com/flwrlabs/flower/pull/6885))
+- **feat(framework): Enforce publish filters before FAB build filters** ([#6823](https://github.com/flwrlabs/flower/pull/6823))
+
+- **refactor(framework): Extract project file utility for** `flwr build` ([#6822](https://github.com/flwrlabs/flower/pull/6822))
+
+- **feat(framework): Enable user-specified include/exclude for FAB build** ([#6805](https://github.com/flwrlabs/flower/pull/6805))
+
+- **feat(framework): Validate FAB include/exclude pattern lists in app config** ([#6803](https://github.com/flwrlabs/flower/pull/6803))
+
+### Scalability improvements
+
+- **refactor(framework): Remove unused lock in** `ServerAppIo.PullAppInputs` ([#6773](https://github.com/flwrlabs/flower/pull/6773))
+
+### Fix local Superlink
+- **fix(framework): Check if the local SuperLink correctly hosts Control API before proceeding with CLI calls** ([#6873](https://github.com/flwrlabs/flower/pull/6873))
+- **fix(framework): Prevent local SuperLink SQLite bootstrap races** ([#6797](https://github.com/flwrlabs/flower/pull/6797))
+
+### CI/CD
+- **ci(:skip): Fix ServerApp heartbeat CI test** ([#6835](https://github.com/flwrlabs/flower/pull/6835))
+- **ci(framework): Use** `flwr list` **to check the status of the execution in framework E2E tests** ([#6816](https://github.com/flwrlabs/flower/pull/6816))
+- **ci(:skip): Migrate GitHub org references from adap to flwrlabs** ([#6743](https://github.com/flwrlabs/flower/pull/6743))
+
+- **ci(:skip): Add checkbox item for addressing LLM-reviewer comments** ([#6793](https://github.com/flwrlabs/flower/pull/6793))
+- **ci(devtool): Move protoc to devtool** ([#6769](https://github.com/flwrlabs/flower/pull/6769))
+- **ci(:skip): Exclude** `toml` **from venv and build directories** ([#6775](https://github.com/flwrlabs/flower/pull/6775))
+- **ci(devtool): Add mypy and pytest to devtool** ([#6770](https://github.com/flwrlabs/flower/pull/6770))
+
+- **ci(:skip): Add isort/black/pylint to devtool** ([#6768](https://github.com/flwrlabs/flower/pull/6768))
+
+- **ci(:skip): Remove symlink to dev from** `/framework` **directory** ([#6701](https://github.com/flwrlabs/flower/pull/6701))
+- **ci(:skip): Introduce** `uv.lock` **check for projects** ([#6753](https://github.com/flwrlabs/flower/pull/6753))
+- **ci(baselines): Disable baselines CI workflow** ([#6744](https://github.com/flwrlabs/flower/pull/6744))
+- **ci(framework): Fix** `framework/dev/get-latest-changelog.sh` **to retrieve changelog correctly for draft releases** ([#6739](https://github.com/flwrlabs/flower/pull/6739))
+- **ci(:skip): Update README.md logo URL** ([#6738](https://github.com/flwrlabs/flower/pull/6738))
+- **ci(:skip): Bump** `flwr` **dev version to** `v1.28.0` ([#6732](https://github.com/flwrlabs/flower/pull/6732))
+
+### General
+- **refactor(framework): Fix changelog 1.27.0** ([#6740](https://github.com/flwrlabs/flower/pull/6740))
+- **fix(framework): Improve zip extraction robustness in flwr install** ([#6627](https://github.com/flwrlabs/flower/pull/6627))
+- **fix(framework): Remove GetRun RPC call from serverapp executor call flow** ([#6751](https://github.com/flwrlabs/flower/pull/6751))
+- **refactor(framework): Use** `Literal` **for** `--format` **and set** `min=1` **for** `--limit` **in CLI** ([#6827](https://github.com/flwrlabs/flower/pull/6827))
+- **feat(framework): Update app publish CLI** ([#6755](https://github.com/flwrlabs/flower/pull/6755))
+- **feat(framework): Update** `uv.lock` **to** `1.28.0` ([#6748](https://github.com/flwrlabs/flower/pull/6748))
+- **fix(framework): Fix app name validation in shared FAB build path** ([#6868](https://github.com/flwrlabs/flower/pull/6868))
+- **refactor(devtool:skip): Remove brittle proto layout test** ([#6869](https://github.com/flwrlabs/flower/pull/6869))
+- **refactor(framework): Remove unused** `argparse` **function for simulation engine** ([#6828](https://github.com/flwrlabs/flower/pull/6828))
+
+- **refactor(framework): Extend** `ApiErrorCode` ([#6763](https://github.com/flwrlabs/flower/pull/6763))
+- **refactor(framework): Remove install app emoji** ([#6779](https://github.com/flwrlabs/flower/pull/6779))
+- **refactor(examples): Remove** `advanced-tensorflow` **example** ([#6842](https://github.com/flwrlabs/flower/pull/6842))
+- **refactor(examples): Remove** `quickstart_pytorch_deprecated` **example** ([#6840](https://github.com/flwrlabs/flower/pull/6840))
+- **refactor(framework): Avoid federation existence leakage in** `flwr run` **using** `FlowerError` ([#6841](https://github.com/flwrlabs/flower/pull/6841))
+- **refactor(framework): Make BIDI** `grpc_server_test.py` **self-contained** ([#6774](https://github.com/flwrlabs/flower/pull/6774))
+- **refactor(framework): Add proto definition** ([#6800](https://github.com/flwrlabs/flower/pull/6800))
+- **ci(framework): Bump minimum typer version to** `0.13.0` ([#6801](https://github.com/flwrlabs/flower/pull/6801))
+- **refactor(framework:skip): Remove unused LinkState get_pending_run_id** ([#6802](https://github.com/flwrlabs/flower/pull/6802))
+- **refactor(examples): Update VAE example** ([#6839](https://github.com/flwrlabs/flower/pull/6839))
+- **fix(framework): Fail trusted entity verification when SuperLink doesn't have app validation support** ([#6811](https://github.com/flwrlabs/flower/pull/6811))
+- **refactor(framework): Handle multiple Alembic heads in state migration upgrades** ([#6815](https://github.com/flwrlabs/flower/pull/6815))
+
+### magic value addr local SuperLink
+
+- **feat(framework): Ensure backward compatibility for** `.options` **-only connection configs for local simulation** ([#6889](https://github.com/flwrlabs/flower/pull/6889))
+
+- **feat(framework): Use magic address values for managed local SuperLink configs** ([#6874](https://github.com/flwrlabs/flower/pull/6874))
+
+### FAB format check
+- **feat(framework): Require license file in** `fab_format_version=1` ([#6825](https://github.com/flwrlabs/flower/pull/6825))
+
+- **feat(framework): Implement** `fab_format_version` **rulesets in FAB build** ([#6782](https://github.com/flwrlabs/flower/pull/6782))
+- **fix(framework): Validate** `flwr-version-target` **against target range** ([#6887](https://github.com/flwrlabs/flower/pull/6887))
+- **refactor(framework): Use lower bound from flwr dependency** ([#6851](https://github.com/flwrlabs/flower/pull/6851))
+- **refactor(framework): Make** `flwr_version_target` **mandatory for FAB format v1** ([#6843](https://github.com/flwrlabs/flower/pull/6843))
 
 ## v1.27.0 (2026-03-10)
 
