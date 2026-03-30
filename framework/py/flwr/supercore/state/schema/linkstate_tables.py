@@ -77,7 +77,7 @@ def create_linkstate_metadata() -> MetaData:
         Column("starting_at", String),
         Column("running_at", String),
         Column("finished_at", String),
-        Column("usage_reported_at", String),
+        Column("usage_reported_at", String, nullable=False, server_default=""),
         Column("sub_status", String),
         Column("details", String),
         Column("federation", String),
