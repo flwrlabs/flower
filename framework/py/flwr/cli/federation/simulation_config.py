@@ -137,11 +137,9 @@ def simulation_config(  # pylint: disable=R0913,R0917,W0613,R0914
     """Configure a Federation using the Simulation Runtime."""
     with cli_output_control_stub(superlink, output_format) as (stub, is_json):
 
-        log_to_driver = (
-            init_args_log_to_driver == "true"
-            if init_args_log_to_driver is not None
-            else None
-        )
+        log_to_driver = None
+        if init_args_log_to_driver is not None:
+            log_to_driver = init_args_log_to_driver == "true"
         request = ConfigureSimulationFederationRequest(
             federation_name=federation or "",
             config=SimulationConfig(
