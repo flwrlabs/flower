@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from flwr.server.superlink.linkstate.linkstate import LinkState
 
 
+# pylint: disable=too-many-public-methods
 class FederationManager(ABC):
     """Abstract base class for FederationManager."""
 
