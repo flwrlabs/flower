@@ -217,4 +217,8 @@ class NoOpFederationManager(FederationManager):
         )
 
     def report_run_usage(self) -> None:
-        """Call hook on successful run status transitions."""
+        """Call hook to report usage for runs.
+
+        This method is called on successful run status transition to FINISHED and when
+        runs are marked as failed due to expired tokens.
+        """
