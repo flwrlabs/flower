@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eoux pipefail
 
 # Set connectivity parameters
 case "$1" in
