@@ -721,8 +721,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 run_record.run.finished_at = current.isoformat()
             run_record.run.status = new_status
 
-        # Report usage
-        self.federation_manager.report_run_usage()
+        # Report usage if the run is marked as finished after the update
+        if new_status.status == Status.FINISHED:
+            self.federation_manager.report_run_usage()
         return True
 
     def acknowledge_node_heartbeat(
@@ -774,6 +775,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 )
                 active_until_dt = datetime.fromtimestamp(active_until, tz=timezone.utc)
                 run_record.run.finished_at = active_until_dt.isoformat()
+
+        # Report usage for runs that have been marked as failed due to expired tokens
+        self.federation_manager.report_run_usage()
 
     def get_serverapp_context(self, run_id: int) -> Context | None:
         """Get the context for the specified `run_id`."""
