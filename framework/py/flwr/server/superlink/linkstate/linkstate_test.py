@@ -402,6 +402,37 @@ class StateTest(CoreStateTest):
         for run_status in run_statuses:
             assert not state.update_run_status(run_id, run_status)
 
+    @parameterized.expand([(1,), (2,), (3,)])  # type: ignore
+    def test_usage_report_hook_called_on_each_successful_transition(
+        self, num_transitions: int
+    ) -> None:
+        """Test report_run_usage hook is called only on the FINISHED transition."""
+        # Prepare
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        state.federation_manager.report_run_usage = Mock()  # type: ignore
+        # Execute
+        transition_run_status(state, run_id, num_transitions)
+        # Assert: hook is called only when the run reaches FINISHED (num_transitions==3)
+        expected_calls = 1 if num_transitions == 3 else 0
+        assert state.federation_manager.report_run_usage.call_count == expected_calls
+
+    def test_usage_report_hook_called_on_tokens_expired(self) -> None:
+        """Test report_run_usage hook is called when tokens expire."""
+        # Prepare
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        assert state.create_token(run_id) is not None
+        state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
+        state.federation_manager.report_run_usage = Mock()  # type: ignore
+        # Execute: advance time past token expiry and trigger cleanup via verify_token
+        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = patched_dt
+            state.verify_token(run_id, "dummy_token")
+        # Assert
+        state.federation_manager.report_run_usage.assert_called_once()
+
     def test_get_message_ins_empty(self) -> None:
         """Validate that a new state has no input Messages."""
         # Prepare
