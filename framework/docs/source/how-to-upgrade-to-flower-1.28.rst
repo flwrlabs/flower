@@ -30,7 +30,7 @@ those used for running Flower with the Deployment Runtime. The result? A more un
 and consistent experience when defining SuperLink connections, regardless of the runtime
 you are using. This means that the configuration of simulations (i.e. number of
 `virtual` SuperNodes, client resources, etc.) is now defined at the ``SuperLink`` that
-executes the simulation. Still, you can override these settings in a per-run basis if
+executes the simulation. Still, you can override these settings on a per-run basis if
 desired.
 
 This guide will help you:
@@ -38,7 +38,7 @@ This guide will help you:
 - Understand how to migrate your existing connections for simulation in your Flower
   Configuration to the new syntax.
 - Learn how to view and adjust the simulation configuration in your ``SuperLink``. You
-  can do this either permanently or in a per-run basis.
+  can do this either permanently or on a per-run basis.
 
 Before we begin, ensure you have updated to Flower 1.28.
 
