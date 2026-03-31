@@ -48,7 +48,6 @@ dataset: [synthetic]
 | Hyperparameter | Value |
 | --- | --- |
 | num-server-rounds | 5 |
-| num-clients | 8 |
 | fraction-train | 1.0 |
 | fraction-evaluate | 1.0 |
 | local-epochs | 1 |
@@ -57,6 +56,9 @@ dataset: [synthetic]
 | random-seed | 2026 |
 | verify-aggregation | true |
 | verification-tolerance | 1e-6 |
+
+The number of simulated clients is controlled by the federation setting
+`options.num-supernodes` (default: 8), not by `--run-config`.
 
 ## Environment Setup
 

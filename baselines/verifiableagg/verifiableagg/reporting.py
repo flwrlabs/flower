@@ -10,4 +10,7 @@ from typing import Any
 def write_json_report(report: dict[str, Any], output_path: Path) -> None:
     """Write JSON report, creating parent directories as needed."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    output_path.write_text(
+        json.dumps(report, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )

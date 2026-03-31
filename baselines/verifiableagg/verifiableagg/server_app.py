@@ -19,9 +19,15 @@ app = ServerApp()
 
 
 def _set_global_seeds(seed: int) -> None:
+    """Set global seeds with deterministic CUDA behavior when available."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        if hasattr(torch.backends, "cudnn"):
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
 
 
 @app.main()
@@ -86,7 +92,7 @@ def main(grid: Grid, context: Context) -> None:
 
     report = {
         "baseline": "verifiableagg",
-        "run_config": {key: run_config[key] for key in run_config},
+        "run_config": {key: run_config[key] for key in sorted(run_config)},
         "train_metrics": train_metrics,
         "evaluate_metrics": eval_metrics,
         "verification_rounds": verification_rounds,

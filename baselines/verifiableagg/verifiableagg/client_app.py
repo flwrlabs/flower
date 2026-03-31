@@ -40,7 +40,7 @@ def train_fn(msg: Message, context: Context) -> Message:
     arrays = msg.content.array_records["arrays"]
     model.load_state_dict(arrays.to_torch_state_dict())
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
     train_loss = train(
         model=model,
         trainloader=trainloader,
@@ -86,7 +86,7 @@ def evaluate_fn(msg: Message, context: Context) -> Message:
     arrays = msg.content.array_records["arrays"]
     model.load_state_dict(arrays.to_torch_state_dict())
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
     eval_loss, eval_acc = evaluate(model=model, valloader=valloader, device=device)
 
     metrics = MetricRecord(

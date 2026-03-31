@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 from flwr.app import ArrayRecord, Message, MetricRecord, RecordDict
@@ -24,15 +24,24 @@ class VerificationRound:
     aggregate_hash: str
 
 
+def _update_with_length_prefix(digest: Any, data: bytes) -> None:
+    """Update a hash digest using unambiguous length-prefixed framing."""
+    digest.update(len(data).to_bytes(8, byteorder="little", signed=False))
+    digest.update(data)
+
+
 def _hash_arrayrecord(arrays: ArrayRecord) -> str:
     """Compute a deterministic SHA256 hash of an ArrayRecord."""
     digest = hashlib.sha256()
     for key in sorted(arrays.keys()):
         arr = np.ascontiguousarray(arrays[key].numpy())
-        digest.update(key.encode("utf-8"))
-        digest.update(str(arr.dtype).encode("utf-8"))
-        digest.update(np.asarray(arr.shape, dtype=np.int64).tobytes())
-        digest.update(arr.tobytes())
+        _update_with_length_prefix(digest, key.encode("utf-8"))
+        _update_with_length_prefix(digest, str(arr.dtype).encode("utf-8"))
+        _update_with_length_prefix(
+            digest,
+            np.asarray(arr.shape, dtype=np.int64).tobytes(),
+        )
+        _update_with_length_prefix(digest, arr.tobytes())
     return digest.hexdigest()
 
 
@@ -43,15 +52,28 @@ def _recompute_weighted_average(
     metricrecord_key: str,
 ) -> dict[str, np.ndarray]:
     """Recompute weighted average from client replies."""
-    first_arrays = replies[0].array_records[arrayrecord_key]
+    first_array_records = replies[0].array_records
+    if arrayrecord_key in first_array_records:
+        first_arrays = first_array_records[arrayrecord_key]
+    else:
+        first_arrays = next(iter(first_array_records.values()))
     keys = list(first_arrays.keys())
 
     sums: dict[str, np.ndarray] = {}
     total_weight = 0.0
 
     for reply in replies:
-        metrics = reply.metric_records[metricrecord_key]
-        arrays = reply.array_records[arrayrecord_key]
+        metric_records = reply.metric_records
+        if metricrecord_key in metric_records:
+            metrics = metric_records[metricrecord_key]
+        else:
+            metrics = next(iter(metric_records.values()))
+
+        array_records = reply.array_records
+        if arrayrecord_key in array_records:
+            arrays = array_records[arrayrecord_key]
+        else:
+            arrays = next(iter(array_records.values()))
         weight = float(cast(int | float, metrics[weighted_by_key]))
         total_weight += weight
 
