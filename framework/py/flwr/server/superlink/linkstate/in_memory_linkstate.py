@@ -721,12 +721,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 run_record.run.finished_at = current.isoformat()
             run_record.run.status = new_status
 
-        try:
-            self.federation_manager.report_run_usage(
-                run_id if new_status.status == Status.FINISHED else None
-            )
-        except Exception as exc:  # pylint: disable=broad-except
-            log(WARNING, "Failed to report run usage: %s", exc)
+        self.federation_manager.report_run_usage(
+            run_id if new_status.status == Status.FINISHED else None
+        )
         return True
 
     def acknowledge_node_heartbeat(
