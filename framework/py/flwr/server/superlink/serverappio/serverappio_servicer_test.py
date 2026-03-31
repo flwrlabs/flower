@@ -30,6 +30,7 @@ from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
     SUPERLINK_NODE_ID,
     Status,
+    SubStatus,
 )
 from flwr.common.message import get_message_to_descendant_id_mapping
 from flwr.common.serde import context_to_proto, message_from_proto, run_status_to_proto
@@ -1039,6 +1040,38 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Assert: Only one token is issued
         assert response1.token != ""
         assert response2.token == ""
+
+    def test_request_token_fail_closed_for_finished_run(self) -> None:
+        """Ensure `RequestToken` returns empty token for finished runs."""
+        # Prepare
+        run_id = self._create_dummy_run(running=False)
+        self._transition_run_status(run_id, 2)
+        assert self.state.update_run_status(
+            run_id,
+            RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done"),
+        )
+        before = self.state.get_run_status({run_id})[run_id]
+
+        # Execute
+        response, call = self._request_token.with_call(
+            request=RequestTokenRequest(run_id=run_id)
+        )
+
+        # Assert: token issuance fails closed
+        assert isinstance(response, RequestTokenResponse)
+        assert grpc.StatusCode.OK == call.code()
+        assert response.token == ""
+
+        # Assert: terminal run status/details remain unchanged
+        after = self.state.get_run_status({run_id})[run_id]
+        assert before.status == after.status == Status.FINISHED
+        assert before.sub_status == after.sub_status == SubStatus.COMPLETED
+        assert before.details == after.details == "done"
+
+        # Assert: no token was left behind for this run
+        token = self.state.create_token(run_id)
+        assert token is not None
+        self.state.delete_token(run_id)
 
     def test_run_status_transitions(self) -> None:
         """Test `RequestToken` and `PullAppInputs` transitions run status from PENDING
