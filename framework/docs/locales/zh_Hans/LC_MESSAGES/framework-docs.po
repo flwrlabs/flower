@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-03-25 01:17+0000\n"
+"POT-Creation-Date: 2026-03-31 01:23+0000\n"
 "PO-Revision-Date: 2024-06-12 10:09+0000\n"
 "Last-Translator: Yan Gao <y.gaogy@gmail.com>\n"
 "Language: zh_Hans\n"
@@ -2165,8 +2165,8 @@ msgstr "祝贺你 🥳 您现在正式成为 \"Flower \"贡献者！"
 #: ../../source/contributor-tutorial-contribute-on-github.rst:354
 #: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:402
 #: ../../source/tutorial-series-customize-the-client-pytorch.rst:339
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:672
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:433
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:674
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:436
 #: ../../source/tutorial-series-what-is-federated-learning.rst:367
 msgid "Next steps"
 msgstr "接下来的步骤"
@@ -5146,10 +5146,10 @@ msgstr "完整代码示例"
 #, fuzzy
 msgid ""
 "For a full code example that uses both centralized and federated "
-"evaluation, see the `Advanced TensorFlow Example "
+"evaluation, see the `Advanced PyTorch Example "
 "<https://github.com/flwrlabs/flower/tree/main/examples/advanced-"
-"tensorflow>`_ (the same approach can be applied to workloads implemented "
-"in any other framework)."
+"pytorch>`_ (the same approach can be applied to workloads implemented in "
+"any other framework)."
 msgstr ""
 "有关同时使用集中评估和联邦评估的完整代码示例，请参阅 *Advanced TensorFlow "
 "Example*（同样的方法也可应用于任何其他框架中）： "
@@ -9668,7 +9668,7 @@ msgid ""
 "command to start a Flower app:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-accounts.rst:148
+#: ../../source/how-to-authenticate-accounts.rst:147
 msgid ""
 "If the account does not have the necessary permissions to run the "
 "command, an error will be returned:"
@@ -10323,11 +10323,11 @@ msgstr ""
 msgid "Example ``pyproject.toml``"
 msgstr "或 ``pyproject.toml```："
 
-#: ../../source/how-to-configure-pyproject-toml.rst:47
+#: ../../source/how-to-configure-pyproject-toml.rst:50
 msgid "Here are a few key sections to look out for:"
 msgstr ""
 
-#: ../../source/how-to-configure-pyproject-toml.rst:51
+#: ../../source/how-to-configure-pyproject-toml.rst:54
 #, fuzzy
 msgid "App Metadata and Dependencies"
 msgstr "安装依赖项"
@@ -10337,69 +10337,235 @@ msgstr "安装依赖项"
 msgid "Understanding each field"
 msgstr "训练模型"
 
-#: ../../source/how-to-configure-pyproject-toml.rst:72
-#: ../../source/how-to-configure-pyproject-toml.rst:105
+#: ../../source/how-to-configure-pyproject-toml.rst:78
+#: ../../source/how-to-configure-pyproject-toml.rst:263
 #, fuzzy
 msgid "\\* Required fields"
 msgstr "所需变更"
 
-#: ../../source/how-to-configure-pyproject-toml.rst:74
+#: ../../source/how-to-configure-pyproject-toml.rst:80
 msgid ""
 "These fields follow the standard ``pyproject.toml`` metadata format, "
 "commonly used by tools like ``uv``, ``poetry``, and others. Flower reuses"
 " these for configuration and packaging."
 msgstr ""
 
-#: ../../source/how-to-configure-pyproject-toml.rst:76
+#: ../../source/how-to-configure-pyproject-toml.rst:82
 #, fuzzy
 msgid "``name``\\*: The name of your Flower app."
 msgstr "基础镜像的存储库名称。"
 
-#: ../../source/how-to-configure-pyproject-toml.rst:77
+#: ../../source/how-to-configure-pyproject-toml.rst:83
 msgid ""
 "``version``\\*: The current version of your app, used for packaging and "
 "distribution. Must follow Semantic Versioning (e.g., \"1.0.0\")."
 msgstr ""
 
-#: ../../source/how-to-configure-pyproject-toml.rst:78
+#: ../../source/how-to-configure-pyproject-toml.rst:84
 msgid "``description``: A short summary of what your app does."
 msgstr ""
 
-#: ../../source/how-to-configure-pyproject-toml.rst:79
+#: ../../source/how-to-configure-pyproject-toml.rst:85
 msgid "``license``: The license your app is distributed under (e.g., Apache-2.0)."
 msgstr ""
 
-#: ../../source/how-to-configure-pyproject-toml.rst:80
+#: ../../source/how-to-configure-pyproject-toml.rst:86
 msgid "``dependencies``\\*: A list of Python packages required to run your app."
 msgstr ""
 
-#: ../../source/how-to-configure-pyproject-toml.rst:81
+#: ../../source/how-to-configure-pyproject-toml.rst:87
 msgid ""
 "``publisher``\\*: The name of the person or organization publishing the "
 "app."
 msgstr ""
 
-#: ../../source/how-to-configure-pyproject-toml.rst:83
+#: ../../source/how-to-configure-pyproject-toml.rst:88
+msgid ""
+"``fab-include``: A list of gitignore-style patterns to include in the "
+"Flower App Bundle. See `Defining Included/Excluded Files`_ for details."
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:89
+msgid ""
+"``fab-exclude``: A list of gitignore-style patterns to exclude from the "
+"Flower App Bundle. See `Defining Included/Excluded Files`_ for details."
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:91
 msgid ""
 "Specify the metadata, including the app name, version, etc., in these "
 "sections. Add any Python packages your app needs under ``dependencies``. "
 "These will be installed when you run:"
 msgstr ""
 
-#: ../../source/how-to-configure-pyproject-toml.rst:93
+#: ../../source/how-to-configure-pyproject-toml.rst:101
+msgid "Defining Included/Excluded Files"
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:103
+msgid ""
+"The ``fab-include`` and ``fab-exclude`` fields let you control which "
+"files end up in your Flower App Bundle (FAB) — the package that carries "
+"your application code to the SuperLink and SuperNodes."
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:107
+msgid ""
+"Both fields are optional. When omitted, Flower uses sensible `built-in "
+"defaults <built-in defaults for fab included/excluded files_>`_ that "
+"include common source files and the top-level ``LICENSE`` file "
+"(``/LICENSE``) while excluding virtual environments, build artifacts, "
+"``__pycache__`` directories, and test files."
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:121
+msgid ""
+"``fab-include``: A list of gitignore-style patterns that narrows the FAB "
+"to only the files you want. When set, Flower starts with an empty "
+"candidate set and adds only files that match at least one of your "
+"patterns. The built-in constraints are then applied on top — if any of "
+"your patterns would pull in an unsupported file type (e.g. ``.txt`` or a "
+"binary), Flower raises an error listing the offending files so you can "
+"fix or remove the pattern."
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:127
+msgid ""
+"``fab-exclude``: A list of gitignore-style patterns that removes specific"
+" files from the FAB. Files that match at least one of your patterns are "
+"dropped before the built-in constraints run, so you can safely exclude "
+"anything the defaults would otherwise keep."
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:134
+msgid ""
+"Both fields are optional. Omit a field entirely to rely on the built-in "
+"defaults — setting it to an empty list is an error. Every pattern you "
+"provide must match at least one file; Flower raises an error at build "
+"time for unresolved patterns, keeping typos from silently changing your "
+"bundle."
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:139
+msgid "Flower applies filtering in two stages:"
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:141
+msgid ""
+"**Publish filter** — Files are first narrowed to supported types, and any"
+" patterns in your ``.gitignore`` are applied to remove ignored files. "
+"Refer to the `Flower Hub documentation <https://flower.ai/docs/hub/how-"
+"to-publish-app-on-hub.html>`_ for more details on how this works when you"
+" publish an app to Flower Hub."
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:145
+msgid ""
+"**FAB filter** — Your ``fab-include`` and ``fab-exclude`` patterns are "
+"applied next, followed by non-overridable built-in constraints that "
+"enforce supported file types and exclude directories like ``.venv/`` or "
+"``__pycache__/``."
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:149
+msgid ""
+"In short, ``fab-include`` and ``fab-exclude`` give you fine-grained "
+"control *within* the boundaries of what Flower supports. You cannot use "
+"them to include unsupported file types (e.g., ``.txt``) — Flower will "
+"flag any such conflicts with a clear error message."
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst
+msgid "Example: Bundling only your source package and a config file"
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:155
+#, fuzzy
+msgid "Suppose your project looks like this::"
+msgstr "一个典型的修改函数可能是这样的："
+
+#: ../../source/how-to-configure-pyproject-toml.rst:167
+#, fuzzy
+msgid "Add the following to your ``pyproject.toml``:"
+msgstr "将 ``pyproject.toml`` 中的次要版本增加一个。"
+
+#: ../../source/how-to-configure-pyproject-toml.rst:176
+msgid ""
+"When you execute |flwr_run_cli_link|_ or |flwr_build_cli_link|_, the "
+"resulting FAB will contain ``pyproject.toml``, "
+"``your_module/client_app.py``, ``your_module/server_app.py``, and "
+"``conf/config.yaml`` — but not ``your_module/scratch.py`` or "
+"``README.md``."
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:183
+msgid "Built-in Defaults for FAB Included/Excluded Files"
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:185
+msgid ""
+"A FAB is a structured package consumed by the SuperLink and SuperNodes, "
+"and they only know how to work with certain file types. Allowing "
+"arbitrary file types into a FAB would not only break compatibility across"
+" the federation and bloat bundle sizes, but also create a security risk —"
+" sensitive files like credentials, private keys, or environment configs "
+"could accidentally be packaged and distributed to every SuperNode in the "
+"federation. That is why Flower enforces a set of built-in patterns on top"
+" of whatever you put in ``fab-include`` or ``fab-exclude`` — and these "
+"cannot be overridden. They are defined in ``flwr.common.constant`` as "
+"``FAB_INCLUDE_PATTERNS`` and ``FAB_EXCLUDE_PATTERNS``."
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:195
+msgid "**Allowed file types** (``FAB_INCLUDE_PATTERNS``):"
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:197
+msgid ""
+"These are the file types that make up a typical Flower app — source code,"
+" configuration, documentation, and data descriptors. Anything outside "
+"this set (for example, ``.txt`` or binary files) is not a recognised FAB "
+"file type and cannot be included:"
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:212
+msgid "**Always excluded** (``FAB_EXCLUDE_PATTERNS``):"
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:214
+msgid ""
+"These are paths that should never travel across the network: generated "
+"artefacts that can be reproduced locally (caches, build outputs, "
+"packaging directories), virtual environments that are machine-specific, "
+"test files that are not needed at runtime, and Flower's own internal "
+"directory:"
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:242
+msgid ""
+"If you use ``fab-include`` to add a file that does not match any of the "
+"built-in include patterns (for example, a ``.txt`` file), Flower will "
+"raise an error and list the conflicting files. The fix is to remove those"
+" patterns from ``fab-include``. Files that *do* match the built-in "
+"includes but are also matched by the built-in excludes (for example, a "
+"``*.py`` file inside ``.venv/``) are silently dropped — this is expected "
+"behaviour."
+msgstr ""
+
+#: ../../source/how-to-configure-pyproject-toml.rst:251
 #, fuzzy
 msgid "App Components"
 msgstr "服务器"
 
-#: ../../source/how-to-configure-pyproject-toml.rst:107
+#: ../../source/how-to-configure-pyproject-toml.rst:265
 msgid "``serverapp``\\*: The import path to your ``ServerApp`` object."
 msgstr ""
 
-#: ../../source/how-to-configure-pyproject-toml.rst:108
+#: ../../source/how-to-configure-pyproject-toml.rst:266
 msgid "``clientapp``\\*: The import path to your ``ClientApp`` object."
 msgstr ""
 
-#: ../../source/how-to-configure-pyproject-toml.rst:110
+#: ../../source/how-to-configure-pyproject-toml.rst:268
 msgid ""
 "These entries point to your ``ServerApp`` and ``ClientApp`` definitions, "
 "using the format ``<module>:<object>``. Only update these import paths if"
@@ -10407,37 +10573,37 @@ msgid ""
 "``ServerApp`` or ``ClientApp``."
 msgstr ""
 
-#: ../../source/how-to-configure-pyproject-toml.rst:116
+#: ../../source/how-to-configure-pyproject-toml.rst:274
 #, fuzzy
 msgid "App Configuration"
 msgstr "配置值"
 
-#: ../../source/how-to-configure-pyproject-toml.rst:124
+#: ../../source/how-to-configure-pyproject-toml.rst:282
 msgid ""
 "Define configuration values that should be available to your app at "
 "runtime. You can specify any number of key-value pairs in this section. "
 "All the configuration values in this section are optional."
 msgstr ""
 
-#: ../../source/how-to-configure-pyproject-toml.rst:128
+#: ../../source/how-to-configure-pyproject-toml.rst:286
 msgid ""
 "Access these values in your code using ``context.run_config``. For "
 "example:"
 msgstr ""
 
-#: ../../source/how-to-configure-pyproject-toml.rst:136
+#: ../../source/how-to-configure-pyproject-toml.rst:294
 msgid ""
 "You can also override the ``run_config`` values by passing the ``--run-"
 "config`` flag followed by key-value pairs when executing ``flwr run``. "
-"See the |flwr_run_cli_link|_ for more details."
+"See the |flwr_run_cli_link|_ CLI documentation for more details."
 msgstr ""
 
-#: ../../source/how-to-configure-pyproject-toml.rst:142
+#: ../../source/how-to-configure-pyproject-toml.rst:300
 #, fuzzy
 msgid "Federation Configuration"
 msgstr "配置值"
 
-#: ../../source/how-to-configure-pyproject-toml.rst:146
+#: ../../source/how-to-configure-pyproject-toml.rst:304
 msgid ""
 "What was previously called \"federation config\" for SuperLink "
 "connections in ``pyproject.toml`` has been renamed and moved. These "
@@ -11022,7 +11188,7 @@ msgid ""
 msgstr "可以使用以下命令来验证 Flower 是否安装成功。如果一切正常，它将在命令行中打印 Flower 的版本：："
 
 #: ../../source/how-to-install-flower.rst:76
-#: ../../source/how-to-run-simulations.rst:49
+#: ../../source/how-to-run-simulations.rst:53
 #: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:94
 msgid ""
 "If you're on Windows and see unexpected terminal output (e.g.: ``� "
@@ -11492,23 +11658,30 @@ msgstr ""
 #: ../../source/how-to-run-flower-locally.rst:9
 msgid ""
 "When you use a local profile in the :doc:`Flower configuration <ref-"
-"flower-configuration>` with ``options.*`` and no explicit ``address``, "
-"``flwr`` does not call the simulation runtime directly. Instead, Flower "
-"starts a managed local ``flower-superlink`` on demand, submits the run "
-"through the Control API, and the local SuperLink executes the run with "
-"the simulation runtime."
+"flower-configuration>` with ``address = \":local:\"``, ``flwr`` does not "
+"call the simulation runtime directly. Instead, Flower starts a managed "
+"local ``flower-superlink`` on demand, submits the run through the Control"
+" API, and the local SuperLink executes the run with the simulation "
+"runtime. The SuperLink will keep running in the background accepting "
+"commands until you :ref:`stop it manually <stop-background-local-"
+"superlink>`."
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:15
+#: ../../source/how-to-run-flower-locally.rst:16
 msgid ""
-"This is the default experience for a profile like the one created "
-"automatically in your Flower configuration:"
+"Flower stores this managed local runtime under ``$HOME/.flwr/local-"
+"superlink``. If you would like to change this location, set the "
+"``FLWR_HOME`` environment variable to a different directory."
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:25
+#: ../../source/how-to-run-flower-locally.rst:22
 msgid ""
-"If ``FLWR_HOME`` is unset, Flower stores this managed local runtime under"
-" ``$HOME/.flwr/local-superlink``."
+"The remainder of this guide assumes you have set ``[superlink.local]`` as"
+" the default profile in your Flower configuration. This should already be"
+" the case if you have installed Flower for the first time or upgraded "
+"from a previous version that didn't have the Flower Configuration "
+"functionality. For more information check :doc:`the Flower Configuration "
+"<ref-flower-configuration>` guide."
 msgstr ""
 
 #: ../../source/how-to-run-flower-locally.rst:30
@@ -11517,8 +11690,9 @@ msgstr ""
 
 #: ../../source/how-to-run-flower-locally.rst:32
 msgid ""
-"On the first command that needs the local Control API, Flower starts a "
-"local ``flower-superlink`` process automatically. That process:"
+"On the first command that needs the local Control API (e.g. ``flwr run``,"
+" ``flwr list``, etc.), Flower starts a local ``flower-superlink`` process"
+" automatically. That process:"
 msgstr ""
 
 #: ../../source/how-to-run-flower-locally.rst:35
@@ -11526,7 +11700,7 @@ msgid "listens on ``127.0.0.1:39093`` for the Control API"
 msgstr ""
 
 #: ../../source/how-to-run-flower-locally.rst:36
-msgid "listens on ``127.0.0.1:39094`` for SimulationIO"
+msgid "binds ServerAppIo to a free local port chosen by the OS"
 msgstr ""
 
 #: ../../source/how-to-run-flower-locally.rst:37
@@ -11541,8 +11715,8 @@ msgstr ""
 
 #: ../../source/how-to-run-flower-locally.rst:41
 msgid ""
-"You can override those default ports with the environment variables "
-"``FLWR_LOCAL_CONTROL_API_PORT`` and ``FLWR_LOCAL_SIMULATIONIO_API_PORT``."
+"You can override the default Control API port with the "
+"``FLWR_LOCAL_CONTROL_API_PORT`` environment variable."
 msgstr ""
 
 #: ../../source/how-to-run-flower-locally.rst:46
@@ -11557,130 +11731,136 @@ msgstr ""
 msgid "Representative output:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:62
+#: ../../source/how-to-run-flower-locally.rst:61
 msgid ""
 "Plain ``flwr run .`` submits the run, prints the run ID, and returns. If "
 "you want to submit the run and immediately follow the logs in the same "
 "terminal, use:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:71
+#: ../../source/how-to-run-flower-locally.rst:70
 #, fuzzy
 msgid "List runs"
 msgstr "运行模拟"
 
-#: ../../source/how-to-run-flower-locally.rst:73
+#: ../../source/how-to-run-flower-locally.rst:72
 msgid "To see all runs known to the local SuperLink:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:79
+#: ../../source/how-to-run-flower-locally.rst:78
 msgid "To inspect one run in detail:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:87
+#: ../../source/how-to-run-flower-locally.rst:86
 msgid "View logs"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:89
+#: ../../source/how-to-run-flower-locally.rst:88
 msgid "To stream logs continuously:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:95
+#: ../../source/how-to-run-flower-locally.rst:94
 msgid "To fetch the currently available logs once and return:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:101
+#: ../../source/how-to-run-flower-locally.rst:100
 msgid "Representative streamed output:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:114
+#: ../../source/how-to-run-flower-locally.rst:113
 #, fuzzy
 msgid "Stop a run"
 msgstr "flower-superlink"
 
-#: ../../source/how-to-run-flower-locally.rst:116
+#: ../../source/how-to-run-flower-locally.rst:115
 msgid "To stop a submitted or running run:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:122
+#: ../../source/how-to-run-flower-locally.rst:121
 msgid ""
 "This stops the run only. It does **not** stop the background local "
 "SuperLink process."
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:126
+#: ../../source/how-to-run-flower-locally.rst:125
 msgid "Local runtime files and state"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:128
+#: ../../source/how-to-run-flower-locally.rst:127
 msgid ""
 "The managed local SuperLink keeps its files in ``$FLWR_HOME/local-"
 "superlink/``:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:130
+#: ../../source/how-to-run-flower-locally.rst:129
 msgid "``state.db`` stores the local SuperLink state"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:131
+#: ../../source/how-to-run-flower-locally.rst:130
 msgid "``ffs/`` stores SuperLink file artifacts"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:132
+#: ../../source/how-to-run-flower-locally.rst:131
 msgid "``superlink.log`` stores the local SuperLink process output"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:134
+#: ../../source/how-to-run-flower-locally.rst:133
 msgid "These files persist across local runs until you remove them yourself."
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:138
+#: ../../source/how-to-run-flower-locally.rst:139
 msgid "Stop the background local SuperLink"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:140
+#: ../../source/how-to-run-flower-locally.rst:141
 msgid ""
 "There is currently no dedicated ``flwr`` command to stop the managed "
 "local SuperLink process. To stop it, first inspect the matching process "
 "and then terminate it."
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:144
+#: ../../source/how-to-run-flower-locally.rst:145
 msgid "macOS/Linux"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:146
-#: ../../source/how-to-run-flower-locally.rst:161
+#: ../../source/how-to-run-flower-locally.rst:147
+#: ../../source/how-to-run-flower-locally.rst:162
 msgid "Inspect the process:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:152
-#: ../../source/how-to-run-flower-locally.rst:171
+#: ../../source/how-to-run-flower-locally.rst:153
+#: ../../source/how-to-run-flower-locally.rst:172
 #, fuzzy
 msgid "Stop the process:"
 msgstr "启动服务器"
 
-#: ../../source/how-to-run-flower-locally.rst:159
+#: ../../source/how-to-run-flower-locally.rst:160
 msgid "Windows PowerShell"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:181
+#: ../../source/how-to-run-flower-locally.rst:182
 msgid ""
 "If you changed the local Control API port with "
 "``FLWR_LOCAL_CONTROL_API_PORT``, replace ``39093`` in the commands above."
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:186
+#: ../../source/how-to-run-flower-locally.rst:187
 msgid "Troubleshooting"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:188
+#: ../../source/how-to-run-flower-locally.rst:189
+msgid ""
+"If you see SQL database errors such as ``database is locked``, see "
+":ref:`FAQ <faq-local-superlink-db-error>`."
+msgstr ""
+
+#: ../../source/how-to-run-flower-locally.rst:192
 msgid ""
 "If a local run fails before it starts, or if the managed local SuperLink "
 "does not come up correctly, inspect:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:195
+#: ../../source/how-to-run-flower-locally.rst:199
 msgid ""
 "That log contains the output of the background ``flower-superlink`` "
 "process and is the first place to check for startup errors, port "
@@ -13634,13 +13814,14 @@ msgstr ""
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:79
 msgid ""
 "If you decide to run the project with ``flwr run .`` against the default "
-"local profile, Flower submits the run to a managed local SuperLink, which"
-" then executes it with the Simulation Runtime. Continue to Step 2 to "
-"instead point ``flwr run`` at a named SuperLink connection for the "
-"Deployment Runtime."
+"local profile (the one marked with ``address = \":local:\"`` in the "
+"Flower configuration), Flower submits the run to a managed local "
+"SuperLink, which then executes it with the Simulation Runtime. Continue "
+"to Step 2 to instead point ``flwr run`` at a named SuperLink connection "
+"for the Deployment Runtime."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:86
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:87
 msgid ""
 "Feel free to inspect the code using your favorite code editor before "
 "proceeding. Just open the ``quickstart-pytorch`` that was automatically "
@@ -13649,33 +13830,33 @@ msgid ""
 "pytorch` tutorial."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:93
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:94
 #, fuzzy
 msgid "Step 2: Launch Flower Federation"
 msgstr "Flower 服务器。"
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:95
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:96
 msgid ""
 "In this section you will learn how to launch a SuperLink and connect two "
 "SuperNodes to it."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:99
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:100
 #, fuzzy
 msgid "Start a Flower SuperLink"
 msgstr "flower-superlink"
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:101
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:102
 msgid ""
 "In a new terminal, activate your environment and start the SuperLink "
 "process in insecure mode:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:110
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:111
 msgid "``flower-superlink``: Name of the SuperLink installed CLI executable."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:111
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:112
 msgid ""
 "``--insecure``: This flag tells the SuperLink to operate in an insecure "
 "mode, allowing unencrypted communication. Refer to the :doc:`how-to-"
@@ -13683,18 +13864,18 @@ msgid ""
 "TLS."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:115
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:116
 #, fuzzy
 msgid "Start two Flower SuperNodes"
 msgstr "然后，我们启动服务器："
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:117
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:118
 msgid ""
 "In this step, you will launch two SuperNodes and connect them to the "
 "SuperLink. You will need two terminals for this step."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:122
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:123
 msgid ""
 "Note that the values passed via the ``--node-config`` argument are "
 "specific to the behaviour of the ``ClientApp``. If you inspect the code "
@@ -13706,17 +13887,17 @@ msgid ""
 "receive, for example, the path to a directory of images."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:130
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:131
 msgid ""
 "**Terminal 1** Start the first SuperNode after activating your "
 "environment:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:142
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:143
 msgid "``flower-supernode``: Name of the SuperNode installed CLI executable."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:143
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:144
 msgid ""
 "``--insecure``: This flag tells the SuperNode to operate in an insecure "
 "mode, allowing unencrypted communication. Refer to the :doc:`how-to-"
@@ -13724,7 +13905,7 @@ msgid ""
 "TLS."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:145
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:146
 msgid ""
 "``--superlink 127.0.0.1:9092``: Connect to the SuperLink's Fleet API at "
 "the address ``127.0.0.1:9092``. If you had launched the SuperLink in a "
@@ -13732,14 +13913,14 @@ msgid ""
 " machine."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:147
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:148
 msgid ""
 "``--clientappio-api-address 127.0.0.1:9094``: Set the address and port "
 "number where the SuperNode is listening to communicate with the "
 "``ClientApp``."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:149
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:150
 msgid ""
 "``--node-config \"partition-id=0 num-partitions=2\"``: The ``ClientApp`` "
 "code generated via ``flwr new`` expects those two key-value pairs to be "
@@ -13747,13 +13928,13 @@ msgid ""
 "partitions to ``2`` for the SuperNode configuration."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:151
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:152
 msgid ""
 "**Terminal 2** Start the second SuperNode after activating your "
 "environment:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:163
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:164
 msgid ""
 "``--clientappio-api-address 127.0.0.1:9095``: Note that a different port "
 "is being used. This is only needed because you are running two SuperNodes"
@@ -13762,19 +13943,19 @@ msgid ""
 "together and left with its default value."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:164
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:165
 msgid ""
 "``--node-config \"partition-id=1 num-partitions=2\"``: Note here we "
 "indicate a different `partition-id`. In this way, a ``ClientApp`` will "
 "use a different data partition depending on which SuperNode runs in."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:168
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:169
 #, fuzzy
 msgid "Step 3: Run a Flower App on the Federation"
 msgstr "使用模拟引擎运行花朵应用程序。"
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:172
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:173
 msgid ""
 "The Flower Configuration file is automatically created for you when you "
 "first use a Flower CLI command. Use ``flwr config list`` to see available"
@@ -13782,18 +13963,16 @@ msgid ""
 "Read more about it in the :doc:`ref-flower-configuration` guide."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:177
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:178
 msgid ""
 "At this point, you have launched two SuperNodes that are connected to the"
 " same SuperLink. The system is idling waiting for a ``Run`` to be "
 "submitted. Before you can run your Flower App through the federation we "
 "need a way to tell ``flwr run`` that the App is to be executed via the "
-"SuperLink we just started, instead of using the local managed local "
-"SuperLink workflow used by the default local profile. Doing this is easy:"
-" define a new SuperLink connection in the **Flower Configuration** file, "
-"indicate the address of the SuperLink and pass a certificate (if any) or "
-"set the insecure flag (only when testing locally, real deployments "
-"require TLS)."
+"SuperLink we just started. Doing this is easy: define a new SuperLink "
+"connection in the **Flower Configuration** file, indicate the address of "
+"the SuperLink and pass a certificate (if any) or set the insecure flag "
+"(only when testing locally, real deployments require TLS)."
 msgstr ""
 
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:200
@@ -13846,11 +14025,11 @@ msgid ""
 "configuration."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:27
+#: ../../source/how-to-run-simulations.rst:31
 msgid "Run simulations"
 msgstr "运行模拟"
 
-#: ../../source/how-to-run-simulations.rst:29
+#: ../../source/how-to-run-simulations.rst:33
 #, fuzzy
 msgid ""
 "Simulating Federated Learning workloads is useful for a multitude of use "
@@ -13868,7 +14047,7 @@ msgstr ""
 "FL 工作负载的一些案例。Flower 可以通过其 \"虚拟客户端引擎\"（VirtualClientEngine）<contributor-"
 "explanation-architecture.html#virtual-client-engine>_或 VCE 来匹配这些情况。"
 
-#: ../../source/how-to-run-simulations.rst:40
+#: ../../source/how-to-run-simulations.rst:44
 msgid ""
 "Flower's ``Simulation Runtime`` is built on top of `Ray "
 "<https://www.ray.io/>`_, an open-source framework for scalable Python "
@@ -13879,7 +14058,7 @@ msgid ""
 "using `WSL2 <https://learn.microsoft.com/en-us/windows/wsl/about>`_."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:52
+#: ../../source/how-to-run-simulations.rst:56
 msgid ""
 "Flower's ``Simulation Runtime`` schedules, launches, and manages "
 "|clientapp_link|_ instances. It does so through a ``Backend``, which "
@@ -13892,7 +14071,7 @@ msgid ""
 "Runtime`` is:"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:60
+#: ../../source/how-to-run-simulations.rst:64
 #, fuzzy
 msgid ""
 "**Resource-aware**: Each backend worker executing ``ClientApp``\\s gets "
@@ -13905,7 +14084,7 @@ msgstr ""
 "资源感知：这意味着每个客户端都会分配到系统中的一部分计算和内存。作为用户，您可以在模拟开始时对其进行控制，从而控制 Flower FL "
 "模拟的并行程度。每个客户端的资源越少，在同一硬件上并发运行的客户端就越多。"
 
-#: ../../source/how-to-run-simulations.rst:65
+#: ../../source/how-to-run-simulations.rst:69
 msgid ""
 "**Batchable**: When there are more ``ClientApps`` to execute than backend"
 " workers, ``ClientApps`` are queued and executed as soon as resources are"
@@ -13913,7 +14092,7 @@ msgid ""
 "of N, where N is the number of backend workers."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:69
+#: ../../source/how-to-run-simulations.rst:73
 #, fuzzy
 msgid ""
 "**Self-managed**: This means that you, as a user, do not need to launch "
@@ -13921,20 +14100,20 @@ msgid ""
 " the execution of all ``ClientApp``\\s."
 msgstr "自管理：这意味着用户无需手动启动客户端，而是由 :code:`VirtualClientEngine` 负责。"
 
-#: ../../source/how-to-run-simulations.rst:72
+#: ../../source/how-to-run-simulations.rst:76
 #, fuzzy
 msgid ""
 "**Ephemeral**: This means that a ``ClientApp`` is only materialized when "
-"it is required by the application (e.g., to do `fit() <ref-api-"
-"flwr.html#flwr.client.Client.fit>`_). The object is destroyed afterward, "
-"releasing the resources it was assigned and allowing other clients to "
-"participate."
+"it is required by the application (e.g., to do `@app.train() <ref-"
+"api/flwr.clientapp.ClientApp.html#flwr.clientapp.ClientApp.train>`_). The"
+" object is destroyed afterward, releasing the resources it was assigned "
+"and allowing other clients to participate."
 msgstr ""
 "即时性：这意味着客户端只有在 FL 进程中需要它时才会被实体化（例如执行 `fit() <ref-api-"
 "flwr.html#flwr.client.Client.fit>`_ "
 "）。之后该对象将被销毁，释放分配给它的资源，并允许其他客户端以这种方式参与。"
 
-#: ../../source/how-to-run-simulations.rst:79
+#: ../../source/how-to-run-simulations.rst:84
 msgid ""
 "You can preserve the state (e.g., internal variables, parts of an ML "
 "model, intermediate results) of a ``ClientApp`` by saving it to its "
@@ -13942,7 +14121,7 @@ msgid ""
 "stateful-clients.rst>`_ guide for a complete walkthrough."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:84
+#: ../../source/how-to-run-simulations.rst:89
 #, fuzzy
 msgid ""
 "The ``Simulation Runtime`` delegates to a ``Backend`` the role of "
@@ -13958,49 +14137,57 @@ msgstr ""
 " :code:`VirtualClientEngine` 使用 `Actors <https://docs.ray.io/en/latest"
 "/ray-core/actors.html>`_ 来生成 `virtual` 客户端并运行它们的工作负载。"
 
-#: ../../source/how-to-run-simulations.rst:93
+#: ../../source/how-to-run-simulations.rst:98
 msgid "Launch your Flower simulation"
 msgstr "启动 Flower 模拟"
 
-#: ../../source/how-to-run-simulations.rst:95
+#: ../../source/how-to-run-simulations.rst:102
+msgid ""
+"If you haven't already, install Flower via ``pip install -U "
+"\"flwr[simulation]\"`` in a Python environment."
+msgstr ""
+
+#: ../../source/how-to-run-simulations.rst:105
 msgid ""
 "Running a simulation is straightforward; in fact, it is the default mode "
-"of operation for |flwr_run_link|_. Therefore, running Flower simulations "
-"primarily requires you to first define a ``ClientApp`` and a "
-"``ServerApp``. A convenient way to generate a minimal but fully "
-"functional Flower app is by means of the |flwr_new_link|_ command. There "
-"are multiple apps to choose from. The example below uses the ``PyTorch`` "
-"quickstart app."
+"of operation for |flwr_run_link|_. Therefore, the only requirement for "
+"running Flower simulations is to have a Flower app. A convenient way to "
+"generate a minimal but fully functional Flower app is by means of the "
+"|flwr_new_link|_ command. There are multiple apps to choose from. The "
+"example below uses the ``PyTorch`` quickstart app."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:103
-msgid ""
-"If you haven't already, install Flower via ``pip install -U flwr`` in a "
-"Python environment."
-msgstr ""
-
-#: ../../source/how-to-run-simulations.rst:111
+#: ../../source/how-to-run-simulations.rst:116
 msgid ""
 "Then, follow the instructions shown after completing the |flwr_new_link|_"
 " command. When you execute |flwr_run_link|_, the run will execute with "
 "the ``Simulation Runtime``."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:114
+#: ../../source/how-to-run-simulations.rst:119
 msgid ""
 "For local simulation profiles, ``flwr run`` submits the run to a managed "
-"local SuperLink via the Control API. If the profile has ``options.*`` and"
-" no explicit ``address``, Flower starts a local SuperLink automatically "
-"when needed, keeps it running in the background, and reuses it for ``flwr"
-" list``, ``flwr log``, and ``flwr stop``. See :doc:`how-to-run-flower-"
-"locally` for the full local workflow and runtime lifecycle."
+"local SuperLink via the Control API. If the profile uses ``address = "
+"\":local:\"``, Flower starts a local SuperLink automatically when needed,"
+" keeps it running in the background, and reuses it for ``flwr list``, "
+"``flwr log``, and ``flwr stop``. See :doc:`how-to-run-flower-locally` for"
+" the full local workflow and runtime lifecycle."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:121
+#: ../../source/how-to-run-simulations.rst:127
+msgid ""
+"If you run your simulations on a server using a networked filesystem "
+"(e.g., NFS-mounted home directory) you might encounter SQL database "
+"errors if your network is slow. If you do, check :ref:`this FAQ entry "
+"<faq-local-superlink-db-error>` to learn how to run simulations with a "
+"SuperLink using an in-memory database."
+msgstr ""
+
+#: ../../source/how-to-run-simulations.rst:133
 msgid "Simulation examples"
 msgstr "模拟示例"
 
-#: ../../source/how-to-run-simulations.rst:123
+#: ../../source/how-to-run-simulations.rst:135
 msgid ""
 "In addition to the quickstart tutorials in the documentation (e.g., "
 "`quickstart PyTorch Tutorial <tutorial-quickstart-pytorch.html>`_, "
@@ -14008,7 +14195,7 @@ msgid ""
 " in the Flower repository are simulation-ready."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:128
+#: ../../source/how-to-run-simulations.rst:140
 #, fuzzy
 msgid ""
 "`Quickstart TensorFlow/Keras "
@@ -14018,7 +14205,7 @@ msgstr ""
 "`TensorFlow快速入门 (代码) <https://github.com/adap/flower/tree/main/examples"
 "/quickstart-tensorflow>`_"
 
-#: ../../source/how-to-run-simulations.rst:130
+#: ../../source/how-to-run-simulations.rst:142
 #, fuzzy
 msgid ""
 "`Quickstart PyTorch "
@@ -14028,7 +14215,7 @@ msgstr ""
 "`PyTorch快速入门 (代码) <https://github.com/adap/flower/tree/main/examples"
 "/quickstart-pytorch>`_"
 
-#: ../../source/how-to-run-simulations.rst:132
+#: ../../source/how-to-run-simulations.rst:144
 #, fuzzy
 msgid ""
 "`Advanced PyTorch <https://github.com/flwrlabs/flower/tree/main/examples"
@@ -14037,7 +14224,7 @@ msgstr ""
 "`PyTorch快速入门 (代码) <https://github.com/adap/flower/tree/main/examples"
 "/quickstart-pytorch>`_"
 
-#: ../../source/how-to-run-simulations.rst:134
+#: ../../source/how-to-run-simulations.rst:146
 #, fuzzy
 msgid ""
 "`Quickstart MLX <https://github.com/flwrlabs/flower/tree/main/examples"
@@ -14046,7 +14233,7 @@ msgstr ""
 "`PyTorch快速入门 (代码) <https://github.com/adap/flower/tree/main/examples"
 "/quickstart-pytorch>`_"
 
-#: ../../source/how-to-run-simulations.rst:136
+#: ../../source/how-to-run-simulations.rst:148
 #, fuzzy
 msgid ""
 "`ViT fine-tuning <https://github.com/flwrlabs/flower/tree/main/examples"
@@ -14055,7 +14242,7 @@ msgstr ""
 "`PyTorch快速入门 (代码) <https://github.com/adap/flower/tree/main/examples"
 "/quickstart-pytorch>`_"
 
-#: ../../source/how-to-run-simulations.rst:139
+#: ../../source/how-to-run-simulations.rst:151
 #, fuzzy
 msgid ""
 "The complete list of examples can be found in `the Flower GitHub "
@@ -14064,25 +14251,25 @@ msgstr ""
 "有关安全连接的完整代码示例，请参见 <https://github.com/adap/flower/tree/main/examples"
 "/advanced-tensorflow>`_ 。"
 
-#: ../../source/how-to-run-simulations.rst:146
+#: ../../source/how-to-run-simulations.rst:156
 #, fuzzy
-msgid "Defining ``ClientApp`` resources"
-msgstr "分配客户端资源"
+msgid "Customize the Simulation Runtime"
+msgstr "笔记本中的模拟"
 
-#: ../../source/how-to-run-simulations.rst:148
+#: ../../source/how-to-run-simulations.rst:158
 msgid ""
-"By default, the ``Simulation Runtime`` assigns two CPU cores to each "
-"backend worker. This means that if your system has 10 CPU cores, five "
-"backend workers can be running in parallel, each executing a different "
-"``ClientApp`` instance."
+"By default, the Simulation Runtime simulates a cohort of 10 SuperNodes "
+"and assigns two CPU cores to each backend worker. This means that if your"
+" system has 12 CPU cores, six backend workers can be running in parallel,"
+" each executing a different ``ClientApp`` instance."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:152
+#: ../../source/how-to-run-simulations.rst:163
 #, fuzzy
 msgid ""
 "More often than not, you would probably like to adjust the resources your"
 " ``ClientApp`` gets assigned based on the complexity (i.e., compute and "
-"memory footprint) of your workload. You can do so by adjusting the "
+"memory footprint) of your Flower app. You can do so by adjusting the "
 "backend resources for your federation."
 msgstr ""
 "通常情况下，您可能希望根据 FL 工作负载的复杂性（即计算和内存占用）来调整分配给客户端的资源。您可以在启动模拟时将参数 "
@@ -14090,7 +14277,7 @@ msgstr ""
 "flwr.html#flwr.simulation.start_simulation>`_ 。Ray "
 "内部使用两个键来调度和生成工作负载（在我们的例子中是 Flower 客户端）："
 
-#: ../../source/how-to-run-simulations.rst:158
+#: ../../source/how-to-run-simulations.rst:169
 #, python-format
 msgid ""
 "Note that the resources the backend assigns to each worker (and hence to "
@@ -14103,81 +14290,114 @@ msgid ""
 "``ClientApp`` instances to crash throwing an out-of-memory (OOM) error."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:166
+#: ../../source/how-to-run-simulations.rst:177
 msgid ""
-"Customizing resources can be done directly in the :doc:`Flower "
-"Configuration <ref-flower-configuration>`. Setting the ``options.backend"
-".client-resources`` variable allows you to define how many CPU cores and "
-"what fraction of GPU memory each backend worker (and hence each "
-"``ClientApp``) gets. For example, to run a simulation with 10 clients "
-"where each ``ClientApp`` assumes to use 1 CPU core and no GPU access, you"
-" would set:"
+"Customizing resources can be done in two ways: either by changing the "
+"default simulation configuration used by your local SuperLink; or by "
+"overriding the simulation configuration on a per-run basis. Let's see how"
+" to do both."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:180
+#: ../../source/how-to-run-simulations.rst:182
+#, fuzzy
+msgid "Permanently set Simulation Runtime configuration"
+msgstr "配置值"
+
+#: ../../source/how-to-run-simulations.rst:184
+#, python-format
 msgid ""
-"With the above backend settings, your simulation will run as many "
-"``ClientApps`` in parallel as CPUs you have in your system. GPU resources"
-" for your ``ClientApp`` can be assigned by specifying the **ratio** of "
-"VRAM each should make use of."
+"The |flwr_fed_sim_config_link|_ command allows you to permanently set the"
+" default simulation configuration for your local SuperLink. This is "
+"useful when you want to have a default configuration that is different "
+"from the one provided by Flower out of the box. For example, if you'd "
+"like to set the configuration to 100 ``SuperNodes``, where each "
+"``ClientApp`` is assigned 4 CPUs and 25% of a GPU, you would run:"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:193
+#: ../../source/how-to-run-simulations.rst:197
 msgid ""
-"If you are using TensorFlow, you need to `enable memory growth "
-"<https://www.tensorflow.org/guide/gpu#limiting_gpu_memory_growth>`_ so "
-"multiple ``ClientApp`` instances can share a GPU. This needs to be done "
-"before launching the simulation. To do so, set the environment variable "
-"``TF_FORCE_GPU_ALLOW_GROWTH=\"1\"``."
+"Then, for every subsequent runs, the SuperLink will use the above "
+"configuration by default. Use ``flwr federation simulation-config "
+"--help`` to see all the options you can set."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:199
+#: ../../source/how-to-run-simulations.rst:202
+#, fuzzy
+msgid "Per-run override of Simulation Runtime configuration"
+msgstr "配置值"
+
+#: ../../source/how-to-run-simulations.rst:204
 msgid ""
-"Let's see how the above configuration results in a different number of "
-"``ClientApps`` running in parallel depending on the resources available "
-"in your system. If your system has:"
+"Sometimes, you might want to override the default simulation "
+"configuration for a specific run. You can do so by passing the same "
+"options as above to |flwr_run_link|_ but using the `--federation-config` "
+"flag, and expressed as a single string. For example, let's say you want "
+"to run a single simulation with 256 ``SuperNodes`` instead of the now "
+"default 100, reduce the number of CPUs per ``ClientApp`` to 1 and leave "
+"the GPU allocation unchanged. You would run:"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:203
+#: ../../source/how-to-run-simulations.rst:217
+msgid ""
+"The `--federation-config` flag accepts any of the options that can be set"
+" with ``flwr federation simulation-config`` using the same syntax but "
+"expressed as a single string and without the ``--`` prefix."
+msgstr ""
+
+#: ../../source/how-to-run-simulations.rst:222
+#, fuzzy
+msgid "Understanding Simulation Runtime resource assignment"
+msgstr "虚拟客户端引擎资源"
+
+#: ../../source/how-to-run-simulations.rst:224
+#, python-format
+msgid ""
+"Let's see how the above configuration, i.e. 1x CPU and 25% of a GPU per "
+"``ClientApp``, results in a different number of ``ClientApps`` running in"
+" parallel depending on the resources available in your system. If your "
+"system has:"
+msgstr ""
+
+#: ../../source/how-to-run-simulations.rst:228
 #, python-format
 msgid ""
 "10x CPUs and 1x GPU: at most 4 ``ClientApps`` will run in parallel since "
 "each requires 25% of the available VRAM."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:205
+#: ../../source/how-to-run-simulations.rst:230
 msgid ""
 "10x CPUs and 2x GPUs: at most 8 ``ClientApps`` will run in parallel "
 "(VRAM-limited)."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:206
+#: ../../source/how-to-run-simulations.rst:231
 msgid ""
 "6x CPUs and 4x GPUs: at most 6 ``ClientApps`` will run in parallel (CPU-"
 "limited)."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:207
+#: ../../source/how-to-run-simulations.rst:232
 msgid ""
 "10x CPUs but 0x GPUs: you won't be able to run the simulation since not "
 "even the resources for a single ``ClientApp`` can be met."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:210
+#: ../../source/how-to-run-simulations.rst:235
 msgid ""
 "A generalization of this is given by the following equation. It gives the"
 " maximum number of ``ClientApps`` that can be executed in parallel on "
 "available CPU cores (SYS_CPUS) and VRAM (SYS_GPUS)."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:214
+#: ../../source/how-to-run-simulations.rst:239
 msgid ""
 "N = \\min\\left(\\left\\lfloor \\frac{\\text{SYS_CPUS}}{\\text{num_cpus}}"
 " \\right\\rfloor, \\left\\lfloor "
 "\\frac{\\text{SYS_GPUS}}{\\text{num_gpus}} \\right\\rfloor\\right)"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:218
+#: ../../source/how-to-run-simulations.rst:243
 msgid ""
 "Both ``num_cpus`` (an integer higher than 1) and ``num_gpus`` (a non-"
 "negative real number) should be set on a per ``ClientApp`` basis. If, for"
@@ -14186,12 +14406,12 @@ msgid ""
 " two whole GPUs, you'd set ``num_gpus=2``."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:223
-#, fuzzy
+#: ../../source/how-to-run-simulations.rst:248
+#, fuzzy, python-brace-format
 msgid ""
-"While the ``options.backend.client-resources`` can be used to control the"
-" degree of concurrency in your simulations, this does not stop you from "
-"running hundreds or even thousands of clients in the same round and "
+"While the ``client-resources-{num-cpus,num-gpus}`` can be used to control"
+" the degree of concurrency in your simulations, this does not stop you "
+"from running hundreds or even thousands of clients in the same round and "
 "having orders of magnitude more *dormant* (i.e., not participating in a "
 "round) clients. Let's say you want to have 100 clients per round but your"
 " system can only accommodate 8 clients concurrently. The ``Simulation "
@@ -14204,45 +14424,45 @@ msgstr ""
 "个客户端。:code:`VirtualClientEngine` 将安排运行 100 "
 "个工作（每个工作模拟策略采样的一个客户端），然后以资源感知的方式分批执行。"
 
-#: ../../source/how-to-run-simulations.rst:233
+#: ../../source/how-to-run-simulations.rst:258
 #, fuzzy
 msgid "Simulation Runtime resources"
 msgstr "虚拟客户端引擎资源"
 
-#: ../../source/how-to-run-simulations.rst:235
+#: ../../source/how-to-run-simulations.rst:260
 msgid ""
 "By default, the ``Simulation Runtime`` has **access to all system "
 "resources** (i.e., all CPUs, all GPUs). However, in some settings, you "
 "might want to limit how many of your system resources are used for "
 "simulation. You can do this in the :doc:`Flower Configuration <ref-"
-"flower-configuration>` by setting the ``options.backend.init-args`` "
-"variable."
+"flower-configuration>` by passing a value to the ``init-args`` flags."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:250
+#: ../../source/how-to-run-simulations.rst:269
 msgid ""
 "With the above setup, the Backend will be initialized with a single CPU "
-"and GPU. Therefore, even if more CPUs and GPUs are available in your "
+"and no GPUs. Therefore, even if more CPUs and GPUs are available in your "
 "system, they will not be used for the simulation. The example above "
 "results in a single ``ClientApp`` running at any given point."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:255
+#: ../../source/how-to-run-simulations.rst:274
 msgid ""
 "For a complete list of settings you can configure, check the `ray.init "
 "<https://docs.ray.io/en/latest/ray-core/api/doc/ray.init.html#ray-init>`_"
 " documentation."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:258
-msgid "For the highest performance, do not set ``options.backend.init-args``."
+#: ../../source/how-to-run-simulations.rst:277
+#, python-brace-format
+msgid "For the highest performance, do not set ``--init-args-{...}`` flags."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:264
+#: ../../source/how-to-run-simulations.rst:283
 msgid "Multi-node Flower simulations"
 msgstr "多节点 Flower 模拟"
 
-#: ../../source/how-to-run-simulations.rst:266
+#: ../../source/how-to-run-simulations.rst:285
 #, fuzzy
 msgid ""
 "Flower's ``Simulation Runtime`` allows you to run FL simulations across "
@@ -14251,17 +14471,17 @@ msgid ""
 "simulation, ensure that you:"
 msgstr "Flower 的 :code:`VirtualClientEngine` 允许您在多个计算节点上运行 FL 模拟。在开始多节点模拟之前，请确保："
 
-#: ../../source/how-to-run-simulations.rst:270
+#: ../../source/how-to-run-simulations.rst:289
 #, fuzzy
 msgid "Have the same Python environment on all nodes."
 msgstr "所有节点都有相同的 Python 环境。"
 
-#: ../../source/how-to-run-simulations.rst:271
+#: ../../source/how-to-run-simulations.rst:290
 #, fuzzy
 msgid "Have a copy of your code on all nodes."
 msgstr "在所有节点上都有一份代码副本（例如整个软件包）。"
 
-#: ../../source/how-to-run-simulations.rst:272
+#: ../../source/how-to-run-simulations.rst:291
 msgid ""
 "Have a copy of your dataset on all nodes. If you are using partitions "
 "from `Flower Datasets <https://flower.ai/docs/datasets>`_, ensure the "
@@ -14269,7 +14489,7 @@ msgid ""
 "is that the i-th dataset partition is identical in all nodes."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:276
+#: ../../source/how-to-run-simulations.rst:295
 #, fuzzy
 msgid ""
 "Start Ray on your head node: on the terminal, type ``ray start --head``. "
@@ -14279,7 +14499,7 @@ msgstr ""
 "在头部节点上启动 Ray：在终端上输入 :code:`raystart--"
 "head`。该命令将打印几行输出，其中一行说明如何将其他节点连接到头部节点。"
 
-#: ../../source/how-to-run-simulations.rst:279
+#: ../../source/how-to-run-simulations.rst:298
 #, fuzzy
 msgid ""
 "Attach other nodes to the head node: copy the command shown after "
@@ -14291,14 +14511,14 @@ msgstr ""
 "将其他节点附加到头部节点：复制启动头部后显示的命令，并在新节点的终端上执行：例如 :code:`ray start "
 "--address='192.168.1.132:6379'`"
 
-#: ../../source/how-to-run-simulations.rst:284
+#: ../../source/how-to-run-simulations.rst:303
 #, fuzzy
 msgid ""
 "With all the above done, you can run your code from the head node as you "
 "would if the simulation were running on a single node. In other words:"
 msgstr "完成上述所有操作后，您就可以在头部节点上运行代码了，就像在单个节点上运行模拟一样。"
 
-#: ../../source/how-to-run-simulations.rst:292
+#: ../../source/how-to-run-simulations.rst:311
 #, fuzzy
 msgid ""
 "Once your simulation is finished, if you'd like to dismantle your "
@@ -14306,7 +14526,7 @@ msgid ""
 "terminal (including the head node)."
 msgstr "模拟结束后，如果要拆除集群，只需在每个节点（包括头部节点）的终端运行 :code:`ray stop` 命令即可。"
 
-#: ../../source/how-to-run-simulations.rst:297
+#: ../../source/how-to-run-simulations.rst:316
 #, fuzzy
 msgid ""
 "When attaching a new node to the head, all its resources (i.e., all CPUs,"
@@ -14323,7 +14543,7 @@ msgstr ""
 " start` 命令（包括启动头部时）中添加 `--num-cpus=<NUM_CPUS_FROM_NODE>`和/或 `--num-"
 "gpus=<NUM_GPUS_FROM_NODE>`"
 
-#: ../../source/how-to-run-simulations.rst:307
+#: ../../source/how-to-run-simulations.rst:326
 #, fuzzy
 msgid "FAQ for Simulations"
 msgstr "运行模拟"
@@ -14332,7 +14552,7 @@ msgstr "运行模拟"
 msgid "Can I make my ``ClientApp`` instances stateful?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:311
+#: ../../source/how-to-run-simulations.rst:330
 msgid ""
 "Yes. Use the ``state`` attribute of the |context_link|_ object that is "
 "passed to the ``ClientApp`` to save variables, parameters, or results to "
@@ -14344,7 +14564,7 @@ msgstr ""
 msgid "Can I run multiple simulations on the same machine?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:315
+#: ../../source/how-to-run-simulations.rst:334
 msgid ""
 "Yes, but bear in mind that each simulation isn't aware of the resource "
 "usage of the other. If your simulations make use of GPUs, consider "
@@ -14359,7 +14579,7 @@ msgid ""
 "compute/memory these make use of?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:319
+#: ../../source/how-to-run-simulations.rst:338
 msgid ""
 "No. These resources are exclusively used by the simulation backend to "
 "control how many workers can be created on startup. Let's say N backend "
@@ -14373,35 +14593,35 @@ msgstr ""
 msgid "My ``ClientApp`` is triggering OOM on my GPU. What should I do?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:323
+#: ../../source/how-to-run-simulations.rst:342
 msgid ""
 "It is likely that your `num_gpus` setting, which controls the number of "
 "``ClientApp`` instances that can share a GPU, is too low (meaning too "
 "many ``ClientApps`` share the same GPU). Try the following:"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:325
+#: ../../source/how-to-run-simulations.rst:344
 msgid ""
 "Set your ``num_gpus=1``. This will make a single ``ClientApp`` run on a "
 "GPU."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:326
+#: ../../source/how-to-run-simulations.rst:345
 msgid "Inspect how much VRAM is being used (use ``nvidia-smi`` for this)."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:327
+#: ../../source/how-to-run-simulations.rst:346
 msgid ""
 "Based on the VRAM you see your single ``ClientApp`` using, calculate how "
 "many more would fit within the remaining VRAM. One divided by the total "
 "number of ``ClientApps`` is the ``num_gpus`` value you should set."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:329
+#: ../../source/how-to-run-simulations.rst:348
 msgid "Refer to :ref:`clientappresources` for more details."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:331
+#: ../../source/how-to-run-simulations.rst:350
 msgid ""
 "If your ``ClientApp`` is using TensorFlow, make sure you are exporting "
 "``TF_FORCE_GPU_ALLOW_GROWTH=\"1\"`` before starting your simulation. For "
@@ -14414,7 +14634,7 @@ msgid ""
 "``ClientApp``?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:335
+#: ../../source/how-to-run-simulations.rst:354
 msgid ""
 "A good practice is to start by running the simulation for a few rounds "
 "with higher ``num_cpus`` and ``num_gpus`` than what is really needed "
@@ -14426,7 +14646,7 @@ msgid ""
 "until you see a satisfactory system resource utilization."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:337
+#: ../../source/how-to-run-simulations.rst:356
 msgid ""
 "Note that if the workload on your ``ClientApp`` instances is not "
 "homogeneous (i.e., some come with a larger compute or memory footprint), "
@@ -14438,7 +14658,7 @@ msgstr ""
 msgid "Can I assign different resources to each ``ClientApp`` instance?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:341
+#: ../../source/how-to-run-simulations.rst:360
 msgid ""
 "No. All ``ClientApp`` objects are assumed to make use of the same "
 "``num_cpus`` and ``num_gpus``. When setting these values (refer to "
@@ -14453,7 +14673,7 @@ msgid ""
 "servers)?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:345
+#: ../../source/how-to-run-simulations.rst:364
 msgid ""
 "Yes. If you are using the ``RayBackend`` (the *default* backend) you can "
 "first interconnect your nodes through Ray's cli and then launch the "
@@ -14468,7 +14688,7 @@ msgid ""
 "taken into account by the ``Simulation Runtime``?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:349
+#: ../../source/how-to-run-simulations.rst:368
 msgid ""
 "No. The ``Simulation Runtime`` only manages ``ClientApps`` and therefore "
 "is only aware of the system resources they require. If your ``ServerApp``"
@@ -14482,7 +14702,7 @@ msgid ""
 "should run? Can I do resource placement?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:353
+#: ../../source/how-to-run-simulations.rst:372
 msgid ""
 "Currently, the placement of ``ClientApp`` instances is managed by the "
 "``RayBackend`` (the only backend available as of ``flwr==1.13.0``) and "
@@ -14557,13 +14777,14 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-save-and-load-model-checkpoints.rst:108
+#, fuzzy
 msgid ""
 "If you are interested, checkout the details in `Advanced PyTorch Example "
 "<https://github.com/flwrlabs/flower/tree/main/examples/advanced-"
-"pytorch>`_ and `Advanced TensorFlow Example "
-"<https://github.com/flwrlabs/flower/tree/main/examples/advanced-"
-"tensorflow>`_."
+"pytorch>`_."
 msgstr ""
+"`PyTorch快速入门 (代码) <https://github.com/adap/flower/tree/main/examples"
+"/quickstart-pytorch>`_"
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:-1
 msgid "Upgrade seamlessly from Flower 0.x to Flower 1.0 with this guide."
@@ -15778,36 +15999,36 @@ msgid ""
 "JSON output is available for the commands documented here because they "
 "operate through the SuperLink Control API. This includes remote "
 "SuperLinks as well as the managed local SuperLink used by local "
-"simulation profiles."
+"simulation profiles marked with ``address = \":local:\"``."
 msgstr ""
 
-#: ../../source/how-to-use-cli-json-output.rst:14
+#: ../../source/how-to-use-cli-json-output.rst:15
 msgid "This guide shows JSON output for:"
 msgstr ""
 
-#: ../../source/how-to-use-cli-json-output.rst:16
+#: ../../source/how-to-use-cli-json-output.rst:17
 msgid "|flwr_run|"
 msgstr ""
 
-#: ../../source/how-to-use-cli-json-output.rst:17
+#: ../../source/how-to-use-cli-json-output.rst:18
 msgid "|flwr_list|"
 msgstr ""
 
-#: ../../source/how-to-use-cli-json-output.rst:18
+#: ../../source/how-to-use-cli-json-output.rst:19
 msgid "|flwr_stop|"
 msgstr ""
 
-#: ../../source/how-to-use-cli-json-output.rst:34
+#: ../../source/how-to-use-cli-json-output.rst:35
 msgid "``flwr run`` JSON output"
 msgstr ""
 
-#: ../../source/how-to-use-cli-json-output.rst:36
+#: ../../source/how-to-use-cli-json-output.rst:37
 msgid ""
 "The |flwr_run| command submits a Flower App run. For a local app, the CLI"
 " first builds a FAB and then starts the run through the Control API."
 msgstr ""
 
-#: ../../source/how-to-use-cli-json-output.rst:39
+#: ../../source/how-to-use-cli-json-output.rst:40
 #: ../../source/how-to-use-cli-json-output.rst:82
 #: ../../source/how-to-use-cli-json-output.rst:182
 msgid "Representative default output:"
@@ -16553,7 +16774,7 @@ msgstr ""
 
 #: ../../flwr accept:1 add-supernode:1 app archive:1 create:1 federation invite
 #: log:1 pull:1 register:1 reject:1 remove-account:1 remove-supernode:1
-#: review:1 revoke:1 simulation-config:1 stop:1 supernode unregister:1
+#: review:1 revoke:1 stop:1 supernode unregister:1
 #, fuzzy
 msgid "Required argument"
 msgstr "构建文档"
@@ -16644,7 +16865,7 @@ msgid "ID of the SuperNode to add."
 msgstr "然后，我们启动服务器："
 
 #: ../../flwr accept:1 add-supernode:1 create:1 federation invite reject:1
-#: remove-supernode:1 revoke:1 simulation-config:1
+#: remove-supernode:1 revoke:1
 #, fuzzy
 msgid "Name of the federation."
 msgstr "flower-superlink"
@@ -16834,11 +17055,6 @@ msgid "Number of CPUs to make available to the Simulation Runtime."
 msgstr ""
 
 #: ../../flwr federation simulation-config:1
-#, fuzzy
-msgid "``0``"
-msgstr "配置日志记录"
-
-#: ../../flwr federation simulation-config:1
 msgid "Number of GPUs to make available to the Simulation Runtime"
 msgstr ""
 
@@ -16859,6 +17075,11 @@ msgstr ""
 #: ../../flwr federation log:1 simulation-config:1
 msgid "``True``"
 msgstr ""
+
+#: ../../flwr federation simulation-config:1
+#, fuzzy
+msgid "Name of the federation; must be in the format `@<account>/<federation>`."
+msgstr "flower-superlink"
 
 #: ../../flwr install:1
 #, fuzzy
@@ -17023,10 +17244,29 @@ msgstr ""
 #: ../../flwr run:1
 msgid ""
 "When providing key-value pairs, values can be of any type supported by "
-"TOML (e.g., bool, int, float, string). The specified keys (<k1> and <k2> "
+"TOML (e.g., bool, int, float, string).The specified keys (<k1> and <k2> "
 "in the example) must exist in the run configuration under the "
 "`[tool.flwr.app.config]` section of `pyproject.toml` to be overridden. "
 "Alternatively, provide a TOML file containing key-value pair overrides."
+msgstr ""
+
+#: ../../flwr run:1
+#, fuzzy
+msgid ""
+"Override federation configuration values using one of the following "
+"formats:"
+msgstr "运行以下命令激活 virtualenv："
+
+#: ../../flwr run:1
+msgid ""
+"--federation-config '<k1>=<v1> <k2>=<v2>' | --federation-config "
+"'<k1>=<v1>' --federation-config '<k2>=<v2>'"
+msgstr ""
+
+#: ../../flwr run:1
+msgid ""
+"When providing key-value pairs, values can be of any type supported by "
+"TOML (e.g., bool, int, float, string)."
 msgstr ""
 
 #: ../../flwr run:1
@@ -36452,6 +36692,46 @@ msgid ""
 "escape codes or incorrect emoji rendering."
 msgstr ""
 
+#: ../../source/ref-faq.rst
+msgid ""
+":fa:`eye,mr-1` I got SQL database errors (like ``Exception calling "
+"application: database is locked``) when running local simulations. What "
+"should I do?"
+msgstr ""
+
+#: ../../source/ref-faq.rst:57
+msgid ""
+"Local simulations run through a managed local SuperLink. By default, that"
+" local SuperLink stores its state in a SQLite database under "
+"``$FLWR_HOME``. SQLite is reliable on a local file system, but it can "
+"perform poorly on networked filesystems such as NFS-mounted home "
+"directories or HPC cluster storage. In those environments, you might see "
+"errors such as ``database is locked`` or other SQLite-related failures."
+msgstr ""
+
+#: ../../source/ref-faq.rst:63
+msgid ""
+"To avoid these issues, stop the background local SuperLink and switch the"
+" local connection to the in-memory mode in your Flower configuration:"
+msgstr ""
+
+#: ../../source/ref-faq.rst:71
+msgid ""
+"After that, start your local simulation again with ``flwr run``. Flower "
+"will launch the managed local SuperLink with an in-memory database "
+"instead of an on-disk SQLite database, which avoids filesystem locking "
+"issues. See :ref:`Flower Configuration <flower-config-local-in-memory>` "
+"for details."
+msgstr ""
+
+#: ../../source/ref-faq.rst:76
+msgid ""
+"The tradeoff is that this mode is not persistent. When the managed local "
+"SuperLink stops, it loses its state, including run history and stored "
+"logs for previous runs. If you need persistence, prefer keeping "
+"``$FLWR_HOME`` on a local disk instead of a network drive."
+msgstr ""
+
 #: ../../source/ref-flower-configuration.rst:-1
 msgid ""
 "Learn how to setup the Flower Configuration and how to use it to run your"
@@ -36471,11 +36751,19 @@ msgid ""
 "file of Flower Apps in older versions."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:16
+#: ../../source/ref-flower-configuration.rst:18
+msgid ""
+"From Flower 1.28.0 onwards, it isn't recommended to define Simulation "
+"Runtime settings (i.e. fields starting with ``options.``) in the Flower "
+"Configuration. Check the :doc:`Simulation Runtime documentation <how-to-"
+"run-simulations>` for the recommended way to configure simulations."
+msgstr ""
+
+#: ../../source/ref-flower-configuration.rst:23
 msgid "**What is it?**"
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:18
+#: ../../source/ref-flower-configuration.rst:25
 msgid ""
 "The Flower Configuration is a system for managing SuperLink connections, "
 "stored in a TOML file (which we refer to as the Flower Configuration "
@@ -36485,11 +36773,11 @@ msgid ""
 "commands."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:24
+#: ../../source/ref-flower-configuration.rst:31
 msgid "**Why use it?**"
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:26
+#: ../../source/ref-flower-configuration.rst:33
 msgid ""
 "The Flower Configuration allows you to define reusable connection "
 "configurations that you can reference by name when running ``flwr`` "
@@ -36498,7 +36786,7 @@ msgid ""
 "them."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:31
+#: ../../source/ref-flower-configuration.rst:38
 msgid ""
 "Most ``flwr`` commands (like ``flwr log``, ``flwr list``, and ``flwr "
 "stop``) can use the Flower Configuration from anywhere on your system. "
@@ -36506,14 +36794,14 @@ msgid ""
 "Flower App directory to access the app code."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:37
+#: ../../source/ref-flower-configuration.rst:44
 msgid ""
 "**First-time setup:** If the Flower Configuration file doesn't exist in "
 "your system, it will be automatically created for you the first time you "
 "run a Flower CLI command."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:41
+#: ../../source/ref-flower-configuration.rst:48
 msgid ""
 "**Upgrading from older versions:** If you are upgrading from a previous "
 "version of Flower, the ``federations`` section in your ``pyproject.toml``"
@@ -36522,17 +36810,17 @@ msgid ""
 " the ``superlink`` keyword instead of ``tool.flwr.federations``."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:49
+#: ../../source/ref-flower-configuration.rst:56
 #, fuzzy
 msgid "Flower Configuration File Structure"
 msgstr "Flower 服务器。"
 
-#: ../../source/ref-flower-configuration.rst:51
+#: ../../source/ref-flower-configuration.rst:58
 #, fuzzy
 msgid "**Understanding the terminology**"
 msgstr "训练模型"
 
-#: ../../source/ref-flower-configuration.rst:53
+#: ../../source/ref-flower-configuration.rst:60
 msgid ""
 "The Flower Configuration file uses the term **\"superlink\"** to refer to"
 " SuperLink connection configurations. Each connection configuration "
@@ -36542,81 +36830,84 @@ msgid ""
 "local simulations or remote deployments."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:59
+#: ../../source/ref-flower-configuration.rst:66
 msgid ""
 "The configuration structure is similar to the older ``federations`` "
 "section in ``pyproject.toml`` before Flower 1.26.0, but now lives in a "
 "central location and uses clearer naming."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:63
+#: ../../source/ref-flower-configuration.rst:70
 #, fuzzy
 msgid "**Basic example**"
 msgstr "实例"
 
-#: ../../source/ref-flower-configuration.rst:77
-#: ../../source/ref-flower-configuration.rst:175
+#: ../../source/ref-flower-configuration.rst:84
+#: ../../source/ref-flower-configuration.rst:188
 #, fuzzy
 msgid "**Explanation**"
 msgstr "说明"
 
-#: ../../source/ref-flower-configuration.rst:79
+#: ../../source/ref-flower-configuration.rst:86
 msgid ""
 "``[superlink]`` section defines which connection configuration to use by "
 "default"
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:80
+#: ../../source/ref-flower-configuration.rst:87
 msgid ""
 "``default = \"local\"`` means the ``superlink.local`` configuration will "
 "be used when you don't specify a connection explicitly in your ``flwr`` "
 "commands"
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:82
+#: ../../source/ref-flower-configuration.rst:89
 msgid ""
-"``[superlink.local]`` defines a local simulation configuration with 10 "
-"virtual SuperNodes"
+"``[superlink.local]`` defines a managed local SuperLink profile. The "
+"special address value ``\":local:\"`` tells Flower to launch or reuse the"
+" background local SuperLink on demand with its default on-disk state. The"
+" alternative value ``\":local-in-memory:\"`` starts the managed local "
+"SuperLink with an in-memory database instead. The SuperLink will run "
+"simulations using the default configuration of the :doc:`Simulation "
+"Runtime <how-to-run-simulations>`."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:84
+#: ../../source/ref-flower-configuration.rst:95
 msgid ""
 "``[superlink.local-poc]`` defines a configuration for connecting to a "
 "locally running SuperLink at address ``127.0.0.1:9093``"
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:87
+#: ../../source/ref-flower-configuration.rst:98
 msgid ""
 "Connection configuration names must be unique and use the ``superlink.`` "
-"prefix. The type of options you specify depends on whether you're "
-"configuring a simulation (``options.num-supernodes``) or a deployment "
-"(``address``, ``insecure``)."
+"prefix."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:93
+#: ../../source/ref-flower-configuration.rst:102
 #, fuzzy
 msgid "Listing your connections"
 msgstr "然后，我们启动服务器："
 
-#: ../../source/ref-flower-configuration.rst:95
+#: ../../source/ref-flower-configuration.rst:104
 msgid ""
 "You can list all your connection configurations using the ``flwr config "
 "list`` command. Assuming the default configuration file shown earlier, "
 "the expected output will be:"
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:107
+#: ../../source/ref-flower-configuration.rst:116
 msgid ""
 "This shows you have two connection configurations available, with "
 "``local`` set as the default."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:112
+#: ../../source/ref-flower-configuration.rst:121
 #, fuzzy
 msgid "Local Simulation Example"
 msgstr "模拟示例"
 
-#: ../../source/ref-flower-configuration.rst:114
+#: ../../source/ref-flower-configuration.rst:123
 msgid ""
 "Local simulations allow you to test your Flower App on your own machine "
 "using virtual SuperNodes instead of real distributed SuperNodes. This is "
@@ -36624,49 +36915,53 @@ msgid ""
 "environments."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:118
+#: ../../source/ref-flower-configuration.rst:127
 #, fuzzy
 msgid "**Basic simulation configuration**"
 msgstr "配置值"
 
-#: ../../source/ref-flower-configuration.rst:125
+#: ../../source/ref-flower-configuration.rst:134
 msgid ""
-"This creates a managed local SuperLink profile that runs 10 virtual "
-"SuperNodes through the simulation runtime."
+"This creates a managed local SuperLink profile using the default "
+"simulation configuration, which involves running 10 simulated SuperNodes "
+"through the simulation runtime. Check the :doc:`Simulation Runtime docs "
+"<how-to-run-simulations>` to learn how to customize the number of "
+"SuperNodes and resources (CPU/GPU) allocated to your simulations."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:128
+#: ../../source/ref-flower-configuration.rst:142
 #, fuzzy
-msgid "**Simulation with custom resources**"
+msgid "**Simulation with in-memory local state**"
 msgstr "虚拟客户端引擎资源"
 
-#: ../../source/ref-flower-configuration.rst:137
-#, python-format
+#: ../../source/ref-flower-configuration.rst:149
 msgid ""
-"This creates a managed local SuperLink profile with 100 virtual "
-"SuperNodes, where each is allocated 1 CPU and 10% of a GPU. This is "
-"useful when you want to control resource distribution or simulate "
-"resource-constrained environments."
+"This creates a managed local SuperLink profile that keeps its database in"
+" memory instead of on disk. This can be useful on networked filesystems "
+"where SQLite locking or performance issues can occur. The tradeoff is "
+"that local run history and logs are lost when the managed local SuperLink"
+" is shut down."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:141
+#: ../../source/ref-flower-configuration.rst:154
 msgid "**When to use each**"
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:143
+#: ../../source/ref-flower-configuration.rst:156
 msgid ""
-"Use the basic configuration for quick testing with default resource "
-"allocation"
+"Use the basic configuration for most local development and testing "
+"scenarios, especially when you want to keep a history of your runs and "
+"logs on disk."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:144
+#: ../../source/ref-flower-configuration.rst:158
 msgid ""
-"Use custom resources when you need to simulate specific hardware "
-"constraints or want to control how many virtual SuperNodes can run in "
-"parallel based on your machine's resources"
+"Use ``address = \":local-in-memory:\"`` when the managed local SuperLink "
+"runs on a filesystem where SQLite performs poorly, such as some network "
+"drives or HPC storage"
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:148
+#: ../../source/ref-flower-configuration.rst:161
 #, fuzzy
 msgid ""
 "Learn more in the `How to Run Simulations "
@@ -36677,41 +36972,41 @@ msgstr ""
 "`TensorFlow快速入门 (教程) <https://flower.ai/docs/framework/tutorial-"
 "quickstart-tensorflow.html>`_"
 
-#: ../../source/ref-flower-configuration.rst:152
+#: ../../source/ref-flower-configuration.rst:165
 msgid ""
-"When you use a local simulation profile (``options.*``), Flower CLI "
-"commands that communicate with SuperLink use the Control API. If the "
-"profile has no explicit ``address``, Flower starts a managed local "
-"SuperLink automatically when needed and reuses it across ``flwr run``, "
-"``flwr list``, ``flwr log``, and ``flwr stop``. See :doc:`how-to-run-"
-"flower-locally` for the full local workflow, background process behavior,"
-" and runtime file locations."
+"When you use a local simulation profile with ``address = \":local:\"`` or"
+" ``address = \":local-in-memory:\"``, Flower CLI commands that "
+"communicate with SuperLink use the Control API. Flower starts a managed "
+"local SuperLink automatically when needed and reuses it across ``flwr "
+"run``, ``flwr list``, ``flwr log``, and ``flwr stop``. See :doc:`how-to-"
+"run-flower-locally` for the full local workflow, background process "
+"behavior, and runtime file locations."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:161
+#: ../../source/ref-flower-configuration.rst:174
 #, fuzzy
 msgid "Remote Deployment Example"
 msgstr "调配"
 
-#: ../../source/ref-flower-configuration.rst:163
+#: ../../source/ref-flower-configuration.rst:176
 msgid ""
 "When you're ready to deploy your federated learning app to real "
 "distributed nodes, you configure connections that point to a remote "
 "SuperLink."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:166
+#: ../../source/ref-flower-configuration.rst:179
 #, fuzzy
 msgid "**Example configuration**"
 msgstr "配置值"
 
-#: ../../source/ref-flower-configuration.rst:177
+#: ../../source/ref-flower-configuration.rst:190
 msgid ""
 "``address`` (required): The address of the SuperLink Control API to "
 "connect to (e.g., ``my-server.example.com:9093``)."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:179
+#: ../../source/ref-flower-configuration.rst:192
 msgid ""
 "``root-certificates``: Path to the root certificate file for TLS "
 "encryption. This secures the communication between your CLI and the "
@@ -36719,91 +37014,91 @@ msgid ""
 "This field is ignored if ``insecure`` is set to ``true``."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:183
+#: ../../source/ref-flower-configuration.rst:196
 msgid ""
 "``insecure``: Set to ``true`` to disable TLS encryption (only use this "
 "for local testing, never in production). Defaults to ``false`` if "
 "omitted, meaning TLS is enabled by default."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:187
+#: ../../source/ref-flower-configuration.rst:200
 msgid "**TLS (Transport Layer Security) explained**"
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:189
+#: ../../source/ref-flower-configuration.rst:202
 msgid ""
 "TLS encrypts the communication between your local machine and the remote "
 "SuperLink to prevent eavesdropping and tampering. In production, you "
 "should always use TLS by either:"
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:192
+#: ../../source/ref-flower-configuration.rst:205
 msgid ""
 "Providing a ``root-certificates`` file (recommended for custom "
 "certificates)"
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:193
+#: ../../source/ref-flower-configuration.rst:206
 msgid ""
 "Omitting both ``root-certificates`` and ``insecure`` to use default "
 "certificates"
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:195
+#: ../../source/ref-flower-configuration.rst:208
 msgid "Only set ``insecure = true`` for local testing environments."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:197
+#: ../../source/ref-flower-configuration.rst:210
 msgid ""
 "Refer to the `deployment documentation "
 "<https://flower.ai/docs/framework/deploy.html>`_ for TLS setup and "
 "advanced configurations."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:202
+#: ../../source/ref-flower-configuration.rst:215
 #, fuzzy
 msgid "Upgrading from previous versions of Flower"
 msgstr "安装 Flower 的开发版本"
 
-#: ../../source/ref-flower-configuration.rst:204
+#: ../../source/ref-flower-configuration.rst:217
 msgid "**If you're new to Flower 1.26.0+, you can skip this section.**"
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:206
+#: ../../source/ref-flower-configuration.rst:219
 msgid ""
 "For users upgrading from versions before 1.26.0: The ``federations`` "
 "section in your ``pyproject.toml`` file will be automatically migrated to"
 " the Flower Configuration the first time you run a ``flwr`` command."
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:210
+#: ../../source/ref-flower-configuration.rst:223
 msgid "**What happens during migration**"
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:212
+#: ../../source/ref-flower-configuration.rst:225
 msgid ""
 "The Flower Configuration file will be created at "
 "``$HOME/.flwr/config.toml`` if not already existing"
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:214
+#: ../../source/ref-flower-configuration.rst:227
 msgid ""
 "Your federation definitions are copied and renamed (``federations`` → "
 "``superlink``)"
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:215
+#: ../../source/ref-flower-configuration.rst:228
 msgid ""
 "The old ``[tool.flwr.federations]`` section in ``pyproject.toml`` is "
 "commented out for your reference"
 msgstr ""
 
-#: ../../source/ref-flower-configuration.rst:218
+#: ../../source/ref-flower-configuration.rst:231
 #, fuzzy
 msgid "**After migration**"
 msgstr "停用"
 
-#: ../../source/ref-flower-configuration.rst:220
+#: ../../source/ref-flower-configuration.rst:233
 msgid ""
 "You can safely delete the commented-out ``federations`` section from your"
 " ``pyproject.toml`` file. All connection configurations now live in the "
@@ -37664,12 +37959,13 @@ msgid ""
 msgstr ""
 
 #: ../../source/tutorial-quickstart-android.rst:18
+#, fuzzy
 msgid ""
-"Let's build a federated learning system using TFLite and Flower on "
-"Android!"
+"Let's build a federated learning system using `TFLite "
+"<https://ai.google.dev/edge/litert/android>`_ and Flower on Android!"
 msgstr "让我们在 Android 上使用 TFLite 和 Flower 构建一个联邦学习系统！"
 
-#: ../../source/tutorial-quickstart-android.rst:20
+#: ../../source/tutorial-quickstart-android.rst:21
 #, fuzzy
 msgid ""
 "Please refer to the `full code example "
@@ -37755,34 +38051,34 @@ msgstr ""
 msgid "With default arguments you will see streamed output like this:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-fastai.rst:89
-#: ../../source/tutorial-quickstart-huggingface.rst:104
-#: ../../source/tutorial-quickstart-jax.rst:94
-#: ../../source/tutorial-quickstart-pytorch-lightning.rst:98
-#: ../../source/tutorial-quickstart-pytorch.rst:130
-#: ../../source/tutorial-quickstart-scikitlearn.rst:121
-#: ../../source/tutorial-quickstart-tensorflow.rst:122
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:596
+#: ../../source/tutorial-quickstart-fastai.rst:88
+#: ../../source/tutorial-quickstart-huggingface.rst:103
+#: ../../source/tutorial-quickstart-jax.rst:93
+#: ../../source/tutorial-quickstart-pytorch-lightning.rst:97
+#: ../../source/tutorial-quickstart-pytorch.rst:129
+#: ../../source/tutorial-quickstart-scikitlearn.rst:120
+#: ../../source/tutorial-quickstart-tensorflow.rst:121
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:597
 msgid ""
 "You can also override the parameters defined in the "
 "``[tool.flwr.app.config]`` section in ``pyproject.toml`` like this:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-fastai.rst:99
-#: ../../source/tutorial-quickstart-huggingface.rst:375
-#: ../../source/tutorial-quickstart-jax.rst:414
-#: ../../source/tutorial-quickstart-mlx.rst:456
-#: ../../source/tutorial-quickstart-pytorch-lightning.rst:108
-#: ../../source/tutorial-quickstart-pytorch.rst:425
-#: ../../source/tutorial-quickstart-scikitlearn.rst:347
-#: ../../source/tutorial-quickstart-tensorflow.rst:359
-#: ../../source/tutorial-quickstart-xgboost.rst:439
+#: ../../source/tutorial-quickstart-fastai.rst:98
+#: ../../source/tutorial-quickstart-huggingface.rst:374
+#: ../../source/tutorial-quickstart-jax.rst:413
+#: ../../source/tutorial-quickstart-mlx.rst:455
+#: ../../source/tutorial-quickstart-pytorch-lightning.rst:107
+#: ../../source/tutorial-quickstart-pytorch.rst:424
+#: ../../source/tutorial-quickstart-scikitlearn.rst:346
+#: ../../source/tutorial-quickstart-tensorflow.rst:358
+#: ../../source/tutorial-quickstart-xgboost.rst:438
 msgid ""
 "Check the :doc:`how-to-run-simulations` documentation to learn more about"
 " how to configure and run Flower simulations."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-fastai.rst:104
+#: ../../source/tutorial-quickstart-fastai.rst:103
 #, fuzzy
 msgid ""
 "Check the `source code "
@@ -37867,38 +38163,38 @@ msgstr ""
 msgid "To run the project, do:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:94
+#: ../../source/tutorial-quickstart-huggingface.rst:93
 msgid "You can also run the project with GPU as follows:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:101
+#: ../../source/tutorial-quickstart-huggingface.rst:100
 msgid ""
 "This will use the default arguments where each ``ClientApp`` will use 4 "
 "CPUs and at most 4 ``ClientApp``\\s will run in a given GPU."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:112
-#: ../../source/tutorial-quickstart-jax.rst:102
-#: ../../source/tutorial-quickstart-pytorch.rst:138
-#: ../../source/tutorial-quickstart-scikitlearn.rst:129
+#: ../../source/tutorial-quickstart-huggingface.rst:111
+#: ../../source/tutorial-quickstart-jax.rst:101
+#: ../../source/tutorial-quickstart-pytorch.rst:137
+#: ../../source/tutorial-quickstart-scikitlearn.rst:128
 msgid ""
 "What follows is an explanation of each component in the project you just "
 "created: dataset partition, the model, defining the ``ClientApp`` and "
 "defining the ``ServerApp``."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:116
-#: ../../source/tutorial-quickstart-jax.rst:107
-#: ../../source/tutorial-quickstart-mlx.rst:143
-#: ../../source/tutorial-quickstart-pytorch.rst:143
-#: ../../source/tutorial-quickstart-scikitlearn.rst:134
-#: ../../source/tutorial-quickstart-tensorflow.rst:132
-#: ../../source/tutorial-quickstart-xgboost.rst:178
+#: ../../source/tutorial-quickstart-huggingface.rst:115
+#: ../../source/tutorial-quickstart-jax.rst:106
+#: ../../source/tutorial-quickstart-mlx.rst:142
+#: ../../source/tutorial-quickstart-pytorch.rst:142
+#: ../../source/tutorial-quickstart-scikitlearn.rst:133
+#: ../../source/tutorial-quickstart-tensorflow.rst:131
+#: ../../source/tutorial-quickstart-xgboost.rst:177
 #, fuzzy
 msgid "The Data"
 msgstr "加载数据"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:118
+#: ../../source/tutorial-quickstart-huggingface.rst:117
 msgid ""
 "This tutorial uses |flowerdatasets|_ to easily download and partition the"
 " `IMDB <https://huggingface.co/datasets/stanfordnlp/imdb>`_ dataset. In "
@@ -37911,17 +38207,17 @@ msgid ""
 "their data partition."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:163
-#: ../../source/tutorial-quickstart-jax.rst:151
-#: ../../source/tutorial-quickstart-mlx.rst:186
-#: ../../source/tutorial-quickstart-pytorch.rst:182
-#: ../../source/tutorial-quickstart-scikitlearn.rst:159
-#: ../../source/tutorial-quickstart-tensorflow.rst:160
+#: ../../source/tutorial-quickstart-huggingface.rst:162
+#: ../../source/tutorial-quickstart-jax.rst:150
+#: ../../source/tutorial-quickstart-mlx.rst:185
+#: ../../source/tutorial-quickstart-pytorch.rst:181
+#: ../../source/tutorial-quickstart-scikitlearn.rst:158
+#: ../../source/tutorial-quickstart-tensorflow.rst:159
 #, fuzzy
 msgid "The Model"
 msgstr "训练模型"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:165
+#: ../../source/tutorial-quickstart-huggingface.rst:164
 #, fuzzy
 msgid ""
 "We will leverage 🤗 Hugging Face to federate the training of language "
@@ -37934,13 +38230,13 @@ msgstr ""
 "我们将利用Hugging Face技术，使用 Flower 在多个客户端上联邦训练语言模型。更具体地说，我们将对预先训练好的 "
 "Transformer 模型（distilBERT）进行微调，以便在 IMDB 评分数据集上进行序列分类。最终目标是检测电影评分是正面还是负面。"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:177
+#: ../../source/tutorial-quickstart-huggingface.rst:176
 msgid ""
 "Note that here, ``model_name`` is a string that will be loaded from the "
 "``Context`` in the ClientApp and ServerApp."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:180
+#: ../../source/tutorial-quickstart-huggingface.rst:179
 msgid ""
 "In addition to loading the pretrained model weights and architecture, we "
 "also include two utility functions to perform both training (i.e. "
@@ -37953,18 +38249,18 @@ msgid ""
 "perform local training or evaluation:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:220
-#: ../../source/tutorial-quickstart-jax.rst:232
-#: ../../source/tutorial-quickstart-mlx.rst:230
-#: ../../source/tutorial-quickstart-pytorch.rst:257
-#: ../../source/tutorial-quickstart-scikitlearn.rst:181
-#: ../../source/tutorial-quickstart-tensorflow.rst:191
-#: ../../source/tutorial-quickstart-xgboost.rst:233
+#: ../../source/tutorial-quickstart-huggingface.rst:219
+#: ../../source/tutorial-quickstart-jax.rst:231
+#: ../../source/tutorial-quickstart-mlx.rst:229
+#: ../../source/tutorial-quickstart-pytorch.rst:256
+#: ../../source/tutorial-quickstart-scikitlearn.rst:180
+#: ../../source/tutorial-quickstart-tensorflow.rst:190
+#: ../../source/tutorial-quickstart-xgboost.rst:232
 #, fuzzy
 msgid "The ClientApp"
 msgstr "客户端"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:222
+#: ../../source/tutorial-quickstart-huggingface.rst:221
 msgid ""
 "The main changes we have to make to use 🤗 Hugging Face with Flower have "
 "to do with converting the |arrayrecord_link|_ received in the "
@@ -37973,12 +38269,12 @@ msgid ""
 "the built-in methods in the ``ArrayRecord`` to make these conversions:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:243
-#: ../../source/tutorial-quickstart-jax.rst:276
-#: ../../source/tutorial-quickstart-pytorch.rst:281
-#: ../../source/tutorial-quickstart-scikitlearn.rst:212
-#: ../../source/tutorial-quickstart-tensorflow.rst:216
-#: ../../source/tutorial-quickstart-xgboost.rst:261
+#: ../../source/tutorial-quickstart-huggingface.rst:242
+#: ../../source/tutorial-quickstart-jax.rst:275
+#: ../../source/tutorial-quickstart-pytorch.rst:280
+#: ../../source/tutorial-quickstart-scikitlearn.rst:211
+#: ../../source/tutorial-quickstart-tensorflow.rst:215
+#: ../../source/tutorial-quickstart-xgboost.rst:260
 msgid ""
 "The rest of the functionality is directly inspired by the centralized "
 "case. The |clientapp_link|_ comes with three core methods (``train``, "
@@ -37990,46 +38286,46 @@ msgid ""
 "``train`` and ``evaluate``."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:251
-#: ../../source/tutorial-quickstart-jax.rst:284
-#: ../../source/tutorial-quickstart-pytorch.rst:289
-#: ../../source/tutorial-quickstart-scikitlearn.rst:220
-#: ../../source/tutorial-quickstart-tensorflow.rst:224
-#: ../../source/tutorial-quickstart-xgboost.rst:269
+#: ../../source/tutorial-quickstart-huggingface.rst:250
+#: ../../source/tutorial-quickstart-jax.rst:283
+#: ../../source/tutorial-quickstart-pytorch.rst:288
+#: ../../source/tutorial-quickstart-scikitlearn.rst:219
+#: ../../source/tutorial-quickstart-tensorflow.rst:223
+#: ../../source/tutorial-quickstart-xgboost.rst:268
 msgid ""
 "Let's see how the ``train`` method can be implemented. It receives as "
 "input arguments a |message_link|_ from the ``ServerApp``. By default it "
 "carries:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:254
-#: ../../source/tutorial-quickstart-jax.rst:287
-#: ../../source/tutorial-quickstart-pytorch.rst:292
-#: ../../source/tutorial-quickstart-scikitlearn.rst:223
-#: ../../source/tutorial-quickstart-tensorflow.rst:227
-#: ../../source/tutorial-quickstart-xgboost.rst:272
+#: ../../source/tutorial-quickstart-huggingface.rst:253
+#: ../../source/tutorial-quickstart-jax.rst:286
+#: ../../source/tutorial-quickstart-pytorch.rst:291
+#: ../../source/tutorial-quickstart-scikitlearn.rst:222
+#: ../../source/tutorial-quickstart-tensorflow.rst:226
+#: ../../source/tutorial-quickstart-xgboost.rst:271
 msgid ""
 "an ``ArrayRecord`` with the arrays of the model to federate. By default "
 "they can be retrieved with key ``\"arrays\"`` when accessing the message "
 "content."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:256
-#: ../../source/tutorial-quickstart-jax.rst:289
-#: ../../source/tutorial-quickstart-pytorch.rst:294
-#: ../../source/tutorial-quickstart-scikitlearn.rst:225
-#: ../../source/tutorial-quickstart-tensorflow.rst:229
-#: ../../source/tutorial-quickstart-xgboost.rst:274
+#: ../../source/tutorial-quickstart-huggingface.rst:255
+#: ../../source/tutorial-quickstart-jax.rst:288
+#: ../../source/tutorial-quickstart-pytorch.rst:293
+#: ../../source/tutorial-quickstart-scikitlearn.rst:224
+#: ../../source/tutorial-quickstart-tensorflow.rst:228
+#: ../../source/tutorial-quickstart-xgboost.rst:273
 msgid ""
 "a ``ConfigRecord`` with the configuration sent from the ``ServerApp``. By"
 " default it can be retrieved with key ``\"config\"`` when accessing the "
 "message content."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:259
-#: ../../source/tutorial-quickstart-jax.rst:292
-#: ../../source/tutorial-quickstart-scikitlearn.rst:228
-#: ../../source/tutorial-quickstart-tensorflow.rst:232
+#: ../../source/tutorial-quickstart-huggingface.rst:258
+#: ../../source/tutorial-quickstart-jax.rst:291
+#: ../../source/tutorial-quickstart-scikitlearn.rst:227
+#: ../../source/tutorial-quickstart-tensorflow.rst:231
 msgid ""
 "The ``train`` method also receives the ``Context``, giving access to "
 "configs for your run and node. The run config hyperparameters are defined"
@@ -38038,11 +38334,11 @@ msgid ""
 "directly configurable during simulations."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:299
-#: ../../source/tutorial-quickstart-jax.rst:334
-#: ../../source/tutorial-quickstart-pytorch.rst:349
-#: ../../source/tutorial-quickstart-tensorflow.rst:287
-#: ../../source/tutorial-quickstart-xgboost.rst:356
+#: ../../source/tutorial-quickstart-huggingface.rst:298
+#: ../../source/tutorial-quickstart-jax.rst:333
+#: ../../source/tutorial-quickstart-pytorch.rst:348
+#: ../../source/tutorial-quickstart-tensorflow.rst:286
+#: ../../source/tutorial-quickstart-xgboost.rst:355
 msgid ""
 "The ``@app.evaluate()`` method would be near identical with two "
 "exceptions: (1) the model is not locally trained, instead it is used to "
@@ -38051,35 +38347,35 @@ msgid ""
 "is not locally modified."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:305
-#: ../../source/tutorial-quickstart-jax.rst:341
-#: ../../source/tutorial-quickstart-mlx.rst:388
-#: ../../source/tutorial-quickstart-mlx.rst:392
-#: ../../source/tutorial-quickstart-pytorch.rst:356
-#: ../../source/tutorial-quickstart-scikitlearn.rst:286
-#: ../../source/tutorial-quickstart-tensorflow.rst:294
-#: ../../source/tutorial-quickstart-xgboost.rst:363
+#: ../../source/tutorial-quickstart-huggingface.rst:304
+#: ../../source/tutorial-quickstart-jax.rst:340
+#: ../../source/tutorial-quickstart-mlx.rst:387
+#: ../../source/tutorial-quickstart-mlx.rst:391
+#: ../../source/tutorial-quickstart-pytorch.rst:355
+#: ../../source/tutorial-quickstart-scikitlearn.rst:285
+#: ../../source/tutorial-quickstart-tensorflow.rst:293
+#: ../../source/tutorial-quickstart-xgboost.rst:362
 #, fuzzy
 msgid "The ServerApp"
 msgstr "服务器"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:307
-#: ../../source/tutorial-quickstart-jax.rst:343
-#: ../../source/tutorial-quickstart-pytorch.rst:358
-#: ../../source/tutorial-quickstart-scikitlearn.rst:288
-#: ../../source/tutorial-quickstart-tensorflow.rst:296
+#: ../../source/tutorial-quickstart-huggingface.rst:306
+#: ../../source/tutorial-quickstart-jax.rst:342
+#: ../../source/tutorial-quickstart-pytorch.rst:357
+#: ../../source/tutorial-quickstart-scikitlearn.rst:287
+#: ../../source/tutorial-quickstart-tensorflow.rst:295
 msgid ""
 "To construct a |serverapp_link|_ we define its ``@app.main()`` method. "
 "This method receive as input arguments:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:310
-#: ../../source/tutorial-quickstart-jax.rst:346
-#: ../../source/tutorial-quickstart-mlx.rst:397
-#: ../../source/tutorial-quickstart-pytorch.rst:361
-#: ../../source/tutorial-quickstart-scikitlearn.rst:291
-#: ../../source/tutorial-quickstart-tensorflow.rst:299
-#: ../../source/tutorial-quickstart-xgboost.rst:368
+#: ../../source/tutorial-quickstart-huggingface.rst:309
+#: ../../source/tutorial-quickstart-jax.rst:345
+#: ../../source/tutorial-quickstart-mlx.rst:396
+#: ../../source/tutorial-quickstart-pytorch.rst:360
+#: ../../source/tutorial-quickstart-scikitlearn.rst:290
+#: ../../source/tutorial-quickstart-tensorflow.rst:298
+#: ../../source/tutorial-quickstart-xgboost.rst:367
 #: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:498
 msgid ""
 "a ``Grid`` object that will be used to interface with the nodes running "
@@ -38087,17 +38383,17 @@ msgid ""
 "other."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:312
-#: ../../source/tutorial-quickstart-jax.rst:348
-#: ../../source/tutorial-quickstart-mlx.rst:399
-#: ../../source/tutorial-quickstart-pytorch.rst:363
-#: ../../source/tutorial-quickstart-scikitlearn.rst:293
-#: ../../source/tutorial-quickstart-tensorflow.rst:301
-#: ../../source/tutorial-quickstart-xgboost.rst:370
+#: ../../source/tutorial-quickstart-huggingface.rst:311
+#: ../../source/tutorial-quickstart-jax.rst:347
+#: ../../source/tutorial-quickstart-mlx.rst:398
+#: ../../source/tutorial-quickstart-pytorch.rst:362
+#: ../../source/tutorial-quickstart-scikitlearn.rst:292
+#: ../../source/tutorial-quickstart-tensorflow.rst:300
+#: ../../source/tutorial-quickstart-xgboost.rst:369
 msgid "a ``Context`` object that provides access to the run configuration."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:314
+#: ../../source/tutorial-quickstart-huggingface.rst:313
 msgid ""
 "In this example we use the |fedavg|_ and configure it with a specific "
 "value of ``fraction_train`` which is read from the run config. You can "
@@ -38106,44 +38402,44 @@ msgid ""
 "|strategy_start_link|_ method. To it we pass:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:319
-#: ../../source/tutorial-quickstart-jax.rst:355
-#: ../../source/tutorial-quickstart-mlx.rst:406
-#: ../../source/tutorial-quickstart-pytorch.rst:370
-#: ../../source/tutorial-quickstart-scikitlearn.rst:300
-#: ../../source/tutorial-quickstart-tensorflow.rst:308
-#: ../../source/tutorial-quickstart-xgboost.rst:377
+#: ../../source/tutorial-quickstart-huggingface.rst:318
+#: ../../source/tutorial-quickstart-jax.rst:354
+#: ../../source/tutorial-quickstart-mlx.rst:405
+#: ../../source/tutorial-quickstart-pytorch.rst:369
+#: ../../source/tutorial-quickstart-scikitlearn.rst:299
+#: ../../source/tutorial-quickstart-tensorflow.rst:307
+#: ../../source/tutorial-quickstart-xgboost.rst:376
 msgid "the ``Grid`` object."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:320
-#: ../../source/tutorial-quickstart-jax.rst:356
+#: ../../source/tutorial-quickstart-huggingface.rst:319
+#: ../../source/tutorial-quickstart-jax.rst:355
 msgid ""
 "an ``ArrayRecord`` carrying a randomly initialized model that will serve "
 "as the global model to be federated."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:322
-#: ../../source/tutorial-quickstart-pytorch.rst:373
-#: ../../source/tutorial-quickstart-scikitlearn.rst:303
+#: ../../source/tutorial-quickstart-huggingface.rst:321
+#: ../../source/tutorial-quickstart-pytorch.rst:372
+#: ../../source/tutorial-quickstart-scikitlearn.rst:302
 msgid ""
 "a ``ConfigRecord`` with the training hyperparameters to be sent to the "
 "clients. The strategy will also insert the current round number in this "
 "config before sending it to the participating nodes."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:325
-#: ../../source/tutorial-quickstart-jax.rst:361
-#: ../../source/tutorial-quickstart-mlx.rst:409
-#: ../../source/tutorial-quickstart-pytorch.rst:376
-#: ../../source/tutorial-quickstart-scikitlearn.rst:306
-#: ../../source/tutorial-quickstart-tensorflow.rst:311
+#: ../../source/tutorial-quickstart-huggingface.rst:324
+#: ../../source/tutorial-quickstart-jax.rst:360
+#: ../../source/tutorial-quickstart-mlx.rst:408
+#: ../../source/tutorial-quickstart-pytorch.rst:375
+#: ../../source/tutorial-quickstart-scikitlearn.rst:305
+#: ../../source/tutorial-quickstart-tensorflow.rst:310
 msgid ""
 "the ``num_rounds`` parameter specifying how many rounds of ``FedAvg`` to "
 "perform."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:362
+#: ../../source/tutorial-quickstart-huggingface.rst:361
 msgid ""
 "Note the ``start`` method of the strategy returns a result object. This "
 "object contains all the relevant information about the FL process, "
@@ -38154,13 +38450,13 @@ msgid ""
 "model `state_dict` using ``torch.save``."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:369
+#: ../../source/tutorial-quickstart-huggingface.rst:368
 msgid ""
 "Congratulations! You've successfully built and run your first federated "
 "learning system for an LLM."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:381
+#: ../../source/tutorial-quickstart-huggingface.rst:380
 msgid ""
 "Check the source code of the extended version of this tutorial in "
 "|quickstart_hf_link|_ in the Flower GitHub repository. For a "
@@ -38418,7 +38714,7 @@ msgid ""
 "has been created. It should have the following structure:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-jax.rst:109
+#: ../../source/tutorial-quickstart-jax.rst:108
 msgid ""
 "This tutorial uses |flowerdatasets|_ to easily download and partition the"
 " MNIST dataset. In this example you'll make use of the |iidpartitioner|_ "
@@ -38426,20 +38722,20 @@ msgid ""
 "|otherpartitioners|_ available in Flower Datasets."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-jax.rst:153
+#: ../../source/tutorial-quickstart-jax.rst:152
 msgid ""
 "We use `Flax <https://flax.readthedocs.io/en/latest/index.html>`_ to "
 "define a simple CNN model for image classification:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-jax.rst:185
+#: ../../source/tutorial-quickstart-jax.rst:184
 msgid ""
 "In addition to defining the model architecture, we also include utility "
 "functions to perform both training (i.e. ``train()``) and evaluation "
 "using the above model."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-jax.rst:234
+#: ../../source/tutorial-quickstart-jax.rst:233
 msgid ""
 "The main changes we have to make to use JAX with Flower have to do with "
 "converting the |arrayrecord_link|_ received in the |message_link|_ into "
@@ -38454,7 +38750,7 @@ msgid ""
 "conversions:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-jax.rst:350
+#: ../../source/tutorial-quickstart-jax.rst:349
 msgid ""
 "In this example we use the |fedavg|_ and configure it with specific "
 "values read from the run config. You can find the default values defined "
@@ -38462,14 +38758,14 @@ msgid ""
 "launched when invoking its |strategy_start_link|_ method. To it we pass:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-jax.rst:358
+#: ../../source/tutorial-quickstart-jax.rst:357
 msgid ""
 "a ``ConfigRecord`` with the training hyperparameters (learning rate) to "
 "be sent to the clients. The strategy will also insert the current round "
 "number in this config before sending it to the participating nodes."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-jax.rst:402
+#: ../../source/tutorial-quickstart-jax.rst:401
 msgid ""
 "Note the ``start`` method of the strategy returns a result object. This "
 "object contains all the relevant information about the FL process, "
@@ -38480,13 +38776,13 @@ msgid ""
 "model NumPy arrays using ``np.savez()`` as shown above."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-jax.rst:409
+#: ../../source/tutorial-quickstart-jax.rst:408
 msgid ""
 "Congratulations! You've successfully built and run your first federated "
 "learning system for JAX with Flower!"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-jax.rst:419
+#: ../../source/tutorial-quickstart-jax.rst:418
 #, fuzzy
 msgid ""
 "Check the source code of the extended version of this tutorial in "
@@ -38545,21 +38841,21 @@ msgstr ""
 msgid "With default arguments, you will see streamed output like this:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:129
-#: ../../source/tutorial-quickstart-xgboost.rst:135
+#: ../../source/tutorial-quickstart-mlx.rst:128
+#: ../../source/tutorial-quickstart-xgboost.rst:134
 msgid ""
 "You can also override the parameters defined in the "
 "``[tool.flwr.app.config]`` section in the ``pyproject.toml`` like this:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:137
+#: ../../source/tutorial-quickstart-mlx.rst:136
 msgid ""
 "What follows is an explanation of each component in the project you just "
 "created: dataset partitioning, the model, defining the ``ClientApp``, and"
 " defining the ``ServerApp``."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:145
+#: ../../source/tutorial-quickstart-mlx.rst:144
 msgid ""
 "We will use `Flower Datasets <https://flower.ai/docs/datasets/>`_ to "
 "easily download and partition the `MNIST` dataset. In this example, "
@@ -38571,20 +38867,20 @@ msgid ""
 "api/flwr_datasets.partitioner.html>`_ available in Flower Datasets:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:188
+#: ../../source/tutorial-quickstart-mlx.rst:187
 msgid ""
 "We define the model as in the `centralized MLX example "
 "<https://github.com/ml-explore/mlx-examples/tree/main/mnist>`_, it's a "
 "simple MLP:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:211
+#: ../../source/tutorial-quickstart-mlx.rst:210
 msgid ""
 "We also define some utility functions to test our model and to iterate "
 "over batches."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:232
+#: ../../source/tutorial-quickstart-mlx.rst:231
 msgid ""
 "The main changes we have to make to use `MLX` with `Flower` will be found"
 " in the ``get_params()`` and ``set_params()`` functions. MLX doesn't "
@@ -38593,17 +38889,17 @@ msgid ""
 "work)."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:237
+#: ../../source/tutorial-quickstart-mlx.rst:236
 msgid "MLX stores its parameters as follows:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:250
+#: ../../source/tutorial-quickstart-mlx.rst:249
 msgid ""
 "Therefore, to get our list of ``np.array`` objects, we need to extract "
 "each array and convert it into a NumPy array:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:259
+#: ../../source/tutorial-quickstart-mlx.rst:258
 msgid ""
 "For the ``set_params()`` function, we perform the reverse operation. We "
 "receive a list of NumPy arrays and want to convert them into MLX "
@@ -38611,21 +38907,21 @@ msgid ""
 "them to the `weight` and `bias` keys of each layer dictionary:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:274
+#: ../../source/tutorial-quickstart-mlx.rst:273
 msgid ""
 "The rest of the functionality is directly inspired by the centralized "
 "case. The |clientapp_link|_ will train the model on local data using the "
 "standard MLX training loop:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:287
+#: ../../source/tutorial-quickstart-mlx.rst:286
 msgid ""
 "Let's put everything together and see the complete implementation of the "
 "``ClientApp``. First, the behavior in a round of training is defined "
 "inside a function wrapped with the ``@app.train()`` decorator."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:291
+#: ../../source/tutorial-quickstart-mlx.rst:290
 msgid ""
 "After reading configuration parameters from the |context_link|_, we "
 "instantiate the model and apply the global parameters sent by the server "
@@ -38641,7 +38937,7 @@ msgid ""
 "data partition."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:355
+#: ../../source/tutorial-quickstart-mlx.rst:354
 msgid ""
 "The ``ClientApp`` also allows for evaluation of the model on local test "
 "data. This can be done by defining a function wrapped with the "
@@ -38656,15 +38952,15 @@ msgid ""
 "by the server to perform weighted averaging of the metrics."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:394
-#: ../../source/tutorial-quickstart-xgboost.rst:365
+#: ../../source/tutorial-quickstart-mlx.rst:393
+#: ../../source/tutorial-quickstart-xgboost.rst:364
 #: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:495
 msgid ""
 "To construct a |serverapp_link|_, we define its ``@app.main()`` method. "
 "This method receives as input arguments:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:401
+#: ../../source/tutorial-quickstart-mlx.rst:400
 msgid ""
 "In this example we use the |fedavg_link|_ and left it with its default "
 "parameters. Then, after initializing the ``MLP`` that would serve as "
@@ -38672,17 +38968,17 @@ msgid ""
 "launched when invoking its |strategy_start_link|_ method. To it we pass:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:407
-#: ../../source/tutorial-quickstart-pytorch.rst:371
-#: ../../source/tutorial-quickstart-scikitlearn.rst:301
+#: ../../source/tutorial-quickstart-mlx.rst:406
+#: ../../source/tutorial-quickstart-pytorch.rst:370
+#: ../../source/tutorial-quickstart-scikitlearn.rst:300
 msgid ""
 "an ``ArrayRecord`` carrying a randomly initialized model that will serve "
 "as the global model to federate."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:447
-#: ../../source/tutorial-quickstart-pytorch.rst:416
-#: ../../source/tutorial-quickstart-xgboost.rst:430
+#: ../../source/tutorial-quickstart-mlx.rst:446
+#: ../../source/tutorial-quickstart-pytorch.rst:415
+#: ../../source/tutorial-quickstart-xgboost.rst:429
 msgid ""
 "Note the ``start`` method of the strategy returns a |result_link|_ "
 "object. This object contains all the relevant information about the FL "
@@ -38690,16 +38986,16 @@ msgid ""
 "federated training and evaluation metrics as ``MetricRecords``."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:452
-#: ../../source/tutorial-quickstart-pytorch.rst:421
-#: ../../source/tutorial-quickstart-tensorflow.rst:355
-#: ../../source/tutorial-quickstart-xgboost.rst:435
+#: ../../source/tutorial-quickstart-mlx.rst:451
+#: ../../source/tutorial-quickstart-pytorch.rst:420
+#: ../../source/tutorial-quickstart-tensorflow.rst:354
+#: ../../source/tutorial-quickstart-xgboost.rst:434
 msgid ""
 "Congratulations! You've successfully built and run your first federated "
 "learning system."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-mlx.rst:461
+#: ../../source/tutorial-quickstart-mlx.rst:460
 #, fuzzy
 msgid ""
 "Check the `source code "
@@ -38773,7 +39069,7 @@ msgid ""
 "pytorch`` has been created. It should have the following structure:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-pytorch.rst:145
+#: ../../source/tutorial-quickstart-pytorch.rst:144
 msgid ""
 "This tutorial uses `Flower Datasets <https://flower.ai/docs/datasets/>`_ "
 "to easily download and partition the `CIFAR-10` dataset. In this example "
@@ -38787,13 +39083,13 @@ msgid ""
 " that correspond to their data partition."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-pytorch.rst:184
+#: ../../source/tutorial-quickstart-pytorch.rst:183
 msgid ""
 "We defined a simple Convolutional Neural Network (CNN), but feel free to "
 "replace it with a more sophisticated model if you'd like:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-pytorch.rst:209
+#: ../../source/tutorial-quickstart-pytorch.rst:208
 msgid ""
 "In addition to defining the model architecture, we also include two "
 "utility functions to perform both training (i.e. ``train()``) and "
@@ -38806,7 +39102,7 @@ msgid ""
 "training or evaluation:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-pytorch.rst:259
+#: ../../source/tutorial-quickstart-pytorch.rst:258
 msgid ""
 "The main changes we have to make to use `PyTorch` with `Flower` have to "
 "do with converting the |arrayrecord_link|_ received in the "
@@ -38815,8 +39111,8 @@ msgid ""
 "built-in methods in the ``ArrayRecord`` to make these conversions:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-pytorch.rst:297
-#: ../../source/tutorial-quickstart-xgboost.rst:277
+#: ../../source/tutorial-quickstart-pytorch.rst:296
+#: ../../source/tutorial-quickstart-xgboost.rst:276
 msgid ""
 "The ``train`` method also receives the |context_link|_, giving access to "
 "configs for your run and node. The run config hyperparameters are defined"
@@ -38825,7 +39121,7 @@ msgid ""
 "directly configurable during simulations."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-pytorch.rst:365
+#: ../../source/tutorial-quickstart-pytorch.rst:364
 msgid ""
 "In this example we use the |fedavg_link|_ and configure it with a "
 "specific value of ``fraction_evaluate`` which is read from the run "
@@ -38834,13 +39130,13 @@ msgid ""
 "|strategy_start_link|_ method. To it we pass:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-pytorch.rst:377
+#: ../../source/tutorial-quickstart-pytorch.rst:376
 msgid ""
 "an ``evaluate_fn`` function that will be called to evaluate the global "
 "model on centralized test data after each round."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-pytorch.rst:430
+#: ../../source/tutorial-quickstart-pytorch.rst:429
 #, fuzzy
 msgid ""
 "Check the `source code "
@@ -38888,13 +39184,13 @@ msgid ""
 " do:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-pytorch-lightning.rst:86
+#: ../../source/tutorial-quickstart-pytorch-lightning.rst:85
 msgid ""
 "Each simulated `ClientApp` (two per round) will also log a summary of "
 "their local training process. Expect this output to be similar to:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-pytorch-lightning.rst:113
+#: ../../source/tutorial-quickstart-pytorch-lightning.rst:112
 #, fuzzy
 msgid ""
 "Check the `source code "
@@ -38951,7 +39247,7 @@ msgid ""
 "sklearn`` has been created. It should have the following structure:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-scikitlearn.rst:136
+#: ../../source/tutorial-quickstart-scikitlearn.rst:135
 msgid ""
 "This tutorial uses |flowerdatasets|_ to easily download and partition the"
 " `Iris <https://huggingface.co/datasets/scikit-learn/iris>`_ dataset. In "
@@ -38963,7 +39259,7 @@ msgid ""
 "going to be used."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-scikitlearn.rst:161
+#: ../../source/tutorial-quickstart-scikitlearn.rst:160
 msgid ""
 "We define the |logisticregression|_ model from scikit-learn in the "
 "``create_log_reg_and_instantiate_parameters()`` function. This helper "
@@ -38971,7 +39267,7 @@ msgid ""
 "``set_initial_params()`` utility function in the same file."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-scikitlearn.rst:183
+#: ../../source/tutorial-quickstart-scikitlearn.rst:182
 msgid ""
 "The main changes we have to make to use ``Scikit-learn`` with ``Flower`` "
 "have to do with converting the |arrayrecord_link|_ received in the "
@@ -38982,7 +39278,7 @@ msgid ""
 "make these conversions:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-scikitlearn.rst:279
+#: ../../source/tutorial-quickstart-scikitlearn.rst:278
 msgid ""
 "The ``@app.evaluate`` method mirrors ``train`` but only evaluates the "
 "received model on the local validation set. It returns a ``MetricRecord``"
@@ -38990,8 +39286,8 @@ msgid ""
 "model weights, since they are not modified during evaluation."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-scikitlearn.rst:295
-#: ../../source/tutorial-quickstart-tensorflow.rst:303
+#: ../../source/tutorial-quickstart-scikitlearn.rst:294
+#: ../../source/tutorial-quickstart-tensorflow.rst:302
 msgid ""
 "In this example we use the |fedavg_link|_ and configure it with a "
 "specific value of ``fraction_train`` which is read from the run config. "
@@ -39000,14 +39296,14 @@ msgid ""
 "|strategy_start_link|_ method. To it we pass:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-scikitlearn.rst:342
+#: ../../source/tutorial-quickstart-scikitlearn.rst:341
 msgid ""
 "Congratulations! You've successfully built and run your first federated "
 "learning system in scikit-learn on the Iris dataset using the new Message"
 " API."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-scikitlearn.rst:352
+#: ../../source/tutorial-quickstart-scikitlearn.rst:351
 #, fuzzy
 msgid ""
 "Check the source code of another Flower App using ``scikit-learn`` in the"
@@ -39058,7 +39354,7 @@ msgid ""
 "tensorflow`` has been created. It should have the following structure:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-tensorflow.rst:134
+#: ../../source/tutorial-quickstart-tensorflow.rst:133
 msgid ""
 "This tutorial uses `Flower Datasets <https://flower.ai/docs/datasets/>`_ "
 "to easily download and partition the `CIFAR-10` dataset. In this example "
@@ -39072,14 +39368,14 @@ msgid ""
 " correspond to their data partition."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-tensorflow.rst:162
+#: ../../source/tutorial-quickstart-tensorflow.rst:161
 msgid ""
 "Next, we need a model. We defined a simple Convolutional Neural Network "
 "(CNN), but feel free to replace it with a more sophisticated model if "
 "you'd like:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-tensorflow.rst:193
+#: ../../source/tutorial-quickstart-tensorflow.rst:192
 msgid ""
 "The main changes we have to make to use `Tensorflow` with `Flower` have "
 "to do with converting the |arrayrecord_link|_ received in the "
@@ -39090,13 +39386,13 @@ msgid ""
 " the ``ArrayRecord`` to make these conversions:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-tensorflow.rst:309
+#: ../../source/tutorial-quickstart-tensorflow.rst:308
 msgid ""
 "an ``ArrayRecord`` carrying a randomly initialized model that will serve "
 "as the global model to federated."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-tensorflow.rst:348
+#: ../../source/tutorial-quickstart-tensorflow.rst:347
 msgid ""
 "Note the ``start`` method of the strategy returns a result object. This "
 "object contains all the relevant information about the FL process, "
@@ -39107,7 +39403,7 @@ msgid ""
 "model weights using Tensorflow's ``save()`` function."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-tensorflow.rst:364
+#: ../../source/tutorial-quickstart-tensorflow.rst:363
 #, fuzzy
 msgid ""
 "Check the source code of the extended version of this tutorial in "
@@ -39164,25 +39460,25 @@ msgid ""
 "xgboost`` has been created. It should have the following structure:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-xgboost.rst:143
+#: ../../source/tutorial-quickstart-xgboost.rst:142
 msgid ""
 "What follows is an explanation of each component in the project you just "
 "created: configurations, dataset partitioning, defining the "
 "``ClientApp``, and defining the ``ServerApp``."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-xgboost.rst:149
+#: ../../source/tutorial-quickstart-xgboost.rst:148
 #, fuzzy
 msgid "The Configurations"
 msgstr "配置值"
 
-#: ../../source/tutorial-quickstart-xgboost.rst:151
+#: ../../source/tutorial-quickstart-xgboost.rst:150
 msgid ""
 "We define all required configurations / hyper-parameters inside the "
 "``pyproject.toml`` file:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-xgboost.rst:172
+#: ../../source/tutorial-quickstart-xgboost.rst:171
 #, fuzzy
 msgid ""
 "The ``local-epochs`` represents the number of iterations for local tree "
@@ -39193,7 +39489,7 @@ msgstr ""
 "代码:`num_local_round`表示本地树的迭代次数。我们默认使用 CPU 进行训练。可以通过将 :code:`tree_method` "
 "设置为 :code:`gpu_hist`，将其转换为 GPU。我们使用 AUC 作为评估指标。"
 
-#: ../../source/tutorial-quickstart-xgboost.rst:180
+#: ../../source/tutorial-quickstart-xgboost.rst:179
 msgid ""
 "We will use `Flower Datasets <https://flower.ai/docs/datasets/>`_ to "
 "easily download and partition the `Higgs` dataset. In this example, "
@@ -39205,7 +39501,7 @@ msgid ""
 "api/flwr_datasets.partitioner.html>`_ available in Flower Datasets:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-xgboost.rst:206
+#: ../../source/tutorial-quickstart-xgboost.rst:205
 #, fuzzy
 msgid ""
 "We train/test split using the given partition (client's local data), and "
@@ -39214,7 +39510,7 @@ msgid ""
 "below:"
 msgstr "然后，我们在给定的分区（客户端的本地数据）上进行训练/测试分割，并为 :code:`xgboost` 软件包转换数据格式。"
 
-#: ../../source/tutorial-quickstart-xgboost.rst:235
+#: ../../source/tutorial-quickstart-xgboost.rst:234
 msgid ""
 "The main changes we have to make to use `XGBoost` with `Flower` have to "
 "do with converting the |arrayrecord_link|_ received in the "
@@ -39223,7 +39519,7 @@ msgid ""
 " of the following conversions:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-xgboost.rst:334
+#: ../../source/tutorial-quickstart-xgboost.rst:333
 #, fuzzy
 msgid ""
 "At the first round, we call ``xgb.train()`` to build up the first set of "
@@ -39235,7 +39531,7 @@ msgstr ""
 "分别存储在 :code:`self.bst` 和 :code:`self.config` 中。从第二轮开始，我们将服务器发送的全局模型加载到 "
 ":code:`self.bst`，然后使用函数 :code:`local_boost`更新本地训练数据的模型权重，如下所示："
 
-#: ../../source/tutorial-quickstart-xgboost.rst:353
+#: ../../source/tutorial-quickstart-xgboost.rst:352
 #, fuzzy
 msgid ""
 "Given ``num_local_round``, we update trees by calling "
@@ -39246,7 +39542,7 @@ msgstr ""
 ":code:`self.bst.update`方法更新树。训练结束后，我们将提取最后一个 :code:`N=num_local_round` "
 "树并发送给服务器。"
 
-#: ../../source/tutorial-quickstart-xgboost.rst:372
+#: ../../source/tutorial-quickstart-xgboost.rst:371
 msgid ""
 "In this example we use the ``FedXgbBagging`` strategy. Then, we "
 "initialize an empty global model as the XGBoost model will be initialized"
@@ -39255,22 +39551,22 @@ msgid ""
 "it we pass:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-xgboost.rst:378
+#: ../../source/tutorial-quickstart-xgboost.rst:377
 msgid ""
 "an ``ArrayRecord`` carrying a randomly initialized model that will serve "
 "as the global"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-xgboost.rst:379
+#: ../../source/tutorial-quickstart-xgboost.rst:378
 #, fuzzy
 msgid "model to federate."
 msgstr "模型参数。"
 
-#: ../../source/tutorial-quickstart-xgboost.rst:380
+#: ../../source/tutorial-quickstart-xgboost.rst:379
 msgid "the ``num_rounds`` parameter specifying how many rounds to perform."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-xgboost.rst:444
+#: ../../source/tutorial-quickstart-xgboost.rst:443
 #, fuzzy
 msgid ""
 "Check the `source code "
@@ -39533,7 +39829,7 @@ msgstr ""
 
 #: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:389
 #: ../../source/tutorial-series-customize-the-client-pytorch.rst:328
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:419
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:422
 msgid "Recap"
 msgstr "回顾"
 
@@ -39555,8 +39851,8 @@ msgstr ""
 
 #: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:404
 #: ../../source/tutorial-series-customize-the-client-pytorch.rst:341
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:674
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:435
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:676
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:438
 #: ../../source/tutorial-series-what-is-federated-learning.rst:369
 #, fuzzy
 msgid ""
@@ -39569,8 +39865,8 @@ msgstr ""
 
 #: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:408
 #: ../../source/tutorial-series-customize-the-client-pytorch.rst:345
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:678
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:439
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:680
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:442
 #: ../../source/tutorial-series-what-is-federated-learning.rst:373
 #, fuzzy
 msgid ""
@@ -40225,85 +40521,88 @@ msgstr ""
 #: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:564
 msgid ""
 "This submits the run to the managed local SuperLink for the "
-"``[superlink.local]`` profile, which then executes the federated learning"
-" simulation with 10 clients, or SuperNodes, using the Flower Simulation "
-"Runtime. Plain ``flwr run .`` submits the run, prints the run ID, and "
-"returns without streaming logs. For the full local workflow, see :doc"
-":`how-to-run-flower-locally`."
+"``[superlink.local]`` profile (identified in the Flower configuration "
+"with ``address = \":local:\"``), which then executes the federated "
+"learning simulation with 10 clients, or SuperNodes, using the Flower "
+"Simulation Runtime. Plain ``flwr run .`` would submit the run, print the "
+"run ID, and return without streaming logs. For the full local workflow, "
+"see :doc:`how-to-run-flower-locally`. If you run into SQL database errors"
+" during local simulations, see :ref:`FAQ <faq-local-superlink-db-error>`."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:570
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:572
 msgid "You should expect streamed output similar to this:"
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:606
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:607
 msgid ""
 "Learn more about how to configure the execution of your Flower App by "
 "checking the `pyproject.toml <how-to-configure-pyproject-toml.html>`_ "
 "guide."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:610
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:611
 msgid "Behind the scenes"
 msgstr "幕后"
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:612
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:613
 msgid "So how does this work? How does Flower execute this simulation?"
 msgstr "那么它是如何工作的呢？Flower 如何进行模拟？"
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:614
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:615
 msgid ""
-"When we execute ``flwr run`` against the default local profile, Flower "
-"submits the run to the managed local SuperLink and tells it that there "
-"are 10 clients (``options.num-supernodes = 10``, where each SuperNode "
-"launches one ``ClientApp``)."
+"When we execute ``flwr run`` against the default local connection "
+"configuration (for example, the one with ``address = \":local:\"``), "
+"Flower submits the run to the managed local SuperLink. By default, the "
+"local SuperLink will configure the simulation runtime to use 10 clients. "
+"Each will run an instance of the ``ClientApp`` we defined earlier."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:618
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:620
 msgid ""
 "The local SuperLink then starts the ``ServerApp`` and asks it to issue "
 "instructions to those nodes using the ``FedAvg`` strategy. In this "
 "example, ``FedAvg`` is configured with two key parameters:"
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:622
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:624
 #, python-format
 msgid "``fraction-train=0.5`` → select 50% of the available clients for training"
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:623
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:625
 #, fuzzy, python-format
 msgid ""
 "``fraction-evaluate=1.0`` → select 100% of the available clients for "
 "evaluation"
 msgstr "使用部分可用客户进行评估。"
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:625
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:627
 msgid ""
 "This means in our example, 5 out of 10 clients will be selected for "
 "training, and all 10 clients will later participate in evaluation."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:628
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:630
 #, fuzzy
 msgid "A typical round looks like this:"
 msgstr "一个典型的修改函数可能是这样的："
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:630
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:632
 #, fuzzy
 msgid "**Training**"
 msgstr "停用"
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:632
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:634
 #, python-format
 msgid "``FedAvg`` randomly selects 5 clients (50% of 10)."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:633
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:635
 msgid "Flower sends a ``TRAIN`` message to each selected ``ClientApp``."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:634
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:636
 msgid ""
 "Each ``ClientApp`` calls the function decorated with ``@app.train()``, "
 "then returns a ``Message`` containing an ``ArrayRecord`` (the updated "
@@ -40311,53 +40610,53 @@ msgid ""
 " examples)."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:637
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:648
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:639
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:650
 msgid "The ``ServerApp`` receives all replies."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:638
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:640
 msgid ""
 "``FedAvg`` aggregates all ``ArrayRecord`` into a new ``ArrayRecord`` "
 "representing the new global model and combines all ``MetricRecord``."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:641
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:643
 #, fuzzy
 msgid "**Evaluation**"
 msgstr "说明"
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:643
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:645
 msgid "``FedAvg`` selects all 10 clients (100%)."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:644
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:646
 msgid "Flower sends an ``EVALUATE`` message to each ``ClientApp``."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:645
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:647
 msgid ""
 "Each ``ClientApp`` calls the function decorated with ``@app.evaluate()`` "
 "and returns a ``Message`` containing a ``MetricRecord`` (the evaluation "
 "loss, accuracy, and number of examples)."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:649
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:651
 msgid "``FedAvg`` aggregates all ``MetricRecord``."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:651
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:653
 msgid ""
 "Once both training and evaluation are done, the next round begins: "
 "another training step, then another evaluation step, and so on, until the"
 " configured number of rounds is reached."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:657
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:659
 msgid "Final remarks"
 msgstr "结束语"
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:659
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:661
 #, fuzzy
 msgid ""
 "Congratulations, you just trained a convolutional neural network, "
@@ -40371,7 +40670,7 @@ msgstr ""
 "进行联邦学习的基础知识。你所看到的方法同样适用于其他机器学习框架（不只是 PyTorch）和任务（不只是 CIFAR-10 图像分类），例如使用 "
 "Hugging Face Transformers 的 NLP 或使用 SpeechBrain 的语音。"
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:665
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:667
 #, fuzzy
 msgid ""
 "In the next tutorial, we're going to cover some more advanced concepts. "
@@ -40380,7 +40679,7 @@ msgid ""
 "the server side? We'll cover all this and more in the next tutorial."
 msgstr "在下一个笔记中，我们将介绍一些更先进的概念。想定制你的策略吗？在服务器端初始化参数？或者在服务器端评估聚合模型？我们将在下一个教程中介绍所有这些内容以及更多。"
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:681
+#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:683
 #, fuzzy
 msgid ""
 "The :doc:`Flower Federated Learning Tutorial - Part 2 <tutorial-series-"
@@ -40629,12 +40928,18 @@ msgstr "扩大联邦学习的规模"
 #, fuzzy
 msgid ""
 "As a last step in this tutorial, let's see how we can use Flower to "
-"experiment with a large number of clients. Locate your Flower "
-"Configuration file (use ``flwr config list``) and increase the number of "
-"SuperNodes to 1000:"
+"experiment with a large number of clients. The most straightforward way "
+"to do this is by overriding the default Simulation Runtime configuration "
+"via the ``--federation-config`` flag:"
 msgstr "作为本笔记的最后一步，让我们看看如何使用 Flower 对大量客户端进行实验。"
 
 #: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:365
+msgid ""
+"For more details on the Simulation Runtime and its configuration, check "
+"out the :doc:`Simulation Runtime documentation <how-to-run-simulations>`."
+msgstr ""
+
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:368
 msgid ""
 "Note that we can reuse the ``ClientApp`` for different ``num-supernodes``"
 " since the ``Context`` carries the ``num-partitions`` key and for "
@@ -40642,18 +40947,18 @@ msgid ""
 "of SuperNodes."
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:369
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:372
 #, fuzzy, python-format
 msgid ""
-"We now have 1000 partitions, each holding 45 training and 5 validation "
+"We now have 200 partitions, each holding 45 training and 5 validation "
 "examples. Given that the number of training examples on each client is "
 "quite small, we should probably train the model a bit longer, so we "
 "configure the clients to perform 3 local training epochs. We should also "
 "adjust the fraction of clients selected for training during each round "
-"(we don't want all 1000 clients participating in every round), so we add "
-"``fraction-train = 0.025`` and adjust ``fraction-evaluate`` to ``0.05``,"
-" which means that only 2.5% of available clients will be selected for "
-"training each round (so 25 clients) and 5% of them for evaluation (so 50 "
+"(we don't want all 200 clients participating in every round), so we add "
+"``fraction-train = 0.025`` and adjust ``fraction-evaluate`` to ``0.05``, "
+"which means that only 2.5% of available clients will be selected for "
+"training each round (so 5 clients) and 5% of them for evaluation (so 10 "
 "clients). We can add and adjust values in the ``pyproject.toml`` for ease"
 " of experimentation:"
 msgstr ""
@@ -40662,18 +40967,18 @@ msgstr ""
 "个本地训练遍历。我们还应该调整每轮训练中被选中的客户端的比例（我们不希望每轮训练都有 1000 个客户端参与），因此我们将 "
 "``fraction_fit`` 调整为 ``0.05``，这意味着每轮训练只选中 5%的可用客户端（即 50 个客户端）："
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:389
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:392
 msgid ""
 "Then, we update the initialization of our strategy in ``server_app.py`` "
 "to the following:"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:411
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:414
 #, fuzzy
 msgid "Finally, run the simulation with the following command:"
 msgstr "运行以下命令激活 virtualenv："
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:421
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:424
 #, fuzzy
 msgid ""
 "In this tutorial, we've seen how we can gradually enhance our system by "
@@ -40683,7 +40988,7 @@ msgid ""
 "right?"
 msgstr "在本笔记中，我们看到了如何通过自定义策略、在服务器端初始化参数、选择不同的策略以及在服务器端评估模型来逐步增强我们的系统。用这么少的代码就能实现这么大的灵活性，不是吗？"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:426
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:429
 #, fuzzy
 msgid ""
 "In the later sections, we've seen how we can communicate arbitrary values"
@@ -40697,7 +41002,7 @@ msgstr ""
 "虚拟客户端引擎构建了一个大规模的联邦学习模拟，并在 Jupyter Notebook 中进行了一次实验，在相同的工作负载中运行了 1000 "
 "个客户端！"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:442
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:445
 #, fuzzy
 msgid ""
 "The :doc:`Flower Federated Learning Tutorial - Part 3 <tutorial-series-"
@@ -69433,4 +69738,329 @@ msgstr ""
 #~ "`Flower 模拟 PyTorch "
 #~ "<https://colab.research.google.com/github/adap/flower/blob/main/examples"
 #~ "/simulation-pytorch/sim.ipynb>`_"
+
+#~ msgid ""
+#~ "You can also override the ``run_config``"
+#~ " values by passing the ``--run-"
+#~ "config`` flag followed by key-value "
+#~ "pairs when executing ``flwr run``. See"
+#~ " the |flwr_run_cli_link|_ for more details."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "When you use a local profile in"
+#~ " the :doc:`Flower configuration <ref-"
+#~ "flower-configuration>` with ``options.*`` and "
+#~ "no explicit ``address``, ``flwr`` does "
+#~ "not call the simulation runtime "
+#~ "directly. Instead, Flower starts a "
+#~ "managed local ``flower-superlink`` on "
+#~ "demand, submits the run through the "
+#~ "Control API, and the local SuperLink "
+#~ "executes the run with the simulation "
+#~ "runtime."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "This is the default experience for "
+#~ "a profile like the one created "
+#~ "automatically in your Flower configuration:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "If ``FLWR_HOME`` is unset, Flower stores"
+#~ " this managed local runtime under "
+#~ "``$HOME/.flwr/local-superlink``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "On the first command that needs "
+#~ "the local Control API, Flower starts "
+#~ "a local ``flower-superlink`` process "
+#~ "automatically. That process:"
+#~ msgstr ""
+
+#~ msgid "listens on ``127.0.0.1:39094`` for SimulationIO"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "You can override those default ports "
+#~ "with the environment variables "
+#~ "``FLWR_LOCAL_CONTROL_API_PORT`` and "
+#~ "``FLWR_LOCAL_SIMULATIONIO_API_PORT``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "If you decide to run the project"
+#~ " with ``flwr run .`` against the "
+#~ "default local profile, Flower submits "
+#~ "the run to a managed local "
+#~ "SuperLink, which then executes it with"
+#~ " the Simulation Runtime. Continue to "
+#~ "Step 2 to instead point ``flwr "
+#~ "run`` at a named SuperLink connection"
+#~ " for the Deployment Runtime."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "At this point, you have launched "
+#~ "two SuperNodes that are connected to "
+#~ "the same SuperLink. The system is "
+#~ "idling waiting for a ``Run`` to be"
+#~ " submitted. Before you can run your"
+#~ " Flower App through the federation we"
+#~ " need a way to tell ``flwr "
+#~ "run`` that the App is to be "
+#~ "executed via the SuperLink we just "
+#~ "started, instead of using the local "
+#~ "managed local SuperLink workflow used by"
+#~ " the default local profile. Doing "
+#~ "this is easy: define a new "
+#~ "SuperLink connection in the **Flower "
+#~ "Configuration** file, indicate the address "
+#~ "of the SuperLink and pass a "
+#~ "certificate (if any) or set the "
+#~ "insecure flag (only when testing "
+#~ "locally, real deployments require TLS)."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Running a simulation is straightforward; "
+#~ "in fact, it is the default mode"
+#~ " of operation for |flwr_run_link|_. "
+#~ "Therefore, running Flower simulations "
+#~ "primarily requires you to first define"
+#~ " a ``ClientApp`` and a ``ServerApp``. "
+#~ "A convenient way to generate a "
+#~ "minimal but fully functional Flower app"
+#~ " is by means of the |flwr_new_link|_"
+#~ " command. There are multiple apps to"
+#~ " choose from. The example below uses"
+#~ " the ``PyTorch`` quickstart app."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "If you haven't already, install Flower"
+#~ " via ``pip install -U flwr`` in "
+#~ "a Python environment."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "For local simulation profiles, ``flwr "
+#~ "run`` submits the run to a managed"
+#~ " local SuperLink via the Control API."
+#~ " If the profile has ``options.*`` and"
+#~ " no explicit ``address``, Flower starts "
+#~ "a local SuperLink automatically when "
+#~ "needed, keeps it running in the "
+#~ "background, and reuses it for ``flwr "
+#~ "list``, ``flwr log``, and ``flwr stop``."
+#~ " See :doc:`how-to-run-flower-locally`"
+#~ " for the full local workflow and "
+#~ "runtime lifecycle."
+#~ msgstr ""
+
+#~ msgid "Defining ``ClientApp`` resources"
+#~ msgstr "分配客户端资源"
+
+#~ msgid ""
+#~ "By default, the ``Simulation Runtime`` "
+#~ "assigns two CPU cores to each "
+#~ "backend worker. This means that if "
+#~ "your system has 10 CPU cores, five"
+#~ " backend workers can be running in"
+#~ " parallel, each executing a different "
+#~ "``ClientApp`` instance."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Customizing resources can be done "
+#~ "directly in the :doc:`Flower Configuration "
+#~ "<ref-flower-configuration>`. Setting the "
+#~ "``options.backend.client-resources`` variable allows"
+#~ " you to define how many CPU "
+#~ "cores and what fraction of GPU "
+#~ "memory each backend worker (and hence"
+#~ " each ``ClientApp``) gets. For example, "
+#~ "to run a simulation with 10 "
+#~ "clients where each ``ClientApp`` assumes "
+#~ "to use 1 CPU core and no GPU"
+#~ " access, you would set:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "With the above backend settings, your"
+#~ " simulation will run as many "
+#~ "``ClientApps`` in parallel as CPUs you"
+#~ " have in your system. GPU resources"
+#~ " for your ``ClientApp`` can be "
+#~ "assigned by specifying the **ratio** of"
+#~ " VRAM each should make use of."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "If you are using TensorFlow, you "
+#~ "need to `enable memory growth "
+#~ "<https://www.tensorflow.org/guide/gpu#limiting_gpu_memory_growth>`_"
+#~ " so multiple ``ClientApp`` instances can"
+#~ " share a GPU. This needs to be"
+#~ " done before launching the simulation. "
+#~ "To do so, set the environment "
+#~ "variable ``TF_FORCE_GPU_ALLOW_GROWTH=\"1\"``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Let's see how the above configuration"
+#~ " results in a different number of "
+#~ "``ClientApps`` running in parallel depending"
+#~ " on the resources available in your"
+#~ " system. If your system has:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "By default, the ``Simulation Runtime`` "
+#~ "has **access to all system resources**"
+#~ " (i.e., all CPUs, all GPUs). However,"
+#~ " in some settings, you might want "
+#~ "to limit how many of your system"
+#~ " resources are used for simulation. "
+#~ "You can do this in the "
+#~ ":doc:`Flower Configuration <ref-flower-"
+#~ "configuration>` by setting the "
+#~ "``options.backend.init-args`` variable."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "With the above setup, the Backend "
+#~ "will be initialized with a single "
+#~ "CPU and GPU. Therefore, even if "
+#~ "more CPUs and GPUs are available "
+#~ "in your system, they will not be"
+#~ " used for the simulation. The example"
+#~ " above results in a single "
+#~ "``ClientApp`` running at any given "
+#~ "point."
+#~ msgstr ""
+
+#~ msgid "For the highest performance, do not set ``options.backend.init-args``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "If you are interested, checkout the "
+#~ "details in `Advanced PyTorch Example "
+#~ "<https://github.com/flwrlabs/flower/tree/main/examples/advanced-"
+#~ "pytorch>`_ and `Advanced TensorFlow Example"
+#~ " <https://github.com/flwrlabs/flower/tree/main/examples"
+#~ "/advanced-tensorflow>`_."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "JSON output is available for the "
+#~ "commands documented here because they "
+#~ "operate through the SuperLink Control "
+#~ "API. This includes remote SuperLinks as"
+#~ " well as the managed local SuperLink"
+#~ " used by local simulation profiles."
+#~ msgstr ""
+
+#~ msgid "``0``"
+#~ msgstr "配置日志记录"
+
+#~ msgid ""
+#~ "When providing key-value pairs, values"
+#~ " can be of any type supported "
+#~ "by TOML (e.g., bool, int, float, "
+#~ "string). The specified keys (<k1> and"
+#~ " <k2> in the example) must exist "
+#~ "in the run configuration under the "
+#~ "`[tool.flwr.app.config]` section of `pyproject.toml`"
+#~ " to be overridden. Alternatively, provide"
+#~ " a TOML file containing key-value "
+#~ "pair overrides."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``[superlink.local]`` defines a local "
+#~ "simulation configuration with 10 virtual "
+#~ "SuperNodes"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Connection configuration names must be "
+#~ "unique and use the ``superlink.`` "
+#~ "prefix. The type of options you "
+#~ "specify depends on whether you're "
+#~ "configuring a simulation (``options.num-"
+#~ "supernodes``) or a deployment (``address``,"
+#~ " ``insecure``)."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "This creates a managed local SuperLink"
+#~ " profile that runs 10 virtual "
+#~ "SuperNodes through the simulation runtime."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "This creates a managed local SuperLink"
+#~ " profile with 100 virtual SuperNodes, "
+#~ "where each is allocated 1 CPU and"
+#~ " 10% of a GPU. This is useful"
+#~ " when you want to control resource"
+#~ " distribution or simulate resource-"
+#~ "constrained environments."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Use the basic configuration for quick"
+#~ " testing with default resource allocation"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Use custom resources when you need "
+#~ "to simulate specific hardware constraints "
+#~ "or want to control how many "
+#~ "virtual SuperNodes can run in parallel"
+#~ " based on your machine's resources"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "When you use a local simulation "
+#~ "profile (``options.*``), Flower CLI commands"
+#~ " that communicate with SuperLink use "
+#~ "the Control API. If the profile "
+#~ "has no explicit ``address``, Flower "
+#~ "starts a managed local SuperLink "
+#~ "automatically when needed and reuses it"
+#~ " across ``flwr run``, ``flwr list``, "
+#~ "``flwr log``, and ``flwr stop``. See "
+#~ ":doc:`how-to-run-flower-locally` for "
+#~ "the full local workflow, background "
+#~ "process behavior, and runtime file "
+#~ "locations."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "This submits the run to the "
+#~ "managed local SuperLink for the "
+#~ "``[superlink.local]`` profile, which then "
+#~ "executes the federated learning simulation "
+#~ "with 10 clients, or SuperNodes, using"
+#~ " the Flower Simulation Runtime. Plain "
+#~ "``flwr run .`` submits the run, "
+#~ "prints the run ID, and returns "
+#~ "without streaming logs. For the full "
+#~ "local workflow, see :doc:`how-to-run-"
+#~ "flower-locally`."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "When we execute ``flwr run`` against "
+#~ "the default local profile, Flower "
+#~ "submits the run to the managed "
+#~ "local SuperLink and tells it that "
+#~ "there are 10 clients (``options.num-"
+#~ "supernodes = 10``, where each SuperNode"
+#~ " launches one ``ClientApp``)."
+#~ msgstr ""
 
