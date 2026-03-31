@@ -134,8 +134,10 @@ def train_download(msg: Message, context: Context):
         return Message(content=RecordDict({"metrics": MetricRecord()}), reply_to=msg)
 
     layer_base_dir = layer_dir(context)
-    touched_layer_paths: set[str] = set()
-    touched_layer_names: set[str] = set()
+    touched_layer_paths: list[str] = []
+    touched_layer_names: list[str] = []
+    touched_layer_paths_seen: set[str] = set()
+    touched_layer_names_seen: set[str] = set()
 
     for layer_name, layer_shape, start, end, is_last_chunk in entries:
         chunk_name = chunk_key(layer_name, start, end)
@@ -181,14 +183,18 @@ def train_download(msg: Message, context: Context):
             flush_cached_layer(_DOWNLOAD_LAYER_CACHE, cache_key)
             _DOWNLOAD_LAYER_CACHE.pop(cache_key, None)
 
-        touched_layer_paths.add(file_path)
-        touched_layer_names.add(layer_name)
+        if file_path not in touched_layer_paths_seen:
+            touched_layer_paths_seen.add(file_path)
+            touched_layer_paths.append(file_path)
+        if layer_name not in touched_layer_names_seen:
+            touched_layer_names_seen.add(layer_name)
+            touched_layer_names.append(layer_name)
 
     # Keep context state aligned for subsequent train/train_comms calls.
     layer_paths: list[str] = []
     if STATE_LAYER_PATHS in context.state:
         layer_paths = list(context.state[STATE_LAYER_PATHS]["paths"])
-    for file_path in sorted(touched_layer_paths):
+    for file_path in touched_layer_paths:
         if file_path not in layer_paths:
             layer_paths.append(file_path)
     context.state[STATE_LAYER_PATHS] = ConfigRecord({"paths": layer_paths})
@@ -196,7 +202,7 @@ def train_download(msg: Message, context: Context):
     layer_names: list[str] = []
     if STATE_LAYER_NAMES in context.state:
         layer_names = list(context.state[STATE_LAYER_NAMES]["names"])
-    for layer_name in sorted(touched_layer_names):
+    for layer_name in touched_layer_names:
         if layer_name not in layer_names:
             layer_names.append(layer_name)
     context.state[STATE_LAYER_NAMES] = ConfigRecord({"names": layer_names})
