@@ -63,6 +63,7 @@ class RunRecord:  # pylint: disable=R0902
     run: Run
     federation_config: SimulationConfig | None = None
     logs: list[tuple[float, str]] = field(default_factory=list)
+    usage_reported_at: str = ""
     log_lock: threading.Lock = field(default_factory=threading.Lock)
     lock: threading.RLock = field(default_factory=threading.RLock)
 
