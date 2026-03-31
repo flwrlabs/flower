@@ -1109,7 +1109,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             query = """
                 UPDATE run
                 SET sub_status = :failed, details = :details, finished_at = :finished_at
-                WHERE run_id = :run_id
+                WHERE run_id = :run_id AND finished_at = ''
             """
             data = [
                 {

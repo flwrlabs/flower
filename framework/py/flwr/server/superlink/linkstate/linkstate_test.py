@@ -1993,6 +1993,29 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state.initialize()
         return state
 
+    def test_token_expiry_does_not_overwrite_finished_completed_run(self) -> None:
+        """Ensure token cleanup doesn't mutate terminal COMPLETED status."""
+        # Prepare
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        assert state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
+        assert state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
+        assert state.update_run_status(
+            run_id, RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done")
+        )
+        assert state.create_token(run_id) is not None
+
+        # Execute: force token expiry and trigger cleanup
+        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = patched_dt
+            status = state.get_run_status({run_id})[run_id]
+
+        # Assert
+        assert status.status == Status.FINISHED
+        assert status.sub_status == SubStatus.COMPLETED
+        assert status.details == "done"
+
 
 class SqlFileBasedTest(StateTest, unittest.TestCase):
     """Test SqlLinkState implementation with file-based database."""
