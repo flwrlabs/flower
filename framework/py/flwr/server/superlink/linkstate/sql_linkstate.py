@@ -1038,11 +1038,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # Update the status
         rows = self.query(query, params)
 
-        if len(rows) > 0:
-            self.federation_manager.report_run_usage(
-                run_id if new_status.status == Status.FINISHED else None
-            )
-
+        # Report usage
+        self.federation_manager.report_run_usage()
         return len(rows) > 0
 
     def acknowledge_node_heartbeat(

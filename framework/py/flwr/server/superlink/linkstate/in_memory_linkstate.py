@@ -721,9 +721,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 run_record.run.finished_at = current.isoformat()
             run_record.run.status = new_status
 
-        self.federation_manager.report_run_usage(
-            run_id if new_status.status == Status.FINISHED else None
-        )
+        # Report usage
+        self.federation_manager.report_run_usage()
         return True
 
     def acknowledge_node_heartbeat(

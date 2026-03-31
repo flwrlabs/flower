@@ -25,7 +25,7 @@ import unittest
 from abc import abstractmethod
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from unittest.mock import Mock, call, patch
+from unittest.mock import Mock, patch
 from uuid import uuid4
 
 from parameterized import parameterized
@@ -402,22 +402,11 @@ class StateTest(CoreStateTest):
         for run_status in run_statuses:
             assert not state.update_run_status(run_id, run_status)
 
-    def test_usage_report_hook_called_on_finished_transition(self) -> None:
-        """Test report_run_usage hook receives finished run ID."""
-        # Prepare
-        state = self.state_factory()
-        run_id = create_dummy_run(state)
-        state.federation_manager.report_run_usage = Mock()  # type: ignore
-        # Execute
-        transition_run_status(state, run_id, 3)
-        # Assert
-        state.federation_manager.report_run_usage.assert_any_call(run_id)
-
-    @parameterized.expand([(1,), (2,)])  # type: ignore
-    def test_usage_report_hook_called_on_non_finished_transition(
+    @parameterized.expand([(1,), (2,), (3,)])  # type: ignore
+    def test_usage_report_hook_called_on_each_successful_transition(
         self, num_transitions: int
     ) -> None:
-        """Test report_run_usage hook receives None for non-finished transitions."""
+        """Test report_run_usage hook is called once per successful transition."""
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
@@ -425,9 +414,7 @@ class StateTest(CoreStateTest):
         # Execute
         transition_run_status(state, run_id, num_transitions)
         # Assert
-        state.federation_manager.report_run_usage.assert_has_calls(
-            [call(None)] * num_transitions
-        )
+        assert state.federation_manager.report_run_usage.call_count == num_transitions
 
     def test_get_message_ins_empty(self) -> None:
         """Validate that a new state has no input Messages."""

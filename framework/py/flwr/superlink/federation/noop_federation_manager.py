@@ -216,6 +216,5 @@ class NoOpFederationManager(FederationManager):
             "`revoke_invitation` is not supported by NoOpFederationManager."
         )
 
-    def report_run_usage(self, run_id: int | None) -> None:
-        """Report run usage if its status is finished."""
-        _ = run_id
+    def report_run_usage(self) -> None:
+        """Call hook on successful run status transitions."""
