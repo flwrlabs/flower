@@ -1037,6 +1037,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         # Update the status
         rows = self.query(query, params)
+        # Report usage if the run is marked as finished after the update
+        if rows and new_status.status == Status.FINISHED:
+            self.federation_manager.report_run_usage()
         return len(rows) > 0
 
     def acknowledge_node_heartbeat(
@@ -1117,6 +1120,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 for run_id, active_until in expired_records
             ]
             self.query(query, data)
+
+        # Report usage for runs that have been marked as failed due to expired tokens
+        self.federation_manager.report_run_usage()
 
     def get_serverapp_context(self, run_id: int) -> Context | None:
         """Get the context for the specified `run_id`."""

@@ -324,6 +324,14 @@ class FederationManager(ABC):
         """
 
     @abstractmethod
+    def report_run_usage(self) -> None:
+        """Call hook to report usage for runs.
+
+        This method is called on successful run status transition to FINISHED and when
+        runs are marked as failed due to expired tokens.
+        """
+
+    @abstractmethod
     def can_execute(
         self, flwr_aid: str, action: ActionType, federation: str, run_type: RunType
     ) -> bool:
