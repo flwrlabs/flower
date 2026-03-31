@@ -250,11 +250,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             msg = f"`node_id` must be != {SUPERLINK_NODE_ID}"
             raise AssertionError(msg)
 
-        # Convert the uint64 value to sint64 for SQLite
-        sint64_node_id = uint64_to_int64(node_id)
-
         with self.session():
-            rows = self._claim_message_ins_rows(sint64_node_id, limit)
+            rows = self._claim_message_ins_rows(node_id, limit)
             message_ids: set[str] = {row["message_id"] for row in rows}
             self._check_stored_messages(message_ids)
 
@@ -274,12 +271,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         return result
 
     def _claim_message_ins_rows(
-        self, sint64_node_id: int, limit: int | None
+        self, node_id: int, limit: int | None
     ) -> list[dict[str, Any]]:
         """Atomically claim eligible instruction Messages for a node."""
         current_time = now()
         params: dict[str, str | int | float] = {
-            "node_id": sint64_node_id,
+            # Convert the uint64 value to sint64 for SQLite
+            "node_id": uint64_to_int64(node_id),
             "current": current_time.timestamp(),
             "delivered_at": current_time.isoformat(),
         }
