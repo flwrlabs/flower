@@ -15,7 +15,6 @@
 """In-memory NodeState implementation."""
 
 
-import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
 from threading import Lock, RLock
@@ -24,6 +23,7 @@ from flwr.common import Context, Error, Message, now
 from flwr.common.constant import ErrorCode
 from flwr.common.typing import Fab, Run
 from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS
+from flwr.supercore.corestate.fab_helpers import get_fab_locked, store_fab_locked
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -92,34 +92,11 @@ class InMemoryNodeState(
 
     def store_fab(self, fab: Fab) -> str:
         """Store a FAB."""
-        fab_hash = hashlib.sha256(fab.content).hexdigest()
-        if fab.hash_str and fab.hash_str != fab_hash:
-            raise ValueError(
-                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
-            )
-        with self.lock_fab_store:
-            # Keep launch behavior: last write wins for metadata under the same
-            # content hash.
-            self.fab_store[fab_hash] = Fab(
-                hash_str=fab_hash,
-                content=fab.content,
-                verifications=dict(fab.verifications),
-            )
-        return fab_hash
+        return store_fab_locked(self.lock_fab_store, self.fab_store, fab)
 
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return a FAB by hash."""
-        with self.lock_fab_store:
-            fab = self.fab_store.get(fab_hash)
-            if fab is None:
-                return None
-            # Launch tradeoff: do not recompute content hash on reads; rely on
-            # write-time validation and hash-addressed lookup.
-            return Fab(
-                hash_str=fab.hash_str,
-                content=fab.content,
-                verifications=dict(fab.verifications),
-            )
+        return get_fab_locked(self.lock_fab_store, self.fab_store, fab_hash)
 
     def store_message(self, message: Message) -> str | None:
         """Store a message."""

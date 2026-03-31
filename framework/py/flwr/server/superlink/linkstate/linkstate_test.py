@@ -108,6 +108,23 @@ class StateTest(CoreStateTest):
         assert retrieved is not None
         self.assertEqual(retrieved.verifications, {"meta": "next"})
 
+    def test_get_fab_returns_defensive_copy(self) -> None:
+        """Test retrieved FAB metadata mutations do not affect stored metadata."""
+        state = self.state_factory()
+        content = b"fab-content"
+        hash_str = hashlib.sha256(content).hexdigest()
+
+        fab_hash = state.store_fab(Fab(hash_str, content, {"meta": "data"}))
+        retrieved = state.get_fab(fab_hash)
+        self.assertIsNotNone(retrieved)
+        assert retrieved is not None
+        retrieved.verifications["meta"] = "mutated"
+
+        reloaded = state.get_fab(fab_hash)
+        self.assertIsNotNone(reloaded)
+        assert reloaded is not None
+        self.assertEqual(reloaded.verifications, {"meta": "data"})
+
     def test_get_fab_missing_returns_none(self) -> None:
         """Test missing FAB retrieval."""
         state = self.state_factory()
