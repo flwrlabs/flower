@@ -78,9 +78,9 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import (
-    ActionType,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION,
+    ActionType,
     RunType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError

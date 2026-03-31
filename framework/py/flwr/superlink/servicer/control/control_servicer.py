@@ -110,9 +110,9 @@ from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.constant import (
-    ActionType,
     NOOP_FEDERATION,
     PLATFORM_API_URL,
+    ActionType,
     RunType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
@@ -208,7 +208,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             ):
                 raise FlowerError(
                     ApiErrorCode.NO_PERMISSIONS,
-                    "You are not entitled to execute runs in this federation.",
+                    f"'{ActionType.START_RUN}' action cannot be executed on federation "
+                    f"'{federation}'.",
                 )
 
         try:
