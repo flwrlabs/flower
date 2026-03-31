@@ -1968,7 +1968,7 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
 
     __test__ = True
     _CONCURRENT_TEST_TIMEOUT = 10.0
-    states: list[SqlLinkState]
+    states: list[SqlLinkState] = []
 
     def state_factory(self) -> SqlLinkState:
         """Return SqlLinkState with file-based database."""
@@ -2002,7 +2002,7 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
         fn: Callable[[SqlLinkState], Any],
         timeout: float = _CONCURRENT_TEST_TIMEOUT,
     ) -> list[Any]:
-        """Run callables concurrently and return their results."""
+        """Query SqlLinkState concurrently and return their results."""
         n_threads = len(self.states)
         barrier = threading.Barrier(n_threads + 1)
         results: list[Any] = [None] * n_threads
@@ -2042,9 +2042,9 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
     def test_get_message_ins_claim_is_unique_across_replicas(self) -> None:
         """Ensure concurrent replicas cannot both claim the same instruction."""
         with tempfile.TemporaryDirectory() as tmpdir:
+            # Prepare
             db_path = os.path.join(tmpdir, "shared.db")
             state_0 = self._create_shared_sql_states(db_path)[0]
-
             node_id = create_dummy_node(state_0)
             run_id = create_dummy_run(state_0)
             msg = create_ins_message_obj(
@@ -2052,17 +2052,20 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
             )
             assert state_0.store_message_ins(message=msg)
 
+            # Execute
             results = self._query_states_in_parallel(
                 lambda state: state.get_message_ins(node_id=node_id, limit=1)
             )
             claimed = [msgs for msgs in results if msgs]
+
+            # Assert
             assert len(claimed) == 1
             assert len(claimed[0]) == 1
 
-    # pylint: disable-next=too-many-locals
     def test_get_message_res_claim_is_unique_across_replicas(self) -> None:
         """Ensure concurrent replicas cannot both claim the same reply Message."""
         with tempfile.TemporaryDirectory() as tmpdir:
+            # Prepare
             db_path = os.path.join(tmpdir, "shared.db")
             state_0 = self._create_shared_sql_states(db_path)[0]
 
@@ -2080,16 +2083,20 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
             msg_res.metadata.__dict__["_message_id"] = str(uuid4())
             assert state_0.store_message_res(msg_res)
 
+            # Execute
             msg_id = pulled_ins.metadata.message_id
             results = self._query_states_in_parallel(
                 lambda state: state.get_message_res({msg_id}),
             )
+
+            # Assert
             assert sum(len(res) for res in results if res is not None) == 1
 
     # pylint: disable-next=too-many-locals
     def test_get_message_ins_distributes_available_work_under_contention(self) -> None:
         """Ensure two replicas can each claim work when two Messages are available."""
         with tempfile.TemporaryDirectory() as tmpdir:
+            # Prepare
             db_path = os.path.join(tmpdir, "shared.db")
             state_0 = self._create_shared_sql_states(db_path)[0]
 
@@ -2104,10 +2111,13 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
             assert state_0.store_message_ins(message=msg_0)
             assert state_0.store_message_ins(message=msg_1)
 
+            # Execute
             results = self._query_states_in_parallel(
                 lambda state: state.get_message_ins(node_id=node_id, limit=1)
             )
             claimed_messages = [msgs for msgs in results if msgs]
+
+            # Assert
             assert len(claimed_messages) == 2
             assert all(len(msgs) == 1 for msgs in claimed_messages)
             assert (
@@ -2119,6 +2129,7 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
     def test_update_run_status_running_claim_is_atomic_across_replicas(self) -> None:
         """Ensure only one replica can claim STARTING -> RUNNING transition."""
         with tempfile.TemporaryDirectory() as tmpdir:
+            # Prepare
             db_path = os.path.join(tmpdir, "shared.db")
             state_0, _ = self._create_shared_sql_states(db_path)
             run_id = create_dummy_run(state_0)
@@ -2129,6 +2140,7 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
             result_queue = ctx.Queue()
             timeout = self._CONCURRENT_TEST_TIMEOUT
 
+            # Execute
             processes = [
                 ctx.Process(
                     target=_claim_running_in_separate_process,
@@ -2169,6 +2181,7 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
             if errors:
                 self.fail(f"Concurrent run-claim process failed: {errors[0]}")
 
+            # Assert
             assert results.count(True) == 1
             assert results.count(False) == 1
 
