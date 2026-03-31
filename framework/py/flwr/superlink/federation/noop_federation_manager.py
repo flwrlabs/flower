@@ -218,9 +218,16 @@ class NoOpFederationManager(FederationManager):
             "`revoke_invitation` is not supported by NoOpFederationManager."
         )
 
+    def report_run_usage(self) -> None:
+        """Call hook to report usage for runs.
+
+        This method is called on successful run status transition to FINISHED and when
+        runs are marked as failed due to expired tokens.
+        """
+
     def can_execute(
         self, flwr_aid: str, action: ActionType, federation: str, run_type: RunType
     ) -> bool:
-        """Allow all actions in no-op mode."""
+        """Check if an account can execute an action under a given context."""
         _ = (flwr_aid, action, federation, run_type)
         return True
