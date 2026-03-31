@@ -91,6 +91,13 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         self.assertEqual(retrieved.content, fab.content)
         self.assertEqual(retrieved.verifications, fab.verifications)
 
+        # Retrieved FAB should be a defensive copy.
+        retrieved.verifications["meta"] = "mutated"
+        reloaded = self.state.get_fab(fab_hash)
+        self.assertIsNotNone(reloaded)
+        assert reloaded is not None
+        self.assertEqual(reloaded.verifications, {"meta": "data"})
+
         # Also verify write-time hash validation rejects mismatched hashes.
         with self.assertRaisesRegex(ValueError, "FAB hash mismatch"):
             self.state.store_fab(Fab("not-the-content-hash", b"fab-content", {}))
@@ -107,22 +114,6 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         self.assertIsNotNone(retrieved)
         assert retrieved is not None
         self.assertEqual(retrieved.verifications, {"meta": "next"})
-
-    def test_get_fab_returns_defensive_copy(self) -> None:
-        """Test retrieved FAB metadata mutations do not affect stored metadata."""
-        content = b"fab-content"
-        hash_str = hashlib.sha256(content).hexdigest()
-
-        fab_hash = self.state.store_fab(Fab(hash_str, content, {"meta": "data"}))
-        retrieved = self.state.get_fab(fab_hash)
-        self.assertIsNotNone(retrieved)
-        assert retrieved is not None
-        retrieved.verifications["meta"] = "mutated"
-
-        reloaded = self.state.get_fab(fab_hash)
-        self.assertIsNotNone(reloaded)
-        assert reloaded is not None
-        self.assertEqual(reloaded.verifications, {"meta": "data"})
 
     def test_get_fab_missing_returns_none(self) -> None:
         """Test missing FAB retrieval."""

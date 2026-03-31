@@ -93,6 +93,13 @@ class StateTest(CoreStateTest):
         self.assertEqual(retrieved.content, fab.content)
         self.assertEqual(retrieved.verifications, fab.verifications)
 
+        # Retrieved FAB should be a defensive copy.
+        retrieved.verifications["meta"] = "mutated"
+        reloaded = state.get_fab(fab_hash)
+        self.assertIsNotNone(reloaded)
+        assert reloaded is not None
+        self.assertEqual(reloaded.verifications, {"meta": "data"})
+
     def test_store_fab_deduplicates_by_hash(self) -> None:
         """Test storing the same FAB content reuses the same hash."""
         state = self.state_factory()
@@ -107,23 +114,6 @@ class StateTest(CoreStateTest):
         self.assertIsNotNone(retrieved)
         assert retrieved is not None
         self.assertEqual(retrieved.verifications, {"meta": "next"})
-
-    def test_get_fab_returns_defensive_copy(self) -> None:
-        """Test retrieved FAB metadata mutations do not affect stored metadata."""
-        state = self.state_factory()
-        content = b"fab-content"
-        hash_str = hashlib.sha256(content).hexdigest()
-
-        fab_hash = state.store_fab(Fab(hash_str, content, {"meta": "data"}))
-        retrieved = state.get_fab(fab_hash)
-        self.assertIsNotNone(retrieved)
-        assert retrieved is not None
-        retrieved.verifications["meta"] = "mutated"
-
-        reloaded = state.get_fab(fab_hash)
-        self.assertIsNotNone(reloaded)
-        assert reloaded is not None
-        self.assertEqual(reloaded.verifications, {"meta": "data"})
 
     def test_get_fab_missing_returns_none(self) -> None:
         """Test missing FAB retrieval."""
