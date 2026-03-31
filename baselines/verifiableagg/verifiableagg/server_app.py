@@ -68,7 +68,8 @@ def main(grid: Grid, context: Context) -> None:
 
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     model_path = artifacts_dir / "final_model.pt"
-    torch.save(result.arrays.to_torch_state_dict(), model_path)
+    final_arrays = result.arrays if result.arrays is not None else initial_arrays
+    torch.save(final_arrays.to_torch_state_dict(), model_path)
 
     verification_rounds = [
         {
