@@ -1038,7 +1038,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # Update the status
         rows = self.query(query, params)
         # Report usage if the run is marked as finished after the update
-        if new_status.status == Status.FINISHED:
+        if rows and new_status.status == Status.FINISHED:
             self.federation_manager.report_run_usage()
         return len(rows) > 0
 
