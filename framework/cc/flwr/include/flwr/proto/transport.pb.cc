@@ -497,6 +497,7 @@ const ::PROTOBUF_NAMESPACE_ID::uint32 TableStruct_flwr_2fproto_2ftransport_2epro
   ::PROTOBUF_NAMESPACE_ID::internal::kInvalidFieldOffsetTag,
   ::PROTOBUF_NAMESPACE_ID::internal::kInvalidFieldOffsetTag,
   ::PROTOBUF_NAMESPACE_ID::internal::kInvalidFieldOffsetTag,
+  ::PROTOBUF_NAMESPACE_ID::internal::kInvalidFieldOffsetTag,
   PROTOBUF_FIELD_OFFSET(::flwr::proto::Scalar, scalar_),
 };
 static const ::PROTOBUF_NAMESPACE_ID::internal::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
@@ -610,22 +611,22 @@ const char descriptor_table_protodef_flwr_2fproto_2ftransport_2eproto[] PROTOBUF
   "C\n\007metrics\030\004 \003(\01322.flwr.proto.ClientMess"
   "age.EvaluateRes.MetricsEntry\032B\n\014MetricsE"
   "ntry\022\013\n\003key\030\001 \001(\t\022!\n\005value\030\002 \001(\0132\022.flwr."
-  "proto.Scalar:\0028\001B\005\n\003msg\"i\n\006Scalar\022\020\n\006dou"
-  "ble\030\001 \001(\001H\000\022\020\n\006sint64\030\010 \001(\022H\000\022\016\n\004bool\030\r "
-  "\001(\010H\000\022\020\n\006string\030\016 \001(\tH\000\022\017\n\005bytes\030\017 \001(\014H\000"
-  "B\010\n\006scalar*\215\001\n\004Code\022\006\n\002OK\020\000\022\"\n\036GET_PROPE"
-  "RTIES_NOT_IMPLEMENTED\020\001\022\"\n\036GET_PARAMETER"
-  "S_NOT_IMPLEMENTED\020\002\022\027\n\023FIT_NOT_IMPLEMENT"
-  "ED\020\003\022\034\n\030EVALUATE_NOT_IMPLEMENTED\020\004*[\n\006Re"
-  "ason\022\013\n\007UNKNOWN\020\000\022\r\n\tRECONNECT\020\001\022\026\n\022POWE"
-  "R_DISCONNECTED\020\002\022\024\n\020WIFI_UNAVAILABLE\020\003\022\007"
-  "\n\003ACK\020\0042S\n\rFlowerService\022B\n\004Join\022\031.flwr."
-  "proto.ClientMessage\032\031.flwr.proto.ServerM"
-  "essage\"\000(\0010\001b\006proto3"
+  "proto.Scalar:\0028\001B\005\n\003msg\"{\n\006Scalar\022\020\n\006dou"
+  "ble\030\001 \001(\001H\000\022\020\n\006uint64\030\006 \001(\004H\000\022\020\n\006sint64\030"
+  "\010 \001(\022H\000\022\016\n\004bool\030\r \001(\010H\000\022\020\n\006string\030\016 \001(\tH"
+  "\000\022\017\n\005bytes\030\017 \001(\014H\000B\010\n\006scalar*\215\001\n\004Code\022\006\n"
+  "\002OK\020\000\022\"\n\036GET_PROPERTIES_NOT_IMPLEMENTED\020"
+  "\001\022\"\n\036GET_PARAMETERS_NOT_IMPLEMENTED\020\002\022\027\n"
+  "\023FIT_NOT_IMPLEMENTED\020\003\022\034\n\030EVALUATE_NOT_I"
+  "MPLEMENTED\020\004*[\n\006Reason\022\013\n\007UNKNOWN\020\000\022\r\n\tR"
+  "ECONNECT\020\001\022\026\n\022POWER_DISCONNECTED\020\002\022\024\n\020WI"
+  "FI_UNAVAILABLE\020\003\022\007\n\003ACK\020\0042S\n\rFlowerServi"
+  "ce\022B\n\004Join\022\031.flwr.proto.ClientMessage\032\031."
+  "flwr.proto.ServerMessage\"\000(\0010\001b\006proto3"
   ;
 static ::PROTOBUF_NAMESPACE_ID::internal::once_flag descriptor_table_flwr_2fproto_2ftransport_2eproto_once;
 const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable descriptor_table_flwr_2fproto_2ftransport_2eproto = {
-  false, false, 2860, descriptor_table_protodef_flwr_2fproto_2ftransport_2eproto, "flwr/proto/transport.proto", 
+  false, false, 2878, descriptor_table_protodef_flwr_2fproto_2ftransport_2eproto, "flwr/proto/transport.proto", 
   &descriptor_table_flwr_2fproto_2ftransport_2eproto_once, nullptr, 0, 22,
   schemas, file_default_instances, TableStruct_flwr_2fproto_2ftransport_2eproto::offsets,
   file_level_metadata_flwr_2fproto_2ftransport_2eproto, file_level_enum_descriptors_flwr_2fproto_2ftransport_2eproto, file_level_service_descriptors_flwr_2fproto_2ftransport_2eproto,
@@ -4717,6 +4718,10 @@ Scalar::Scalar(const Scalar& from)
       _internal_set_double_(from._internal_double_());
       break;
     }
+    case kUint64: {
+      _internal_set_uint64(from._internal_uint64());
+      break;
+    }
     case kSint64: {
       _internal_set_sint64(from._internal_sint64());
       break;
@@ -4775,6 +4780,10 @@ void Scalar::clear_scalar() {
       // No need to clear
       break;
     }
+    case kUint64: {
+      // No need to clear
+      break;
+    }
     case kSint64: {
       // No need to clear
       break;
@@ -4820,6 +4829,14 @@ const char* Scalar::_InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::int
         if (PROTOBUF_PREDICT_TRUE(static_cast<::PROTOBUF_NAMESPACE_ID::uint8>(tag) == 9)) {
           _internal_set_double_(::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<double>(ptr));
           ptr += sizeof(double);
+        } else
+          goto handle_unusual;
+        continue;
+      // uint64 uint64 = 6;
+      case 6:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<::PROTOBUF_NAMESPACE_ID::uint8>(tag) == 48)) {
+          _internal_set_uint64(::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr));
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -4893,6 +4910,12 @@ failure:
     target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteDoubleToArray(1, this->_internal_double_(), target);
   }
 
+  // uint64 uint64 = 6;
+  if (_internal_has_uint64()) {
+    target = stream->EnsureSpace(target);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteUInt64ToArray(6, this->_internal_uint64(), target);
+  }
+
   // sint64 sint64 = 8;
   if (_internal_has_sint64()) {
     target = stream->EnsureSpace(target);
@@ -4941,6 +4964,11 @@ size_t Scalar::ByteSizeLong() const {
     // double double = 1;
     case kDouble: {
       total_size += 1 + 8;
+      break;
+    }
+    // uint64 uint64 = 6;
+    case kUint64: {
+      total_size += ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::UInt64SizePlusOne(this->_internal_uint64());
       break;
     }
     // sint64 sint64 = 8;
@@ -4996,6 +5024,10 @@ void Scalar::MergeFrom(const Scalar& from) {
   switch (from.scalar_case()) {
     case kDouble: {
       _internal_set_double_(from._internal_double_());
+      break;
+    }
+    case kUint64: {
+      _internal_set_uint64(from._internal_uint64());
       break;
     }
     case kSint64: {

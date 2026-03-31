@@ -46,7 +46,7 @@ struct TableStruct_flwr_2fproto_2fnode_2eproto {
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
   static const ::PROTOBUF_NAMESPACE_ID::internal::AuxiliaryParseTableField aux[]
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
-  static const ::PROTOBUF_NAMESPACE_ID::internal::ParseTable schema[1]
+  static const ::PROTOBUF_NAMESPACE_ID::internal::ParseTable schema[2]
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
   static const ::PROTOBUF_NAMESPACE_ID::internal::FieldMetadata field_metadata[];
   static const ::PROTOBUF_NAMESPACE_ID::internal::SerializationTable serialization_table[];
@@ -58,10 +58,14 @@ namespace proto {
 class Node;
 struct NodeDefaultTypeInternal;
 extern NodeDefaultTypeInternal _Node_default_instance_;
+class NodeInfo;
+struct NodeInfoDefaultTypeInternal;
+extern NodeInfoDefaultTypeInternal _NodeInfo_default_instance_;
 }  // namespace proto
 }  // namespace flwr
 PROTOBUF_NAMESPACE_OPEN
 template<> ::flwr::proto::Node* Arena::CreateMaybeMessage<::flwr::proto::Node>(Arena*);
+template<> ::flwr::proto::NodeInfo* Arena::CreateMaybeMessage<::flwr::proto::NodeInfo>(Arena*);
 PROTOBUF_NAMESPACE_CLOSE
 namespace flwr {
 namespace proto {
@@ -188,24 +192,14 @@ class Node final :
 
   enum : int {
     kNodeIdFieldNumber = 1,
-    kAnonymousFieldNumber = 2,
   };
-  // sint64 node_id = 1;
+  // uint64 node_id = 1;
   void clear_node_id();
-  ::PROTOBUF_NAMESPACE_ID::int64 node_id() const;
-  void set_node_id(::PROTOBUF_NAMESPACE_ID::int64 value);
+  ::PROTOBUF_NAMESPACE_ID::uint64 node_id() const;
+  void set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value);
   private:
-  ::PROTOBUF_NAMESPACE_ID::int64 _internal_node_id() const;
-  void _internal_set_node_id(::PROTOBUF_NAMESPACE_ID::int64 value);
-  public:
-
-  // bool anonymous = 2;
-  void clear_anonymous();
-  bool anonymous() const;
-  void set_anonymous(bool value);
-  private:
-  bool _internal_anonymous() const;
-  void _internal_set_anonymous(bool value);
+  ::PROTOBUF_NAMESPACE_ID::uint64 _internal_node_id() const;
+  void _internal_set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value);
   public:
 
   // @@protoc_insertion_point(class_scope:flwr.proto.Node)
@@ -215,9 +209,318 @@ class Node final :
   template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
-  ::PROTOBUF_NAMESPACE_ID::int64 node_id_;
-  bool anonymous_;
+  ::PROTOBUF_NAMESPACE_ID::uint64 node_id_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  friend struct ::TableStruct_flwr_2fproto_2fnode_2eproto;
+};
+// -------------------------------------------------------------------
+
+class NodeInfo final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:flwr.proto.NodeInfo) */ {
+ public:
+  inline NodeInfo() : NodeInfo(nullptr) {}
+  ~NodeInfo() override;
+  explicit constexpr NodeInfo(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  NodeInfo(const NodeInfo& from);
+  NodeInfo(NodeInfo&& from) noexcept
+    : NodeInfo() {
+    *this = ::std::move(from);
+  }
+
+  inline NodeInfo& operator=(const NodeInfo& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline NodeInfo& operator=(NodeInfo&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const NodeInfo& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const NodeInfo* internal_default_instance() {
+    return reinterpret_cast<const NodeInfo*>(
+               &_NodeInfo_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    1;
+
+  friend void swap(NodeInfo& a, NodeInfo& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(NodeInfo* other) {
+    if (other == this) return;
+    if (GetOwningArena() == other->GetOwningArena()) {
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(NodeInfo* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  inline NodeInfo* New() const final {
+    return new NodeInfo();
+  }
+
+  NodeInfo* New(::PROTOBUF_NAMESPACE_ID::Arena* arena) const final {
+    return CreateMaybeMessage<NodeInfo>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const NodeInfo& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom(const NodeInfo& from);
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  ::PROTOBUF_NAMESPACE_ID::uint8* _InternalSerialize(
+      ::PROTOBUF_NAMESPACE_ID::uint8* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _cached_size_.Get(); }
+
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(NodeInfo* other);
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "flwr.proto.NodeInfo";
+  }
+  protected:
+  explicit NodeInfo(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  private:
+  static void ArenaDtor(void* object);
+  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kOwnerAidFieldNumber = 2,
+    kOwnerNameFieldNumber = 3,
+    kStatusFieldNumber = 4,
+    kRegisteredAtFieldNumber = 5,
+    kLastActivatedAtFieldNumber = 6,
+    kLastDeactivatedAtFieldNumber = 7,
+    kUnregisteredAtFieldNumber = 8,
+    kPublicKeyFieldNumber = 11,
+    kNodeIdFieldNumber = 1,
+    kOnlineUntilFieldNumber = 9,
+    kHeartbeatIntervalFieldNumber = 10,
+  };
+  // string owner_aid = 2;
+  void clear_owner_aid();
+  const std::string& owner_aid() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_owner_aid(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_owner_aid();
+  PROTOBUF_MUST_USE_RESULT std::string* release_owner_aid();
+  void set_allocated_owner_aid(std::string* owner_aid);
+  private:
+  const std::string& _internal_owner_aid() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_owner_aid(const std::string& value);
+  std::string* _internal_mutable_owner_aid();
+  public:
+
+  // string owner_name = 3;
+  void clear_owner_name();
+  const std::string& owner_name() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_owner_name(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_owner_name();
+  PROTOBUF_MUST_USE_RESULT std::string* release_owner_name();
+  void set_allocated_owner_name(std::string* owner_name);
+  private:
+  const std::string& _internal_owner_name() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_owner_name(const std::string& value);
+  std::string* _internal_mutable_owner_name();
+  public:
+
+  // string status = 4;
+  void clear_status();
+  const std::string& status() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_status(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_status();
+  PROTOBUF_MUST_USE_RESULT std::string* release_status();
+  void set_allocated_status(std::string* status);
+  private:
+  const std::string& _internal_status() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_status(const std::string& value);
+  std::string* _internal_mutable_status();
+  public:
+
+  // string registered_at = 5;
+  void clear_registered_at();
+  const std::string& registered_at() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_registered_at(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_registered_at();
+  PROTOBUF_MUST_USE_RESULT std::string* release_registered_at();
+  void set_allocated_registered_at(std::string* registered_at);
+  private:
+  const std::string& _internal_registered_at() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_registered_at(const std::string& value);
+  std::string* _internal_mutable_registered_at();
+  public:
+
+  // optional string last_activated_at = 6;
+  bool has_last_activated_at() const;
+  private:
+  bool _internal_has_last_activated_at() const;
+  public:
+  void clear_last_activated_at();
+  const std::string& last_activated_at() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_last_activated_at(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_last_activated_at();
+  PROTOBUF_MUST_USE_RESULT std::string* release_last_activated_at();
+  void set_allocated_last_activated_at(std::string* last_activated_at);
+  private:
+  const std::string& _internal_last_activated_at() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_last_activated_at(const std::string& value);
+  std::string* _internal_mutable_last_activated_at();
+  public:
+
+  // optional string last_deactivated_at = 7;
+  bool has_last_deactivated_at() const;
+  private:
+  bool _internal_has_last_deactivated_at() const;
+  public:
+  void clear_last_deactivated_at();
+  const std::string& last_deactivated_at() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_last_deactivated_at(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_last_deactivated_at();
+  PROTOBUF_MUST_USE_RESULT std::string* release_last_deactivated_at();
+  void set_allocated_last_deactivated_at(std::string* last_deactivated_at);
+  private:
+  const std::string& _internal_last_deactivated_at() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_last_deactivated_at(const std::string& value);
+  std::string* _internal_mutable_last_deactivated_at();
+  public:
+
+  // optional string unregistered_at = 8;
+  bool has_unregistered_at() const;
+  private:
+  bool _internal_has_unregistered_at() const;
+  public:
+  void clear_unregistered_at();
+  const std::string& unregistered_at() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_unregistered_at(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_unregistered_at();
+  PROTOBUF_MUST_USE_RESULT std::string* release_unregistered_at();
+  void set_allocated_unregistered_at(std::string* unregistered_at);
+  private:
+  const std::string& _internal_unregistered_at() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_unregistered_at(const std::string& value);
+  std::string* _internal_mutable_unregistered_at();
+  public:
+
+  // bytes public_key = 11;
+  void clear_public_key();
+  const std::string& public_key() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_public_key(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_public_key();
+  PROTOBUF_MUST_USE_RESULT std::string* release_public_key();
+  void set_allocated_public_key(std::string* public_key);
+  private:
+  const std::string& _internal_public_key() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_public_key(const std::string& value);
+  std::string* _internal_mutable_public_key();
+  public:
+
+  // uint64 node_id = 1;
+  void clear_node_id();
+  ::PROTOBUF_NAMESPACE_ID::uint64 node_id() const;
+  void set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value);
+  private:
+  ::PROTOBUF_NAMESPACE_ID::uint64 _internal_node_id() const;
+  void _internal_set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value);
+  public:
+
+  // optional double online_until = 9;
+  bool has_online_until() const;
+  private:
+  bool _internal_has_online_until() const;
+  public:
+  void clear_online_until();
+  double online_until() const;
+  void set_online_until(double value);
+  private:
+  double _internal_online_until() const;
+  void _internal_set_online_until(double value);
+  public:
+
+  // double heartbeat_interval = 10;
+  void clear_heartbeat_interval();
+  double heartbeat_interval() const;
+  void set_heartbeat_interval(double value);
+  private:
+  double _internal_heartbeat_interval() const;
+  void _internal_set_heartbeat_interval(double value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:flwr.proto.NodeInfo)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::internal::HasBits<1> _has_bits_;
+  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr owner_aid_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr owner_name_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr status_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr registered_at_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr last_activated_at_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr last_deactivated_at_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr unregistered_at_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr public_key_;
+  ::PROTOBUF_NAMESPACE_ID::uint64 node_id_;
+  double online_until_;
+  double heartbeat_interval_;
   friend struct ::TableStruct_flwr_2fproto_2fnode_2eproto;
 };
 // ===================================================================
@@ -231,49 +534,507 @@ class Node final :
 #endif  // __GNUC__
 // Node
 
-// sint64 node_id = 1;
+// uint64 node_id = 1;
 inline void Node::clear_node_id() {
-  node_id_ = int64_t{0};
+  node_id_ = uint64_t{0u};
 }
-inline ::PROTOBUF_NAMESPACE_ID::int64 Node::_internal_node_id() const {
+inline ::PROTOBUF_NAMESPACE_ID::uint64 Node::_internal_node_id() const {
   return node_id_;
 }
-inline ::PROTOBUF_NAMESPACE_ID::int64 Node::node_id() const {
+inline ::PROTOBUF_NAMESPACE_ID::uint64 Node::node_id() const {
   // @@protoc_insertion_point(field_get:flwr.proto.Node.node_id)
   return _internal_node_id();
 }
-inline void Node::_internal_set_node_id(::PROTOBUF_NAMESPACE_ID::int64 value) {
+inline void Node::_internal_set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value) {
   
   node_id_ = value;
 }
-inline void Node::set_node_id(::PROTOBUF_NAMESPACE_ID::int64 value) {
+inline void Node::set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value) {
   _internal_set_node_id(value);
   // @@protoc_insertion_point(field_set:flwr.proto.Node.node_id)
 }
 
-// bool anonymous = 2;
-inline void Node::clear_anonymous() {
-  anonymous_ = false;
+// -------------------------------------------------------------------
+
+// NodeInfo
+
+// uint64 node_id = 1;
+inline void NodeInfo::clear_node_id() {
+  node_id_ = uint64_t{0u};
 }
-inline bool Node::_internal_anonymous() const {
-  return anonymous_;
+inline ::PROTOBUF_NAMESPACE_ID::uint64 NodeInfo::_internal_node_id() const {
+  return node_id_;
 }
-inline bool Node::anonymous() const {
-  // @@protoc_insertion_point(field_get:flwr.proto.Node.anonymous)
-  return _internal_anonymous();
+inline ::PROTOBUF_NAMESPACE_ID::uint64 NodeInfo::node_id() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.NodeInfo.node_id)
+  return _internal_node_id();
 }
-inline void Node::_internal_set_anonymous(bool value) {
+inline void NodeInfo::_internal_set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value) {
   
-  anonymous_ = value;
+  node_id_ = value;
 }
-inline void Node::set_anonymous(bool value) {
-  _internal_set_anonymous(value);
-  // @@protoc_insertion_point(field_set:flwr.proto.Node.anonymous)
+inline void NodeInfo::set_node_id(::PROTOBUF_NAMESPACE_ID::uint64 value) {
+  _internal_set_node_id(value);
+  // @@protoc_insertion_point(field_set:flwr.proto.NodeInfo.node_id)
+}
+
+// string owner_aid = 2;
+inline void NodeInfo::clear_owner_aid() {
+  owner_aid_.ClearToEmpty();
+}
+inline const std::string& NodeInfo::owner_aid() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.NodeInfo.owner_aid)
+  return _internal_owner_aid();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void NodeInfo::set_owner_aid(ArgT0&& arg0, ArgT... args) {
+ 
+ owner_aid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:flwr.proto.NodeInfo.owner_aid)
+}
+inline std::string* NodeInfo::mutable_owner_aid() {
+  std::string* _s = _internal_mutable_owner_aid();
+  // @@protoc_insertion_point(field_mutable:flwr.proto.NodeInfo.owner_aid)
+  return _s;
+}
+inline const std::string& NodeInfo::_internal_owner_aid() const {
+  return owner_aid_.Get();
+}
+inline void NodeInfo::_internal_set_owner_aid(const std::string& value) {
+  
+  owner_aid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::_internal_mutable_owner_aid() {
+  
+  return owner_aid_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::release_owner_aid() {
+  // @@protoc_insertion_point(field_release:flwr.proto.NodeInfo.owner_aid)
+  return owner_aid_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+}
+inline void NodeInfo::set_allocated_owner_aid(std::string* owner_aid) {
+  if (owner_aid != nullptr) {
+    
+  } else {
+    
+  }
+  owner_aid_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), owner_aid,
+      GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set_allocated:flwr.proto.NodeInfo.owner_aid)
+}
+
+// string owner_name = 3;
+inline void NodeInfo::clear_owner_name() {
+  owner_name_.ClearToEmpty();
+}
+inline const std::string& NodeInfo::owner_name() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.NodeInfo.owner_name)
+  return _internal_owner_name();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void NodeInfo::set_owner_name(ArgT0&& arg0, ArgT... args) {
+ 
+ owner_name_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:flwr.proto.NodeInfo.owner_name)
+}
+inline std::string* NodeInfo::mutable_owner_name() {
+  std::string* _s = _internal_mutable_owner_name();
+  // @@protoc_insertion_point(field_mutable:flwr.proto.NodeInfo.owner_name)
+  return _s;
+}
+inline const std::string& NodeInfo::_internal_owner_name() const {
+  return owner_name_.Get();
+}
+inline void NodeInfo::_internal_set_owner_name(const std::string& value) {
+  
+  owner_name_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::_internal_mutable_owner_name() {
+  
+  return owner_name_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::release_owner_name() {
+  // @@protoc_insertion_point(field_release:flwr.proto.NodeInfo.owner_name)
+  return owner_name_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+}
+inline void NodeInfo::set_allocated_owner_name(std::string* owner_name) {
+  if (owner_name != nullptr) {
+    
+  } else {
+    
+  }
+  owner_name_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), owner_name,
+      GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set_allocated:flwr.proto.NodeInfo.owner_name)
+}
+
+// string status = 4;
+inline void NodeInfo::clear_status() {
+  status_.ClearToEmpty();
+}
+inline const std::string& NodeInfo::status() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.NodeInfo.status)
+  return _internal_status();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void NodeInfo::set_status(ArgT0&& arg0, ArgT... args) {
+ 
+ status_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:flwr.proto.NodeInfo.status)
+}
+inline std::string* NodeInfo::mutable_status() {
+  std::string* _s = _internal_mutable_status();
+  // @@protoc_insertion_point(field_mutable:flwr.proto.NodeInfo.status)
+  return _s;
+}
+inline const std::string& NodeInfo::_internal_status() const {
+  return status_.Get();
+}
+inline void NodeInfo::_internal_set_status(const std::string& value) {
+  
+  status_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::_internal_mutable_status() {
+  
+  return status_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::release_status() {
+  // @@protoc_insertion_point(field_release:flwr.proto.NodeInfo.status)
+  return status_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+}
+inline void NodeInfo::set_allocated_status(std::string* status) {
+  if (status != nullptr) {
+    
+  } else {
+    
+  }
+  status_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), status,
+      GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set_allocated:flwr.proto.NodeInfo.status)
+}
+
+// string registered_at = 5;
+inline void NodeInfo::clear_registered_at() {
+  registered_at_.ClearToEmpty();
+}
+inline const std::string& NodeInfo::registered_at() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.NodeInfo.registered_at)
+  return _internal_registered_at();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void NodeInfo::set_registered_at(ArgT0&& arg0, ArgT... args) {
+ 
+ registered_at_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:flwr.proto.NodeInfo.registered_at)
+}
+inline std::string* NodeInfo::mutable_registered_at() {
+  std::string* _s = _internal_mutable_registered_at();
+  // @@protoc_insertion_point(field_mutable:flwr.proto.NodeInfo.registered_at)
+  return _s;
+}
+inline const std::string& NodeInfo::_internal_registered_at() const {
+  return registered_at_.Get();
+}
+inline void NodeInfo::_internal_set_registered_at(const std::string& value) {
+  
+  registered_at_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::_internal_mutable_registered_at() {
+  
+  return registered_at_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::release_registered_at() {
+  // @@protoc_insertion_point(field_release:flwr.proto.NodeInfo.registered_at)
+  return registered_at_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+}
+inline void NodeInfo::set_allocated_registered_at(std::string* registered_at) {
+  if (registered_at != nullptr) {
+    
+  } else {
+    
+  }
+  registered_at_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), registered_at,
+      GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set_allocated:flwr.proto.NodeInfo.registered_at)
+}
+
+// optional string last_activated_at = 6;
+inline bool NodeInfo::_internal_has_last_activated_at() const {
+  bool value = (_has_bits_[0] & 0x00000001u) != 0;
+  return value;
+}
+inline bool NodeInfo::has_last_activated_at() const {
+  return _internal_has_last_activated_at();
+}
+inline void NodeInfo::clear_last_activated_at() {
+  last_activated_at_.ClearToEmpty();
+  _has_bits_[0] &= ~0x00000001u;
+}
+inline const std::string& NodeInfo::last_activated_at() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.NodeInfo.last_activated_at)
+  return _internal_last_activated_at();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void NodeInfo::set_last_activated_at(ArgT0&& arg0, ArgT... args) {
+ _has_bits_[0] |= 0x00000001u;
+ last_activated_at_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:flwr.proto.NodeInfo.last_activated_at)
+}
+inline std::string* NodeInfo::mutable_last_activated_at() {
+  std::string* _s = _internal_mutable_last_activated_at();
+  // @@protoc_insertion_point(field_mutable:flwr.proto.NodeInfo.last_activated_at)
+  return _s;
+}
+inline const std::string& NodeInfo::_internal_last_activated_at() const {
+  return last_activated_at_.Get();
+}
+inline void NodeInfo::_internal_set_last_activated_at(const std::string& value) {
+  _has_bits_[0] |= 0x00000001u;
+  last_activated_at_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::_internal_mutable_last_activated_at() {
+  _has_bits_[0] |= 0x00000001u;
+  return last_activated_at_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::release_last_activated_at() {
+  // @@protoc_insertion_point(field_release:flwr.proto.NodeInfo.last_activated_at)
+  if (!_internal_has_last_activated_at()) {
+    return nullptr;
+  }
+  _has_bits_[0] &= ~0x00000001u;
+  return last_activated_at_.ReleaseNonDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+}
+inline void NodeInfo::set_allocated_last_activated_at(std::string* last_activated_at) {
+  if (last_activated_at != nullptr) {
+    _has_bits_[0] |= 0x00000001u;
+  } else {
+    _has_bits_[0] &= ~0x00000001u;
+  }
+  last_activated_at_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), last_activated_at,
+      GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set_allocated:flwr.proto.NodeInfo.last_activated_at)
+}
+
+// optional string last_deactivated_at = 7;
+inline bool NodeInfo::_internal_has_last_deactivated_at() const {
+  bool value = (_has_bits_[0] & 0x00000002u) != 0;
+  return value;
+}
+inline bool NodeInfo::has_last_deactivated_at() const {
+  return _internal_has_last_deactivated_at();
+}
+inline void NodeInfo::clear_last_deactivated_at() {
+  last_deactivated_at_.ClearToEmpty();
+  _has_bits_[0] &= ~0x00000002u;
+}
+inline const std::string& NodeInfo::last_deactivated_at() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.NodeInfo.last_deactivated_at)
+  return _internal_last_deactivated_at();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void NodeInfo::set_last_deactivated_at(ArgT0&& arg0, ArgT... args) {
+ _has_bits_[0] |= 0x00000002u;
+ last_deactivated_at_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:flwr.proto.NodeInfo.last_deactivated_at)
+}
+inline std::string* NodeInfo::mutable_last_deactivated_at() {
+  std::string* _s = _internal_mutable_last_deactivated_at();
+  // @@protoc_insertion_point(field_mutable:flwr.proto.NodeInfo.last_deactivated_at)
+  return _s;
+}
+inline const std::string& NodeInfo::_internal_last_deactivated_at() const {
+  return last_deactivated_at_.Get();
+}
+inline void NodeInfo::_internal_set_last_deactivated_at(const std::string& value) {
+  _has_bits_[0] |= 0x00000002u;
+  last_deactivated_at_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::_internal_mutable_last_deactivated_at() {
+  _has_bits_[0] |= 0x00000002u;
+  return last_deactivated_at_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::release_last_deactivated_at() {
+  // @@protoc_insertion_point(field_release:flwr.proto.NodeInfo.last_deactivated_at)
+  if (!_internal_has_last_deactivated_at()) {
+    return nullptr;
+  }
+  _has_bits_[0] &= ~0x00000002u;
+  return last_deactivated_at_.ReleaseNonDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+}
+inline void NodeInfo::set_allocated_last_deactivated_at(std::string* last_deactivated_at) {
+  if (last_deactivated_at != nullptr) {
+    _has_bits_[0] |= 0x00000002u;
+  } else {
+    _has_bits_[0] &= ~0x00000002u;
+  }
+  last_deactivated_at_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), last_deactivated_at,
+      GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set_allocated:flwr.proto.NodeInfo.last_deactivated_at)
+}
+
+// optional string unregistered_at = 8;
+inline bool NodeInfo::_internal_has_unregistered_at() const {
+  bool value = (_has_bits_[0] & 0x00000004u) != 0;
+  return value;
+}
+inline bool NodeInfo::has_unregistered_at() const {
+  return _internal_has_unregistered_at();
+}
+inline void NodeInfo::clear_unregistered_at() {
+  unregistered_at_.ClearToEmpty();
+  _has_bits_[0] &= ~0x00000004u;
+}
+inline const std::string& NodeInfo::unregistered_at() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.NodeInfo.unregistered_at)
+  return _internal_unregistered_at();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void NodeInfo::set_unregistered_at(ArgT0&& arg0, ArgT... args) {
+ _has_bits_[0] |= 0x00000004u;
+ unregistered_at_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:flwr.proto.NodeInfo.unregistered_at)
+}
+inline std::string* NodeInfo::mutable_unregistered_at() {
+  std::string* _s = _internal_mutable_unregistered_at();
+  // @@protoc_insertion_point(field_mutable:flwr.proto.NodeInfo.unregistered_at)
+  return _s;
+}
+inline const std::string& NodeInfo::_internal_unregistered_at() const {
+  return unregistered_at_.Get();
+}
+inline void NodeInfo::_internal_set_unregistered_at(const std::string& value) {
+  _has_bits_[0] |= 0x00000004u;
+  unregistered_at_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::_internal_mutable_unregistered_at() {
+  _has_bits_[0] |= 0x00000004u;
+  return unregistered_at_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::release_unregistered_at() {
+  // @@protoc_insertion_point(field_release:flwr.proto.NodeInfo.unregistered_at)
+  if (!_internal_has_unregistered_at()) {
+    return nullptr;
+  }
+  _has_bits_[0] &= ~0x00000004u;
+  return unregistered_at_.ReleaseNonDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+}
+inline void NodeInfo::set_allocated_unregistered_at(std::string* unregistered_at) {
+  if (unregistered_at != nullptr) {
+    _has_bits_[0] |= 0x00000004u;
+  } else {
+    _has_bits_[0] &= ~0x00000004u;
+  }
+  unregistered_at_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), unregistered_at,
+      GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set_allocated:flwr.proto.NodeInfo.unregistered_at)
+}
+
+// optional double online_until = 9;
+inline bool NodeInfo::_internal_has_online_until() const {
+  bool value = (_has_bits_[0] & 0x00000008u) != 0;
+  return value;
+}
+inline bool NodeInfo::has_online_until() const {
+  return _internal_has_online_until();
+}
+inline void NodeInfo::clear_online_until() {
+  online_until_ = 0;
+  _has_bits_[0] &= ~0x00000008u;
+}
+inline double NodeInfo::_internal_online_until() const {
+  return online_until_;
+}
+inline double NodeInfo::online_until() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.NodeInfo.online_until)
+  return _internal_online_until();
+}
+inline void NodeInfo::_internal_set_online_until(double value) {
+  _has_bits_[0] |= 0x00000008u;
+  online_until_ = value;
+}
+inline void NodeInfo::set_online_until(double value) {
+  _internal_set_online_until(value);
+  // @@protoc_insertion_point(field_set:flwr.proto.NodeInfo.online_until)
+}
+
+// double heartbeat_interval = 10;
+inline void NodeInfo::clear_heartbeat_interval() {
+  heartbeat_interval_ = 0;
+}
+inline double NodeInfo::_internal_heartbeat_interval() const {
+  return heartbeat_interval_;
+}
+inline double NodeInfo::heartbeat_interval() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.NodeInfo.heartbeat_interval)
+  return _internal_heartbeat_interval();
+}
+inline void NodeInfo::_internal_set_heartbeat_interval(double value) {
+  
+  heartbeat_interval_ = value;
+}
+inline void NodeInfo::set_heartbeat_interval(double value) {
+  _internal_set_heartbeat_interval(value);
+  // @@protoc_insertion_point(field_set:flwr.proto.NodeInfo.heartbeat_interval)
+}
+
+// bytes public_key = 11;
+inline void NodeInfo::clear_public_key() {
+  public_key_.ClearToEmpty();
+}
+inline const std::string& NodeInfo::public_key() const {
+  // @@protoc_insertion_point(field_get:flwr.proto.NodeInfo.public_key)
+  return _internal_public_key();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void NodeInfo::set_public_key(ArgT0&& arg0, ArgT... args) {
+ 
+ public_key_.SetBytes(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:flwr.proto.NodeInfo.public_key)
+}
+inline std::string* NodeInfo::mutable_public_key() {
+  std::string* _s = _internal_mutable_public_key();
+  // @@protoc_insertion_point(field_mutable:flwr.proto.NodeInfo.public_key)
+  return _s;
+}
+inline const std::string& NodeInfo::_internal_public_key() const {
+  return public_key_.Get();
+}
+inline void NodeInfo::_internal_set_public_key(const std::string& value) {
+  
+  public_key_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::_internal_mutable_public_key() {
+  
+  return public_key_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::release_public_key() {
+  // @@protoc_insertion_point(field_release:flwr.proto.NodeInfo.public_key)
+  return public_key_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+}
+inline void NodeInfo::set_allocated_public_key(std::string* public_key) {
+  if (public_key != nullptr) {
+    
+  } else {
+    
+  }
+  public_key_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), public_key,
+      GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set_allocated:flwr.proto.NodeInfo.public_key)
 }
 
 #ifdef __GNUC__
   #pragma GCC diagnostic pop
 #endif  // __GNUC__
+// -------------------------------------------------------------------
+
 
 // @@protoc_insertion_point(namespace_scope)
 
