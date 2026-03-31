@@ -1045,8 +1045,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 )
             except Exception as exc:  # pylint: disable=broad-except
                 log(WARNING, "Failed to report run usage: %s", exc)
-            return True
-        return False
+
+        return len(rows) > 0
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
