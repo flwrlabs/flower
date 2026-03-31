@@ -25,7 +25,7 @@ import threading
 import time
 import unittest
 from abc import abstractmethod
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from unittest.mock import Mock, patch
@@ -1794,7 +1794,7 @@ def create_ins_message(
     dst_node_id: int,
     run_id: int,
 ) -> ProtoMessage:
-    """Create a Message for testing."""
+    """Create an instruction Message proto for testing."""
     proto = ProtoMessage(
         metadata=ProtoMetadata(
             run_id=run_id,
@@ -1818,7 +1818,7 @@ def create_res_message(
     run_id: int,
     error: Error | None = None,
 ) -> ProtoMessage:
-    """Create a (reply) Message for testing."""
+    """Create a (reply) Message proto for testing."""
     in_msg_proto = create_ins_message(
         src_node_id=dst_node_id, dst_node_id=src_node_id, run_id=run_id
     )
@@ -1830,6 +1830,23 @@ def create_res_message(
         out_msg = Message(RecordDict(), reply_to=in_msg)
     out_msg.metadata.__dict__["_message_id"] = out_msg.object_id
     return message_to_proto(out_msg)
+
+
+def create_ins_message_obj(src_node_id: int, dst_node_id: int, run_id: int) -> Message:
+    """Create an instruction Message object for testing."""
+    proto = create_ins_message(src_node_id, dst_node_id, run_id)
+    return message_from_proto(proto)
+
+
+def create_res_message_obj(
+    src_node_id: int,
+    dst_node_id: int,
+    run_id: int,
+    error: Error | None = None,
+) -> Message:
+    """Create a (reply) Message object for testing."""
+    proto = create_res_message(src_node_id, dst_node_id, run_id, error)
+    return message_from_proto(proto)
 
 
 def transition_run_status(state: LinkState, run_id: int, num_transitions: int) -> None:
@@ -1951,6 +1968,7 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
 
     __test__ = True
     _CONCURRENT_TEST_TIMEOUT = 10.0
+    states: list[SqlLinkState]
 
     def state_factory(self) -> SqlLinkState:
         """Return SqlLinkState with file-based database."""
@@ -1964,49 +1982,41 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
         state.initialize()
         return state
 
-    @staticmethod
     def _create_shared_sql_states(
-        database_path: str,
-    ) -> tuple[SqlLinkState, SqlLinkState]:
+        self, database_path: str, num_replicas: int = 2
+    ) -> list[SqlLinkState]:
         """Create two SqlLinkState replicas sharing the same SQLite file."""
-        state_0 = SqlLinkState(
-            database_path=database_path,
-            federation_manager=NoOpFederationManager(),
-            object_store=ObjectStoreFactory().store(),
-        )
-        state_1 = SqlLinkState(
-            database_path=database_path,
-            federation_manager=NoOpFederationManager(),
-            object_store=ObjectStoreFactory().store(),
-        )
-        state_0.initialize()
-        state_1.initialize()
-        return state_0, state_1
+        self.states = []
+        for _ in range(num_replicas):
+            state = SqlLinkState(
+                database_path=database_path,
+                federation_manager=NoOpFederationManager(),
+                object_store=ObjectStoreFactory().store(),
+            )
+            state.initialize()
+            self.states.append(state)
+        return self.states
 
-    @staticmethod
-    def _run_in_parallel(
-        fns: Iterable[Callable[[], list[Message]]],
+    def _query_states_in_parallel(
+        self,
+        fn: Callable[[SqlLinkState], Any],
         timeout: float = _CONCURRENT_TEST_TIMEOUT,
-    ) -> list[list[Message]]:
+    ) -> list[Any]:
         """Run callables concurrently and return their results."""
-        runnables = list(fns)
-        if not runnables:
-            raise AssertionError("`fns` must not be empty")
-
-        barrier = threading.Barrier(len(runnables) + 1)
-        results: list[list[Message] | None] = [None] * len(runnables)
+        n_threads = len(self.states)
+        barrier = threading.Barrier(n_threads + 1)
+        results: list[Any] = [None] * n_threads
         exceptions: list[Exception] = []
 
-        def _run(idx: int, fn: Callable[[], list[Message]]) -> None:
+        def _run(idx: int) -> None:
             try:
                 barrier.wait(timeout=timeout)
-                results[idx] = fn()
+                results[idx] = fn(self.states[idx])
             except Exception as ex:  # pylint: disable=broad-exception-caught
                 exceptions.append(ex)
 
         threads = [
-            threading.Thread(target=_run, args=(idx, fn))
-            for idx, fn in enumerate(runnables)
+            threading.Thread(target=_run, args=(idx,)) for idx in range(n_threads)
         ]
         for thread in threads:
             thread.start()
@@ -2026,30 +2036,24 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
 
         if exceptions:
             raise exceptions[0]
-        assert all(message_list is not None for message_list in results)
-        return [message_list or [] for message_list in results]
+        return results
 
     # pylint: disable-next=too-many-locals
     def test_get_message_ins_claim_is_unique_across_replicas(self) -> None:
         """Ensure concurrent replicas cannot both claim the same instruction."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = os.path.join(tmpdir, "shared.db")
-            state_0, state_1 = self._create_shared_sql_states(db_path)
+            state_0 = self._create_shared_sql_states(db_path)[0]
 
             node_id = create_dummy_node(state_0)
             run_id = create_dummy_run(state_0)
-            msg = message_from_proto(
-                create_ins_message(
-                    src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-                )
+            msg = create_ins_message_obj(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
             )
             assert state_0.store_message_ins(message=msg)
 
-            results = self._run_in_parallel(
-                [
-                    lambda: state_0.get_message_ins(node_id=node_id, limit=1),
-                    lambda: state_1.get_message_ins(node_id=node_id, limit=1),
-                ]
+            results = self._query_states_in_parallel(
+                lambda state: state.get_message_ins(node_id=node_id, limit=1)
             )
             claimed = [msgs for msgs in results if msgs]
             assert len(claimed) == 1
@@ -2060,16 +2064,14 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
         """Ensure concurrent replicas cannot both claim the same reply Message."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = os.path.join(tmpdir, "shared.db")
-            state_0, state_1 = self._create_shared_sql_states(db_path)
+            state_0 = self._create_shared_sql_states(db_path)[0]
 
             node_id = create_dummy_node(state_0)
             assert state_0.store_message_ins(
-                message_from_proto(
-                    create_ins_message(
-                        src_node_id=SUPERLINK_NODE_ID,
-                        dst_node_id=node_id,
-                        run_id=create_dummy_run(state_0),
-                    )
+                create_ins_message_obj(
+                    src_node_id=SUPERLINK_NODE_ID,
+                    dst_node_id=node_id,
+                    run_id=create_dummy_run(state_0),
                 )
             )
             pulled_ins = state_0.get_message_ins(node_id=node_id, limit=1)[0]
@@ -2079,42 +2081,31 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
             assert state_0.store_message_res(msg_res)
 
             msg_id = pulled_ins.metadata.message_id
-            results = self._run_in_parallel(
-                [
-                    lambda: state_0.get_message_res({msg_id}),
-                    lambda: state_1.get_message_res({msg_id}),
-                ],
-                timeout=self._CONCURRENT_TEST_TIMEOUT,
+            results = self._query_states_in_parallel(
+                lambda state: state.get_message_res({msg_id}),
             )
-            assert sum(len(res) for res in results) == 1
+            assert sum(len(res) for res in results if res is not None) == 1
 
     # pylint: disable-next=too-many-locals
     def test_get_message_ins_distributes_available_work_under_contention(self) -> None:
         """Ensure two replicas can each claim work when two Messages are available."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = os.path.join(tmpdir, "shared.db")
-            state_0, state_1 = self._create_shared_sql_states(db_path)
+            state_0 = self._create_shared_sql_states(db_path)[0]
 
             node_id = create_dummy_node(state_0)
             run_id = create_dummy_run(state_0)
-            msg_0 = message_from_proto(
-                create_ins_message(
-                    src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-                )
+            msg_0 = create_ins_message_obj(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
             )
-            msg_1 = message_from_proto(
-                create_ins_message(
-                    src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-                )
+            msg_1 = create_ins_message_obj(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
             )
             assert state_0.store_message_ins(message=msg_0)
             assert state_0.store_message_ins(message=msg_1)
 
-            results = self._run_in_parallel(
-                [
-                    lambda: state_0.get_message_ins(node_id=node_id, limit=1),
-                    lambda: state_1.get_message_ins(node_id=node_id, limit=1),
-                ]
+            results = self._query_states_in_parallel(
+                lambda state: state.get_message_ins(node_id=node_id, limit=1)
             )
             claimed_messages = [msgs for msgs in results if msgs]
             assert len(claimed_messages) == 2
