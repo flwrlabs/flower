@@ -2044,13 +2044,13 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             # Prepare
             db_path = os.path.join(tmpdir, "shared.db")
-            state_0 = self._create_shared_sql_states(db_path)[0]
-            node_id = create_dummy_node(state_0)
-            run_id = create_dummy_run(state_0)
+            state = self._create_shared_sql_states(db_path)[0]
+            node_id = create_dummy_node(state)
+            run_id = create_dummy_run(state)
             msg = create_ins_message_obj(
                 src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
             )
-            assert state_0.store_message_ins(message=msg)
+            assert state.store_message_ins(message=msg)
 
             # Execute
             results = self._query_states_in_parallel(
@@ -2067,21 +2067,21 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             # Prepare
             db_path = os.path.join(tmpdir, "shared.db")
-            state_0 = self._create_shared_sql_states(db_path)[0]
+            state = self._create_shared_sql_states(db_path)[0]
 
-            node_id = create_dummy_node(state_0)
-            assert state_0.store_message_ins(
+            node_id = create_dummy_node(state)
+            assert state.store_message_ins(
                 create_ins_message_obj(
                     src_node_id=SUPERLINK_NODE_ID,
                     dst_node_id=node_id,
-                    run_id=create_dummy_run(state_0),
+                    run_id=create_dummy_run(state),
                 )
             )
-            pulled_ins = state_0.get_message_ins(node_id=node_id, limit=1)[0]
+            pulled_ins = state.get_message_ins(node_id=node_id, limit=1)[0]
 
             msg_res = Message(RecordDict(), reply_to=pulled_ins)
             msg_res.metadata.__dict__["_message_id"] = str(uuid4())
-            assert state_0.store_message_res(msg_res)
+            assert state.store_message_res(msg_res)
 
             # Execute
             msg_id = pulled_ins.metadata.message_id
@@ -2098,18 +2098,18 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             # Prepare
             db_path = os.path.join(tmpdir, "shared.db")
-            state_0 = self._create_shared_sql_states(db_path)[0]
+            state = self._create_shared_sql_states(db_path)[0]
 
-            node_id = create_dummy_node(state_0)
-            run_id = create_dummy_run(state_0)
+            node_id = create_dummy_node(state)
+            run_id = create_dummy_run(state)
             msg_0 = create_ins_message_obj(
                 src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
             )
             msg_1 = create_ins_message_obj(
                 src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
             )
-            assert state_0.store_message_ins(message=msg_0)
-            assert state_0.store_message_ins(message=msg_1)
+            assert state.store_message_ins(message=msg_0)
+            assert state.store_message_ins(message=msg_1)
 
             # Execute
             results = self._query_states_in_parallel(
@@ -2131,9 +2131,9 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             # Prepare
             db_path = os.path.join(tmpdir, "shared.db")
-            state_0, _ = self._create_shared_sql_states(db_path)
-            run_id = create_dummy_run(state_0)
-            assert state_0.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
+            state = self._create_shared_sql_states(db_path)[0]
+            run_id = create_dummy_run(state)
+            assert state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
 
             ctx = multiprocessing.get_context("spawn")
             start_event = ctx.Event()
