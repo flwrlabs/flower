@@ -784,10 +784,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 f"bytes_sent={bytes_sent}, bytes_recv={bytes_recv}"
             )
 
+        # Transport can report a zero-delta sample; skip these updates.
         if bytes_sent == 0 and bytes_recv == 0:
-            raise ValueError(
-                f"Both bytes_sent and bytes_recv cannot be zero for run {run_id}"
-            )
+            return
 
         with self.lock:
             if run_id not in self.run_ids:
