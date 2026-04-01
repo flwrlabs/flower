@@ -18,6 +18,7 @@
 from unittest.mock import Mock
 
 import pytest
+from parameterized import parameterized
 
 from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.common.typing import Federation, Run, RunStatus
@@ -236,19 +237,19 @@ def test_has_node() -> None:
         manager.has_node(999, "any_federation")
 
 
-def test_can_execute() -> None:
+@parameterized.expand(
+    [
+        (ActionType.START_RUN),
+        (ActionType.REGISTER_SUPERNODE),
+        (ActionType.CREATE_FEDERATION),
+    ]
+)  # type: ignore
+def test_can_execute(action: ActionType) -> None:
     """Test can_execute method returns True for NOOP_FEDERATION."""
     manager = NoOpFederationManager()
 
-    allowed = manager.can_execute(
-        NOOP_FLWR_AID, ActionType.START_RUN, ActionContext()
-    )
-    allowed_register = manager.can_execute(
-        NOOP_FLWR_AID, ActionType.REGISTER_SUPERNODE, ActionContext()
-    )
-
+    allowed = manager.can_execute(NOOP_FLWR_AID, action, ActionContext())
     assert allowed is True
-    assert allowed_register is True
 
 
 def test_get_federations() -> None:
