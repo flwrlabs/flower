@@ -195,7 +195,7 @@ def event(
     def run() -> None:
         try:
             result.set_result(create_event(event_type, event_details))
-        except Exception as ex:  # pragma: no cover
+        except Exception as ex:  # pylint: disable=broad-exception-caught
             result.set_exception(ex)
 
     Thread(target=run, daemon=True).start()
