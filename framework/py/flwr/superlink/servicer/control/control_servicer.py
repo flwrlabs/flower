@@ -202,6 +202,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             runtime = RunTime.DEPLOYMENT
             if sim_cfg := state.federation_manager.get_simulation_config(federation):
                 run_type = RunType.SIMULATION
+                runtime = RunTime.SIMULATION
                 resolved_federation_config = SimulationConfig()
                 resolved_federation_config.CopyFrom(sim_cfg)
                 resolved_federation_config.MergeFrom(request.override_federation_config)
