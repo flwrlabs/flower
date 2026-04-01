@@ -183,7 +183,7 @@ class ActionContext:
 
 @dataclass(frozen=True)
 class StartRunContext(ActionContext):
-    """Context for the :attr:`ActionType.START_RUN` action.
+    """Context for the `ActionType.START_RUN` action.
 
     Attributes
     ----------
