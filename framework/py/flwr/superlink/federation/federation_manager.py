@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 from flwr.common.typing import Federation
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Invitation  # pylint: disable=E0611
-from flwr.supercore.constant import ActionType, RunType
+from flwr.supercore.constant import ActionContext, ActionType
 
 if TYPE_CHECKING:
     from flwr.server.superlink.linkstate.linkstate import LinkState
@@ -334,7 +334,7 @@ class FederationManager(ABC):
 
     @abstractmethod
     def can_execute(
-        self, flwr_aid: str, action: ActionType, federation: str, run_type: RunType
+        self, flwr_aid: str, action: ActionType, context: ActionContext
     ) -> bool:
         """Check if an account can execute an action under a given context.
 
@@ -344,10 +344,8 @@ class FederationManager(ABC):
             Flower account ID of the subject.
         action : ActionType
             The action to authorize.
-        federation : str
-            Target federation name.
-        run_type : RunType
-            The run type relevant to the action.
+        context : ActionContext
+            Action-specific context required for authorization.
 
         Returns
         -------

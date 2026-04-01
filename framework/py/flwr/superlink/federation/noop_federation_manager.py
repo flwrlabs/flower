@@ -29,8 +29,8 @@ from flwr.supercore.constant import (
     DEFAULT_SIMULATION_CONFIG,
     NOOP_FEDERATION,
     NOOP_FEDERATION_DESCRIPTION,
+    ActionContext,
     ActionType,
-    RunType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 
@@ -226,8 +226,8 @@ class NoOpFederationManager(FederationManager):
         """
 
     def can_execute(
-        self, flwr_aid: str, action: ActionType, federation: str, run_type: RunType
+        self, flwr_aid: str, action: ActionType, context: ActionContext
     ) -> bool:
         """Check if an account can execute an action under a given context."""
-        _ = (flwr_aid, action, federation, run_type)
+        _ = (flwr_aid, action, context)
         return True
