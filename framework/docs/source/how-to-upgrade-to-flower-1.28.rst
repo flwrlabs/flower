@@ -19,7 +19,7 @@ Let's dive in!
 ********************
 
 With Flower 1.26, we introduced the Flower Configuration, a new system for managing
-SuperLink connections that replaces the older `federations` section in the
+SuperLink connections that replaces the older ``federations`` section in the
 ``pyproject.toml`` file. This change allows for more flexible and reusable connection
 configurations across all your Flower apps. You can read more about it in the
 :doc:`Flower Configuration reference <ref-flower-configuration>` page.
