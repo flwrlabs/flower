@@ -240,6 +240,7 @@ def test_has_node() -> None:
 @parameterized.expand(
     [
         (ActionType.START_RUN),
+        (ActionType.CREATE_FEDERATION),
         (ActionType.CREATE_INVITATION),
     ]
 )  # type: ignore
@@ -248,7 +249,6 @@ def test_can_execute(action: ActionType) -> None:
     manager = NoOpFederationManager()
 
     allowed = manager.can_execute(NOOP_FLWR_AID, action, ActionContext())
-
     assert allowed is True
 
 
