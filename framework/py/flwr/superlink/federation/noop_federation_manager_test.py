@@ -241,8 +241,12 @@ def test_can_execute() -> None:
     manager = NoOpFederationManager()
 
     allowed = manager.can_execute(NOOP_FLWR_AID, ActionType.START_RUN, ActionContext())
+    allowed_register = manager.can_execute(
+        NOOP_FLWR_AID, ActionType.REGISTER_SUPERNODE, ActionContext()
+    )
 
     assert allowed is True
+    assert allowed_register is True
 
 
 def test_get_federations() -> None:

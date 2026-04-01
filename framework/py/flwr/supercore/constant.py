@@ -172,4 +172,5 @@ class RunTime(str, Enum):
 class ActionType(str, Enum):
     """Supported control action types."""
 
+    REGISTER_SUPERNODE = "register_supernode"
     START_RUN = "start_run"
