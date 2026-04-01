@@ -89,7 +89,7 @@ from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
-from flwr.supercore.typing import StartRunContext
+from flwr.supercore.typing import CreateFederationContext, StartRunContext
 from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.control.control_account_auth_interceptor import (
@@ -558,16 +558,35 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             members=mock_members,
             simulation=True,
         )
+        manager_calls = Mock()
 
         # Execute
-        with patch.object(
-            self.state.federation_manager,
-            "create_federation",
-            return_value=mock_federation,
-        ) as mock_create:
+        with (
+            patch.object(
+                self.state.federation_manager,
+                "can_execute",
+                return_value=True,
+            ) as mock_can_execute,
+            patch.object(
+                self.state.federation_manager,
+                "create_federation",
+                return_value=mock_federation,
+            ) as mock_create,
+        ):
+            manager_calls.attach_mock(mock_can_execute, "can_execute")
+            manager_calls.attach_mock(mock_create, "create_federation")
             response = self.servicer.CreateFederation(request, Mock())
 
         # Assert
+        mock_can_execute.assert_called_once_with(
+            self.aid,
+            ActionType.CREATE_FEDERATION,
+            CreateFederationContext(
+                federation=expected_name,
+                runtime=RunTime.SIMULATION,
+                visibility="private",
+            ),
+        )
         mock_create.assert_called_once_with(
             name=expected_name,
             description=description,
@@ -597,6 +616,28 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Execute & Assert
         with self.assertRaises(grpc.RpcError):
             self.servicer.CreateFederation(request, mock_context)
+
+    def test_create_federation_denied_when_not_entitled(self) -> None:
+        """Test CreateFederation aborts when federation manager denies execution."""
+        request = CreateFederationRequest(
+            federation_name="test-federation",
+            description="A test federation",
+            simulation=False,
+        )
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch.object(
+                self.state.federation_manager,
+                "can_execute",
+                return_value=False,
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.CreateFederation(request, context)
+
+        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
 
     def test_archive_federation_success(self) -> None:
         """Test ArchiveFederation succeeds when federation_manager.archive_federation

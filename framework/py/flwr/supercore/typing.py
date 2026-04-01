@@ -39,3 +39,22 @@ class StartRunContext(ActionContext):
 
     federation: str
     runtime: RunTime
+
+
+@dataclass(frozen=True)
+class CreateFederationContext(ActionContext):
+    """Context for the `ActionType.CREATE_FEDERATION` action.
+
+    Attributes
+    ----------
+    federation : str
+        Target federation name.
+    runtime : RunTime
+        The runtime relevant to the action.
+    visibility: str
+        The visibility level of the federation to be created.
+    """
+
+    federation: str
+    runtime: RunTime
+    visibility: str
