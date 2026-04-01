@@ -207,20 +207,21 @@ def create_event(event_type: EventType, event_details: dict[str, Any] | None) ->
     with state_lock:
         if state["source"] is None:
             state["source"] = _get_source_id()
+
         if state["cluster"] is None:
             state["cluster"] = str(uuid.uuid4())
+
         if state["partner"] is None:
             state["partner"] = _get_partner_id()
-        state_snapshot = state.copy()
 
     if event_details is None:
         event_details = {}
 
     date = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
     context = {
-        "partner": state_snapshot["partner"],
-        "source": state_snapshot["source"],
-        "cluster": state_snapshot["cluster"],
+        "partner": state["partner"],
+        "source": state["source"],
+        "cluster": state["cluster"],
         "date": date,
         "flower": {
             "package_name": package_name,
