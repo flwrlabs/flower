@@ -109,11 +109,18 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
-from flwr.supercore.constant import NOOP_FEDERATION, PLATFORM_API_URL, RunType
+from flwr.supercore.constant import (
+    NOOP_FEDERATION,
+    PLATFORM_API_URL,
+    ActionType,
+    RunTime,
+    RunType,
+)
 from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
 from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
+from flwr.supercore.typing import StartRunContext
 from flwr.supercore.utils import parse_app_spec, request_download_link
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
@@ -192,11 +199,24 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             # federation config overrides
             run_type = RunType.SERVER_APP
             resolved_federation_config = None
+            runtime = RunTime.DEPLOYMENT
             if sim_cfg := state.federation_manager.get_simulation_config(federation):
                 run_type = RunType.SIMULATION
+                runtime = RunTime.SIMULATION
                 resolved_federation_config = SimulationConfig()
                 resolved_federation_config.CopyFrom(sim_cfg)
                 resolved_federation_config.MergeFrom(request.override_federation_config)
+
+            if not state.federation_manager.can_execute(
+                flwr_aid,
+                ActionType.START_RUN,
+                StartRunContext(federation=federation, runtime=runtime),
+            ):
+                raise FlowerError(
+                    ApiErrorCode.NO_PERMISSIONS,
+                    f"'{ActionType.START_RUN}' action cannot be executed on federation "
+                    f"'{federation}'.",
+                )
 
         try:
             # Validate user config overrides matches keys in run config in FAB

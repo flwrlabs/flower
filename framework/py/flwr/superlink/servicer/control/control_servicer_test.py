@@ -75,13 +75,21 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsResponse,
     UnregisterNodeRequest,
 )
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_DB_NAME,
+    NOOP_FEDERATION,
+    ActionType,
+    RunTime,
+    RunType,
+)
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
+from flwr.supercore.typing import StartRunContext
 from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.control.control_account_auth_interceptor import (
@@ -252,6 +260,76 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         status_code, details = context.abort.call_args.args
         self.assertEqual(status_code, grpc.StatusCode.FAILED_PRECONDITION)
         self.assertIn("unknown.key", details)
+
+    def test_start_run_denied_when_not_entitled(self) -> None:
+        """Test StartRun aborts when federation manager denies execution."""
+        request = StartRunRequest()
+        request.fab.hash_str = hashlib.sha256(b"test FAB content").hexdigest()
+        request.fab.content = b"test FAB content"
+        request.federation = NOOP_FEDERATION
+
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch.object(
+                self.state.federation_manager,
+                "can_execute",
+                return_value=False,
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.StartRun(request, context)
+
+        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
+
+    @parameterized.expand(
+        [
+            (RunTime.DEPLOYMENT, False),
+            (RunTime.SIMULATION, True),
+        ]
+    )  # type: ignore
+    def test_start_run_calls_can_execute_with_expected_args(
+        self, expected_runtime: RunTime, simulation: bool
+    ) -> None:
+        """Test StartRun calls can_execute with correct runtime in StartRunContext."""
+        fab_content = b"test FAB content 777"
+        request = StartRunRequest()
+        request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
+        request.fab.content = fab_content
+        request.federation = NOOP_FEDERATION
+
+        sim_cfg = SimulationConfig() if simulation else None
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+            ) as mock_get_fab_config,
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+            ) as mock_get_metadata_from_config,
+            patch.object(
+                self.state.federation_manager,
+                "can_execute",
+                return_value=True,
+            ) as mock_can_execute,
+            patch.object(
+                self.state.federation_manager,
+                "get_simulation_config",
+                return_value=sim_cfg,
+            ),
+        ):
+            mock_get_fab_config.return_value = {
+                "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
+            }
+            mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
+            _ = self.servicer.StartRun(request, Mock())
+
+        mock_can_execute.assert_called_once_with(
+            self.aid,
+            ActionType.START_RUN,
+            StartRunContext(federation=NOOP_FEDERATION, runtime=expected_runtime),
+        )
 
     @parameterized.expand([(None,), (1,), (2,), (3,), (9,)])  # type: ignore
     def test_list_runs(self, limit: int | None) -> None:
