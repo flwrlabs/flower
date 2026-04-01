@@ -29,10 +29,10 @@ from flwr.supercore.constant import (
     DEFAULT_SIMULATION_CONFIG,
     NOOP_FEDERATION,
     NOOP_FEDERATION_DESCRIPTION,
-    ActionContext,
     ActionType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.typing import ActionContext
 
 from .federation_manager import FederationManager
 

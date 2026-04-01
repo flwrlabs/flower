@@ -18,7 +18,6 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
 from enum import Enum
 
 from flwr.common.constant import FLWR_DIR, NOOP_ACCOUNT_NAME
@@ -174,24 +173,3 @@ class ActionType(str, Enum):
     """Supported control action types."""
 
     START_RUN = "start_run"
-
-
-@dataclass(frozen=True)
-class ActionContext:
-    """Base context for authorization checks in ``can_execute``."""
-
-
-@dataclass(frozen=True)
-class StartRunContext(ActionContext):
-    """Context for the `ActionType.START_RUN` action.
-
-    Attributes
-    ----------
-    federation : str
-        Target federation name.
-    runtime : RunTime
-        The runtime relevant to the action.
-    """
-
-    federation: str
-    runtime: RunTime
