@@ -41,7 +41,14 @@ def main(grid: Grid, context: Context) -> None:
         initial_state_dict=init_state_dict,
     )
 
-    # Start strategy, run FedAvg for `num_rounds`
+    # Start strategy, run FedAvg for `num_rounds`.
+    # If federated evaluation is disabled, skip server-side global evaluation too.
+    evaluate_fn = None
+    if float(cfg.strategy.fraction_evaluate) > 0.0:
+        evaluate_fn = get_evaluate_fn(
+            cfg.model, cfg.train.save_every_round, num_rounds, save_path
+        )
+
     train_cfg = dict(context.run_config)
     train_cfg["save_path"] = save_path
     strategy.start(
@@ -49,9 +56,7 @@ def main(grid: Grid, context: Context) -> None:
         initial_arrays=arrays,
         train_config=ConfigRecord(train_cfg),
         num_rounds=num_rounds,
-        evaluate_fn=get_evaluate_fn(
-            cfg.model, cfg.train.save_every_round, num_rounds, save_path
-        ),
+        evaluate_fn=evaluate_fn,
     )
 
 
