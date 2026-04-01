@@ -77,3 +77,19 @@ class CreateInvitationContext(ActionContext):
     federation: str
     invitee_account_name: str
     runtime: RunTime
+
+
+@dataclass(frozen=True)
+class AcceptInvitationContext(ActionContext):
+    """Context for the `ActionType.ACCEPT_INVITATION` action.
+
+    Attributes
+    ----------
+    federation : str
+        Target federation name.
+    runtime : RunTime
+        The runtime relevant to the action.
+    """
+
+    federation: str
+    runtime: RunTime

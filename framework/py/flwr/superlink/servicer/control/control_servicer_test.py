@@ -90,6 +90,7 @@ from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.supercore.typing import (
+    AcceptInvitationContext,
     CreateFederationContext,
     CreateInvitationContext,
     StartRunContext,
@@ -855,14 +856,37 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         """Test AcceptInvitation success path."""
         request = AcceptInvitationRequest(federation_name="test-federation")
         context = Mock()
+        self.state.federation_manager.can_execute.return_value = True
+        self.state.federation_manager.get_simulation_config.return_value = None
 
         response = self.servicer.AcceptInvitation(request, context)
 
+        self.state.federation_manager.can_execute.assert_called_once_with(
+            flwr_aid=self.flwr_aid,
+            action=ActionType.ACCEPT_INVITATION,
+            context=AcceptInvitationContext(
+                federation="test-federation",
+                runtime=RunTime.DEPLOYMENT,
+            ),
+        )
         self.state.federation_manager.accept_invitation.assert_called_once_with(
             flwr_aid=self.flwr_aid,
             federation="test-federation",
         )
         self.assertIsInstance(response, AcceptInvitationResponse)
+
+    def test_accept_invitation_denied_when_not_permitted(self) -> None:
+        """Test AcceptInvitation aborts when can_execute returns False."""
+        request = AcceptInvitationRequest(federation_name="test-federation")
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+        self.state.federation_manager.can_execute.return_value = False
+
+        with self.assertRaises(grpc.RpcError):
+            self.servicer.AcceptInvitation(request, context)
+
+        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
+        self.state.federation_manager.accept_invitation.assert_not_called()
 
     def test_reject_invitation_success(self) -> None:
         """Test RejectInvitation success path."""
