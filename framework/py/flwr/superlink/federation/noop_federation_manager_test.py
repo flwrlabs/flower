@@ -241,6 +241,7 @@ def test_has_node() -> None:
     [
         (ActionType.START_RUN),
         (ActionType.CREATE_FEDERATION),
+        (ActionType.CREATE_INVITATION),
     ]
 )  # type: ignore
 def test_can_execute(action: ActionType) -> None:
