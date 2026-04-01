@@ -28,8 +28,8 @@ from flwr.supercore.constant import (
     DEFAULT_SIMULATION_CONFIG,
     NOOP_FEDERATION,
     NOOP_FEDERATION_DESCRIPTION,
+    ActionContext,
     ActionType,
-    RunType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 
@@ -237,15 +237,10 @@ def test_has_node() -> None:
 
 
 def test_can_execute() -> None:
-    """Test can_execute method always returns True."""
+    """Test can_execute method returns True for NOOP_FEDERATION."""
     manager = NoOpFederationManager()
 
-    allowed = manager.can_execute(
-        NOOP_FLWR_AID,
-        ActionType.START_RUN,
-        NOOP_FEDERATION,
-        RunType.SERVER_APP,
-    )
+    allowed = manager.can_execute(NOOP_FLWR_AID, ActionType.START_RUN, ActionContext())
 
     assert allowed is True
 
