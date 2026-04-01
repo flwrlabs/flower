@@ -175,3 +175,4 @@ class ActionType(str, Enum):
     REGISTER_SUPERNODE = "register_supernode"
     START_RUN = "start_run"
     CREATE_FEDERATION = "create_federation"
+    CREATE_INVITATION = "create_invitation"

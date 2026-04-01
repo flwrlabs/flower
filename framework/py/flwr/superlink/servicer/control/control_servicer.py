@@ -122,6 +122,7 @@ from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
 from flwr.supercore.typing import (
     CreateFederationContext,
+    CreateInvitationContext,
     RegisterSupernodeContext,
     StartRunContext,
 )
@@ -814,10 +815,35 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         with rpc_error_translator(context, rpc_name):
+            flwr_aid = _get_flwr_aid(context)
+            federation = request.federation_name
+            invitee_account_name = request.invitee_account_name
+
+            runtime = (
+                RunTime.SIMULATION
+                if state.federation_manager.get_simulation_config(federation)
+                else RunTime.DEPLOYMENT
+            )
+
+            if not state.federation_manager.can_execute(
+                flwr_aid=flwr_aid,
+                action=ActionType.CREATE_INVITATION,
+                context=CreateInvitationContext(
+                    federation=federation,
+                    invitee_account_name=invitee_account_name,
+                    runtime=runtime,
+                ),
+            ):
+                raise FlowerError(
+                    ApiErrorCode.NO_PERMISSIONS,
+                    f"'{ActionType.CREATE_INVITATION}' action cannot be executed on "
+                    f"federation '{federation}' for account '{invitee_account_name}'.",
+                )
+
             state.federation_manager.create_invitation(
-                flwr_aid=_get_flwr_aid(context),
-                federation=request.federation_name,
-                invitee_account_name=request.invitee_account_name,
+                flwr_aid=flwr_aid,
+                federation=federation,
+                invitee_account_name=invitee_account_name,
             )
         return CreateInvitationResponse()
 

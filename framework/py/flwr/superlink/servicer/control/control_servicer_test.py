@@ -91,6 +91,7 @@ from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.supercore.typing import (
     CreateFederationContext,
+    CreateInvitationContext,
     RegisterSupernodeContext,
     StartRunContext,
 )
@@ -840,15 +841,42 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             federation_name="test-federation",
         )
         context = Mock()
+        self.state.federation_manager.can_execute.return_value = True
+        self.state.federation_manager.get_simulation_config.return_value = None
 
         response = self.servicer.CreateInvitation(request, context)
 
+        self.state.federation_manager.can_execute.assert_called_once_with(
+            flwr_aid=self.flwr_aid,
+            action=ActionType.CREATE_INVITATION,
+            context=CreateInvitationContext(
+                federation="test-federation",
+                invitee_account_name="invitee-aid",
+                runtime=RunTime.DEPLOYMENT,
+            ),
+        )
         self.state.federation_manager.create_invitation.assert_called_once_with(
             flwr_aid=self.flwr_aid,
             federation="test-federation",
             invitee_account_name="invitee-aid",
         )
         self.assertIsInstance(response, CreateInvitationResponse)
+
+    def test_create_invitation_denied_when_not_permitted(self) -> None:
+        """Test CreateInvitation aborts when can_execute returns False."""
+        request = CreateInvitationRequest(
+            invitee_account_name="invitee-aid",
+            federation_name="test-federation",
+        )
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+        self.state.federation_manager.can_execute.return_value = False
+
+        with self.assertRaises(grpc.RpcError):
+            self.servicer.CreateInvitation(request, context)
+
+        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
+        self.state.federation_manager.create_invitation.assert_not_called()
 
     def test_list_invitations_success(self) -> None:
         """Test ListInvitations success path."""
