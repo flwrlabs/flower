@@ -36,13 +36,13 @@ class StartRunContext(ActionContext):
 
     Attributes
     ----------
-    federation : str
+    federation_name : str
         Target federation name.
     runtime : RunTime
         The runtime relevant to the action.
     """
 
-    federation: str
+    federation_name: str
     runtime: RunTime
 
 
@@ -52,7 +52,7 @@ class CreateFederationContext(ActionContext):
 
     Attributes
     ----------
-    federation : str
+    federation_name : str
         Target federation name.
     runtime : RunTime
         The runtime relevant to the action.
@@ -60,7 +60,7 @@ class CreateFederationContext(ActionContext):
         The visibility level of the federation to be created.
     """
 
-    federation: str
+    federation_name: str
     runtime: RunTime
     visibility: str
 
@@ -71,7 +71,7 @@ class CreateInvitationContext(ActionContext):
 
     Attributes
     ----------
-    federation : str
+    federation_name : str
         Target federation name.
     invitee_account_name : str
         Account name of the invitee.
@@ -79,6 +79,22 @@ class CreateInvitationContext(ActionContext):
         The runtime relevant to the action.
     """
 
-    federation: str
+    federation_name: str
     invitee_account_name: str
+    runtime: RunTime
+
+
+@dataclass(frozen=True)
+class AcceptInvitationContext(ActionContext):
+    """Context for the `ActionType.ACCEPT_INVITATION` action.
+
+    Attributes
+    ----------
+    federation_name : str
+        Target federation name.
+    runtime : RunTime
+        The runtime relevant to the action.
+    """
+
+    federation_name: str
     runtime: RunTime

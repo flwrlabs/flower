@@ -243,6 +243,7 @@ def test_has_node() -> None:
         (ActionType.REGISTER_SUPERNODE),
         (ActionType.CREATE_FEDERATION),
         (ActionType.CREATE_INVITATION),
+        (ActionType.ACCEPT_INVITATION),
     ]
 )  # type: ignore
 def test_can_execute(action: ActionType) -> None:

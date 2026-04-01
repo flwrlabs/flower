@@ -176,3 +176,4 @@ class ActionType(str, Enum):
     START_RUN = "start_run"
     CREATE_FEDERATION = "create_federation"
     CREATE_INVITATION = "create_invitation"
+    ACCEPT_INVITATION = "accept_invitation"

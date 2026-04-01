@@ -121,6 +121,7 @@ from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
 from flwr.supercore.typing import (
+    AcceptInvitationContext,
     CreateFederationContext,
     CreateInvitationContext,
     RegisterSupernodeContext,
@@ -215,7 +216,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             if not state.federation_manager.can_execute(
                 flwr_aid,
                 ActionType.START_RUN,
-                StartRunContext(federation=federation, runtime=runtime),
+                StartRunContext(federation_name=federation, runtime=runtime),
             ):
                 raise FlowerError(
                     ApiErrorCode.NO_PERMISSIONS,
@@ -671,7 +672,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 flwr_aid,
                 ActionType.CREATE_FEDERATION,
                 CreateFederationContext(
-                    federation=federation_name,
+                    federation_name=federation_name,
                     runtime=runtime,
                     visibility="private",
                 ),
@@ -829,7 +830,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 flwr_aid=flwr_aid,
                 action=ActionType.CREATE_INVITATION,
                 context=CreateInvitationContext(
-                    federation=federation,
+                    federation_name=federation,
                     invitee_account_name=invitee_account_name,
                     runtime=runtime,
                 ),
@@ -873,6 +874,29 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         with rpc_error_translator(context, rpc_name):
+            flwr_aid = _get_flwr_aid(context)
+            federation = request.federation_name
+
+            runtime = (
+                RunTime.SIMULATION
+                if state.federation_manager.get_simulation_config(federation)
+                else RunTime.DEPLOYMENT
+            )
+
+            if not state.federation_manager.can_execute(
+                flwr_aid=flwr_aid,
+                action=ActionType.ACCEPT_INVITATION,
+                context=AcceptInvitationContext(
+                    federation_name=federation,
+                    runtime=runtime,
+                ),
+            ):
+                raise FlowerError(
+                    ApiErrorCode.NO_PERMISSIONS,
+                    f"'{ActionType.ACCEPT_INVITATION}' action cannot be executed on "
+                    f"federation '{federation}'.",
+                )
+
             state.federation_manager.accept_invitation(
                 flwr_aid=_get_flwr_aid(context),
                 federation=request.federation_name,
