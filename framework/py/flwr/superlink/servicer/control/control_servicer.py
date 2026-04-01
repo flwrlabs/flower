@@ -785,12 +785,20 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             flwr_aid = _get_flwr_aid(context)
             federation = request.federation_name
             invitee_account_name = request.invitee_account_name
+
+            runtime = (
+                RunTime.SIMULATION
+                if state.federation_manager.get_simulation_config(federation)
+                else RunTime.DEPLOYMENT
+            )
+
             if not state.federation_manager.can_execute(
                 flwr_aid=flwr_aid,
                 action=ActionType.CREATE_INVITATION,
                 context=CreateInvitationContext(
                     federation=federation,
                     invitee_account_name=invitee_account_name,
+                    runtime=runtime,
                 ),
             ):
                 raise FlowerError(

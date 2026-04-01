@@ -755,6 +755,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         )
         context = Mock()
         self.state.federation_manager.can_execute.return_value = True
+        self.state.federation_manager.get_simulation_config.return_value = None
 
         response = self.servicer.CreateInvitation(request, context)
 
@@ -764,6 +765,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             context=CreateInvitationContext(
                 federation="test-federation",
                 invitee_account_name="invitee-aid",
+                runtime=RunTime.DEPLOYMENT,
             ),
         )
         self.state.federation_manager.create_invitation.assert_called_once_with(

@@ -49,7 +49,12 @@ class CreateInvitationContext(ActionContext):
     ----------
     federation : str
         Target federation name.
+    invitee_account_name : str
+        Account name of the invitee.
+    runtime : RunTime
+        The runtime relevant to the action.
     """
 
     federation: str
     invitee_account_name: str
+    runtime: RunTime
