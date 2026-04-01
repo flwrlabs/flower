@@ -160,3 +160,20 @@ class RunType(str, Enum):
 
     SERVER_APP = "serverapp"
     SIMULATION = "simulation"
+
+
+class RunTime(str, Enum):
+    """Supported runtimes."""
+
+    DEPLOYMENT = "deployment"
+    SIMULATION = "simulation"
+
+
+class ActionType(str, Enum):
+    """Supported control action types."""
+
+    REGISTER_SUPERNODE = "register_supernode"
+    START_RUN = "start_run"
+    CREATE_FEDERATION = "create_federation"
+    CREATE_INVITATION = "create_invitation"
+    ACCEPT_INVITATION = "accept_invitation"

@@ -29,8 +29,10 @@ from flwr.supercore.constant import (
     DEFAULT_SIMULATION_CONFIG,
     NOOP_FEDERATION,
     NOOP_FEDERATION_DESCRIPTION,
+    ActionType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.typing import ActionContext
 
 from .federation_manager import FederationManager
 
@@ -52,7 +54,8 @@ class NoOpFederationManager(FederationManager):
         self._simulation = simulation
         self._simulation_config: SimulationConfig | None = None
         if self._simulation:
-            self._simulation_config = DEFAULT_SIMULATION_CONFIG
+            self._simulation_config = SimulationConfig()
+            self._simulation_config.CopyFrom(DEFAULT_SIMULATION_CONFIG)
 
     def exists(self, federation: str) -> bool:
         """Check if a federation exists."""
@@ -139,8 +142,7 @@ class NoOpFederationManager(FederationManager):
                 ApiErrorCode.FEDERATION_NOT_FOUND_OR_NO_PERMISSION,
                 f"Cannot set simulation configuration for federation '{federation}'.",
             ) from None
-        self._simulation_config = SimulationConfig()
-        self._simulation_config.CopyFrom(config)
+        cast(SimulationConfig, self._simulation_config).MergeFrom(config)
 
     def create_federation(
         self,
@@ -215,3 +217,17 @@ class NoOpFederationManager(FederationManager):
         raise UnsupportedError(
             "`revoke_invitation` is not supported by NoOpFederationManager."
         )
+
+    def report_run_usage(self) -> None:
+        """Call hook to report usage for runs.
+
+        This method is called on successful run status transition to FINISHED and when
+        runs are marked as failed due to expired tokens.
+        """
+
+    def can_execute(
+        self, flwr_aid: str, action: ActionType, context: ActionContext
+    ) -> bool:
+        """Check if an account can execute an action under a given context."""
+        _ = (flwr_aid, action, context)
+        return True
