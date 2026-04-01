@@ -75,6 +75,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsResponse,
     UnregisterNodeRequest,
 )
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import (
@@ -282,13 +283,23 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
 
-    def test_start_run_calls_can_execute_with_expected_args(self) -> None:
-        """Test StartRun calls can_execute with expected typed arguments."""
+    @parameterized.expand(
+        [
+            (RunTime.DEPLOYMENT, False),
+            (RunTime.SIMULATION, True),
+        ]
+    )  # type: ignore
+    def test_start_run_calls_can_execute_with_expected_args(
+        self, expected_runtime: RunTime, simulation: bool
+    ) -> None:
+        """Test StartRun calls can_execute with correct runtime in StartRunContext."""
         fab_content = b"test FAB content 777"
         request = StartRunRequest()
         request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
         request.fab.content = fab_content
         request.federation = NOOP_FEDERATION
+
+        sim_cfg = SimulationConfig() if simulation else None
 
         with (
             patch(
@@ -302,6 +313,11 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 "can_execute",
                 return_value=True,
             ) as mock_can_execute,
+            patch.object(
+                self.state.federation_manager,
+                "get_simulation_config",
+                return_value=sim_cfg,
+            ),
         ):
             mock_get_fab_config.return_value = {
                 "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
@@ -312,7 +328,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         mock_can_execute.assert_called_once_with(
             self.aid,
             ActionType.START_RUN,
-            StartRunContext(federation=NOOP_FEDERATION, runtime=RunTime.DEPLOYMENT),
+            StartRunContext(federation=NOOP_FEDERATION, runtime=expected_runtime),
         )
 
     @parameterized.expand([(None,), (1,), (2,), (3,), (9,)])  # type: ignore
