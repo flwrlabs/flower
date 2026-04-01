@@ -659,7 +659,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 raise FlowerError(
                     ApiErrorCode.NO_PERMISSIONS,
                     f"'{ActionType.CREATE_FEDERATION}' action cannot be executed with "
-                    f"a runtime '{runtime}'.",
+                    f"a '{runtime}' runtime.",
                 )
 
             # Create federation
