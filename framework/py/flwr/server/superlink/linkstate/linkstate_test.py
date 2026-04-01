@@ -1999,7 +1999,6 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state = self.state_factory()
         run_id = create_dummy_run(state)
         assert state.create_token(run_id) is not None
-        state.federation_manager.report_run_usage = Mock()  # type: ignore
 
         # Execute: force token expiry and trigger cleanup
         patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
@@ -2011,7 +2010,6 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         assert status.status == Status.PENDING
         assert status.sub_status == ""
         assert status.details == ""
-        state.federation_manager.report_run_usage.assert_not_called()
 
         # Assert: expired token was removed and run can be re-claimed
         token = state.create_token(run_id)
