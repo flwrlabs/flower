@@ -825,7 +825,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 raise FlowerError(
                     ApiErrorCode.NO_PERMISSIONS,
                     f"'{ActionType.CREATE_INVITATION}' action cannot be executed on "
-                    f"federation '{federation}'.",
+                    f"federation '{federation}' for account '{invitee_account_name}'.",
                 )
 
             state.federation_manager.create_invitation(
