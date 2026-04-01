@@ -55,6 +55,6 @@ class CreateFederationContext(ActionContext):
         The visibility level of the federation to be created.
     """
 
-    federation_name: str
+    federation: str
     runtime: RunTime
     visibility: str

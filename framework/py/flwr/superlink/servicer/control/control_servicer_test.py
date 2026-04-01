@@ -598,6 +598,28 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         with self.assertRaises(grpc.RpcError):
             self.servicer.CreateFederation(request, mock_context)
 
+    def test_create_federation_denied_when_not_entitled(self) -> None:
+        """Test CreateFederation aborts when federation manager denies execution."""
+        request = CreateFederationRequest(
+            federation_name="test-federation",
+            description="A test federation",
+            simulation=False,
+        )
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch.object(
+                self.state.federation_manager,
+                "can_execute",
+                return_value=False,
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.CreateFederation(request, context)
+
+        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
+
     def test_archive_federation_success(self) -> None:
         """Test ArchiveFederation succeeds when federation_manager.archive_federation
         works."""

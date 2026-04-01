@@ -655,7 +655,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 flwr_aid,
                 ActionType.CREATE_FEDERATION,
                 CreateFederationContext(
-                    federation=federation_name, runtime=runtime, visibility="private"
+                    federation=federation_name,
+                    runtime=runtime,
+                    visibility="private",
                 ),
             ):
                 raise FlowerError(
