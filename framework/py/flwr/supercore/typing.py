@@ -39,3 +39,17 @@ class StartRunContext(ActionContext):
 
     federation: str
     runtime: RunTime
+
+
+@dataclass(frozen=True)
+class CreateInvitationContext(ActionContext):
+    """Context for the `ActionType.CREATE_INVITATION` action.
+
+    Attributes
+    ----------
+    federation : str
+        Target federation name.
+    """
+
+    federation: str
+    invitee_account_name: str

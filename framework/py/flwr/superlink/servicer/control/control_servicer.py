@@ -120,7 +120,7 @@ from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
 from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
-from flwr.supercore.typing import StartRunContext
+from flwr.supercore.typing import CreateInvitationContext, StartRunContext
 from flwr.supercore.utils import parse_app_spec, request_download_link
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
@@ -782,10 +782,27 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         with rpc_error_translator(context, rpc_name):
+            flwr_aid = _get_flwr_aid(context)
+            federation = request.federation_name
+            invitee_account_name = request.invitee_account_name
+            if not state.federation_manager.can_execute(
+                flwr_aid=flwr_aid,
+                action=ActionType.CREATE_INVITATION,
+                context=CreateInvitationContext(
+                    federation=federation,
+                    invitee_account_name=invitee_account_name,
+                ),
+            ):
+                raise FlowerError(
+                    ApiErrorCode.NO_PERMISSIONS,
+                    f"'{ActionType.CREATE_INVITATION}' action cannot be executed on "
+                    f"federation '{federation}'.",
+                )
+
             state.federation_manager.create_invitation(
-                flwr_aid=_get_flwr_aid(context),
-                federation=request.federation_name,
-                invitee_account_name=request.invitee_account_name,
+                flwr_aid=flwr_aid,
+                federation=federation,
+                invitee_account_name=invitee_account_name,
             )
         return CreateInvitationResponse()
 
