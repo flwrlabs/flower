@@ -696,7 +696,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             assert list(object_ids_in_response) == [msg_res.object_id]
 
     def test_push_serverapp_outputs_successful_if_running(self) -> None:
-        """Test `PushServerAppOutputs` success."""
+        """Test `PushServerAppOutputs` success and token retention."""
         # Prepare
         run_id = self._create_dummy_run(running=False)
         token = self.state.create_token(run_id)
@@ -724,6 +724,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Assert
         assert isinstance(response, PushAppOutputsResponse)
         assert grpc.StatusCode.OK == call.code()
+        assert self.state.get_run_id_by_token(token) == run_id
 
     def _assert_push_serverapp_outputs_not_allowed(
         self, token: str, context: Context
@@ -822,6 +823,51 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             self._update_run_status.with_call(request=request)
         assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
         assert e.exception.details() == self.status_to_msg[run_status.status]
+
+    def test_update_run_status_invalid_transition_returns_failed_precondition(
+        self,
+    ) -> None:
+        """Test invalid transition returns FAILED_PRECONDITION and keeps token."""
+        # Prepare
+        run_id = self._create_dummy_run(running=False)
+        token = self.state.create_token(run_id)
+        assert token is not None
+        self._transition_run_status(run_id, 2)  # Move run to RUNNING
+
+        # RUNNING -> STARTING is invalid and should fail.
+        request = UpdateRunStatusRequest(
+            run_id=run_id,
+            run_status=run_status_to_proto(RunStatus(Status.STARTING, "", "")),
+        )
+
+        # Execute/Assert
+        with self.assertRaises(grpc.RpcError) as e:
+            self._update_run_status.with_call(request=request)
+        assert e.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
+        assert self.state.get_run_id_by_token(token) == run_id
+
+    def test_update_run_status_finished_deletes_token(self) -> None:
+        """Test successful terminal transition deletes token."""
+        # Prepare
+        run_id = self._create_dummy_run(running=False)
+        token = self.state.create_token(run_id)
+        assert token is not None
+        self._transition_run_status(run_id, 2)  # Move run to RUNNING
+
+        request = UpdateRunStatusRequest(
+            run_id=run_id,
+            run_status=run_status_to_proto(
+                RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done")
+            ),
+        )
+
+        # Execute
+        response, call = self._update_run_status.with_call(request=request)
+
+        # Assert
+        assert isinstance(response, UpdateRunStatusResponse)
+        assert grpc.StatusCode.OK == call.code()
+        assert self.state.get_run_id_by_token(token) is None
 
     @parameterized.expand([(True,), (False,)])  # type: ignore
     def test_send_app_heartbeat(self, success: bool) -> None:

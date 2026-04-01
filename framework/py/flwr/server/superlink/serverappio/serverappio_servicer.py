@@ -368,7 +368,7 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         log(DEBUG, "ServerAppIoServicer.PushAppOutputs")
 
         # Validate the token
-        run_id = self._verify_token(request.token, context)
+        self._verify_token(request.token, context)
 
         # Init state and store
         state = self.state_factory.state()
@@ -385,8 +385,8 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
 
         state.set_serverapp_context(request.run_id, context_from_proto(request.context))
 
-        # Remove the token
-        state.delete_token(run_id)
+        # Keep token until terminal status is committed. If shutdown finalization fails,
+        # heartbeat expiry still needs the token to trigger run finalization fallback.
         return PushAppOutputsResponse()
 
     def UpdateRunStatus(
@@ -403,14 +403,23 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         abort_if(request.run_id, [Status.FINISHED], state, store, context)
 
         # Update the run status
-        state.update_run_status(
+        updated = state.update_run_status(
             run_id=request.run_id, new_status=run_status_from_proto(request.run_status)
         )
+        if not updated:
+            # Keep token unchanged when the transition fails; it can still expire and
+            # trigger heartbeat-based fallback finalization.
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                f"Failed to update status for run {request.run_id}",
+            )
 
         # If the run is finished, delete the run from ObjectStore
         if request.run_status.status == Status.FINISHED:
             # Delete all objects related to the run
             store.delete_objects_in_run(request.run_id)
+            # Delete token only after terminal status is persisted.
+            state.delete_token(request.run_id)
 
         return UpdateRunStatusResponse()
 
