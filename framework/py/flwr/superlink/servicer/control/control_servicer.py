@@ -199,6 +199,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             # federation config overrides
             run_type = RunType.SERVER_APP
             resolved_federation_config = None
+            runtime = RunTime.DEPLOYMENT
             if sim_cfg := state.federation_manager.get_simulation_config(federation):
                 run_type = RunType.SIMULATION
                 resolved_federation_config = SimulationConfig()
