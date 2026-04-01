@@ -102,23 +102,6 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         with self.assertRaisesRegex(ValueError, "FAB hash mismatch"):
             self.state.store_fab(Fab("not-the-content-hash", b"fab-content", {}))
 
-    def test_store_fab_deduplicates_by_hash(self) -> None:
-        """Test storing the same FAB content reuses the same hash."""
-        content = b"fab-content"
-        hash_str = hashlib.sha256(content).hexdigest()
-        fab_hash = self.state.store_fab(Fab(hash_str, content, {"meta": "data"}))
-        other_hash = self.state.store_fab(Fab(hash_str, content, {"meta": "next"}))
-        retrieved = self.state.get_fab(fab_hash)
-
-        self.assertEqual(fab_hash, other_hash)
-        self.assertIsNotNone(retrieved)
-        assert retrieved is not None
-        self.assertEqual(retrieved.verifications, {"meta": "next"})
-
-    def test_get_fab_missing_returns_none(self) -> None:
-        """Test missing FAB retrieval."""
-        self.assertIsNone(self.state.get_fab("missing-fab-hash"))
-
     def test_store_and_get_context(self) -> None:
         """Test storing and retrieving a context."""
         # Prepare

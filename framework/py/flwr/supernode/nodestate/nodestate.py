@@ -19,7 +19,7 @@ from abc import abstractmethod
 from collections.abc import Sequence
 
 from flwr.common import Context, Message
-from flwr.common.typing import Fab, Run
+from flwr.common.typing import Run
 from flwr.supercore.corestate import CoreState
 
 
@@ -33,14 +33,6 @@ class NodeState(CoreState):
     @abstractmethod
     def get_node_id(self) -> int:
         """Get the node ID."""
-
-    @abstractmethod
-    def store_fab(self, fab: Fab) -> str:
-        """Store a FAB and return its canonical SHA-256 hash."""
-
-    @abstractmethod
-    def get_fab(self, fab_hash: str) -> Fab | None:
-        """Return the FAB for the given hash, if present."""
 
     @abstractmethod
     def store_message(self, message: Message) -> str | None:

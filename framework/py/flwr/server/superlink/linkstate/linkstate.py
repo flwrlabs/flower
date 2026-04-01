@@ -21,7 +21,7 @@ from typing import Literal
 
 from flwr.app.user_config import UserConfig
 from flwr.common import Context, Message
-from flwr.common.typing import Fab, Run, RunStatus
+from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
@@ -35,14 +35,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
     @abc.abstractmethod
     def federation_manager(self) -> FederationManager:
         """Return the FederationManager instance."""
-
-    @abc.abstractmethod
-    def store_fab(self, fab: Fab) -> str:
-        """Store a FAB and return its canonical SHA-256 hash."""
-
-    @abc.abstractmethod
-    def get_fab(self, fab_hash: str) -> Fab | None:
-        """Return the FAB for the given hash, if present."""
 
     @abc.abstractmethod
     def store_message_ins(self, message: Message) -> str | None:

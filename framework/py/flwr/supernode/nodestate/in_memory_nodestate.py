@@ -21,9 +21,8 @@ from threading import Lock, RLock
 
 from flwr.common import Context, Error, Message, now
 from flwr.common.constant import ErrorCode
-from flwr.common.typing import Fab, Run
+from flwr.common.typing import Run
 from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS
-from flwr.supercore.corestate.fab_helpers import get_fab_locked, store_fab_locked
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -70,9 +69,6 @@ class InMemoryNodeState(
         # Store run ID to Run mapping
         self.run_store: dict[int, Run] = {}
         self.lock_run_store = Lock()
-        # Store hash to FAB mapping
-        self.fab_store: dict[str, Fab] = {}
-        self.lock_fab_store = Lock()
         # Store run ID to Context mapping
         self.ctx_store: dict[int, Context] = {}
         self.lock_ctx_store = Lock()
@@ -89,14 +85,6 @@ class InMemoryNodeState(
         if self.node_id is None:
             raise ValueError("Node ID not set")
         return self.node_id
-
-    def store_fab(self, fab: Fab) -> str:
-        """Store a FAB."""
-        return store_fab_locked(self.lock_fab_store, self.fab_store, fab)
-
-    def get_fab(self, fab_hash: str) -> Fab | None:
-        """Return a FAB by hash."""
-        return get_fab_locked(self.lock_fab_store, self.fab_store, fab_hash)
 
     def store_message(self, message: Message) -> str | None:
         """Store a message."""

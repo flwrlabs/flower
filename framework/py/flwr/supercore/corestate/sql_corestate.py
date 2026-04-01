@@ -15,6 +15,8 @@
 """SQLAlchemy-based CoreState implementation."""
 
 
+import hashlib
+import json
 import secrets
 from typing import cast
 
@@ -27,6 +29,7 @@ from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
 )
+from flwr.common.typing import Fab
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
@@ -46,6 +49,49 @@ class SqlCoreState(CoreState, SqlMixin):
     def object_store(self) -> ObjectStore:
         """Return the ObjectStore instance used by this CoreState."""
         return self._object_store
+
+    def store_fab(self, fab: Fab) -> str:
+        """Store a FAB."""
+        fab_hash = hashlib.sha256(fab.content).hexdigest()
+        if fab.hash_str and fab.hash_str != fab_hash:
+            raise ValueError(
+                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+            )
+        params = {
+            "fab_hash": fab_hash,
+            "content": fab.content,
+            "verifications": json.dumps(fab.verifications),
+        }
+        # Keep launch behavior: last write wins for metadata under the same
+        # content hash.
+        query = """
+            INSERT INTO fab (fab_hash, content, verifications)
+            VALUES (:fab_hash, :content, :verifications)
+            ON CONFLICT(fab_hash) DO UPDATE SET
+                content = excluded.content,
+                verifications = excluded.verifications
+        """
+        self.query(query, params)
+        return fab_hash
+
+    def get_fab(self, fab_hash: str) -> Fab | None:
+        """Return a FAB by hash."""
+        query = """
+            SELECT fab_hash, content, verifications
+            FROM fab
+            WHERE fab_hash = :fab_hash
+        """
+        rows = self.query(query, {"fab_hash": fab_hash})
+        if not rows:
+            return None
+        row = rows[0]
+        # Launch tradeoff: do not recompute content hash on reads; rely on
+        # write-time validation and hash-addressed lookup.
+        return Fab(
+            hash_str=row["fab_hash"],
+            content=row["content"],
+            verifications=json.loads(row["verifications"]),
+        )
 
     def get_metadata(self) -> MetaData:
         """Return SQLAlchemy MetaData needed for CoreState tables."""

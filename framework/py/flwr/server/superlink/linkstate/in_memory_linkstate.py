@@ -36,13 +36,12 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.typing import Fab, Run, RunStatus
+from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.utils import validate_message
 from flwr.supercore.constant import NodeStatus
-from flwr.supercore.corestate.fab_helpers import get_fab_locked, store_fab_locked
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.superlink.federation import FederationManager
@@ -85,7 +84,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         # Map run_id to RunRecord
         self.run_ids: dict[int, RunRecord] = {}
         self.contexts: dict[int, Context] = {}
-        self.fab_store: dict[str, Fab] = {}
         self.message_ins_store: dict[str, Message] = {}
         self.message_res_store: dict[str, Message] = {}
         self.message_ins_id_to_message_res_id: dict[str, str] = {}
@@ -103,14 +101,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
     def federation_manager(self) -> FederationManager:
         """Get the FederationManager instance."""
         return self._federation_manager
-
-    def store_fab(self, fab: Fab) -> str:
-        """Store a FAB."""
-        return store_fab_locked(self.lock, self.fab_store, fab)
-
-    def get_fab(self, fab_hash: str) -> Fab | None:
-        """Return a FAB by hash."""
-        return get_fab_locked(self.lock, self.fab_store, fab_hash)
 
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
