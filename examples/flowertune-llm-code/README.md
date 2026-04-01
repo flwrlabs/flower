@@ -56,7 +56,7 @@ flwr federation simulation-config \
 ```
 
 > [!IMPORTANT]
-> Please note that `[tool.flwr.app.config.static]` are not allowed to be modified for fair competition if you plan to participatein the [LLM leaderboard](https://flower.ai/benchmarks/llm-leaderboard). Additionally, the number of supernodes (i.e. `--num-supernodes`) must be 10.
+> Please note that `[tool.flwr.app.config.static]` are not allowed to be modified for fair competition if you plan to participate in the [LLM leaderboard](https://flower.ai/benchmarks/llm-leaderboard). Additionally, the number of supernodes (i.e. `--num-supernodes`) must be 10.
 
 ## Running the challenge
 
@@ -89,4 +89,4 @@ You can adjust the CPU/GPU resources you assign to each of the clients based on 
 The global PEFT model checkpoints are saved every 5 rounds after aggregation on the sever side as default, which can be specified with `train.save-every-round` under [tool.flwr.app.config] entry in `pyproject.toml`.
 
 > [!NOTE]
-> Please provide the last PEFT checkpoint if you plan to participatein the [LLM leaderboard](https://flower.ai/benchmarks/llm-leaderboard).
+> Please provide the last PEFT checkpoint if you plan to participate in the [LLM leaderboard](https://flower.ai/benchmarks/llm-leaderboard).
