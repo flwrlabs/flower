@@ -113,7 +113,9 @@ from flwr.supercore.constant import (
     NOOP_FEDERATION,
     PLATFORM_API_URL,
     ActionType,
+    RunTime,
     RunType,
+    StartRunContext,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
 from flwr.supercore.ffs import FfsFactory
@@ -203,8 +205,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 resolved_federation_config.CopyFrom(sim_cfg)
                 resolved_federation_config.MergeFrom(request.override_federation_config)
 
+            runtime = RunTime.SIMULATION if sim_cfg else RunTime.DEPLOYMENT
             if not state.federation_manager.can_execute(
-                flwr_aid, ActionType.START_RUN, federation, run_type
+                flwr_aid,
+                ActionType.START_RUN,
+                StartRunContext(federation=federation, runtime=runtime),
             ):
                 raise FlowerError(
                     ApiErrorCode.NO_PERMISSIONS,

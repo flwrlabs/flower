@@ -81,7 +81,9 @@ from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION,
     ActionType,
+    RunTime,
     RunType,
+    StartRunContext,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.error.catalog import API_ERROR_MAP
@@ -310,8 +312,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         mock_can_execute.assert_called_once_with(
             self.aid,
             ActionType.START_RUN,
-            NOOP_FEDERATION,
-            RunType.SERVER_APP,
+            StartRunContext(federation=NOOP_FEDERATION, runtime=RunTime.DEPLOYMENT),
         )
 
     @parameterized.expand([(None,), (1,), (2,), (3,), (9,)])  # type: ignore
