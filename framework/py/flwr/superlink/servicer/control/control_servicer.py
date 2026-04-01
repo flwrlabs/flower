@@ -215,7 +215,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             if not state.federation_manager.can_execute(
                 flwr_aid,
                 ActionType.START_RUN,
-                StartRunContext(federation=federation, runtime=runtime),
+                StartRunContext(federation_name=federation, runtime=runtime),
             ):
                 raise FlowerError(
                     ApiErrorCode.NO_PERMISSIONS,
@@ -660,7 +660,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 flwr_aid,
                 ActionType.CREATE_FEDERATION,
                 CreateFederationContext(
-                    federation=federation_name,
+                    federation_name=federation_name,
                     runtime=runtime,
                     visibility="private",
                 ),
@@ -818,7 +818,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 flwr_aid=flwr_aid,
                 action=ActionType.CREATE_INVITATION,
                 context=CreateInvitationContext(
-                    federation=federation,
+                    federation_name=federation,
                     invitee_account_name=invitee_account_name,
                     runtime=runtime,
                 ),
@@ -875,7 +875,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 flwr_aid=flwr_aid,
                 action=ActionType.ACCEPT_INVITATION,
                 context=AcceptInvitationContext(
-                    federation=federation,
+                    federation_name=federation,
                     runtime=runtime,
                 ),
             ):

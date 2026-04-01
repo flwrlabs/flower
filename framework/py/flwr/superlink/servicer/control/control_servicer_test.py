@@ -333,7 +333,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         mock_can_execute.assert_called_once_with(
             self.aid,
             ActionType.START_RUN,
-            StartRunContext(federation=NOOP_FEDERATION, runtime=expected_runtime),
+            StartRunContext(federation_name=NOOP_FEDERATION, runtime=expected_runtime),
         )
 
     @parameterized.expand([(None,), (1,), (2,), (3,), (9,)])  # type: ignore
@@ -587,7 +587,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             self.aid,
             ActionType.CREATE_FEDERATION,
             CreateFederationContext(
-                federation=expected_name,
+                federation_name=expected_name,
                 runtime=RunTime.SIMULATION,
                 visibility="private",
             ),
@@ -809,7 +809,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             flwr_aid=self.flwr_aid,
             action=ActionType.CREATE_INVITATION,
             context=CreateInvitationContext(
-                federation="test-federation",
+                federation_name="test-federation",
                 invitee_account_name="invitee-aid",
                 runtime=RunTime.DEPLOYMENT,
             ),
@@ -865,7 +865,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             flwr_aid=self.flwr_aid,
             action=ActionType.ACCEPT_INVITATION,
             context=AcceptInvitationContext(
-                federation="test-federation",
+                federation_name="test-federation",
                 runtime=RunTime.DEPLOYMENT,
             ),
         )
