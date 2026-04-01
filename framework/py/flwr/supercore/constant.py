@@ -162,10 +162,10 @@ class ActionType(str, Enum):
     START_RUN = "start_run"
 
 
-class RunTime(str, Enum):
+class RunType(str, Enum):
     """Supported run types."""
 
-    DEPLOYMENT = "deployment"
+    SERVER_APP = "serverapp"
     SIMULATION = "simulation"
 
 
