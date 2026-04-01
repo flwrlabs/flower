@@ -92,6 +92,7 @@ from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_
 from flwr.supercore.typing import (
     CreateFederationContext,
     CreateInvitationContext,
+    RegisterSupernodeContext,
     StartRunContext,
 )
 from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
@@ -428,6 +429,47 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             )
         else:
             assert node_id
+
+    def test_register_node_denied_when_not_entitled(self) -> None:
+        """Test RegisterNode aborts when federation manager denies execution."""
+        req = RegisterNodeRequest(
+            public_key=public_key_to_bytes(generate_key_pairs()[1])
+        )
+        ctx = Mock()
+        ctx.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch.object(self.state, "create_node") as mock_create_node,
+            patch.object(
+                self.state.federation_manager,
+                "can_execute",
+                return_value=False,
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.RegisterNode(req, ctx)
+
+        _assert_abort_with_flwr_err(ctx, ApiErrorCode.NO_PERMISSIONS)
+        mock_create_node.assert_not_called()
+
+    def test_register_node_calls_can_execute_with_expected_args(self) -> None:
+        """Test RegisterNode calls can_execute with register action."""
+        req = RegisterNodeRequest(
+            public_key=public_key_to_bytes(generate_key_pairs()[1])
+        )
+
+        with patch.object(
+            self.state.federation_manager,
+            "can_execute",
+            return_value=True,
+        ) as mock_can_execute:
+            _ = self.servicer.RegisterNode(req, Mock())
+
+        mock_can_execute.assert_called_once_with(
+            self.aid,
+            ActionType.REGISTER_SUPERNODE,
+            RegisterSupernodeContext(),
+        )
 
     @parameterized.expand(
         [

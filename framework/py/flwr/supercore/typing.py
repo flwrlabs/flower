@@ -26,6 +26,11 @@ class ActionContext:
 
 
 @dataclass(frozen=True)
+class RegisterSupernodeContext(ActionContext):
+    """Context for the `ActionType.REGISTER_SUPERNODE` action."""
+
+
+@dataclass(frozen=True)
 class StartRunContext(ActionContext):
     """Context for the `ActionType.START_RUN` action.
 

@@ -123,6 +123,7 @@ from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_
 from flwr.supercore.typing import (
     CreateFederationContext,
     CreateInvitationContext,
+    RegisterSupernodeContext,
     StartRunContext,
 )
 from flwr.supercore.utils import parse_app_spec, request_download_link
@@ -521,6 +522,17 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         node_id = 0
 
         flwr_aid = _get_flwr_aid(context)
+        with rpc_error_translator(context, self.RegisterNode.__qualname__):
+            if not state.federation_manager.can_execute(
+                flwr_aid,
+                ActionType.REGISTER_SUPERNODE,
+                RegisterSupernodeContext(),
+            ):
+                raise FlowerError(
+                    ApiErrorCode.NO_PERMISSIONS,
+                    f"'{ActionType.REGISTER_SUPERNODE}' action cannot be executed.",
+                )
+
         # Account name exists if `flwr_aid` exists
         account_name = cast(str, get_current_account_info().account_name)
         try:

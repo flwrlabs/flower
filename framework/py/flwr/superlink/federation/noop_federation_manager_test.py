@@ -240,6 +240,7 @@ def test_has_node() -> None:
 @parameterized.expand(
     [
         (ActionType.START_RUN),
+        (ActionType.REGISTER_SUPERNODE),
         (ActionType.CREATE_FEDERATION),
         (ActionType.CREATE_INVITATION),
     ]
