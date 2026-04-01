@@ -1105,27 +1105,31 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if not expired_records:
             return
 
+        updated_any = False
         with self.session():
             query = """
                 UPDATE run
                 SET sub_status = :failed, details = :details, finished_at = :finished_at
                 WHERE run_id = :run_id AND finished_at = '' AND starting_at != ''
+                RETURNING run_id
             """
-            data = [
-                {
-                    "failed": SubStatus.FAILED,
-                    "details": RUN_FAILURE_DETAILS_NO_HEARTBEAT,
-                    "finished_at": datetime.fromtimestamp(
-                        active_until, tz=timezone.utc
-                    ).isoformat(),
-                    "run_id": uint64_to_int64(run_id),
-                }
-                for run_id, active_until in expired_records
-            ]
-            self.query(query, data)
+            for run_id, active_until in expired_records:
+                rows = self.query(
+                    query,
+                    {
+                        "failed": SubStatus.FAILED,
+                        "details": RUN_FAILURE_DETAILS_NO_HEARTBEAT,
+                        "finished_at": datetime.fromtimestamp(
+                            active_until, tz=timezone.utc
+                        ).isoformat(),
+                        "run_id": uint64_to_int64(run_id),
+                    },
+                )
+                updated_any = updated_any or bool(rows)
 
-        # Report usage for runs that have been marked as failed due to expired tokens
-        self.federation_manager.report_run_usage()
+        # Report usage only if at least one run was marked as failed.
+        if updated_any:
+            self.federation_manager.report_run_usage()
 
     def get_serverapp_context(self, run_id: int) -> Context | None:
         """Get the context for the specified `run_id`."""
