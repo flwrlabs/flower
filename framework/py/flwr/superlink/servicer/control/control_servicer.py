@@ -649,11 +649,24 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             account = _get_account(context)
             federation_name = f"@{account.account_name}/{request.federation_name}"
 
+            runtime = RunTime.SIMULATION if request.simulation else RunTime.DEPLOYMENT
+            flwr_aid = cast(str, account.flwr_aid)
+            if not state.federation_manager.can_execute(
+                flwr_aid,
+                ActionType.CREATE_FEDERATION,
+                StartRunContext(federation=federation_name, runtime=runtime),
+            ):
+                raise FlowerError(
+                    ApiErrorCode.NO_PERMISSIONS,
+                    f"'{ActionType.CREATE_FEDERATION}' action cannot be executed with "
+                    f"a runtime '{runtime}'.",
+                )
+
             # Create federation
             federation = state.federation_manager.create_federation(
                 name=federation_name,
                 description=request.description,
-                flwr_aid=cast(str, account.flwr_aid),
+                flwr_aid=flwr_aid,
                 simulation=request.simulation,
             )
 

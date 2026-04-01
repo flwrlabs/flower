@@ -173,3 +173,4 @@ class ActionType(str, Enum):
     """Supported control action types."""
 
     START_RUN = "start_run"
+    CREATE_FEDERATION = "create_federation"
