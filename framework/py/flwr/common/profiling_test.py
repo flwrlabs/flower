@@ -25,9 +25,33 @@ class TestProfileRecorder(unittest.TestCase):
     def test_summary_and_network(self) -> None:
         recorder = ProfileRecorder(run_id=1)
 
-        recorder.record("server", "send_and_receive", 1, None, 200.0, {})
-        recorder.record("client", "total", 1, 10, 50.0, {})
-        recorder.record("client", "total", 1, 11, 70.0, {})
+        recorder.record(
+            "server",
+            "send_and_receive",
+            1,
+            None,
+            200.0,
+            {},
+            timestamp_ms=1000.0,
+        )
+        recorder.record(
+            "client",
+            "total",
+            1,
+            10,
+            50.0,
+            {},
+            timestamp_ms=1200.0,
+        )
+        recorder.record(
+            "client",
+            "total",
+            1,
+            10,
+            70.0,
+            {},
+            timestamp_ms=1300.0,
+        )
 
         summary = recorder.summarize()
         entries = {
@@ -39,3 +63,6 @@ class TestProfileRecorder(unittest.TestCase):
         self.assertIn(("server", "network", 1), entries)
         self.assertAlmostEqual(entries[("client", "total", 1)]["avg_ms"], 60.0)
         self.assertAlmostEqual(entries[("server", "network", 1)]["avg_ms"], 140.0)
+        self.assertAlmostEqual(summary["first_event_ts_ms"], 1000.0)
+        self.assertAlmostEqual(summary["last_event_ts_ms"], 1370.0)
+        self.assertAlmostEqual(summary["total_execution_ms"], 370.0)

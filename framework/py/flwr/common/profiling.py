@@ -75,6 +75,15 @@ class ProfileRecorder:
         """Return a JSON-serializable summary of all events."""
         with self._lock:
             events = list(self._events)
+        total_execution_ms = 0.0
+        first_event_ts_ms: float | None = None
+        last_event_ts_ms: float | None = None
+        if events:
+            first_event_ts_ms = min(event.timestamp_ms for event in events)
+            last_event_ts_ms = max(
+                event.timestamp_ms + max(event.duration_ms, 0.0) for event in events
+            )
+            total_execution_ms = max(last_event_ts_ms - first_event_ts_ms, 0.0)
 
         stats: dict[tuple[str, str, int | None, int | None], dict[str, Any]] = {}
         for event in events:
@@ -299,6 +308,9 @@ class ProfileRecorder:
         return {
             "run_id": self.run_id,
             "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+            "total_execution_ms": total_execution_ms,
+            "first_event_ts_ms": first_event_ts_ms,
+            "last_event_ts_ms": last_event_ts_ms,
             "entries": entries,
             "events": event_entries,
         }

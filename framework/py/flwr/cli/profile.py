@@ -194,7 +194,14 @@ def _render_table(
     include_memory: bool = True,
     include_disk: bool = True,
 ) -> Table:
-    table = Table(title=title)
+    table_title = title
+    if title == "Run Profile Summary":
+        total_execution_ms = summary.get("total_execution_ms")
+        if isinstance(total_execution_ms, (int, float)):
+            table_title = (
+                f"{title} (Total execution: {total_execution_ms / 1000.0:.2f}s)"
+            )
+    table = Table(title=table_title)
     table.add_column("Task", style="white")
     table.add_column("Scope", style="white")
     table.add_column("Round", style="cyan")
