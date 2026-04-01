@@ -52,15 +52,6 @@ def _validate_and_clone_fab(fab: Fab) -> tuple[str, Fab]:
     )
 
 
-def _clone_fab(fab: Fab) -> Fab:
-    """Return a defensive FAB copy."""
-    return Fab(
-        hash_str=fab.hash_str,
-        content=fab.content,
-        verifications=dict(fab.verifications),
-    )
-
-
 def store_fab_locked(
     lock: LockLike,
     store: MutableMapping[str, Fab],
@@ -84,4 +75,8 @@ def get_fab_locked(
             return None
         # Launch tradeoff: do not recompute content hash on reads; rely on write-time
         # validation and hash-addressed lookup.
-        return _clone_fab(fab)
+        return Fab(
+            hash_str=fab.hash_str,
+            content=fab.content,
+            verifications=dict(fab.verifications),
+        )
