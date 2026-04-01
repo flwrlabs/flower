@@ -120,7 +120,7 @@ from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
 from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
-from flwr.supercore.typing import StartRunContext
+from flwr.supercore.typing import CreateFederationContext, StartRunContext
 from flwr.supercore.utils import parse_app_spec, request_download_link
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
@@ -654,7 +654,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             if not state.federation_manager.can_execute(
                 flwr_aid,
                 ActionType.CREATE_FEDERATION,
-                StartRunContext(federation=federation_name, runtime=runtime),
+                CreateFederationContext(
+                    federation=federation_name, runtime=runtime, visibility="public"
+                ),
             ):
                 raise FlowerError(
                     ApiErrorCode.NO_PERMISSIONS,
