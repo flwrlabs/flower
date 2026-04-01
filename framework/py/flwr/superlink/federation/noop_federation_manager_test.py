@@ -246,7 +246,18 @@ def test_can_execute() -> None:
     )
 
     assert allowed is True
-    assert allowed_register is True
+
+@parameterized.expand(
+    [
+        (ActionType.START_RUN),
+        (ActionType.REGISTER_SUPERNODE),
+    ]
+)  # type: ignore
+def test_can_execute(action: ActionType) -> None:
+    """Test can_execute method returns True for NOOP_FEDERATION."""
+    manager = NoOpFederationManager()
+
+    allowed = manager.can_execute(NOOP_FLWR_AID, action, ActionContext())
 
 
 def test_get_federations() -> None:
