@@ -207,7 +207,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 resolved_federation_config.CopyFrom(sim_cfg)
                 resolved_federation_config.MergeFrom(request.override_federation_config)
 
-            runtime = RunTime.SIMULATION if sim_cfg else RunTime.DEPLOYMENT
             if not state.federation_manager.can_execute(
                 flwr_aid,
                 ActionType.START_RUN,
