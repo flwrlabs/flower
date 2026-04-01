@@ -434,6 +434,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         ctx.abort.side_effect = grpc.RpcError()
 
         with (
+            patch.object(self.state, "create_node") as mock_create_node,
             patch.object(
                 self.state.federation_manager,
                 "can_execute",
@@ -444,7 +445,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             self.servicer.RegisterNode(req, ctx)
 
         _assert_abort_with_flwr_err(ctx, ApiErrorCode.NO_PERMISSIONS)
-        self.state.create_node.assert_not_called()
+        mock_create_node.assert_not_called()
 
     def test_register_node_calls_can_execute_with_expected_args(self) -> None:
         """Test RegisterNode calls can_execute with register action."""
