@@ -160,3 +160,16 @@ class RunType(str, Enum):
 
     SERVER_APP = "serverapp"
     SIMULATION = "simulation"
+
+
+class RunTime(str, Enum):
+    """Supported runtimes."""
+
+    DEPLOYMENT = "deployment"
+    SIMULATION = "simulation"
+
+
+class ActionType(str, Enum):
+    """Supported control action types."""
+
+    START_RUN = "start_run"

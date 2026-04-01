@@ -28,8 +28,10 @@ from flwr.supercore.constant import (
     DEFAULT_SIMULATION_CONFIG,
     NOOP_FEDERATION,
     NOOP_FEDERATION_DESCRIPTION,
+    ActionType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.typing import ActionContext
 
 from .noop_federation_manager import NoOpFederationManager
 
@@ -232,6 +234,15 @@ def test_has_node() -> None:
     # Test that it raises ValueError for non-existent federation
     with pytest.raises(ValueError):
         manager.has_node(999, "any_federation")
+
+
+def test_can_execute() -> None:
+    """Test can_execute method returns True for NOOP_FEDERATION."""
+    manager = NoOpFederationManager()
+
+    allowed = manager.can_execute(NOOP_FLWR_AID, ActionType.START_RUN, ActionContext())
+
+    assert allowed is True
 
 
 def test_get_federations() -> None:
