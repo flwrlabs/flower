@@ -17,7 +17,6 @@
 
 from dataclasses import dataclass
 
-
 from flwr.supercore.constant import RunTime
 
 
