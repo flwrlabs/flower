@@ -21,7 +21,8 @@ from typing import TYPE_CHECKING
 from flwr.common.typing import Federation
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Invitation  # pylint: disable=E0611
-from flwr.supercore.constant import ActionContext, ActionType
+from flwr.supercore.constant import ActionType
+from flwr.supercore.typing import ActionContext
 
 if TYPE_CHECKING:
     from flwr.server.superlink.linkstate.linkstate import LinkState
