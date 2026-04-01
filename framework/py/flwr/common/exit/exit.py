@@ -87,7 +87,7 @@ def flwr_exit(
     if event_type:
         event_details = event_details or {}
         event_details["exit_code"] = code
-        event(event_type, event_details).result()
+        event(event_type, event_details)  # Best effort, do not block exit
 
     # Log the exit message
     log(log_level, exit_message)
