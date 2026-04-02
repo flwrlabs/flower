@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["fedomop"]
+
+[project]
+name = "fed-omop"
+license = "Apache-2.0"
+version = "0.1.0"
+description = "Personalized Federated Framework for OMOP-CDM Multi-Hospital Data"
+requires-python = ">=3.10"
+dependencies = [
+    "torch==2.7.1",
+    "torchvision==0.22.1",
+    "flwr[simulation]>=1.26.1",
+    "flwr-datasets[vision]>=0.6.0",
+    "scikit-learn==1.7.2",
+    "omegaconf",
+    "imbalanced-learn>=0.12.",
+    "numpy",
+    "pandas",
+    "tqdm",
+    "joblib",
+    "matplotlib",
+    "datasets",
+]
+
+[tool.flwr.app]
+publisher = "danimanjah"
+
+
+[tool.flwr.app.components]
+serverapp = "fedomop.server_app:app"
+clientapp = "fedomop.client_app:app"
+
+[tool.setuptools.packages.find]
+where=["."]
+include=["fedomop*"]
+
+[tool.flwr.app.config]
+num-server-rounds = 30
+fraction-evaluate = 1.0
+strategy = "FedAvg"
+dataset = "synthea-small" # options ["synthea-small", "mimiciv"]
+partitioner = "iid" # options ["iid","dirichlet", "natural"]
+dirichlet_alpha = 0.8
+model = "ResMLP"
+batch-size = 32
+local-epochs = 2
+lr = 0.001
+weight_decay = 0.0005
+seed = 0
