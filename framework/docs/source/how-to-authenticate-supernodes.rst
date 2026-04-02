@@ -115,7 +115,7 @@ the path to the CA certificate used to launch the SuperLink. For example:
 
 .. code-block:: toml
     :caption: config.toml
-    :emphasize-lines: 3,3
+    :emphasize-lines: 3
 
     [superlink.local-deployment]
     address = "127.0.0.1:9093"
@@ -134,14 +134,12 @@ command:
     ┡━━━━━━━━╇━━━━━━━━━━━━╇━━━━━╇━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━┩
     └────────┴────────────┴─────┴────────┴─────────┴──────────────────┘
 
-With a correctly configure Flower CLi, let's proceed to register two SuperNodes:
+With a correctly configured Flower CLI, let's proceed to register two SuperNodes:
 
-::
+.. code-block:: bash
 
-    .. code-block:: bash
-
-    # flwr supernode register <supernode-pub-key> <superlink> $ flwr supernode register
-    keys/supernode_credentials_1.pub local-deployment
+    # flwr supernode register <supernode-pub-key> <superlink>
+    $ flwr supernode register keys/supernode_credentials_1.pub local-deployment
 
 Next, let's register the second SuperNode as well:
 
