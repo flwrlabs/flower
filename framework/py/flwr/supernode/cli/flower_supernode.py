@@ -47,9 +47,9 @@ from flwr.supernode.start_client_internal import start_client_internal
 
 def flower_supernode() -> None:
     """Run Flower SuperNode."""
-    args = _parse_args_run_supernode().parse_args()
-
     warn_if_flwr_update_available(process_name="flower-supernode")
+
+    args = _parse_args_run_supernode().parse_args()
 
     log(INFO, "Starting Flower SuperNode")
 
