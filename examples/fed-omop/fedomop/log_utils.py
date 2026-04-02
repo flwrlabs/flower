@@ -7,7 +7,7 @@ from flwr.serverapp.strategy import Result
 
 RESULTS_FILE_TEMPLATE = "result-{}.json"
 
-def config_json_file(n_nodes : int , run_config: dict):
+def config_json_file(n_nodes: int, run_config: dict):
     """Initialize the json file and write the run configurations."""
     # Initialize the execution results directory.
     res_save_path = Path("results") / run_config['dataset'] / f"{n_nodes}_clients" / f"{run_config['num-server-rounds']}_rounds" #Path(f"./results/{run_config['dataset']}/{str(n_nodes)}_clients/{run_config['num-server-rounds']}_rounds")
