@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-03-31 01:23+0000\n"
+"POT-Creation-Date: 2026-04-02 01:21+0000\n"
 "PO-Revision-Date: 2024-06-12 10:09+0000\n"
 "Last-Translator: Yan Gao <y.gaogy@gmail.com>\n"
 "Language: zh_Hans\n"
@@ -3002,6 +3002,8 @@ msgstr "将 ``pyproject.toml`` 中的次要版本增加一个。"
 #: ../../source/how-to-run-flower-on-gcp.rst:624
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:678
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:202
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:80
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:99
 #, fuzzy
 msgid "config.toml"
 msgstr "配置日志记录"
@@ -15151,6 +15153,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-upgrade-to-flower-1.13.rst:18
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:15
 #: ../../source/how-to-upgrade-to-message-api.rst:59
 #, fuzzy
 msgid "Let's dive in!"
@@ -15407,6 +15410,162 @@ msgid ""
 "updating this guide. Please feel free to share any feedback with us!"
 msgstr "随着 Flower Next 的不断快速改进，我们将定期更新本指南。如有任何反馈，请随时与我们分享！"
 
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:-1
+msgid ""
+"Upgrade seamlessly to Flower 1.28 with this guide for transitioning your "
+"setup to the latest features and enhancements."
+msgstr ""
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:7
+#, fuzzy
+msgid "Upgrade to Flower 1.28"
+msgstr "升级至 Flower 1.0"
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:9
+msgid ""
+"Welcome to the migration guide for updating your Flower Configuration to "
+"the latest version, 1.28. This guide will walk you through the necessary "
+"steps to ensure a smooth transition, including any changes in "
+"configuration syntax, new features, and best practices for leveraging the"
+" latest capabilities of Flower. This guide is relevant for users "
+"upgrading from versions 1.26 and 1.27."
+msgstr ""
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:19
+#: ../../source/how-to-upgrade-to-message-api.rst:71
+#, fuzzy
+msgid "Summary of changes"
+msgstr "做出改变"
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:21
+msgid ""
+"With Flower 1.26, we introduced the Flower Configuration, a new system "
+"for managing SuperLink connections that replaces the older "
+"``federations`` section in the ``pyproject.toml`` file. This change "
+"allows for more flexible and reusable connection configurations across "
+"all your Flower apps. You can read more about it in the :doc:`Flower "
+"Configuration reference <ref-flower-configuration>` page."
+msgstr ""
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:27
+msgid ""
+"Now with Flower 1.28, we have made further improvements to the Flower "
+"Configuration, closing the syntax gap between SuperLink connections used "
+"for Flower simulations and those used for running Flower with the "
+"Deployment Runtime. The result? A more unified and consistent experience "
+"when defining SuperLink connections, regardless of the runtime you are "
+"using. This means that the configuration of simulations (i.e. number of "
+"`virtual` SuperNodes, client resources, etc.) is now defined at the "
+"``SuperLink`` that executes the simulation. Still, you can override these"
+" settings on a per-run basis if desired."
+msgstr ""
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:36
+msgid "This guide will help you:"
+msgstr ""
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:38
+msgid ""
+"Understand how to migrate your existing connections for simulation in "
+"your Flower Configuration to the new syntax."
+msgstr ""
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:40
+msgid ""
+"Learn how to view and adjust the simulation configuration in your "
+"``SuperLink``. You can do this either permanently or on a per-run basis."
+msgstr ""
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:43
+msgid "Before we begin, ensure you have updated to Flower 1.28."
+msgstr ""
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:52
+#, fuzzy
+msgid "Update your Flower Configuration"
+msgstr "配置值"
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:54
+msgid ""
+"The main update in your Flower Configuration is to remove or comment "
+"simulation-specific settings (i.e. those starting with ``options.``). "
+"These settings are now defined at the ``SuperLink`` level and will apply "
+"to all simulation runs using that SuperLink. Additionally, a new field "
+"``address`` needs to be added. It will be used for launching a managed "
+"``SuperLink`` on demand. Let's see how to do this with an example. Use "
+"the following steps to update your Flower Configuration:"
+msgstr ""
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:61
+msgid "Locate your Flower Configuration file. You can find it by running:"
+msgstr ""
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:67
+msgid ""
+"This will show you the path to your Flower Configuration file and the "
+"SuperLink connections defined in it. Example output:"
+msgstr ""
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:77
+msgid ""
+"Open the Flower Configuration file in a text editor. You should see "
+"something like this:"
+msgstr ""
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:94
+msgid ""
+"Remove or comment out the simulation-specific settings under the "
+"``[superlink.local]`` section (and any other connections you may have "
+"added that also include ``options.`` fields). Then, add a new field "
+"containing ``address = \":local:\"``. The updated configuration should "
+"look like this:"
+msgstr ""
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:115
+msgid ""
+"Introducing the ``address`` field with the value ``:local:`` allows "
+"Flower to start a managed ``SuperLink`` on demand when you submit a run "
+"using this connection. Read more about this in the :doc:`Run Flower "
+"Locally with a Managed SuperLink <how-to-run-flower-locally>` guide."
+msgstr ""
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:122
+#, fuzzy
+msgid "Using custom settings for simulations"
+msgstr "多节点 Flower 模拟"
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:126
+msgid ""
+"This guide assumes you don't have a local SuperLink running. If you do, "
+"please stop it. If you aren't sure, please refer to the :ref:`section on "
+"stopping a local SuperLink <stop-background-local-superlink>`."
+msgstr ""
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:130
+msgid ""
+"In the section above we removed the simulation-specific settings from the"
+" Flower Configuration. Now, you may be wondering how to configure the "
+"number of virtual SuperNodes or client resources for your simulations. "
+"First, you can inspect whether your SuperLink connection is pointing to a"
+" managed local SuperLink ready for simulations by running:"
+msgstr ""
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:147
+msgid ""
+"Note the ``Runtime`` type is ``simulation``. Then, you can view the "
+"current simulation configuration of your managed local SuperLink with the"
+" following command:"
+msgstr ""
+
+#: ../../source/how-to-upgrade-to-flower-1.28.rst:167
+msgid ""
+"As you can see, the current configuration is the same as the one we had "
+"before in the Flower Configuration file ``config.toml``. To change any of"
+" these settings, refer to the ``Customize the Simulation Runtime`` "
+"section in the :doc:`Flower Simulation Runtime reference <how-to-run-"
+"simulations>` guide."
+msgstr ""
+
 #: ../../source/how-to-upgrade-to-message-api.rst:-1
 msgid ""
 "Upgrade seamlessly to Flower 1.21 with this guide for transitioning your "
@@ -15437,11 +15596,6 @@ msgid ""
 "<https://github.com/flwrlabs/flower/blob/main/examples/quickstart-"
 "pytorch>`_ example."
 msgstr ""
-
-#: ../../source/how-to-upgrade-to-message-api.rst:71
-#, fuzzy
-msgid "Summary of changes"
-msgstr "做出改变"
 
 #: ../../source/how-to-upgrade-to-message-api.rst:73
 msgid ""
@@ -16903,8 +17057,7 @@ msgstr "flower-superlink"
 msgid "Create this federation for simulation use."
 msgstr "配置值"
 
-#: ../../flwr create:1 federation invite list:1 run:1 simulation-config:1
-#: supernode
+#: ../../flwr create:1 federation invite list:1 run:1 supernode
 #, fuzzy
 msgid "``False``"
 msgstr "``FLWR_VERSION``"
@@ -17009,27 +17162,12 @@ msgid "The number of virtual SuperNodes in the simulation"
 msgstr "需要等待的客户数量。"
 
 #: ../../flwr federation simulation-config:1
-#, fuzzy
-msgid "``10``"
-msgstr "配置日志记录"
-
-#: ../../flwr federation simulation-config:1
 msgid "CPUs assigned to the execution of each ClientApp"
 msgstr ""
 
 #: ../../flwr federation simulation-config:1
-#, fuzzy
-msgid "``2``"
-msgstr "配置日志记录"
-
-#: ../../flwr federation simulation-config:1
 msgid "Ratio of a GPU VRAM assigned to the execution of each ClientApp"
 msgstr ""
-
-#: ../../flwr federation simulation-config:1
-#, fuzzy
-msgid "``0.0``"
-msgstr "``1.0.0b0``"
 
 #: ../../flwr federation simulation-config:1
 #, fuzzy
@@ -17039,11 +17177,6 @@ msgstr "虚拟客户端引擎资源"
 #: ../../flwr federation simulation-config:1
 msgid "Choice of backend name (Currently, only 'ray' is supported)."
 msgstr ""
-
-#: ../../flwr federation simulation-config:1
-#, fuzzy
-msgid "``'ray'``"
-msgstr "``FLWR_VERSION``"
 
 #: ../../flwr federation simulation-config:1
 #, fuzzy
@@ -17064,16 +17197,11 @@ msgid "Control logging level in Simulation Runtime."
 msgstr "多节点 Flower 模拟"
 
 #: ../../flwr federation simulation-config:1
-#, fuzzy
-msgid "``'WARNING'``"
-msgstr "``FLWR_VERSION``"
-
-#: ../../flwr federation simulation-config:1
 msgid "Whether to propagate logs from Simulation Runtime upwards."
 msgstr ""
 
-#: ../../flwr federation log:1 simulation-config:1
-msgid "``True``"
+#: ../../flwr federation simulation-config:1
+msgid "true | false"
 msgstr ""
 
 #: ../../flwr federation simulation-config:1
@@ -17173,6 +17301,10 @@ msgstr ""
 
 #: ../../flwr log:1
 msgid "Flag to stream or print logs from the Flower run"
+msgstr ""
+
+#: ../../flwr log:1
+msgid "``True``"
 msgstr ""
 
 #: ../../flwr log:1
@@ -70063,4 +70195,19 @@ msgstr ""
 #~ "supernodes = 10``, where each SuperNode"
 #~ " launches one ``ClientApp``)."
 #~ msgstr ""
+
+#~ msgid "``10``"
+#~ msgstr "配置日志记录"
+
+#~ msgid "``2``"
+#~ msgstr "配置日志记录"
+
+#~ msgid "``0.0``"
+#~ msgstr "``1.0.0b0``"
+
+#~ msgid "``'ray'``"
+#~ msgstr "``FLWR_VERSION``"
+
+#~ msgid "``'WARNING'``"
+#~ msgstr "``FLWR_VERSION``"
 
