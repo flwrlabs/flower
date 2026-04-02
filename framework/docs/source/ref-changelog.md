@@ -26,7 +26,7 @@ We would like to give our special thanks to all the contributors who made the ne
 
   Introduces validation rules for FAB format version 1, requiring `flwr-version-target` to be specified and enforcing a lower bound for the `flwr` dependency in `pyproject.toml`. Adds license file requirements during FAB build.
 
-- **Add non-blocking version update checks across Flower components** ([#6786](https://github.com/flwrlabs/flower/pull/6786), [#6788](https://github.com/flwrlabs/flower/pull/6788), [#6833](https://github.com/flwrlabs/flower/pull/6833))
+- **Add non-blocking version update checks across Flower components** ([#6786](https://github.com/flwrlabs/flower/pull/6786), [#6788](https://github.com/flwrlabs/flower/pull/6788), [#6833](https://github.com/flwrlabs/flower/pull/6833), [#6938](https://github.com/flwrlabs/flower/pull/6938))
 
   Adds non-blocking startup checks in the Flower CLI to detect newer versions of `flwr` in CLI. Allows disabling by setting environment variable `FLWR_DISABLE_UPDATE_CHECK=1`.
 
