@@ -16,15 +16,15 @@ We would like to give our special thanks to all the contributors who made the ne
 
 - **Improve local SuperLink stability and configuration handling** ([#6797](https://github.com/flwrlabs/flower/pull/6797), [#6873](https://github.com/flwrlabs/flower/pull/6873), [#6874](https://github.com/flwrlabs/flower/pull/6874), [#6889](https://github.com/flwrlabs/flower/pull/6889))
 
-  Improves local SuperLink stability by fixing SQLite bootstrap race conditions and validating Control API availability before executing CLI calls. Allows magic values (`":local:"`, `":local-in-memory:"`) for `address` fields in Flower Config, which will be translated to the local SuperLink address. Ensures backward compatibility for `.options`-only connection configurations. See [Flower Config guide](https://flower.ai/docs/framework/1.28/en/ref-flower-configuration.html#local-simulation-example) for more details.
+  Improves local SuperLink stability by fixing SQLite bootstrap race conditions and validating Control API availability before executing CLI calls. Allows magic values (`":local:"`, `":local-in-memory:"`) for `address` fields in Flower configuration, which will be translated to the local SuperLink address. Ensures backward compatibility for `.options`-only connection configurations. Using `.options` fields in the Flower configuration is now deprecated. See [Flower configuration guide](https://flower.ai/docs/framework/1.28/en/ref-flower-configuration.html#local-simulation-example) for more details.
 
 - **Add configurable FAB inclusion and exclusion rules** ([#6803](https://github.com/flwrlabs/flower/pull/6803), [#6804](https://github.com/flwrlabs/flower/pull/6804), [#6805](https://github.com/flwrlabs/flower/pull/6805), [#6822](https://github.com/flwrlabs/flower/pull/6822), [#6823](https://github.com/flwrlabs/flower/pull/6823), [#6872](https://github.com/flwrlabs/flower/pull/6872), [#6885](https://github.com/flwrlabs/flower/pull/6885))
 
   Introduces support for user-defined include and exclude patterns in FAB builds via configuration, with validation of pattern lists and extended matching capabilities. Ensures publish filters are applied before FAB build filters, standardizes metadata keys in `pyproject.toml`, and refactors supporting utilities. Updates [documentation](https://flower.ai/docs/framework/1.28/en/how-to-configure-pyproject-toml.html#defining-included-excluded-files) with guide on configuring inclusion and exclusion rules.
 
-- **Enforce FAB format v1 validation rules and requirements** ([#6782](https://github.com/flwrlabs/flower/pull/6782), [#6825](https://github.com/flwrlabs/flower/pull/6825), [#6843](https://github.com/flwrlabs/flower/pull/6843), [#6851](https://github.com/flwrlabs/flower/pull/6851), [#6887](https://github.com/flwrlabs/flower/pull/6887))
+- **Introduce FAB format v1 validation rules and requirements** ([#6782](https://github.com/flwrlabs/flower/pull/6782), [#6825](https://github.com/flwrlabs/flower/pull/6825), [#6843](https://github.com/flwrlabs/flower/pull/6843), [#6851](https://github.com/flwrlabs/flower/pull/6851), [#6887](https://github.com/flwrlabs/flower/pull/6887))
 
-  Introduces validation rules for FAB format version 1, requiring `flwr_version_target` to be specified and enforcing a lower bound for the `flwr` dependency in `pyproject.toml`. Adds license file requirements during FAB build.
+  Introduces validation rules for FAB format version 1, requiring `flwr-version-target` to be specified and enforcing a lower bound for the `flwr` dependency in `pyproject.toml`. Adds license file requirements during FAB build.
 
 - **Add non-blocking version update checks across Flower components** ([#6786](https://github.com/flwrlabs/flower/pull/6786), [#6788](https://github.com/flwrlabs/flower/pull/6788), [#6833](https://github.com/flwrlabs/flower/pull/6833))
 
@@ -52,9 +52,9 @@ We would like to give our special thanks to all the contributors who made the ne
 
 ### Incompatible changes
 
-- **Remove deprecated `run_simulation` entrypoint** ([#6752](https://github.com/flwrlabs/flower/pull/6752))
+- **Remove deprecated `run_simulation` Python entrypoint** ([#6752](https://github.com/flwrlabs/flower/pull/6752))
 
-  Removes the previously deprecated `run_simulation` entrypoint from `flwr.simulation`.
+  Removes the previously deprecated `run_simulation` entrypoint to run simulations. The recommended way for launching simulations is `flwr run`. Refer to the [quickstart-turorials](https://flower.ai/docs/framework/tutorial-quickstart-pytorch.html) for a short guide on how to run your simulations.
 
 ## v1.27.0 (2026-03-10)
 
