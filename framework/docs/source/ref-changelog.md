@@ -54,7 +54,7 @@ We would like to give our special thanks to all the contributors who made the ne
 
 - **Remove deprecated `run_simulation` Python entrypoint** ([#6752](https://github.com/flwrlabs/flower/pull/6752))
 
-  Removes the previously deprecated `run_simulation` entrypoint to run simulations. The recommended way for launching simulations is `flwr run`. Refer to the [quickstart-turorials](https://flower.ai/docs/framework/tutorial-quickstart-pytorch.html) for a short guide on how to run your simulations.
+  Removes the previously deprecated `run_simulation` entrypoint to run simulations. The recommended way for launching simulations is `flwr run`. Refer to the [quickstart-turorials](https://flower.ai/docs/framework/1.28/en/tutorial-quickstart-pytorch.html) for a short guide on how to run your simulations.
 
 ## v1.27.0 (2026-03-10)
 
