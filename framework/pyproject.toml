@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "flwr"
-version = "1.28.0"
+version = "1.29.0"
 description = "Flower: A Friendly Federated AI Framework"
 license = "Apache-2.0"
 authors = [{ name = "The Flower Authors", email = "hello@flower.ai" }]
