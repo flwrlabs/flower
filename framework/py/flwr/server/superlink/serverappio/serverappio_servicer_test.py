@@ -918,12 +918,47 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             "delete_objects_in_run",
             side_effect=RuntimeError("object cleanup failed"),
         ):
-            with self.assertRaises(grpc.RpcError):
-                self._update_run_status.with_call(request=request)
+            response, call = self._update_run_status.with_call(request=request)
+        assert isinstance(response, UpdateRunStatusResponse)
+        assert grpc.StatusCode.OK == call.code()
         assert self.state.get_run_id_by_token(token) is None
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.FINISHED
         assert run_status.sub_status == SubStatus.COMPLETED
+
+    def test_update_run_status_finished_deletes_token_before_cleanup(self) -> None:
+        """Delete token before starting FINISHED object-store cleanup."""
+        # Prepare
+        run_id = self._create_dummy_run(running=False)
+        token = self.state.create_token(run_id)
+        assert token is not None
+        self._transition_run_status(run_id, 2)  # Move run to RUNNING
+        request = UpdateRunStatusRequest(
+            run_id=run_id,
+            run_status=run_status_to_proto(
+                RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done")
+            ),
+        )
+        cleanup_called = {"value": False}
+
+        def _cleanup_and_assert_token_deleted(run_id_to_delete: int) -> None:
+            assert run_id_to_delete == run_id
+            cleanup_called["value"] = True
+            assert self.state.get_run_id_by_token(token) is None
+
+        # Execute
+        with patch.object(
+            self.store,
+            "delete_objects_in_run",
+            side_effect=_cleanup_and_assert_token_deleted,
+        ):
+            response, call = self._update_run_status.with_call(request=request)
+
+        # Assert
+        assert isinstance(response, UpdateRunStatusResponse)
+        assert grpc.StatusCode.OK == call.code()
+        assert cleanup_called["value"]
+        assert self.state.get_run_id_by_token(token) is None
 
     @parameterized.expand([(True,), (False,)])  # type: ignore
     def test_send_app_heartbeat(self, success: bool) -> None:

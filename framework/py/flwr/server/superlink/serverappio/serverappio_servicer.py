@@ -416,14 +416,21 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
                 f"Failed to update status for run {request.run_id}",
             )
 
-        # If the run is finished, delete the run from ObjectStore
+        # If the run is finished, delete token immediately after status persistence.
+        # This prevents expiry cleanup from flipping a completed run while cleanup I/O
+        # is still in progress.
         if request.run_status.status == Status.FINISHED:
+            state.delete_token(request.run_id)
             try:
                 # Delete all objects related to the run
                 store.delete_objects_in_run(request.run_id)
-            finally:
-                # Delete token once terminal status is persisted, even if cleanup fails.
-                state.delete_token(request.run_id)
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                log(
+                    ERROR,
+                    "Failed to delete objects for run %d: %s",
+                    request.run_id,
+                    exc,
+                )
 
         return UpdateRunStatusResponse()
 
