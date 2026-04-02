@@ -17,14 +17,18 @@ This example implements a form of Federated Analyics by which instead of trainin
 
 ## Set up the project
 
-### Clone the project
+### Fetch the app
 
-Start by cloning the example project.
+Install Flower:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
-		&& mv _tmp/examples/quickstart-pandas . \
-		&& rm -rf _tmp && cd quickstart-pandas
+pip install flwr
+```
+
+Fetch the app:
+
+```shell
+flwr new @flwrlabs/quickstart-pandas
 ```
 
 This will create a new directory called `quickstart-pandas` with the following structure:
@@ -65,9 +69,6 @@ You can also override some of the settings for your `ClientApp` and `ServerApp` 
 ```bash
 flwr run . --run-config num-server-rounds=5
 ```
-
-> [!TIP]
-> For a more detailed walk-through check our [quickstart PyTorch tutorial](https://flower.ai/docs/framework/tutorial-quickstart-pandas.html)
 
 ### Run with the Deployment Engine
 

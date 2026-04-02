@@ -18,17 +18,34 @@ syntax = "proto3";
 package flwr.proto;
 import "flwr/proto/run.proto";
 import "flwr/proto/node.proto";
+import "flwr/proto/federation_config.proto";
 
 message Account {
   string id = 1;
   string name = 2;
 }
 
+message Member {
+  Account account = 1;
+  string role = 2;
+}
+
 message Federation {
   string name = 1;
-  repeated string member_aids = 2; // Deprecated in v1.26.0
-  repeated NodeInfo nodes = 3;
-  repeated Run runs = 4;
-  string description = 5;        // Added in v1.26.0
-  repeated Account accounts = 6; // Added in v1.26.0
+  repeated NodeInfo nodes = 2;
+  repeated Run runs = 3;
+  string description = 4;      // Added in v1.26.0
+  repeated Member members = 5; // Added in v1.27.0
+  bool archived = 6;           // Added in v1.27.0
+  bool simulation = 7;         // Added in v1.28.0
+  SimulationConfig config = 8; // Added in v1.28.0
+}
+
+message Invitation {
+  string federation_name = 1;
+  Account inviter = 2;
+  Account invitee = 3;
+  string status = 4;
+  string created_at = 5;
+  string status_changed_at = 6;
 }

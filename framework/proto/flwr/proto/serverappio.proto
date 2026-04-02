@@ -22,7 +22,6 @@ import "flwr/proto/log.proto";
 import "flwr/proto/node.proto";
 import "flwr/proto/message.proto";
 import "flwr/proto/run.proto";
-import "flwr/proto/fab.proto";
 import "flwr/proto/appio.proto";
 
 service ServerAppIo {
@@ -79,6 +78,10 @@ service ServerAppIo {
 
   // Push ServerApp logs
   rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
+
+  // Get Federation Options
+  rpc GetFederationOptions(GetFederationOptionsRequest)
+      returns (GetFederationOptionsResponse) {}
 
   /////////////////////////////////////////////////////////////////////////////
   // Specific endpoints for ServerAppIo

@@ -13,28 +13,27 @@
 // limitations under the License.
 // =============================================================================
 
+import type { ProgressInfo, TextGenerationConfig } from '@huggingface/transformers';
 import {
   InterruptableStoppingCriteria,
+  pipeline,
   StoppingCriteriaList,
   Tensor,
   TextGenerationPipeline,
   TextStreamer,
-  pipeline,
 } from '@huggingface/transformers';
 
-import type { ProgressInfo, TextGenerationConfig } from '@huggingface/transformers';
+import { getAvailableRAM } from '../env';
 import {
+  ChatResponseResult,
   FailureCode,
   Message,
-  Result,
   Progress,
-  ChatResponseResult,
   ResponseFormat,
+  Result,
 } from '../typing';
-
-import { getAvailableRAM } from '../env';
-import { BaseEngine } from './engine';
 import { getEngineModelConfig } from './common/model';
+import { BaseEngine } from './engine';
 
 const stoppingCriteria = new InterruptableStoppingCriteria();
 const choice = 0;

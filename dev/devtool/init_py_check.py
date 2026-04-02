@@ -116,12 +116,12 @@ def check_all_init_files(dir_list: list[str]) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 0:
-        raise Exception(  # pylint: disable=W0719
+    if len(sys.argv) < 2:
+        raise ValueError(
             "Please provide at least one directory path relative "
             "to your current working directory."
         )
-    for i, _ in enumerate(sys.argv):
-        abs_path: str = os.path.abspath(os.path.join(os.getcwd(), sys.argv[i]))
+    for relative_path in sys.argv[1:]:
+        abs_path = os.path.abspath(os.path.join(os.getcwd(), relative_path))
         init_dirs = check_missing_init_files(abs_path)
         check_all_init_files(init_dirs)

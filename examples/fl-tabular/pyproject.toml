@@ -8,8 +8,8 @@ version = "1.0.0"
 description = "Adult Census Income Tabular Dataset and Federated Learning in Flower"
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]>=1.26.1",
-    "flwr-datasets>=0.5.0",
+    "flwr[simulation]>=1.27.0",
+    "flwr-datasets>=0.6.0",
     "torch==2.8.0",
     "scikit-learn==1.7.1",
 ]

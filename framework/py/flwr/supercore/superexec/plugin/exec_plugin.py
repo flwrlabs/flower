@@ -28,11 +28,9 @@ class ExecPlugin(ABC):
     def __init__(
         self,
         appio_api_address: str,
-        flwr_dir: str,
         get_run: Callable[[int], Run],
     ) -> None:
         self.appio_api_address = appio_api_address
-        self.flwr_dir = flwr_dir
         self.get_run = get_run
 
     @abstractmethod

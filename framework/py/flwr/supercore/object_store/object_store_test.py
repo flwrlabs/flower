@@ -23,9 +23,13 @@ from typing import cast
 from parameterized import parameterized
 from sqlalchemy import Engine, inspect
 
-from flwr.common.inflatable import get_object_id, get_object_tree, iterate_object_tree
-from flwr.common.inflatable_test import CustomDataClass
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.supercore.inflatable.inflatable_object import (
+    get_object_id,
+    get_object_tree,
+    iterate_object_tree,
+)
+from flwr.supercore.inflatable.inflatable_object_test import CustomDataClass
 
 from .in_memory_object_store import InMemoryObjectStore
 from .object_store import NoObjectInStoreError, ObjectStore

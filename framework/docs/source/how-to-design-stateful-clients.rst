@@ -24,7 +24,7 @@
 
 By design, ClientApp_ objects are stateless. This means that the ``ClientApp`` object is
 recreated each time a new ``Message`` is to be processed. This behavior is identical
-with Flower's Simulation Engine and Deployment Engine. For the former, it allows us to
+with Flower's Simulation Runtime and Deployment Runtime. For the former, it allows us to
 simulate the running of a large number of nodes on a single machine or across multiple
 machines. For the latter, it enables each ``SuperNode`` to be part of multiple runs,
 each running a different ``ClientApp``.

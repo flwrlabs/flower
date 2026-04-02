@@ -21,7 +21,6 @@ from typing import cast
 import grpc
 
 from flwr.common import Context
-from flwr.common.inflatable import UnexpectedObjectContentError
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -62,6 +61,7 @@ from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
 
 # pylint: disable=E0601
 from flwr.supercore.ffs import FfsFactory
+from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
 from flwr.supernode.nodestate import NodeStateFactory
 

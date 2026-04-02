@@ -19,10 +19,11 @@ This guide describes how to establish secure TLS Superlink ↔ SuperNodes as wel
 .. tip::
 
     Checkout the `Flower Authentication
-    <https://github.com/adap/flower/tree/main/examples/flower-authentication>`_ example
-    for a complete self-contained example on how to setup TLS and (optionally) node
-    authentication. Check out the :doc:`how-to-authenticate-supernodes` guide to learn
-    more about adding an authentication layer to SuperLink ↔ SuperNode connections.
+    <https://github.com/flwrlabs/flower/tree/main/examples/supernode-authentication>`_
+    example for a complete self-contained example on how to setup TLS and (optionally)
+    node authentication. Check out the :doc:`how-to-authenticate-supernodes` guide to
+    learn more about adding an authentication layer to SuperLink ↔ SuperNode
+    connections.
 
 **************
  Certificates

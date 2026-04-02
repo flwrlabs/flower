@@ -77,7 +77,7 @@ git lfs install
 Start by cloning the example project:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
         && mv _tmp/examples/fedrag . \
         && rm -rf _tmp \
         && cd fedrag

@@ -54,9 +54,9 @@ loading. In part 2, we federate this PyTorch project using Flower.
 
 .. tip::
 
-    `Star Flower on GitHub <https://github.com/adap/flower>`__ ⭐️ and join the Flower
-    community on Flower Discuss and the Flower Slack to connect, ask questions, and get
-    help:
+    `Star Flower on GitHub <https://github.com/flwrlabs/flower>`__ ⭐️ and join the
+    Flower community on Flower Discuss and the Flower Slack to connect, ask questions,
+    and get help:
 
     - `Join Flower Discuss <https://discuss.flower.ai/>`__ We'd love to hear from you in
       the ``Introduction`` topic! If anything is unclear, post in ``Flower Help -
@@ -88,6 +88,11 @@ Then, run the command below:
 .. code-block:: shell
 
     $ flwr new @flwrlabs/quickstart-pytorch
+
+.. note::
+
+    If you're on Windows and see unexpected terminal output (e.g.: ``� □[32m□[1m``),
+    check :ref:`this FAQ entry <faq-windows-unexpected-output>`.
 
 After running it you'll notice a new directory named ``quickstart-pytorch`` has been
 created. It should have the following structure:
@@ -554,31 +559,24 @@ with Flower! The last step is to run our simulation in the command line, as foll
 
 .. code-block:: shell
 
-    $ flwr run .
+    $ flwr run . --stream
 
-This will execute the federated learning simulation with 10 clients, or SuperNodes,
-defined in the ``[superlink.local]`` section in your Flower Configuration file. You
-should expect an output log similar to this:
+This submits the run to the managed local SuperLink for the ``[superlink.local]``
+profile (identified in the Flower configuration with ``address = ":local:"``), which
+then executes the federated learning simulation with 10 clients, or SuperNodes, using
+the Flower Simulation Runtime. Plain ``flwr run .`` would submit the run, print the run
+ID, and return without streaming logs. For the full local workflow, see
+:doc:`how-to-run-flower-locally`. If you run into SQL database errors during local
+simulations, see :ref:`FAQ <faq-local-superlink-db-error>`.
+
+You should expect streamed output similar to this:
 
 .. code-block:: shell
 
-    Loading project configuration...
-    Success
+    Starting local SuperLink on 127.0.0.1:39093...
+    Successfully started run 1859953118041441032
     INFO :      Starting FedAvg strategy:
     INFO :          ├── Number of rounds: 3
-    INFO :          ├── ArrayRecord (0.24 MB)
-    INFO :          ├── ConfigRecord (train): {'lr': 0.01}
-    INFO :          ├── ConfigRecord (evaluate): (empty!)
-    INFO :          ├──> Sampling:
-    INFO :          │       ├──Fraction: train (0.50) | evaluate ( 1.00)
-    INFO :          │       ├──Minimum nodes: train (2) | evaluate (2)
-    INFO :          │       └──Minimum available nodes: 2
-    INFO :          └──> Keys in records:
-    INFO :                  ├── Weighted by: 'num-examples'
-    INFO :                  ├── ArrayRecord key: 'arrays'
-    INFO :                  └── ConfigRecord key: 'config'
-    INFO :
-    INFO :
     INFO :      [ROUND 1/3]
     INFO :      configure_train: Sampled 5 nodes (out of 10)
     INFO :      aggregate_train: Received 5 results and 0 failures
@@ -586,44 +584,14 @@ should expect an output log similar to this:
     INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
     INFO :      aggregate_evaluate: Received 10 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'eval_loss': 2.304821, 'eval_acc': 0.0965}
-    INFO :
     INFO :      [ROUND 2/3]
-    INFO :      configure_train: Sampled 5 nodes (out of 10)
-    INFO :      aggregate_train: Received 5 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'train_loss': 2.17333}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'eval_loss': 2.304577, 'eval_acc': 0.10030}
-    INFO :
+    INFO :      ...
     INFO :      [ROUND 3/3]
-    INFO :      configure_train: Sampled 5 nodes (out of 10)
-    INFO :      aggregate_train: Received 5 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'train_loss': 2.16953}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'eval_loss': 2.29976, 'eval_acc': 0.1015}
-    INFO :
+    INFO :      ...
     INFO :      Strategy execution finished in 17.18s
-    INFO :
     INFO :      Final results:
-    INFO :
-    INFO :          Global Arrays:
-    INFO :                  ArrayRecord (0.238 MB)
-    INFO :
-    INFO :          Aggregated ClientApp-side Train Metrics:
-    INFO :          { 1: {'train_loss': '2.2581e+00'},
-    INFO :            2: {'train_loss': '2.1733e+00'},
-    INFO :            3: {'train_loss': '2.1695e+00'}}
-    INFO :
-    INFO :          Aggregated ClientApp-side Evaluate Metrics:
-    INFO :          { 1: {'eval_acc': '9.6500e-02', 'eval_loss': '2.3048e+00'},
-    INFO :            2: {'eval_acc': '1.0030e-01', 'eval_loss': '2.3046e+00'},
-    INFO :            3: {'eval_acc': '1.0150e-01', 'eval_loss': '2.2998e+00'}}
-    INFO :
     INFO :          ServerApp-side Evaluate Metrics:
     INFO :          {}
-    INFO :
-
     Saving final model to disk...
 
 You can also override the parameters defined in the ``[tool.flwr.app.config]`` section
@@ -632,7 +600,7 @@ in ``pyproject.toml`` like this:
 .. code-block:: shell
 
     # Run the simulation with 5 server rounds and 3 local epochs
-    $ flwr run . --run-config "num-server-rounds=5 local-epochs=3"
+    $ flwr run . --stream --run-config "num-server-rounds=5 local-epochs=3"
 
 .. tip::
 
@@ -644,11 +612,14 @@ Behind the scenes
 
 So how does this work? How does Flower execute this simulation?
 
-When we execute ``flwr run``, we tell Flower that there are 10 clients
-(``options.num-supernodes = 10``, where each SuperNode launches one ``ClientApp``).
+When we execute ``flwr run`` against the default local connection configuration (for
+example, the one with ``address = ":local:"``), Flower submits the run to the managed
+local SuperLink. By default, the local SuperLink will configure the simulation runtime
+to use 10 clients. Each will run an instance of the ``ClientApp`` we defined earlier.
 
-Flower then asks the ``ServerApp`` to issue instructions to those nodes using the
-``FedAvg`` strategy. In this example, ``FedAvg`` is configured with two key parameters:
+The local SuperLink then starts the ``ServerApp`` and asks it to issue instructions to
+those nodes using the ``FedAvg`` strategy. In this example, ``FedAvg`` is configured
+with two key parameters:
 
 - ``fraction-train=0.5`` → select 50% of the available clients for training
 - ``fraction-evaluate=1.0`` → select 100% of the available clients for evaluation

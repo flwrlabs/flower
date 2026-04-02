@@ -35,7 +35,7 @@ aggregation but also the callback function used to aggregate metrics.
     By default, Flower strategies use as ``weighted_by_key="num-examples"``. If you are
     interested, see the full implementation of how the default weighted aggregation
     callback works `here
-    <https://github.com/adap/flower/blob/b174b2e02bb34cae9ba9f2a124c610a844cee870/framework/py/flwr/serverapp/strategy/strategy_utils.py#L109>`_.
+    <https://github.com/flwrlabs/flower/blob/b174b2e02bb34cae9ba9f2a124c610a844cee870/framework/py/flwr/serverapp/strategy/strategy_utils.py#L109>`_.
 
 .. code-block:: python
 

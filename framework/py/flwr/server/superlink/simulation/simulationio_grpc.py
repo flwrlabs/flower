@@ -57,7 +57,7 @@ def run_simulationio_api_grpc(
     log(
         INFO,
         "Flower Simulation Engine: Starting SimulationIo API on %s",
-        address,
+        simulationio_grpc_server.bound_address,
     )
     simulationio_grpc_server.start()
 

@@ -57,3 +57,55 @@ article a.sd-btn.sd-btn-primary:hover {
   border-color: #ffda27 !important;
   color: #222222 !important;
 }
+
+.flwr-old-version-banner {
+  align-items: center;
+  background: #651126;
+  color: #f7e9ec;
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  padding: 0.85rem 1.2rem;
+}
+
+.flwr-old-version-banner__text {
+  font-size: 1.05rem;
+}
+
+.flwr-old-version-banner__action {
+  background: #e58d9e;
+  border: 0;
+  border-radius: 0.35rem;
+  color: #2b0b12;
+  cursor: pointer;
+  font-size: 1.05rem;
+  padding: 0.5rem 1rem;
+}
+
+.flwr-old-version-banner__action:hover {
+  background: #ed9dac;
+}
+
+.flwr-old-version-banner__close {
+  background: transparent;
+  border: 0;
+  color: #f3bbc5;
+  cursor: pointer;
+  font-size: 1.75rem;
+  line-height: 1;
+  margin-left: auto;
+  padding: 0 0.2rem;
+}
+
+@media (max-width: 900px) {
+  .flwr-old-version-banner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.6rem;
+    text-align: left;
+  }
+
+  .flwr-old-version-banner__close {
+    margin-left: 0;
+  }
+}

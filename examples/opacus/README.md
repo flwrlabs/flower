@@ -6,21 +6,24 @@ framework: [opacus, torch]
 
 # Training with Sample-Level Differential Privacy using Opacus Privacy Engine
 
-In this example, we demonstrate how to train a model with differential privacy (DP) using Flower. We employ PyTorch and integrate the Opacus Privacy Engine to achieve sample-level differential privacy. This setup ensures robust privacy guarantees during the client training phase. The code is adapted from the [PyTorch Quickstart example](https://github.com/adap/flower/tree/main/examples/quickstart-pytorch).
+In this example, we demonstrate how to train a model with differential privacy (DP) using Flower. We employ PyTorch and integrate the Opacus Privacy Engine to achieve sample-level differential privacy. This setup ensures robust privacy guarantees during the client training phase. The code is adapted from the [PyTorch Quickstart example](https://flower.ai/apps/flwrlabs/quickstart-pytorch/).
 
 For more information about DP in Flower please refer to the [tutorial](https://flower.ai/docs/framework/how-to-use-differential-privacy.html). For additional information about Opacus, visit the official [website](https://opacus.ai/).
 
 ## Set up the project
 
-### Clone the project
+### Fetch the app
 
-Start by cloning the example project:
+Install Flower:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git \
-        && mv flower/examples/opacus . \
-        && rm -rf flower \
-        && cd opacus
+pip install flwr
+```
+
+Fetch the app:
+
+```shell
+flwr new @flwrlabs/opacus-fl
 ```
 
 This will create a new directory called `opacus` containing the following files:

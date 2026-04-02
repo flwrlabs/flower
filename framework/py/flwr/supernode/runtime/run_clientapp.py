@@ -24,21 +24,9 @@ from flwr.cli.install import install_from_fab
 from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
 from flwr.common import Context, Message
-from flwr.common.config import get_flwr_dir
 from flwr.common.constant import ErrorCode
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
-from flwr.common.inflatable import (
-    get_all_nested_objects,
-    get_object_tree,
-    no_object_id_recompute,
-)
-from flwr.common.inflatable_protobuf_utils import (
-    make_confirm_message_received_fn_protobuf,
-    make_pull_object_fn_protobuf,
-    make_push_object_fn_protobuf,
-)
-from flwr.common.inflatable_utils import pull_and_inflate_object_from_tree, push_objects
 from flwr.common.logger import log
 from flwr.common.message import remove_content_from_message
 from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
@@ -64,13 +52,26 @@ from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
+from flwr.supercore.inflatable.inflatable_object import (
+    get_all_nested_objects,
+    get_object_tree,
+    no_object_id_recompute,
+)
+from flwr.supercore.inflatable.inflatable_protobuf_utils import (
+    make_confirm_message_received_fn_protobuf,
+    make_pull_object_fn_protobuf,
+    make_push_object_fn_protobuf,
+)
+from flwr.supercore.inflatable.inflatable_utils import (
+    pull_and_inflate_object_from_tree,
+    push_objects,
+)
 from flwr.supercore.utils import mask_string
 
 
 def run_clientapp(  # pylint: disable=R0913, R0914, R0917
     clientappio_api_address: str,
     token: str,
-    flwr_dir: str | None = None,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
 ) -> None:
@@ -99,8 +100,6 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
         exit_handlers=[on_exit],
     )
 
-    # Resolve directory where FABs are installed
-    flwr_dir_ = get_flwr_dir(flwr_dir)
     try:
         stub = ClientAppIoStub(channel)
         wrap_stub(stub, make_simple_grpc_retry_invoker())
@@ -117,13 +116,12 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
             # Install FAB, if provided
             if fab:
                 log(DEBUG, "[flwr-clientapp] Start FAB installation.")
-                install_from_fab(fab.content, flwr_dir=flwr_dir_, skip_prompt=True)
+                install_from_fab(fab.content, skip_prompt=True)
 
             load_client_app_fn = get_load_client_app_fn(
                 default_app_ref="",
                 app_path=None,
                 multi_app=True,
-                flwr_dir=str(flwr_dir_),
             )
 
             # Load ClientApp

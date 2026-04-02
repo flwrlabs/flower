@@ -1,0 +1,148 @@
+name: Framework Docs
+
+on:
+  push:
+    branches:
+      - main
+      - release/framework-*
+    paths:
+      - framework/docs/**
+      - .github/workflows/framework-docs.yml
+  pull_request:
+    branches:
+      - main
+      - release/framework-*
+    paths:
+      - framework/docs/**
+      - .github/workflows/framework-docs.yml
+  release:
+    types: [released]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLWR_TELEMETRY_ENABLED: 0
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-22.04
+    name: Build and deploy framework docs
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Check copyright line
+        run: ./dev/test-copyright.sh
+      - name: Bootstrap
+        uses: ./.github/actions/bootstrap
+      - name: Install pandoc
+        run: sudo apt install pandoc
+      - name: Install Flower Framework
+        run: |
+          cd framework
+          python -m poetry install
+      - name: Sync required docs build assets from main for release branches
+        if: ${{ startsWith(github.ref, 'refs/heads/release/framework-') || (github.event_name == 'pull_request' && startsWith(github.base_ref, 'release/framework-')) || (github.event_name == 'release' && startsWith(github.ref, 'refs/tags/framework-')) }}
+        run: |
+          echo "Syncing required docs build assets from main branch for release branch"
+          git fetch origin main
+          git checkout origin/main -- \
+            framework/docs/source/_static/docs-ui.js \
+            framework/docs/source/_static/custom.css \
+            framework/docs/source/conf_base.py \
+            framework/docs/source/_templates/
+      - name: Resolve docs version
+        id: doc_version
+        shell: bash
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "release" ]; then
+            tag="${GITHUB_REF_NAME}"
+            if [[ "$tag" =~ ^framework-([0-9]+)\.([0-9]+)\.[0-9]+$ ]]; then
+              echo "version=${BASH_REMATCH[1]}.${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Unsupported release tag: $tag" >&2
+            exit 1
+          fi
+
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            ref="${GITHUB_BASE_REF}"
+          else
+            ref="${GITHUB_REF#refs/heads/}"
+          fi
+
+          if [ "$ref" = "main" ]; then
+            echo "version=main" >> "$GITHUB_OUTPUT"
+          elif [[ "$ref" =~ ^release/framework-([0-9]+)\.([0-9]+)$ ]]; then
+            echo "version=${BASH_REMATCH[1]}.${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "Unsupported branch: $ref" >&2
+            exit 1
+          fi
+      - name: Build docs
+        env:
+          DOC_VERSION: ${{ steps.doc_version.outputs.version }}
+        run: |
+          echo "Building docs for version: ${DOC_VERSION}"
+          ./framework/dev/build-docs.sh full
+      - name: Determine if this is the latest stable version
+        if: ${{ github.repository == 'flwrlabs/flower' && ((startsWith(github.ref, 'refs/heads/release/framework-') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')) || (github.event_name == 'release' && startsWith(github.ref, 'refs/tags/framework-'))) }}
+        id: latest_check
+        run: |
+          # Get all framework version tags and find the latest one
+          all_versions=$(git tag -l 'framework-*.*.*' 'v*.*.*' | sed 's/^framework-//' | sed 's/^v//' | sort -V)
+          latest_version=$(echo "$all_versions" | tail -n 1)
+          latest_major_minor=$(echo "$latest_version" | cut -d. -f1-2)
+
+          if [ "${GITHUB_EVENT_NAME}" = "release" ]; then
+            # Extract version from tag (e.g., `framework-1.26.0` -> `1.26`)
+            current_branch=$(echo "${GITHUB_REF_NAME#framework-}" | cut -d. -f1-2)
+          else
+            # Extract version from current branch (e.g., `release/framework-1.26` -> `1.26`)
+            current_branch="${GITHUB_REF#refs/heads/release/framework-}"
+          fi
+
+          if [ "$current_branch" = "$latest_major_minor" ]; then
+            echo "is_latest=true" >> "$GITHUB_OUTPUT"
+            echo "This is the latest stable version: $current_branch"
+          else
+            echo "is_latest=false" >> "$GITHUB_OUTPUT"
+            echo "Not the latest stable version. Current: $current_branch, Latest: $latest_major_minor"
+          fi
+      - name: Deploy docs HTML
+        if: ${{ github.repository == 'flwrlabs/flower' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'release') }}
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.DOCS_AWS_DEFAULT_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.DOCS_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.DOCS_AWS_SECRET_KEY_ID }}
+          DOC_VERSION: ${{ steps.doc_version.outputs.version }}
+        run: |
+          echo "Deploying docs for version: ${DOC_VERSION}"
+          aws s3 sync --delete --exclude ".*" --cache-control "no-cache" ./framework/docs/build/html/${DOC_VERSION}/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/framework/${DOC_VERSION}
+
+          # Deploy latest stable version to root (if applicable)
+          if [ "${{ steps.latest_check.outputs.is_latest }}" = "true" ]; then
+            echo "Deploying latest stable version (${DOC_VERSION}) English docs to root"
+            aws s3 sync --exclude ".*" --cache-control "no-cache" ./framework/docs/build/html/${DOC_VERSION}/en/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/framework/
+          fi
+      - name: Generate and deploy shared docs UI metadata from main
+        if: ${{ github.repository == 'flwrlabs/flower' && (github.ref == 'refs/heads/main' || github.event_name == 'release') }}
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.DOCS_AWS_DEFAULT_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.DOCS_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.DOCS_AWS_SECRET_KEY_ID }}
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "release" ]; then
+            echo "GitHub release event detected; generating docs UI metadata from `main`"
+            git fetch origin main
+            git checkout origin/main
+          fi
+
+          python ./framework/docs/generate_docs_ui_metadata.py \
+            --docs-ui-config ./dev/docs-ui-config.yml \
+            --output ./framework/docs/build/docs-ui-metadata.json
+
+          aws s3 cp --cache-control "no-cache" ./framework/docs/build/docs-ui-metadata.json s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/framework/docs-ui-metadata.json

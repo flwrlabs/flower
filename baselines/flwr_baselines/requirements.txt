@@ -2,7 +2,7 @@
 # Under Apache-2.0 license
 # Authors: The Flower Authors <hello@flower.ai>
 # Website: https://flower.ai
-# Repository: https://github.com/adap/flower
+# Repository: https://github.com/flwrlabs/flower
 # Documentation: https://flower.ai
 
 ##### dependencies

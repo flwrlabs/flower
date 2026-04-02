@@ -18,6 +18,8 @@ concurrency:
 
 env:
   FLWR_TELEMETRY_ENABLED: 0
+  UV_NO_MANAGED_PYTHON: 1
+  UV_PYTHON_DOWNLOADS: never
 
 jobs:
   frameworks:
@@ -46,6 +48,8 @@ jobs:
         uses: ./.github/actions/bootstrap
         with:
           python-version: 3.10.19
+          uv-skip: "false"
+          poetry-skip: "true"
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@v1.3.1
         with:
@@ -61,6 +65,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
       - name: Install dependencies
-        run: python -m poetry install
+        run: uv sync --frozen
       - name: Run tests
-        run: python -m unittest discover -p '*_test.py'
+        run: uv run python -m unittest discover -p '*_test.py'

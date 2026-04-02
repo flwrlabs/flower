@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower SimulationIo connection."""
+"""Flower simulation connection compatibility helper."""
 
 
 from logging import DEBUG, WARNING
@@ -20,20 +20,20 @@ from typing import cast
 
 import grpc
 
-from flwr.common.constant import SIMULATIONIO_API_DEFAULT_CLIENT_ADDRESS
+from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
 from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
-from flwr.proto.simulationio_pb2_grpc import SimulationIoStub  # pylint: disable=E0611
+from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
 
 
 class SimulationIoConnection:
-    """`SimulationIoConnection` provides an interface to the SimulationIo API.
+    """`SimulationIoConnection` provides an interface to the ServerAppIo API.
 
     Parameters
     ----------
-    simulationio_service_address : str (default: "[::]:9094")
-        The address (URL, IPv6, IPv4) of the SuperLink SimulationIo API service.
+    serverappio_api_address : str (default: "127.0.0.1:9091")
+        The address (URL, IPv6, IPv4) of the SuperLink ServerAppIo API service.
     root_certificates : Optional[bytes] (default: None)
         The PEM-encoded root certificates as a byte string.
         If provided, a secure connection using the certificates will be
@@ -42,29 +42,29 @@ class SimulationIoConnection:
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
-        simulationio_service_address: str = SIMULATIONIO_API_DEFAULT_CLIENT_ADDRESS,
+        serverappio_api_address: str = SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
         root_certificates: bytes | None = None,
     ) -> None:
-        self._addr = simulationio_service_address
+        self._addr = serverappio_api_address
         self._cert = root_certificates
-        self._grpc_stub: SimulationIoStub | None = None
+        self._grpc_stub: ServerAppIoStub | None = None
         self._channel: grpc.Channel | None = None
         self._retry_invoker = make_simple_grpc_retry_invoker()
 
     @property
     def _is_connected(self) -> bool:
-        """Check if connected to the SimulationIo API server."""
+        """Check if connected to the ServerAppIo API server."""
         return self._channel is not None
 
     @property
-    def _stub(self) -> SimulationIoStub:
-        """SimulationIo stub."""
+    def _stub(self) -> ServerAppIoStub:
+        """ServerAppIo stub."""
         if not self._is_connected:
             self._connect()
-        return cast(SimulationIoStub, self._grpc_stub)
+        return cast(ServerAppIoStub, self._grpc_stub)
 
     def _connect(self) -> None:
-        """Connect to the SimulationIo API."""
+        """Connect to the ServerAppIo API."""
         if self._is_connected:
             log(WARNING, "Already connected")
             return
@@ -74,12 +74,12 @@ class SimulationIoConnection:
             root_certificates=self._cert,
         )
         self._channel.subscribe(on_channel_state_change)
-        self._grpc_stub = SimulationIoStub(self._channel)
+        self._grpc_stub = ServerAppIoStub(self._channel)
         wrap_stub(self._grpc_stub, self._retry_invoker)
-        log(DEBUG, "[SimulationIO] Connected to %s", self._addr)
+        log(DEBUG, "[ServerAppIO] Connected to %s", self._addr)
 
     def _disconnect(self) -> None:
-        """Disconnect from the SimulationIo API."""
+        """Disconnect from the ServerAppIo API."""
         if not self._is_connected:
             log(DEBUG, "Already disconnected")
             return
@@ -87,4 +87,4 @@ class SimulationIoConnection:
         self._channel = None
         self._grpc_stub = None
         channel.close()
-        log(DEBUG, "[SimulationIO] Disconnected")
+        log(DEBUG, "[ServerAppIO] Disconnected")

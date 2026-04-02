@@ -20,9 +20,9 @@ limitations under the License.
 import builtins
 import collections.abc
 import flwr.proto.fab_pb2
+import flwr.proto.federation_config_pb2
 import flwr.proto.federation_pb2
 import flwr.proto.node_pb2
-import flwr.proto.recorddict_pb2
 import flwr.proto.run_pb2
 import flwr.proto.transport_pb2
 import google.protobuf.descriptor
@@ -56,7 +56,7 @@ class StartRunRequest(google.protobuf.message.Message):
 
     FAB_FIELD_NUMBER: builtins.int
     OVERRIDE_CONFIG_FIELD_NUMBER: builtins.int
-    FEDERATION_OPTIONS_FIELD_NUMBER: builtins.int
+    OVERRIDE_FEDERATION_CONFIG_FIELD_NUMBER: builtins.int
     APP_SPEC_FIELD_NUMBER: builtins.int
     FEDERATION_FIELD_NUMBER: builtins.int
     app_spec: builtins.str
@@ -66,18 +66,18 @@ class StartRunRequest(google.protobuf.message.Message):
     @property
     def override_config(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, flwr.proto.transport_pb2.Scalar]: ...
     @property
-    def federation_options(self) -> flwr.proto.recorddict_pb2.ConfigRecord: ...
+    def override_federation_config(self) -> flwr.proto.federation_config_pb2.SimulationConfig: ...
     def __init__(
         self,
         *,
         fab: flwr.proto.fab_pb2.Fab | None = ...,
         override_config: collections.abc.Mapping[builtins.str, flwr.proto.transport_pb2.Scalar] | None = ...,
-        federation_options: flwr.proto.recorddict_pb2.ConfigRecord | None = ...,
+        override_federation_config: flwr.proto.federation_config_pb2.SimulationConfig | None = ...,
         app_spec: builtins.str = ...,
         federation: builtins.str = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["fab", b"fab", "federation_options", b"federation_options"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["app_spec", b"app_spec", "fab", b"fab", "federation", b"federation", "federation_options", b"federation_options", "override_config", b"override_config"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["fab", b"fab", "override_federation_config", b"override_federation_config"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["app_spec", b"app_spec", "fab", b"fab", "federation", b"federation", "override_config", b"override_config", "override_federation_config", b"override_federation_config"]) -> None: ...
 
 global___StartRunRequest = StartRunRequest
 
@@ -139,14 +139,20 @@ class ListRunsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RUN_ID_FIELD_NUMBER: builtins.int
+    LIMIT_FIELD_NUMBER: builtins.int
     run_id: builtins.int
+    limit: builtins.int
     def __init__(
         self,
         *,
         run_id: builtins.int | None = ...,
+        limit: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_run_id", b"_run_id", "run_id", b"run_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_run_id", b"_run_id", "run_id", b"run_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_limit", b"_limit", "_run_id", b"_run_id", "limit", b"limit", "run_id", b"run_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_limit", b"_limit", "_run_id", b"_run_id", "limit", b"limit", "run_id", b"run_id"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
+    @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_run_id", b"_run_id"]) -> typing.Literal["run_id"] | None: ...
 
 global___ListRunsRequest = ListRunsRequest
@@ -471,17 +477,20 @@ global___ShowFederationResponse = ShowFederationResponse
 class CreateFederationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    NAME_FIELD_NUMBER: builtins.int
+    FEDERATION_NAME_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
-    name: builtins.str
+    SIMULATION_FIELD_NUMBER: builtins.int
+    federation_name: builtins.str
     description: builtins.str
+    simulation: builtins.bool
     def __init__(
         self,
         *,
-        name: builtins.str = ...,
+        federation_name: builtins.str = ...,
         description: builtins.str = ...,
+        simulation: builtins.bool = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["description", b"description", "name", b"name"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["description", b"description", "federation_name", b"federation_name", "simulation", b"simulation"]) -> None: ...
 
 global___CreateFederationRequest = CreateFederationRequest
 
@@ -532,17 +541,16 @@ class AddNodeToFederationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     FEDERATION_NAME_FIELD_NUMBER: builtins.int
-    NODE_IDS_FIELD_NUMBER: builtins.int
+    NODE_ID_FIELD_NUMBER: builtins.int
     federation_name: builtins.str
-    @property
-    def node_ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
+    node_id: builtins.int
     def __init__(
         self,
         *,
         federation_name: builtins.str = ...,
-        node_ids: collections.abc.Iterable[builtins.int] | None = ...,
+        node_id: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["federation_name", b"federation_name", "node_ids", b"node_ids"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["federation_name", b"federation_name", "node_id", b"node_id"]) -> None: ...
 
 global___AddNodeToFederationRequest = AddNodeToFederationRequest
 
@@ -561,17 +569,16 @@ class RemoveNodeFromFederationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     FEDERATION_NAME_FIELD_NUMBER: builtins.int
-    NODE_IDS_FIELD_NUMBER: builtins.int
+    NODE_ID_FIELD_NUMBER: builtins.int
     federation_name: builtins.str
-    @property
-    def node_ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
+    node_id: builtins.int
     def __init__(
         self,
         *,
         federation_name: builtins.str = ...,
-        node_ids: collections.abc.Iterable[builtins.int] | None = ...,
+        node_id: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["federation_name", b"federation_name", "node_ids", b"node_ids"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["federation_name", b"federation_name", "node_id", b"node_id"]) -> None: ...
 
 global___RemoveNodeFromFederationRequest = RemoveNodeFromFederationRequest
 
@@ -584,3 +591,237 @@ class RemoveNodeFromFederationResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___RemoveNodeFromFederationResponse = RemoveNodeFromFederationResponse
+
+@typing.final
+class RemoveAccountFromFederationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FEDERATION_NAME_FIELD_NUMBER: builtins.int
+    ACCOUNT_NAME_FIELD_NUMBER: builtins.int
+    federation_name: builtins.str
+    account_name: builtins.str
+    def __init__(
+        self,
+        *,
+        federation_name: builtins.str = ...,
+        account_name: builtins.str | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_account_name", b"_account_name", "account_name", b"account_name"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_account_name", b"_account_name", "account_name", b"account_name", "federation_name", b"federation_name"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_account_name", b"_account_name"]) -> typing.Literal["account_name"] | None: ...
+
+global___RemoveAccountFromFederationRequest = RemoveAccountFromFederationRequest
+
+@typing.final
+class RemoveAccountFromFederationResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___RemoveAccountFromFederationResponse = RemoveAccountFromFederationResponse
+
+@typing.final
+class CreateInvitationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    INVITEE_ACCOUNT_NAME_FIELD_NUMBER: builtins.int
+    FEDERATION_NAME_FIELD_NUMBER: builtins.int
+    invitee_account_name: builtins.str
+    federation_name: builtins.str
+    def __init__(
+        self,
+        *,
+        invitee_account_name: builtins.str = ...,
+        federation_name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["federation_name", b"federation_name", "invitee_account_name", b"invitee_account_name"]) -> None: ...
+
+global___CreateInvitationRequest = CreateInvitationRequest
+
+@typing.final
+class CreateInvitationResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___CreateInvitationResponse = CreateInvitationResponse
+
+@typing.final
+class ListInvitationsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___ListInvitationsRequest = ListInvitationsRequest
+
+@typing.final
+class ListInvitationsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CREATED_INVITATIONS_FIELD_NUMBER: builtins.int
+    RECEIVED_INVITATIONS_FIELD_NUMBER: builtins.int
+    @property
+    def created_invitations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.federation_pb2.Invitation]: ...
+    @property
+    def received_invitations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.federation_pb2.Invitation]: ...
+    def __init__(
+        self,
+        *,
+        created_invitations: collections.abc.Iterable[flwr.proto.federation_pb2.Invitation] | None = ...,
+        received_invitations: collections.abc.Iterable[flwr.proto.federation_pb2.Invitation] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created_invitations", b"created_invitations", "received_invitations", b"received_invitations"]) -> None: ...
+
+global___ListInvitationsResponse = ListInvitationsResponse
+
+@typing.final
+class AcceptInvitationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FEDERATION_NAME_FIELD_NUMBER: builtins.int
+    federation_name: builtins.str
+    def __init__(
+        self,
+        *,
+        federation_name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["federation_name", b"federation_name"]) -> None: ...
+
+global___AcceptInvitationRequest = AcceptInvitationRequest
+
+@typing.final
+class AcceptInvitationResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___AcceptInvitationResponse = AcceptInvitationResponse
+
+@typing.final
+class RejectInvitationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FEDERATION_NAME_FIELD_NUMBER: builtins.int
+    federation_name: builtins.str
+    def __init__(
+        self,
+        *,
+        federation_name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["federation_name", b"federation_name"]) -> None: ...
+
+global___RejectInvitationRequest = RejectInvitationRequest
+
+@typing.final
+class RejectInvitationResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___RejectInvitationResponse = RejectInvitationResponse
+
+@typing.final
+class RevokeInvitationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    INVITEE_ACCOUNT_NAME_FIELD_NUMBER: builtins.int
+    FEDERATION_NAME_FIELD_NUMBER: builtins.int
+    invitee_account_name: builtins.str
+    federation_name: builtins.str
+    def __init__(
+        self,
+        *,
+        invitee_account_name: builtins.str = ...,
+        federation_name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["federation_name", b"federation_name", "invitee_account_name", b"invitee_account_name"]) -> None: ...
+
+global___RevokeInvitationRequest = RevokeInvitationRequest
+
+@typing.final
+class RevokeInvitationResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___RevokeInvitationResponse = RevokeInvitationResponse
+
+@typing.final
+class ConfigureSimulationFederationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FEDERATION_NAME_FIELD_NUMBER: builtins.int
+    CONFIG_FIELD_NUMBER: builtins.int
+    federation_name: builtins.str
+    @property
+    def config(self) -> flwr.proto.federation_config_pb2.SimulationConfig: ...
+    def __init__(
+        self,
+        *,
+        federation_name: builtins.str = ...,
+        config: flwr.proto.federation_config_pb2.SimulationConfig | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["config", b"config"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["config", b"config", "federation_name", b"federation_name"]) -> None: ...
+
+global___ConfigureSimulationFederationRequest = ConfigureSimulationFederationRequest
+
+@typing.final
+class ConfigureSimulationFederationResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___ConfigureSimulationFederationResponse = ConfigureSimulationFederationResponse
+
+@typing.final
+class StreamRunEventsRequest(google.protobuf.message.Message):
+    """##############
+    Unused for now
+    ##############
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    RUN_ID_FIELD_NUMBER: builtins.int
+    run_id: builtins.int
+    def __init__(
+        self,
+        *,
+        run_id: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["run_id", b"run_id"]) -> None: ...
+
+global___StreamRunEventsRequest = StreamRunEventsRequest
+
+@typing.final
+class StreamRunEventsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENT_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    event: builtins.str
+    data: builtins.str
+    def __init__(
+        self,
+        *,
+        event: builtins.str = ...,
+        data: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "event", b"event"]) -> None: ...
+
+global___StreamRunEventsResponse = StreamRunEventsResponse

@@ -12,14 +12,18 @@ fastai is a deep learning library built on PyTorch which provides practitioners 
 
 ## Set up the project
 
-### Clone the project
+### Fetch the app
 
-Start by cloning the example project:
+Install Flower:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
-		&& mv _tmp/examples/quickstart-fastai . \
-		&& rm -rf _tmp && cd quickstart-fastai
+pip install flwr
+```
+
+Fetch the app:
+
+```shell
+flwr new @flwrlabs/quickstart-fastai
 ```
 
 This will create a new directory called `quickstart-fastai` containing the following files:

@@ -1,0 +1,100 @@
+name: Ping Stale External PRs
+
+on:
+  schedule:
+    - cron: '0 8 * * *'  # Daily at 08:00 UTC
+  workflow_dispatch:
+
+jobs:
+  ping-stale-external-prs:
+    runs-on: ubuntu-22.04
+    permissions:
+      pull-requests: read
+    env:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID_SUPPORT_GITHUB_ISSUES }}
+
+    steps:
+      - name: Ping stale Contributor PRs via Slack
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const now = new Date();
+            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const { data: prs } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: "open",
+              per_page: 100
+            });
+
+            const stale = [];
+
+            for (const pr of prs) {
+              const isContributor = pr.labels.some(
+                (l) => l.name.toLowerCase() === "contributor"
+              );
+              if (!isContributor) continue;
+
+              const createdAt = new Date(pr.created_at);
+              const updatedAt = new Date(pr.updated_at);
+
+              if (pr.draft && createdAt < fourteenDaysAgo) {
+                stale.push({ number: pr.number, title: pr.title, state: "Draft", days: Math.floor((now - createdAt) / (1000 * 60 * 60 * 24)) });
+              } else if (!pr.draft && updatedAt < sevenDaysAgo) {
+                let inferredState = "In Review";
+                if (pr.requested_reviewers.length > 0) {
+                  inferredState = "In Review";
+                } else {
+                  // Optional: fetch reviews to refine state
+                  const { data: reviews } = await github.rest.pulls.listReviews({
+                    owner,
+                    repo,
+                    pull_number: pr.number
+                  });
+                  const latestReview = [...reviews].reverse().find(r => r.state && ["CHANGES_REQUESTED", "APPROVED"].includes(r.state));
+                  if (latestReview) {
+                    inferredState = latestReview.state === "CHANGES_REQUESTED" ? "Changes Requested" : "Approved";
+                  }
+                }
+
+                stale.push({ number: pr.number, title: pr.title, state: inferredState, days: Math.floor((now - updatedAt) / (1000 * 60 * 60 * 24)) });
+              }
+            }
+
+            if (stale.length === 0) {
+              console.log("No stale Contributor PRs.");
+              return;
+            }
+
+            const lines = [
+              "*📣 Stale Contributor Pull Requests (no activity or long drafts)*",
+              "```",
+              "| PR   | Title                                | State             | Days Old |",
+              "|------|--------------------------------------|-------------------|----------|",
+            ];
+
+            for (const pr of stale) {
+              const title = pr.title.length > 38 ? pr.title.slice(0, 35) + "..." : pr.title;
+              lines.push(`| #${pr.number} | ${title.padEnd(38)} | ${pr.state.padEnd(17)} | ${pr.days}d     |`);
+            }
+
+            lines.push("```");
+
+            await fetch("https://slack.com/api/chat.postMessage", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                channel: process.env.SLACK_CHANNEL_ID,
+                text: lines.join("\n"),
+              }),
+            });

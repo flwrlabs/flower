@@ -1,0 +1,91 @@
+name: Datasets
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "datasets/**"
+      - "dev/devtool/**"
+      - "dev/pyproject.toml"
+      - "dev/uv.lock"
+      - ".github/workflows/datasets-*.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "datasets/**"
+      - "dev/devtool/**"
+      - "dev/pyproject.toml"
+      - "dev/uv.lock"
+      - ".github/workflows/datasets-*.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLWR_TELEMETRY_ENABLED: 0
+  UV_NO_MANAGED_PYTHON: 1
+  UV_PYTHON_DOWNLOADS: never
+
+jobs:
+  test_core:
+    runs-on: ubuntu-22.04
+    strategy:
+      max-parallel: 2
+      matrix:
+        # Latest version which comes cached in the host image can be found here:
+        # https://github.com/actions/runner-images/blob/main/images/linux/Ubuntu2204-Readme.md#python
+        # In case of a mismatch, the job has to download Python to install it.
+        python: ['3.10', '3.11', '3.12', '3.13']
+
+    name: Python ${{ matrix.python }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Bootstrap
+        uses: ./.github/actions/bootstrap
+        with:
+          python-version: ${{ matrix.python }}
+          uv-skip: "false"
+          poetry-skip: "true"
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false
+          docker-images: false
+          swap-storage: false
+      - name: Install dependencies (system)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+      - name: Install dependencies
+        run: |
+          cd datasets
+          uv sync --frozen --all-extras
+      - name: Cache Hugging Face datasets
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/huggingface
+          key: hf-datasets-v1
+          restore-keys: hf-datasets-
+      - name: Set Hugging Face token
+        run: |
+          cd datasets
+          if [ -n "${{ secrets.HF_TOKEN }}" ]; then
+            echo "Logging into Hugging Face..."
+            uv run hf auth login --token ${{ secrets.HF_TOKEN }}
+          else
+            echo "Skipping Hugging Face login stage (HF_TOKEN not set)"
+          fi
+      - name: Test (formatting + unit tests)
+        run: |
+          cd datasets
+          uv run ./dev/test.sh

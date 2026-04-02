@@ -29,7 +29,7 @@ copyright = f"{datetime.date.today().year} Flower Labs GmbH"
 author = "The Flower Authors"
 
 # The full version, including alpha/beta/rc tags
-release = "1.27.0"
+release = "1.28.0"
 
 
 # -- General configuration ---------------------------------------------------
@@ -78,6 +78,8 @@ redirects = {
     "quickstart-sklearn-tabular": "quickstart-sklearn.html",
     "xgboost-quickstart": "quickstart-xgboost.html",
     "tensorflow-privacy": "index.html",
+    "flower-authentication": "supernode-authentication.html",
+    "pytorch-federated-variational-autoencoder": "federated-vae.html",
 }
 
 
@@ -123,6 +125,26 @@ html_theme_options = {
         "color-toc-item-text--hover": "#d2d2d2",
         "color-toc-item-text--active": "#fff5bf",
     },
+    #
+    # Sphinx Book Theme
+    #
+    # https://sphinx-book-theme.readthedocs.io/en/latest/configure.html
+    # "repository_url": "https://github.com/flwrlabs/flower",
+    # "repository_branch": "main",
+    # "path_to_docs": "doc/source/",
+    # "home_page_in_toc": True,
+    # "use_repository_button": True,
+    # "use_issues_button": True,
+    # "use_edit_page_button": True,
+    #
+    # Furo
+    #
+    # https://pradyunsg.me/furo/customisation/
+    # "light_css_variables": {
+    #     "color-brand-primary": "#292F36",
+    #     "color-brand-content": "#292F36",
+    #     "color-admonition-background": "#F2B705",
+    # },
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
@@ -139,7 +161,7 @@ _open_in_colab_button = """
 .. raw:: html
 
     <br/>
-    <a href="https://colab.research.google.com/github/adap/flower/blob/main/framework/docs/source/{{ env.doc2path(env.docname, base=None) }}">
+    <a href="https://colab.research.google.com/github/flwrlabs/flower/blob/main/framework/docs/source/{{ env.doc2path(env.docname, base=None) }}">
         <img alt="Open in Colab" src="https://colab.research.google.com/assets/colab-badge.svg"/>
     </a>
 """

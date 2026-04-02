@@ -18,4 +18,4 @@
 set -e
 cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/../
 
-python -m poetry publish -u __token__ -p ${PYPI_TOKEN}
+uv publish --token "${PYPI_TOKEN}"

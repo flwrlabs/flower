@@ -30,27 +30,10 @@ from flwr.common.constant import (
     ErrorCode,
 )
 from flwr.common.grpc import create_channel, on_channel_state_change
-from flwr.common.inflatable import (
-    InflatableObject,
-    get_all_nested_objects,
-    get_object_tree,
-    iterate_object_tree,
-    no_object_id_recompute,
-)
-from flwr.common.inflatable_protobuf_utils import (
-    make_pull_object_fn_protobuf,
-    make_push_object_fn_protobuf,
-)
-from flwr.common.inflatable_utils import (
-    ObjectUnavailableError,
-    inflate_object_from_contents,
-    pull_objects,
-    push_objects,
-)
 from flwr.common.logger import log, warn_deprecated_feature
 from flwr.common.message import make_message, remove_content_from_message
 from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
-from flwr.common.serde import message_to_proto, run_from_proto
+from flwr.common.serde import message_to_proto
 from flwr.common.typing import Run
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppMessagesRequest,
@@ -62,13 +45,29 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
-from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
 )
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
 from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE
+from flwr.supercore.inflatable.inflatable_object import (
+    InflatableObject,
+    get_all_nested_objects,
+    get_object_tree,
+    iterate_object_tree,
+    no_object_id_recompute,
+)
+from flwr.supercore.inflatable.inflatable_protobuf_utils import (
+    make_pull_object_fn_protobuf,
+    make_push_object_fn_protobuf,
+)
+from flwr.supercore.inflatable.inflatable_utils import (
+    ObjectUnavailableError,
+    inflate_object_from_contents,
+    pull_objects,
+    push_objects,
+)
 
 from .grid import Grid
 
@@ -164,14 +163,12 @@ class GrpcGrid(Grid):
         channel.close()
         log(DEBUG, "[flwr-serverapp] Disconnected")
 
-    def set_run(self, run_id: int) -> None:
+    def set_run(self, run: Run) -> None:
         """Set the run."""
-        # Get the run info
-        req = GetRunRequest(run_id=run_id)
-        res: GetRunResponse = self._stub.GetRun(req)
-        if not res.HasField("run"):
-            raise RuntimeError(f"Cannot find the run with ID: {run_id}")
-        self._run = run_from_proto(res.run)
+        if not isinstance(run, Run):
+            run_type = type(run).__name__
+            raise TypeError(f"`run` must be an instance of Run, got {run_type}")
+        self._run = run
 
     @property
     def run(self) -> Run:

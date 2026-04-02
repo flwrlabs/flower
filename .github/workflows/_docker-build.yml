@@ -1,4 +1,4 @@
-name: Reusable docker image build workflow
+name: Reusable Docker image build workflow
 
 on:
   workflow_call:
@@ -26,7 +26,7 @@ on:
         required: true
     outputs:
       metadata:
-        description: "Metadata of the docker image."
+        description: "Metadata of the Docker image."
         value: ${{ jobs.build-manifest.outputs.metadata }}
 
 permissions:
@@ -35,7 +35,7 @@ permissions:
 # based on https://docs.docker.com/build/ci/github-actions/multi-platform/#distribute-build-across-multiple-runners
 jobs:
   build:
-    name: Build image
+    name: Build Docker image
     runs-on: ${{ matrix.platform.runner-os }}
     timeout-minutes: 180
     outputs:
@@ -123,7 +123,7 @@ jobs:
           retention-days: 1
 
   build-manifest:
-    name: Build and push docker manifest for all platforms
+    name: Build and push Docker manifest for all platforms
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     needs: build
@@ -153,10 +153,10 @@ jobs:
           username: ${{ secrets.dockerhub-user }}
           password: ${{ secrets.dockerhub-token }}
 
-      - name: Create manifest list and push
+      - name: Create Docker manifest list and push
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
               $(printf '${{ inputs.namespace-repository }}@sha256:%s ' *)
-      - name: Inspect image
+      - name: Inspect Docker image
         run: docker buildx imagetools inspect ${{ inputs.namespace-repository }}:${{ steps.meta.outputs.version }}

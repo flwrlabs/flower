@@ -46,7 +46,6 @@ def flwr_clientapp() -> None:
             plugin_class=ClientAppExecPlugin,
             stub_class=ClientAppIoStub,
             appio_api_address=args.clientappio_api_address,
-            flwr_dir=args.flwr_dir,
             parent_pid=args.parent_pid,
             warn_run_once=args.run_once,
         )
@@ -63,7 +62,6 @@ def flwr_clientapp() -> None:
     run_clientapp(
         clientappio_api_address=args.clientappio_api_address,
         token=args.token,
-        flwr_dir=args.flwr_dir,
         certificates=None,
         parent_pid=args.parent_pid,
     )

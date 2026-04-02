@@ -24,7 +24,6 @@ from flwr.common.constant import (
     NOOP_FLWR_AID,
     Status,
 )
-from flwr.common.inflatable import UnexpectedObjectContentError
 from flwr.common.serde import (
     fab_to_proto,
     message_from_proto,
@@ -64,6 +63,7 @@ from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.utils import check_abort
 from flwr.supercore.ffs import Ffs
+from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStore
 
 
@@ -368,10 +368,10 @@ def _validate_node_in_federation(
 ) -> Run:
     """Raise if the requesting SuperNode is not part of the federation the run belongs
     to."""
-    run = state.get_run(run_id)
-    if not run:
+    if not (runs := state.get_run_info(run_ids=[run_id])):
         raise ValueError(f"Run ID not found: {run_id}")
 
+    run = runs[0]
     if not state.federation_manager.has_node(node_id, run.federation):
         raise ValueError(f"SuperNode is not part of the federation '{run.federation}'.")
     return run

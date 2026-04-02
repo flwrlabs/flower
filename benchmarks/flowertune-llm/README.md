@@ -71,7 +71,7 @@ With a new project directory created, running a baseline challenge can be done b
 ## Evaluate fine-tuned LLMs
 
 Once the LLM fine-tuning finished, evaluate the performance of your fine-tuned LLM
-following the `README.md` in [`evaluation`](https://github.com/adap/flower/tree/main/benchmarks/flowertune-llm/evaluation) directory.
+following the `README.md` in [`evaluation`](https://github.com/flwrlabs/flower/tree/main/benchmarks/flowertune-llm/evaluation) directory.
 
 
 > [!NOTE]

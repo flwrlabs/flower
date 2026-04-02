@@ -33,7 +33,7 @@ Those diagrams illustrate HFL vs VFL using a simplified version of what we will 
 Start by cloning the example project:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
         && mv _tmp/examples/vertical-fl . \
         && rm -rf _tmp \
         && cd vertical-fl

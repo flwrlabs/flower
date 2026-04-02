@@ -17,13 +17,13 @@
 
 from sqlalchemy import MetaData
 
-from flwr.common.inflatable import (
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.supercore.inflatable.inflatable_object import (
     get_object_id,
     is_valid_sha256_hash,
     iterate_object_tree,
 )
-from flwr.common.inflatable_utils import validate_object_content
-from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.supercore.inflatable.inflatable_utils import validate_object_content
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.objectstore_tables import create_objectstore_metadata
 from flwr.supercore.utils import uint64_to_int64

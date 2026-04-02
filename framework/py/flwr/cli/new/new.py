@@ -27,6 +27,7 @@ import typer
 from flwr.supercore.constant import PLATFORM_API_URL
 from flwr.supercore.utils import parse_app_spec, request_download_link
 
+from ..archive_utils import safe_extract_zip
 from ..utils import prompt_options, prompt_text
 
 
@@ -141,41 +142,6 @@ def fetch_recommended_apps() -> list[dict[str, str]]:
         raise click.ClickException(f"Failed to fetch recommended apps: {e}") from e
 
 
-# Security: prevent zip-slip
-def _safe_extract_zip(zf: zipfile.ZipFile, dest_dir: Path) -> None:
-    """Extract ZIP file into destination directory."""
-    dest_dir = dest_dir.resolve()
-
-    def _is_within_directory(base: Path, target: Path) -> bool:
-        try:
-            target.relative_to(base)
-            return True
-        except ValueError:
-            return False
-
-    for member in zf.infolist():
-        # Skip directory placeholders;
-        # ZipInfo can represent them as names ending with '/'.
-        if member.is_dir():
-            target_path = (dest_dir / member.filename).resolve()
-            if not _is_within_directory(dest_dir, target_path):
-                raise ValueError(f"Unsafe path in zip: {member.filename}")
-            target_path.mkdir(parents=True, exist_ok=True)
-            continue
-
-        # Files
-        target_path = (dest_dir / member.filename).resolve()
-        if not _is_within_directory(dest_dir, target_path):
-            raise ValueError(f"Unsafe path in zip: {member.filename}")
-
-        # Ensure parent exists
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Extract
-        with zf.open(member, "r") as src, open(target_path, "wb") as dst:
-            dst.write(src.read())
-
-
 def _download_zip_to_memory(presigned_url: str) -> io.BytesIO:
     """Download ZIP file from Platform API to memory."""
     try:
@@ -238,6 +204,6 @@ def download_remote_app_via_api(app_spec: str) -> None:
         bold=True,
     )
     with zipfile.ZipFile(zip_buf) as zf:
-        _safe_extract_zip(zf, Path.cwd())
+        safe_extract_zip(zf, Path.cwd())
 
     print_success_prompt(app_name)

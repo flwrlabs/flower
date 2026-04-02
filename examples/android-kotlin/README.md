@@ -20,7 +20,7 @@ This example is similar to the Flower Android Example in Java:
 Start by cloning the example project. We prepared a single-line command that you can copy into your shell which will checkout the example for you:
 
 ```sh
-git clone --depth=1 https://github.com/adap/flower.git && mv flower/examples/android-kotlin . && rm -rf flower && cd android-kotlin
+git clone --depth=1 https://github.com/flwrlabs/flower.git && mv flower/examples/android-kotlin . && rm -rf flower && cd android-kotlin
 ```
 
 Download the training and testing data from <https://www.dropbox.com/s/coeixr4kh8ljw6o/cifar10.zip?dl=1> and extract them to `client/app/src/main/assets/data`.
