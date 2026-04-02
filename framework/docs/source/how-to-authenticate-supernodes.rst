@@ -109,8 +109,9 @@ allowed to connect to it. This process is handled through the
 |flower_cli_supernode_link|_ using the public keys previously generated for each
 SuperNode you plan to connect to the SuperLink.
 
-First, ensure your Flower configuration file has a SuperLink connection profile that points to your running SuperLink
-and that includes a ``root-certificates`` field with the path to the CA certificate used to launch the SuperLink. For example:
+First, ensure your Flower configuration file has a SuperLink connection profile that
+points to your running SuperLink and that includes a ``root-certificates`` field with
+the path to the CA certificate used to launch the SuperLink. For example:
 
 .. code-block:: toml
     :caption: config.toml
@@ -120,7 +121,8 @@ and that includes a ``root-certificates`` field with the path to the CA certific
     address = "127.0.0.1:9093"
     root-certificates = "/absolute/path/to/certificates/ca.crt"
 
-You can verify that your connection is correctly configured by running a ``flwr ls`` command:
+You can verify that your connection is correctly configured by running a ``flwr ls``
+command:
 
 .. code-block:: bash
 
@@ -131,14 +133,15 @@ You can verify that your connection is correctly configured by running a ``flwr 
     ┃ Run ID ┃ Federation ┃ App ┃ Status ┃ Elapsed ┃ Status Changed @ ┃
     ┡━━━━━━━━╇━━━━━━━━━━━━╇━━━━━╇━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━┩
     └────────┴────────────┴─────┴────────┴─────────┴──────────────────┘
-    
 
-With a correctly configure Flower CLi, let's proceed to register two SuperNodes::
+With a correctly configure Flower CLi, let's proceed to register two SuperNodes:
 
-.. code-block:: bash
+::
 
-    # flwr supernode register <supernode-pub-key> <superlink>
-    $ flwr supernode register keys/supernode_credentials_1.pub local-deployment
+    .. code-block:: bash
+
+    # flwr supernode register <supernode-pub-key> <superlink> $ flwr supernode register
+    keys/supernode_credentials_1.pub local-deployment
 
 Next, let's register the second SuperNode as well:
 
