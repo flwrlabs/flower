@@ -363,6 +363,6 @@ Congratulations! You've successfully built and run your first federated learning
     Check the source code of the extended version of this tutorial in
     |quickstart_tf_link|_ in the Flower GitHub repository.
 
-.. |quickstart_tf_link| replace:: ``examples/quickstart-tensorflow``
+.. |quickstart_tf_link| replace:: ``hub/apps/quickstart-tensorflow``
 
-.. _quickstart_tf_link: https://github.com/flwrlabs/flower/blob/main/examples/quickstart-tensorflow
+.. _quickstart_tf_link: https://github.com/flwrlabs/flower/blob/main/hub/apps/quickstart-tensorflow

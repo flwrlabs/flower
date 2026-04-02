@@ -38,7 +38,7 @@ jobs:
               - 'dev/uv.lock'
               - '.github/workflows/framework-test.yml'
             ex_bench:
-              - 'examples/**/*'
+              - 'hub/apps/**/*'
               - 'benchmarks/**/*'
               - 'dev/test.sh'
               - '.github/workflows/framework-test.yml'

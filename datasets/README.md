@@ -10,7 +10,7 @@ Flower Datasets (`flwr-datasets`) is a library to quickly and easily create data
 
 
 > [!TIP]
-> For complete documentation that includes API docs, how-to guides and tutorials, please visit the [Flower Datasets Documentation](https://flower.ai/docs/datasets/) and for full FL example see the [Flower Examples page](https://github.com/flwrlabs/flower/tree/main/examples).
+> For complete documentation that includes API docs, how-to guides and tutorials, please visit the [Flower Datasets Documentation](https://flower.ai/docs/datasets/) and for full FL example see the [Flower Examples page](https://github.com/flwrlabs/flower/tree/main/hub/apps).
 
 ## Installation
 

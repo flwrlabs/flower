@@ -545,7 +545,7 @@ given deep learning framework (in this case PyTorch) due to the saving of a fina
 This functionality is optional, but mirrors the automatic saving of a model at the end
 of an OpenFL experiment. This ``ServerApp`` change requires only a few lines of
 modifications, and Flower has support for an extensive set of deep learning frameworks
-in it's `examples <https://github.com/flwrlabs/flower/tree/main/examples>`_ (Tensorflow,
+in its `examples <https://github.com/flwrlabs/flower/tree/main/hub/apps>`_ (Tensorflow,
 FastAI, Huggingface, etc.) should you need reference code.
 
 **************

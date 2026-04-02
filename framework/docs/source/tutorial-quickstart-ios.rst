@@ -91,7 +91,7 @@ Let's create a new application project in Xcode and add ``flwr`` as a dependency
 project. For our application, we will store the logic of our app in ``FLiOSModel.swift``
 and the UI elements in ``ContentView.swift``. We will focus more on ``FLiOSModel.swift``
 in this quickstart. Please refer to the `full code example
-<https://github.com/flwrlabs/flower/tree/main/examples/ios>`_ to learn more about the
+<https://github.com/flwrlabs/flower/tree/main/hub/apps/ios>`_ to learn more about the
 app.
 
 Import Flower and CoreML related packages in ``FLiOSModel.swift``:
@@ -189,5 +189,5 @@ Simulator visit `here
 
 Congratulations! You've successfully built and run your first federated learning system
 in your ios device. The full `source code
-<https://github.com/flwrlabs/flower/blob/main/examples/ios>`_ for this example can be
-found in ``examples/ios``.
+<https://github.com/flwrlabs/flower/blob/main/hub/apps/ios>`_ for this example can be
+found in ``hub/apps/ios``.

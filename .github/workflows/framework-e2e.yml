@@ -342,7 +342,7 @@ jobs:
           python -m pip install "flwr[simulation] @ ${WHEEL_URL}"
       - name: Install project dependencies
         if: ${{ needs.changes.outputs.framework == 'true' }}
-        working-directory: examples/${{ matrix.example }}
+        working-directory: hub/apps/${{ matrix.example }}
         run: |
           sed -i 's/"flwr\[[^]]*\][^"]*", *//g' pyproject.toml
           # Replace tensorflow with tensorflow-cpu to avoid GPU warnings in CI
@@ -351,7 +351,7 @@ jobs:
           pip install .  --extra-index-url https://download.pytorch.org/whl/cpu
       - name: Run project
         if: ${{ needs.changes.outputs.framework == 'true' }}
-        working-directory: examples/${{ matrix.example }}
+        working-directory: hub/apps/${{ matrix.example }}
         run: |
           flwr run --run-config num-server-rounds=1 --stream 2>&1 | tee flwr_output.log 
           output=$(flwr ls --format=json)

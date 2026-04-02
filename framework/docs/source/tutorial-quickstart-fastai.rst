@@ -17,7 +17,7 @@ Then, clone the code example directly from GitHub:
 .. code-block:: shell
 
     git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
-                 && mv _tmp/examples/quickstart-fastai . \
+                 && mv _tmp/hub/apps/quickstart-fastai . \
                  && rm -rf _tmp && cd quickstart-fastai
 
 This will create a new directory called `quickstart-fastai` containing the following
@@ -101,5 +101,5 @@ in ``pyproject.toml`` like this:
 .. note::
 
     Check the `source code
-    <https://github.com/flwrlabs/flower/tree/main/examples/quickstart-fastai>`_ of this
-    tutorial in ``examples/quickstart-fastai`` in the Flower GitHub repository.
+    <https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-fastai>`_ of this
+    tutorial in ``hub/apps/quickstart-fastai`` in the Flower GitHub repository.

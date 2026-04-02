@@ -113,33 +113,32 @@ Several code examples show different usage scenarios of Flower (in combination w
 
 Quickstart examples:
 
-- [Quickstart (TensorFlow)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-tensorflow)
-- [Quickstart (PyTorch)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-pytorch)
-- [Quickstart (Hugging Face)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-huggingface)
-- [Quickstart (PyTorch Lightning)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-pytorch-lightning)
-- [Quickstart (fastai)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-fastai)
-- [Quickstart (Pandas)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-pandas)
-- [Quickstart (JAX)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-jax)
-- [Quickstart (MONAI)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-monai)
-- [Quickstart (scikit-learn)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-sklearn)
-- [Quickstart (Android [TFLite])](https://github.com/flwrlabs/flower/tree/main/examples/android)
-- [Quickstart (iOS [CoreML])](https://github.com/flwrlabs/flower/tree/main/examples/ios)
-- [Quickstart (MLX)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-mlx)
-- [Quickstart (XGBoost)](https://github.com/flwrlabs/flower/tree/main/examples/xgboost-quickstart)
+- [Quickstart (TensorFlow)](https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-tensorflow)
+- [Quickstart (PyTorch)](https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-pytorch)
+- [Quickstart (Hugging Face)](https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-huggingface)
+- [Quickstart (PyTorch Lightning)](https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-pytorch-lightning)
+- [Quickstart (fastai)](https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-fastai)
+- [Quickstart (Pandas)](https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-pandas)
+- [Quickstart (JAX)](https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-jax)
+- [Quickstart (MONAI)](https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-monai)
+- [Quickstart (scikit-learn)](https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-sklearn)
+- [Quickstart (Android [TFLite])](https://github.com/flwrlabs/flower/tree/main/hub/apps/android)
+- [Quickstart (iOS [CoreML])](https://github.com/flwrlabs/flower/tree/main/hub/apps/ios)
+- [Quickstart (MLX)](https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-mlx)
+- [Quickstart (XGBoost)](https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-xgboost)
 
-Other [examples](https://github.com/flwrlabs/flower/tree/main/examples):
+Other [examples](https://github.com/flwrlabs/flower/tree/main/hub/apps):
 
-- [Raspberry Pi & Nvidia Jetson Tutorial](https://github.com/flwrlabs/flower/tree/main/examples/embedded-devices)
-- [PyTorch: From Centralized to Federated](https://github.com/flwrlabs/flower/tree/main/examples/pytorch-from-centralized-to-federated)
-- [Vertical FL](https://github.com/flwrlabs/flower/tree/main/examples/vertical-fl)
-- [Federated Finetuning of OpenAI's Whisper](https://github.com/flwrlabs/flower/tree/main/examples/whisper-federated-finetuning)
-- [Federated Finetuning of Large Language Model](https://github.com/flwrlabs/flower/tree/main/examples/flowertune-llm)
-- [Federated Finetuning of a Vision Transformer](https://github.com/flwrlabs/flower/tree/main/examples/flowertune-vit)
-- [Advanced Flower with PyTorch](https://github.com/flwrlabs/flower/tree/main/examples/advanced-pytorch)
-- [Comprehensive Flower+XGBoost](https://github.com/flwrlabs/flower/tree/main/examples/xgboost-comprehensive)
-- [Flower with KaplanMeierFitter from the lifelines library](https://github.com/flwrlabs/flower/tree/main/examples/federated-kaplan-meier-fitter)
-- [Sample Level Privacy with Opacus](https://github.com/flwrlabs/flower/tree/main/examples/opacus)
-- [Flower with a Tabular Dataset](https://github.com/flwrlabs/flower/tree/main/examples/fl-tabular)
+- [Raspberry Pi & Nvidia Jetson Tutorial](https://github.com/flwrlabs/flower/tree/main/hub/apps/embedded-devices)
+- [Vertical FL](https://github.com/flwrlabs/flower/tree/main/hub/apps/vertical-fl)
+- [Federated Finetuning of OpenAI's Whisper](https://github.com/flwrlabs/flower/tree/main/hub/apps/whisper-federated-finetuning)
+- [Federated Finetuning of Large Language Model](https://github.com/flwrlabs/flower/tree/main/hub/apps/flowertune-llm)
+- [Federated Finetuning of a Vision Transformer](https://github.com/flwrlabs/flower/tree/main/hub/apps/flowertune-vit)
+- [Advanced Flower with PyTorch](https://github.com/flwrlabs/flower/tree/main/hub/apps/advanced-pytorch)
+- [Comprehensive Flower+XGBoost](https://github.com/flwrlabs/flower/tree/main/hub/apps/xgboost-comprehensive)
+- [Flower with KaplanMeierFitter from the lifelines library](https://github.com/flwrlabs/flower/tree/main/hub/apps/federated-kaplan-meier-fitter)
+- [Sample Level Privacy with Opacus](https://github.com/flwrlabs/flower/tree/main/hub/apps/opacus)
+- [Flower with a Tabular Dataset](https://github.com/flwrlabs/flower/tree/main/hub/apps/fl-tabular)
 
 ## Community
 

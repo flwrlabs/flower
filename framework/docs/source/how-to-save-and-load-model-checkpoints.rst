@@ -106,4 +106,4 @@ Then, pass it to the |strategy_start_link|_ method of the defined strategy:
     )
 
 If you are interested, checkout the details in `Advanced PyTorch Example
-<https://github.com/flwrlabs/flower/tree/main/examples/advanced-pytorch>`_.
+<https://github.com/flwrlabs/flower/tree/main/hub/apps/advanced-pytorch>`_.

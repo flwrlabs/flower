@@ -51,7 +51,7 @@ enabled:
 .. tip::
 
     Checkout the `Flower Authentication
-    <https://github.com/flwrlabs/flower/tree/main/examples/supernode-authentication>`_
+    <https://github.com/flwrlabs/flower/tree/main/hub/apps/supernode-authentication>`_
     example for a complete self-contained example on how to setup TLS and node
     authentication.
 

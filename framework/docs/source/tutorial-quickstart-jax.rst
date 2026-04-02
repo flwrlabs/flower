@@ -434,9 +434,9 @@ for JAX with Flower!
 
 .. _otherpartitioners: https://flower.ai/docs/datasets/ref-api/flwr_datasets.partitioner.html
 
-.. |quickstart_jax_link| replace:: ``examples/quickstart-jax``
+.. |quickstart_jax_link| replace:: ``hub/apps/quickstart-jax``
 
-.. _quickstart_jax_link: https://github.com/flwrlabs/flower/tree/main/examples/quickstart-jax
+.. _quickstart_jax_link: https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-jax
 
 .. |message_link| replace:: ``Message``
 

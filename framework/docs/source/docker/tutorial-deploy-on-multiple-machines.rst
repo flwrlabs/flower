@@ -88,7 +88,7 @@ For example, you can use ``scp`` to copy the directories:
 
     $ scp -r ./server \
            ./superlink-certificates \
-           ../../../examples/quickstart-sklearn/pyproject.toml remote:~/distributed
+           ../../../hub/apps/quickstart-sklearn/pyproject.toml remote:~/distributed
 
 ********************************************
  Step 3: Start the Flower Server Components
@@ -135,7 +135,7 @@ On your local machine, run the following command to start the client components:
 .. code-block:: bash
 
     # In the `docker/distributed` directory
-    $ export PROJECT_DIR=../../../../examples/quickstart-sklearn
+    $ export PROJECT_DIR=../../../../hub/apps/quickstart-sklearn
     $ docker compose -f client/compose.yml up --build -d
 
 .. note::
@@ -175,8 +175,8 @@ Run the project and follow the ``ServerApp`` logs:
 
 .. code-block:: bash
 
-    $ cd flower/examples/quickstart-sklearn
-    $ flwr run ../../../examples/quickstart-sklearn remote-deployment --stream
+    $ cd flower/hub/apps/quickstart-sklearn
+    $ flwr run ../../../hub/apps/quickstart-sklearn remote-deployment --stream
 
 That's it! With these steps, you've set up Flower on two separate machines and are ready
 to start using it.
@@ -200,6 +200,6 @@ Shut down the Flower server components and delete the SuperLink state:
     $ cd <path-to-``distributed``-directory>
     $ docker compose -f server/compose.yml down -v
 
-.. |quickstart_sklearn_tabular| replace:: ``examples/quickstart-sklearn``
+.. |quickstart_sklearn_tabular| replace:: ``hub/apps/quickstart-sklearn``
 
-.. _quickstart_sklearn_tabular: https://github.com/flwrlabs/flower/tree/main/examples/quickstart-sklearn
+.. _quickstart_sklearn_tabular: https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-sklearn

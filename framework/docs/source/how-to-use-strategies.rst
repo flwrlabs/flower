@@ -310,6 +310,6 @@ of this callback is and how to use it:
 .. tip::
 
     Take a look at the `quickstart-pytorch
-    <https://github.com/flwrlabs/flower/blob/main/examples/quickstart-pytorch>`_ example
+    <https://github.com/flwrlabs/flower/blob/main/hub/apps/quickstart-pytorch>`_ example
     on GitHub for a complete example using several of the concepts presented in this
     how-to guide.

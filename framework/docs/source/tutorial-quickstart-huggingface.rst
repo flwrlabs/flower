@@ -382,7 +382,7 @@ for an LLM.
     of a federated fine-tuning of an LLM with Flower, refer to the |flowertune|_ example
     in the Flower GitHub repository.
 
-.. |quickstart_hf_link| replace:: ``examples/quickstart-huggingface``
+.. |quickstart_hf_link| replace:: ``hub/apps/quickstart-huggingface``
 
 .. |fedavg| replace:: ``FedAvg``
 
@@ -402,13 +402,13 @@ for an LLM.
 
 .. _flowerdatasets: https://flower.ai/docs/datasets/
 
-.. _flowertune: https://github.com/flwrlabs/flower/tree/main/examples/flowertune-llm
+.. _flowertune: https://github.com/flwrlabs/flower/tree/main/hub/apps/flowertune-llm
 
 .. _iidpartitioner: https://flower.ai/docs/datasets/ref-api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner
 
 .. _otherpartitioners: https://flower.ai/docs/datasets/ref-api/flwr_datasets.partitioner.html
 
-.. _quickstart_hf_link: https://github.com/flwrlabs/flower/tree/main/examples/quickstart-huggingface
+.. _quickstart_hf_link: https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-huggingface
 
 .. |arrayrecord_link| replace:: ``ArrayRecord``
 

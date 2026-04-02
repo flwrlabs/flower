@@ -350,7 +350,7 @@ in scikit-learn on the Iris dataset using the new Message API.
 
     Check the source code of another Flower App using ``scikit-learn`` in the `Flower
     GitHub repository
-    <https://github.com/flwrlabs/flower/tree/main/examples/quickstart-sklearn-tabular>`_.
+    <https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-sklearn-tabular>`_.
 
 .. |flowerdatasets| replace:: Flower Datasets
 
@@ -360,7 +360,7 @@ in scikit-learn on the Iris dataset using the new Message API.
 
 .. |otherpartitioners| replace:: other partitioners
 
-.. |quickstart_sklearn_link| replace:: ``examples/sklearn-logreg-mnist``
+.. |quickstart_sklearn_link| replace:: ``hub/apps/sklearn-logreg-mnist``
 
 .. _client: ref-api/flwr.client.Client.html#client
 

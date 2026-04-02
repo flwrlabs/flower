@@ -138,18 +138,18 @@ Tutorial <tutorial-quickstart-pytorch.html>`_, `quickstart JAX Tutorial
 simulation-ready.
 
 - `Quickstart TensorFlow/Keras
-  <https://github.com/flwrlabs/flower/tree/main/examples/quickstart-tensorflow>`_.
+  <https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-tensorflow>`_.
 - `Quickstart PyTorch
-  <https://github.com/flwrlabs/flower/tree/main/examples/quickstart-pytorch>`_
+  <https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-pytorch>`_
 - `Advanced PyTorch
-  <https://github.com/flwrlabs/flower/tree/main/examples/advanced-pytorch>`_
+  <https://github.com/flwrlabs/flower/tree/main/hub/apps/advanced-pytorch>`_
 - `Quickstart MLX
-  <https://github.com/flwrlabs/flower/tree/main/examples/quickstart-mlx>`_
+  <https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-mlx>`_
 - `ViT fine-tuning
-  <https://github.com/flwrlabs/flower/tree/main/examples/flowertune-vit>`_
+  <https://github.com/flwrlabs/flower/tree/main/hub/apps/flowertune-vit>`_
 
 The complete list of examples can be found in `the Flower GitHub
-<https://github.com/flwrlabs/flower/tree/main/examples>`_.
+<https://github.com/flwrlabs/flower/tree/main/hub/apps>`_.
 
 **********************************
  Customize the Simulation Runtime

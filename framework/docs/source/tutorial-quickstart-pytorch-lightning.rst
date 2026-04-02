@@ -18,7 +18,7 @@ Then, clone the code example directly from GitHub:
 .. code-block:: shell
 
     git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
-                 && mv _tmp/examples/quickstart-pytorch-lightning . \
+                 && mv _tmp/hub/apps/quickstart-pytorch-lightning . \
                  && rm -rf _tmp && cd quickstart-pytorch-lightning
 
 This will create a new directory called `quickstart-pytorch-lightning` containing the
@@ -110,8 +110,8 @@ in ``pyproject.toml`` like this:
 .. note::
 
     Check the `source code
-    <https://github.com/flwrlabs/flower/tree/main/examples/quickstart-pytorch-lightning>`_
-    of this tutorial in ``examples/quickstart-pytorch-lightning`` in the Flower GitHub
+    <https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-pytorch-lightning>`_
+    of this tutorial in ``hub/apps/quickstart-pytorch-lightning`` in the Flower GitHub
     repository.
 
 .. |fedavg| replace:: ``FedAvg``

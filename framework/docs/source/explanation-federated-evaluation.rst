@@ -232,5 +232,5 @@ arbitrary evaluation results as a dictionary:
 
 For a full code example that uses both centralized and federated evaluation, see the
 `Advanced PyTorch Example
-<https://github.com/flwrlabs/flower/tree/main/examples/advanced-pytorch>`_ (the same
+<https://github.com/flwrlabs/flower/tree/main/hub/apps/advanced-pytorch>`_ (the same
 approach can be applied to workloads implemented in any other framework).

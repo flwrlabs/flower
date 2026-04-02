@@ -7,7 +7,7 @@
 ####################################################
 
 Flower provides a set of `quickstart examples
-<https://github.com/flwrlabs/flower/tree/main/examples>`_ to help you get started with
+<https://github.com/flwrlabs/flower/tree/main/hub/apps>`_ to help you get started with
 the framework. These examples are designed to demonstrate the capabilities of Flower and
 by default run using the Simulation Runtime. This guide demonstrates how to run them
 using Flower's Deployment Runtime via Docker Compose.
@@ -36,7 +36,7 @@ Before you start, make sure that:
    .. code-block:: bash
 
        $ git clone --depth=1 https://github.com/flwrlabs/flower.git \
-            && mv flower/examples/quickstart-pytorch . \
+            && mv flower/hub/apps/quickstart-pytorch . \
             && rm -rf flower && cd quickstart-pytorch
 
 2. Download the `compose.yml

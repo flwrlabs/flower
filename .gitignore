@@ -10,9 +10,9 @@ flwr_logs
 # Node.js
 node_modules
 
-# Flower Examples
-examples/**/dataset/**
-#examples/**/dev/*.sh
+# Flower Apps
+hub/apps/**/dataset/**
+#hub/apps/**/dev/*.sh
 
 # Flower Baselines
 baselines/datasets/leaf

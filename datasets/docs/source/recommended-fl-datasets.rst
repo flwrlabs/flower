@@ -5,7 +5,7 @@ This page lists the recommended datasets for federated learning research, which 
 used with Flower Datasets ``flwr-datasets``. To learn about the library, see the
 `quickstart tutorial <https://flower.ai/docs/datasets/tutorial-quickstart.html>`_ . To
 see the full FL example with Flower and Flower Datasets open the `quickstart-pytorch
-<https://github.com/flwrlabs/flower/tree/main/examples/quickstart-pytorch>`_.
+<https://github.com/flwrlabs/flower/tree/main/hub/apps/quickstart-pytorch>`_.
 
 .. note::
 

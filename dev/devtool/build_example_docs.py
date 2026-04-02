@@ -195,7 +195,7 @@ def _copy_markdown_files(example: str) -> None:
 def _add_gh_button(example: str) -> None:
     gh_text = (
         '[<img src="_static/view-gh.png" alt="View on GitHub" width="200"/>]'
-        f"(https://github.com/flwrlabs/flower/blob/main/examples/{example})"
+        f"(https://github.com/flwrlabs/flower/blob/main/hub/apps/{example})"
     )
     readme_file = os.path.join(str(ROOT), "examples", "docs", "source", example + ".md")
     with open(readme_file, "r+", encoding="utf-8") as f:
@@ -221,7 +221,7 @@ def _copy_images(example: str) -> None:
 
 
 def _add_all_entries() -> None:
-    examples_dir = os.path.join(ROOT, "examples")
+    examples_dir = os.path.join(ROOT, "hub", "apps")
     for example in sorted(os.listdir(examples_dir)):
         example_path = os.path.join(examples_dir, example)
         if os.path.isdir(example_path) and example != "docs":
@@ -237,7 +237,7 @@ def _main() -> None:
     with INDEX.open("w", encoding="utf-8") as index_file:
         index_file.write(INITIAL_TEXT)
 
-    examples_dir = os.path.join(ROOT, "examples")
+    examples_dir = os.path.join(ROOT, "hub", "apps")
     for example in sorted(os.listdir(examples_dir)):
         example_path = os.path.join(examples_dir, example)
         if os.path.isdir(example_path) and example != "docs":

@@ -441,6 +441,6 @@ Congratulations! You've successfully built and run your first federated learning
 .. note::
 
     Check the `source code
-    <https://github.com/flwrlabs/flower/blob/main/examples/xgboost-quickstart>`_ of the
-    extended version of this tutorial in ``examples/xgboost-quickstart`` in the Flower
+    <https://github.com/flwrlabs/flower/blob/main/hub/apps/quickstart-xgboost>`_ of the
+    extended version of this tutorial in ``hub/apps/quickstart-xgboost`` in the Flower
     GitHub repository.

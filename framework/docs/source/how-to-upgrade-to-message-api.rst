@@ -63,7 +63,7 @@ Let's dive in!
     If you would like to create a new Flower App using the `Message API`, run the ``flwr
     new`` command and choose the appropriate template. Alternatively, you may want to
     take a look at the `quickstart-pytorch
-    <https://github.com/flwrlabs/flower/blob/main/examples/quickstart-pytorch>`_
+    <https://github.com/flwrlabs/flower/blob/main/hub/apps/quickstart-pytorch>`_
     example.
 
 ********************
