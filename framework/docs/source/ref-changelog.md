@@ -6,7 +6,7 @@
 
 We would like to give our special thanks to all the contributors who made the new version of Flower possible (in `git shortlog` order):
 
-`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Heng Pan`, `Javier`, `Micah Sheller`, `Mohammad Naseri`, `Patrick Foley`, `Taner Topal`, `William Lindskog`, `Yan Gao`, `xiaoyanshen799` <!---TOKEN_v1.28.0-->
+`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Heng Pan`, `Javier`, `Julian Rußmeyer`, `Micah Sheller`, `Mohammad Naseri`, `Patrick Foley`, `Taner Topal`, `William Lindskog`, `Yan Gao`, `xiaoyanshen799` <!---TOKEN_v1.28.0-->
 
 ### What's new?
 
