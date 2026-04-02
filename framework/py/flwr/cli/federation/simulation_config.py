@@ -129,7 +129,7 @@ def simulation_config(  # pylint: disable=R0913,R0917,W0613,R0914
 ) -> None:
     """Configure a Federation using the Simulation Runtime."""
     # Ensure one of the options is provided
-    if all(
+    no_sim_options_passed = all(
         option is None
         for option in (
             num_supernodes,
@@ -142,12 +142,15 @@ def simulation_config(  # pylint: disable=R0913,R0917,W0613,R0914
             init_args_logging_level,
             init_args_log_to_driver,
         )
-    ):
-        raise click.ClickException(
-            "At least one simulation configuration option must be provided."
-        )
+    )
 
     with cli_output_control_stub(superlink, output_format) as (stub, is_json):
+
+        if no_sim_options_passed:
+            raise click.UsageError(
+                "At least one simulation configuration option must be provided."
+            )
+
         log_to_driver = None
         if init_args_log_to_driver is not None:
             log_to_driver = init_args_log_to_driver == "true"
