@@ -58,7 +58,7 @@ DATASETS: Dict[str, DatasetSpec] = {
         targets= None,
         criterion="auroc",
         backend = "tabular",
-        isErrorMetric = False,
+        is_error_metric = False,
         models={
             "ResMLP": create_resmlp,
         },
@@ -68,7 +68,7 @@ DATASETS: Dict[str, DatasetSpec] = {
         targets= None,
         criterion="auroc",
         backend = "tabular",
-        isErrorMetric = False,
+        is_error_metric = False,
         models={
             "ResMLP": create_resmlp,
         },
@@ -106,7 +106,7 @@ def get_train_and_test_modules(dataset: str):
     spec = DATASETS[dataset]
     backend = getattr(spec, "backend")
     criterion = getattr(spec, "criterion")
-    isErrorMetric = getattr(spec, "isErrorMetric")
+    is_error_metric = getattr(spec, "is_error_metric")
 
     if backend == "tabular":
         from fedomop.model import train
@@ -115,7 +115,7 @@ def get_train_and_test_modules(dataset: str):
     else:
         raise NotImplementedError(f"No backend defined for dataset {dataset}")
     
-    return train, test, isErrorMetric, criterion
+    return train, test, is_error_metric, criterion
 
 
 
