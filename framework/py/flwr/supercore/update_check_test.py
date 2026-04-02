@@ -16,7 +16,7 @@
 
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
@@ -102,7 +102,7 @@ def test_warn_if_flwr_update_available_prints_cached_message(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
-    """The cached update message should be printed at most once every 12 hours."""
+    """The cached update message should be printed every time."""
     monkeypatch.delenv(FLWR_DISABLE_UPDATE_CHECK, raising=False)
     monkeypatch.setattr(update_check_module, "get_flwr_home", lambda: tmp_path)
     monkeypatch.setattr(
@@ -120,7 +120,6 @@ def test_warn_if_flwr_update_available_prints_cached_message(
             "flwr_version": "1.28.0",
             "update_available": True,
             "message": "A newer Flower version is available: 1.0.0 -> 1.1.0",
-            "last_shown_at": (now - timedelta(days=2)).isoformat(),
         },
     )
     monkeypatch.setattr(update_check_module, "flwr_package_name", "flwr-nightly")
@@ -130,17 +129,14 @@ def test_warn_if_flwr_update_available_prints_cached_message(
 
     captured = capsys.readouterr()
     assert captured.err == "A newer Flower version is available: 1.0.0 -> 1.1.0\n"
-    cache = _read_update_check_cache(tmp_path)
-    assert cache is not None
-    assert cache["last_shown_at"] == now.isoformat()
 
 
-def test_warn_if_flwr_update_available_suppresses_recent_cached_message(
+def test_warn_if_flwr_update_available_always_shows_cached_message(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
-    """The cached message should not be shown again within 12 hours."""
+    """The cached message should be shown on every invocation."""
     monkeypatch.delenv(FLWR_DISABLE_UPDATE_CHECK, raising=False)
     monkeypatch.setattr(update_check_module, "get_flwr_home", lambda: tmp_path)
     monkeypatch.setattr(
@@ -158,16 +154,19 @@ def test_warn_if_flwr_update_available_suppresses_recent_cached_message(
             "flwr_version": "1.28.0",
             "update_available": True,
             "message": "A newer Flower version is available: 1.0.0 -> 1.1.0",
-            "last_shown_at": (now - timedelta(hours=6)).isoformat(),
         },
     )
     monkeypatch.setattr(update_check_module, "flwr_package_name", "flwr-nightly")
     monkeypatch.setattr(update_check_module, "flwr_version", "1.28.0")
 
+    # Call twice — both should print
     warn_if_flwr_update_available(process_name="flower-superlink")
-
     captured = capsys.readouterr()
-    assert captured.err == ""
+    assert captured.err == "A newer Flower version is available: 1.0.0 -> 1.1.0\n"
+
+    warn_if_flwr_update_available(process_name="flower-superlink")
+    captured = capsys.readouterr()
+    assert captured.err == "A newer Flower version is available: 1.0.0 -> 1.1.0\n"
 
 
 def test_warn_if_flwr_update_available_skips_refresh_if_checked_today(

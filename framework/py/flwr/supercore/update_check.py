@@ -20,7 +20,7 @@ import os
 import platform
 import sys
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -36,7 +36,6 @@ from .constant import (
     FLWR_UPDATE_CHECK_CACHE_FILENAME,
     FLWR_UPDATE_CHECK_CONNECT_TIMEOUT_SECONDS,
     FLWR_UPDATE_CHECK_READ_TIMEOUT_SECONDS,
-    FLWR_UPDATE_CHECK_SHOW_INTERVAL_SECONDS,
     FLWR_UPDATE_CHECK_URL,
 )
 from .utils import get_flwr_home
@@ -119,13 +118,7 @@ def _should_show_cached_flwr_update_message(cache: dict[str, Any]) -> bool:
     if not isinstance(message, str) or not message.strip():
         return False
 
-    last_shown_at = _parse_flwr_update_check_timestamp(cache.get("last_shown_at"))
-    if last_shown_at is None:
-        return True
-
-    return utcnow() - last_shown_at >= timedelta(
-        seconds=FLWR_UPDATE_CHECK_SHOW_INTERVAL_SECONDS
-    )
+    return True
 
 
 def _should_refresh_flwr_update_check_cache(cache: dict[str, Any] | None) -> bool:
@@ -141,12 +134,6 @@ def _should_refresh_flwr_update_check_cache(cache: dict[str, Any] | None) -> boo
         return True
 
     return last_checked_at.date() < utcnow().date()
-
-
-def _mark_cached_flwr_update_message_shown(cache: dict[str, Any]) -> None:
-    """Update and persist the last time the cached message was shown."""
-    cache["last_shown_at"] = utcnow().isoformat()
-    _write_flwr_update_check_cache(cache)
 
 
 def _request_flwr_update_check(
@@ -202,11 +189,6 @@ def _refresh_flwr_update_check_cache(process_name: str | None = None) -> None:
         if isinstance(upgrade_hint, str) and upgrade_hint.strip():
             cache["upgrade_hint"] = upgrade_hint
 
-        if _cache_matches_current_install(previous_cache):
-            last_shown_at = previous_cache.get("last_shown_at")
-            if isinstance(last_shown_at, str):
-                cache["last_shown_at"] = last_shown_at
-
     _write_flwr_update_check_cache(cache)
 
 
@@ -230,7 +212,6 @@ def warn_if_flwr_update_available(process_name: str | None = None) -> None:
         message = cache.get("message")
         if isinstance(message, str):
             print(message, file=sys.stderr)
-            _mark_cached_flwr_update_message_shown(cache)
 
     if _should_refresh_flwr_update_check_cache(cache):
         _start_flwr_update_check_refresh_thread(process_name)
