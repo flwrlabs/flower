@@ -157,9 +157,9 @@ def get_federation_manager(is_simulation: bool = False) -> FederationManager:
 # pylint: disable=too-many-branches, too-many-locals, too-many-statements
 def run_superlink() -> None:
     """Run Flower SuperLink (ServerAppIo API and Fleet API)."""
-    args = _parse_args_run_superlink().parse_args()
-
     warn_if_flwr_update_available(process_name="flower-superlink")
+
+    args = _parse_args_run_superlink().parse_args()
 
     if args.log_file:
         configure_superlink_log_file(
