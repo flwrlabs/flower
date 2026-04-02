@@ -1,7 +1,8 @@
 from __future__ import annotations
 from collections import OrderedDict
 from dataclasses import dataclass
-import os, random
+import os
+import random
 from typing import Callable, Dict, Tuple, cast
 
 from flwr.common import (
