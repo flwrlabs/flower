@@ -14,7 +14,7 @@ description = "Federated Learning with Numpy and Flower (Quickstart Example)"
 license = "Apache-2.0"
 # Dependencies for your Flower App
 dependencies = [
-    "flwr[simulation]>=1.27.0",
+    "flwr[simulation]>=1.28.0",
     "numpy>=2.0.2",
 ]
 

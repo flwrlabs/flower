@@ -18,6 +18,7 @@
 from unittest.mock import Mock
 
 import pytest
+from parameterized import parameterized
 
 from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
 from flwr.common.typing import Federation, Run, RunStatus
@@ -28,8 +29,10 @@ from flwr.supercore.constant import (
     DEFAULT_SIMULATION_CONFIG,
     NOOP_FEDERATION,
     NOOP_FEDERATION_DESCRIPTION,
+    ActionType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.typing import ActionContext
 
 from .noop_federation_manager import NoOpFederationManager
 
@@ -232,6 +235,23 @@ def test_has_node() -> None:
     # Test that it raises ValueError for non-existent federation
     with pytest.raises(ValueError):
         manager.has_node(999, "any_federation")
+
+
+@parameterized.expand(
+    [
+        (ActionType.START_RUN),
+        (ActionType.REGISTER_SUPERNODE),
+        (ActionType.CREATE_FEDERATION),
+        (ActionType.CREATE_INVITATION),
+        (ActionType.ACCEPT_INVITATION),
+    ]
+)  # type: ignore
+def test_can_execute(action: ActionType) -> None:
+    """Test can_execute method returns True for NOOP_FEDERATION."""
+    manager = NoOpFederationManager()
+
+    allowed = manager.can_execute(NOOP_FLWR_AID, action, ActionContext())
+    assert allowed is True
 
 
 def test_get_federations() -> None:
