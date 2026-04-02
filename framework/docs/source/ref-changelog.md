@@ -1,6 +1,60 @@
 # Changelog
 
-## Unreleased
+## v1.28.0 (2026-04-02)
+
+### Thanks to our contributors
+
+We would like to give our special thanks to all the contributors who made the new version of Flower possible (in `git shortlog` order):
+
+`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Heng Pan`, `Javier`, `Julian Rußmeyer`, `Micah Sheller`, `Mohammad Naseri`, `Patrick Foley`, `Taner Topal`, `William Lindskog`, `Yan Gao`, `xiaoyanshen799` <!---TOKEN_v1.28.0-->
+
+### What's new?
+
+- **Introduce federation-based simulation configuration and management** ([#6787](https://github.com/flwrlabs/flower/pull/6787), [#6790](https://github.com/flwrlabs/flower/pull/6790), [#6791](https://github.com/flwrlabs/flower/pull/6791), [#6806](https://github.com/flwrlabs/flower/pull/6806), [#6813](https://github.com/flwrlabs/flower/pull/6813), [#6820](https://github.com/flwrlabs/flower/pull/6820), [#6821](https://github.com/flwrlabs/flower/pull/6821), [#6826](https://github.com/flwrlabs/flower/pull/6826), [#6829](https://github.com/flwrlabs/flower/pull/6829), [#6837](https://github.com/flwrlabs/flower/pull/6837), [#6846](https://github.com/flwrlabs/flower/pull/6846), [#6848](https://github.com/flwrlabs/flower/pull/6848), [#6857](https://github.com/flwrlabs/flower/pull/6857), [#6858](https://github.com/flwrlabs/flower/pull/6858), [#6859](https://github.com/flwrlabs/flower/pull/6859), [#6860](https://github.com/flwrlabs/flower/pull/6860), [#6861](https://github.com/flwrlabs/flower/pull/6861), [#6865](https://github.com/flwrlabs/flower/pull/6865), [#6867](https://github.com/flwrlabs/flower/pull/6867), [#6882](https://github.com/flwrlabs/flower/pull/6882), [#6883](https://github.com/flwrlabs/flower/pull/6883), [#6888](https://github.com/flwrlabs/flower/pull/6888), [#6895](https://github.com/flwrlabs/flower/pull/6895), [#6907](https://github.com/flwrlabs/flower/pull/6907), [#6934](https://github.com/flwrlabs/flower/pull/6934))
+
+  Introduces simulation-capable federations and a mechanism to configure the Simulation Runtime that these federations use in both a persistent manner and with per-run overrides. For the former, the `flwr federation simulation-config` command is introduced; for the latter `--federation-config` can be used to dynamically override values at when submitting a run via `flwr run`. Updates documentation and provides a migration guide [here](https://flower.ai/docs/framework/1.28/en/how-to-upgrade-to-flower-1.28.html). Refer to the updated [Simulation Runtime guide](https://flower.ai/docs/framework/1.28/en/how-to-run-simulations.html) for more details about running simulations with Flower.
+
+- **Improve local SuperLink stability and configuration handling** ([#6797](https://github.com/flwrlabs/flower/pull/6797), [#6873](https://github.com/flwrlabs/flower/pull/6873), [#6874](https://github.com/flwrlabs/flower/pull/6874), [#6889](https://github.com/flwrlabs/flower/pull/6889))
+
+  Improves local SuperLink stability by improving SQLite bootstrap robustness and validating Control API availability before executing CLI calls. Allows magic values (`":local:"`, `":local-in-memory:"`) for `address` fields in Flower configuration, which will be translated to the local SuperLink address. Ensures backward compatibility for `.options`-only connection configurations. Using `.options` fields in the Flower configuration (`config.toml`) is now deprecated. See [Flower configuration guide](https://flower.ai/docs/framework/1.28/en/ref-flower-configuration.html#local-simulation-example) for more details.
+
+- **Add configurable FAB inclusion and exclusion rules** ([#6803](https://github.com/flwrlabs/flower/pull/6803), [#6804](https://github.com/flwrlabs/flower/pull/6804), [#6805](https://github.com/flwrlabs/flower/pull/6805), [#6822](https://github.com/flwrlabs/flower/pull/6822), [#6823](https://github.com/flwrlabs/flower/pull/6823), [#6872](https://github.com/flwrlabs/flower/pull/6872), [#6885](https://github.com/flwrlabs/flower/pull/6885))
+
+  Introduces support for user-defined include and exclude patterns in FAB builds via configuration, with validation of pattern lists and extended matching capabilities. Ensures publish filters are applied before FAB build filters, standardizes metadata keys in `pyproject.toml`, and refactors supporting utilities. Updates [documentation](https://flower.ai/docs/framework/1.28/en/how-to-configure-pyproject-toml.html#defining-included-excluded-files) with guide on configuring inclusion and exclusion rules.
+
+- **Introduce FAB format v1 validation rules and requirements** ([#6782](https://github.com/flwrlabs/flower/pull/6782), [#6825](https://github.com/flwrlabs/flower/pull/6825), [#6843](https://github.com/flwrlabs/flower/pull/6843), [#6851](https://github.com/flwrlabs/flower/pull/6851), [#6887](https://github.com/flwrlabs/flower/pull/6887))
+
+  Introduces validation rules for FAB format version 1, requiring `flwr-version-target` to be specified and enforcing a lower bound for the `flwr` dependency in `pyproject.toml`. Adds license file requirements during FAB build.
+
+- **Add non-blocking version update checks across Flower components** ([#6786](https://github.com/flwrlabs/flower/pull/6786), [#6788](https://github.com/flwrlabs/flower/pull/6788), [#6833](https://github.com/flwrlabs/flower/pull/6833), [#6938](https://github.com/flwrlabs/flower/pull/6938))
+
+  Adds non-blocking startup checks in the Flower CLI to detect newer versions of `flwr` in CLI. Allows disabling by setting environment variable `FLWR_DISABLE_UPDATE_CHECK=1`.
+
+- **Support port `0` for automatic OS-assigned ports** ([#6795](https://github.com/flwrlabs/flower/pull/6795))
+
+- **Add `--version` flag to Flower CLI components** ([#6781](https://github.com/flwrlabs/flower/pull/6781))
+
+- **Add dynamic data seed option to FlowerTune LLM examples** ([#6831](https://github.com/flwrlabs/flower/pull/6831))
+
+- **Add `flwr federation remove-account` command for managing federation membership** ([#6757](https://github.com/flwrlabs/flower/pull/6757), [#6759](https://github.com/flwrlabs/flower/pull/6759), [#6764](https://github.com/flwrlabs/flower/pull/6764), [#6772](https://github.com/flwrlabs/flower/pull/6772), [#6777](https://github.com/flwrlabs/flower/pull/6777), [#6778](https://github.com/flwrlabs/flower/pull/6778), [#6789](https://github.com/flwrlabs/flower/pull/6789))
+
+- **Improve availability and reliability of message delivery and state handling** ([#6773](https://github.com/flwrlabs/flower/pull/6773), [#6785](https://github.com/flwrlabs/flower/pull/6785), [#6877](https://github.com/flwrlabs/flower/pull/6877), [#6915](https://github.com/flwrlabs/flower/pull/6915))
+
+- **Fix handling of scalar (0D) NumPy arrays in strategies and mods** ([#6783](https://github.com/flwrlabs/flower/pull/6783))
+
+- **Improve documentation** ([#6332](https://github.com/flwrlabs/flower/pull/6332), [#6742](https://github.com/flwrlabs/flower/pull/6742), [#6771](https://github.com/flwrlabs/flower/pull/6771), [#6834](https://github.com/flwrlabs/flower/pull/6834), [#6838](https://github.com/flwrlabs/flower/pull/6838), [#6910](https://github.com/flwrlabs/flower/pull/6910), [#6929](https://github.com/flwrlabs/flower/pull/6929), [#6941](https://github.com/flwrlabs/flower/pull/6941))
+
+- **Improve CI/CD workflows and developer tooling** ([#6701](https://github.com/flwrlabs/flower/pull/6701), [#6732](https://github.com/flwrlabs/flower/pull/6732), [#6738](https://github.com/flwrlabs/flower/pull/6738), [#6739](https://github.com/flwrlabs/flower/pull/6739), [#6743](https://github.com/flwrlabs/flower/pull/6743), [#6744](https://github.com/flwrlabs/flower/pull/6744), [#6753](https://github.com/flwrlabs/flower/pull/6753), [#6768](https://github.com/flwrlabs/flower/pull/6768), [#6769](https://github.com/flwrlabs/flower/pull/6769), [#6770](https://github.com/flwrlabs/flower/pull/6770), [#6775](https://github.com/flwrlabs/flower/pull/6775), [#6793](https://github.com/flwrlabs/flower/pull/6793), [#6816](https://github.com/flwrlabs/flower/pull/6816), [#6835](https://github.com/flwrlabs/flower/pull/6835))
+
+- **General improvements** ([#6578](https://github.com/flwrlabs/flower/pull/6578), [#6627](https://github.com/flwrlabs/flower/pull/6627), [#6734](https://github.com/flwrlabs/flower/pull/6734), [#6740](https://github.com/flwrlabs/flower/pull/6740), [#6748](https://github.com/flwrlabs/flower/pull/6748), [#6749](https://github.com/flwrlabs/flower/pull/6749), [#6751](https://github.com/flwrlabs/flower/pull/6751), [#6755](https://github.com/flwrlabs/flower/pull/6755), [#6763](https://github.com/flwrlabs/flower/pull/6763), [#6774](https://github.com/flwrlabs/flower/pull/6774), [#6776](https://github.com/flwrlabs/flower/pull/6776), [#6779](https://github.com/flwrlabs/flower/pull/6779), [#6800](https://github.com/flwrlabs/flower/pull/6800), [#6801](https://github.com/flwrlabs/flower/pull/6801), [#6802](https://github.com/flwrlabs/flower/pull/6802), [#6811](https://github.com/flwrlabs/flower/pull/6811), [#6815](https://github.com/flwrlabs/flower/pull/6815), [#6827](https://github.com/flwrlabs/flower/pull/6827), [#6828](https://github.com/flwrlabs/flower/pull/6828), [#6839](https://github.com/flwrlabs/flower/pull/6839), [#6840](https://github.com/flwrlabs/flower/pull/6840), [#6841](https://github.com/flwrlabs/flower/pull/6841), [#6842](https://github.com/flwrlabs/flower/pull/6842), [#6868](https://github.com/flwrlabs/flower/pull/6868), [#6869](https://github.com/flwrlabs/flower/pull/6869), [#6893](https://github.com/flwrlabs/flower/pull/6893), [#6900](https://github.com/flwrlabs/flower/pull/6900), [#6901](https://github.com/flwrlabs/flower/pull/6901), [#6906](https://github.com/flwrlabs/flower/pull/6906), [#6908](https://github.com/flwrlabs/flower/pull/6908), [#6909](https://github.com/flwrlabs/flower/pull/6909), [#6918](https://github.com/flwrlabs/flower/pull/6918), [#6919](https://github.com/flwrlabs/flower/pull/6919), [#6920](https://github.com/flwrlabs/flower/pull/6920), [#6921](https://github.com/flwrlabs/flower/pull/6921), [#6922](https://github.com/flwrlabs/flower/pull/6922), [#6923](https://github.com/flwrlabs/flower/pull/6923), [#6930](https://github.com/flwrlabs/flower/pull/6930), [#6932](https://github.com/flwrlabs/flower/pull/6932))
+
+  As always, many parts of the Flower framework and quality infrastructure were improved and updated.
+
+### Incompatible changes
+
+- **Remove deprecated `run_simulation` Python entrypoint** ([#6752](https://github.com/flwrlabs/flower/pull/6752))
+
+  Removes the previously deprecated `run_simulation` entrypoint to run simulations. The recommended way for launching simulations is `flwr run`. Refer to the [quickstart-turorials](https://flower.ai/docs/framework/1.28/en/tutorial-quickstart-pytorch.html) for a short guide on how to run your simulations.
 
 ## v1.27.0 (2026-03-10)
 
