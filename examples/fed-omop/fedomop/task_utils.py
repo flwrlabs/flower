@@ -37,7 +37,7 @@ class DatasetSpec:
     # factory takes (num_features, num_targets); it may ignore them
     models: Dict[str, Callable[[int, int], nn.Module]]
     criterion: str
-    isErrorMetric: bool
+    is_error_metric: bool
     backend: str
     
     @property

@@ -4,9 +4,6 @@ from flwr_datasets.partitioner import DirichletPartitioner, IidPartitioner, Natu
 from sklearn.preprocessing import StandardScaler
 import pandas as pd
 import numpy as np
-from pathlib import Path
-
-
 
 HF_DS = {
     "synthea_small": "danimanjah/synthea_small",
