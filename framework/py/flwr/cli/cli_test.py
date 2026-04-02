@@ -18,15 +18,20 @@
 from typing import Any
 from unittest.mock import patch
 
+import click
 import pytest
 from typer.testing import CliRunner
 
 from flwr.supercore.version import package_version
 
 from . import app as app_module
-from .app import app
+from .app import app, typer_click_object
 
 runner = CliRunner()
+
+
+def _make_context() -> click.Context:
+    return click.Context(typer_click_object)
 
 
 def _invoke_flwr(args: list[str]) -> Any:
@@ -135,7 +140,7 @@ def test_flwr_callback_checks_for_update(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(app_module, "warn_if_flwr_update_available", _raise_sentinel)
 
     with pytest.raises(_SentinelError):
-        app_module.main(version=False)
+        app_module.main(_make_context(), version=False)
 
     assert captured == {"process_name": "flwr"}
 
@@ -156,7 +161,7 @@ def test_flwr_callback_skips_update_check_for_json_format(
 
     monkeypatch.setattr(app_module, "warn_if_flwr_update_available", _warn)
 
-    app_module.main(version=False)
+    app_module.main(_make_context(), version=False)
 
     assert called is False
 
@@ -181,7 +186,7 @@ def test_flwr_callback_uses_last_format_value(
 
     monkeypatch.setattr(app_module, "warn_if_flwr_update_available", _warn)
 
-    app_module.main(version=False)
+    app_module.main(_make_context(), version=False)
 
     assert called is should_call
 
