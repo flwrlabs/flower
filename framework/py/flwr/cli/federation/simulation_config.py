@@ -128,6 +128,7 @@ def simulation_config(  # pylint: disable=R0913,R0917,W0613,R0914
     ] = None,
 ) -> None:
     """Configure a Federation using the Simulation Runtime."""
+    # Ensure one of the options is provided
     if all(
         option is None
         for option in (
