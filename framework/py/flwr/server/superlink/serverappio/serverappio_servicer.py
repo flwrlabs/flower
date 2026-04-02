@@ -367,8 +367,10 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         """Push ServerApp process outputs."""
         log(DEBUG, "ServerAppIoServicer.PushAppOutputs")
 
-        # Validate the token
-        self._verify_token(request.token, context)
+        # Validate token and bind request to the token-owned run.
+        run_id = self._verify_token(request.token, context)
+        if request.run_id != run_id:
+            context.abort(grpc.StatusCode.PERMISSION_DENIED, "Invalid token.")
 
         # Init state and store
         state = self.state_factory.state()
@@ -376,14 +378,14 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
 
         # Abort if the run is not running
         abort_if(
-            request.run_id,
+            run_id,
             [Status.PENDING, Status.STARTING, Status.FINISHED],
             state,
             store,
             context,
         )
 
-        state.set_serverapp_context(request.run_id, context_from_proto(request.context))
+        state.set_serverapp_context(run_id, context_from_proto(request.context))
 
         # Keep token until terminal status is committed. If shutdown finalization fails,
         # heartbeat expiry still needs the token to trigger run finalization fallback.
@@ -416,10 +418,12 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
 
         # If the run is finished, delete the run from ObjectStore
         if request.run_status.status == Status.FINISHED:
-            # Delete all objects related to the run
-            store.delete_objects_in_run(request.run_id)
-            # Delete token only after terminal status is persisted.
-            state.delete_token(request.run_id)
+            try:
+                # Delete all objects related to the run
+                store.delete_objects_in_run(request.run_id)
+            finally:
+                # Delete token once terminal status is persisted, even if cleanup fails.
+                state.delete_token(request.run_id)
 
         return UpdateRunStatusResponse()
 
