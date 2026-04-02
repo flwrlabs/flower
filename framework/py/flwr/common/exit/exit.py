@@ -24,7 +24,10 @@ from logging import ERROR, INFO
 from typing import Any, NoReturn
 
 from flwr.common import EventType, event
-from flwr.supercore.constant import FORCE_EXIT_TIMEOUT_SECONDS
+from flwr.supercore.constant import (
+    FORCE_EXIT_TIMEOUT_SECONDS,
+    TELEMETRY_TIMEOUT_SECONDS,
+)
 from flwr.supercore.version import package_version
 
 from ..logger import log
@@ -84,10 +87,11 @@ def flwr_exit(
 
     # Telemetry event
     event_type = event_type or _try_obtain_telemetry_event()
+    event_future = None
     if event_type:
         event_details = event_details or {}
         event_details["exit_code"] = code
-        event(event_type, event_details).result()
+        event_future = event(event_type, event_details)
 
     # Log the exit message
     log(log_level, exit_message)
@@ -101,6 +105,13 @@ def flwr_exit(
 
     # Trigger exit handlers
     trigger_exit_handlers()
+
+    # Wait for telemetry event to be sent before exiting
+    if event_future:
+        try:
+            event_future.result(timeout=TELEMETRY_TIMEOUT_SECONDS)
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
 
     # Exit
     sys.exit(sys_exit_code)
