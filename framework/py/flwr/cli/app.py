@@ -69,7 +69,6 @@ app = typer.Typer(
         fg=typer.colors.BRIGHT_YELLOW,
         bold=True,
     ),
-    no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 
@@ -151,6 +150,7 @@ def _is_json_output_requested(argv: list[str]) -> bool:
 
 @app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,
     version: bool = typer.Option(
         None,
         "-V",
@@ -166,6 +166,10 @@ def main(
     if version:
         typer.secho(f"Flower version: {package_version}", fg="blue")
         raise typer.Exit()
+
+    if ctx.invoked_subcommand is None and len(sys.argv) == 1:
+        typer.echo(ctx.get_help())
+        raise typer.Exit(code=2)
 
 
 if __name__ == "__main__":
