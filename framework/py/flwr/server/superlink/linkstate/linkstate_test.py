@@ -436,6 +436,26 @@ class StateTest(CoreStateTest):
         # Assert
         state.federation_manager.report_run_usage.assert_called_once()
 
+    def test_usage_report_hook_not_called_when_no_runs_updated(self) -> None:
+        """Test report_run_usage is not called when expired tokens match no runs."""
+        # Prepare: create a run already in FINISHED state
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        assert state.create_token(run_id) is not None
+        state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
+        state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
+        state.update_run_status(
+            run_id, RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done")
+        )
+        state.federation_manager.report_run_usage = Mock()  # type: ignore
+        # Execute: advance time past token expiry and trigger cleanup
+        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = patched_dt
+            state.verify_token(run_id, "dummy_token")
+        # Assert: hook should NOT be called since the run was already finished
+        state.federation_manager.report_run_usage.assert_not_called()
+
     def test_get_message_ins_empty(self) -> None:
         """Validate that a new state has no input Messages."""
         # Prepare
