@@ -15,29 +15,27 @@
 """Flower Simulation."""
 
 
-import argparse
 import asyncio
+import importlib
 import json
 import logging
 import platform
-import sys
 import threading
 import traceback
 from logging import DEBUG, ERROR, INFO, WARNING
-from pathlib import Path
 from queue import Empty, Queue
 from typing import Any, cast
 
 from flwr.app.user_config import UserConfig
-from flwr.cli.config_utils import load_and_validate
 from flwr.cli.utils import get_sha256_hash
 from flwr.clientapp import ClientApp
 from flwr.common import Context, EventType, RecordDict, event, log, now
-from flwr.common.config import get_fused_config_from_dir, parse_config_args
 from flwr.common.constant import RUN_ID_NUM_BYTES, Status
+from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import (
     set_logger_propagation,
     update_console_handler,
+    warn_deprecated_feature,
     warn_deprecated_feature_with_example,
 )
 from flwr.common.typing import Run, RunStatus
@@ -52,7 +50,11 @@ from flwr.server.superlink.linkstate.utils import generate_rand_int_from_bytes
 from flwr.simulation.ray_transport.utils import (
     enable_tf_gpu_growth as enable_gpu_growth,
 )
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION
+from flwr.supercore.constant import (
+    DEFAULT_SIMULATION_CONFIG,
+    FLWR_IN_MEMORY_DB_NAME,
+    NOOP_FEDERATION,
+)
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
@@ -69,7 +71,7 @@ def _replace_keys(d: Any, match: str, target: str) -> Any:
 
 
 def _check_ray_support(backend_name: str) -> None:
-    if backend_name.lower() == "ray":
+    if backend_name == "ray":
         if platform.system() == "Windows":
             log(
                 WARNING,
@@ -78,84 +80,6 @@ def _check_ray_support(backend_name: str) -> None:
                 "On Windows, Flower Simulations run best in WSL2: "
                 "https://learn.microsoft.com/en-us/windows/wsl/about",
             )
-
-
-# Entry point from CLI
-# pylint: disable=too-many-locals
-def run_simulation_from_cli() -> None:
-    """Run Simulation Engine from the CLI."""
-    args = _parse_args_run_simulation().parse_args()
-
-    event(
-        EventType.CLI_FLOWER_SIMULATION_ENTER,
-        event_details={"backend": args.backend, "num-supernodes": args.num_supernodes},
-    )
-
-    if args.enable_tf_gpu_growth:
-        warn_deprecated_feature_with_example(
-            "Passing `--enable-tf-gpu-growth` is deprecated.",
-            example_message="Instead, set the `TF_FORCE_GPU_ALLOW_GROWTH` environmnet "
-            "variable to true.",
-            code_example='TF_FORCE_GPU_ALLOW_GROWTH="true" flower-simulation <...>',
-        )
-
-    _check_ray_support(args.backend)
-
-    # Load JSON config
-    backend_config = json.loads(args.backend_config)
-
-    run_id = (
-        generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
-        if args.run_id is None
-        else args.run_id
-    )
-
-    app_path = Path(args.app)
-    if not app_path.is_dir():
-        log(ERROR, "--app is not a directory")
-        sys.exit("Simulation Engine cannot start.")
-
-    # Load pyproject.toml
-    config, _ = load_and_validate(app_path / "pyproject.toml", check_module=False)
-
-    # Get ClientApp and SeverApp components
-    app_components = config["tool"]["flwr"]["app"]["components"]
-    client_app_attr = app_components["clientapp"]
-    server_app_attr = app_components["serverapp"]
-
-    override_config = parse_config_args(
-        [args.run_config] if args.run_config else args.run_config
-    )
-    fused_config = get_fused_config_from_dir(app_path, override_config)
-
-    # Create run
-    run = Run.create_empty(run_id)
-    run.federation = NOOP_FEDERATION
-    run.override_config = override_config
-
-    # Create Context
-    server_app_context = Context(
-        run_id=run_id,
-        node_id=0,
-        node_config=UserConfig(),
-        state=RecordDict(),
-        run_config=fused_config,
-    )
-
-    _ = _run_simulation(
-        server_app_attr=server_app_attr,
-        client_app_attr=client_app_attr,
-        num_supernodes=args.num_supernodes,
-        backend_name=args.backend,
-        backend_config=backend_config,
-        app_dir=args.app,
-        run=run,
-        enable_tf_gpu_growth=args.enable_tf_gpu_growth,
-        verbose_logging=args.verbose,
-        server_app_context=server_app_context,
-        is_app=True,
-        exit_event=EventType.CLI_FLOWER_SIMULATION_LEAVE,
-    )
 
 
 # Entry point from Python session (script or notebook)
@@ -208,6 +132,12 @@ def run_simulation(
         When disabled, only INFO, WARNING and ERROR log messages will be shown. If
         enabled, DEBUG-level logs will be displayed.
     """
+    warn_deprecated_feature(
+        "The `run_simulation` function is deprecated and will be removed in a future "
+        "version of Flower. Please use `flwr run` in the CLI instead to run your "
+        "simulation. Refer to the Flower Tutorials "
+        "for more details: https://flower.ai/docs/framework/tutorial-quickstart-pytorch.html",
+    )
     event(
         EventType.PYTHON_API_RUN_SIMULATION_ENTER,
         event_details={"backend": backend_name, "num-supernodes": num_supernodes},
@@ -317,7 +247,6 @@ def _main_loop(
     enable_tf_gpu_growth: bool,
     run: Run,
     exit_event: EventType,
-    flwr_dir: str | None = None,
     client_app: ClientApp | None = None,
     client_app_attr: str | None = None,
     server_app: ServerApp | None = None,
@@ -354,7 +283,7 @@ def _main_loop(
 
         # Initialize Grid
         grid = InMemoryGrid(state_factory=state_factory)
-        grid.set_run(run_id=run.run_id)
+        grid.set_run(run)
         output_context_queue: Queue[Context] = Queue()
 
         # Get and run ServerApp thread
@@ -382,7 +311,6 @@ def _main_loop(
             state_factory=state_factory,
             f_stop=f_stop,
             run=run,
-            flwr_dir=flwr_dir,
         )
 
         updated_context = output_context_queue.get(timeout=3)
@@ -407,7 +335,7 @@ def _main_loop(
             },
         )
         if serverapp_th:
-            serverapp_th.join()
+            serverapp_th.join(timeout=5)
             if server_app_thread_has_exception.is_set():
                 raise RuntimeError("Exception in ServerApp thread")
 
@@ -427,7 +355,6 @@ def _run_simulation(
     server_app_attr: str | None = None,
     server_app_context: Context | None = None,
     app_dir: str = "",
-    flwr_dir: str | None = None,
     run: Run | None = None,
     enable_tf_gpu_growth: bool = False,
     verbose_logging: bool = False,
@@ -443,10 +370,29 @@ def _run_simulation(
         )
         log(DEBUG, "backend_config: %s", backend_config)
 
+    # Exit early if the `ray` dependency is missing
+    if backend_name == "ray":
+        if importlib.util.find_spec("ray") is None:
+            flwr_exit(
+                code=ExitCode.SIMULATION_MISSING_EXTRA,
+                message=(
+                    "`ray` backend selected for simulation, but `ray` is not "
+                    "installed."
+                ),
+                event_type=exit_event,
+                event_details={"success": False},
+            )
+
     # Set default init_args if not passed
     backend_config.setdefault("init_args", {})
     # Set default client_resources if not passed
-    backend_config.setdefault("client_resources", {"num_cpus": 2, "num_gpus": 0})
+    backend_config.setdefault(
+        "client_resources",
+        {
+            "num_cpus": DEFAULT_SIMULATION_CONFIG.client_resources_num_cpus,
+            "num_gpus": DEFAULT_SIMULATION_CONFIG.client_resources_num_gpus,
+        },
+    )
     # Initialization of backend config to enable GPU growth globally when set
     backend_config.setdefault("actor", {"tensorflow": 0})
 
@@ -456,8 +402,12 @@ def _run_simulation(
         update_console_handler(level=DEBUG, timestamps=True, colored=True)
     else:
         init_args = backend_config["init_args"]
-        init_args.setdefault("logging_level", WARNING)
-        init_args.setdefault("log_to_driver", True)
+        init_args.setdefault(
+            "logging_level", DEFAULT_SIMULATION_CONFIG.init_args_logging_level
+        )
+        init_args.setdefault(
+            "log_to_driver", DEFAULT_SIMULATION_CONFIG.init_args_log_to_driver
+        )
 
     if enable_tf_gpu_growth:
         # Check that Backend config has also enabled using GPU growth
@@ -484,7 +434,6 @@ def _run_simulation(
         enable_tf_gpu_growth,
         run,
         exit_event,
-        flwr_dir,
         client_app,
         client_app_attr,
         server_app,
@@ -513,76 +462,3 @@ def _run_simulation(
 
         updated_context = _main_loop(*args)
     return updated_context
-
-
-def _parse_args_run_simulation() -> argparse.ArgumentParser:
-    """Parse flower-simulation command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Start a Flower simulation",
-    )
-    parser.add_argument(
-        "--app",
-        type=str,
-        required=True,
-        help="Path to a directory containing a FAB-like structure with a "
-        "pyproject.toml.",
-    )
-    parser.add_argument(
-        "--num-supernodes",
-        type=int,
-        required=True,
-        help="Number of simulated SuperNodes.",
-    )
-    parser.add_argument(
-        "--run-config",
-        default=None,
-        help="Override configuration key-value pairs.",
-    )
-    parser.add_argument(
-        "--backend",
-        default="ray",
-        type=str,
-        help="Simulation backend that executes the ClientApp.",
-    )
-    parser.add_argument(
-        "--backend-config",
-        type=str,
-        default="{}",
-        help='A JSON formatted stream, e.g \'{"<keyA>":<value>, "<keyB>":<value>}\' to '
-        "configure a backend. Values supported in <value> are those included by "
-        "`flwr.common.typing.ConfigRecordValues`. ",
-    )
-    parser.add_argument(
-        "--enable-tf-gpu-growth",
-        action="store_true",
-        help="Enables GPU growth on the main thread. This is desirable if you make "
-        "use of a TensorFlow model on your `ServerApp` while having your `ClientApp` "
-        "running on the same GPU. Without enabling this, you might encounter an "
-        "out-of-memory error because TensorFlow by default allocates all GPU memory."
-        "Read more about how `tf.config.experimental.set_memory_growth()` works in "
-        "the TensorFlow documentation: https://www.tensorflow.org/api/stable.",
-    )
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="When unset, only INFO, WARNING and ERROR log messages will be shown. "
-        "If set, DEBUG-level logs will be displayed. ",
-    )
-    parser.add_argument(
-        "--flwr-dir",
-        default=None,
-        help="""The path containing installed Flower Apps.
-    By default, this value is equal to:
-
-        - `$FLWR_HOME/` if `$FLWR_HOME` is defined
-        - `$XDG_DATA_HOME/.flwr/` if `$XDG_DATA_HOME` is defined
-        - `$HOME/.flwr/` in all other cases
-    """,
-    )
-    parser.add_argument(
-        "--run-id",
-        type=int,
-        help="Sets the ID of the run started by the Simulation Engine.",
-    )
-
-    return parser

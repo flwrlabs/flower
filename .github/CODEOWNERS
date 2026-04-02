@@ -16,7 +16,7 @@ README.md @jafermarq @tanertopal @danieljanes
 /datasets @jafermarq @tanertopal @danieljanes
 
 # Flower Examples
-/examples @panh99 @chongshenng @jafermarq @tanertopal @danieljanes
+/examples @yan-gao-GY @panh99 @chongshenng @jafermarq @tanertopal @danieljanes
 
 # Flower Intelligence
 /intelligence/dev @charlesbvll @tanertopal @danieljanes
@@ -29,9 +29,6 @@ README.md @jafermarq @tanertopal @danieljanes
 # Flower Framework E2E Tests
 /framework/e2e @panh99 @tanertopal @danieljanes
 
-# Flower Templates
-/framework/py/flwr/cli/new/templates @jafermarq @tanertopal @danieljanes
-
 # Changelog
 /framework/docs/source/ref-changelog.md @jafermarq @tanertopal @danieljanes
 
@@ -39,14 +36,16 @@ README.md @jafermarq @tanertopal @danieljanes
 /framework/docs/locales @charlesbvll @tanertopal @danieljanes
 
 # GitHub Actions and Workflows
-/.github/actions @Robert-Steiner @tanertopal @danieljanes
-/.github/workflows @Robert-Steiner @tanertopal @danieljanes
+/.github/actions @tanertopal @danieljanes
+/.github/workflows @tanertopal @danieljanes
+/.github/workflows/datasets-e2e.yml @jafermarq @tanertopal @danieljanes
+/.github/workflows/datasets-test.yml @jafermarq @tanertopal @danieljanes
 
 # Docker-related files
-**/*.Dockerfile @Robert-Steiner @Moep90 @tanertopal @danieljanes
-**/Dockerfile @Robert-Steiner @Moep90 @tanertopal @danieljanes
-/.devcontainer @Robert-Steiner @Moep90 @tanertopal @danieljanes
-/framework/docker @Robert-Steiner @Moep90 @tanertopal @danieljanes
+**/*.Dockerfile @tanertopal @danieljanes
+**/Dockerfile @tanertopal @danieljanes
+/.devcontainer @tanertopal @danieljanes
+/framework/docker @tanertopal @danieljanes
 
 # Flower `flwr` CLI
 /framework/py/flwr/cli/ @jafermarq @panh99 @tanertopal @danieljanes

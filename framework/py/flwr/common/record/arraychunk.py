@@ -19,7 +19,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..inflatable import InflatableObject, add_header_to_object_body, get_object_body
+from flwr.supercore.inflatable.inflatable_object import (
+    InflatableObject,
+    add_header_to_object_body,
+    get_object_body,
+)
 
 
 @dataclass

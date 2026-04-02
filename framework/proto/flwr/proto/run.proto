@@ -37,6 +37,7 @@ message Run {
   uint64 bytes_sent = 13;
   uint64 bytes_recv = 14;
   double clientapp_runtime = 15;
+  string run_type = 16;
 }
 
 message RunStatus {

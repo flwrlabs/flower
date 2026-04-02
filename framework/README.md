@@ -2,21 +2,21 @@
 
 <p align="center">
   <a href="https://flower.ai/">
-    <img src="https://flower.ai/_next/image/?url=%2F_next%2Fstatic%2Fmedia%2Fflwr-head.4d68867a.png&w=384&q=75" width="140px" alt="Flower Website" />
+    <img src="https://flower.ai/static/images/icon/icon.png" width="140px" alt="Flower Website" />
   </a>
 </p>
 <p align="center">
     <a href="https://flower.ai/">Website</a> |
     <a href="https://flower.ai/blog">Blog</a> |
     <a href="https://flower.ai/docs/">Docs</a> |
-    <a href="https://flower.ai/events/flower-ai-summit-2026">Summit</a> |
+    <a href="https://flower.ai/events/flower-ai-summit-2026/?utm_source=docs">Summit</a> |
     <a href="https://flower.ai/join-slack">Slack</a>
     <br /><br />
 </p>
 
-[![GitHub license](https://img.shields.io/github/license/adap/flower)](https://github.com/adap/flower/blob/main/LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/adap/flower/blob/main/CONTRIBUTING.md)
-![Build](https://github.com/adap/flower/actions/workflows/framework.yml/badge.svg)
+[![GitHub license](https://img.shields.io/github/license/flwrlabs/flower)](https://github.com/flwrlabs/flower/blob/main/LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/flwrlabs/flower/blob/main/CONTRIBUTING.md)
+![Build](https://github.com/flwrlabs/flower/actions/workflows/framework.yml/badge.svg)
 [![Downloads](https://static.pepy.tech/badge/flwr)](https://pepy.tech/project/flwr)
 [![Docker Hub](https://img.shields.io/badge/Docker%20Hub-flwr-blue)](https://hub.docker.com/u/flwr)
 [![Slack](https://img.shields.io/badge/Chat-Slack-red)](https://flower.ai/join-slack)
@@ -58,9 +58,6 @@ Flower's goal is to make federated learning accessible to everyone. This series 
 
 Stay tuned, more tutorials are coming soon. Topics include **Privacy and Security in Federated Learning**, and **Scaling Federated Learning**.
 
-## 30-Minute Federated Learning Tutorial
-
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/adap/flower/blob/main/examples/flower-in-30-minutes/tutorial.ipynb) (or open the [Jupyter Notebook](https://github.com/adap/flower/blob/main/examples/flower-in-30-minutes/tutorial.ipynb))
 
 ## Documentation
 
@@ -82,28 +79,28 @@ Stay tuned, more tutorials are coming soon. Topics include **Privacy and Securit
 
 Flower Baselines is a collection of community-contributed projects that reproduce the experiments performed in popular federated learning publications. Researchers can build on Flower Baselines to quickly evaluate new ideas. The Flower community loves contributions! Make your work more visible and enable others to build on it by contributing it as a baseline!
 
-- [DASHA](https://github.com/adap/flower/tree/main/baselines/dasha)
-- [DepthFL](https://github.com/adap/flower/tree/main/baselines/depthfl)
-- [FedBN](https://github.com/adap/flower/tree/main/baselines/fedbn)
-- [FedMeta](https://github.com/adap/flower/tree/main/baselines/fedmeta)
-- [FedMLB](https://github.com/adap/flower/tree/main/baselines/fedmlb)
-- [FedPer](https://github.com/adap/flower/tree/main/baselines/fedper)
-- [FedProx](https://github.com/adap/flower/tree/main/baselines/fedprox)
-- [FedNova](https://github.com/adap/flower/tree/main/baselines/fednova)
-- [HeteroFL](https://github.com/adap/flower/tree/main/baselines/heterofl)
-- [FedAvgM](https://github.com/adap/flower/tree/main/baselines/fedavgm)
-- [FedRep](https://github.com/adap/flower/tree/main/baselines/fedrep)
-- [FedStar](https://github.com/adap/flower/tree/main/baselines/fedstar)
-- [FedWav2vec2](https://github.com/adap/flower/tree/main/baselines/fedwav2vec2)
-- [FjORD](https://github.com/adap/flower/tree/main/baselines/fjord)
-- [MOON](https://github.com/adap/flower/tree/main/baselines/moon)
-- [niid-Bench](https://github.com/adap/flower/tree/main/baselines/niid_bench)
-- [TAMUNA](https://github.com/adap/flower/tree/main/baselines/tamuna)
-- [FedVSSL](https://github.com/adap/flower/tree/main/baselines/fedvssl)
-- [FedXGBoost](https://github.com/adap/flower/tree/main/baselines/hfedxgboost)
-- [FedPara](https://github.com/adap/flower/tree/main/baselines/fedpara)
-- [FedAvg](https://github.com/adap/flower/tree/main/baselines/flwr_baselines/flwr_baselines/publications/fedavg_mnist)
-- [FedOpt](https://github.com/adap/flower/tree/main/baselines/flwr_baselines/flwr_baselines/publications/adaptive_federated_optimization)
+- [DASHA](https://github.com/flwrlabs/flower/tree/main/baselines/dasha)
+- [DepthFL](https://github.com/flwrlabs/flower/tree/main/baselines/depthfl)
+- [FedBN](https://github.com/flwrlabs/flower/tree/main/baselines/fedbn)
+- [FedMeta](https://github.com/flwrlabs/flower/tree/main/baselines/fedmeta)
+- [FedMLB](https://github.com/flwrlabs/flower/tree/main/baselines/fedmlb)
+- [FedPer](https://github.com/flwrlabs/flower/tree/main/baselines/fedper)
+- [FedProx](https://github.com/flwrlabs/flower/tree/main/baselines/fedprox)
+- [FedNova](https://github.com/flwrlabs/flower/tree/main/baselines/fednova)
+- [HeteroFL](https://github.com/flwrlabs/flower/tree/main/baselines/heterofl)
+- [FedAvgM](https://github.com/flwrlabs/flower/tree/main/baselines/fedavgm)
+- [FedRep](https://github.com/flwrlabs/flower/tree/main/baselines/fedrep)
+- [FedStar](https://github.com/flwrlabs/flower/tree/main/baselines/fedstar)
+- [FedWav2vec2](https://github.com/flwrlabs/flower/tree/main/baselines/fedwav2vec2)
+- [FjORD](https://github.com/flwrlabs/flower/tree/main/baselines/fjord)
+- [MOON](https://github.com/flwrlabs/flower/tree/main/baselines/moon)
+- [niid-Bench](https://github.com/flwrlabs/flower/tree/main/baselines/niid_bench)
+- [TAMUNA](https://github.com/flwrlabs/flower/tree/main/baselines/tamuna)
+- [FedVSSL](https://github.com/flwrlabs/flower/tree/main/baselines/fedvssl)
+- [FedXGBoost](https://github.com/flwrlabs/flower/tree/main/baselines/hfedxgboost)
+- [FedPara](https://github.com/flwrlabs/flower/tree/main/baselines/fedpara)
+- [FedAvg](https://github.com/flwrlabs/flower/tree/main/baselines/flwr_baselines/flwr_baselines/publications/fedavg_mnist)
+- [FedOpt](https://github.com/flwrlabs/flower/tree/main/baselines/flwr_baselines/flwr_baselines/publications/adaptive_federated_optimization)
 
 Please refer to the [Flower Baselines Documentation](https://flower.ai/docs/baselines/) for a detailed categorization of baselines and for additional info including:
 
@@ -116,41 +113,40 @@ Several code examples show different usage scenarios of Flower (in combination w
 
 Quickstart examples:
 
-- [Quickstart (TensorFlow)](https://github.com/adap/flower/tree/main/examples/quickstart-tensorflow)
-- [Quickstart (PyTorch)](https://github.com/adap/flower/tree/main/examples/quickstart-pytorch)
-- [Quickstart (Hugging Face)](https://github.com/adap/flower/tree/main/examples/quickstart-huggingface)
-- [Quickstart (PyTorch Lightning)](https://github.com/adap/flower/tree/main/examples/quickstart-pytorch-lightning)
-- [Quickstart (fastai)](https://github.com/adap/flower/tree/main/examples/quickstart-fastai)
-- [Quickstart (Pandas)](https://github.com/adap/flower/tree/main/examples/quickstart-pandas)
-- [Quickstart (JAX)](https://github.com/adap/flower/tree/main/examples/quickstart-jax)
-- [Quickstart (MONAI)](https://github.com/adap/flower/tree/main/examples/quickstart-monai)
-- [Quickstart (scikit-learn)](https://github.com/adap/flower/tree/main/examples/quickstart-sklearn)
-- [Quickstart (Android [TFLite])](https://github.com/adap/flower/tree/main/examples/android)
-- [Quickstart (iOS [CoreML])](https://github.com/adap/flower/tree/main/examples/ios)
-- [Quickstart (MLX)](https://github.com/adap/flower/tree/main/examples/quickstart-mlx)
-- [Quickstart (XGBoost)](https://github.com/adap/flower/tree/main/examples/xgboost-quickstart)
+- [Quickstart (TensorFlow)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-tensorflow)
+- [Quickstart (PyTorch)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-pytorch)
+- [Quickstart (Hugging Face)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-huggingface)
+- [Quickstart (PyTorch Lightning)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-pytorch-lightning)
+- [Quickstart (fastai)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-fastai)
+- [Quickstart (Pandas)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-pandas)
+- [Quickstart (JAX)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-jax)
+- [Quickstart (MONAI)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-monai)
+- [Quickstart (scikit-learn)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-sklearn)
+- [Quickstart (Android [TFLite])](https://github.com/flwrlabs/flower/tree/main/examples/android)
+- [Quickstart (iOS [CoreML])](https://github.com/flwrlabs/flower/tree/main/examples/ios)
+- [Quickstart (MLX)](https://github.com/flwrlabs/flower/tree/main/examples/quickstart-mlx)
+- [Quickstart (XGBoost)](https://github.com/flwrlabs/flower/tree/main/examples/xgboost-quickstart)
 
-Other [examples](https://github.com/adap/flower/tree/main/examples):
+Other [examples](https://github.com/flwrlabs/flower/tree/main/examples):
 
-- [Raspberry Pi & Nvidia Jetson Tutorial](https://github.com/adap/flower/tree/main/examples/embedded-devices)
-- [PyTorch: From Centralized to Federated](https://github.com/adap/flower/tree/main/examples/pytorch-from-centralized-to-federated)
-- [Vertical FL](https://github.com/adap/flower/tree/main/examples/vertical-fl)
-- [Federated Finetuning of OpenAI's Whisper](https://github.com/adap/flower/tree/main/examples/whisper-federated-finetuning)
-- [Federated Finetuning of Large Language Model](https://github.com/adap/flower/tree/main/examples/flowertune-llm)
-- [Federated Finetuning of a Vision Transformer](https://github.com/adap/flower/tree/main/examples/flowertune-vit)
-- [Advanced Flower with TensorFlow/Keras](https://github.com/adap/flower/tree/main/examples/advanced-tensorflow)
-- [Advanced Flower with PyTorch](https://github.com/adap/flower/tree/main/examples/advanced-pytorch)
-- [Comprehensive Flower+XGBoost](https://github.com/adap/flower/tree/main/examples/xgboost-comprehensive)
-- [Flower with KaplanMeierFitter from the lifelines library](https://github.com/adap/flower/tree/main/examples/federated-kaplan-meier-fitter)
-- [Sample Level Privacy with Opacus](https://github.com/adap/flower/tree/main/examples/opacus)
-- [Flower with a Tabular Dataset](https://github.com/adap/flower/tree/main/examples/fl-tabular)
+- [Raspberry Pi & Nvidia Jetson Tutorial](https://github.com/flwrlabs/flower/tree/main/examples/embedded-devices)
+- [PyTorch: From Centralized to Federated](https://github.com/flwrlabs/flower/tree/main/examples/pytorch-from-centralized-to-federated)
+- [Vertical FL](https://github.com/flwrlabs/flower/tree/main/examples/vertical-fl)
+- [Federated Finetuning of OpenAI's Whisper](https://github.com/flwrlabs/flower/tree/main/examples/whisper-federated-finetuning)
+- [Federated Finetuning of Large Language Model](https://github.com/flwrlabs/flower/tree/main/examples/flowertune-llm)
+- [Federated Finetuning of a Vision Transformer](https://github.com/flwrlabs/flower/tree/main/examples/flowertune-vit)
+- [Advanced Flower with PyTorch](https://github.com/flwrlabs/flower/tree/main/examples/advanced-pytorch)
+- [Comprehensive Flower+XGBoost](https://github.com/flwrlabs/flower/tree/main/examples/xgboost-comprehensive)
+- [Flower with KaplanMeierFitter from the lifelines library](https://github.com/flwrlabs/flower/tree/main/examples/federated-kaplan-meier-fitter)
+- [Sample Level Privacy with Opacus](https://github.com/flwrlabs/flower/tree/main/examples/opacus)
+- [Flower with a Tabular Dataset](https://github.com/flwrlabs/flower/tree/main/examples/fl-tabular)
 
 ## Community
 
 Flower is built by a wonderful community of researchers and engineers. [Join Slack](https://flower.ai/join-slack) to meet them, [contributions](#contributing-to-flower) are welcome.
 
-<a href="https://github.com/adap/flower/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=adap/flower&columns=10" />
+<a href="https://github.com/flwrlabs/flower/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=flwrlabs/flower&columns=10" />
 </a>
 
 ## Citation
@@ -170,4 +166,4 @@ Please also consider adding your publication to the list of Flower-based publica
 
 ## Contributing to Flower
 
-We welcome contributions. Please see [CONTRIBUTING.md](CONTRIBUTING.md) to get started!
+We welcome contributions. Please see [CONTRIBUTING.md](../CONTRIBUTING.md) to get started!

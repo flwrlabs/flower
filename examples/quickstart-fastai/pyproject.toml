@@ -3,12 +3,12 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "fastai_example"
+name = "quickstart-fastai"
 version = "1.0.0"
 description = "Federated Learning with Fastai and Flower (Quickstart Example)"
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]>=1.26.1",
+    "flwr[simulation]>=1.27.0",
     "flwr-datasets[vision]>=0.6.0",
     "fastai==2.8.4",
     "torch==2.8.0",

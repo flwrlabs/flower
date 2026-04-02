@@ -12,12 +12,18 @@ This example uses [Flower Datasets](https://flower.ai/docs/datasets/) to downloa
 
 ## Set up the project
 
-### Clone the project
+### Fetch the app
 
-Start by cloning the example project:
+Install Flower:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git && mv flower/examples/fl-tabular . && rm -rf flower && cd fl-tabular
+pip install flwr
+```
+
+Fetch the app:
+
+```shell
+flwr new @flwrlabs/fl-tabular
 ```
 
 This will create a new directory called `fl-tabular` containing the following files:

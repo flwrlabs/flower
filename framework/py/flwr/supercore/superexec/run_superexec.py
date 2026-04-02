@@ -19,7 +19,6 @@ import time
 from logging import WARN
 from typing import Any
 
-from flwr.common.config import get_flwr_dir
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
@@ -34,7 +33,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
-from flwr.proto.simulationio_pb2_grpc import SimulationIoStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 
@@ -43,10 +41,9 @@ from .plugin import ExecPlugin
 
 def run_superexec(  # pylint: disable=R0913,R0914,R0917
     plugin_class: type[ExecPlugin],
-    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub] | type[SimulationIoStub],
+    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
     appio_api_address: str,
     plugin_config: dict[str, Any] | None = None,
-    flwr_dir: str | None = None,
     parent_pid: int | None = None,
     health_server_address: str | None = None,
 ) -> None:
@@ -56,15 +53,13 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
     ----------
     plugin_class : type[ExecPlugin]
         The class of the SuperExec plugin to use.
-    stub_class : type[ClientAppIoStub]
+    stub_class : type[ClientAppIoStub] | type[ServerAppIoStub]
         The gRPC stub class for the AppIO API.
     appio_api_address : str
         The address of the AppIO API.
     plugin_config : Optional[dict[str, Any]] (default: None)
         The configuration dictionary for the plugin. If `None`, the plugin will use
         its default configuration.
-    flwr_dir : Optional[str] (default: None)
-        The Flower directory.
     parent_pid : Optional[int] (default: None)
         The PID of the parent process. If provided, the SuperExec will terminate
         when the parent process exits.
@@ -111,7 +106,6 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
     # Create the SuperExec plugin instance
     plugin = plugin_class(
         appio_api_address=appio_api_address,
-        flwr_dir=str(get_flwr_dir(flwr_dir)),
         get_run=get_run,
     )
 
@@ -156,9 +150,8 @@ def run_with_deprecation_warning(  # pylint: disable=R0913, R0917
     cmd: str,
     plugin_type: str,
     plugin_class: type[ExecPlugin],
-    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub] | type[SimulationIoStub],
+    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
     appio_api_address: str,
-    flwr_dir: str | None,
     parent_pid: int | None,
     warn_run_once: bool,
 ) -> None:
@@ -176,8 +169,6 @@ def run_with_deprecation_warning(  # pylint: disable=R0913, R0917
     log(WARN, "For now, the following command is being run automatically:")
     new_cmd = f"flower-superexec --insecure --plugin-type {plugin_type} "
     new_cmd += f"--appio-api-address {appio_api_address} "
-    if flwr_dir is not None:
-        new_cmd += f"--flwr-dir {flwr_dir} "
     if parent_pid is not None:
         new_cmd += f"--parent-pid {parent_pid}"
     log(WARN, new_cmd)
@@ -190,6 +181,5 @@ def run_with_deprecation_warning(  # pylint: disable=R0913, R0917
         plugin_class=plugin_class,
         stub_class=stub_class,
         appio_api_address=appio_api_address,
-        flwr_dir=flwr_dir,
         parent_pid=parent_pid,
     )

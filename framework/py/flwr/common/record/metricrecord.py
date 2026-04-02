@@ -27,7 +27,12 @@ from flwr.proto.recorddict_pb2 import MetricRecord as ProtoMetricRecord
 from flwr.proto.recorddict_pb2 import MetricRecordValue as ProtoMetricRecordValue
 
 # pylint: enable=E0611
-from ..inflatable import InflatableObject, add_header_to_object_body, get_object_body
+from flwr.supercore.inflatable.inflatable_object import (
+    InflatableObject,
+    add_header_to_object_body,
+    get_object_body,
+)
+
 from ..logger import log
 from ..serde_utils import record_value_dict_from_proto, record_value_dict_to_proto
 from .typeddict import TypedDict

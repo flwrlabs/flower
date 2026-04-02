@@ -44,7 +44,7 @@ We currently provide SDKs for TypeScript/JavaScript, Kotlin, and Swift.
           # Please refer to https://developer.apple.com/documentation/xcode/adding-package-dependencies-to-your-app.
           #
           # To add dependency to your Swift package, you can run the following command:
-          swift package add-dependency "https://github.com/adap/flower.git"
+          swift package add-dependency "https://github.com/flwrlabs/flower.git"
 
     .. tab-item:: Kotlin
         :sync: kotlin
@@ -895,7 +895,7 @@ that takes a :doc:`Progress <ts-api-ref/interfaces/Progress>` object as input:
 .. note::
 
     Checkout out full examples over on `GitHub
-    <https://github.com/adap/flower/tree/main/intelligence/ts/examples>`_ for more
+    <https://github.com/flwrlabs/flower/tree/main/intelligence/ts/examples>`_ for more
     information!
 
 ************************************

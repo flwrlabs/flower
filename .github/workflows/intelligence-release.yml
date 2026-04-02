@@ -28,7 +28,7 @@ jobs:
 
   publish-typescript:
     needs: check-version
-    if: ${{ github.repository == 'adap/flower' }}
+    if: ${{ github.repository == 'flwrlabs/flower' }}
     name: Publish Flower Intelligence TypeScript SDK to NPM
     runs-on: ubuntu-22.04
     timeout-minutes: 10
@@ -61,7 +61,7 @@ jobs:
 
   publish-kotlin:
     needs: check-version
-    if: ${{ github.repository == 'adap/flower' }}
+    if: ${{ github.repository == 'flwrlabs/flower' }}
     name: Publish Flower Intelligence Kotlin SDK to Maven Central
     runs-on: ubuntu-22.04
     timeout-minutes: 10

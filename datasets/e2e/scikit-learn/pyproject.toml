@@ -1,16 +1,13 @@
-[build-system]
-requires = ["poetry-core>=2.1.3"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.poetry]
+[project]
 name = "fds-e2e-sklearn"
 version = "0.1.0"
 description = "Flower Datasets with scikit-learn"
-authors = ["The Flower Authors <hello@flower.ai>"]
-package-mode = false
+requires-python = ">=3.10"
+dependencies = [
+    "flwr-datasets[vision]",
+    "scikit-learn>=1.2.0,<2.0.0",
+    "parameterized==0.9.0",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-flwr-datasets = { path = "./../../", extras = ["vision"] }
-scikit-learn = "^1.2.0"
-parameterized = "==0.9.0"
+[tool.uv.sources]
+flwr-datasets = { path = "../..", editable = true }

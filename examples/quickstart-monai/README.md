@@ -14,15 +14,18 @@ Running this example in itself is quite easy. [MONAI](https://docs.monai.io/en/l
 
 ## Set up the project
 
-### Clone the project
+### Fetch the app
 
-Start by cloning the example project:
+Install Flower:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
-        && mv _tmp/examples/quickstart-monai . \
-        && rm -rf _tmp \
-        && cd quickstart-monai
+pip install flwr
+```
+
+Fetch the app:
+
+```shell
+flwr new @flwrlabs/quickstart-monai
 ```
 
 This will create a new directory called `quickstart-monai` with the following structure:

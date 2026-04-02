@@ -21,11 +21,6 @@ from unittest.mock import Mock
 from parameterized import parameterized
 
 from flwr.common import Context, typing
-from flwr.common.inflatable import (
-    get_all_nested_objects,
-    get_object_tree,
-    iterate_object_tree,
-)
 from flwr.common.message import make_message
 from flwr.common.serde import fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker
@@ -47,6 +42,11 @@ from flwr.proto.message_pb2 import (  # pylint:disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import Run as ProtoRun  # pylint:disable=E0611
+from flwr.supercore.inflatable.inflatable_object import (
+    get_all_nested_objects,
+    get_object_tree,
+    iterate_object_tree,
+)
 from flwr.supernode.runtime.run_clientapp import pull_appinputs, push_appoutputs
 
 from .clientappio_servicer import ClientAppIoServicer

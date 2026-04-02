@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://flower.ai/">
-    <img src="https://flower.ai/_next/image/?url=%2F_next%2Fstatic%2Fmedia%2Fflwr-head.4d68867a.png&w=384&q=75" width="140px" alt="Flower Website" />
+    <img src="https://flower.ai/static/images/icon/icon.png" width="140px" alt="Flower Website" />
   </a>
 </p>
 
@@ -12,7 +12,7 @@
   [Quickstart with Docker](https://flower.ai/docs/framework/docker/tutorial-quickstart-docker.html) and [Quickstart with Docker Compose](https://flower.ai/docs/framework/docker/tutorial-quickstart-docker-compose.html)
 
 - **Where to get help:**<br>
-  [Flower Discuss](https://discuss.flower.ai), [Slack](https://flower.ai/join-slack) or [GitHub](https://github.com/adap/flower)
+  [Flower Discuss](https://discuss.flower.ai), [Slack](https://flower.ai/join-slack) or [GitHub](https://github.com/flwrlabs/flower)
 
 - **Supported architectures:**<br>
   `amd64`, `arm64v8`

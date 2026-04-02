@@ -26,7 +26,7 @@ Flower requires at least `Python 3.10 <https://docs.python.org/3.10/>`_.
 One of the recommended virtual environment is `pyenv
 <https://github.com/pyenv/pyenv>`_/`virtualenv
 <https://github.com/pyenv/pyenv-virtualenv>`_. Please see `Flower examples
-<https://github.com/adap/flower/tree/main/examples/>`_ for details.
+<https://github.com/flwrlabs/flower/tree/main/examples/>`_ for details.
 
 Once Pyenv is set up, you can use it to install `Python Version 3.10
 <https://docs.python.org/3.10/>`_ or above:
@@ -52,7 +52,8 @@ Activate the virtualenv by running the following command:
 ************************
 
 The Flower examples are based on `Poetry <https://python-poetry.org/docs/>`_ to manage
-dependencies. After installing Poetry you simply create a virtual environment with:
+dependencies. After installing Poetry you can create and activate a virtual environment
+with:
 
 .. code-block:: shell
 

@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "quickstart_pennylane"
+name = "quickstart-pennylane"
 version = "1.0.0"
 description = "Quantum Federated Learning with PennyLane and Flower"
 license = "Apache-2.0"
@@ -14,8 +14,8 @@ authors = [
     { name = "Alan Yi", email = "yi161@purdue.edu" }
 ]
 dependencies = [
-    "flwr[simulation]>=1.26.1",
-    "flwr-datasets[vision]>=0.5.0",
+    "flwr[simulation]>=1.27.0",
+    "flwr-datasets[vision]>=0.6.0",
     "torch==2.8.0",
     "torchvision==0.23.0",
     "pennylane==0.41.1",

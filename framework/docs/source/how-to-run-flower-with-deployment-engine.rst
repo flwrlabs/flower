@@ -1,12 +1,12 @@
-:og:description: Guide to use Flower's Deployment Engine and run a Flower App trough a federation consisting of a SuperLink and two SuperNodes.
+:og:description: Guide to use Flower's Deployment Runtime and run a Flower App through a federation consisting of a SuperLink and two SuperNodes.
 .. meta::
-    :description: Guide to use Flower's Deployment Engine and run a Flower App trough a federation consisting of a SuperLink and two SuperNodes.
+    :description: Guide to use Flower's Deployment Runtime and run a Flower App through a federation consisting of a SuperLink and two SuperNodes.
 
-#######################################
- Run Flower with the Deployment Engine
-#######################################
+########################################
+ Run Flower with the Deployment Runtime
+########################################
 
-This how-to guide demonstrates how to set up and run Flower with the Deployment Engine
+This how-to guide demonstrates how to set up and run Flower with the Deployment Runtime
 using minimal configurations to illustrate the workflow. This is a complementary guide
 to the :doc:`docker/index` guides.
 
@@ -76,8 +76,11 @@ executing ``flwr new``:
 
 .. note::
 
-    If you decide to run the project with ``flwr run .``, the Simulation Engine will be
-    used. Continue to Step 2 to know how to instead use the Deployment Engine.
+    If you decide to run the project with ``flwr run .`` against the default local
+    profile (the one marked with ``address = ":local:"`` in the Flower configuration),
+    Flower submits the run to a managed local SuperLink, which then executes it with the
+    Simulation Runtime. Continue to Step 2 to instead point ``flwr run`` at a named
+    SuperLink connection for the Deployment Runtime.
 
 .. tip::
 
@@ -175,11 +178,10 @@ need two terminals for this step.
 At this point, you have launched two SuperNodes that are connected to the same
 SuperLink. The system is idling waiting for a ``Run`` to be submitted. Before you can
 run your Flower App through the federation we need a way to tell ``flwr run`` that the
-App is to be executed via the SuperLink we just started, instead of using the local
-Simulation Engine (the default). Doing this is easy: define a new SuperLink connection
-in the **Flower Configuration** file, indicate the address of the SuperLink and pass a
-certificate (if any) or set the insecure flag (only when testing locally, real
-deployments require TLS).
+App is to be executed via the SuperLink we just started. Doing this is easy: define a
+new SuperLink connection in the **Flower Configuration** file, indicate the address of
+the SuperLink and pass a certificate (if any) or set the insecure flag (only when
+testing locally, real deployments require TLS).
 
 1. Find the Flower Configuration TOML file in your machine. This file is automatically
    create for your when you first use a Flower CLI command. Use ``flwr config list`` to

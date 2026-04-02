@@ -4,7 +4,7 @@ import flwr
 import numpy as np
 
 
-# https://github.com/adap/flower/pull/488/files#diff-206567616f04a829972d62974a49c3b5769e331dd544233f180182c088c18ebfR30
+# https://github.com/flwrlabs/flower/pull/488/files#diff-206567616f04a829972d62974a49c3b5769e331dd544233f180182c088c18ebfR30
 class SaveModelStrategy(flwr.server.strategy.FedAvg):
     def aggregate_fit(
         self,

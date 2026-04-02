@@ -27,7 +27,10 @@ from sqlalchemy import (
     String,
     Table,
     UniqueConstraint,
+    text,
 )
+
+from flwr.supercore.constant import RunType
 
 
 def create_linkstate_metadata() -> MetaData:
@@ -75,10 +78,12 @@ def create_linkstate_metadata() -> MetaData:
         Column("starting_at", String),
         Column("running_at", String),
         Column("finished_at", String),
+        Column("usage_reported_at", String, nullable=False, server_default=text("''")),
         Column("sub_status", String),
         Column("details", String),
         Column("federation", String),
-        Column("federation_options", LargeBinary),
+        Column("federation_config", String),
+        Column("run_type", String, nullable=False, server_default=RunType.SERVER_APP),
         Column("flwr_aid", String),
         Column("bytes_sent", Integer, server_default="0"),
         Column("bytes_recv", Integer, server_default="0"),

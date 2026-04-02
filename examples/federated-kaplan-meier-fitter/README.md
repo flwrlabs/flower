@@ -32,7 +32,7 @@ the group it comes from therefore to simulate the division that might occur.
 Start by cloning the example project:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
         && mv _tmp/examples/federated-kaplan-meier-fitter . \
         && rm -rf _tmp \
         && cd federated-kaplan-meier-fitter

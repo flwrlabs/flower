@@ -29,9 +29,9 @@ RUN apt-get install -y curl wget gnupg python3 python-is-python3 python3-pip git
     build-essential tmux vim
 
 RUN python -m pip install \
-    pip==25.3 \
-    setuptools==80.9.0 \
-    poetry==2.1.3 \
+    pip==26.0.1 \
+    setuptools==82.0.0 \
+    poetry==2.3.2 \
     maturin==1.8.6
 # Install taplo from the main branch on GitHub so that maturin can build the wheel
 RUN python -m pip install \

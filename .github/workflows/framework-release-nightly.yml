@@ -1,0 +1,79 @@
+name: Release nightly
+
+on:
+  schedule:
+    - cron: "0 23 * * *"
+
+env:
+  FLWR_TELEMETRY_ENABLED: 0
+
+jobs:
+  release-nightly:
+    runs-on: ubuntu-22.04
+    name: Relase nightly on PyPI
+    if: github.repository == 'flwrlabs/flower'
+    outputs:
+      skip: ${{ steps.release.outputs.skip }}
+      pip-version: ${{ steps.release.outputs.pip-version }}
+      setuptools-version: ${{ steps.release.outputs.setuptools-version }}
+      matrix: ${{ steps.release.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Bootstrap
+        id: bootstrap
+        uses: ./.github/actions/bootstrap
+      - name: Release nightly
+        id: release
+        env:
+          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        working-directory: framework
+        run: |
+          RESULT=$(./dev/publish-nightly.sh)
+          if [ "$RESULT" == "There were no commits in the last 24 hours." ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+
+          echo "pip-version=${{ steps.bootstrap.outputs.pip-version }}" >> "$GITHUB_OUTPUT"
+          echo "setuptools-version=${{ steps.bootstrap.outputs.setuptools-version }}" >> "$GITHUB_OUTPUT"
+
+          NAME=$(poetry version | awk {'print $1'})
+          VERSION=$(poetry version -s)
+          python dev/build-docker-image-matrix.py --flwr-version "${VERSION}" --matrix nightly --flwr-package "${NAME}" > matrix.json
+          echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
+
+  build-docker-base-images:
+    name: Build nightly base images
+    if: github.repository == 'flwrlabs/flower' && needs.release-nightly.outputs.skip != 'true'
+    uses: ./.github/workflows/_docker-build.yml
+    needs: release-nightly
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.release-nightly.outputs.matrix).base }}
+    with:
+      namespace-repository: ${{ matrix.images.namespace_repository }}
+      file-dir: ${{ matrix.images.file_dir }}
+      build-args: |
+        PIP_VERSION=${{ needs.release-nightly.outputs.pip-version }}
+        SETUPTOOLS_VERSION=${{ needs.release-nightly.outputs.setuptools-version }}
+        ${{ matrix.images.build_args_encoded }}
+      tags: ${{ matrix.images.tags_encoded }}
+    secrets:
+      dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  build-docker-binary-images:
+    name: Build nightly binary images
+    if: github.repository == 'flwrlabs/flower' && needs.release-nightly.outputs.skip != 'true'
+    uses: ./.github/workflows/_docker-build.yml
+    needs: [release-nightly, build-docker-base-images]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.release-nightly.outputs.matrix).binary }}
+    with:
+      namespace-repository: ${{ matrix.images.namespace_repository }}
+      file-dir: ${{ matrix.images.file_dir }}
+      build-args: BASE_IMAGE=${{ matrix.images.base_image }}
+      tags: ${{ matrix.images.tags_encoded }}
+    secrets:
+      dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
+      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}

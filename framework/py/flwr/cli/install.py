@@ -26,9 +26,11 @@ from typing import IO, Annotated
 import click
 import typer
 
-from flwr.common.config import get_flwr_dir, get_metadata_from_config
-from flwr.common.constant import FAB_HASH_TRUNCATION
+from flwr.common.config import get_metadata_from_config
+from flwr.common.constant import APP_DIR, FAB_HASH_TRUNCATION
+from flwr.supercore.utils import get_flwr_home
 
+from .archive_utils import safe_extract_zip
 from .config_utils import load_and_validate
 from .utils import get_sha256_hash
 
@@ -38,27 +40,17 @@ def install(
         Path | None,
         typer.Argument(metavar="source", help="The source FAB file to install."),
     ] = None,
-    flwr_dir: Annotated[
-        Path | None,
-        typer.Option(help="The desired install path."),
-    ] = None,
 ) -> None:
     """Install a Flower App Bundle.
 
-    It can be ran with a single FAB file argument:
+    It can be run with a single FAB file argument:
 
         ``flwr install ./target_project.fab``
 
-    The target install directory can be specified with ``--flwr-dir``:
+    Apps are installed to:
 
-        ``flwr install ./target_project.fab --flwr-dir ./docs/flwr``
-
-    This will install ``target_project`` to ``./docs/flwr/``. By default,
-    ``flwr-dir`` is equal to:
-
-        - ``$FLWR_HOME/`` if ``$FLWR_HOME`` is defined
-        - ``$XDG_DATA_HOME/.flwr/`` if ``$XDG_DATA_HOME`` is defined
-        - ``$HOME/.flwr/`` in all other cases
+        - ``$FLWR_HOME/apps/`` if ``$FLWR_HOME`` is defined
+        - ``$HOME/.flwr/apps/`` otherwise
     """
     if source is None:
         source = Path(typer.prompt("Enter the source FAB file"))
@@ -73,14 +65,14 @@ def install(
         raise click.ClickException(f"The source {source} is not a `.fab` file.")
 
     try:
-        install_from_fab(source, flwr_dir)
+        install_from_fab(source)
     except ValueError as e:
         raise click.ClickException(str(e)) from None
 
 
 def install_from_fab(
     fab_file: Path | bytes,
-    flwr_dir: Path | None,
+    install_dir: Path | None = None,
     skip_prompt: bool = False,
 ) -> Path:
     """Install from a FAB file after extracting and validating.
@@ -89,7 +81,7 @@ def install_from_fab(
     ----------
     fab_file : Path | bytes
         Either a path to the FAB file or the FAB file content as bytes.
-    flwr_dir : Path | None
+    install_dir : Path | None
         Target installation directory, or None to use default.
     skip_prompt : bool
         If True, skip confirmation prompts. Default is False.
@@ -119,8 +111,8 @@ def install_from_fab(
 
     with tempfile.TemporaryDirectory() as tmpdir:
         with zipfile.ZipFile(fab_file_archive, "r") as zipf:
-            zipf.extractall(tmpdir)
             tmpdir_path = Path(tmpdir)
+            safe_extract_zip(zipf, tmpdir_path)
             info_dir = tmpdir_path / ".info"
             if not info_dir.exists():
                 raise click.ClickException("FAB file has incorrect format.")
@@ -135,7 +127,7 @@ def install_from_fab(
             shutil.rmtree(info_dir)
 
             installed_path = validate_and_install(
-                tmpdir_path, fab_hash, fab_name, flwr_dir, skip_prompt
+                tmpdir_path, fab_hash, fab_name, install_dir, skip_prompt
             )
 
     return installed_path
@@ -146,7 +138,7 @@ def validate_and_install(
     project_dir: Path,
     fab_hash: str,
     fab_name: str | None,
-    flwr_dir: Path | None,
+    install_dir: Path | None,
     skip_prompt: bool = False,
 ) -> Path:
     """Validate the TOML file and install the project to the desired directory.
@@ -159,7 +151,7 @@ def validate_and_install(
         SHA-256 hash of the FAB file.
     fab_name : str | None
         Name of the FAB file, or None if installing from bytes.
-    flwr_dir : Path | None
+    install_dir : Path | None
         Target installation directory, or None to use default.
     skip_prompt : bool (default: False)
         If True, skip confirmation prompts.
@@ -183,14 +175,15 @@ def validate_and_install(
     if fab_name:
         _validate_fab_and_config_metadata(fab_name, config_metadata)
 
-    install_dir: Path = (
-        (get_flwr_dir() if not flwr_dir else flwr_dir)
-        / "apps"
+    install_base_dir = install_dir.expanduser() if install_dir else get_flwr_home()
+    install_path: Path = (
+        install_base_dir
+        / APP_DIR
         / f"{publisher}.{project_name}.{version}.{fab_hash[:FAB_HASH_TRUNCATION]}"
     )
-    if install_dir.exists():
+    if install_path.exists():
         if skip_prompt:
-            return install_dir
+            return install_path
         if not typer.confirm(
             typer.style(
                 f"\n💬 {project_name} version {version} is already installed, "
@@ -199,24 +192,24 @@ def validate_and_install(
                 bold=True,
             )
         ):
-            return install_dir
+            return install_path
 
-    install_dir.mkdir(parents=True, exist_ok=True)
+    install_path.mkdir(parents=True, exist_ok=True)
 
     # Move contents from source directory
     for item in project_dir.iterdir():
         if item.is_dir():
-            shutil.copytree(item, install_dir / item.name, dirs_exist_ok=True)
+            shutil.copytree(item, install_path / item.name, dirs_exist_ok=True)
         else:
-            shutil.copy2(item, install_dir / item.name)
+            shutil.copy2(item, install_path / item.name)
 
     typer.secho(
-        f"🎊 Successfully installed {project_name} to {install_dir}.",
+        f"Successfully installed {project_name} to {install_path}.",
         fg=typer.colors.GREEN,
         bold=True,
     )
 
-    return install_dir
+    return install_path
 
 
 def _verify_hashes(list_content: str, tmpdir: Path) -> bool:

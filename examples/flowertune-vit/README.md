@@ -15,7 +15,7 @@ This example shows how to use Flower's Simulation Engine to federate the finetun
 Start by cloning the example project:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
         && mv _tmp/examples/flowertune-vit . \
         && rm -rf _tmp \
         && cd flowertune-vit

@@ -37,7 +37,7 @@ superexec:
 
 ## Run simulations in Kubernetes using the Simulation Plugin
 
-For more details, visit: [Run simulations](../how-to-run-simulations.rst#run-simulations) guide.
+For more details, visit the [Run simulations](../how-to-run-simulations.rst) guide.
 
 ```yaml
 superlink:
@@ -192,7 +192,7 @@ global:
 Explanation of Parameters:
 
 - `authn_type`: The authentication mechanism being used (e.g., oidc).
-- `auth_url`: The OpenID Connect authentication endpoint where users authenticate.
+- `authn_url`: The OpenID Connect authentication endpoint where users authenticate.
 - `token_url`: The URL for retrieving access tokens.
 - `validate_url`: The endpoint for validating account authentication.
 - `oidc_client_id`: The client ID issued by the authentication provider.
@@ -228,7 +228,7 @@ stringData:
 
 ### Configuring OpenFGA
 
-The flower-server chat component supports OpenFGA as a fine-grained authorization service,
+The Flower server chart component supports OpenFGA as a fine-grained authorization service,
 but it is disabled by default.
 
 To enable OpenFGA change the following value in your `values.yml` file:
@@ -272,7 +272,7 @@ type service
 
 :::
 
-:::{dropdown} User permissions file `tuples.fga`
+:::{dropdown} User permissions file `tuples.yaml`
 
 ```yaml
 - user: flwr_aid:<OIDC_SUB_1>
@@ -441,7 +441,7 @@ tls:
   existingSecret: ""
 ```
 
-See the [Ingress Configuration](###generate-a-certificate-via-ingress-annotations) section for more information.
+See the [Ingress Configuration](#generate-a-certificate-via-ingress-annotations) section for more information.
 
 ## Use an Existing TLS Certificate
 

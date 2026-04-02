@@ -7,7 +7,7 @@
 ***************
 
 - `Python 3.10 <https://docs.python.org/3.10/>`_ or above
-- `Poetry 1.3 <https://python-poetry.org/>`_ or above
+- `Poetry 2.3 <https://python-poetry.org/>`_ or above
 - (Optional) `pyenv <https://github.com/pyenv/pyenv>`_
 - (Optional) `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_
 
@@ -49,11 +49,11 @@ Ensure you system (Ubuntu 22.04+) is up-to-date, and you have all necessary pack
 Create Flower Dev Environment
 =============================
 
-1. Clone the `Flower repository <https://github.com/adap/flower>`_ from GitHub:
+1. Clone the `Flower repository <https://github.com/flwrlabs/flower>`_ from GitHub:
 
        ::
 
-           $ git clone git@github.com:adap/flower.git
+           $ git clone git@github.com:flwrlabs/flower.git
            $ cd flower
 
 2. Create and activate a Python virtual environment for development. See `Set up a
@@ -75,7 +75,7 @@ Create Flower Dev Environment
 
        ::
 
-           (your-env-name) $ pip install poetry==2.1.3
+           (your-env-name) $ pip install poetry==2.3.2
 
 4. Navigate to the ``framework`` directory and install the Flower project in development
    mode, including all optional dependencies:
@@ -98,7 +98,7 @@ Compile ProtoBuf Definitions
 
 ::
 
-    $ python -m flwr_tool.protoc
+    $ ./framework/dev/protoc.sh
 
 Auto-Format Code
 ================

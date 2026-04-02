@@ -19,6 +19,9 @@ import tempfile
 import unittest
 from abc import abstractmethod
 from pathlib import Path
+from unittest.mock import patch
+
+import yaml
 
 from .credential_store import CredentialStore
 from .file_credential_store import FileCredentialStore
@@ -173,3 +176,33 @@ class FileCredentialStoreTest(CredentialStoreTest):
     def credential_store_factory(self) -> CredentialStore:
         """Return FileCredentialStore."""
         return FileCredentialStore(Path(self.temp_file.name))
+
+    def test_get_with_invalid_yaml_removes_file(self) -> None:
+        """Test invalid YAML is removed and treated as empty credentials."""
+        with Path(self.temp_file.name).open("w", encoding="utf-8") as f:
+            f.write("test_key: dmFsdWU=\nbroken_line_without_colon")
+
+        store = self.credential_store_factory()
+        self.assertIsNone(store.get("test_key"))
+        self.assertFalse(Path(self.temp_file.name).exists())
+
+    def test_set_does_not_raise_on_write_failure(self) -> None:
+        """Test write failures are tolerated without raising."""
+        store = self.credential_store_factory()
+
+        with patch(
+            "flwr.supercore.credential_store.file_credential_store.yaml.safe_dump",
+            side_effect=yaml.YAMLError("failed to dump"),
+        ):
+            store.set("test_key", b"test_value")
+
+        self.assertIsNone(store.get("test_key"))
+
+    def test_get_with_invalid_base64_removes_file(self) -> None:
+        """Test malformed encoded values are treated as corruption."""
+        with Path(self.temp_file.name).open("w", encoding="utf-8") as f:
+            f.write('test_key: "not_base64_encoded_value"')
+
+        store = self.credential_store_factory()
+        self.assertIsNone(store.get("test_key"))
+        self.assertFalse(Path(self.temp_file.name).exists())

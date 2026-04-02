@@ -24,7 +24,7 @@ for f in "${files[@]}"; do
   comment_taplo "$f"
 done
 
-sudo poetry install --with dev --extras "simulation"
+sudo poetry install --all-extras
 
 # Restore taplo lines in "files"
 for f in "${files[@]}"; do

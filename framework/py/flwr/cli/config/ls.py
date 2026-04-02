@@ -15,7 +15,7 @@
 """Flower command line interface `config list` command."""
 
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
@@ -28,7 +28,7 @@ from ..utils import cli_output_handler, print_json_to_stdout
 
 def ls(
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,

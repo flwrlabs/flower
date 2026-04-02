@@ -1,4 +1,4 @@
-name: Build and deploy baselines, examples, and datasets docs
+name: Build and deploy baselines, examples, datasets, and hub docs
 
 on:
   push:
@@ -27,23 +27,35 @@ jobs:
         run: ./dev/test-copyright.sh
       - name: Bootstrap
         uses: ./.github/actions/bootstrap
+        with:
+          uv-skip: "false"
       - name: Install pandoc
         run: sudo apt install pandoc
       - name: Install docs dependencies
         run: |
           cd framework
-          python -m poetry add ../datasets
           python -m poetry install
+          python -m pip install -e ../datasets
+      - name: Install devtool dependencies
+        run: |
+          cd dev
+          uv sync --frozen
       - name: Update HTML theme options
-        run: python dev/update-html-themes.py
+        run: |
+          cd dev
+          uv run python -m devtool.update_html_themes
       - name: Build baselines docs
         run: ./dev/build-baseline-docs.sh
       - name: Build examples docs
-        run: python dev/build-example-docs.py
+        run: |
+          cd dev
+          uv run python -m devtool.build_example_docs
       - name: Build datasets docs
         run: ./datasets/dev/build-flwr-datasets-docs.sh
+      - name: Build hub docs
+        run: ./dev/build-hub-docs.sh
       - name: Deploy docs
-        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork }}
+        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         env:
           AWS_DEFAULT_REGION: ${{ secrets.DOCS_AWS_DEFAULT_REGION }}
           AWS_ACCESS_KEY_ID: ${{ secrets.DOCS_AWS_ACCESS_KEY_ID }}
@@ -52,3 +64,4 @@ jobs:
           aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./baselines/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/baselines
           aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./examples/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/examples
           aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./datasets/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/datasets
+          aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./hub/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/hub

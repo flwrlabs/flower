@@ -81,7 +81,7 @@ created. Here is a comparison between it and the relevant files in a typical
     .. grid-item-card:: OpenFL Example
 
         .. code-block:: text
-           :emphasize-lines: 15-18
+           :emphasize-lines: 15-17
 
            openfl-example
            ├── requirements.txt
@@ -133,11 +133,11 @@ Migrate your model
 ==================
 
 The model is very straightforward to port from OpenFL to Flower. If you are working with
-a PyTorch model, OpenFL has a ``PyTorchTaskRunner`` that inherits from ``nn.module`` (in
+a PyTorch model, OpenFL has a ``PyTorchTaskRunner`` that inherits from ``nn.Module`` (in
 ``taskrunner.py``) - and includes other things like the ``train`` and ``validate``
 functions. Flower assumes you bring a standard PyTorch model, so it's as easy as moving
 the model definition to ``task.py`` in the ``quickstart-pytorch`` directory, and
-changing the inheritance of the Net back to ``nn.module``. For a concrete example, see
+changing the inheritance of the Net back to ``nn.Module``. For a concrete example, see
 the following OpenFL TaskRunner code snippet:
 
 .. code-block:: python
@@ -148,7 +148,7 @@ the following OpenFL TaskRunner code snippet:
         """
         Simple CNN for classification.
 
-        PyTorchTaskRunner inherits from nn.module, so you can define your model
+        PyTorchTaskRunner inherits from nn.Module, so you can define your model
         in the same way that you would for PyTorch
         """
 
@@ -545,7 +545,7 @@ given deep learning framework (in this case PyTorch) due to the saving of a fina
 This functionality is optional, but mirrors the automatic saving of a model at the end
 of an OpenFL experiment. This ``ServerApp`` change requires only a few lines of
 modifications, and Flower has support for an extensive set of deep learning frameworks
-in it's `examples <https://github.com/adap/flower/tree/main/examples>`_ (Tensorflow,
+in it's `examples <https://github.com/flwrlabs/flower/tree/main/examples>`_ (Tensorflow,
 FastAI, Huggingface, etc.) should you need reference code.
 
 **************

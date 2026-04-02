@@ -22,6 +22,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from logging import ERROR, WARNING
+from typing import Literal
 
 from flwr.app.user_config import UserConfig
 from flwr.common import Context, Message, log, now
@@ -35,8 +36,8 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.record import ConfigRecord
 from flwr.common.typing import Run, RunStatus
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.utils import validate_message
@@ -60,7 +61,9 @@ class RunRecord:  # pylint: disable=R0902
     """The record of a specific run, including its status and timestamps."""
 
     run: Run
+    federation_config: SimulationConfig | None = None
     logs: list[tuple[float, str]] = field(default_factory=list)
+    usage_reported_at: str = ""
     log_lock: threading.Lock = field(default_factory=threading.Lock)
     lock: threading.RLock = field(default_factory=threading.RLock)
 
@@ -81,7 +84,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         # Map run_id to RunRecord
         self.run_ids: dict[int, RunRecord] = {}
         self.contexts: dict[int, Context] = {}
-        self.federation_options: dict[int, ConfigRecord] = {}
         self.message_ins_store: dict[str, Message] = {}
         self.message_res_store: dict[str, Message] = {}
         self.message_ins_id_to_message_res_id: dict[str, str] = {}
@@ -541,8 +543,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         fab_hash: str | None,
         override_config: UserConfig,
         federation: str,
-        federation_options: ConfigRecord,
+        federation_config: SimulationConfig | None,
         flwr_aid: str | None,
+        run_type: str,
     ) -> int:
         """Create a new run."""
         # Sample a random int64 as run_id
@@ -571,40 +574,96 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         bytes_sent=0,
                         bytes_recv=0,
                         clientapp_runtime=0.0,
+                        run_type=run_type,
                     ),
+                    federation_config=federation_config,
                 )
                 self.run_ids[run_id] = run_record
                 # Add run_id to the flwr_aid_to_run_ids mapping if flwr_aid is provided
                 if flwr_aid:
                     self.flwr_aid_to_run_ids[flwr_aid].add(run_id)
 
-                # Record federation options. Leave empty if not passed
-                self.federation_options[run_id] = federation_options
                 return run_id
         log(ERROR, "Unexpected run creation failure.")
         return 0
 
-    def get_run_ids(self, flwr_aid: str | None) -> set[int]:
-        """Retrieve all run IDs if `flwr_aid` is not specified.
-
-        Otherwise, retrieve all run IDs for the specified `flwr_aid`.
-        """
-        with self.lock:
-            if flwr_aid is not None:
-                # Return run IDs for the specified flwr_aid
-                return set(self.flwr_aid_to_run_ids.get(flwr_aid, ()))
-            return set(self.run_ids.keys())
-
-    def get_run(self, run_id: int) -> Run | None:
-        """Retrieve information about the run with the specified `run_id`."""
+    def get_run_info(
+        self,
+        *,
+        run_ids: Sequence[int] | None = None,
+        statuses: Sequence[str] | None = None,
+        flwr_aids: Sequence[str] | None = None,
+        federations: Sequence[str] | None = None,
+        order_by: Literal["pending_at"] | None = None,
+        ascending: bool = True,
+        limit: int | None = None,
+    ) -> Sequence[Run]:
+        """Retrieve information about runs based on the specified filters."""
         # Clean up expired tokens; this will flag inactive runs as needed
         self._cleanup_expired_tokens()
 
         with self.lock:
+            # Build candidate set and apply each filter as an AND condition.
+            matched_run_ids = set(self.run_ids.keys())
+
+            # Filter by run_ids
+            if run_ids is not None:
+                if not run_ids:
+                    return []
+                matched_run_ids &= set(run_ids)
+
+            # Filter by statuses
+            if statuses is not None:
+                if not statuses:
+                    return []
+                status_set = set(statuses)
+                matched_run_ids &= {
+                    run_id
+                    for run_id in matched_run_ids
+                    if self.run_ids[run_id].run.status.status in status_set
+                }
+
+            # Filter by Flower Account IDs
+            if flwr_aids is not None:
+                if not flwr_aids:
+                    return []
+                aid_matched: set[int] = set()
+                for flwr_aid in flwr_aids:
+                    aid_matched |= self.flwr_aid_to_run_ids.get(flwr_aid, set())
+                matched_run_ids &= aid_matched
+
+            # Filter by federations
+            if federations is not None:
+                if not federations:
+                    return []
+                federation_set = set(federations)
+                matched_run_ids &= {
+                    run_id
+                    for run_id in matched_run_ids
+                    if self.run_ids[run_id].run.federation in federation_set
+                }
+
+            runs = [self.run_ids[run_id].run for run_id in matched_run_ids]
+
+            if order_by is not None:
+                runs = sorted(
+                    runs,
+                    key=lambda run: run.pending_at,
+                    reverse=not ascending,
+                )
+
+            if limit is not None:
+                runs = runs[:limit]
+
+            return runs
+
+    def get_federation_config(self, run_id: int) -> SimulationConfig | None:
+        """Get the resolved federation configuration for the specified `run_id`."""
+        with self.lock:
             if run_id not in self.run_ids:
-                log(ERROR, "`run_id` is invalid")
+                log(ERROR, "`run_id` invalid for fetching resolved federation config")
                 return None
-            return self.run_ids[run_id].run
+            return self.run_ids[run_id].federation_config
 
     def get_run_status(self, run_ids: set[int]) -> dict[int, RunStatus]:
         """Retrieve the statuses for the specified runs."""
@@ -661,28 +720,11 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             elif new_status.status == Status.FINISHED:
                 run_record.run.finished_at = current.isoformat()
             run_record.run.status = new_status
-            return True
 
-    def get_pending_run_id(self) -> int | None:
-        """Get the `run_id` of a run with `Status.PENDING` status, if any."""
-        pending_run_id = None
-
-        # Loop through all registered runs
-        for run_id, run_rec in self.run_ids.items():
-            # Break once a pending run is found
-            if run_rec.run.status.status == Status.PENDING:
-                pending_run_id = run_id
-                break
-
-        return pending_run_id
-
-    def get_federation_options(self, run_id: int) -> ConfigRecord | None:
-        """Retrieve the federation options for the specified `run_id`."""
-        with self.lock:
-            if run_id not in self.run_ids:
-                log(ERROR, "`run_id` is invalid")
-                return None
-            return self.federation_options[run_id]
+        # Report usage if the run is marked as finished after the update
+        if new_status.status == Status.FINISHED:
+            self.federation_manager.report_run_usage()
+        return True
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
@@ -722,10 +764,13 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             List of tuples containing (run_id, active_until timestamp)
             for expired tokens.
         """
+        updated = False
         for run_id, active_until in expired_records:
             if not (run_record := self.run_ids.get(run_id)):
                 continue
             with run_record.lock:
+                if run_record.run.finished_at:
+                    continue
                 run_record.run.status = RunStatus(
                     status=Status.FINISHED,
                     sub_status=SubStatus.FAILED,
@@ -733,6 +778,11 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 )
                 active_until_dt = datetime.fromtimestamp(active_until, tz=timezone.utc)
                 run_record.run.finished_at = active_until_dt.isoformat()
+                updated = True
+
+        # Report usage for runs that have been marked as failed due to expired tokens
+        if updated:
+            self.federation_manager.report_run_usage()
 
     def get_serverapp_context(self, run_id: int) -> Context | None:
         """Get the context for the specified `run_id`."""

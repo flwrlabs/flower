@@ -38,7 +38,7 @@ class FedXgbNnAvg(FedAvg):
     Warning
     -------
     This strategy is deprecated, but a copy of it is available in Flower Baselines:
-    https://github.com/adap/flower/tree/main/baselines/hfedxgboost.
+    https://github.com/flwrlabs/flower/tree/main/baselines/hfedxgboost.
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:

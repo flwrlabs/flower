@@ -9,7 +9,7 @@ tags: [web, chat, minimal, typescript]
 You must first download the example with the following command:
 
 ```bash
-git clone --depth=1 https://github.com/adap/flower.git _tmp && mv _tmp/intelligence/ts/examples/web-chat . && rm -rf _tmp && cd web-chat
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp && mv _tmp/intelligence/ts/examples/web-chat . && rm -rf _tmp && cd web-chat
 ```
 
 And install the required dependencies:

@@ -30,12 +30,6 @@ from flwr.common.constant import (
     SUPERLINK_NODE_ID,
     Status,
 )
-from flwr.common.inflatable import (
-    get_all_nested_objects,
-    get_object_id,
-    get_object_tree,
-    iterate_object_tree,
-)
 from flwr.common.message import get_message_to_descendant_id_mapping
 from flwr.common.serde import message_from_proto
 from flwr.common.typing import RunStatus
@@ -72,8 +66,19 @@ from flwr.server.superlink.linkstate.linkstate_test import (
     create_res_message,
 )
 from flwr.server.superlink.utils import _STATUS_TO_MSG
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, NodeStatus
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_DB_NAME,
+    NOOP_FEDERATION,
+    NodeStatus,
+    RunType,
+)
 from flwr.supercore.ffs import FfsFactory
+from flwr.supercore.inflatable.inflatable_object import (
+    get_all_nested_objects,
+    get_object_id,
+    get_object_tree,
+    iterate_object_tree,
+)
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
@@ -189,8 +194,9 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
             fab_hash=fab_hash,
             override_config={},
             federation=NOOP_FEDERATION,
-            federation_options=ConfigRecord(),
+            federation_config=None,
             flwr_aid="",
+            run_type=RunType.SERVER_APP,
         )
         if running:
             self._transition_run_status(run_id, 2)
@@ -748,8 +754,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         self.store.preregister(run_id, get_object_tree(obj))
 
         # Get initial traffic
-        run_before = self.state.get_run(run_id)
-        assert run_before is not None
+        run_before = self.state.get_run_info(run_ids=[run_id])[0]
         bytes_recv_before = run_before.bytes_recv
 
         # Execute
@@ -763,8 +768,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
 
         # Assert
         assert res.stored
-        run_after = self.state.get_run(run_id)
-        assert run_after is not None
+        run_after = self.state.get_run_info(run_ids=[run_id])[0]
         # Verify traffic was recorded
         assert run_after.bytes_recv == bytes_recv_before + len(obj_b)
         assert run_after.bytes_sent == 0  # No bytes sent during push
@@ -782,8 +786,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         self.store.put(object_id=obj.object_id, object_content=obj_b)
 
         # Get initial traffic
-        run_before = self.state.get_run(run_id)
-        assert run_before is not None
+        run_before = self.state.get_run_info(run_ids=[run_id])[0]
         bytes_sent_before = run_before.bytes_sent
 
         # Execute
@@ -795,8 +798,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         # Assert
         assert res.object_found
         assert res.object_available
-        run_after = self.state.get_run(run_id)
-        assert run_after is not None
+        run_after = self.state.get_run_info(run_ids=[run_id])[0]
         # Verify traffic was recorded
         assert run_after.bytes_sent == bytes_sent_before + len(obj_b)
         assert run_after.bytes_recv == 0  # No bytes received during pull

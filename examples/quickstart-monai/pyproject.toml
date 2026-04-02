@@ -3,13 +3,13 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "monaiexample"
+name = "quickstart-monai"
 version = "1.0.0"
 description = "Federated Learning with MONAI and Flower (Quickstart Example)"
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]>=1.26.1",
-    "flwr-datasets[vision]>=0.5.0",
+    "flwr[simulation]>=1.27.0",
+    "flwr-datasets[vision]>=0.6.0",
     "monai==1.5.2",
     "filelock==3.20.3",
     "numpy>=2.0.0",

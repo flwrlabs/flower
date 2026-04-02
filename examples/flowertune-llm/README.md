@@ -19,7 +19,7 @@ which allows users to perform the training on a single GPU.
 Start by cloning the example project:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
         && mv _tmp/examples/flowertune-llm . \
         && rm -rf _tmp \
         && cd flowertune-llm

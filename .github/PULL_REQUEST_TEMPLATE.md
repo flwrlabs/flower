@@ -2,7 +2,7 @@
 Thank you for opening a pull request (PR)!
 
 Please rename your PRs following this [format](https://flower.ai/docs/framework/contributor-tutorial-contribute-on-github.html#pr-title-format).
-Contribution guidelines: https://github.com/adap/flower/blob/main/CONTRIBUTING.md
+Contribution guidelines: https://github.com/flwrlabs/flower/blob/main/CONTRIBUTING.md
 -->
 
 ## Issue
@@ -38,6 +38,7 @@ Example: The variable `rnd` was renamed to `server_round` to improve readability
 - [ ] Implement proposed change
 - [ ] Write tests
 - [ ] Update [documentation](https://flower.ai/docs/writing-documentation.html)
+- [ ] Address LLM-reviewer comments, if applicable (e.g., GitHub Copilot)
 - [ ] Make CI checks pass
 - [ ] Ping maintainers on [Slack](https://flower.ai/join-slack/) (channel `#contributions`)
 

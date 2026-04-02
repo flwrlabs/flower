@@ -25,8 +25,8 @@ Stable releases are available on `PyPI <https://pypi.org/project/flwr/>`_:
 
     python -m pip install flwr
 
-For simulations that use the Virtual Client Engine, ``flwr`` should be installed with
-the ``simulation`` extra:
+For simulations that use the Simulation Runtime, ``flwr`` should be installed with the
+``simulation`` extra:
 
 ::
 
@@ -65,11 +65,16 @@ or with ``mamba``:
 The following command can be used to verify if Flower was successfully installed. If
 everything worked, it should print the version of Flower to the command line:
 
-.. code-block:: bash
+.. code-block:: console
     :substitutions:
 
-    python -c "import flwr;print(flwr.__version__)"
-    |stable_flwr_version|
+    $ flwr --version
+    Flower version: |stable_flwr_version|
+
+.. note::
+
+    If you're on Windows and see unexpected terminal output (e.g.: ``� □[32m□[1m``),
+    check :ref:`this FAQ entry <faq-windows-unexpected-output>`.
 
 *******************************
  Advanced installation options
@@ -90,7 +95,7 @@ versions (alpha, beta, release candidate) before the stable release happens:
 
     python -m pip install -U --pre flwr
 
-For simulations that use the Virtual Client Engine, ``flwr`` pre-releases should be
+For simulations that use the Simulation Runtime, ``flwr`` pre-releases should be
 installed with the ``simulation`` extra:
 
 ::
@@ -106,7 +111,7 @@ The latest (potentially unstable) changes in Flower are available as nightly rel
 
     python -m pip install -U flwr-nightly
 
-For simulations that use the Virtual Client Engine, ``flwr-nightly`` should be installed
+For simulations that use the Simulation Runtime, ``flwr-nightly`` should be installed
 with the ``simulation`` extra:
 
 ::

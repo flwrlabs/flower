@@ -22,7 +22,12 @@ from logging import WARN
 from textwrap import indent
 from typing import TypeVar, cast
 
-from ..inflatable import InflatableObject, add_header_to_object_body, get_object_body
+from flwr.supercore.inflatable.inflatable_object import (
+    InflatableObject,
+    add_header_to_object_body,
+    get_object_body,
+)
+
 from ..logger import log
 from .arrayrecord import ArrayRecord
 from .configrecord import ConfigRecord

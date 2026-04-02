@@ -171,5 +171,5 @@ Flower Confidential Remote Compute.
 
 If you want to get started with a more concrete use case, you should probably checkout
 the `CRC example
-<https://github.com/adap/flower/tree/main/intelligence/ts/examples/encrypted>`_ for
-TypeScript we have available on our `GitHub repo <https://github.com/adap/flower>`_.
+<https://github.com/flwrlabs/flower/tree/main/intelligence/ts/examples/encrypted>`_ for
+TypeScript we have available on our `GitHub repo <https://github.com/flwrlabs/flower>`_.

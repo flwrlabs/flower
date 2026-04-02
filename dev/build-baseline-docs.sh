@@ -78,7 +78,7 @@ for d in $(printf '%s\n' */ | sort -V); do
     # For each baseline, copy the README into the source of the Baselines docs
     cp $baseline/README.md $ROOT/baselines/docs/source/$baseline.md 2>&1 >/dev/null
 
-    gh_text="[<img src=\"_static/view-gh.png\" alt=\"View on GitHub\" width=\"200\"/>](https://github.com/adap/flower/blob/main/baselines/$baseline)"
+    gh_text="[<img src=\"_static/view-gh.png\" alt=\"View on GitHub\" width=\"200\"/>](https://github.com/flwrlabs/flower/blob/main/baselines/$baseline)"
     readme_file="$ROOT/baselines/docs/source/$baseline.md"
 
     if ! grep -Fq "$gh_text" "$readme_file"; then

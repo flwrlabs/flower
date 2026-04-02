@@ -19,6 +19,7 @@ import os
 import sys
 
 from git import Repo
+from packaging.version import InvalidVersion, Version
 
 # Configuration file for the Sphinx documentation builder.
 #
@@ -41,6 +42,12 @@ else:
     current_language = "en"
 html_context["current_language"] = current_language
 
+# Shared UI metadata (versions + announcement) used by all docs versions.
+html_context["docs_ui_metadata_url"] = os.getenv(
+    "FLWR_DOCS_UI_METADATA_URL",
+    "https://flower.ai/docs/framework/docs-ui-metadata.json",
+)
+
 # Make current version accessible for the html templates
 repo = Repo(search_parent_directories=True)
 local = False
@@ -52,32 +59,22 @@ else:
     local = True
     current_version = repo.active_branch.name
 
-# Format current version for the html templates
-html_context["current_version"] = {}
-html_context["current_version"]["url"] = current_version
-html_context["current_version"]["full_name"] = (
-    "main"
-    if current_version == "main"
-    else f"{'' if local else 'Flower Framework '}{current_version}"
-)
+# Derive full name for the current version (e.g., v1.26.x)
+try:
+    ver = Version(current_version)
+    full_name = f"v{ver.release[0]}.{ver.release[1]}.x"
+except InvalidVersion:
+    full_name = current_version
 
-# Make version list accessible for the html templates
-html_context["versions"] = list()
-versions = sorted(
-    [
-        tag.name
-        for tag in repo.tags
-        if not tag.name.startswith("intelligence/")
-        and tag.name[0] == "v"
-        and int(tag.name[1]) > 0
-        and int(tag.name.split(".")[1]) >= 8
-    ],
-    key=lambda x: [int(part) for part in x[1:].split(".")],
-    reverse=True,  # Latest version tags first
-)
-versions.insert(0, "main")  # Ensure "main" appears first
-for version in versions:
-    html_context["versions"].append({"name": version})
+
+# Format current version for the html templates
+html_context["current_version"] = {
+    "url": current_version,
+    "full_name": full_name,
+}
+
+# Keep sidebar templates enabled; runtime JSON provides the authoritative list.
+html_context["versions"] = [{"name": "main", "url": "main"}]
 
 
 # -- Translation options -----------------------------------------------------
@@ -286,7 +283,7 @@ html_theme_options = {
     # Sphinx Book Theme
     #
     # https://sphinx-book-theme.readthedocs.io/en/latest/configure.html
-    # "repository_url": "https://github.com/adap/flower",
+    # "repository_url": "https://github.com/flwrlabs/flower",
     # "repository_branch": "main",
     # "path_to_docs": "framework/docs/source/",
     # "home_page_in_toc": True,
@@ -302,12 +299,7 @@ html_theme_options = {
     #     "color-brand-content": "#292F36",
     #     "color-admonition-background": "#F2B705",
     # },
-    "announcement": (
-        "<a href='https://flower.ai/events/flower-ai-summit-2026/'>"
-        "<strong style='color: #f2b705;'>👉 Register now</strong></a> "
-        "for Flower AI Summit 2026!<br />"
-        "April 15-16, 🇬🇧 London"
-    ),
+    "announcement": "<span id='flwr-runtime-announcement'></span>",
     "light_logo": "flower-logo-light.png",
     "dark_logo": "flower-logo-dark.png",
     "light_css_variables": {
@@ -346,6 +338,7 @@ html_theme_options = {
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
+html_js_files = ["docs-ui.js"]
 
 # Set modules for custom sidebar
 html_sidebars = {

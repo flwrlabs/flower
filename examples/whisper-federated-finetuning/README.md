@@ -24,7 +24,7 @@ This example can be run in three modes:
 Start by cloning the example project:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp \
         && mv _tmp/examples/whisper-federated-finetuning  . \
         && rm -rf _tmp \
         && cd whisper-federated-finetuning 
@@ -279,7 +279,7 @@ To launch a Flower `SuperNode` on a Raspberry Pi you'd typically follow the same
 First, ensure your Rasberry Pi has been setup correctly. You'll need either a Rasbperry Pi 4 or 5. Using the code as-is, RAM usage on the Raspberry Pi does not exceed 1.5GB. Note that unlike in the previous sections of this example, clients for Raspberry Pi work better when using PyTorch 1.13.1 (or earlier versions to PyTorch 2.0 in general).
 
 > [!TIP]
-> Follow the `Setup your Pi` section in the [examples/embedded-devices](https://github.com/adap/flower/tree/main/examples/embedded-devices#setting-up-a-raspberry-pi) example to set it up if you haven't done so already.
+> Follow the `Setup your Pi` section in the [examples/embedded-devices](https://github.com/flwrlabs/flower/tree/main/examples/embedded-devices#setting-up-a-raspberry-pi) example to set it up if you haven't done so already.
 
 Second, generate and copy the a single data partition to your raspbery pi. Do so from your development machine (e.g. your laptop) as shown earlier in the [Run with the Deployment Engine](#run-with-the-deployment-engine) section.
 

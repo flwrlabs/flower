@@ -61,6 +61,7 @@ class ExitCode:
 
     # Simulation exit codes (700-799)
     SIMULATION_EXCEPTION = 700
+    SIMULATION_MISSING_EXTRA = 701
 
     def __new__(cls) -> ExitCode:
         """Prevent instantiation."""
@@ -163,4 +164,11 @@ To use the REST API, install `flwr` with the `rest` extra:
     ExitCode.SIMULATION_EXCEPTION: (
         "An unhandled exception occurred when running the simulation."
     ),
+    ExitCode.SIMULATION_MISSING_EXTRA: """
+Extra dependencies required for simulation are missing.
+
+To use simulation with the Ray backend, install `flwr` with the `simulation` extra:
+
+    `pip install "flwr[simulation]"`.
+""",
 }
