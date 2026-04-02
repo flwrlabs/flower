@@ -97,6 +97,7 @@ erDiagram
     VARCHAR running_at "nullable"
     VARCHAR starting_at "nullable"
     VARCHAR sub_status "nullable"
+    VARCHAR usage_reported_at
   }
 
   run_objects {

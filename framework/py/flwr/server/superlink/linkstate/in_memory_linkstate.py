@@ -63,6 +63,7 @@ class RunRecord:  # pylint: disable=R0902
     run: Run
     federation_config: SimulationConfig | None = None
     logs: list[tuple[float, str]] = field(default_factory=list)
+    usage_reported_at: str = ""
     log_lock: threading.Lock = field(default_factory=threading.Lock)
     lock: threading.RLock = field(default_factory=threading.RLock)
 
@@ -719,7 +720,11 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             elif new_status.status == Status.FINISHED:
                 run_record.run.finished_at = current.isoformat()
             run_record.run.status = new_status
-            return True
+
+        # Report usage if the run is marked as finished after the update
+        if new_status.status == Status.FINISHED:
+            self.federation_manager.report_run_usage()
+        return True
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
@@ -759,10 +764,13 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             List of tuples containing (run_id, active_until timestamp)
             for expired tokens.
         """
+        updated = False
         for run_id, active_until in expired_records:
             if not (run_record := self.run_ids.get(run_id)):
                 continue
             with run_record.lock:
+                if run_record.run.finished_at:
+                    continue
                 run_record.run.status = RunStatus(
                     status=Status.FINISHED,
                     sub_status=SubStatus.FAILED,
@@ -770,6 +778,11 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 )
                 active_until_dt = datetime.fromtimestamp(active_until, tz=timezone.utc)
                 run_record.run.finished_at = active_until_dt.isoformat()
+                updated = True
+
+        # Report usage for runs that have been marked as failed due to expired tokens
+        if updated:
+            self.federation_manager.report_run_usage()
 
     def get_serverapp_context(self, run_id: int) -> Context | None:
         """Get the context for the specified `run_id`."""

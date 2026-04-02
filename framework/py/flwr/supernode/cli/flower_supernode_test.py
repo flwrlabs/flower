@@ -43,7 +43,7 @@ def test_parse_supernode_version_flag(
 def test_flower_supernode_checks_for_update(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """SuperNode should run the startup update check after parsing arguments."""
+    """SuperNode should run the startup update check before parsing arguments."""
 
     class _SentinelError(Exception):
         pass
@@ -56,15 +56,20 @@ def test_flower_supernode_checks_for_update(
     def _parse_args() -> _Parser:
         return _Parser()
 
-    captured: dict[str, str] = {}
+    captured: list[str] = []
 
     def _raise_sentinel(process_name: str | None = None) -> None:
+        captured.append("update")
         if process_name is not None:
-            captured["process_name"] = process_name
+            captured.append(process_name)
         raise _SentinelError()
 
+    def _unexpected_parse_args() -> _Parser:
+        captured.append("parse")
+        return _parse_args()
+
     monkeypatch.setattr(
-        flower_supernode_module, "_parse_args_run_supernode", _parse_args
+        flower_supernode_module, "_parse_args_run_supernode", _unexpected_parse_args
     )
     monkeypatch.setattr(
         flower_supernode_module, "warn_if_flwr_update_available", _raise_sentinel
@@ -73,4 +78,4 @@ def test_flower_supernode_checks_for_update(
     with pytest.raises(_SentinelError):
         flower_supernode_module.flower_supernode()
 
-    assert captured == {"process_name": "flower-supernode"}
+    assert captured == ["update", "flower-supernode"]

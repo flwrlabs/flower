@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from logging import ERROR, WARNING
 from typing import Any, Literal
 
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, text
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app.user_config import UserConfig
@@ -64,8 +64,6 @@ from .utils import (
     convert_uint64_values_in_dict_to_sint64,
     dict_to_message,
     generate_rand_int_from_bytes,
-    has_valid_sub_status,
-    is_valid_transition,
     message_to_dict,
     verify_found_message_replies,
     verify_message_ids,
@@ -252,48 +250,15 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             msg = f"`node_id` must be != {SUPERLINK_NODE_ID}"
             raise AssertionError(msg)
 
-        params: dict[str, str | int] = {}
-
-        # Convert the uint64 value to sint64 for SQLite
-        params["node_id"] = uint64_to_int64(node_id)
-
         with self.session():
-            # Retrieve all Messages for node_id
-            query = """
-                SELECT message_id
-                FROM message_ins
-                WHERE dst_node_id = :node_id
-                AND delivered_at = ''
-                AND (created_at + ttl) > CAST(strftime('%s', 'now') AS REAL)
-            """
-
-            if limit is not None:
-                query += " LIMIT :limit"
-                params["limit"] = limit
-
-            rows = self.query(query, params)
+            rows = self._claim_message_ins_rows(node_id, limit)
             message_ids: set[str] = {row["message_id"] for row in rows}
             self._check_stored_messages(message_ids)
 
-            # Mark retrieved Messages as delivered
-            if rows:
-                # Prepare query
-                placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
-                query = f"""
-                    UPDATE message_ins
-                    SET delivered_at = :delivered_at
-                    WHERE message_id IN ({placeholders})
-                    RETURNING *
-                """
-
-                # Prepare data for query
-                delivered_at = now().isoformat()
-                params = {"delivered_at": delivered_at}
-                for index, msg_id in enumerate(message_ids):
-                    params[f"mid_{index}"] = str(msg_id)
-
-                # Run query
-                rows = self.query(query, params)
+            # _check_stored_messages can delete claimed Messages if they became invalid
+            # (for example, node removed from federation), so re-read current rows.
+            if message_ids:
+                rows = self._load_message_ins_rows(message_ids)
 
             for row in rows:
                 # Convert values from sint64 to uint64
@@ -304,6 +269,56 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         result = [dict_to_message(dict(row)) for row in rows]
 
         return result
+
+    def _claim_message_ins_rows(
+        self, node_id: int, limit: int | None
+    ) -> list[dict[str, Any]]:
+        """Atomically claim eligible instruction Messages for a node."""
+        current_time = now()
+        params: dict[str, str | int | float] = {
+            # Convert the uint64 value to sint64 for SQLite
+            "node_id": uint64_to_int64(node_id),
+            "current": current_time.timestamp(),
+            "delivered_at": current_time.isoformat(),
+        }
+        common_condition = """
+            dst_node_id = :node_id
+            AND delivered_at = ''
+            AND (created_at + ttl) > :current
+        """
+        condition = common_condition
+        if limit is not None:
+            condition = f"""
+                message_id IN (
+                    SELECT message_id
+                    FROM message_ins
+                    WHERE {common_condition}
+                    ORDER BY rowid
+                    LIMIT :limit
+                )
+                AND delivered_at = ''
+            """
+            params["limit"] = limit
+
+        query = f"""
+            UPDATE message_ins
+            SET delivered_at = :delivered_at
+            WHERE {condition}
+            RETURNING *
+        """
+        return self.query(query, params)
+
+    def _load_message_ins_rows(self, message_ids: set[str]) -> list[dict[str, Any]]:
+        """Load instruction Messages by IDs."""
+        placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
+        query = f"""
+            SELECT *
+            FROM message_ins
+            WHERE message_id IN ({placeholders})
+            ORDER BY rowid
+        """
+        params = {f"mid_{i}": msg_id for i, msg_id in enumerate(message_ids)}
+        return self.query(query, params)
 
     def store_message_res(self, message: Message) -> str | None:
         """Store one Message."""
@@ -434,15 +449,18 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             )
             ret.update(tmp_ret_dict)
 
-            # Find all reply Messages
+            # Atomically claim all eligible reply Messages
             placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
+            delivered_at = now().isoformat()
             query = f"""
-                SELECT *
-                FROM message_res
+                UPDATE message_res
+                SET delivered_at = :delivered_at
                 WHERE reply_to_message_id IN ({placeholders})
                 AND delivered_at = ''
+                RETURNING *
             """
-            params = {f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)}
+            params = {"delivered_at": delivered_at}
+            params.update({f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)})
             rows = self.query(query, params)
             for row in rows:
                 convert_sint64_values_in_dict_to_uint64(
@@ -455,23 +473,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 current_time=current,
             )
             ret.update(tmp_ret_dict)
-
-            # Mark existing reply Messages to be returned as delivered
-            delivered_at = now().isoformat()
-            for message_res in ret.values():
-                message_res.metadata.delivered_at = delivered_at
-            message_res_ids = [
-                message_res.metadata.message_id for message_res in ret.values()
-            ]
-            placeholders = ",".join([f":mid_{i}" for i in range(len(message_res_ids))])
-            query = f"""
-                UPDATE message_res
-                SET delivered_at = :delivered_at
-                WHERE message_id IN ({placeholders})
-            """
-            params = {"delivered_at": delivered_at}
-            params.update({f"mid_{i}": mid for i, mid in enumerate(message_res_ids)})
-            self.query(query, params)
 
         return list(ret.values())
 
@@ -815,12 +816,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     INSERT INTO run
                     (run_id, fab_id, fab_version, fab_hash, override_config, federation,
                     federation_config, run_type, pending_at, starting_at, running_at,
-                    finished_at, sub_status, details, flwr_aid, bytes_sent, bytes_recv,
-                    clientapp_runtime)
+                    finished_at, usage_reported_at, sub_status, details, flwr_aid,
+                    bytes_sent, bytes_recv, clientapp_runtime)
                     VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
                     :federation, :federation_config, :run_type, :pending_at,
-                    :starting_at, :running_at, :finished_at, :sub_status, :details,
-                    :flwr_aid, :bytes_sent, :bytes_recv, :clientapp_runtime)
+                    :starting_at, :running_at, :finished_at, :usage_reported_at,
+                    :sub_status, :details, :flwr_aid, :bytes_sent, :bytes_recv,
+                    :clientapp_runtime)
                 """
                 override_config_json = json.dumps(override_config)
                 params = {
@@ -842,6 +844,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     "bytes_sent": 0,
                     "bytes_recv": 0,
                     "clientapp_runtime": 0.0,
+                    "usage_reported_at": "",
                 }
                 self.query(query, params)
                 return uint64_run_id
@@ -1000,70 +1003,47 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # Clean up expired tokens; this will flag inactive runs as needed
         self._cleanup_expired_tokens()
 
-        with self.session():
-            # Convert the uint64 value to sint64 for SQLite
-            sint64_run_id = uint64_to_int64(run_id)
-            query = "SELECT * FROM run WHERE run_id = :run_id"
-            rows = self.query(query, {"run_id": sint64_run_id})
+        # Determine the timestamp field and conditions based on the new status
+        ts_fld = ""
+        ts_con = ""
+        if new_status.status == Status.STARTING:
+            ts_fld = "starting_at"
+            # Condition: current status is PENDING
+            ts_con = "starting_at = '' AND finished_at = ''"
+        elif new_status.status == Status.RUNNING:
+            ts_fld = "running_at"
+            # Condition: current status is STARTING
+            ts_con = "starting_at != '' AND running_at = '' AND finished_at = ''"
+        elif new_status.status == Status.FINISHED:
+            ts_fld = "finished_at"
+            # Condition: current status is not FINISHED
+            ts_con = "finished_at = ''"
+            if new_status.sub_status == SubStatus.COMPLETED:
+                # For COMPLETED runs, ensure they are currently RUNNING
+                ts_con += " AND running_at != ''"
+        else:
+            return False  # Cannot update to PENDING
 
-            # Check if the run_id exists
-            if not rows:
-                log(ERROR, "`run_id` is invalid")
-                return False
+        # Prepare the query and parameters
+        query = f"""
+            UPDATE run SET {ts_fld} = :timestamp,
+            sub_status = :sub_status, details = :details
+            WHERE run_id = :run_id AND {ts_con}
+            RETURNING run_id
+        """
+        params = {
+            "timestamp": now().isoformat(),
+            "sub_status": new_status.sub_status,
+            "details": new_status.details,
+            "run_id": uint64_to_int64(run_id),
+        }
 
-            # Check if the status transition is valid
-            row = rows[0]
-            current_status = RunStatus(
-                status=determine_run_status(row),
-                sub_status=row["sub_status"],
-                details=row["details"],
-            )
-            if not is_valid_transition(current_status, new_status):
-                log(
-                    ERROR,
-                    'Invalid status transition: from "%s" to "%s"',
-                    current_status.status,
-                    new_status.status,
-                )
-                return False
-
-            # Check if the sub-status is valid
-            if not has_valid_sub_status(current_status):
-                log(
-                    ERROR,
-                    'Invalid sub-status "%s" for status "%s"',
-                    current_status.sub_status,
-                    current_status.status,
-                )
-                return False
-
-            # Update the status
-            query = """
-                UPDATE run SET %s = :timestamp,
-                sub_status = :sub_status, details = :details
-                WHERE run_id = :run_id
-            """
-
-            # Prepare data for query
-            current = now()
-
-            # Determine the timestamp field based on the new status
-            timestamp_fld = ""
-            if new_status.status == Status.STARTING:
-                timestamp_fld = "starting_at"
-            elif new_status.status == Status.RUNNING:
-                timestamp_fld = "running_at"
-            elif new_status.status == Status.FINISHED:
-                timestamp_fld = "finished_at"
-
-            params = {
-                "timestamp": current.isoformat(),
-                "sub_status": new_status.sub_status,
-                "details": new_status.details,
-                "run_id": sint64_run_id,
-            }
-            self.query(query % timestamp_fld, params)
-        return True
+        # Update the status
+        rows = self.query(query, params)
+        # Report usage if the run is marked as finished after the update
+        if rows and new_status.status == Status.FINISHED:
+            self.federation_manager.report_run_usage()
+        return len(rows) > 0
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
@@ -1125,11 +1105,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if not expired_records:
             return
 
-        with self.session():
+        with self.session() as session:
             query = """
                 UPDATE run
                 SET sub_status = :failed, details = :details, finished_at = :finished_at
-                WHERE run_id = :run_id
+                WHERE run_id = :run_id AND finished_at = ''
             """
             data = [
                 {
@@ -1142,7 +1122,12 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 }
                 for run_id, active_until in expired_records
             ]
-            self.query(query, data)
+            result = session.execute(text(query), data)
+            updated_rows = result.rowcount or 0  # type: ignore[attr-defined]
+
+        # Report usage for runs that have been marked as failed due to expired tokens
+        if updated_rows > 0:
+            self.federation_manager.report_run_usage()
 
     def get_serverapp_context(self, run_id: int) -> Context | None:
         """Get the context for the specified `run_id`."""
