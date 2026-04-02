@@ -65,39 +65,22 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 
 ### Run with the Simulation Engine
 
-This example is designed to run with two virtual clients. Let's first locate the Flower Configuration file and modify one of the existing connections to make use of two nodes.
+This example is designed to run with two virtual `SuperNodes`. First we need to change the configuration of the Simulation Runtime (which by default uses 10 nodes). This guide assumes your default `SuperLink` connection points to one ready for simulations. If you aren't sure, please refer to the [How-to run Flower locally](https://flower.ai/docs/framework/how-to-run-flower-locally.html) guide.
 
-Locate your Flower configuration file by running:
-
-```shell
-flwr config list
-```
-
-```console
-# Example output:
-Flower Config file: /path/to/your/.flwr/config.toml
-SuperLink connections:
- supergrid
- local (default)
-```
-
-Modify the `local` connection so it has two supernodes:
-
-```TOML
-[superlink.local]
-options.num-supernodes = 2
+```bash
+flwr federation simulation-config --num-supernodes=2
 ```
 
 Run the app:
 
 ```shell
-flwr run .
+flwr run .  --stream
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
 
 ```shell
-flwr run . --run-config "num-server-rounds=5"
+flwr run . --run-config "num-server-rounds=5"  --stream
 ```
 
 You can also check that the results match the centralized version.

@@ -53,31 +53,13 @@ pip install -e .
 
 You can run your Flower project in both _simulation_ and _deployment_ mode without making changes to the code. If you are starting with Flower, we recommend you using the _simulation_ mode as it requires fewer components to be launched manually. By default, `flwr run` will make use of the Simulation Engine.
 
-### Define the FlowerTune connection
+This example is designed to run with 20 virtual `SuperNodes` which have GPU-enabled `ClientApp` execution. First we need to change the configuration of the Simulation Runtime (which by default uses 10 nodes and only CPU). This guide assumes your default `SuperLink` connection points to one ready for simulations. If you aren't sure, please refer to the [How-to run Flower locally](https://flower.ai/docs/framework/how-to-run-flower-locally.html) guide.
 
-This example is designed to run with 20 virtual clients. Let's first locate the Flower Configuration file and edit one of the existing connections to make it use 20 nodes.
-
-Locate the Flower Configuration file:
-
-```shell
-flwr config list
-```
-
-```console
-# Example output:
-Flower Config file: /path/to/your/.flwr/config.toml
-SuperLink connections:
- supergrid
- local (default)
-```
-
-Modify the `local` connection so it has 20 supernodes and each gets assigned the following compute and memory resources:
-
-```TOML
-[superlink.local]
-options.num-supernodes = 20
-options.backend.client-resources.num-cpus = 8
-options.backend.client-resources.num-gpus = 1.0
+```bash
+flwr federation simulation-config \
+    --num-supernodes=20 \
+    --client-resources-num-cpus=8 \
+    --client-resources-num-gpus=1.0
 ```
 
 ### Run with the Simulation Engine
@@ -86,17 +68,17 @@ options.backend.client-resources.num-gpus = 1.0
 > Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
 ```bash
-flwr run .
+flwr run .  --stream
 ```
 
 This command will run FL simulations with a 4-bit [OpenLLaMA 3Bv2](https://huggingface.co/openlm-research/open_llama_3b_v2) model involving 2 clients per rounds for 100 FL rounds. You can override configuration parameters directly from the command line. Below are a few settings you might want to test:
 
 ```bash
 # Use OpenLLaMA-7B instead of 3B and 8-bits quantization
-flwr run . --run-config "model.name='openlm-research/open_llama_7b_v2' model.quantization=8"
+flwr run . --run-config "model.name='openlm-research/open_llama_7b_v2' model.quantization=8"  --stream
 
 # Run for 50 rounds but increasing the fraction of clients that participate per round to 25%
-flwr run . --run-config "num-server-rounds=50 strategy.fraction-train=0.25"
+flwr run . --run-config "num-server-rounds=50 strategy.fraction-train=0.25"  --stream
 ```
 
 ### Run with the Deployment Engine
