@@ -21,11 +21,14 @@ from typing import TYPE_CHECKING
 from flwr.common.typing import Federation
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Invitation  # pylint: disable=E0611
+from flwr.supercore.constant import ActionType
+from flwr.supercore.typing import ActionContext
 
 if TYPE_CHECKING:
     from flwr.server.superlink.linkstate.linkstate import LinkState
 
 
+# pylint: disable=too-many-public-methods
 class FederationManager(ABC):
     """Abstract base class for FederationManager."""
 
@@ -328,4 +331,25 @@ class FederationManager(ABC):
 
         This method is called on successful run status transition to FINISHED and when
         runs are marked as failed due to expired tokens.
+        """
+
+    @abstractmethod
+    def can_execute(
+        self, flwr_aid: str, action: ActionType, context: ActionContext
+    ) -> bool:
+        """Check if an account can execute an action under a given context.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Flower account ID of the subject.
+        action : ActionType
+            The action to authorize.
+        context : ActionContext
+            Action-specific context required for authorization.
+
+        Returns
+        -------
+        bool
+            ``True`` if the action is allowed, otherwise ``False``.
         """
