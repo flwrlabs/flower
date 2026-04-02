@@ -134,6 +134,13 @@ command:
     ┡━━━━━━━━╇━━━━━━━━━━━━╇━━━━━╇━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━┩
     └────────┴────────────┴─────┴────────┴─────────┴──────────────────┘
 
+.. tip::
+
+    You can setup your ``local-deployment`` profile as the default so you don't have to
+    specify it in every Flower CLI command that needs to connect to the SuperLink. For
+    that and more details about the Flower configuration, refer to the :doc:`the Flower
+    Configuration <ref-flower-configuration>` guide.
+
 With a correctly configured Flower CLI, let's proceed to register two SuperNodes:
 
 .. code-block:: bash
