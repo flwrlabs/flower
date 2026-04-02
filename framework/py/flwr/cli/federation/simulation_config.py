@@ -17,6 +17,7 @@
 
 from typing import Annotated, Literal
 
+import click
 import typer
 
 from flwr.cli.utils import (
@@ -127,6 +128,24 @@ def simulation_config(  # pylint: disable=R0913,R0917,W0613,R0914
     ] = None,
 ) -> None:
     """Configure a Federation using the Simulation Runtime."""
+    if all(
+        option is None
+        for option in (
+            num_supernodes,
+            client_resources_num_cpus,
+            client_resources_num_gpus,
+            verbose,
+            backend,
+            init_args_num_cpus,
+            init_args_num_gpus,
+            init_args_logging_level,
+            init_args_log_to_driver,
+        )
+    ):
+        raise click.ClickException(
+            "At least one simulation configuration option must be provided."
+        )
+
     with cli_output_control_stub(superlink, output_format) as (stub, is_json):
         log_to_driver = None
         if init_args_log_to_driver is not None:
