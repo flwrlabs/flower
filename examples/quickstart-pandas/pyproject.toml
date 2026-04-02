@@ -12,7 +12,7 @@ authors = [
     { name = "Ragy Haddad", email = "ragy202@gmail.com" },
 ]
 dependencies = [
-    "flwr[simulation]>=1.27.0",
+    "flwr[simulation]>=1.28.0",
     "flwr-datasets[vision]>=0.6.0",
     "numpy>=2.0.2",
     "pandas==2.2.3",
