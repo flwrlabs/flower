@@ -16,10 +16,13 @@ def load_layer_weights_from_state(state: RecordDict, head: nn.Module):
     state_dict = state[classification_head_name].to_torch_state_dict()
     head.load_state_dict(state_dict, strict=True)
 
-def save_model_from_to_state(state: RecordDict, net: nn.Module):
+def save_model_to_state(state: RecordDict, net: nn.Module):
     """Save last weights to state."""
     state[personal_model_name] = ArrayRecord(net.state_dict())
 
+def save_model_from_to_state(state: RecordDict, net: nn.Module):
+    """Backward-compatible wrapper for save_model_to_state."""
+    return save_model_to_state(state, net)
 def load_model_from_state(state: RecordDict, net: nn.Module):
     """Load last weights from state and applies them to the model."""
     if personal_model_name not in state:
