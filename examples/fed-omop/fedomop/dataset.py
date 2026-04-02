@@ -96,7 +96,7 @@ def load_local_data(
     if partitioner_strat == "iid":
         partitioner = IidPartitioner(num_partitions=num_partitions)
     elif partitioner_strat =="natural":
-           partitioner = NaturalIdPartitioner(partition_by="hospital_id")    
+        partitioner = NaturalIdPartitioner(partition_by="hospital_id")    
     elif partitioner_strat == "dirichlet":
         partitioner = DirichletPartitioner(
             num_partitions=num_partitions,
