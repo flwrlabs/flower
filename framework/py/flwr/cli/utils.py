@@ -596,7 +596,8 @@ def filter_paths_for_publish(
         if depth_of(Path(rel_pth)) > MAX_DIR_DEPTH:
             raise ValueError(
                 f"'{rel_pth}' in the project exceeds the maximum directory depth "
-                f"of {MAX_DIR_DEPTH}."
+                f"of {MAX_DIR_DEPTH}. Consider refactoring your project structure to "
+                "reduce nesting."
             )
         ret_files[rel_pth] = files[rel_pth]
     return ret_files
