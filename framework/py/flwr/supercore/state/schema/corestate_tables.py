@@ -33,4 +33,12 @@ def create_corestate_metadata() -> MetaData:
         Column("active_until", Float),
     )
 
+    Table(
+        "nonce_store",
+        metadata,
+        Column("namespace", String, primary_key=True, nullable=False),
+        Column("nonce", String, primary_key=True, nullable=False),
+        Column("expires_at", Float, nullable=False),
+    )
+
     return metadata

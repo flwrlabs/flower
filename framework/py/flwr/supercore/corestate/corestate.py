@@ -100,3 +100,22 @@ class CoreState(ABC):
         bool
             True if the heartbeat is acknowledged successfully, False otherwise.
         """
+
+    @abstractmethod
+    def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:
+        """Atomically reserve a nonce in a namespace until `expires_at`.
+
+        Parameters
+        ----------
+        namespace : str
+            Namespace for the nonce reservation.
+        nonce : str
+            Nonce value to reserve.
+        expires_at : float
+            POSIX timestamp when the reservation expires.
+
+        Returns
+        -------
+        bool
+            True if the nonce was reserved, False if it already exists and is active.
+        """

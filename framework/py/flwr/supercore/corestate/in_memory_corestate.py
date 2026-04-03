@@ -47,6 +47,8 @@ class InMemoryCoreState(CoreState):
         self.token_store: dict[int, TokenRecord] = {}
         self.token_to_run_id: dict[str, int] = {}
         self.lock_token_store = Lock()
+        self.nonce_store: dict[tuple[str, str], float] = {}
+        self.lock_nonce_store = Lock()
 
     @property
     def object_store(self) -> ObjectStore:
@@ -136,3 +138,22 @@ class InMemoryCoreState(CoreState):
             List of tuples containing (run_id, active_until timestamp)
             for expired tokens.
         """
+
+    def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:
+        """Atomically reserve a nonce in a namespace."""
+        if namespace == "" or nonce == "":
+            return False
+        with self.lock_nonce_store:
+            self._cleanup_expired_nonces()
+            key = (namespace, nonce)
+            if key in self.nonce_store:
+                return False
+            self.nonce_store[key] = expires_at
+            return True
+
+    def _cleanup_expired_nonces(self) -> None:
+        """Delete nonce reservations that are no longer active."""
+        current = now().timestamp()
+        for key, active_until in list(self.nonce_store.items()):
+            if active_until < current:
+                del self.nonce_store[key]

@@ -151,3 +151,28 @@ class SqlCoreState(CoreState, SqlMixin):
             List of tuples containing (run_id, active_until timestamp)
             for expired tokens.
         """
+
+    def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:
+        """Atomically reserve a nonce in a namespace."""
+        if namespace == "" or nonce == "":
+            return False
+        self._cleanup_expired_nonces()
+        query = """
+            INSERT INTO nonce_store (namespace, nonce, expires_at)
+            VALUES (:namespace, :nonce, :expires_at);
+        """
+        data = {"namespace": namespace, "nonce": nonce, "expires_at": expires_at}
+        try:
+            self.query(query, data)
+            return True
+        except IntegrityError:
+            return False
+
+    def _cleanup_expired_nonces(self) -> None:
+        """Delete nonce reservations that are no longer active."""
+        current = now().timestamp()
+        query = """
+            DELETE FROM nonce_store
+            WHERE expires_at < :current;
+        """
+        self.query(query, {"current": current})
