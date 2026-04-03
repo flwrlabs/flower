@@ -15,7 +15,7 @@
 """ServerAppIo gRPC API."""
 
 
-from logging import INFO
+from logging import INFO, WARN
 
 import grpc
 
@@ -26,26 +26,43 @@ from flwr.proto.serverappio_pb2_grpc import (  # pylint: disable=E0611
     add_ServerAppIoServicer_to_server,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
+from flwr.supercore.auth import derive_superexec_audience
 from flwr.supercore.ffs import FfsFactory
-from flwr.supercore.interceptors import create_serverappio_token_auth_server_interceptor
+from flwr.supercore.interceptors import (
+    create_serverappio_superexec_auth_server_interceptor,
+    create_serverappio_token_auth_server_interceptor,
+)
 from flwr.supercore.object_store import ObjectStoreFactory
 
 from .serverappio_servicer import ServerAppIoServicer
 
 
-def run_serverappio_api_grpc(
+def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
     address: str,
     state_factory: LinkStateFactory,
     ffs_factory: FfsFactory,
     objectstore_factory: ObjectStoreFactory,
     certificates: tuple[bytes, bytes, bytes] | None,
+    superexec_auth_secret: bytes,
 ) -> grpc.Server:
     """Run ServerAppIo API (gRPC, request-response)."""
+    if certificates is None:
+        log(
+            WARN,
+            "SuperExec auth is enabled on insecure ServerAppIo transport. "
+            "Request metadata confidentiality is not guaranteed without TLS.",
+        )
+
     # Create ServerAppIo API gRPC server
     serverappio_servicer: grpc.Server = ServerAppIoServicer(
         state_factory=state_factory,
         ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
+    )
+    superexec_auth_interceptor = create_serverappio_superexec_auth_server_interceptor(
+        state_provider=state_factory.state,
+        master_secret=superexec_auth_secret,
+        expected_audience=derive_superexec_audience("serverappio", address),
     )
     auth_interceptor = create_serverappio_token_auth_server_interceptor(
         state_provider=state_factory.state
@@ -59,7 +76,7 @@ def run_serverappio_api_grpc(
         server_address=address,
         max_message_length=GRPC_MAX_MESSAGE_LENGTH,
         certificates=certificates,
-        interceptors=[auth_interceptor],
+        interceptors=[superexec_auth_interceptor, auth_interceptor],
     )
 
     address = serverappio_grpc_server.bound_address
