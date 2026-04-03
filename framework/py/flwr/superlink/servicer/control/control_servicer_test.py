@@ -1330,7 +1330,10 @@ def test_format_verification_compact() -> None:
         (
             "test federation",
             False,
-            "Invalid name: no spaces allowed, only letters, numbers, and hyphens are allowed.",
+            (
+                "Invalid name: no spaces allowed, only letters, numbers, and "
+                "hyphens are allowed."
+            ),
         ),  # contains_space
         (
             "Testfederation",
@@ -1345,7 +1348,10 @@ def test_format_verification_compact() -> None:
         (
             "Test Federation!",
             False,
-            "Invalid name: no spaces allowed, must be all lowercase, only letters, numbers, and hyphens are allowed.",
+            (
+                "Invalid name: no spaces allowed, must be all lowercase, only "
+                "letters, numbers, and hyphens are allowed."
+            ),
         ),  # multiple_violations
     ]
 )

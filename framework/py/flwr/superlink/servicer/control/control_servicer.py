@@ -993,7 +993,7 @@ class FederationNotSpecified(FlowerError):
 
 
 def _validate_federation_name(name: str) -> tuple[bool, str]:
-    """Validates a federation name based on specific security and formatting rules.
+    """Validate a federation name based on specific security and formatting rules.
 
     Rules:
     1. The name must not be empty.
