@@ -44,6 +44,7 @@ from ..utils import (
     collect_files,
     filter_paths_for_publish,
     load_cli_auth_plugin_from_connection,
+    validate_project_name,
 )
 
 
@@ -74,6 +75,7 @@ def publish(
 
     # Validate app description from config
     config, _ = load_and_validate(app / FAB_CONFIG_FILE, check_module=False)
+    _validate_app_name(app.name, "Flower App directory name")
     _validate_description(config["project"].get("description", ""))
 
     # Collect & validate app files
@@ -122,6 +124,14 @@ def _validate_description(description: Any) -> None:
         should_continue = typer.confirm("Do you want to continue publishing anyway?")
         if not should_continue:
             raise click.ClickException("Publishing cancelled by user.")
+
+
+def _validate_app_name(name: str, target: str) -> None:
+    """Validate app and directory names used during publish."""
+    try:
+        validate_project_name(name, target)
+    except ValueError as err:
+        raise click.ClickException(str(err)) from None
 
 
 def _detect_mime(path: Path) -> str:

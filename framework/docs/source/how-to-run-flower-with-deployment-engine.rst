@@ -77,9 +77,10 @@ executing ``flwr new``:
 .. note::
 
     If you decide to run the project with ``flwr run .`` against the default local
-    profile, Flower submits the run to a managed local SuperLink, which then executes it
-    with the Simulation Runtime. Continue to Step 2 to instead point ``flwr run`` at a
-    named SuperLink connection for the Deployment Runtime.
+    profile (the one marked with ``address = ":local:"`` in the Flower configuration),
+    Flower submits the run to a managed local SuperLink, which then executes it with the
+    Simulation Runtime. Continue to Step 2 to instead point ``flwr run`` at a named
+    SuperLink connection for the Deployment Runtime.
 
 .. tip::
 
@@ -177,11 +178,10 @@ need two terminals for this step.
 At this point, you have launched two SuperNodes that are connected to the same
 SuperLink. The system is idling waiting for a ``Run`` to be submitted. Before you can
 run your Flower App through the federation we need a way to tell ``flwr run`` that the
-App is to be executed via the SuperLink we just started, instead of using the local
-managed local SuperLink workflow used by the default local profile. Doing this is easy:
-define a new SuperLink connection in the **Flower Configuration** file, indicate the
-address of the SuperLink and pass a certificate (if any) or set the insecure flag (only
-when testing locally, real deployments require TLS).
+App is to be executed via the SuperLink we just started. Doing this is easy: define a
+new SuperLink connection in the **Flower Configuration** file, indicate the address of
+the SuperLink and pass a certificate (if any) or set the insecure flag (only when
+testing locally, real deployments require TLS).
 
 1. Find the Flower Configuration TOML file in your machine. This file is automatically
    create for your when you first use a Flower CLI command. Use ``flwr config list`` to
@@ -224,6 +224,13 @@ when testing locally, real deployments require TLS).
 
    If you want to rerun the project or test an updated version by making changes to the
    code, simply re-run the command above.
+
+.. tip::
+
+    You can setup your ``local-deployment`` profile as the default so you don't have to
+    specify it in every Flower CLI command that needs to connect to the SuperLink. For
+    that and more details about the Flower configuration, refer to the :doc:`the Flower
+    Configuration <ref-flower-configuration>` guide.
 
 ******************
  Step 4: Clean Up

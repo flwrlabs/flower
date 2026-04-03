@@ -17,7 +17,7 @@
 
 import os
 
-from flwr.supercore.constant import DEFAULT_SIMULATION_CONFIG, SUPERGRID_ADDRESS
+from flwr.supercore.constant import SUPERGRID_ADDRESS
 
 # General help message for config overrides
 CONFIG_HELP_MESSAGE = (
@@ -91,6 +91,15 @@ class SimulationBackendConfigTomlKey:
     NAME = "name"
 
 
+# Local SuperLink configuration
+LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE = ":local:"
+LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE_IN_MEMORY = ":local-in-memory:"
+LOCAL_CONTROL_API_PORT = os.environ.get("FLWR_LOCAL_CONTROL_API_PORT", "39093")
+LOCAL_CONTROL_API_ADDRESS = f"127.0.0.1:{LOCAL_CONTROL_API_PORT}"
+LOCAL_SUPERLINK_STARTUP_TIMEOUT = 15.0
+CONTROL_API_PROBE_TIMEOUT = 0.4
+CONTROL_API_PROBE_INTERVAL = 0.2
+
 # CLI connection configuration file name
 FLOWER_CONFIG_FILE = "config.toml"
 
@@ -102,23 +111,10 @@ default = "local"
 address = "{SUPERGRID_ADDRESS}"
 
 [superlink.local]
-options.num-supernodes = {DEFAULT_SIMULATION_CONFIG.num_supernodes}
-options.backend.client-resources.num-cpus = \
-{DEFAULT_SIMULATION_CONFIG.client_resources_num_cpus}
-options.backend.client-resources.num-gpus = \
-{DEFAULT_SIMULATION_CONFIG.client_resources_num_gpus}
+address = "{LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE}"
 """
 
 # Keys for storing account auth credentials in the credential store
 AUTHN_TYPE_STORE_KEY = "flower.account-auth.%s.authn-type"
 ACCESS_TOKEN_STORE_KEY = "flower.account-auth.%s.oidc-access-token"
 REFRESH_TOKEN_STORE_KEY = "flower.account-auth.%s.oidc-refresh-token"
-
-# Local SuperLink configuration
-LOCAL_CONTROL_API_PORT = os.environ.get("FLWR_LOCAL_CONTROL_API_PORT", "39093")
-LOCAL_SERVERAPPIO_API_PORT = os.environ.get("FLWR_LOCAL_SERVERAPPIO_API_PORT", "39094")
-LOCAL_CONTROL_API_ADDRESS = f"127.0.0.1:{LOCAL_CONTROL_API_PORT}"
-LOCAL_SERVERAPPIO_API_ADDRESS = f"127.0.0.1:{LOCAL_SERVERAPPIO_API_PORT}"
-LOCAL_SUPERLINK_STARTUP_TIMEOUT = 15.0
-CONTROL_API_PROBE_TIMEOUT = 0.4
-CONTROL_API_PROBE_INTERVAL = 0.2

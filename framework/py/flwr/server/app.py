@@ -157,9 +157,9 @@ def get_federation_manager(is_simulation: bool = False) -> FederationManager:
 # pylint: disable=too-many-branches, too-many-locals, too-many-statements
 def run_superlink() -> None:
     """Run Flower SuperLink (ServerAppIo API and Fleet API)."""
-    args = _parse_args_run_superlink().parse_args()
-
     warn_if_flwr_update_available(process_name="flower-superlink")
+
+    args = _parse_args_run_superlink().parse_args()
 
     if args.log_file:
         configure_superlink_log_file(
@@ -419,7 +419,9 @@ def run_superlink() -> None:
 
     # Launch SuperExec if isolation mode is subprocess
     if args.isolation == ISOLATION_MODE_SUBPROCESS:
-        appio_address = resolve_bind_address(serverappio_address)
+        # bound_address contains the actual address when the port is set to :0
+        # which means let the OS choose a free port.
+        appio_address = resolve_bind_address(serverappio_server.bound_address)
         command = ["flower-superexec", "--insecure"]
         command += ["--appio-api-address", appio_address]
         command += ["--plugin-type", ExecPluginType.SERVER_APP]

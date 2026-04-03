@@ -87,7 +87,7 @@ erDiagram
     VARCHAR fab_id "nullable"
     VARCHAR fab_version "nullable"
     VARCHAR federation "nullable"
-    BLOB federation_options "nullable"
+    VARCHAR federation_config "nullable"
     VARCHAR finished_at "nullable"
     VARCHAR flwr_aid "nullable"
     VARCHAR override_config "nullable"
@@ -97,6 +97,7 @@ erDiagram
     VARCHAR running_at "nullable"
     VARCHAR starting_at "nullable"
     VARCHAR sub_status "nullable"
+    VARCHAR usage_reported_at
   }
 
   run_objects {

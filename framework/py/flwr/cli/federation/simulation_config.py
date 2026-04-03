@@ -15,8 +15,9 @@
 """Flower command line interface `federation simulation-config` command."""
 
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
+import click
 import typer
 
 from flwr.cli.utils import (
@@ -31,23 +32,18 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
-from flwr.supercore.constant import DEFAULT_SIMULATION_CONFIG
 
 from .error_handlers import handle_invite_grpc_error
 
 
-def _handle_none_field(cfg: SimulationConfig, field_name: str) -> Any:
-    """Convert unset optional fields to None."""
-    if not cfg.HasField(field_name):  # type: ignore
-        return None
-    return getattr(cfg, field_name)
-
-
-def simulation_config(  # pylint: disable=R0913,R0917,W0613
+def simulation_config(  # pylint: disable=R0913,R0917,W0613,R0914
     federation: Annotated[
-        str,
-        typer.Argument(help="Name of the federation."),
-    ],
+        str | None,
+        typer.Argument(
+            help="Name of the federation; must be in the "
+            "format `@<account>/<federation>`."
+        ),
+    ] = None,
     superlink: Annotated[
         str | None,
         typer.Argument(help="Name of the SuperLink connection."),
@@ -61,44 +57,44 @@ def simulation_config(  # pylint: disable=R0913,R0917,W0613
         ),
     ] = CliOutputFormat.DEFAULT,
     num_supernodes: Annotated[
-        int,
+        int | None,
         typer.Option(
             "--num-supernodes",
             help="The number of virtual SuperNodes in the simulation",
             min=1,
         ),
-    ] = DEFAULT_SIMULATION_CONFIG.num_supernodes,
+    ] = None,
     client_resources_num_cpus: Annotated[
-        int,
+        int | None,
         typer.Option(
             "--client-resources-num-cpus",
             help="CPUs assigned to the execution of each ClientApp",
             min=1,
         ),
-    ] = DEFAULT_SIMULATION_CONFIG.client_resources_num_cpus,
+    ] = None,
     client_resources_num_gpus: Annotated[
-        float,
+        float | None,
         typer.Option(
             "--client-resources-num-gpus",
             help="Ratio of a GPU VRAM assigned to the execution of each ClientApp",
             min=0.0,
         ),
-    ] = DEFAULT_SIMULATION_CONFIG.client_resources_num_gpus,
+    ] = None,
     verbose: Annotated[
-        bool,
+        bool | None,
         typer.Option(
             "--verbose",
             help="Run the Simulation Runtime with verbose logs",
         ),
-    ] = DEFAULT_SIMULATION_CONFIG.verbose,
+    ] = None,
     backend: Annotated[
-        Literal["ray"],
+        Literal["ray"] | None,
         typer.Option(
             "--backend-name",
             case_sensitive=False,
             help="Choice of backend name (Currently, only 'ray' is supported).",
         ),
-    ] = DEFAULT_SIMULATION_CONFIG.backend,  # type: ignore
+    ] = None,
     init_args_num_cpus: Annotated[
         int | None,
         typer.Option(
@@ -106,7 +102,7 @@ def simulation_config(  # pylint: disable=R0913,R0917,W0613
             help="Number of CPUs to make available to the Simulation Runtime.",
             min=1,
         ),
-    ] = _handle_none_field(DEFAULT_SIMULATION_CONFIG, "init_args_num_cpus"),
+    ] = None,
     init_args_num_gpus: Annotated[
         int | None,
         typer.Option(
@@ -114,26 +110,53 @@ def simulation_config(  # pylint: disable=R0913,R0917,W0613
             help="Number of GPUs to make available to the Simulation Runtime",
             min=0,
         ),
-    ] = _handle_none_field(DEFAULT_SIMULATION_CONFIG, "init_args_num_gpus"),
+    ] = None,
     init_args_logging_level: Annotated[
         str | None,
         typer.Option(
             "--init-args-logging-level",
             help="Control logging level in Simulation Runtime.",
         ),
-    ] = DEFAULT_SIMULATION_CONFIG.init_args_logging_level,
+    ] = None,
     init_args_log_to_driver: Annotated[
-        bool,
+        Literal["true", "false"] | None,
         typer.Option(
             "--init-args-log-to-driver",
+            case_sensitive=False,
             help="Whether to propagate logs from Simulation Runtime upwards.",
         ),
-    ] = DEFAULT_SIMULATION_CONFIG.init_args_log_to_driver,
+    ] = None,
 ) -> None:
     """Configure a Federation using the Simulation Runtime."""
+    # Ensure one of the options is provided
+    no_sim_options_passed = all(
+        option is None
+        for option in (
+            num_supernodes,
+            client_resources_num_cpus,
+            client_resources_num_gpus,
+            verbose,
+            backend,
+            init_args_num_cpus,
+            init_args_num_gpus,
+            init_args_logging_level,
+            init_args_log_to_driver,
+        )
+    )
+
     with cli_output_control_stub(superlink, output_format) as (stub, is_json):
+
+        if no_sim_options_passed:
+            raise click.UsageError(
+                "At least one simulation configuration option must be provided."
+            )
+
+        log_to_driver = None
+        if init_args_log_to_driver is not None:
+            log_to_driver = init_args_log_to_driver == "true"
+
         request = ConfigureSimulationFederationRequest(
-            federation_name=federation,
+            federation_name=federation or "",
             config=SimulationConfig(
                 num_supernodes=num_supernodes,
                 client_resources_num_cpus=client_resources_num_cpus,
@@ -143,7 +166,7 @@ def simulation_config(  # pylint: disable=R0913,R0917,W0613
                 init_args_num_cpus=init_args_num_cpus,
                 init_args_num_gpus=init_args_num_gpus,
                 init_args_logging_level=init_args_logging_level,
-                init_args_log_to_driver=init_args_log_to_driver,
+                init_args_log_to_driver=log_to_driver,
             ),
         )
         _ = is_json
@@ -168,6 +191,4 @@ def _configure_federation_for_simulation(
     if is_json:
         print_json_to_stdout({"success": True})
     else:
-        typer.secho(
-            f"✅ Updated simulation configuration for '{request.federation_name}'."
-        )
+        typer.secho("✅ Updated simulation configuration.")

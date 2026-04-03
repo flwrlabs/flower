@@ -25,7 +25,7 @@ from unittest.mock import patch
 import grpc
 from parameterized import parameterized
 
-from flwr.common import ConfigRecord, now
+from flwr.common import now
 from flwr.common.constant import (
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     NOOP_ACCOUNT_NAME,
@@ -255,7 +255,7 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
     def _create_dummy_run(self, running: bool = True) -> int:
         """Create a dummy run in linkstate and return the run_id."""
         run_id = self.state.create_run(
-            "", "", "", {}, NOOP_FEDERATION, ConfigRecord(), "", RunType.SERVER_APP
+            "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
         )
         if running:
             self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
