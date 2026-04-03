@@ -633,53 +633,17 @@ def validate_credentials_content(creds_path: Path) -> str:
 def validate_federation_name(name: str) -> tuple[bool, str]:
     """Validate a federation name based on specific security and formatting rules.
 
-    Rules:
-    1. The name must not be empty.
-    2. The name must be less than 20 characters long.
-    3. The name must start with a letter or a number.
-    4. No spaces are allowed.
-    5. No capital letters are allowed (must be lowercase).
-    6. Only letters, numbers, and hyphens (-) are allowed.
-
-    Args:
-        name (str): The string to be validated.
-
     Returns
     -------
         tuple: (bool, str)
                - A boolean indicating if the name is valid (True/False).
                - A string containing a success message or a detailed error message.
     """
-    errors = []
 
-    # 1. Check if the name is empty
-    if not name:
-        return False, "Name cannot be empty."
-
-    # 2. Check length (must be < 20)
-    if len(name) >= 20:
-        errors.append("must be less than 20 characters long")
-
-    # 3. Check if it starts with a letter or a number
-    if not name[0].isalnum():
-        errors.append("must start with a letter or a number")
-
-    # 4. Check for spaces
-    if " " in name:
-        errors.append("no spaces allowed")
-
-    # 5. Check for capital letters
-    if any(char.isupper() for char in name):
-        errors.append("must be all lowercase")
-
-    # 6. Check for invalid symbols (allowing only alphanumeric and '-')
-    for char in name:
-        if not char.isalnum() and char != "-":
-            errors.append("only letters, numbers, and hyphens are allowed")
-            break
+    valid = is_valid_project_name(name)
 
     # Final Decision logic
-    if errors:
-        return False, f"Invalid name: {', '.join(errors)}."
+    if not valid:
+        return False, "Invalid name."
 
     return True, "Name is valid."
