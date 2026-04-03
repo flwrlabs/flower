@@ -1,8 +1,3 @@
-from flwr_datasets import FederatedDataset
-from flwr_datasets.partitioner import IidPartitioner
-from transformers import AutoTokenizer
-from trl import DataCollatorForCompletionOnlyLM
-
 FDS = None  # Cache FederatedDataset
 
 
@@ -17,6 +12,9 @@ def formatting_prompts_func(example):
 
 
 def get_tokenizer_and_data_collator_and_propt_formatting(model_name: str):
+    from transformers import AutoTokenizer
+    from trl import DataCollatorForCompletionOnlyLM
+
     # From: https://huggingface.co/docs/trl/en/sft_trainer
     tokenizer = AutoTokenizer.from_pretrained(
         model_name, use_fast=True, padding_side="right"
@@ -35,6 +33,9 @@ def get_tokenizer_and_data_collator_and_propt_formatting(model_name: str):
 
 def load_data(partition_id: int, num_partitions: int, dataset_name: str):
     """Load partition data."""
+    from flwr_datasets import FederatedDataset
+    from flwr_datasets.partitioner import IidPartitioner
+
     # Only initialize `FederatedDataset` once
     global FDS
     if FDS is None:

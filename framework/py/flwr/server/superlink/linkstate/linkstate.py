@@ -512,3 +512,36 @@ class LinkState(CoreState):  # pylint: disable=R0904
         runtime : float
             The runtime in seconds to add to the `run_id`'s cumulative total.
         """
+
+    @abc.abstractmethod
+    def record_instruction_enqueued(self, message_id: str, enqueued_at_ms: float) -> None:
+        """Record when a ServerApp instruction is enqueued at SuperLink."""
+
+    @abc.abstractmethod
+    def record_reply_enqueued(self, message_id: str, enqueued_at_ms: float) -> None:
+        """Record when a SuperNode reply is enqueued at SuperLink.
+
+        Parameters
+        ----------
+        message_id : str
+            The instruction message ID this reply corresponds to
+            (`reply_to_message_id`).
+        enqueued_at_ms : float
+            Unix timestamp in milliseconds.
+        """
+
+    @abc.abstractmethod
+    def record_clientapp_delivered(
+        self, run_id: int, message_id: str, delivered_at_ms: float
+    ) -> None:
+        """Record when an instruction is delivered to ClientApp runtime."""
+
+    @abc.abstractmethod
+    def record_serverapp_delivered(
+        self, run_id: int, message_id: str, delivered_at_ms: float
+    ) -> None:
+        """Record when a reply is delivered to ServerApp runtime."""
+
+    @abc.abstractmethod
+    def get_delivery_timings(self, message_id: str) -> dict[str, float | None]:
+        """Get delivery timing anchors for a specific instruction message ID."""

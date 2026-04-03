@@ -19,6 +19,7 @@
 
 import json
 import sqlite3
+import threading
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from logging import ERROR, WARNING
@@ -36,7 +37,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.message import make_message
-from flwr.common.record import ConfigRecord
+from flwr.common.record import ConfigRecord, MetricRecord
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.common.typing import Run, RunStatus, UserConfig
@@ -195,6 +196,8 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
         super().__init__(database_path, object_store)
         federation_manager.linkstate = self
         self._federation_manager = federation_manager
+        self._delivery_lock = threading.RLock()
+        self._delivery_timings: dict[str, dict[str, float | None]] = {}
 
     def get_sql_statements(self) -> tuple[str, ...]:
         """Return SQL statements for LinkState tables."""
@@ -223,6 +226,10 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
         if any(errors):
             log(ERROR, errors)
             return None
+
+        # Anchor reply enqueue in SuperLink clock for upstream delivery metrics.
+        enqueued_at_ms = now().timestamp() * 1000.0
+        message.metadata.created_at = enqueued_at_ms / 1000.0
 
         # Store Message
         data = (message_to_dict(message),)
@@ -273,6 +280,10 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
             # with more integrity checks.
             self.conn.execute(query, data[0])
 
+        self.record_instruction_enqueued(
+            message_id=message.metadata.message_id,
+            enqueued_at_ms=now().timestamp() * 1000.0,
+        )
         return message.metadata.message_id
 
     def _check_stored_messages(self, message_ids: set[str]) -> None:
@@ -458,6 +469,7 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
             log(ERROR, "`run` is invalid")
             return None
 
+        self.record_reply_enqueued(msg_ins_id, enqueued_at_ms)
         return message.metadata.message_id
 
     def get_message_res(self, message_ids: set[str]) -> list[Message]:
@@ -538,9 +550,38 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
             ret.update(tmp_ret_dict)
 
             # Mark existing reply Messages to be returned as delivered
-            delivered_at = now().isoformat()
+            delivered_at_dt = now()
+            delivered_at = delivered_at_dt.isoformat()
+            delivered_at_ms = delivered_at_dt.timestamp() * 1000.0
             for message_res in ret.values():
                 message_res.metadata.delivered_at = delivered_at
+                ins_msg_id = message_res.metadata.reply_to_message_id
+                self.record_serverapp_delivered(
+                    run_id=message_res.metadata.run_id,
+                    message_id=ins_msg_id,
+                    delivered_at_ms=delivered_at_ms,
+                )
+                timings = self.get_delivery_timings(ins_msg_id)
+                ins_enqueued_at_ms = timings.get("ins_enqueued_at_ms")
+                clientapp_delivered_at_ms = timings.get("clientapp_delivered_at_ms")
+                if (
+                    ins_enqueued_at_ms is not None
+                    and clientapp_delivered_at_ms is not None
+                    and message_res.has_content()
+                ):
+                    downstream_ms = max(
+                        float(clientapp_delivered_at_ms) - float(ins_enqueued_at_ms),
+                        0.0,
+                    )
+                    metric_record = message_res.content.metric_records.get(
+                        "_flwr_network_delivery"
+                    )
+                    if metric_record is None:
+                        metric_record = MetricRecord()
+                        message_res.content.metric_records[
+                            "_flwr_network_delivery"
+                        ] = metric_record
+                    metric_record["downstream_ms"] = downstream_ms
             message_res_ids = [
                 message_res.metadata.message_id for message_res in ret.values()
             ]
@@ -1310,6 +1351,81 @@ class SqliteLinkState(LinkState, SqliteCoreState):  # pylint: disable=R0904
 
             if not rows:
                 raise ValueError(f"Run {run_id} not found")
+
+    def record_instruction_enqueued(self, message_id: str, enqueued_at_ms: float) -> None:
+        """Record when a ServerApp instruction is enqueued at SuperLink."""
+        with self._delivery_lock:
+            timings = self._delivery_timings.setdefault(
+                message_id,
+                {
+                    "ins_enqueued_at_ms": None,
+                    "clientapp_delivered_at_ms": None,
+                    "res_enqueued_at_ms": None,
+                    "serverapp_delivered_at_ms": None,
+                },
+            )
+            timings["ins_enqueued_at_ms"] = enqueued_at_ms
+
+    def record_reply_enqueued(self, message_id: str, enqueued_at_ms: float) -> None:
+        """Record when a SuperNode reply is enqueued at SuperLink."""
+        with self._delivery_lock:
+            timings = self._delivery_timings.setdefault(
+                message_id,
+                {
+                    "ins_enqueued_at_ms": None,
+                    "clientapp_delivered_at_ms": None,
+                    "res_enqueued_at_ms": None,
+                    "serverapp_delivered_at_ms": None,
+                },
+            )
+            timings["res_enqueued_at_ms"] = enqueued_at_ms
+
+    def record_clientapp_delivered(
+        self, run_id: int, message_id: str, delivered_at_ms: float
+    ) -> None:
+        """Record when an instruction is delivered to ClientApp runtime."""
+        del run_id  # Unused in SQLite implementation.
+        with self._delivery_lock:
+            timings = self._delivery_timings.setdefault(
+                message_id,
+                {
+                    "ins_enqueued_at_ms": None,
+                    "clientapp_delivered_at_ms": None,
+                    "res_enqueued_at_ms": None,
+                    "serverapp_delivered_at_ms": None,
+                },
+            )
+            timings["clientapp_delivered_at_ms"] = delivered_at_ms
+
+    def record_serverapp_delivered(
+        self, run_id: int, message_id: str, delivered_at_ms: float
+    ) -> None:
+        """Record when a reply is delivered to ServerApp runtime."""
+        del run_id  # Unused in SQLite implementation.
+        with self._delivery_lock:
+            timings = self._delivery_timings.setdefault(
+                message_id,
+                {
+                    "ins_enqueued_at_ms": None,
+                    "clientapp_delivered_at_ms": None,
+                    "res_enqueued_at_ms": None,
+                    "serverapp_delivered_at_ms": None,
+                },
+            )
+            timings["serverapp_delivered_at_ms"] = delivered_at_ms
+
+    def get_delivery_timings(self, message_id: str) -> dict[str, float | None]:
+        """Get delivery timing anchors for a specific instruction message ID."""
+        with self._delivery_lock:
+            timings = self._delivery_timings.get(message_id)
+            if timings is None:
+                return {
+                    "ins_enqueued_at_ms": None,
+                    "clientapp_delivered_at_ms": None,
+                    "res_enqueued_at_ms": None,
+                    "serverapp_delivered_at_ms": None,
+                }
+            return dict(timings)
 
 
 def message_to_dict(message: Message) -> dict[str, Any]:

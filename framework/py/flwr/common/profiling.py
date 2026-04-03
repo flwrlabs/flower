@@ -246,7 +246,7 @@ class ProfileRecorder:
                 }
             )
 
-        # Derive approximate network time per round
+        # Derive combined network time per round from measured upstream/downstream.
         by_round: dict[int | None, dict[str, float]] = {}
         for entry in entries:
             if entry["round"] is None:
@@ -254,16 +254,14 @@ class ProfileRecorder:
             round_id = entry["round"]
             if round_id not in by_round:
                 by_round[round_id] = {}
-            if entry["scope"] == "server" and entry["task"] == "send_and_receive":
-                by_round[round_id]["send_and_receive_avg"] = entry["avg_ms"]
-            if entry["scope"] == "client" and entry["task"] == "total":
-                by_round[round_id]["client_total_avg"] = entry["avg_ms"]
+            if entry["scope"] == "server" and entry["task"] == "network_upstream":
+                by_round[round_id]["upstream_avg"] = entry["avg_ms"]
+            if entry["scope"] == "server" and entry["task"] == "network_downstream":
+                by_round[round_id]["downstream_avg"] = entry["avg_ms"]
 
         for round_id, values in by_round.items():
-            if "send_and_receive_avg" in values and "client_total_avg" in values:
-                network_ms = max(
-                    values["send_and_receive_avg"] - values["client_total_avg"], 0.0
-                )
+            if "upstream_avg" in values and "downstream_avg" in values:
+                network_ms = max(values["upstream_avg"] + values["downstream_avg"], 0.0)
                 entries.append(
                     {
                         "scope": "server",
@@ -457,6 +455,63 @@ def record_profile_metrics_from_messages(messages: Iterable[Message]) -> None:
                         duration_ms=duration,
                         metadata=metadata,
                     )
+        except Exception:
+            # Profiling should never break normal control flow
+            continue
+
+
+def record_network_delivery_metrics_from_messages(
+    messages: Iterable[Message], delivered_at_ms: float
+) -> None:
+    """Record network delivery timings derived from per-message delivery anchors."""
+    profiler = get_active_profiler()
+    if profiler is None:
+        return
+
+    round_id = get_current_round()
+    for msg in messages:
+        try:
+            if msg.has_error():
+                continue
+            # Upstream: SuperNode reply enqueue at SuperLink -> ServerApp delivery.
+            created_at_ms = float(msg.metadata.created_at) * 1000.0
+            upstream_ms = max(delivered_at_ms - created_at_ms, 0.0)
+            profiler.record(
+                scope="network",
+                task="upstream",
+                round=round_id,
+                node_id=None,
+                duration_ms=upstream_ms,
+            )
+
+            # Downstream is injected by SuperLink as part of reply payload when
+            # both instruction enqueue and ClientApp delivery anchors are available.
+            downstream_ms: float | None = None
+            downstream_hint = msg.metadata.__dict__.get("_network_downstream_ms")
+            if isinstance(downstream_hint, (int, float)):
+                downstream_ms = max(float(downstream_hint), 0.0)
+            elif msg.has_content():
+                metric_record = msg.content.metric_records.get("_flwr_network_delivery")
+                if metric_record is not None:
+                    value = metric_record.get("downstream_ms")
+                    if isinstance(value, (int, float)):
+                        downstream_ms = max(float(value), 0.0)
+
+            if downstream_ms is not None:
+                profiler.record(
+                    scope="network",
+                    task="downstream",
+                    round=round_id,
+                    node_id=None,
+                    duration_ms=downstream_ms,
+                )
+                profiler.record(
+                    scope="network",
+                    task="combined",
+                    round=round_id,
+                    node_id=None,
+                    duration_ms=downstream_ms + upstream_ms,
+                )
         except Exception:
             # Profiling should never break normal control flow
             continue

@@ -32,17 +32,85 @@ learning-rate = 0.1
 batch-size = 32
 profile.enabled = false
 
-[tool.flwr.federations]
-default = "local-simulation"
 
-[tool.flwr.federations.local-simulation]
-options.num-supernodes = 10
+#######################################################################
+# CONFIGURATION MIGRATION NOTICE:
+#
+# What was previously called "federation config" for SuperLink
+# connections in pyproject.toml has been renamed and moved.
+#
+# These settings are now **SuperLink connection configuration**
+# and are defined in the Flower configuration file.
+#
+# The entries below are commented out intentionally and are kept
+# only as a migration reference.
+#
+# Docs: https://flower.ai/docs/framework/ref-flower-configuration.html
+#######################################################################
 
-[tool.flwr.federations.local-simulation-gpu]
-options.num-supernodes = 10
-options.backend.client-resources.num-cpus = 2 # each ClientApp assumes to use 2CPUs
-options.backend.client-resources.num-gpus = 0.2 # at most 5 ClientApp will run in a given GPU
+# [tool.flwr.federations]
+# default = "local-simulation"
 
-[tool.flwr.federations.local-deployment]
-insecure=true
-address="127.0.0.1:9093"
+# [tool.flwr.federations.local-simulation]
+# options.num-supernodes = 10
+
+# [tool.flwr.federations.local-simulation-gpu]
+# options.num-supernodes = 10
+# options.backend.client-resources.num-cpus = 2 # each ClientApp assumes to use 2CPUs
+# options.backend.client-resources.num-gpus = 0.2 # at most 5 ClientApp will run in a given GPU
+
+# [tool.flwr.federations.local-deployment]
+# insecure=true
+# address="127.0.0.1:9093"
+
+
+#######################################################################
+# CONFIGURATION MIGRATION NOTICE:
+#
+# What was previously called "federation config" for SuperLink
+# connections in pyproject.toml has been renamed and moved.
+#
+# These settings are now **SuperLink connection configuration**
+# and are defined in the Flower configuration file.
+#
+# The entries below are commented out intentionally and are kept
+# only as a migration reference.
+#
+# Docs: https://flower.ai/docs/framework/ref-flower-configuration.html
+#######################################################################
+
+# [tool.flwr.federations]
+# default = "local-simulation"
+
+# [tool.flwr.federations.local-simulation]
+# options.num-supernodes = 2
+
+# [tool.flwr.federations.local-deployment]
+# insecure = true
+# address = "127.0.0.1:9093"
+
+
+#######################################################################
+# CONFIGURATION MIGRATION NOTICE:
+#
+# What was previously called "federation config" for SuperLink
+# connections in pyproject.toml has been renamed and moved.
+#
+# These settings are now **SuperLink connection configuration**
+# and are defined in the Flower configuration file.
+#
+# The entries below are commented out intentionally and are kept
+# only as a migration reference.
+#
+# Docs: https://flower.ai/docs/framework/ref-flower-configuration.html
+#######################################################################
+
+# [tool.flwr.federations]
+# default = "local-simulation"
+
+# [tool.flwr.federations.local-simulation]
+# options.num-supernodes = 2
+
+# [tool.flwr.federations.local-deployment]
+# insecure = true
+# address = "127.0.0.1:9093"

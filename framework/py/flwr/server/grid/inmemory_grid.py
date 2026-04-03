@@ -26,6 +26,7 @@ from flwr.common.profiling import (
     get_active_profiler,
     get_current_round,
     publish_profile_summary,
+    record_network_delivery_metrics_from_messages,
     record_profile_metrics_from_messages,
 )
 
@@ -143,6 +144,15 @@ class InMemoryGrid(Grid):
         msg_ids = set(message_ids)
         # Pull Messages
         message_res_list = self.state.get_message_res(message_ids=msg_ids)
+        for msg_res in message_res_list:
+            metric_record = msg_res.content.metric_records.get("_flwr_network_delivery")
+            if metric_record is not None:
+                downstream_ms = metric_record.get("downstream_ms")
+                if isinstance(downstream_ms, (int, float)):
+                    msg_res.metadata.__dict__["_network_downstream_ms"] = float(
+                        downstream_ms
+                    )
+                del msg_res.content.metric_records["_flwr_network_delivery"]
         # Get IDs of Messages these replies are for
         message_ins_ids_to_delete = {
             msg_res.metadata.reply_to_message_id for msg_res in message_res_list
@@ -223,7 +233,7 @@ class InMemoryGrid(Grid):
                 )
             profiler.record(
                 scope="server",
-                task="network_upstream",
+                task="network_downstream",
                 round=get_current_round(),
                 node_id=None,
                 duration_ms=(perf_counter() - push_start) * 1000.0,
@@ -245,24 +255,35 @@ class InMemoryGrid(Grid):
         pull_start = perf_counter() if profiler is not None else None
         mem_start_mb = None
         disk_start = None
+        pull_active_ms = 0.0
+        wait_sleep_ms = 0.0
         if proc is not None:
             mem_start_mb = proc.memory_info().rss / (1024**2)
             disk_start = read_disk_io_mb(proc)
         end_time = time.time() + (timeout if timeout is not None else 0.0)
         ret: list[Message] = []
         while timeout is None or time.time() < end_time:
+            iter_start = perf_counter() if profiler is not None else None
             res_msgs = self.pull_messages(msg_ids)
+            if iter_start is not None:
+                pull_active_ms += (perf_counter() - iter_start) * 1000.0
             ret.extend(res_msgs)
             msg_ids.difference_update(
                 {msg.metadata.reply_to_message_id for msg in res_msgs}
             )
             if profiler is not None and res_msgs:
+                record_network_delivery_metrics_from_messages(
+                    res_msgs, delivered_at_ms=time.time() * 1000.0
+                )
                 record_profile_metrics_from_messages(res_msgs)
                 publish_profile_summary()
             if len(msg_ids) == 0:
                 break
             # Sleep
+            sleep_start = perf_counter() if profiler is not None else None
             time.sleep(self.pull_interval)
+            if sleep_start is not None:
+                wait_sleep_ms += (perf_counter() - sleep_start) * 1000.0
         if profiler is not None and pull_start is not None:
             mem_end_mb = None
             mem_delta_mb = None
@@ -279,12 +300,13 @@ class InMemoryGrid(Grid):
                 )
             profiler.record(
                 scope="server",
-                task="network_downstream",
+                task="network_upstream",
                 round=get_current_round(),
                 node_id=None,
-                duration_ms=(perf_counter() - pull_start) * 1000.0,
+                duration_ms=pull_active_ms,
                 metadata={
                     "received": len(ret),
+                    "wait_sleep_ms": wait_sleep_ms,
                     "memory_start_mb": mem_start_mb,
                     "memory_end_mb": mem_end_mb,
                     "memory_delta_mb": mem_delta_mb,
@@ -314,9 +336,12 @@ class InMemoryGrid(Grid):
                 task="send_and_receive",
                 round=get_current_round(),
                 node_id=None,
-                duration_ms=duration_ms,
+                duration_ms=max(
+                    duration_ms - wait_sleep_ms, 0.0
+                ),
                 metadata={
                     "expected_replies": expected_replies,
+                    "wait_sleep_ms": wait_sleep_ms,
                     "memory_start_mb": overall_mem_start_mb,
                     "memory_end_mb": mem_end_mb,
                     "memory_delta_mb": mem_delta_mb,

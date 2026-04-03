@@ -185,6 +185,75 @@ def extract_state_dict(payload: object) -> dict[str, torch.Tensor]:
     raise TypeError(f"Unsupported checkpoint payload type: {type(payload)}")
 
 
+def _normalize_state_dict_for_hf(
+    state_dict: dict[str, torch.Tensor],
+) -> dict[str, torch.Tensor]:
+    """Normalize nested checkpoint dicts to plain HF-like state_dict."""
+    if "model" in state_dict and isinstance(state_dict["model"], dict):
+        model_state = state_dict["model"]
+        return {
+            str(name): tensor.detach().cpu()
+            for name, tensor in model_state.items()
+            if torch.is_tensor(tensor)
+        }
+    return {
+        str(name): tensor.detach().cpu()
+        for name, tensor in state_dict.items()
+        if torch.is_tensor(tensor)
+    }
+
+
+def _save_state_dict_as_dcp(
+    state_dict: dict[str, torch.Tensor],
+    output_dir: str,
+    *,
+    train_spec_name: str,
+    model_args_key: str,
+    dcp_threads: int,
+) -> None:
+    """Save state_dict in DCP format, preferring TorchTitan adapter when available."""
+    from torch.distributed import checkpoint as dcp
+
+    os.makedirs(output_dir, exist_ok=True)
+    writer = dcp.filesystem.FileSystemWriter(output_dir, thread_count=dcp_threads)
+    try:
+        import torchtitan.protocols.train_spec as train_spec_module
+    except Exception:
+        dcp.save(state_dict, storage_writer=writer)
+        return
+
+    train_spec = train_spec_module.get_train_spec(train_spec_name)
+    model_args = train_spec.model_args[model_args_key]
+    sd_adapter = train_spec.state_dict_adapter(model_args, None)
+    titan_state_dict = sd_adapter.from_hf(state_dict)
+    dcp.save(titan_state_dict, storage_writer=writer)
+
+
+def _load_state_dict_from_dcp(
+    input_dir: str,
+    *,
+    train_spec_name: str,
+    model_args_key: str,
+) -> dict[str, torch.Tensor]:
+    """Load state_dict from DCP format, converting back to HF-like mapping."""
+    from torch.distributed import checkpoint as dcp
+
+    reader = dcp.filesystem.FileSystemReader(input_dir)
+    checkpoint_dict: dict[str, Any] = {}
+    dcp.load(checkpoint_dict, storage_reader=reader, no_dist=True)
+
+    try:
+        import torchtitan.protocols.train_spec as train_spec_module
+    except Exception:
+        return _normalize_state_dict_for_hf(extract_state_dict(checkpoint_dict))
+
+    train_spec = train_spec_module.get_train_spec(train_spec_name)
+    model_args = train_spec.model_args[model_args_key]
+    sd_adapter = train_spec.state_dict_adapter(model_args, None)
+    hf_state = sd_adapter.to_hf(checkpoint_dict)
+    return _normalize_state_dict_for_hf(extract_state_dict(hf_state))
+
+
 def run_torchtitan_training(
     cfg: DictConfig,
     context: Context,
@@ -203,16 +272,59 @@ def run_torchtitan_training(
     os.makedirs(output_dir, exist_ok=True)
     input_state_path = os.path.join(output_dir, "input_state.pt")
     output_state_path = os.path.join(output_dir, "output_state.pt")
+    input_dcp_dir = os.path.join(output_dir, "input_state.dcp")
+    output_dcp_dir = os.path.join(output_dir, "output_state.dcp")
+    dcp_enabled = _as_bool(
+        _config_value(
+            context,
+            "trainer.torchtitan.dcp-enabled",
+            _config_value(context, "trainer.torchtitan.dcp_enabled", False),
+        ),
+        default=False,
+    )
+    dcp_train_spec = str(
+        _config_value(
+            context,
+            "trainer.torchtitan.dcp-train-spec",
+            _config_value(context, "trainer.torchtitan.dcp_train_spec", "llama3"),
+        )
+    ).strip()
+    dcp_model_args = str(
+        _config_value(
+            context,
+            "trainer.torchtitan.dcp-model-args",
+            _config_value(context, "trainer.torchtitan.dcp_model_args", "8B"),
+        )
+    ).strip()
+    dcp_threads = int(
+        _config_value(
+            context,
+            "trainer.torchtitan.dcp-threads",
+            _config_value(context, "trainer.torchtitan.dcp_threads", 8),
+        )
+    )
     torch.save(state_dict, input_state_path)
+    if dcp_enabled:
+        _save_state_dict_as_dcp(
+            state_dict,
+            input_dcp_dir,
+            train_spec_name=dcp_train_spec,
+            model_args_key=dcp_model_args,
+            dcp_threads=dcp_threads,
+        )
 
     env = os.environ.copy()
     env["FLWR_TORCHTITAN_INPUT_STATE"] = input_state_path
     env["FLWR_TORCHTITAN_OUTPUT_STATE"] = output_state_path
+    env["FLWR_TORCHTITAN_INPUT_DCP_DIR"] = input_dcp_dir
+    env["FLWR_TORCHTITAN_OUTPUT_DCP_DIR"] = output_dcp_dir
     env["FLWR_RUN_ID"] = str(context.run_id)
     env["FLWR_NODE_ID"] = str(context.node_id)
     scheduler_env = {
         "FLWR_TORCHTITAN_INPUT_STATE": input_state_path,
         "FLWR_TORCHTITAN_OUTPUT_STATE": output_state_path,
+        "FLWR_TORCHTITAN_INPUT_DCP_DIR": input_dcp_dir,
+        "FLWR_TORCHTITAN_OUTPUT_DCP_DIR": output_dcp_dir,
         "FLWR_RUN_ID": str(context.run_id),
         "FLWR_NODE_ID": str(context.node_id),
     }
@@ -313,12 +425,20 @@ def run_torchtitan_training(
             "TorchTitan command failed with exit code "
             f"{result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
         )
-    if not os.path.exists(output_state_path):
-        raise FileNotFoundError(
-            "TorchTitan command completed but did not write "
-            f"{output_state_path}. Set FLWR_TORCHTITAN_OUTPUT_STATE in your command."
+    if os.path.exists(output_state_path):
+        payload = torch.load(output_state_path, map_location="cpu")
+        trained_state = extract_state_dict(payload)
+        return _normalize_state_dict_for_hf(trained_state)
+
+    if dcp_enabled and os.path.isdir(output_dcp_dir):
+        return _load_state_dict_from_dcp(
+            output_dcp_dir,
+            train_spec_name=dcp_train_spec,
+            model_args_key=dcp_model_args,
         )
 
-    payload = torch.load(output_state_path, map_location="cpu")
-    trained_state = extract_state_dict(payload)
-    return {name: tensor.detach().cpu() for name, tensor in trained_state.items()}
+    raise FileNotFoundError(
+        "TorchTitan command completed but did not write either "
+        f"{output_state_path} or {output_dcp_dir}. "
+        "Set FLWR_TORCHTITAN_OUTPUT_STATE or FLWR_TORCHTITAN_OUTPUT_DCP_DIR."
+    )

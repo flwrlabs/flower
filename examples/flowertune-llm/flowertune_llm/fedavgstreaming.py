@@ -480,6 +480,15 @@ class FedAvgStreaming(FedAvg):
             set_current_round(current_round)
             log(INFO, "")
             log(INFO, "[ROUND %s/%s]", current_round, num_rounds)
+            aggregation_mode = train_config.get("aggregation.mode", "layerwise")
+
+            # In all_at_once mode, send the current global model each round.
+            # Using `initial_arrays` here would resend stale/empty arrays.
+            round_arrays = (
+                ArrayRecord(state_dict)
+                if aggregation_mode == "all_at_once"
+                else initial_arrays
+            )
 
             # -----------------------------------------------------------------
             # --- TRAINING (CLIENTAPP-SIDE) -----------------------------------
@@ -487,7 +496,7 @@ class FedAvgStreaming(FedAvg):
             train_messages = list(
                 self.configure_train(
                     current_round,
-                    initial_arrays,
+                    round_arrays,
                     train_config,
                     grid,
                 )
@@ -496,7 +505,6 @@ class FedAvgStreaming(FedAvg):
                 log(WARNING, "No train messages configured for round %s", current_round)
                 continue
 
-            aggregation_mode = train_config.get("aggregation.mode", "layerwise")
             selected_node_ids = [msg.metadata.dst_node_id for msg in train_messages]
             if aggregation_mode != "all_at_once":
                 self._download_layers_to_clients(

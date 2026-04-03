@@ -16,7 +16,7 @@
 
 from logging import ERROR
 
-from flwr.common import Message, log
+from flwr.common import Message, log, now
 from flwr.common.constant import (
     HEARTBEAT_MAX_INTERVAL,
     HEARTBEAT_MIN_INTERVAL,
@@ -348,6 +348,12 @@ def confirm_message_received(
     )
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
+
+    state.record_clientapp_delivered(
+        run_id=request.run_id,
+        message_id=request.message_object_id,
+        delivered_at_ms=now().timestamp() * 1000.0,
+    )
 
     # Delete the message object
     store.delete(request.message_object_id)

@@ -42,7 +42,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_get_fab = Mock()
         self.mock_push_object = Mock()
         self.mock_pull_object = Mock()
-        self.mock_confirm_message_received = Mock()
         self.simple_store: dict[str, bytes] = {}
 
     def test_pull_and_store_message_no_message(self) -> None:
@@ -60,7 +59,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             get_run=self.mock_get_run,
             get_fab=self.mock_get_fab,
             pull_object=self.mock_pull_object,
-            confirm_message_received=self.mock_confirm_message_received,
             trusted_entities={},
         )
 
@@ -70,7 +68,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_get_run.assert_not_called()
         self.mock_get_fab.assert_not_called()
         self.mock_pull_object.assert_not_called()
-        self.mock_confirm_message_received.assert_not_called()
 
     def _prepare_for_pull_and_store_message(self) -> None:
         """Prepare mocks for pull_and_store_message."""
@@ -106,7 +103,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
 
         # Assert: the message should be pulled and stored
         self.mock_receive.assert_called_once()
-        self.mock_confirm_message_received.assert_called_once()
         self.mock_state.get_run.assert_called_once()
         self.mock_state.store_message.assert_called_once_with(message_without_content)
 
@@ -131,7 +127,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             get_run=self.mock_get_run,
             get_fab=self.mock_get_fab,
             pull_object=self.mock_pull_object,
-            confirm_message_received=self.mock_confirm_message_received,
             trusted_entities={},
         )
 
@@ -181,7 +176,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
                 get_run=self.mock_get_run,
                 get_fab=self.mock_get_fab,
                 pull_object=self.mock_pull_object,
-                confirm_message_received=self.mock_confirm_message_received,
                 trusted_entities={},
             )
 

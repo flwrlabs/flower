@@ -15,6 +15,7 @@
 """ClientAppIo API servicer."""
 
 
+from collections.abc import Callable
 from logging import DEBUG, ERROR
 from typing import cast
 
@@ -79,6 +80,13 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
         self.state_factory = state_factory
         self.ffs_factory = ffs_factory
         self.objectstore_factory = objectstore_factory
+        self._confirm_message_received_fn: Callable[[int, str], None] | None = None
+
+    def set_confirm_message_received_fn(
+        self, confirm_message_received_fn: Callable[[int, str], None] | None
+    ) -> None:
+        """Set callback to confirm instruction delivery at SuperLink."""
+        self._confirm_message_received_fn = confirm_message_received_fn
 
     def ListAppsToLaunch(
         self,
@@ -225,6 +233,12 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
 
         # Record message processing start time
         state.record_message_processing_start(message_id=message.metadata.message_id)
+        if self._confirm_message_received_fn is not None:
+            try:
+                self._confirm_message_received_fn(run_id, message.metadata.message_id)
+            except Exception:  # pragma: no cover
+                # Delivery profiling should never interrupt message flow.
+                pass
 
         # Retrieve the object tree for the message
         object_tree = store.get_object_tree(message.metadata.message_id)

@@ -34,7 +34,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.record import ConfigRecord
+from flwr.common.record import ConfigRecord, MetricRecord
 from flwr.common.typing import Run, RunStatus, UserConfig
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
@@ -84,6 +84,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         self.message_ins_store: dict[str, Message] = {}
         self.message_res_store: dict[str, Message] = {}
         self.message_ins_id_to_message_res_id: dict[str, str] = {}
+        # Instruction-scoped delivery anchors used for network delivery profiling.
+        self.delivery_timings: dict[str, dict[str, float | None]] = {}
 
         # Map flwr_aid to run_ids for O(1) reverse index lookup
         self.flwr_aid_to_run_ids: dict[str, set[int]] = defaultdict(set)
@@ -139,6 +141,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         message_id = message.metadata.message_id
         with self.lock:
             self.message_ins_store[message_id] = message
+            self.record_instruction_enqueued(
+                message_id=message_id, enqueued_at_ms=now().timestamp() * 1000.0
+            )
 
         # Return the new message_id
         return message_id
@@ -262,8 +267,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
         message_id = message.metadata.message_id
         with self.lock:
+            enqueued_at_ms = now().timestamp() * 1000.0
             self.message_res_store[message_id] = message
             self.message_ins_id_to_message_res_id[msg_ins_id] = message_id
+            self.record_reply_enqueued(message_id=msg_ins_id, enqueued_at_ms=enqueued_at_ms)
+            # Anchor reply enqueue in SuperLink clock for upstream delivery metrics.
+            message.metadata.created_at = enqueued_at_ms / 1000.0
 
         # Return the new message_id
         return message_id
@@ -320,9 +329,38 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             ret.update(tmp_ret_dict)
 
             # Mark existing reply Messages to be returned as delivered
-            delivered_at = now().isoformat()
+            delivered_at_dt = now()
+            delivered_at = delivered_at_dt.isoformat()
+            delivered_at_ms = delivered_at_dt.timestamp() * 1000.0
             for message_res in message_res_found:
                 message_res.metadata.delivered_at = delivered_at
+                ins_msg_id = message_res.metadata.reply_to_message_id
+                self.record_serverapp_delivered(
+                    run_id=message_res.metadata.run_id,
+                    message_id=ins_msg_id,
+                    delivered_at_ms=delivered_at_ms,
+                )
+                timings = self.get_delivery_timings(ins_msg_id)
+                ins_enqueued_at_ms = timings.get("ins_enqueued_at_ms")
+                clientapp_delivered_at_ms = timings.get("clientapp_delivered_at_ms")
+                if (
+                    ins_enqueued_at_ms is not None
+                    and clientapp_delivered_at_ms is not None
+                    and message_res.has_content()
+                ):
+                    downstream_ms = max(
+                        float(clientapp_delivered_at_ms) - float(ins_enqueued_at_ms),
+                        0.0,
+                    )
+                    metric_record = message_res.content.metric_records.get(
+                        "_flwr_network_delivery"
+                    )
+                    if metric_record is None:
+                        metric_record = MetricRecord()
+                        message_res.content.metric_records[
+                            "_flwr_network_delivery"
+                        ] = metric_record
+                    metric_record["downstream_ms"] = downstream_ms
 
         return list(ret.values())
 
@@ -804,3 +842,78 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             if run_id not in self.run_ids:
                 raise ValueError(f"Run {run_id} not found")
             self.run_ids[run_id].run.clientapp_runtime += runtime
+
+    def record_instruction_enqueued(self, message_id: str, enqueued_at_ms: float) -> None:
+        """Record when a ServerApp instruction is enqueued at SuperLink."""
+        with self.lock:
+            timings = self.delivery_timings.setdefault(
+                message_id,
+                {
+                    "ins_enqueued_at_ms": None,
+                    "clientapp_delivered_at_ms": None,
+                    "res_enqueued_at_ms": None,
+                    "serverapp_delivered_at_ms": None,
+                },
+            )
+            timings["ins_enqueued_at_ms"] = enqueued_at_ms
+
+    def record_reply_enqueued(self, message_id: str, enqueued_at_ms: float) -> None:
+        """Record when a SuperNode reply is enqueued at SuperLink."""
+        with self.lock:
+            timings = self.delivery_timings.setdefault(
+                message_id,
+                {
+                    "ins_enqueued_at_ms": None,
+                    "clientapp_delivered_at_ms": None,
+                    "res_enqueued_at_ms": None,
+                    "serverapp_delivered_at_ms": None,
+                },
+            )
+            timings["res_enqueued_at_ms"] = enqueued_at_ms
+
+    def record_clientapp_delivered(
+        self, run_id: int, message_id: str, delivered_at_ms: float
+    ) -> None:
+        """Record when an instruction is delivered to ClientApp runtime."""
+        del run_id  # Unused.
+        with self.lock:
+            timings = self.delivery_timings.setdefault(
+                message_id,
+                {
+                    "ins_enqueued_at_ms": None,
+                    "clientapp_delivered_at_ms": None,
+                    "res_enqueued_at_ms": None,
+                    "serverapp_delivered_at_ms": None,
+                },
+            )
+            timings["clientapp_delivered_at_ms"] = delivered_at_ms
+
+    def record_serverapp_delivered(
+        self, run_id: int, message_id: str, delivered_at_ms: float
+    ) -> None:
+        """Record when a reply is delivered to ServerApp runtime."""
+        del run_id  # Unused.
+        with self.lock:
+            timings = self.delivery_timings.setdefault(
+                message_id,
+                {
+                    "ins_enqueued_at_ms": None,
+                    "clientapp_delivered_at_ms": None,
+                    "res_enqueued_at_ms": None,
+                    "serverapp_delivered_at_ms": None,
+                },
+            )
+            timings["serverapp_delivered_at_ms"] = delivered_at_ms
+
+    def get_delivery_timings(self, message_id: str) -> dict[str, float | None]:
+        """Get delivery timing anchors for a specific instruction message ID."""
+        with self.lock:
+            timings = self.delivery_timings.get(message_id)
+            if timings is None:
+                return {
+                    "ins_enqueued_at_ms": None,
+                    "clientapp_delivered_at_ms": None,
+                    "res_enqueued_at_ms": None,
+                    "serverapp_delivered_at_ms": None,
+                }
+            return dict(timings)

@@ -54,9 +54,8 @@ pip install -e .
 You can run your Flower project in both _simulation_ and _deployment_ mode without making changes to the code. If you are starting with Flower, we recommend you using the _simulation_ mode as it requires fewer components to be launched manually. By default, `flwr run` will make use of the Simulation Engine.
 
 > [!NOTE]
-> In this version of the example, **client-side training is disabled** to allow
-> aggregation-only runs. Dataset/tokenizer work is skipped, and the example focuses
-> on layer-wise model aggregation.
+> You can force aggregation-only debug runs (skip client training) by setting
+> `train.disable=true` in `--run-config`.
 
 ### Run with the Simulation Engine
 
@@ -121,6 +120,30 @@ Then use the new CLI command to display a summary:
 ```bash
 flwr profile <run_id>
 ```
+
+### Scheduler-backed Training on SuperNode (Slurm/Flux)
+
+You can pass scheduler settings directly to each `flower-supernode` process:
+
+```bash
+# Slurm example
+flower-supernode --insecure --superlink <SUPERLINK_HOST:9092> \
+  --node-config "scheduler.backend='slurm' scheduler.slurm.submit-command='sbatch' scheduler.slurm.extra-args='--partition=gpu --gres=gpu:1'"
+
+# Flux example
+flower-supernode --insecure --superlink <SUPERLINK_HOST:9092> \
+  --node-config "scheduler.backend='flux' scheduler.flux.run-command='flux run' scheduler.flux.extra-args='-N1 -n1 -g1'"
+```
+
+To skip training entirely at runtime (useful for communication/debug profiling):
+
+```bash
+flwr run . local-deployment --run-config "train.disable=true profile.enabled=true"
+```
+
+For a laptop-friendly Docker Compose smoke test (Slurm/Flux scheduler paths +
+TorchTitan installed in containers), see:
+`/Users/pfoley/Code/flower/examples/flowertune-llm/docker/local-schedulers/README.md`
 
 ### Layer-wise Aggregation + Profiling (Quickstart)
 

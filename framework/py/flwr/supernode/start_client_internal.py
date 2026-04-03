@@ -183,7 +183,7 @@ def start_client_internal(
 
     # Launch ClientAppIo API server
     grpc_servers = []
-    clientappio_server = run_clientappio_api_grpc(
+    clientappio_server, clientappio_servicer = run_clientappio_api_grpc(
         address=clientappio_api_address,
         state_factory=state_factory,
         ffs_factory=ffs_factory,
@@ -237,6 +237,7 @@ def start_client_internal(
             push_object,
             confirm_message_received,
         ) = conn
+        clientappio_servicer.set_confirm_message_received_fn(confirm_message_received)
         # Store node_id in state
         state.set_node_id(node_id)
         log(INFO, "SuperNode ID: %s", node_id)
@@ -254,7 +255,6 @@ def start_client_internal(
                 get_run=get_run,
                 get_fab=get_fab,
                 pull_object=pull_object,
-                confirm_message_received=confirm_message_received,
                 trusted_entities=trusted_entities,
             )
 
@@ -297,7 +297,6 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
     get_run: Callable[[int], Run],
     get_fab: Callable[[str, int], Fab],
     pull_object: Callable[[int, str], bytes],
-    confirm_message_received: Callable[[int, str], None],
     trusted_entities: dict[str, str] | None,
 ) -> int | None:
     """Pull a message from the SuperLink and store it in the state.
@@ -397,8 +396,6 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
             for obj_id in list(obj_contents.keys()):
                 object_store.put(obj_id, obj_contents.pop(obj_id))
 
-            # Confirm that the message was received
-            confirm_message_received(run_id, message.metadata.message_id)
             log(INFO, "Received successfully")
         except Exception as err:  # pylint: disable=broad-except
             log(
@@ -622,9 +619,9 @@ def run_clientappio_api_grpc(
     ffs_factory: FfsFactory,
     objectstore_factory: ObjectStoreFactory,
     certificates: tuple[bytes, bytes, bytes] | None,
-) -> grpc.Server:
+) -> tuple[grpc.Server, ClientAppIoServicer]:
     """Run ClientAppIo API gRPC server."""
-    clientappio_servicer: grpc.Server = ClientAppIoServicer(
+    clientappio_servicer = ClientAppIoServicer(
         state_factory=state_factory,
         ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
@@ -641,7 +638,7 @@ def run_clientappio_api_grpc(
     )
     log(INFO, "Flower Deployment Runtime: Starting ClientAppIo API on %s", address)
     clientappio_grpc_server.start()
-    return clientappio_grpc_server
+    return clientappio_grpc_server, clientappio_servicer
 
 
 def _verify_fab(fab: Fab, trusted_entities: dict[str, str]) -> bool:

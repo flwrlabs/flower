@@ -263,13 +263,12 @@ def _render_table(
 
 def _split_entries(summary: dict) -> tuple[list[dict], list[dict]]:
     entries = summary.get("entries", [])
-    network_tasks = {"network_upstream", "network_downstream", "send_and_receive"}
     network_entries: list[dict] = []
     other_entries: list[dict] = []
     for entry in entries:
         if entry.get("scope") == "client" and entry.get("task") == "total":
             continue
-        if entry.get("scope") == "server" and entry.get("task") in network_tasks:
+        if entry.get("scope") == "network":
             network_entries.append(entry)
         else:
             other_entries.append(entry)
