@@ -700,7 +700,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             self.servicer.CreateFederation(request, context)
 
         context.abort.assert_called_once()
-        status_code, details = context.abort.call_args.args
+        status_code, _ = context.abort.call_args.args
         self.assertEqual(status_code, grpc.StatusCode.FAILED_PRECONDITION)
 
     def test_archive_federation_success(self) -> None:
