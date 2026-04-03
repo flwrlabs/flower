@@ -112,6 +112,7 @@ DEFAULT_SIMULATION_CONFIG = SimulationConfig(
 
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function
+TELEMETRY_TIMEOUT_SECONDS = 4  # Timeout for sending telemetry events during exit
 
 # Constants for message processing timing
 MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS = 3600

@@ -764,10 +764,13 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             List of tuples containing (run_id, active_until timestamp)
             for expired tokens.
         """
+        updated = False
         for run_id, active_until in expired_records:
             if not (run_record := self.run_ids.get(run_id)):
                 continue
             with run_record.lock:
+                if run_record.run.finished_at:
+                    continue
                 run_record.run.status = RunStatus(
                     status=Status.FINISHED,
                     sub_status=SubStatus.FAILED,
@@ -775,9 +778,11 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 )
                 active_until_dt = datetime.fromtimestamp(active_until, tz=timezone.utc)
                 run_record.run.finished_at = active_until_dt.isoformat()
+                updated = True
 
         # Report usage for runs that have been marked as failed due to expired tokens
-        self.federation_manager.report_run_usage()
+        if updated:
+            self.federation_manager.report_run_usage()
 
     def get_serverapp_context(self, run_id: int) -> Context | None:
         """Get the context for the specified `run_id`."""

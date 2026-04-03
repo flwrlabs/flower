@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from logging import ERROR, WARNING
 from typing import Any, Literal
 
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, text
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app.user_config import UserConfig
@@ -1105,7 +1105,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if not expired_records:
             return
 
-        with self.session():
+        with self.session() as session:
             query = """
                 UPDATE run
                 SET sub_status = :failed, details = :details, finished_at = :finished_at
@@ -1122,10 +1122,12 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 }
                 for run_id, active_until in expired_records
             ]
-            self.query(query, data)
+            result = session.execute(text(query), data)
+            updated_rows = result.rowcount or 0  # type: ignore[attr-defined]
 
         # Report usage for runs that have been marked as failed due to expired tokens
-        self.federation_manager.report_run_usage()
+        if updated_rows > 0:
+            self.federation_manager.report_run_usage()
 
     def get_serverapp_context(self, run_id: int) -> Context | None:
         """Get the context for the specified `run_id`."""
