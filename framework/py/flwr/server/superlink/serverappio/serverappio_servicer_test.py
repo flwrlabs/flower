@@ -15,6 +15,10 @@
 """ServerAppIoServicer tests."""
 
 
+import hashlib
+import os
+import tempfile
+import threading
 import unittest
 from datetime import timedelta
 from unittest.mock import Mock, patch
@@ -27,14 +31,10 @@ from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
     SUPERLINK_NODE_ID,
     Status,
+    SubStatus,
 )
 from flwr.common.message import get_message_to_descendant_id_mapping
-from flwr.common.serde import (
-    config_record_from_proto,
-    context_to_proto,
-    message_from_proto,
-    run_status_to_proto,
-)
+from flwr.common.serde import context_to_proto, message_from_proto, run_status_to_proto
 from flwr.common.serde_test import RecordMaker
 from flwr.common.typing import Fab, RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
@@ -69,8 +69,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import (  # pylint: disable=E0611
-    GetFederationOptionsRequest,
-    GetFederationOptionsResponse,
     UpdateRunStatusRequest,
     UpdateRunStatusResponse,
 )
@@ -78,6 +76,7 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
 )
+from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
@@ -94,7 +93,7 @@ from flwr.supercore.inflatable.inflatable_object import (
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
-# pylint: disable=broad-except
+# pylint: disable=broad-except,too-many-lines
 
 
 def test_raise_if_false() -> None:
@@ -139,6 +138,143 @@ def test_raise_if_true() -> None:
         assert str(err) == "Malformed DummyRequest: test"
     except Exception as err:
         raise AssertionError() from err
+
+
+def _start_serverappio_with_port_retry(
+    state_factory: LinkStateFactory,
+    objectstore_factory: ObjectStoreFactory,
+    start_port: int,
+) -> grpc.Server:
+    for offset in range(40):
+        address = f"127.0.0.1:{start_port + offset}"
+        try:
+            return run_serverappio_api_grpc(
+                address,
+                state_factory,
+                objectstore_factory,
+                None,
+            )
+        except RuntimeError as err:
+            if "Failed to bind to address" in str(err):
+                continue
+            raise
+
+    raise AssertionError(
+        f"Could not bind ServerAppIo gRPC server starting at port {start_port}."
+    )
+
+
+def _create_shared_runtime(
+    tmpdir: str,
+) -> tuple[int, LinkState, grpc.Server, grpc.Server]:
+    database_path = os.path.join(tmpdir, "shared.db")
+
+    objectstore_factory_0 = ObjectStoreFactory()
+    objectstore_factory_1 = ObjectStoreFactory()
+    state_factory_0 = LinkStateFactory(
+        database_path, NoOpFederationManager(), objectstore_factory_0
+    )
+    state_factory_1 = LinkStateFactory(
+        database_path, NoOpFederationManager(), objectstore_factory_1
+    )
+    state_0 = state_factory_0.state()
+    fab_content = b"mock fab content"
+    fab_hash = state_0.store_fab(
+        Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
+    )
+
+    run_id = state_0.create_run(
+        "",
+        "",
+        fab_hash,
+        {},
+        NOOP_FEDERATION,
+        None,
+        "",
+        RunType.SERVER_APP,
+    )
+    state_0.set_serverapp_context(
+        run_id, Context(run_id, SUPERLINK_NODE_ID, {}, RecordDict(), {})
+    )
+    server_0 = _start_serverappio_with_port_retry(
+        state_factory_0,
+        objectstore_factory_0,
+        start_port=19091,
+    )
+    server_1 = _start_serverappio_with_port_retry(
+        state_factory_1,
+        objectstore_factory_1,
+        start_port=19141,
+    )
+    return run_id, state_0, server_0, server_1
+
+
+def _request_token(channel: grpc.Channel, run_id: int) -> str:
+    request_token = channel.unary_unary(
+        "/flwr.proto.ServerAppIo/RequestToken",
+        request_serializer=RequestTokenRequest.SerializeToString,
+        response_deserializer=RequestTokenResponse.FromString,
+    )
+    token_response, token_call = request_token.with_call(
+        RequestTokenRequest(run_id=run_id)
+    )
+    assert grpc.StatusCode.OK == token_call.code()
+    token = str(token_response.token)
+    assert token
+    return token
+
+
+def _claim_in_parallel(
+    channel_0: grpc.Channel, channel_1: grpc.Channel, token: str
+) -> list[grpc.StatusCode | None]:
+    pull_app_inputs_0 = channel_0.unary_unary(
+        "/flwr.proto.ServerAppIo/PullAppInputs",
+        request_serializer=PullAppInputsRequest.SerializeToString,
+        response_deserializer=PullAppInputsResponse.FromString,
+    )
+    pull_app_inputs_1 = channel_1.unary_unary(
+        "/flwr.proto.ServerAppIo/PullAppInputs",
+        request_serializer=PullAppInputsRequest.SerializeToString,
+        response_deserializer=PullAppInputsResponse.FromString,
+    )
+    timeout = 5.0
+    barrier = threading.Barrier(3)
+    results: list[grpc.StatusCode | None] = [None, None]
+    exceptions: list[Exception] = []
+
+    def claim_inputs(idx: int, pull_fn: grpc.UnaryUnaryMultiCallable) -> None:
+        try:
+            barrier.wait(timeout=timeout)
+            response, call = pull_fn.with_call(PullAppInputsRequest(token=token))
+            del response
+            results[idx] = call.code()
+        except grpc.RpcError as err:
+            results[idx] = err.code()
+        except Exception as ex:  # pylint: disable=broad-exception-caught
+            exceptions.append(ex)
+
+    threads = [
+        threading.Thread(target=claim_inputs, args=(0, pull_app_inputs_0)),
+        threading.Thread(target=claim_inputs, args=(1, pull_app_inputs_1)),
+    ]
+    for thread in threads:
+        thread.start()
+    try:
+        barrier.wait(timeout=timeout)
+    except threading.BrokenBarrierError as ex:
+        exceptions.append(ex)
+    for thread in threads:
+        thread.join(timeout=timeout)
+
+    alive_threads = [thread for thread in threads if thread.is_alive()]
+    if alive_threads:
+        raise AssertionError(
+            f"Concurrent PullAppInputs test timed out; {len(alive_threads)} "
+            f"thread(s) still alive after {timeout} seconds."
+        )
+    if exceptions:
+        raise exceptions[0]
+    return results
 
 
 class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
@@ -198,11 +334,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=SendAppHeartbeatRequest.SerializeToString,
             response_deserializer=SendAppHeartbeatResponse.FromString,
         )
-        self._get_federation_options = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/GetFederationOptions",
-            request_serializer=GetFederationOptionsRequest.SerializeToString,
-            response_deserializer=GetFederationOptionsResponse.FromString,
-        )
         self._push_object = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/PushObject",
             request_serializer=PushObjectRequest.SerializeToString,
@@ -253,7 +384,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             fab_hash,
             {},
             NOOP_FEDERATION,
-            ConfigRecord(),
+            None,
             "",
             RunType.SERVER_APP,
         )
@@ -898,54 +1029,45 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert response1.token != ""
         assert response2.token == ""
 
-    def test_get_federation_options(self) -> None:
-        """Test `GetFederationOptions`."""
+    def test_request_token_fail_closed_for_finished_run(self) -> None:
+        """Ensure `RequestToken` returns empty token for finished runs."""
         # Prepare
-        federation_options = ConfigRecord({"num-supernodes": 3, "backend": "ray"})
-        run_id = self.state.create_run(
-            "",
-            "",
-            "",
-            {},
-            NOOP_FEDERATION,
-            federation_options,
-            "",
-            RunType.SIMULATION,
+        run_id = self._create_dummy_run(running=False)
+        self._transition_run_status(run_id, 2)
+        assert self.state.update_run_status(
+            run_id,
+            RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done"),
         )
-        request = GetFederationOptionsRequest(run_id=run_id)
+        before = self.state.get_run_status({run_id})[run_id]
 
         # Execute
-        response, call = self._get_federation_options.with_call(request=request)
+        response, call = self._request_token.with_call(
+            request=RequestTokenRequest(run_id=run_id)
+        )
 
-        # Assert
-        assert isinstance(response, GetFederationOptionsResponse)
+        # Assert: token issuance fails closed
+        assert isinstance(response, RequestTokenResponse)
         assert grpc.StatusCode.OK == call.code()
-        assert (
-            config_record_from_proto(response.federation_options) == federation_options
-        )
+        assert response.token == ""
 
-    def test_get_federation_options_not_successful_for_unknown_run_id(
-        self,
-    ) -> None:
-        """Test `GetFederationOptions` failure for an unknown run_id."""
-        # Prepare
-        request = GetFederationOptionsRequest(run_id=2**63 - 1)
+        # Assert: terminal run status/details remain unchanged
+        after = self.state.get_run_status({run_id})[run_id]
+        assert before.status == after.status == Status.FINISHED
+        assert before.sub_status == after.sub_status == SubStatus.COMPLETED
+        assert before.details == after.details == "done"
 
-        # Execute & Assert
-        with self.assertRaises(grpc.RpcError) as err:
-            self._get_federation_options.with_call(request=request)
-        assert err.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
-        assert (
-            err.exception.details()
-            == "Expected federation options to be set, but none available."
-        )
+        # Assert: no token was left behind for this run
+        token = self.state.create_token(run_id)
+        assert token is not None
+        self.state.delete_token(run_id)
 
     def test_run_status_transitions(self) -> None:
         """Test `RequestToken` and `PullAppInputs` transitions run status from PENDING
         to STARTING to RUNNING."""
         # Prepare: Create a run with FAB
+        fab_content = b"mock fab content"
         fab_hash = self.state.store_fab(
-            Fab(hash_str="ignored", content=b"mock fab content", verifications={})
+            Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
         )
         run_id = self._create_dummy_run(running=False, fab_hash=fab_hash)
 
@@ -973,3 +1095,24 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert grpc.StatusCode.OK == call.code()
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.RUNNING
+
+
+def test_ha_pull_app_inputs_claim_is_unique_across_replicas() -> None:
+    """Ensure only one replica can claim STARTING -> RUNNING via PullAppInputs."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        run_id, state_0, server_0, server_1 = _create_shared_runtime(tmpdir)
+        channel_0 = grpc.insecure_channel(server_0.bound_address)
+        channel_1 = grpc.insecure_channel(server_1.bound_address)
+        try:
+            token = _request_token(channel_0, run_id)
+            results = _claim_in_parallel(channel_0, channel_1, token)
+
+            assert results.count(grpc.StatusCode.OK) == 1
+            assert results.count(grpc.StatusCode.FAILED_PRECONDITION) == 1
+            run_status = state_0.get_run_status({run_id})[run_id]
+            assert run_status.status == Status.RUNNING
+        finally:
+            channel_0.close()
+            channel_1.close()
+            server_0.stop(None)
+            server_1.stop(None)

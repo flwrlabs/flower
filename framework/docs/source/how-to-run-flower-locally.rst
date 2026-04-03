@@ -7,39 +7,39 @@
 #############################################
 
 When you use a local profile in the :doc:`Flower configuration
-<ref-flower-configuration>` with ``options.*`` and no explicit ``address``, ``flwr``
-does not call the simulation runtime directly. Instead, Flower starts a managed local
-``flower-superlink`` on demand, submits the run through the Control API, and the local
-SuperLink executes the run with the simulation runtime.
+<ref-flower-configuration>` with ``address = ":local:"``, ``flwr`` does not call the
+simulation runtime directly. Instead, Flower starts a managed local ``flower-superlink``
+on demand, submits the run through the Control API, and the local SuperLink executes the
+run with the simulation runtime. The SuperLink will keep running in the background
+accepting commands until you :ref:`stop it manually <stop-background-local-superlink>`.
 
-This is the default experience for a profile like the one created automatically in your
-Flower configuration:
+Flower stores this managed local runtime under ``$HOME/.flwr/local-superlink``. If you
+would like to change this location, set the ``FLWR_HOME`` environment variable to a
+different directory.
 
-.. code-block:: toml
+.. note::
 
-    [superlink.local]
-    options.num-supernodes = 10
-    options.backend.client-resources.num-cpus = 1
-    options.backend.client-resources.num-gpus = 0
-
-If ``FLWR_HOME`` is unset, Flower stores this managed local runtime under
-``$HOME/.flwr/local-superlink``.
+    The remainder of this guide assumes you have set ``[superlink.local]`` as the
+    default profile in your Flower configuration. This should already be the case if you
+    have installed Flower for the first time or upgraded from a previous version that
+    didn't have the Flower Configuration functionality. For more information check
+    :doc:`the Flower Configuration <ref-flower-configuration>` guide.
 
 ****************************
  What Flower starts for you
 ****************************
 
-On the first command that needs the local Control API, Flower starts a local
-``flower-superlink`` process automatically. That process:
+On the first command that needs the local Control API (e.g. ``flwr run``, ``flwr list``,
+etc.), Flower starts a local ``flower-superlink`` process automatically. That process:
 
 - listens on ``127.0.0.1:39093`` for the Control API
-- listens on ``127.0.0.1:39094`` for SimulationIO
+- binds ServerAppIo to a free local port chosen by the OS
 - keeps running in the background after your command finishes
 - is reused by later ``flwr run``, ``flwr list``, ``flwr log``, and ``flwr stop``
   commands
 
-You can override those default ports with the environment variables
-``FLWR_LOCAL_CONTROL_API_PORT`` and ``FLWR_LOCAL_SIMULATIONIO_API_PORT``.
+You can override the default Control API port with the ``FLWR_LOCAL_CONTROL_API_PORT``
+environment variable.
 
 **************
  Submit a run
@@ -55,7 +55,6 @@ Representative output:
 
 .. code-block:: text
 
-    Successfully built flwrlabs.myapp.1-0-0.014c8eb3.fab
     Starting local SuperLink on 127.0.0.1:39093...
     Successfully started run 1859953118041441032
 
@@ -139,6 +138,8 @@ These files persist across local runs until you remove them yourself.
     and older runs that depended on that storage are not recoverable after upgrade
     without manual migration.
 
+.. _stop-background-local-superlink:
+
 *************************************
  Stop the background local SuperLink
 *************************************
@@ -190,6 +191,9 @@ If you changed the local Control API port with ``FLWR_LOCAL_CONTROL_API_PORT``, 
 *****************
  Troubleshooting
 *****************
+
+If you see SQL database errors such as ``database is locked``, see :ref:`FAQ
+<faq-local-superlink-db-error>`.
 
 If a local run fails before it starts, or if the managed local SuperLink does not come
 up correctly, inspect:

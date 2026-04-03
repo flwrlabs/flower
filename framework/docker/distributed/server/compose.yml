@@ -1,6 +1,6 @@
 services:
   superlink:
-    image: flwr/superlink:${FLWR_VERSION:-1.28.0}
+    image: flwr/superlink:${FLWR_VERSION:-1.29.0}
     command:
       - --isolation
       - process
@@ -25,7 +25,7 @@ services:
     build:
       context: ${PROJECT_DIR:-.}
       dockerfile_inline: |
-        FROM flwr/superexec:${FLWR_VERSION:-1.28.0}
+        FROM flwr/superexec:${FLWR_VERSION:-1.29.0}
 
         WORKDIR /app
         COPY --chown=app:app pyproject.toml .

@@ -15,7 +15,7 @@
 """Flower command line interface `federation list` command."""
 
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import typer
 from rich.console import Console
@@ -34,9 +34,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ShowFederationResponse,
 )
 from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation, Member  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
-from flwr.supercore.utils import humanize_duration
+from flwr.supercore.utils import humanize_duration, simulation_config_to_json
 
 from ..run_utils import RunRow, format_runs
 from ..utils import (
@@ -54,7 +55,7 @@ def ls(  # pylint: disable=R0914, R0913, R0917, R0912
         typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,
@@ -92,7 +93,9 @@ def ls(  # pylint: disable=R0914, R0913, R0917, R0912
 
             if federation:
                 # Show specific federation details
-                members, nodes, runs, archived = _show_federation(stub, federation)
+                members, nodes, runs, archived, simulation, config = _show_federation(
+                    stub, federation
+                )
                 archived_str = (
                     "[bold yellow]ARCHIVED[/bold yellow] " if archived else ""
                 )
@@ -104,13 +107,21 @@ def ls(  # pylint: disable=R0914, R0913, R0917, R0912
                 if is_json:
                     print_json_to_stdout(
                         _to_json(
-                            members=members, nodes=nodes, runs=runs, archived=archived
+                            members=members,
+                            nodes=nodes,
+                            runs=runs,
+                            archived=archived,
+                            simulation=simulation,
+                            config=config,
                         )
                     )
                 else:
 
                     Console().print(_to_members_table(members))
-                    Console().print(_to_nodes_table(nodes))
+                    if simulation:
+                        Console().print(_to_simulation_config_table(config))
+                    else:
+                        Console().print(_to_nodes_table(nodes))
                     Console().print(_to_runs_table(runs))
             else:
                 # List federations
@@ -151,6 +162,9 @@ def _to_table(federations: list[Federation]) -> Table:
         Text("Description", justify="center"), style="bright_black", no_wrap=True
     )
     table.add_column(
+        Text("Runtime", justify="center"), style="bright_black", no_wrap=True
+    )
+    table.add_column(
         Text("Status", justify="center"), style="bright_black", no_wrap=True
     )
 
@@ -161,17 +175,26 @@ def _to_table(federations: list[Federation]) -> Table:
         else:
             style = ""
             status = "[green]active[/green]"
-        table.add_row(federation.name, federation.description, status, style=style)
+        runtime = "simulation" if federation.simulation else "deployment"
+        table.add_row(
+            federation.name,
+            federation.description,
+            runtime,
+            status,
+            style=style,
+        )
 
     return table
 
 
-def _to_json(
+def _to_json(  # pylint: disable=R0913,R0917
     federations: list[Federation] | None = None,
     members: list[Member] | None = None,
     nodes: list[NodeInfo] | None = None,
     runs: list[RunRow] | None = None,
     archived: bool | None = None,
+    simulation: bool | None = None,
+    config: SimulationConfig | None = None,
 ) -> dict[str, Any]:
     """Format the provided federations list to JSON serializable format."""
     if federations is not None:
@@ -181,6 +204,7 @@ def _to_json(
                     "name": federation.name,
                     "description": federation.description,
                     "archived": federation.archived,
+                    "simulation": federation.simulation,
                 }
                 for federation in federations
             ]
@@ -221,13 +245,15 @@ def _to_json(
             "nodes": nodes_list,
             "runs": runs_list,
             "archived": archived,
+            "simulation": simulation,
+            "simulation-config": simulation_config_to_json(config) if config else None,
         }
     }
 
 
 def _show_federation(
     stub: ControlStub, federation: str
-) -> tuple[list[Member], list[NodeInfo], list[RunRow], bool]:
+) -> tuple[list[Member], list[NodeInfo], list[RunRow], bool, bool, SimulationConfig]:
     """Show federation details.
 
     Parameters
@@ -239,8 +265,8 @@ def _show_federation(
 
     Returns
     -------
-    tuple[list[Member], list[NodeInfo], list[RunRow]]
-        A tuple containing (members, nodes, runs).
+    tuple[list[Member], list[NodeInfo], list[RunRow], bool, bool, SimulationConfig]
+        A tuple containing (members, nodes, runs, archived, simulation, config).
     """
     with flwr_cli_grpc_exc_handler():
         res: ShowFederationResponse = stub.ShowFederation(
@@ -256,6 +282,8 @@ def _show_federation(
         list(fed_proto.nodes),
         formatted_runs,
         fed_proto.archived,
+        fed_proto.simulation,
+        fed_proto.config,
     )
 
 
@@ -337,6 +365,35 @@ def _to_nodes_table(nodes: list[NodeInfo]) -> Table:
             f"[{status_style}]{status}",
         )
         table.add_row(*formatted_row)
+
+    return table
+
+
+def _to_simulation_config_table(config: SimulationConfig) -> Table:
+    """Format the simulation configuration as a rich Table."""
+    table = Table(
+        title="Simulation Configuration",
+        header_style="bold cyan",
+        show_lines=True,
+    )
+
+    table.add_column(Text("Setting", justify="center"), style="bright_black")
+    table.add_column(Text("Key", justify="center"), style="bright_black")
+    table.add_column(Text("Value"), justify="right")
+
+    rows = [
+        ("Number of Simulated SuperNodes", "num_supernodes"),
+        ("ClientApp Resources (CPUs)", "client_resources_num_cpus"),
+        ("ClientApp Resources (GPUs)", "client_resources_num_gpus"),
+        ("Backend Name", "backend"),
+    ]
+
+    for name, key in rows:
+        table.add_row(
+            name,
+            Text(key.replace("_", "-"), style="bold magenta"),
+            str(getattr(config, key)),
+        )
 
     return table
 

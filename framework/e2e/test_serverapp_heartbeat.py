@@ -15,6 +15,7 @@ from flwr.common.constant import (
 )
 
 use_sim = sys.argv[1] == "simulation" if len(sys.argv) > 1 else False
+superlink_connection = "e2e-sim" if use_sim else "e2e"
 plugin_type_arg = "simulation" if use_sim else "serverapp"
 app_cmd = "flwr-simulation" if use_sim else "flwr-serverapp"
 
@@ -42,7 +43,7 @@ def flwr_run() -> str:
     """Run the `flwr run` command and return `run_id`."""
     # Run the command
     result = subprocess.run(
-        ["flwr", "run", ".", "e2e", "--format", "json"],
+        ["flwr", "run", ".", superlink_connection, "--format", "json"],
         capture_output=True,
         text=True,
         check=True,
@@ -74,7 +75,7 @@ def flwr_ls(max_retries: int = 5, retry_delay: float = 0.5) -> dict[str, str]:
     last_error: str = ""
     for attempt in range(max_retries):
         result = subprocess.run(
-            ["flwr", "ls", "e2e", "--format", "json"],
+            ["flwr", "ls", superlink_connection, "--format", "json"],
             capture_output=True,
             text=True,
             check=False,

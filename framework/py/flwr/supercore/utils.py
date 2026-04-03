@@ -19,10 +19,12 @@ import json
 import os
 import re
 from pathlib import Path
+from typing import Any
 
 import requests
 
 from flwr.common.constant import FLWR_DIR, FLWR_HOME
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.supercore.version import package_version as flwr_version
 
 from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN
@@ -193,6 +195,35 @@ def request_download_link(
     verifications = data["verifications"] if "verifications" in data else None
 
     return str(data[out_url]), verifications
+
+
+def simulation_config_to_json(config: SimulationConfig) -> dict[str, Any]:
+    """Convert a simulation config protobuf to a JSON-serializable dictionary."""
+    payload: dict[str, Any] = {}
+    for field in config.DESCRIPTOR.fields:
+        if field.has_presence and not config.HasField(field.name):
+            payload[field.name] = None
+            continue
+        payload[field.name] = getattr(config, field.name)
+
+    return payload
+
+
+def simulation_config_from_json(payload: dict[str, Any]) -> SimulationConfig:
+    """Convert a JSON payload into a simulation config protobuf."""
+    config = SimulationConfig()
+    valid_fields = {field.name for field in config.DESCRIPTOR.fields}
+    unknown_fields = set(payload) - valid_fields
+    if unknown_fields:
+        field_names = ", ".join(sorted(unknown_fields))
+        raise ValueError(f"Unknown simulation config field(s): {field_names}")
+
+    for field_name, value in payload.items():
+        if value is None:
+            continue
+        setattr(config, field_name, value)
+
+    return config
 
 
 def humanize_duration(seconds: float) -> str:

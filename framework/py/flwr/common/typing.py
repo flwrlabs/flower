@@ -24,8 +24,10 @@ import numpy as np
 import numpy.typing as npt
 
 from flwr.app.user_config import UserConfig
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Member  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.supercore.constant import RunType
 
 NDArray = npt.NDArray[Any]
 NDArrayInt = npt.NDArray[np.int_]
@@ -259,7 +261,7 @@ class Run:  # pylint: disable=too-many-instance-attributes
             bytes_sent=0,
             bytes_recv=0,
             clientapp_runtime=0.0,
-            run_type="",
+            run_type=RunType.SERVER_APP,
         )
 
 
@@ -341,7 +343,7 @@ class LogEntry:
 
 
 @dataclass
-class Federation:
+class Federation:  # pylint: disable=R0902
     """Federation details."""
 
     name: str
@@ -349,4 +351,6 @@ class Federation:
     members: list[Member]
     nodes: list[NodeInfo]
     runs: list[Run]
-    archived: bool = False
+    archived: bool
+    simulation: bool
+    config: SimulationConfig | None

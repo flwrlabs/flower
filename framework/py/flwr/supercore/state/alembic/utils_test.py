@@ -30,6 +30,7 @@ from flwr.common.exit import ExitCode
 from flwr.supercore.state.alembic.utils import (
     ALEMBIC_DIR,
     ALEMBIC_VERSION_TABLE,
+    FLWR_STATE_BASELINE_REVISION,
     _get_baseline_metadata,
     _metadata_providers,
     _version_locations,
@@ -46,11 +47,14 @@ class TestAlembicRun(unittest.TestCase):
 
     def setUp(self) -> None:
         """Create temporary directory for test databases."""
+        self.original_locations = _version_locations.copy()
         self.temp_dir = TemporaryDirectory()  # pylint: disable=consider-using-with
         self.temp_path = Path(self.temp_dir.name)
 
     def tearDown(self) -> None:
         """Clean up temporary directory."""
+        _version_locations.clear()
+        _version_locations.extend(self.original_locations)
         self.temp_dir.cleanup()
 
     def create_engine(self, db_name: str = "state.db") -> Engine:
@@ -65,15 +69,15 @@ class TestAlembicRun(unittest.TestCase):
         try:
             # Execute & Assert
             # Initially, there should be no alembic_version table or revision.
-            self.assertIsNone(get_current_revision(engine))
+            self.assertEqual(get_current_revisions(engine), set())
             self.assertTrue(check_migrations_pending(engine))
 
             run_migrations(engine)
 
-            # After migration, alembic_version should be set to the latest head.
-            current = get_current_revision(engine)
+            # After migration, alembic_version should be set to the latest heads.
+            current = get_current_revisions(engine)
             script = ScriptDirectory.from_config(build_alembic_config(engine))
-            self.assertIn(current, script.get_heads())
+            self.assertEqual(current, set(script.get_heads()))
             # No pending migrations should remain.
             self.assertFalse(check_migrations_pending(engine))
         finally:
@@ -122,16 +126,16 @@ class TestAlembicRun(unittest.TestCase):
             # construction, there is no alembic_version table or revision.
             baseline_metadata = _get_baseline_metadata()
             baseline_metadata.create_all(engine)
-            self.assertIsNone(get_current_revision(engine))
+            self.assertEqual(get_current_revisions(engine), set())
             self.assertFalse(inspect(engine).has_table(ALEMBIC_VERSION_TABLE))
 
             run_migrations(engine)
 
-            # After migration, alembic_version should be set to the latest head with
+            # After migration, alembic_version should be set to the latest heads with
             # no pending migrations.
-            current = get_current_revision(engine)
+            current = get_current_revisions(engine)
             script = ScriptDirectory.from_config(build_alembic_config(engine))
-            self.assertIn(current, script.get_heads())
+            self.assertEqual(current, set(script.get_heads()))
             self.assertFalse(check_migrations_pending(engine))
         finally:
             engine.dispose()
@@ -231,30 +235,90 @@ class TestAlembicRun(unittest.TestCase):
             # Execute: should succeed and stamp/upgrade successfully
             run_migrations(engine)
 
-            current = get_current_revision(engine)
+            current = get_current_revisions(engine)
             script = ScriptDirectory.from_config(build_alembic_config(engine))
             # Assert
-            self.assertIn(current, script.get_heads())
+            self.assertEqual(current, set(script.get_heads()))
+            self.assertFalse(check_migrations_pending(engine))
+        finally:
+            engine.dispose()
+
+    def test_run_migrations_upgrades_to_all_heads(self) -> None:
+        """Ensure migrations upgrade to every head across registered branches."""
+        # Prepare: add a synthetic migration branch without relying on EE imports
+        _version_locations.clear()
+        extra_versions = self.temp_path / "external_versions"
+        extra_versions.mkdir()
+        write_revision_file(
+            extra_versions / "rev_external_branch.py",
+            revision="external_branch_001",
+            down_revision=FLWR_STATE_BASELINE_REVISION,
+        )
+        register_version_location(extra_versions)
+
+        engine = self.create_engine()
+        try:
+            # Execute
+            run_migrations(engine)
+
+            # Assert: both the core head and synthetic branch head are current
+            current = get_current_revisions(engine)
+            script = ScriptDirectory.from_config(build_alembic_config(engine))
+            heads = set(script.get_heads())
+
+            self.assertEqual(current, heads)
+            self.assertIn("external_branch_001", current)
+            self.assertGreater(len(current), 1)
             self.assertFalse(check_migrations_pending(engine))
         finally:
             engine.dispose()
 
 
-def get_current_revision(engine: Engine) -> str | None:
-    """Return the current Alembic revision for the given database."""
+def write_revision_file(path: Path, revision: str, down_revision: str) -> None:
+    """Write a minimal Alembic revision file for tests."""
+    path.write_text(
+        f'''"""Synthetic migration branch for tests.
+
+Revision ID: {revision}
+Revises: {down_revision}
+Create Date: 2026-03-23 00:00:00.000000
+"""
+
+from collections.abc import Sequence
+
+
+revision: str = "{revision}"
+down_revision: str | Sequence[str] | None = "{down_revision}"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
+
+def upgrade() -> None:
+    """Apply the synthetic test migration."""
+
+
+def downgrade() -> None:
+    """Revert the synthetic test migration."""
+''',
+        encoding="utf-8",
+    )
+
+
+def get_current_revisions(engine: Engine) -> set[str]:
+    """Return the current Alembic revisions for the given database."""
     with engine.connect() as connection:
         context = MigrationContext.configure(connection)
-        return context.get_current_revision()
+        return set(context.get_current_heads())
 
 
 def check_migrations_pending(engine: Engine) -> bool:
-    """Return True if the database is not on the latest migration head."""
-    current = get_current_revision(engine)
+    """Return True if the database is not on the latest migration heads."""
+    current = get_current_revisions(engine)
     script = ScriptDirectory.from_config(build_alembic_config(engine))
     heads = set(script.get_heads())
-    if current is None:
+    if not current:
         return True
-    return current not in heads
+    return current != heads
 
 
 class TestMetadataProviderRegistry(unittest.TestCase):

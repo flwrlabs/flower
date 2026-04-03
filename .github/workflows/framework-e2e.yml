@@ -322,7 +322,6 @@ jobs:
           - example: quickstart-jax
           - example: quickstart-sklearn
           - example: quickstart-numpy
-          - example: quickstart-pytorch-deprecated
 
     name: App / ${{ matrix.example }}
 
@@ -355,7 +354,10 @@ jobs:
         working-directory: examples/${{ matrix.example }}
         run: |
           flwr run --run-config num-server-rounds=1 --stream 2>&1 | tee flwr_output.log 
-          if grep -q "ERROR" flwr_output.log; then
+          output=$(flwr ls --format=json)
+          if ! echo "$output" | jq -e '.success == true and (.runs | length) == 1 and .runs[0].status == "finished:completed"' > /dev/null; then
+            echo "Unexpected flwr ls output:"
+            echo "$output"
             exit 1
           fi
 
@@ -396,7 +398,10 @@ jobs:
         run: |
           cd $APP_NAME
           flwr run . --run-config num-server-rounds=1 --stream 2>&1 | tee flwr_output.log 
-          if grep -q "ERROR" flwr_output.log; then
+          output=$(flwr ls --format=json)
+          if ! echo "$output" | jq -e '.success == true and (.runs | length) == 1 and .runs[0].status == "finished:completed"' > /dev/null; then
+            echo "Unexpected flwr ls output:"
+            echo "$output"
             exit 1
           fi
 

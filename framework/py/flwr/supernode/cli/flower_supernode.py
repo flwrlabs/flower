@@ -40,12 +40,15 @@ from flwr.common.constant import (
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
 from flwr.supercore.grpc_health import add_args_health
+from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.version import package_version
 from flwr.supernode.start_client_internal import start_client_internal
 
 
 def flower_supernode() -> None:
     """Run Flower SuperNode."""
+    warn_if_flwr_update_available(process_name="flower-supernode")
+
     args = _parse_args_run_supernode().parse_args()
 
     log(INFO, "Starting Flower SuperNode")

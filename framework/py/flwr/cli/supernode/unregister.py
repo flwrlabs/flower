@@ -15,7 +15,7 @@
 """Flower command line interface `supernode unregister` command."""
 
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
@@ -46,7 +46,7 @@ def unregister(  # pylint: disable=R0914
         typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,

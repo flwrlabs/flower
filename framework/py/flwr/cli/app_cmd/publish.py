@@ -17,7 +17,7 @@
 
 from contextlib import ExitStack
 from pathlib import Path
-from typing import IO, Annotated, Any
+from typing import IO, Annotated, Any, cast
 
 import click
 import requests
@@ -28,9 +28,6 @@ from flwr.cli.config_utils import load_and_validate
 from flwr.common.constant import FAB_CONFIG_FILE
 from flwr.supercore.constant import (
     APP_PUBLISH_ALLOWED_LICENSE_FILES,
-    APP_PUBLISH_EXCLUDE_PATTERNS,
-    APP_PUBLISH_INCLUDE_PATTERNS,
-    MAX_DIR_DEPTH,
     MAX_FILE_BYTES,
     MAX_FILE_COUNT,
     MAX_TOTAL_BYTES,
@@ -44,9 +41,10 @@ from flwr.supercore.version import package_version as flwr_version
 from ..auth_plugin.oidc_cli_plugin import OidcCliPlugin
 from ..config_utils import load as load_toml
 from ..utils import (
-    build_pathspec,
+    collect_files,
+    filter_paths_for_publish,
     load_cli_auth_plugin_from_connection,
-    load_gitignore_patterns,
+    validate_project_name,
 )
 
 
@@ -77,6 +75,7 @@ def publish(
 
     # Validate app description from config
     config, _ = load_and_validate(app / FAB_CONFIG_FILE, check_module=False)
+    _validate_app_name(app.name, "Flower App directory name")
     _validate_description(config["project"].get("description", ""))
 
     # Collect & validate app files
@@ -127,14 +126,12 @@ def _validate_description(description: Any) -> None:
             raise click.ClickException("Publishing cancelled by user.")
 
 
-def _depth_of(relative_path_to_root: Path) -> int:
-    """Return depth that is number of parts (directories) in the relative path
-    (excluding filename).
-
-    Example: "a/b/c.py" -> depth 2
-    Interpret "directory depth" as number of directories: len(parts) - 1
-    """
-    return max(0, len(relative_path_to_root.parts) - 1)
+def _validate_app_name(name: str, target: str) -> None:
+    """Validate app and directory names used during publish."""
+    try:
+        validate_project_name(name, target)
+    except ValueError as err:
+        raise click.ClickException(str(err)) from None
 
 
 def _detect_mime(path: Path) -> str:
@@ -186,35 +183,19 @@ def _collect_file_paths(root: Path) -> list[Path]:
     """Return list of file paths that match include/exclude patterns."""
     declared_license_file = _get_declared_license_file(root)
 
-    # Build include/exclude pathspecs
-    # Note: This should be a temporary solution until we have a complete mechanism
-    # for configurable inclusion and exclusion rules.
-    # Note: Unlike Git, we do not support nested .gitignore files in subdirectories.
-    gitignore_patterns = tuple(load_gitignore_patterns(root / ".gitignore"))
-    exclude_pathspec = build_pathspec(gitignore_patterns + APP_PUBLISH_EXCLUDE_PATTERNS)
-    include_pathspec = build_pathspec(APP_PUBLISH_INCLUDE_PATTERNS)
-
-    # Walk the directory tree
-    file_paths: list[Path] = []
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
-
-        # Skip excluded or not included files
-        # Note: pathspec requires POSIX style relative paths
-        relative_path = path.relative_to(root)
-        posix = relative_path.as_posix()
-        if exclude_pathspec.match_file(posix) or not include_pathspec.match_file(posix):
-            typer.echo(typer.style(f"Skip: {path}", fg=typer.colors.YELLOW))
-            continue
-
-        # Check max depth
-        if _depth_of(relative_path) > MAX_DIR_DEPTH:
-            raise click.ClickException(
-                f"'{path}' exceeds the maximum directory depth of {MAX_DIR_DEPTH}."
-            )
-
-        file_paths.append(path)
+    try:
+        # Collect all files
+        all_files = collect_files(root)
+        # Filter files based on .gitignore and include/exclude patterns
+        files = cast(dict[str, Path], filter_paths_for_publish(all_files))
+        # Warn about skipped files (sorted for deterministic output)
+        skipped_paths = sorted(set(all_files.keys()) - set(files.keys()))
+        for path in skipped_paths:
+            typer.secho(f"Skip: {path}", fg=typer.colors.YELLOW)
+        # Build list of absolute file paths (sorted by relative path for stability)
+        file_paths = [files[key].expanduser().resolve() for key in sorted(files.keys())]
+    except ValueError as err:
+        raise click.ClickException(str(err)) from err
 
     if declared_license_file and declared_license_file not in file_paths:
         raise click.ClickException(
@@ -222,8 +203,6 @@ def _collect_file_paths(root: Path) -> list[Path]:
             "excluded by `.gitignore` or publish exclude rules."
         )
 
-    # Sort for deterministic ordering
-    file_paths.sort(key=lambda path: path.as_posix())
     return file_paths
 
 

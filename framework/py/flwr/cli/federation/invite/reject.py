@@ -15,7 +15,7 @@
 """Flower command line interface `federation invite reject` command."""
 
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
@@ -44,7 +44,7 @@ def reject(
         typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,

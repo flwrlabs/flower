@@ -21,8 +21,8 @@ from typing import Literal
 
 from flwr.app.user_config import UserConfig
 from flwr.common import Context, Message
-from flwr.common.record import ConfigRecord
-from flwr.common.typing import Fab, Run, RunStatus
+from flwr.common.typing import Run, RunStatus
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.superlink.federation import FederationManager
@@ -35,14 +35,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
     @abc.abstractmethod
     def federation_manager(self) -> FederationManager:
         """Return the FederationManager instance."""
-
-    @abc.abstractmethod
-    def store_fab(self, fab: Fab) -> str:
-        """Store a FAB and return its canonical SHA-256 hash."""
-
-    @abc.abstractmethod
-    def get_fab(self, fab_hash: str) -> Fab | None:
-        """Return the FAB for the given hash, if present."""
 
     @abc.abstractmethod
     def store_message_ins(self, message: Message) -> str | None:
@@ -263,7 +255,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         fab_hash: str | None,
         override_config: UserConfig,
         federation: str,
-        federation_options: ConfigRecord,
+        federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         run_type: str,
     ) -> int:
@@ -271,20 +263,19 @@ class LinkState(CoreState):  # pylint: disable=R0904
 
         Parameters
         ----------
-        fab_id : Optional[str]
+        fab_id : str | None
             The ID of the FAB, of format `<publisher>/<app-name>`.
-        fab_version : Optional[str]
+        fab_version : str | None
             The version of the FAB.
-        fab_hash : Optional[str]
+        fab_hash : str | None
             The SHA256 hex hash of the FAB.
         override_config : UserConfig
             Configuration overrides for the run config.
         federation : str
             The federation this run belongs to.
-        federation_options : ConfigRecord
-            Federation configurations. For now, only `num-supernodes` for
-            the simulation runtime.
-        flwr_aid : Optional[str]
+        federation_config : SimulationConfig | None
+            Optional resolved federation configuration for the run.
+        flwr_aid : str | None
             Flower Account ID of the creator.
         run_type : str
             The type of run being created.
@@ -342,6 +333,10 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
+    def get_federation_config(self, run_id: int) -> SimulationConfig | None:
+        """Get the resolved federation configuration for the specified `run_id`."""
+
+    @abc.abstractmethod
     def get_run_status(self, run_ids: set[int]) -> dict[int, RunStatus]:
         """Retrieve the statuses for the specified runs.
 
@@ -376,21 +371,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         -------
         bool
             True if the status update is successful; False otherwise.
-        """
-
-    @abc.abstractmethod
-    def get_federation_options(self, run_id: int) -> ConfigRecord | None:
-        """Retrieve the federation options for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run.
-
-        Returns
-        -------
-        Optional[ConfigRecord]
-            The federation options for the run if it exists; None otherwise.
         """
 
     @abc.abstractmethod

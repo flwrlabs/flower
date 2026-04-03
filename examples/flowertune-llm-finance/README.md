@@ -47,33 +47,17 @@ The dataset is divided into 50 partitions in an IID fashion, a partition is assi
 We randomly sample a fraction (0.1) of the total nodes to participate in each round, for a total of `200` rounds.
 All the Flower App settings are defined in `pyproject.toml`.
 
-Before proceeding you need to create a new SuperLink connection and define 50 virtual SuperNodes. To do this, let's first locate the Flower Configuration file and then edit it.
+This app is designed to run with 50 virtual `SuperNodes` which have GPU-enabled `ClientApp` execution. First we need to change the configuration of the Simulation Runtime (which by default uses 10 nodes but only CPU). This guide assumes your default `SuperLink` connection points to one ready for simulations. If you aren't sure, please refer to the [How-to run Flower locally](https://flower.ai/docs/framework/how-to-run-flower-locally.html) guide.
 
-Locate the Flower Configuration file:
-
-```shell
-flwr config list
-```
-
-```console
-# Example output:
-Flower Config file: /path/to/your/.flwr/config.toml
-SuperLink connections:
- supergrid
- local (default)
-```
-
-Add a new connection named `flowertune` and make it the default.
-
-```TOML
-[superlink.flowertune]
-options.num-supernodes = 50
-options.backend.client-resources.num-cpus = 6
-options.backend.client-resources.num-gpus = 1.0
+```bash
+flwr federation simulation-config \
+    --num-supernodes=50 \
+    --client-resources-num-cpus=6 \
+    --client-resources-num-gpus=1.0
 ```
 
 > [!IMPORTANT]
-> Please note that `[tool.flwr.app.config.static]` are not allowed to be modified for fair competition if you plan to participated in the [LLM leaderboard](https://flower.ai/benchmarks/llm-leaderboard). Additionally, the number of supernodes (i.e. `options.num-supernodes`) must be 50.
+> Please note that `[tool.flwr.app.config.static]` are not allowed to be modified for fair competition if you plan to participate in the [LLM leaderboard](https://flower.ai/benchmarks/llm-leaderboard). Additionally, the number of supernodes (i.e. `--num-supernodes`) must be 50.
 
 ## Running the challenge
 
@@ -88,7 +72,7 @@ Run the challenge with default config values.
 The configs are defined in `[tool.flwr.app.config]` entry of `pyproject.toml`, and are loaded automatically.
 
 ```bash
-flwr run
+flwr run  --stream
 ```
 
 ## VRAM consumption
@@ -106,4 +90,4 @@ You can adjust the CPU/GPU resources you assign to each of the clients based on 
 The global PEFT model checkpoints are saved every 5 rounds after aggregation on the sever side as default, which can be specified with `train.save-every-round` under [tool.flwr.app.config] entry in `pyproject.toml`.
 
 > [!NOTE]
-> Please provide the last PEFT checkpoint if you plan to participated in the [LLM leaderboard](https://flower.ai/benchmarks/llm-leaderboard).
+> Please provide the last PEFT checkpoint if you plan to participate in the [LLM leaderboard](https://flower.ai/benchmarks/llm-leaderboard).

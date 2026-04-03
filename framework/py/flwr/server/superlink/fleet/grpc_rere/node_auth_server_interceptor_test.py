@@ -15,6 +15,7 @@
 """Flower server interceptor tests."""
 
 
+import hashlib
 import datetime
 import unittest
 from collections.abc import Callable
@@ -24,7 +25,7 @@ from unittest.mock import patch
 import grpc
 from parameterized import parameterized
 
-from flwr.common import ConfigRecord, now
+from flwr.common import now
 from flwr.common.constant import (
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     NOOP_ACCOUNT_NAME,
@@ -254,7 +255,7 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
             fab_hash,
             {},
             NOOP_FEDERATION,
-            ConfigRecord(),
+            None,
             "",
             RunType.SERVER_APP,
         )
@@ -317,8 +318,9 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
 
     def _test_get_fab(self, metadata: list[Any]) -> Any:
         """Test GetFab."""
+        fab_content = b"mock fab content"
         fab_hash = self.state.store_fab(
-            Fab(hash_str="ignored", content=b"mock fab content", verifications={})
+            Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
         )
         node_id = self._create_node_in_linkstate()
         run_id = self._create_dummy_run(fab_hash=fab_hash)

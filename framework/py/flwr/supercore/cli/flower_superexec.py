@@ -16,7 +16,7 @@
 
 
 import argparse
-from logging import INFO
+from logging import INFO, WARN
 from typing import Any
 
 import yaml
@@ -33,9 +33,9 @@ from flwr.supercore.superexec.plugin import (
     ClientAppExecPlugin,
     ExecPlugin,
     ServerAppExecPlugin,
-    SimulationExecPlugin,
 )
 from flwr.supercore.superexec.run_superexec import run_superexec
+from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.version import package_version
 
 try:
@@ -66,6 +66,9 @@ except ImportError:
 def flower_superexec() -> None:
     """Run `flower-superexec` command."""
     args = _parse_args().parse_args()
+
+    warn_if_flwr_update_available(process_name="flower-superexec")
+
     if not args.insecure:
         flwr_exit(
             ExitCode.COMMON_TLS_NOT_SUPPORTED,
@@ -93,6 +96,16 @@ def flower_superexec() -> None:
             )
 
     # Get the plugin class and stub class based on the plugin type
+    if args.plugin_type == ExecPluginType.SIMULATION:
+        log(
+            WARN,
+            "The '%s' plugin type is deprecated and will be removed in a future "
+            "release. Please use '%s' instead, which supports both simulation "
+            "and deployment.",
+            ExecPluginType.SIMULATION,
+            ExecPluginType.SERVER_APP,
+        )
+        args.plugin_type = ExecPluginType.SERVER_APP
     plugin_class, stub_class = _get_plugin_and_stub_class(args.plugin_type)
     run_superexec(
         plugin_class=plugin_class,
@@ -151,7 +164,6 @@ def _get_plugin_and_stub_class(
     mapping: dict[str, tuple[type[ExecPlugin], type[object]]] = {
         ExecPluginType.CLIENT_APP: (ClientAppExecPlugin, ClientAppIoStub),
         ExecPluginType.SERVER_APP: (ServerAppExecPlugin, ServerAppIoStub),
-        ExecPluginType.SIMULATION: (SimulationExecPlugin, ServerAppIoStub),
     }
     if plugin_type in mapping:
         return mapping[plugin_type]

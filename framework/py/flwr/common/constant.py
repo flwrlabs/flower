@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import os
+from typing import Final
 
 TRANSPORT_TYPE_GRPC_RERE = "grpc-rere"
 TRANSPORT_TYPE_GRPC_ADAPTER = "grpc-adapter"
@@ -78,11 +79,18 @@ FAB_HASH_TRUNCATION = 8
 FAB_MAX_SIZE = 10 * 1024 * 1024  # 10 MB
 FLWR_DIR = ".flwr"  # The default Flower directory: ~/.flwr/
 FLWR_HOME = "FLWR_HOME"  # If set, override the default Flower directory
+# FAB include and exclude keys in pyproject.toml
+FAB_INCLUDE_KEY = "fab-include"
+FAB_EXCLUDE_KEY = "fab-exclude"
 # FAB file include patterns (gitignore-style patterns)
 FAB_INCLUDE_PATTERNS = (
     "**/*.py",
     "**/*.toml",
     "**/*.md",
+    "**/*.yaml",
+    "**/*.yml",
+    "**/*.json",
+    "**/*.jsonl",
     "/LICENSE",
 )
 # FAB file exclude patterns (gitignore-style patterns)
@@ -183,7 +191,6 @@ SUPERNODE_NOT_CREATED_FROM_CLI_MESSAGE = "Invalid SuperNode credentials"
 PUBLIC_KEY_ALREADY_IN_USE_MESSAGE = "Public key already in use"
 PUBLIC_KEY_NOT_VALID = "The provided public key is not valid"
 NODE_NOT_FOUND_MESSAGE = "Node ID not found for account"
-FEDERATION_NOT_SPECIFIED_MESSAGE = "No federation specified in the request"
 FEDERATION_NOT_FOUND_MESSAGE = "Federation '%s' does not exist"
 
 
@@ -254,8 +261,8 @@ class SubStatus:
 class CliOutputFormat:
     """Define output format for `flwr` CLI commands."""
 
-    DEFAULT = "default"
-    JSON = "json"
+    DEFAULT: Final = "default"
+    JSON: Final = "json"
 
     def __new__(cls) -> CliOutputFormat:
         """Prevent instantiation."""
@@ -298,7 +305,7 @@ class ExecPluginType:
 
     CLIENT_APP = "clientapp"
     SERVER_APP = "serverapp"
-    SIMULATION = "simulation"
+    SIMULATION = "simulation"  # Deprecated
 
     def __new__(cls) -> ExecPluginType:
         """Prevent instantiation."""

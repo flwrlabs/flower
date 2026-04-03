@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Add run_type to run table.
+"""Add run_type and federation_config to run table.
 
 Revision ID: c8f4f6e2c1ad
 Revises: 8e65d8ae60b0
@@ -46,13 +46,19 @@ def upgrade() -> None:
             server_default=RunType.SERVER_APP,
         ),
     )
+    op.add_column("run", sa.Column("federation_config", sa.String(), nullable=True))
     op.execute(
         sa.text(
             "UPDATE run SET run_type = :run_type WHERE length(federation_options) > 0"
         ).bindparams(run_type=RunType.SIMULATION)
     )
+    op.drop_column("run", "federation_options")
 
 
 def downgrade() -> None:
     """Downgrade schema."""
+    op.add_column(
+        "run", sa.Column("federation_options", sa.LargeBinary(), nullable=True)
+    )
+    op.drop_column("run", "federation_config")
     op.drop_column("run", "run_type")

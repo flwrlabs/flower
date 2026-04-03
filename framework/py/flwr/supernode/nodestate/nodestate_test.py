@@ -15,6 +15,7 @@
 """Tests all NodeState implementations have to conform to."""
 
 
+import hashlib
 from datetime import timedelta
 from typing import Any
 from unittest.mock import patch
@@ -31,7 +32,7 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from . import InMemoryNodeState, NodeState
 
 
-class StateTest(CoreStateTest):
+class StateTest(CoreStateTest):  # pylint: disable=R0904
     """Test all state implementations."""
 
     # This is to True in each child class
@@ -78,7 +79,8 @@ class StateTest(CoreStateTest):
 
     def test_store_and_get_fab(self) -> None:
         """Test storing and retrieving a FAB."""
-        fab = Fab("ignored", b"fab-content", {"meta": "data"})
+        content = b"fab-content"
+        fab = Fab(hashlib.sha256(content).hexdigest(), content, {"meta": "data"})
 
         fab_hash = self.state.store_fab(fab)
         retrieved = self.state.get_fab(fab_hash)
@@ -89,20 +91,16 @@ class StateTest(CoreStateTest):
         self.assertEqual(retrieved.content, fab.content)
         self.assertEqual(retrieved.verifications, fab.verifications)
 
-    def test_store_fab_deduplicates_by_hash(self) -> None:
-        """Test storing the same FAB content reuses the same hash."""
-        fab_hash = self.state.store_fab(Fab("a", b"fab-content", {"meta": "data"}))
-        other_hash = self.state.store_fab(Fab("b", b"fab-content", {"meta": "next"}))
-        retrieved = self.state.get_fab(fab_hash)
+        # Retrieved FAB should be a defensive copy.
+        retrieved.verifications["meta"] = "mutated"
+        reloaded = self.state.get_fab(fab_hash)
+        self.assertIsNotNone(reloaded)
+        assert reloaded is not None
+        self.assertEqual(reloaded.verifications, {"meta": "data"})
 
-        self.assertEqual(fab_hash, other_hash)
-        self.assertIsNotNone(retrieved)
-        assert retrieved is not None
-        self.assertEqual(retrieved.verifications, {"meta": "next"})
-
-    def test_get_fab_missing_returns_none(self) -> None:
-        """Test missing FAB retrieval."""
-        self.assertIsNone(self.state.get_fab("missing-fab-hash"))
+        # Also verify write-time hash validation rejects mismatched hashes.
+        with self.assertRaisesRegex(ValueError, "FAB hash mismatch"):
+            self.state.store_fab(Fab("not-the-content-hash", b"fab-content", {}))
 
     def test_store_and_get_context(self) -> None:
         """Test storing and retrieving a context."""

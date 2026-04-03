@@ -17,14 +17,13 @@
 
 # pylint: disable=too-many-lines
 
-import hashlib
 import json
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from logging import ERROR, WARNING
 from typing import Any, Literal
 
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, text
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app.user_config import UserConfig
@@ -39,8 +38,8 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.record import ConfigRecord
-from flwr.common.typing import Fab, Run, RunStatus
+from flwr.common.typing import Run, RunStatus
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.server.utils.validator import validate_message
 from flwr.supercore.constant import NodeStatus
@@ -48,22 +47,23 @@ from flwr.supercore.corestate.sql_corestate import SqlCoreState
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
-from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
+from flwr.supercore.utils import (
+    int64_to_uint64,
+    simulation_config_from_json,
+    simulation_config_to_json,
+    uint64_to_int64,
+)
 from flwr.superlink.federation import FederationManager
 
 from .linkstate import LinkState
 from .utils import (
     check_node_availability_for_in_message,
-    configrecord_from_bytes,
-    configrecord_to_bytes,
     context_from_bytes,
     context_to_bytes,
     convert_sint64_values_in_dict_to_uint64,
     convert_uint64_values_in_dict_to_sint64,
     dict_to_message,
     generate_rand_int_from_bytes,
-    has_valid_sub_status,
-    is_valid_transition,
     message_to_dict,
     verify_found_message_replies,
     verify_message_ids,
@@ -88,7 +88,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # Start with linkstate tables
         metadata = create_linkstate_metadata()
 
-        # Add corestate tables (token_store)
+        # Add corestate tables (for example token_store and fab)
         corestate_metadata = create_corestate_metadata()
         for table in corestate_metadata.tables.values():
             table.to_metadata(metadata)
@@ -99,41 +99,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def federation_manager(self) -> FederationManager:
         """Return the FederationManager instance."""
         return self._federation_manager
-
-    def store_fab(self, fab: Fab) -> str:
-        """Store a FAB."""
-        fab_hash = hashlib.sha256(fab.content).hexdigest()
-        params = {
-            "fab_hash": fab_hash,
-            "content": fab.content,
-            "verifications": json.dumps(fab.verifications),
-        }
-        query = """
-            INSERT INTO fab (fab_hash, content, verifications)
-            VALUES (:fab_hash, :content, :verifications)
-            ON CONFLICT(fab_hash) DO UPDATE SET
-                content = excluded.content,
-                verifications = excluded.verifications
-        """
-        self.query(query, params)
-        return fab_hash
-
-    def get_fab(self, fab_hash: str) -> Fab | None:
-        """Return a FAB by hash."""
-        query = """
-            SELECT fab_hash, content, verifications
-            FROM fab
-            WHERE fab_hash = :fab_hash
-        """
-        rows = self.query(query, {"fab_hash": fab_hash})
-        if not rows:
-            return None
-        row = rows[0]
-        return Fab(
-            hash_str=row["fab_hash"],
-            content=row["content"],
-            verifications=json.loads(row["verifications"]),
-        )
 
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
@@ -285,48 +250,15 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             msg = f"`node_id` must be != {SUPERLINK_NODE_ID}"
             raise AssertionError(msg)
 
-        params: dict[str, str | int] = {}
-
-        # Convert the uint64 value to sint64 for SQLite
-        params["node_id"] = uint64_to_int64(node_id)
-
         with self.session():
-            # Retrieve all Messages for node_id
-            query = """
-                SELECT message_id
-                FROM message_ins
-                WHERE dst_node_id = :node_id
-                AND delivered_at = ''
-                AND (created_at + ttl) > CAST(strftime('%s', 'now') AS REAL)
-            """
-
-            if limit is not None:
-                query += " LIMIT :limit"
-                params["limit"] = limit
-
-            rows = self.query(query, params)
+            rows = self._claim_message_ins_rows(node_id, limit)
             message_ids: set[str] = {row["message_id"] for row in rows}
             self._check_stored_messages(message_ids)
 
-            # Mark retrieved Messages as delivered
-            if rows:
-                # Prepare query
-                placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
-                query = f"""
-                    UPDATE message_ins
-                    SET delivered_at = :delivered_at
-                    WHERE message_id IN ({placeholders})
-                    RETURNING *
-                """
-
-                # Prepare data for query
-                delivered_at = now().isoformat()
-                params = {"delivered_at": delivered_at}
-                for index, msg_id in enumerate(message_ids):
-                    params[f"mid_{index}"] = str(msg_id)
-
-                # Run query
-                rows = self.query(query, params)
+            # _check_stored_messages can delete claimed Messages if they became invalid
+            # (for example, node removed from federation), so re-read current rows.
+            if message_ids:
+                rows = self._load_message_ins_rows(message_ids)
 
             for row in rows:
                 # Convert values from sint64 to uint64
@@ -337,6 +269,56 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         result = [dict_to_message(dict(row)) for row in rows]
 
         return result
+
+    def _claim_message_ins_rows(
+        self, node_id: int, limit: int | None
+    ) -> list[dict[str, Any]]:
+        """Atomically claim eligible instruction Messages for a node."""
+        current_time = now()
+        params: dict[str, str | int | float] = {
+            # Convert the uint64 value to sint64 for SQLite
+            "node_id": uint64_to_int64(node_id),
+            "current": current_time.timestamp(),
+            "delivered_at": current_time.isoformat(),
+        }
+        common_condition = """
+            dst_node_id = :node_id
+            AND delivered_at = ''
+            AND (created_at + ttl) > :current
+        """
+        condition = common_condition
+        if limit is not None:
+            condition = f"""
+                message_id IN (
+                    SELECT message_id
+                    FROM message_ins
+                    WHERE {common_condition}
+                    ORDER BY rowid
+                    LIMIT :limit
+                )
+                AND delivered_at = ''
+            """
+            params["limit"] = limit
+
+        query = f"""
+            UPDATE message_ins
+            SET delivered_at = :delivered_at
+            WHERE {condition}
+            RETURNING *
+        """
+        return self.query(query, params)
+
+    def _load_message_ins_rows(self, message_ids: set[str]) -> list[dict[str, Any]]:
+        """Load instruction Messages by IDs."""
+        placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
+        query = f"""
+            SELECT *
+            FROM message_ins
+            WHERE message_id IN ({placeholders})
+            ORDER BY rowid
+        """
+        params = {f"mid_{i}": msg_id for i, msg_id in enumerate(message_ids)}
+        return self.query(query, params)
 
     def store_message_res(self, message: Message) -> str | None:
         """Store one Message."""
@@ -467,15 +449,18 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             )
             ret.update(tmp_ret_dict)
 
-            # Find all reply Messages
+            # Atomically claim all eligible reply Messages
             placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
+            delivered_at = now().isoformat()
             query = f"""
-                SELECT *
-                FROM message_res
+                UPDATE message_res
+                SET delivered_at = :delivered_at
                 WHERE reply_to_message_id IN ({placeholders})
                 AND delivered_at = ''
+                RETURNING *
             """
-            params = {f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)}
+            params = {"delivered_at": delivered_at}
+            params.update({f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)})
             rows = self.query(query, params)
             for row in rows:
                 convert_sint64_values_in_dict_to_uint64(
@@ -488,23 +473,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 current_time=current,
             )
             ret.update(tmp_ret_dict)
-
-            # Mark existing reply Messages to be returned as delivered
-            delivered_at = now().isoformat()
-            for message_res in ret.values():
-                message_res.metadata.delivered_at = delivered_at
-            message_res_ids = [
-                message_res.metadata.message_id for message_res in ret.values()
-            ]
-            placeholders = ",".join([f":mid_{i}" for i in range(len(message_res_ids))])
-            query = f"""
-                UPDATE message_res
-                SET delivered_at = :delivered_at
-                WHERE message_id IN ({placeholders})
-            """
-            params = {"delivered_at": delivered_at}
-            params.update({f"mid_{i}": mid for i, mid in enumerate(message_res_ids)})
-            self.query(query, params)
 
         return list(ret.values())
 
@@ -816,14 +784,14 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         node_id = int64_to_uint64(rows[0]["node_id"])
         return node_id
 
-    def create_run(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def create_run(  # pylint: disable=R0913, R0914, R0917
         self,
         fab_id: str | None,
         fab_version: str | None,
         fab_hash: str | None,
         override_config: UserConfig,
         federation: str,
-        federation_options: ConfigRecord,
+        federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         run_type: str,
     ) -> int:
@@ -834,6 +802,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # Convert the uint64 value to sint64 for SQLite
         sint64_run_id = uint64_to_int64(uint64_run_id)
 
+        # Convert federation_config to JSON string for storage
+        fed_config_json = None
+        if federation_config:
+            fed_config_json = json.dumps(simulation_config_to_json(federation_config))
+
         with self.session():
             # Check conflicts
             query = "SELECT COUNT(*) as cnt FROM run WHERE run_id = :run_id"
@@ -841,15 +814,15 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             if rows[0]["cnt"] == 0:
                 query = """
                     INSERT INTO run
-                    (run_id, fab_id, fab_version,
-                    fab_hash, override_config, federation, federation_options, run_type,
-                    pending_at, starting_at, running_at, finished_at, sub_status,
-                    details, flwr_aid, bytes_sent, bytes_recv, clientapp_runtime)
+                    (run_id, fab_id, fab_version, fab_hash, override_config, federation,
+                    federation_config, run_type, pending_at, starting_at, running_at,
+                    finished_at, usage_reported_at, sub_status, details, flwr_aid,
+                    bytes_sent, bytes_recv, clientapp_runtime)
                     VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
-                    :federation, :federation_options, :run_type, :pending_at,
-                    :starting_at,
-                    :running_at, :finished_at, :sub_status, :details, :flwr_aid,
-                    :bytes_sent, :bytes_recv, :clientapp_runtime)
+                    :federation, :federation_config, :run_type, :pending_at,
+                    :starting_at, :running_at, :finished_at, :usage_reported_at,
+                    :sub_status, :details, :flwr_aid, :bytes_sent, :bytes_recv,
+                    :clientapp_runtime)
                 """
                 override_config_json = json.dumps(override_config)
                 params = {
@@ -859,7 +832,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     "fab_hash": fab_hash or "",
                     "override_config": override_config_json,
                     "federation": federation,
-                    "federation_options": configrecord_to_bytes(federation_options),
+                    "federation_config": fed_config_json,
                     "run_type": run_type,
                     "pending_at": now().isoformat(),
                     "starting_at": "",
@@ -871,6 +844,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     "bytes_sent": 0,
                     "bytes_recv": 0,
                     "clientapp_runtime": 0.0,
+                    "usage_reported_at": "",
                 }
                 self.query(query, params)
                 return uint64_run_id
@@ -1009,90 +983,67 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             for row in rows
         }
 
+    def get_federation_config(self, run_id: int) -> SimulationConfig | None:
+        """Get the resolved federation configuration for the specified `run_id`."""
+        query = "SELECT federation_config FROM run WHERE run_id = :run_id"
+        sint64_run_id = uint64_to_int64(run_id)
+        rows = self.query(query, {"run_id": sint64_run_id})
+        if not rows:
+            log(ERROR, "`run_id` invalid for fetching resolved federation config")
+            return None
+
+        fed_config_json = rows[0]["federation_config"]
+        if fed_config_json is None:
+            return None
+
+        return simulation_config_from_json(json.loads(fed_config_json))
+
     def update_run_status(self, run_id: int, new_status: RunStatus) -> bool:
         """Update the status of the run with the specified `run_id`."""
         # Clean up expired tokens; this will flag inactive runs as needed
         self._cleanup_expired_tokens()
 
-        with self.session():
-            # Convert the uint64 value to sint64 for SQLite
-            sint64_run_id = uint64_to_int64(run_id)
-            query = "SELECT * FROM run WHERE run_id = :run_id"
-            rows = self.query(query, {"run_id": sint64_run_id})
+        # Determine the timestamp field and conditions based on the new status
+        ts_fld = ""
+        ts_con = ""
+        if new_status.status == Status.STARTING:
+            ts_fld = "starting_at"
+            # Condition: current status is PENDING
+            ts_con = "starting_at = '' AND finished_at = ''"
+        elif new_status.status == Status.RUNNING:
+            ts_fld = "running_at"
+            # Condition: current status is STARTING
+            ts_con = "starting_at != '' AND running_at = '' AND finished_at = ''"
+        elif new_status.status == Status.FINISHED:
+            ts_fld = "finished_at"
+            # Condition: current status is not FINISHED
+            ts_con = "finished_at = ''"
+            if new_status.sub_status == SubStatus.COMPLETED:
+                # For COMPLETED runs, ensure they are currently RUNNING
+                ts_con += " AND running_at != ''"
+        else:
+            return False  # Cannot update to PENDING
 
-            # Check if the run_id exists
-            if not rows:
-                log(ERROR, "`run_id` is invalid")
-                return False
+        # Prepare the query and parameters
+        query = f"""
+            UPDATE run SET {ts_fld} = :timestamp,
+            sub_status = :sub_status, details = :details
+            WHERE run_id = :run_id AND {ts_con}
+            RETURNING run_id
+        """
+        params = {
+            "timestamp": now().isoformat(),
+            "sub_status": new_status.sub_status,
+            "details": new_status.details,
+            "run_id": uint64_to_int64(run_id),
+        }
 
-            # Check if the status transition is valid
-            row = rows[0]
-            current_status = RunStatus(
-                status=determine_run_status(row),
-                sub_status=row["sub_status"],
-                details=row["details"],
-            )
-            if not is_valid_transition(current_status, new_status):
-                log(
-                    ERROR,
-                    'Invalid status transition: from "%s" to "%s"',
-                    current_status.status,
-                    new_status.status,
-                )
-                return False
-
-            # Check if the sub-status is valid
-            if not has_valid_sub_status(current_status):
-                log(
-                    ERROR,
-                    'Invalid sub-status "%s" for status "%s"',
-                    current_status.sub_status,
-                    current_status.status,
-                )
-                return False
-
-            # Update the status
-            query = """
-                UPDATE run SET %s = :timestamp,
-                sub_status = :sub_status, details = :details
-                WHERE run_id = :run_id
-            """
-
-            # Prepare data for query
-            current = now()
-
-            # Determine the timestamp field based on the new status
-            timestamp_fld = ""
-            if new_status.status == Status.STARTING:
-                timestamp_fld = "starting_at"
-            elif new_status.status == Status.RUNNING:
-                timestamp_fld = "running_at"
-            elif new_status.status == Status.FINISHED:
-                timestamp_fld = "finished_at"
-
-            params = {
-                "timestamp": current.isoformat(),
-                "sub_status": new_status.sub_status,
-                "details": new_status.details,
-                "run_id": sint64_run_id,
-            }
-            self.query(query % timestamp_fld, params)
-        return True
-
-    def get_federation_options(self, run_id: int) -> ConfigRecord | None:
-        """Retrieve the federation options for the specified `run_id`."""
-        # Convert the uint64 value to sint64 for SQLite
-        sint64_run_id = uint64_to_int64(run_id)
-        query = "SELECT federation_options FROM run WHERE run_id = :run_id"
-        rows = self.query(query, {"run_id": sint64_run_id})
-
-        # Check if the run_id exists
-        if not rows:
-            log(ERROR, "`run_id` is invalid")
-            return None
-
-        row = rows[0]
-        return configrecord_from_bytes(row["federation_options"])
+        # Update the status
+        rows = self.query(query, params)
+        # Report usage if the run is marked as finished after the update
+        if rows and new_status.status == Status.FINISHED:
+            self.federation_manager.report_run_usage()
+        return len(rows) > 0
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
@@ -1154,11 +1105,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if not expired_records:
             return
 
-        with self.session():
+        with self.session() as session:
             query = """
                 UPDATE run
                 SET sub_status = :failed, details = :details, finished_at = :finished_at
-                WHERE run_id = :run_id
+                WHERE run_id = :run_id AND finished_at = ''
             """
             data = [
                 {
@@ -1171,7 +1122,12 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 }
                 for run_id, active_until in expired_records
             ]
-            self.query(query, data)
+            result = session.execute(text(query), data)
+            updated_rows = result.rowcount or 0  # type: ignore[attr-defined]
+
+        # Report usage for runs that have been marked as failed due to expired tokens
+        if updated_rows > 0:
+            self.federation_manager.report_run_usage()
 
     def get_serverapp_context(self, run_id: int) -> Context | None:
         """Get the context for the specified `run_id`."""

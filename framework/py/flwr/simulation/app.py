@@ -16,6 +16,7 @@
 
 
 import argparse
+from dataclasses import replace
 from logging import DEBUG, ERROR, INFO
 from queue import Queue
 
@@ -28,7 +29,6 @@ from flwr.common.config import (
     get_fused_config_from_dir,
     get_project_config,
     get_project_dir,
-    unflatten_dict,
 )
 from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
@@ -45,7 +45,6 @@ from flwr.common.logger import (
     stop_log_uploader,
 )
 from flwr.common.serde import (
-    config_record_from_proto,
     context_from_proto,
     context_to_proto,
     fab_from_proto,
@@ -58,19 +57,50 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppInputsResponse,
     PushAppOutputsRequest,
 )
-from flwr.proto.run_pb2 import (  # pylint: disable=E0611
-    GetFederationOptionsRequest,
-    GetFederationOptionsResponse,
-    UpdateRunStatusRequest,
-)
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.run_pb2 import UpdateRunStatusRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
 from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
 from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.constant import NOOP_FEDERATION
 from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
-from flwr.supercore.superexec.plugin import SimulationExecPlugin
+from flwr.supercore.superexec.plugin import ServerAppExecPlugin
 from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning
+
+
+def _run_simulation_settings(
+    sim_cfg: SimulationConfig,
+) -> tuple[int, str, BackendConfig, bool, bool]:
+    """Extract simulation runtime settings from a run."""
+    if sim_cfg is None or not sim_cfg.HasField("num_supernodes"):
+        raise ValueError(
+            "Simulation run expects `run.federation_config.num_supernodes` to be set."
+        )
+
+    backend_name = sim_cfg.backend if sim_cfg.HasField("backend") else "ray"
+    backend_config: BackendConfig = {"client_resources": {}, "init_args": {}}
+
+    if sim_cfg.HasField("client_resources_num_cpus"):
+        backend_config["client_resources"][
+            "num_cpus"
+        ] = sim_cfg.client_resources_num_cpus
+    if sim_cfg.HasField("client_resources_num_gpus"):
+        backend_config["client_resources"][
+            "num_gpus"
+        ] = sim_cfg.client_resources_num_gpus
+    if sim_cfg.HasField("init_args_num_cpus"):
+        backend_config["init_args"]["num_cpus"] = sim_cfg.init_args_num_cpus
+    if sim_cfg.HasField("init_args_num_gpus"):
+        backend_config["init_args"]["num_gpus"] = sim_cfg.init_args_num_gpus
+    if sim_cfg.HasField("init_args_logging_level"):
+        backend_config["init_args"]["logging_level"] = sim_cfg.init_args_logging_level
+    if sim_cfg.HasField("init_args_log_to_driver"):
+        backend_config["init_args"]["log_to_driver"] = sim_cfg.init_args_log_to_driver
+
+    verbose = sim_cfg.verbose if sim_cfg.HasField("verbose") else False
+    return sim_cfg.num_supernodes, backend_name, backend_config, verbose, False
 
 
 def flwr_simulation() -> None:
@@ -91,8 +121,8 @@ def flwr_simulation() -> None:
     if args.token is None:
         run_with_deprecation_warning(
             cmd="flwr-simulation",
-            plugin_type=ExecPluginType.SIMULATION,
-            plugin_class=SimulationExecPlugin,
+            plugin_type=ExecPluginType.SERVER_APP,
+            plugin_class=ServerAppExecPlugin,
             stub_class=ServerAppIoStub,
             appio_api_address=args.serverappio_api_address,
             parent_pid=args.parent_pid,
@@ -211,23 +241,13 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             app_path,
         )
 
-        # Pull Federation Options
-        fed_opt_res: GetFederationOptionsResponse = conn._stub.GetFederationOptions(
-            GetFederationOptionsRequest(run_id=run.run_id)
-        )
-        federation_options = config_record_from_proto(fed_opt_res.federation_options)
-
-        # Unflatten underlying dict
-        fed_opt = unflatten_dict({**federation_options})
-
-        # Extract configs values of interest
-        num_supernodes = fed_opt.get("num-supernodes")
-        if num_supernodes is None:
-            raise ValueError("Federation options expects `num-supernodes` to be set.")
-        backend_name: str = fed_opt.get("backend", {}).get("name", "ray")
-        backend_config: BackendConfig = fed_opt.get("backend", {})
-        verbose: bool = fed_opt.get("verbose", False)
-        enable_tf_gpu_growth: bool = fed_opt.get("enable_tf_gpu_growth", False)
+        (
+            num_supernodes,
+            backend_name,
+            backend_config,
+            verbose,
+            enable_tf_gpu_growth,
+        ) = _run_simulation_settings(res.federation_config)
 
         run_id_hash = get_sha256_hash(run.run_id)
         event(
@@ -253,7 +273,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             backend_name=backend_name,
             backend_config=backend_config,
             app_dir=str(app_path),
-            run=run,
+            run=replace(run, federation=NOOP_FEDERATION),
             enable_tf_gpu_growth=enable_tf_gpu_growth,
             verbose_logging=verbose,
             server_app_context=context,

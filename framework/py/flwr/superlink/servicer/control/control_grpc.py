@@ -88,6 +88,7 @@ def run_control_api_grpc(
         interceptors=interceptors or None,
     )
 
+    address = control_grpc_server.bound_address
     if isinstance(authn_plugin, NoOpControlAuthnPlugin):
         log(INFO, "Flower Deployment Runtime: Starting Control API on %s", address)
     else:

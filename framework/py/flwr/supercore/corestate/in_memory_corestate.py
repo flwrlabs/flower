@@ -15,6 +15,7 @@
 """In-memory CoreState implementation."""
 
 
+import hashlib
 import secrets
 from dataclasses import dataclass
 from threading import Lock
@@ -25,6 +26,7 @@ from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
 )
+from flwr.common.typing import Fab
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -43,6 +45,8 @@ class InMemoryCoreState(CoreState):
 
     def __init__(self, object_store: ObjectStore) -> None:
         self._object_store = object_store
+        self.fab_store: dict[str, Fab] = {}
+        self.lock_fab_store = Lock()
         # Store run ID to token mapping and token to run ID mapping
         self.token_store: dict[int, TokenRecord] = {}
         self.token_to_run_id: dict[str, int] = {}
@@ -52,6 +56,36 @@ class InMemoryCoreState(CoreState):
     def object_store(self) -> ObjectStore:
         """Return the ObjectStore instance used by this CoreState."""
         return self._object_store
+
+    def store_fab(self, fab: Fab) -> str:
+        """Store a FAB."""
+        fab_hash = hashlib.sha256(fab.content).hexdigest()
+        if fab.hash_str and fab.hash_str != fab_hash:
+            raise ValueError(
+                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+            )
+        with self.lock_fab_store:
+            # Keep launch behavior: last write wins for metadata under the same
+            # content hash.
+            self.fab_store[fab_hash] = Fab(
+                hash_str=fab_hash,
+                content=fab.content,
+                verifications=dict(fab.verifications),
+            )
+        return fab_hash
+
+    def get_fab(self, fab_hash: str) -> Fab | None:
+        """Return a FAB by hash."""
+        with self.lock_fab_store:
+            if (fab := self.fab_store.get(fab_hash)) is None:
+                return None
+            # Launch tradeoff: do not recompute content hash on reads; rely on
+            # write-time validation and hash-addressed lookup.
+            return Fab(
+                hash_str=fab.hash_str,
+                content=fab.content,
+                verifications=dict(fab.verifications),
+            )
 
     def create_token(self, run_id: int) -> str | None:
         """Create a token for the given run ID."""

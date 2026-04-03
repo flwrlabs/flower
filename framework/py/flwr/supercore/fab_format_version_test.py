@@ -23,7 +23,7 @@ from .fab_format_version import normalize_and_validate_fab_format
 
 
 def test_normalize_and_validate_fab_format_rejects_unsupported_version() -> None:
-    """Test unsupported fab_format_version values fail explicitly."""
+    """Test unsupported fab-format-version values fail explicitly."""
     config: dict[str, Any] = {
         "project": {
             "name": "fedgpt",
@@ -33,7 +33,7 @@ def test_normalize_and_validate_fab_format_rejects_unsupported_version() -> None
             "flwr": {
                 "app": {
                     "publisher": "flwrlabs",
-                    "fab_format_version": 2,
+                    "fab-format-version": 2,
                 }
             }
         },
@@ -43,8 +43,8 @@ def test_normalize_and_validate_fab_format_rejects_unsupported_version() -> None
         normalize_and_validate_fab_format(config)
 
 
-def test_normalize_and_validate_fab_format_accepts_target_for_version_zero() -> None:
-    """Test flwr_version_target is accepted for fab_format_version=0."""
+def test_normalize_and_validate_fab_format_ignores_target_for_version_zero() -> None:
+    """Test flwr-version-target is ignored for fab-format-version=0."""
     config: dict[str, Any] = {
         "project": {
             "name": "fedgpt",
@@ -54,8 +54,8 @@ def test_normalize_and_validate_fab_format_accepts_target_for_version_zero() -> 
             "flwr": {
                 "app": {
                     "publisher": "flwrlabs",
-                    "fab_format_version": 0,
-                    "flwr_version_target": "1.27.0",
+                    "fab-format-version": 0,
+                    "flwr-version-target": "1.27.0",
                 }
             }
         },
@@ -65,12 +65,11 @@ def test_normalize_and_validate_fab_format_accepts_target_for_version_zero() -> 
 
     assert metadata.fab_format_version == 0
     assert metadata.flwr_version_min is None
-    assert metadata.flwr_version_target == "1.27.0"
-    assert metadata.flwr_version_max is None
+    assert metadata.flwr_version_target is None
 
 
-def test_normalize_and_validate_fab_format_derives_bounds_for_version_zero() -> None:
-    """Test fab_format_version=0 derives bounds when the flwr dependency is usable."""
+def test_normalize_and_validate_fab_format_derives_min_for_version_zero() -> None:
+    """Test fab-format-version=0 derives only the lower bound when usable."""
     config: dict[str, Any] = {
         "project": {
             "name": "fedgpt",
@@ -81,8 +80,8 @@ def test_normalize_and_validate_fab_format_derives_bounds_for_version_zero() -> 
             "flwr": {
                 "app": {
                     "publisher": "flwrlabs",
-                    "fab_format_version": 0,
-                    "flwr_version_target": "1.27.0",
+                    "fab-format-version": 0,
+                    "flwr-version-target": "1.27.0",
                 }
             }
         },
@@ -92,12 +91,11 @@ def test_normalize_and_validate_fab_format_derives_bounds_for_version_zero() -> 
 
     assert metadata.fab_format_version == 0
     assert metadata.flwr_version_min == "1.26.0"
-    assert metadata.flwr_version_target == "1.27.0"
-    assert metadata.flwr_version_max == "1.28.0"
+    assert metadata.flwr_version_target is None
 
 
 def test_v0_fab_format_skips_unsupported_bounds() -> None:
-    """Test fab_format_version=0 ignores unrepresentable flwr dependency specifiers."""
+    """Test fab-format-version=0 ignores unrepresentable flwr dependency specifiers."""
     config: dict[str, Any] = {
         "project": {
             "name": "fedgpt",
@@ -108,8 +106,8 @@ def test_v0_fab_format_skips_unsupported_bounds() -> None:
             "flwr": {
                 "app": {
                     "publisher": "flwrlabs",
-                    "fab_format_version": 0,
-                    "flwr_version_target": "1.27.0",
+                    "fab-format-version": 0,
+                    "flwr-version-target": "1.27.0",
                 }
             }
         },
@@ -119,49 +117,226 @@ def test_v0_fab_format_skips_unsupported_bounds() -> None:
 
     assert metadata.fab_format_version == 0
     assert metadata.flwr_version_min is None
-    assert metadata.flwr_version_target == "1.27.0"
-    assert metadata.flwr_version_max is None
+    assert metadata.flwr_version_target is None
 
 
-def test_v1_fab_format_rejects_duplicate_lower_bounds() -> None:
-    """Test fab_format_version=1 rejects multiple lower-bound specifiers."""
+def test_v0_fab_format_ignores_target_even_with_upper_bounds() -> None:
+    """Test fab-format-version=0 ignores flwr-version-target even with upper bounds."""
     config: dict[str, Any] = {
         "project": {
             "name": "fedgpt",
             "version": "1.0.0",
+            "dependencies": ["flwr>=1.26.0,<1.28.0"],
+        },
+        "tool": {
+            "flwr": {
+                "app": {
+                    "publisher": "flwrlabs",
+                    "fab-format-version": 0,
+                    "flwr-version-target": "2.1.0",
+                }
+            }
+        },
+    }
+
+    metadata = normalize_and_validate_fab_format(config)
+
+    assert metadata.fab_format_version == 0
+    assert metadata.flwr_version_min == "1.26.0"
+    assert metadata.flwr_version_target is None
+
+
+def test_v1_fab_format_uses_highest_inclusive_lower_bound() -> None:
+    """Test fab-format-version=1 derives the highest declared `>=` lower bound."""
+    config: dict[str, Any] = {
+        "project": {
+            "name": "fedgpt",
+            "version": "1.0.0",
+            "license": {"file": "LICENSE"},
             "dependencies": ["flwr>=1.26.0,>=1.27.0"],
         },
         "tool": {
             "flwr": {
                 "app": {
                     "publisher": "flwrlabs",
-                    "fab_format_version": 1,
+                    "fab-format-version": 1,
+                    "flwr-version-target": "1.27.0",
                 }
             }
         },
     }
 
-    with pytest.raises(ValueError, match="multiple lower bounds"):
-        normalize_and_validate_fab_format(config)
+    metadata = normalize_and_validate_fab_format(config)
+
+    assert metadata.fab_format_version == 1
+    assert metadata.flwr_version_min == "1.27.0"
+    assert metadata.flwr_version_target == "1.27.0"
 
 
-def test_v1_fab_format_rejects_duplicate_upper_bounds() -> None:
-    """Test fab_format_version=1 rejects multiple upper-bound specifiers."""
+def test_v1_fab_format_accepts_additional_non_lower_bound_specifiers() -> None:
+    """Test fab-format-version=1 accepts extra specifiers beyond the lower bound."""
     config: dict[str, Any] = {
         "project": {
             "name": "fedgpt",
             "version": "1.0.0",
-            "dependencies": ["flwr>=1.26.0,<=2.0.0,<=1.28.0"],
+            "license": {"file": "LICENSE"},
+            "dependencies": ["flwr>=1.26.0,==1.27.0,!=1.27.1"],
         },
         "tool": {
             "flwr": {
                 "app": {
                     "publisher": "flwrlabs",
-                    "fab_format_version": 1,
+                    "fab-format-version": 1,
+                    "flwr-version-target": "1.27.0",
                 }
             }
         },
     }
 
-    with pytest.raises(ValueError, match="multiple upper bounds"):
+    metadata = normalize_and_validate_fab_format(config)
+
+    assert metadata.fab_format_version == 1
+    assert metadata.flwr_version_min == "1.26.0"
+    assert metadata.flwr_version_target == "1.27.0"
+
+
+def test_v1_fab_format_rejects_target_outside_declared_range() -> None:
+    """Test fab-format-version=1 rejects targets outside the flwr specifier."""
+    config: dict[str, Any] = {
+        "project": {
+            "name": "fedgpt",
+            "version": "1.0.0",
+            "license": {"file": "LICENSE"},
+            "dependencies": ["flwr>=1.26.0,<2.0.0,<=1.28.0"],
+        },
+        "tool": {
+            "flwr": {
+                "app": {
+                    "publisher": "flwrlabs",
+                    "fab-format-version": 1,
+                    "flwr-version-target": "2.1.0",
+                }
+            }
+        },
+    }
+
+    with pytest.raises(ValueError, match='must satisfy the declared "flwr"'):
+        normalize_and_validate_fab_format(config)
+
+
+def test_v1_fab_format_rejects_missing_inclusive_lower_bound() -> None:
+    """Test fab-format-version=1 rejects lower bounds declared with `>` only."""
+    config: dict[str, Any] = {
+        "project": {
+            "name": "fedgpt",
+            "version": "1.0.0",
+            "license": {"file": "LICENSE"},
+            "dependencies": ["flwr>1.26.0,<2.0.0"],
+        },
+        "tool": {
+            "flwr": {
+                "app": {
+                    "publisher": "flwrlabs",
+                    "fab-format-version": 1,
+                    "flwr-version-target": "1.27.0",
+                }
+            }
+        },
+    }
+
+    with pytest.raises(ValueError, match="inclusive lower bound"):
+        normalize_and_validate_fab_format(config)
+
+
+def test_v1_fab_format_requires_target_version() -> None:
+    """Test fab-format-version=1 requires flwr-version-target."""
+    config: dict[str, Any] = {
+        "project": {
+            "name": "fedgpt",
+            "version": "1.0.0",
+            "license": {"file": "LICENSE"},
+            "dependencies": ["flwr>=1.26.0,<=1.28.0"],
+        },
+        "tool": {
+            "flwr": {
+                "app": {
+                    "publisher": "flwrlabs",
+                    "fab-format-version": 1,
+                }
+            }
+        },
+    }
+
+    with pytest.raises(ValueError, match="flwr-version-target"):
+        normalize_and_validate_fab_format(config)
+
+
+def test_v1_fab_format_requires_license_file_reference() -> None:
+    """Test fab-format-version=1 requires [project].license.file."""
+    config: dict[str, Any] = {
+        "project": {
+            "name": "fedgpt",
+            "version": "1.0.0",
+            "dependencies": ["flwr>=1.26.0,<=2.0.0"],
+        },
+        "tool": {
+            "flwr": {
+                "app": {
+                    "publisher": "flwrlabs",
+                    "fab-format-version": 1,
+                    "flwr-version-target": "1.27.0",
+                }
+            }
+        },
+    }
+
+    with pytest.raises(ValueError, match=r"\[project\]\.license"):
+        normalize_and_validate_fab_format(config)
+
+
+def test_v1_fab_format_rejects_inline_license_text() -> None:
+    """Test fab-format-version=1 rejects inline license text."""
+    config: dict[str, Any] = {
+        "project": {
+            "name": "fedgpt",
+            "version": "1.0.0",
+            "license": {"text": "Apache-2.0"},
+            "dependencies": ["flwr>=1.26.0,<=2.0.0"],
+        },
+        "tool": {
+            "flwr": {
+                "app": {
+                    "publisher": "flwrlabs",
+                    "fab-format-version": 1,
+                    "flwr-version-target": "1.27.0",
+                }
+            }
+        },
+    }
+
+    with pytest.raises(ValueError, match="root-level license file"):
+        normalize_and_validate_fab_format(config)
+
+
+def test_v1_fab_format_rejects_invalid_license_file_name() -> None:
+    """Test fab-format-version=1 only allows LICENSE or LICENSE.md."""
+    config: dict[str, Any] = {
+        "project": {
+            "name": "fedgpt",
+            "version": "1.0.0",
+            "license": {"file": "legal/LICENSE.txt"},
+            "dependencies": ["flwr>=1.26.0,<=2.0.0"],
+        },
+        "tool": {
+            "flwr": {
+                "app": {
+                    "publisher": "flwrlabs",
+                    "fab-format-version": 1,
+                    "flwr-version-target": "1.27.0",
+                }
+            }
+        },
+    }
+
+    with pytest.raises(ValueError, match='"LICENSE" or "LICENSE.md"'):
         normalize_and_validate_fab_format(config)
