@@ -32,6 +32,7 @@ from .publish import (
     _build_multipart_files_param,
     _collect_file_paths,
     _detect_mime,
+    _validate_app_name,
     _validate_description,
     _validate_files,
 )
@@ -260,6 +261,19 @@ def test_validate_description_empty_raises() -> None:
 def test_validate_description_valid() -> None:
     """Test valid description passes validation."""
     _validate_description("A simple Flower federated learning app.")
+
+
+@pytest.mark.parametrize("value", ["app-numpy33", "App-NumPy33"])
+def test_validate_app_name_accepts_valid_values(value: str) -> None:
+    """Test valid app names pass validation."""
+    _validate_app_name(value, "Flower App name")
+
+
+@pytest.mark.parametrize("value", ["app_numpy33", "33app", "app.numpy33"])
+def test_validate_app_name_rejects_invalid_values(value: str) -> None:
+    """Test invalid app names are rejected."""
+    with pytest.raises(click.ClickException, match="valid app name must start"):
+        _validate_app_name(value, "Flower App name")
 
 
 def test_validate_description_long_continue(monkeypatch: pytest.MonkeyPatch) -> None:

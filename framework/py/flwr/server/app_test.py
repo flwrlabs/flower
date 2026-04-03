@@ -88,7 +88,7 @@ def test_parse_superlink_log_rotation_backup_requires_positive_int(
 
 
 def test_run_superlink_checks_for_update(monkeypatch: pytest.MonkeyPatch) -> None:
-    """SuperLink should run the startup update check after parsing arguments."""
+    """SuperLink should run the startup update check before parsing arguments."""
 
     class _SentinelError(Exception):
         pass
@@ -101,17 +101,22 @@ def test_run_superlink_checks_for_update(monkeypatch: pytest.MonkeyPatch) -> Non
     def _parse_args() -> _Parser:
         return _Parser()
 
-    captured: dict[str, str] = {}
+    captured: list[str] = []
 
     def _raise_sentinel(process_name: str | None = None) -> None:
+        captured.append("update")
         if process_name is not None:
-            captured["process_name"] = process_name
+            captured.append(process_name)
         raise _SentinelError()
 
-    monkeypatch.setattr(app_module, "_parse_args_run_superlink", _parse_args)
+    def _unexpected_parse_args() -> _Parser:
+        captured.append("parse")
+        return _parse_args()
+
+    monkeypatch.setattr(app_module, "_parse_args_run_superlink", _unexpected_parse_args)
     monkeypatch.setattr(app_module, "warn_if_flwr_update_available", _raise_sentinel)
 
     with pytest.raises(_SentinelError):
         app_module.run_superlink()
 
-    assert captured == {"process_name": "flower-superlink"}
+    assert captured == ["update", "flower-superlink"]

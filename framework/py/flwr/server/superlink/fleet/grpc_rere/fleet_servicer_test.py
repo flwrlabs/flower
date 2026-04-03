@@ -194,7 +194,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
             fab_hash=fab_hash,
             override_config={},
             federation=NOOP_FEDERATION,
-            federation_options=ConfigRecord(),
+            federation_config=None,
             flwr_aid="",
             run_type=RunType.SERVER_APP,
         )

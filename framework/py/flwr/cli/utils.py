@@ -219,6 +219,16 @@ def is_valid_project_name(name: str) -> bool:
     return True
 
 
+def validate_project_name(name: str, target: str) -> None:
+    """Validate a project-related name and raise ValueError if invalid."""
+    if not is_valid_project_name(name):
+        raise ValueError(
+            f'{target} "{name}" is invalid, '
+            "a valid app name must start with a letter, "
+            "and can only contain letters, digits, and hyphens."
+        )
+
+
 def get_sha256_hash(file_path_or_int: Path | int) -> str:
     """Calculate the SHA-256 hash of a file or integer.
 
@@ -586,7 +596,8 @@ def filter_paths_for_publish(
         if depth_of(Path(rel_pth)) > MAX_DIR_DEPTH:
             raise ValueError(
                 f"'{rel_pth}' in the project exceeds the maximum directory depth "
-                f"of {MAX_DIR_DEPTH}."
+                f"of {MAX_DIR_DEPTH}. Consider refactoring your project structure to "
+                "reduce nesting."
             )
         ret_files[rel_pth] = files[rel_pth]
     return ret_files

@@ -14,7 +14,7 @@ description = "Base App for the General NLP challenge in the FlowerTune LLM Lead
 license = "Apache-2.0"
 # Dependencies for your Flower App
 dependencies = [
-    "flwr[simulation]>=1.27.0",
+    "flwr[simulation]>=1.28.0",
     "flwr-datasets>=0.6.0",
     "torch==2.9.1",
     "trl==0.8.1",
