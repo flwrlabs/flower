@@ -659,9 +659,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             if not request.federation_name:
                 raise FederationNotSpecified()
 
-            # Init link state
-            state = self.linkstate_factory.state()
-
             # Ensure valid federation name is provided
             success, err_msg = _validate_federation_name(request.federation_name)
             if not success:
@@ -669,6 +666,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     grpc.StatusCode.FAILED_PRECONDITION,
                     f"Invalid federation name: '{request.federation_name}'. {err_msg}",
                 )
+
+            # Init link state
+            state = self.linkstate_factory.state()
 
             # Construct federation name
             account = _get_account(context)
