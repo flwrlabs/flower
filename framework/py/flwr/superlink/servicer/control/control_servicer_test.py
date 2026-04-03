@@ -106,7 +106,6 @@ from .control_servicer import (
     ControlServicer,
     _format_verification,
     _validate_federation_and_node_in_request,
-    _validate_federation_name,
 )
 
 FLWR_AID_MISMATCH_CASES = (
@@ -686,6 +685,23 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             self.servicer.CreateFederation(request, context)
 
         _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
+
+    def test_create_federation_raises_on_invalid_name(self) -> None:
+        """Test CreateFederation aborts when federation name is invalid."""
+        request = CreateFederationRequest(
+            federation_name="Invalid Federation Name!",
+            description="A test federation with invalid name",
+            simulation=False,
+        )
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with self.assertRaises(grpc.RpcError):
+            self.servicer.CreateFederation(request, context)
+
+        context.abort.assert_called_once()
+        status_code, details = context.abort.call_args.args
+        self.assertEqual(status_code, grpc.StatusCode.FAILED_PRECONDITION)
 
     def test_archive_federation_success(self) -> None:
         """Test ArchiveFederation succeeds when federation_manager.archive_federation
@@ -1310,59 +1326,6 @@ def test_format_verification_compact() -> None:
     v2: dict[str, str] = json.loads(out["key2"])
     assert v1 == {"sig": "abc", "algo": "ed25519"}
     assert v2 == {"sig": "def", "algo": "ed25519"}
-
-
-@parameterized.expand(  # type: ignore
-    [
-        ("", False, "Name cannot be empty."),  # empty
-        ("federation123", True, "Name is valid."),  # alphanumeric
-        ("test-federation", True, "Name is valid."),  # hyphenated
-        (
-            "thisfederationnameistoolong",
-            False,
-            "Invalid name: must be less than 20 characters long.",
-        ),  # too_long
-        (
-            "-federation",
-            False,
-            "Invalid name: must start with a letter or a number.",
-        ),  # starts_with_symbol
-        (
-            "test federation",
-            False,
-            (
-                "Invalid name: no spaces allowed, only letters, numbers, and "
-                "hyphens are allowed."
-            ),
-        ),  # contains_space
-        (
-            "Testfederation",
-            False,
-            "Invalid name: must be all lowercase.",
-        ),  # uppercase
-        (
-            "test_federation",
-            False,
-            "Invalid name: only letters, numbers, and hyphens are allowed.",
-        ),  # invalid_symbol
-        (
-            "Test Federation!",
-            False,
-            (
-                "Invalid name: no spaces allowed, must be all lowercase, only "
-                "letters, numbers, and hyphens are allowed."
-            ),
-        ),  # multiple_violations
-    ]
-)
-def test_validate_federation_name(
-    name: str, expected_valid: bool, expected_message: str
-) -> None:
-    """Test federation name validator function."""
-    valid, message = _validate_federation_name(name)
-
-    assert valid is expected_valid
-    assert message == expected_message
 
 
 def _assert_abort_with_flwr_err(ctx: MagicMock, code: int) -> None:

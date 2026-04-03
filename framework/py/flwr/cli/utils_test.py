@@ -27,6 +27,7 @@ from unittest.mock import Mock, patch
 import click
 import grpc
 import pytest
+from parameterized import parameterized
 
 from flwr.cli.constant import (
     LOCAL_CONTROL_API_ADDRESS,
@@ -53,6 +54,7 @@ from .utils import (
     init_channel_from_connection,
     load_gitignore_patterns,
     validate_credentials_content,
+    validate_federation_name,
 )
 
 
@@ -445,3 +447,56 @@ def test_filter_paths_for_publish_max_depth_exceeded(
 def test_filter_paths_for_publish_empty() -> None:
     """Empty input returns empty output."""
     assert not filter_paths_for_publish({})
+
+
+@parameterized.expand(  # type: ignore
+    [
+        ("", False, "Name cannot be empty."),  # empty
+        ("federation123", True, "Name is valid."),  # alphanumeric
+        ("test-federation", True, "Name is valid."),  # hyphenated
+        (
+            "thisfederationnameistoolong",
+            False,
+            "Invalid name: must be less than 20 characters long.",
+        ),  # too_long
+        (
+            "-federation",
+            False,
+            "Invalid name: must start with a letter or a number.",
+        ),  # starts_with_symbol
+        (
+            "test federation",
+            False,
+            (
+                "Invalid name: no spaces allowed, only letters, numbers, and "
+                "hyphens are allowed."
+            ),
+        ),  # contains_space
+        (
+            "Testfederation",
+            False,
+            "Invalid name: must be all lowercase.",
+        ),  # uppercase
+        (
+            "test_federation",
+            False,
+            "Invalid name: only letters, numbers, and hyphens are allowed.",
+        ),  # invalid_symbol
+        (
+            "Test Federation!",
+            False,
+            (
+                "Invalid name: no spaces allowed, must be all lowercase, only "
+                "letters, numbers, and hyphens are allowed."
+            ),
+        ),  # multiple_violations
+    ]
+)
+def test_validate_federation_name(
+    name: str, expected_valid: bool, expected_message: str
+) -> None:
+    """Test federation name validator function."""
+    valid, message = validate_federation_name(name)
+
+    assert valid is expected_valid
+    assert message == expected_message
