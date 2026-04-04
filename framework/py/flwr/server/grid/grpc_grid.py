@@ -56,6 +56,7 @@ from flwr.common.inflatable_protobuf_utils import (
     make_push_object_fn_protobuf,
 )
 from flwr.common.inflatable_utils import (
+    ObjectIdNotPreregisteredError,
     ObjectUnavailableError,
     inflate_object_from_contents,
     pull_objects,
@@ -292,8 +293,21 @@ class GrpcGrid(Grid):
                     msg.metadata.__dict__["_message_id"] = msg.object_id
                     # Check message
                     self._check_message(msg)
-                # Try pushing messages and their objects
-                message_ids = self._try_push_messages(run_id, messages)
+                # Try pushing messages and their objects.
+                # In some deployment environments, preregistered object IDs can
+                # become temporarily inconsistent during high-load startup windows.
+                # Retry once by re-registering object trees before failing hard.
+                try:
+                    message_ids = self._try_push_messages(run_id, messages)
+                except ObjectIdNotPreregisteredError as err:
+                    log(
+                        WARNING,
+                        "Object preregistration mismatch while pushing messages. "
+                        "Retrying once (run_id=%s): %s",
+                        run_id,
+                        err,
+                    )
+                    message_ids = self._try_push_messages(run_id, messages)
 
         except grpc.RpcError as e:
             if e.code() == grpc.StatusCode.RESOURCE_EXHAUSTED:  # pylint: disable=E1101
