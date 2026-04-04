@@ -119,7 +119,7 @@ class VerifiableFedAvg(FedAvg):
                     server_round=server_round,
                     num_replies=0,
                     max_abs_diff=0.0,
-                    passed=True,
+                    passed=False,
                     aggregate_hash="",
                 )
             )
