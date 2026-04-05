@@ -53,13 +53,13 @@ class TestSuperExecAuthPrimitives(TestCase):
         self.assertEqual(
             canonical,
             (
-                "method=/flwr.proto.ServerAppIo/RequestToken\n"
-                "audience=serverappio:9091\n"
-                "ts=123\n"
-                "nonce=nonce-1\n"
-                "run_id=7\n"
-                "body_sha256=abc"
-            ).encode("utf-8"),
+                b"method=/flwr.proto.ServerAppIo/RequestToken\n"
+                b"audience=serverappio:9091\n"
+                b"ts=123\n"
+                b"nonce=nonce-1\n"
+                b"run_id=7\n"
+                b"body_sha256=abc"
+            ),
         )
 
     def test_compute_request_body_sha256_is_deterministic(self) -> None:
@@ -129,7 +129,9 @@ class TestSuperExecAuthPrimitives(TestCase):
     def test_extract_superexec_run_id(self) -> None:
         """Run ID extraction should follow method policy requirements."""
         policy = {
-            "/flwr.proto.ServerAppIo/ListAppsToLaunch": SuperExecMethodPolicy.no_run_id(),
+            "/flwr.proto.ServerAppIo/ListAppsToLaunch": (
+                SuperExecMethodPolicy.no_run_id()
+            ),
             "/flwr.proto.ServerAppIo/RequestToken": SuperExecMethodPolicy.run_scoped(),
         }
 
