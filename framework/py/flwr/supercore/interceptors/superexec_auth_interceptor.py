@@ -18,7 +18,7 @@
 from __future__ import annotations
 
 import secrets
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection
 from typing import Any, NoReturn, Protocol, cast
 
 import grpc
@@ -26,17 +26,14 @@ from google.protobuf.message import Message as GrpcMessage
 
 from flwr.common import now
 from flwr.supercore.auth import (
-    CLIENTAPPIO_SUPEREXEC_AUTH_POLICY,
     MAX_TIMESTAMP_DIFF_SECONDS,
     MIN_TIMESTAMP_DIFF_SECONDS,
-    SERVERAPPIO_SUPEREXEC_AUTH_POLICY,
     SUPEREXEC_AUTH_AUDIENCE_HEADER,
     SUPEREXEC_AUTH_BODY_SHA256_HEADER,
     SUPEREXEC_AUTH_NONCE_HEADER,
     SUPEREXEC_AUTH_RUN_ID_HEADER,
     SUPEREXEC_AUTH_SIGNATURE_HEADER,
     SUPEREXEC_AUTH_TIMESTAMP_HEADER,
-    SuperExecMethodPolicy,
     compute_request_body_sha256,
     compute_superexec_signature,
     derive_run_secret,
@@ -46,6 +43,22 @@ from flwr.supercore.auth import (
 )
 
 from .appio_token_interceptor import AUTHENTICATION_FAILED_MESSAGE
+
+SERVERAPPIO_SUPEREXEC_METHODS: frozenset[str] = frozenset(
+    {
+        "/flwr.proto.ServerAppIo/ListAppsToLaunch",
+        "/flwr.proto.ServerAppIo/RequestToken",
+        "/flwr.proto.ServerAppIo/GetRun",
+    }
+)
+
+CLIENTAPPIO_SUPEREXEC_METHODS: frozenset[str] = frozenset(
+    {
+        "/flwr.proto.ClientAppIo/ListAppsToLaunch",
+        "/flwr.proto.ClientAppIo/RequestToken",
+        "/flwr.proto.ClientAppIo/GetRun",
+    }
+)
 
 
 class _NonceState(Protocol):
@@ -76,11 +89,11 @@ class SuperExecAuthClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type:
         *,
         master_secret: bytes,
         audience: str,
-        method_auth_policy: Mapping[str, SuperExecMethodPolicy],
+        protected_methods: Collection[str],
     ) -> None:
         self._master_secret = master_secret
         self._audience = audience
-        self._method_auth_policy = dict(method_auth_policy)
+        self._protected_methods = set(protected_methods)
 
     def intercept_unary_unary(
         self,
@@ -90,10 +103,10 @@ class SuperExecAuthClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type:
     ) -> grpc.Call:
         """Add SuperExec signature metadata on outbound unary requests."""
         method = client_call_details.method
-        if method not in self._method_auth_policy:
+        if method not in self._protected_methods:
             return continuation(client_call_details, request)
 
-        run_id = extract_superexec_run_id(method, request, self._method_auth_policy)
+        run_id = extract_superexec_run_id(request)
         timestamp = int(now().timestamp())
         nonce = secrets.token_hex(16)
         body_sha256 = compute_request_body_sha256(request)
@@ -142,12 +155,12 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         state_provider: Callable[[], _NonceState],
         master_secret: bytes,
         expected_audience: str,
-        method_auth_policy: Mapping[str, SuperExecMethodPolicy],
+        protected_methods: Collection[str],
     ) -> None:
         self._state_provider = state_provider
         self._master_secret = master_secret
         self._expected_audience = expected_audience
-        self._method_auth_policy = dict(method_auth_policy)
+        self._protected_methods = set(protected_methods)
 
     def intercept_service(
         self,
@@ -156,7 +169,7 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
     ) -> grpc.RpcMethodHandler:
         """Enforce SuperExec metadata auth for configured unary RPC methods."""
         method = handler_call_details.method
-        if method not in self._method_auth_policy:
+        if method not in self._protected_methods:
             return continuation(handler_call_details)
 
         method_handler = continuation(handler_call_details)
@@ -211,9 +224,7 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 _abort_auth_denied(context)
 
             try:
-                run_id = extract_superexec_run_id(
-                    method, request, self._method_auth_policy
-                )
+                run_id = extract_superexec_run_id(request)
             except ValueError:
                 _abort_auth_denied(context)
             if run_id != run_id_header:
@@ -265,7 +276,7 @@ def create_serverappio_superexec_auth_server_interceptor(
         state_provider=state_provider,
         master_secret=master_secret,
         expected_audience=expected_audience,
-        method_auth_policy=SERVERAPPIO_SUPEREXEC_AUTH_POLICY,
+        protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
     )
 
 
@@ -280,5 +291,5 @@ def create_clientappio_superexec_auth_server_interceptor(
         state_provider=state_provider,
         master_secret=master_secret,
         expected_audience=expected_audience,
-        method_auth_policy=CLIENTAPPIO_SUPEREXEC_AUTH_POLICY,
+        protected_methods=CLIENTAPPIO_SUPEREXEC_METHODS,
     )
