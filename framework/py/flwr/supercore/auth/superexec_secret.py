@@ -47,17 +47,23 @@ def load_superexec_auth_secret(
     """Load the SuperExec shared secret from file or stdin."""
     secret: bytes | None = None
     if secret_file is not None:
+        # File input is treated as exact raw bytes.
         secret = Path(secret_file).expanduser().read_bytes()
     elif secret_stdin:
         secret = sys.stdin.buffer.read()
+        # Shell redirection often appends a trailing newline. Trim at most one
+        # line ending sequence for stdin input only, without stripping other bytes.
+        if secret.endswith(b"\r\n"):
+            secret = secret[:-2]
+        elif secret.endswith(b"\n") or secret.endswith(b"\r"):
+            secret = secret[:-1]
 
     if secret is None:
         return None
 
-    normalized = secret.strip()
-    if normalized == b"":
+    if secret == b"":
         raise ValueError("SuperExec auth secret must not be empty")
-    return normalized
+    return secret
 
 
 def generate_superexec_auth_secret(num_bytes: int = 32) -> bytes:
