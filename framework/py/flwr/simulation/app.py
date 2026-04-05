@@ -32,7 +32,6 @@ from flwr.common.config import (
 )
 from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
-    ExecPluginType,
     Status,
     SubStatus,
 )
@@ -59,15 +58,12 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.run_pb2 import UpdateRunStatusRequest  # pylint: disable=E0611
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
 from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import NOOP_FEDERATION
 from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
-from flwr.supercore.superexec.plugin import ServerAppExecPlugin
-from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning
 
 
 def _run_simulation_settings(
@@ -119,16 +115,11 @@ def flwr_simulation() -> None:
 
     # Disallow long-running `flwr-simulation` processes
     if args.token is None:
-        run_with_deprecation_warning(
-            cmd="flwr-simulation",
-            plugin_type=ExecPluginType.SERVER_APP,
-            plugin_class=ServerAppExecPlugin,
-            stub_class=ServerAppIoStub,
-            appio_api_address=args.serverappio_api_address,
-            parent_pid=args.parent_pid,
-            warn_run_once=args.run_once,
+        flwr_exit(
+            ExitCode.SUPEREXEC_INVALID_PLUGIN_CONFIG,
+            "Long-running mode in `flwr-simulation` is no longer supported. "
+            "Use `flower-superexec --plugin-type serverapp` instead.",
         )
-        return
 
     log(INFO, "Starting Flower Simulation")
     log(
