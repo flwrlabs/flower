@@ -29,12 +29,10 @@ from flwr.supercore.address import parse_address
 SUPEREXEC_AUTH_AUDIENCE_HEADER = "flwr-superexec-audience"
 SUPEREXEC_AUTH_TIMESTAMP_HEADER = "flwr-superexec-ts"
 SUPEREXEC_AUTH_NONCE_HEADER = "flwr-superexec-nonce"
-SUPEREXEC_AUTH_RUN_ID_HEADER = "flwr-superexec-run-id"
 SUPEREXEC_AUTH_BODY_SHA256_HEADER = "flwr-superexec-body-sha256"
 SUPEREXEC_AUTH_SIGNATURE_HEADER = "flwr-superexec-signature"
 
-SUPEREXEC_RUN_ID_PLACEHOLDER = "-"
-SUPEREXEC_RUN_SECRET_PREFIX = "superexec-run-v1"
+SUPEREXEC_AUTH_SECRET_CONTEXT = b"superexec-auth-v1"
 
 MIN_TIMESTAMP_DIFF_SECONDS = -SYSTEM_TIME_TOLERANCE
 MAX_TIMESTAMP_DIFF_SECONDS = TIMESTAMP_TOLERANCE + SYSTEM_TIME_TOLERANCE
@@ -57,7 +55,6 @@ def canonicalize_superexec_auth_input(  # pylint: disable=R0913
     audience: str,
     timestamp: int,
     nonce: str,
-    run_id: str,
     body_sha256: str,
 ) -> bytes:
     """Serialize SuperExec auth fields to canonical bytes for HMAC input."""
@@ -66,7 +63,6 @@ def canonicalize_superexec_auth_input(  # pylint: disable=R0913
         f"audience={audience}\n"
         f"ts={timestamp}\n"
         f"nonce={nonce}\n"
-        f"run_id={run_id}\n"
         f"body_sha256={body_sha256}"
     )
     return canonical.encode("utf-8")
@@ -78,20 +74,20 @@ def compute_request_body_sha256(request: GrpcMessage) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def derive_run_secret(master_secret: bytes, run_id: str) -> bytes:
-    """Derive a run-scoped secret from the master secret."""
-    message = f"{SUPEREXEC_RUN_SECRET_PREFIX}|{run_id}".encode()
-    return hmac.new(master_secret, message, hashlib.sha256).digest()
+def derive_auth_secret(master_secret: bytes) -> bytes:
+    """Derive an auth-scope secret from the master secret."""
+    return hmac.new(
+        master_secret, SUPEREXEC_AUTH_SECRET_CONTEXT, hashlib.sha256
+    ).digest()
 
 
 def compute_superexec_signature(  # pylint: disable=R0913
     *,
-    run_secret: bytes,
+    auth_secret: bytes,
     method: str,
     audience: str,
     timestamp: int,
     nonce: str,
-    run_id: str,
     body_sha256: str,
 ) -> str:
     """Compute SuperExec HMAC-SHA256 signature as a lowercase hex string."""
@@ -100,10 +96,9 @@ def compute_superexec_signature(  # pylint: disable=R0913
         audience=audience,
         timestamp=timestamp,
         nonce=nonce,
-        run_id=run_id,
         body_sha256=body_sha256,
     )
-    return hmac.new(run_secret, canonical, hashlib.sha256).hexdigest()
+    return hmac.new(auth_secret, canonical, hashlib.sha256).hexdigest()
 
 
 def verify_superexec_signature(
@@ -111,16 +106,6 @@ def verify_superexec_signature(
 ) -> bool:
     """Verify signatures with constant-time comparison."""
     return hmac.compare_digest(expected_signature, received_signature)
-
-
-def extract_superexec_run_id(request: GrpcMessage) -> str:
-    """Extract run_id if present on request; otherwise return placeholder."""
-    run_id = getattr(request, "run_id", None)
-    if run_id is None:
-        return SUPEREXEC_RUN_ID_PLACEHOLDER
-    if not isinstance(run_id, int):
-        raise ValueError("Request run_id must be an integer when present")
-    return str(run_id)
 
 
 def extract_single_str_metadata(
