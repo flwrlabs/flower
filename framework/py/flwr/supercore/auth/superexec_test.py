@@ -1,0 +1,165 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Tests for SuperExec auth primitives."""
+
+
+from unittest import TestCase
+
+from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    ListAppsToLaunchRequest,
+    RequestTokenRequest,
+)
+
+from .superexec import (
+    SUPEREXEC_RUN_ID_PLACEHOLDER,
+    SuperExecMethodPolicy,
+    canonicalize_superexec_auth_input,
+    compute_request_body_sha256,
+    compute_superexec_signature,
+    derive_run_secret,
+    derive_superexec_audience,
+    extract_single_str_metadata,
+    extract_superexec_run_id,
+    verify_superexec_signature,
+)
+
+
+class TestSuperExecAuthPrimitives(TestCase):
+    """Unit tests for SuperExec auth helpers."""
+
+    def test_canonicalize_superexec_auth_input(self) -> None:
+        """Canonicalization should produce deterministic UTF-8 bytes."""
+        canonical = canonicalize_superexec_auth_input(
+            method="/flwr.proto.ServerAppIo/RequestToken",
+            audience="serverappio:9091",
+            timestamp=123,
+            nonce="nonce-1",
+            run_id="7",
+            body_sha256="abc",
+        )
+
+        self.assertEqual(
+            canonical,
+            (
+                "method=/flwr.proto.ServerAppIo/RequestToken\n"
+                "audience=serverappio:9091\n"
+                "ts=123\n"
+                "nonce=nonce-1\n"
+                "run_id=7\n"
+                "body_sha256=abc"
+            ).encode("utf-8"),
+        )
+
+    def test_compute_request_body_sha256_is_deterministic(self) -> None:
+        """Body SHA256 should be deterministic for equivalent request payloads."""
+        req_a = RequestTokenRequest(run_id=11)
+        req_b = RequestTokenRequest(run_id=11)
+        req_c = RequestTokenRequest(run_id=12)
+
+        hash_a = compute_request_body_sha256(req_a)
+        hash_b = compute_request_body_sha256(req_b)
+        hash_c = compute_request_body_sha256(req_c)
+
+        self.assertEqual(hash_a, hash_b)
+        self.assertNotEqual(hash_a, hash_c)
+        self.assertEqual(len(hash_a), 64)
+
+    def test_derive_run_secret_is_deterministic_and_run_scoped(self) -> None:
+        """Derived run secrets should be deterministic and run-specific."""
+        master_secret = b"master-secret"
+
+        run_7_first = derive_run_secret(master_secret, "7")
+        run_7_second = derive_run_secret(master_secret, "7")
+        run_8 = derive_run_secret(master_secret, "8")
+
+        self.assertEqual(run_7_first, run_7_second)
+        self.assertNotEqual(run_7_first, run_8)
+        self.assertTrue(run_7_first)
+
+    def test_verify_superexec_signature(self) -> None:
+        """Signature verification should use constant-time equality semantics."""
+        run_secret = derive_run_secret(b"master-secret", "7")
+        good_signature = compute_superexec_signature(
+            run_secret=run_secret,
+            method="/flwr.proto.ServerAppIo/RequestToken",
+            audience="serverappio:9091",
+            timestamp=456,
+            nonce="nonce-2",
+            run_id="7",
+            body_sha256="f" * 64,
+        )
+        bad_signature = "0" * 64
+
+        self.assertTrue(verify_superexec_signature(good_signature, good_signature))
+        self.assertFalse(verify_superexec_signature(good_signature, bad_signature))
+
+    def test_extract_single_str_metadata(self) -> None:
+        """Metadata extraction should enforce a single non-empty string value."""
+        metadata: tuple[tuple[str, str], ...] = (
+            ("k1", "v1"),
+            ("k2", "v2"),
+        )
+        self.assertEqual(extract_single_str_metadata(metadata, "k1"), "v1")
+        self.assertIsNone(extract_single_str_metadata(metadata, "missing"))
+        self.assertIsNone(
+            extract_single_str_metadata((("k1", "v1"), ("k1", "v2")), "k1")
+        )
+        self.assertIsNone(extract_single_str_metadata((("k1", ""),), "k1"))
+
+    def test_derive_superexec_audience(self) -> None:
+        """Audience should be normalized to `<service-kind>:<port>`."""
+        audience = derive_superexec_audience("serverappio", "127.0.0.1:9091")
+        self.assertEqual(audience, "serverappio:9091")
+
+        with self.assertRaises(ValueError):
+            _ = derive_superexec_audience("serverappio", "not-an-address")
+
+    def test_extract_superexec_run_id(self) -> None:
+        """Run ID extraction should follow method policy requirements."""
+        policy = {
+            "/flwr.proto.ServerAppIo/ListAppsToLaunch": SuperExecMethodPolicy.no_run_id(),
+            "/flwr.proto.ServerAppIo/RequestToken": SuperExecMethodPolicy.run_scoped(),
+        }
+
+        self.assertEqual(
+            extract_superexec_run_id(
+                method="/flwr.proto.ServerAppIo/ListAppsToLaunch",
+                request=ListAppsToLaunchRequest(),
+                policy=policy,
+            ),
+            SUPEREXEC_RUN_ID_PLACEHOLDER,
+        )
+        self.assertEqual(
+            extract_superexec_run_id(
+                method="/flwr.proto.ServerAppIo/RequestToken",
+                request=RequestTokenRequest(run_id=42),
+                policy=policy,
+            ),
+            "42",
+        )
+
+        with self.assertRaises(ValueError):
+            _ = extract_superexec_run_id(
+                method="/flwr.proto.ServerAppIo/GetRun",
+                request=RequestTokenRequest(run_id=1),
+                policy=policy,
+            )
+
+        with self.assertRaises(ValueError):
+            _ = extract_superexec_run_id(
+                method="/flwr.proto.ServerAppIo/RequestToken",
+                request=ListAppsToLaunchRequest(),
+                policy=policy,
+            )
