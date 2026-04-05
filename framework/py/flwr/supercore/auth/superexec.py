@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-from dataclasses import dataclass
 from typing import Any
 
 from google.protobuf.message import Message as GrpcMessage
@@ -39,36 +38,6 @@ SUPEREXEC_RUN_SECRET_PREFIX = "superexec-run-v1"
 
 MIN_TIMESTAMP_DIFF_SECONDS = -SYSTEM_TIME_TOLERANCE
 MAX_TIMESTAMP_DIFF_SECONDS = TIMESTAMP_TOLERANCE + SYSTEM_TIME_TOLERANCE
-
-
-@dataclass(frozen=True)
-class SuperExecMethodPolicy:
-    """Auth policy for one SuperExec-facing AppIo RPC."""
-
-    requires_run_id: bool
-
-    @staticmethod
-    def no_run_id() -> SuperExecMethodPolicy:
-        """Return policy for methods that are not run-scoped."""
-        return SuperExecMethodPolicy(requires_run_id=False)
-
-    @staticmethod
-    def run_scoped() -> SuperExecMethodPolicy:
-        """Return policy for methods that are run-scoped."""
-        return SuperExecMethodPolicy(requires_run_id=True)
-
-
-SERVERAPPIO_SUPEREXEC_AUTH_POLICY: dict[str, SuperExecMethodPolicy] = {
-    "/flwr.proto.ServerAppIo/ListAppsToLaunch": SuperExecMethodPolicy.no_run_id(),
-    "/flwr.proto.ServerAppIo/RequestToken": SuperExecMethodPolicy.run_scoped(),
-    "/flwr.proto.ServerAppIo/GetRun": SuperExecMethodPolicy.run_scoped(),
-}
-
-CLIENTAPPIO_SUPEREXEC_AUTH_POLICY: dict[str, SuperExecMethodPolicy] = {
-    "/flwr.proto.ClientAppIo/ListAppsToLaunch": SuperExecMethodPolicy.no_run_id(),
-    "/flwr.proto.ClientAppIo/RequestToken": SuperExecMethodPolicy.run_scoped(),
-    "/flwr.proto.ClientAppIo/GetRun": SuperExecMethodPolicy.run_scoped(),
-}
 
 
 def derive_superexec_audience(service_kind: str, address: str) -> str:
@@ -144,20 +113,13 @@ def verify_superexec_signature(
     return hmac.compare_digest(expected_signature, received_signature)
 
 
-def extract_superexec_run_id(
-    method: str,
-    request: GrpcMessage,
-    policy: dict[str, SuperExecMethodPolicy],
-) -> str:
-    """Extract the authoritative run_id string for a SuperExec RPC request."""
-    method_policy = policy.get(method)
-    if method_policy is None:
-        raise ValueError(f"Missing SuperExec policy for method: {method}")
-    if not method_policy.requires_run_id:
-        return SUPEREXEC_RUN_ID_PLACEHOLDER
+def extract_superexec_run_id(request: GrpcMessage) -> str:
+    """Extract run_id if present on request; otherwise return placeholder."""
     run_id = getattr(request, "run_id", None)
+    if run_id is None:
+        return SUPEREXEC_RUN_ID_PLACEHOLDER
     if not isinstance(run_id, int):
-        raise ValueError(f"Request for method {method} must include integer run_id")
+        raise ValueError("Request run_id must be an integer when present")
     return str(run_id)
 
 
