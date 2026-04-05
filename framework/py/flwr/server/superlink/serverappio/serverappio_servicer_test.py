@@ -321,7 +321,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Provide a valid metadata token on the default test channel so existing
         # servicer behavior tests continue to exercise business logic paths.
         self._auth_run_id = self.state.create_run(
-            "", "", "", {}, NOOP_FEDERATION, ConfigRecord(), "", RunType.SERVER_APP
+            "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
         )
         auth_token = self.state.create_token(self._auth_run_id)
         assert auth_token is not None
