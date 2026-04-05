@@ -63,6 +63,7 @@ class TestServerAppIoTokenLifecycleIntegration(unittest.TestCase):
             state_factory,
             objectstore_factory,
             None,
+            superexec_auth_secret=b"test-superexec-secret",
         )
 
         channel = grpc.insecure_channel("localhost:9091")

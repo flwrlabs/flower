@@ -32,10 +32,19 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
+from flwr.supercore.auth import SERVERAPPIO_SUPEREXEC_AUTH_POLICY
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
-from flwr.supercore.interceptors import APP_TOKEN_HEADER, AUTHENTICATION_FAILED_MESSAGE
+from flwr.supercore.ffs import FfsFactory
+from flwr.supercore.interceptors import (
+    APP_TOKEN_HEADER,
+    AUTHENTICATION_FAILED_MESSAGE,
+    SuperExecAuthClientInterceptor,
+)
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
+
+_SUPEREXEC_SECRET = b"test-superexec-secret"
+_SUPEREXEC_AUDIENCE = "serverappio:9091"
 
 
 class TestServerAppIoAuthIntegration(unittest.TestCase):
@@ -50,6 +59,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):
         state_factory = LinkStateFactory(
             FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), objectstore_factory
         )
+        ffs_factory = FfsFactory(self.temp_dir.name)
 
         self.state = state_factory.state()
         node_id = self.state.create_node("mock_owner", "fake_name", b"pk", 30)
@@ -58,8 +68,10 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):
         self._server: grpc.Server = run_serverappio_api_grpc(
             SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
             state_factory,
+            ffs_factory,
             objectstore_factory,
             None,
+            superexec_auth_secret=_SUPEREXEC_SECRET,
         )
 
         channel = grpc.insecure_channel("localhost:9091")
@@ -69,6 +81,19 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):
             response_deserializer=GetNodesResponse.FromString,
         )
         self._list_apps_to_launch = channel.unary_unary(
+            "/flwr.proto.ServerAppIo/ListAppsToLaunch",
+            request_serializer=ListAppsToLaunchRequest.SerializeToString,
+            response_deserializer=ListAppsToLaunchResponse.FromString,
+        )
+        superexec_channel = grpc.intercept_channel(
+            grpc.insecure_channel("localhost:9091"),
+            SuperExecAuthClientInterceptor(
+                master_secret=_SUPEREXEC_SECRET,
+                audience=_SUPEREXEC_AUDIENCE,
+                method_auth_policy=SERVERAPPIO_SUPEREXEC_AUTH_POLICY,
+            ),
+        )
+        self._list_apps_to_launch_superexec = superexec_channel.unary_unary(
             "/flwr.proto.ServerAppIo/ListAppsToLaunch",
             request_serializer=ListAppsToLaunchRequest.SerializeToString,
             response_deserializer=ListAppsToLaunchResponse.FromString,
@@ -121,11 +146,17 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):
         assert isinstance(response, GetNodesResponse)
         assert call.code() == grpc.StatusCode.OK
 
-    def test_list_apps_to_launch_allows_without_metadata_token(self) -> None:
-        """No-auth RPC should be callable without metadata token."""
-        response, call = self._list_apps_to_launch.with_call(
+    def test_list_apps_to_launch_denied_without_superexec_metadata(self) -> None:
+        """SuperExec RPC should deny requests missing signed metadata."""
+        with self.assertRaises(grpc.RpcError) as err:
+            self._list_apps_to_launch.with_call(request=ListAppsToLaunchRequest())
+        assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
+        assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE
+
+    def test_list_apps_to_launch_allows_with_superexec_metadata(self) -> None:
+        """SuperExec RPC should allow requests with valid signed metadata."""
+        response, call = self._list_apps_to_launch_superexec.with_call(
             request=ListAppsToLaunchRequest()
         )
-
         assert isinstance(response, ListAppsToLaunchResponse)
         assert call.code() == grpc.StatusCode.OK

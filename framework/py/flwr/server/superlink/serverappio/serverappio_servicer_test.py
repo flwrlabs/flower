@@ -84,6 +84,7 @@ from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
 from flwr.server.superlink.serverappio.serverappio_servicer import _raise_if
 from flwr.server.superlink.utils import _STATUS_TO_MSG
+from flwr.supercore.auth import SERVERAPPIO_SUPEREXEC_AUTH_POLICY
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
 from flwr.supercore.date import now
 from flwr.supercore.inflatable.inflatable_object import (
@@ -92,11 +93,18 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     iterate_object_tree,
 )
-from flwr.supercore.interceptors import APP_TOKEN_HEADER, AppIoTokenClientInterceptor
+from flwr.supercore.interceptors import (
+    APP_TOKEN_HEADER,
+    AppIoTokenClientInterceptor,
+    SuperExecAuthClientInterceptor,
+)
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
 # pylint: disable=broad-except,too-many-lines
+
+_SUPEREXEC_SECRET = b"test-superexec-secret"
+_SUPEREXEC_AUDIENCE = "serverappio:9091"
 
 
 def test_raise_if_false() -> None:
@@ -307,6 +315,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             state_factory,
             objectstore_factory,
             None,
+            superexec_auth_secret=_SUPEREXEC_SECRET,
         )
 
         # Provide a valid metadata token on the default test channel so existing
@@ -326,6 +335,14 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         self._channel = grpc.intercept_channel(
             grpc.insecure_channel("localhost:9091"),
             AppIoTokenClientInterceptor(token=self._auth_token),
+        )
+        self._superexec_channel = grpc.intercept_channel(
+            grpc.insecure_channel("localhost:9091"),
+            SuperExecAuthClientInterceptor(
+                master_secret=_SUPEREXEC_SECRET,
+                audience=_SUPEREXEC_AUDIENCE,
+                method_auth_policy=SERVERAPPIO_SUPEREXEC_AUTH_POLICY,
+            ),
         )
         self._get_nodes = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/GetNodes",
@@ -372,12 +389,12 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=ConfirmMessageReceivedRequest.SerializeToString,
             response_deserializer=ConfirmMessageReceivedResponse.FromString,
         )
-        self._list_apps_to_launch = self._channel.unary_unary(
+        self._list_apps_to_launch = self._superexec_channel.unary_unary(
             "/flwr.proto.ServerAppIo/ListAppsToLaunch",
             request_serializer=ListAppsToLaunchRequest.SerializeToString,
             response_deserializer=ListAppsToLaunchResponse.FromString,
         )
-        self._request_token = self._channel.unary_unary(
+        self._request_token = self._superexec_channel.unary_unary(
             "/flwr.proto.ServerAppIo/RequestToken",
             request_serializer=RequestTokenRequest.SerializeToString,
             response_deserializer=RequestTokenResponse.FromString,
