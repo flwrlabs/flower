@@ -337,7 +337,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: ListRunsRequest, context: grpc.ServicerContext
     ) -> ListRunsResponse:
         """Handle `flwr ls` command."""
-        log(INFO, "ControlServicer.ListRuns")
+        log(INFO, rpc_name := self.ListRuns.__qualname__)
+
+        # Init link state
         state = self.linkstate_factory.state()
 
         flwr_aid = _get_flwr_aid(context)
@@ -362,8 +364,12 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
                 raise grpc.RpcError()  # This line is unreachable
 
-            # Check if `flwr_aid` matches the run's `flwr_aid`
-            _check_flwr_aid_in_run(flwr_aid=flwr_aid, run=runs[0], context=context)
+            # Check if requester is a member of the federation
+            # that the run belongs to
+            with rpc_error_translator(context, rpc_name):
+                _validate_federation_membership_in_request(
+                    state, flwr_aid, runs[0].federation, context
+                )
 
         # Clear objects of finished runs
         store = self.objectstore_factory.store()
