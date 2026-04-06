@@ -109,19 +109,6 @@ from .control_servicer import (
     _validate_federation_membership_in_request,
 )
 
-FLWR_AID_MISMATCH_CASES = (
-    # (context_flwr_aid, run_flwr_aid)
-    ("user-123", "user-xyz"),
-    ("user-234", ""),
-    ("", "user-234"),
-    ("user-345", None),
-    (None, "user-456"),
-    (None, None),
-    ("", ""),
-    ("", None),
-    (None, ""),
-)
-
 
 class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     """Test the Control API servicer."""
