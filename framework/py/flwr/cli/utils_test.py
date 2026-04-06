@@ -41,7 +41,7 @@ from flwr.common.constant import (
     REFRESH_TOKEN_KEY,
 )
 from flwr.common.grpc import GRPC_MAX_MESSAGE_LENGTH
-from flwr.supercore.constant import MAX_DIR_DEPTH
+from flwr.supercore.constant import MAX_APP_NAME_LENGTH, MAX_DIR_DEPTH
 
 from .utils import (
     build_pathspec,
@@ -451,20 +451,32 @@ def test_filter_paths_for_publish_empty() -> None:
 
 @parameterized.expand(  # type: ignore
     [
-        ("federation123", True, "Name is valid."),  # alphanumeric
-        ("test-federation", True, "Name is valid."),  # hyphenated
-        ("federation-name-1234", True, "Name is valid."),  # exactly_20_chars
+        ("federation123", True, ""),  # alphanumeric
+        ("test-federation", True, ""),  # hyphenated
+        ("f" * MAX_APP_NAME_LENGTH, True, ""),  # exactly_max_length
         (
-            "thisfederationnameistoolong",
+            "f" * (MAX_APP_NAME_LENGTH + 1),
             False,
-            "Invalid name: must be no longer than 20 characters.",
+            f"Must be no longer than {MAX_APP_NAME_LENGTH} characters.",
         ),  # too_long
-        ("", False, "Invalid name."),  # empty
-        ("-federation", False, "Invalid name."),  # starts_with_symbol
-        ("test federation", False, "Invalid name."),  # contains_space
-        ("Testfederation", True, "Name is valid."),  # uppercase allowed
-        ("test_federation", False, "Invalid name."),  # invalid_symbol
-        ("Test Federation!", False, "Invalid name."),  # multiple_violations
+        ("", False, "Cannot be empty."),  # empty
+        ("-federation", False, "Must start with a letter."),  # starts_with_symbol
+        (
+            "test federation",
+            False,
+            "Can only contain letters, digits, and hyphens.",
+        ),  # contains_space
+        ("Testfederation", True, ""),  # uppercase allowed
+        (
+            "test_federation",
+            False,
+            "Can only contain letters, digits, and hyphens.",
+        ),  # invalid_symbol
+        (
+            "Test Federation!",
+            False,
+            "Can only contain letters, digits, and hyphens.",
+        ),  # multiple_violations
     ]
 )
 def test_validate_federation_name(
