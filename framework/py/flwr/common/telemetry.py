@@ -22,9 +22,10 @@ import os
 import platform
 import urllib.request
 import uuid
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future
 from enum import Enum, auto
-from typing import Any, cast
+from threading import Lock, Thread
+from typing import Any
 
 from flwr.supercore.utils import get_flwr_home
 from flwr.supercore.version import package_name, package_version
@@ -176,42 +177,42 @@ class EventType(str, Enum):
     RUN_SUPEREXEC_LEAVE = auto()
 
 
-# Use the ThreadPoolExecutor with max_workers=1 to have a queue
-# and also ensure that telemetry calls are not blocking.
-state: dict[str, str | None | ThreadPoolExecutor | None] = {
-    # Will be assigned ThreadPoolExecutor(max_workers=1)
-    # in event() the first time it's required
-    "executor": None,
+state: dict[str, str | None] = {
     "source": None,
     "cluster": None,
     "partner": None,
 }
+state_lock = Lock()
 
 
 def event(
     event_type: EventType,
     event_details: dict[str, Any] | None = None,
-) -> Future:  # type: ignore
-    """Submit create_event to ThreadPoolExecutor to avoid blocking."""
-    if state["executor"] is None:
-        state["executor"] = ThreadPoolExecutor(max_workers=1)
+) -> Future[str]:
+    """Start create_event on a daemon thread to avoid blocking."""
+    result: Future[str] = Future()
 
-    executor: ThreadPoolExecutor = cast(ThreadPoolExecutor, state["executor"])
+    def run() -> None:
+        try:
+            result.set_result(create_event(event_type, event_details))
+        except Exception as ex:  # pylint: disable=broad-exception-caught
+            result.set_exception(ex)
 
-    result = executor.submit(create_event, event_type, event_details)
+    Thread(target=run, daemon=True).start()
     return result
 
 
 def create_event(event_type: EventType, event_details: dict[str, Any] | None) -> str:
     """Create telemetry event."""
-    if state["source"] is None:
-        state["source"] = _get_source_id()
+    with state_lock:
+        if state["source"] is None:
+            state["source"] = _get_source_id()
 
-    if state["cluster"] is None:
-        state["cluster"] = str(uuid.uuid4())
+        if state["cluster"] is None:
+            state["cluster"] = str(uuid.uuid4())
 
-    if state["partner"] is None:
-        state["partner"] = _get_partner_id()
+        if state["partner"] is None:
+            state["partner"] = _get_partner_id()
 
     if event_details is None:
         event_details = {}

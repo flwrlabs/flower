@@ -20,7 +20,7 @@ import unittest
 
 import grpc
 
-from flwr.common import ConfigRecord, Context
+from flwr.common import Context
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS, Status
 from flwr.common.serde import context_to_proto, run_status_to_proto
 from flwr.common.serde_test import RecordMaker
@@ -86,7 +86,7 @@ class TestServerAppIoTokenLifecycleIntegration(unittest.TestCase):
 
     def _create_running_run_and_token(self) -> tuple[int, str]:
         run_id = self.state.create_run(
-            "", "", "", {}, NOOP_FEDERATION, ConfigRecord(), "", RunType.SERVER_APP
+            "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
         )
         _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
         _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
