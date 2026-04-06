@@ -32,7 +32,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PullObjectRequest,
     PullObjectResponse,
 )
-from flwr.supercore.auth import CLIENTAPPIO_SUPEREXEC_AUTH_POLICY
 from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.interceptors import (
     APP_TOKEN_HEADER,
@@ -45,6 +44,11 @@ from flwr.supernode.start_client_internal import run_clientappio_api_grpc
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
 _SUPEREXEC_AUDIENCE = "clientappio:9094"
+_CLIENTAPPIO_SUPEREXEC_METHODS = (
+    "/flwr.proto.ClientAppIo/ListAppsToLaunch",
+    "/flwr.proto.ClientAppIo/RequestToken",
+    "/flwr.proto.ClientAppIo/GetRun",
+)
 
 
 class TestClientAppIoAuthIntegration(unittest.TestCase):
@@ -89,7 +93,7 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
                 audience=_SUPEREXEC_AUDIENCE,
-                method_auth_policy=CLIENTAPPIO_SUPEREXEC_AUTH_POLICY,
+                protected_methods=_CLIENTAPPIO_SUPEREXEC_METHODS,
             ),
         )
         self._list_apps_to_launch_superexec = superexec_channel.unary_unary(
