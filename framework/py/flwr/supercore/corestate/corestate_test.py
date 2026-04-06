@@ -147,3 +147,33 @@ class StateTest(unittest.TestCase):
             # Assert: token1 should be cleaned up, token2 should still be valid
             self.assertFalse(state.verify_token(run_id1, token1))
             self.assertTrue(state.verify_token(run_id2, token2))
+
+    def test_reserve_nonce_success_and_duplicate(self) -> None:
+        """Test reserving a nonce and rejecting a duplicate active nonce."""
+        state = self.state_factory()
+        expires_at = now().timestamp() + 60
+
+        first_reserved = state.reserve_nonce("ns-a", "nonce-a", expires_at)
+        second_reserved = state.reserve_nonce("ns-a", "nonce-a", expires_at)
+
+        self.assertTrue(first_reserved)
+        self.assertFalse(second_reserved)
+
+    def test_reserve_nonce_invalid_inputs(self) -> None:
+        """Test reserve_nonce returns False for invalid empty inputs."""
+        state = self.state_factory()
+        expires_at = now().timestamp() + 60
+
+        self.assertFalse(state.reserve_nonce("", "nonce-a", expires_at))
+        self.assertFalse(state.reserve_nonce("ns-a", "", expires_at))
+
+    def test_reserve_nonce_allows_reuse_after_expiry(self) -> None:
+        """Test nonce can be reused after an expired reservation is cleaned up."""
+        state = self.state_factory()
+        now_ts = now().timestamp()
+
+        first_reserved = state.reserve_nonce("ns-b", "nonce-b", now_ts - 1)
+        second_reserved = state.reserve_nonce("ns-b", "nonce-b", now_ts + 60)
+
+        self.assertTrue(first_reserved)
+        self.assertTrue(second_reserved)
