@@ -298,7 +298,7 @@ def _to_json(run_list: list[RunRow]) -> str:
                 "fab-id": row.fab_id,
                 "fab-name": row.fab_id.split("/")[-1],
                 "fab-version": row.fab_version,
-                "fab-hash": row.fab_hash[:8],
+                "fab-hash": row.fab_hash,
                 "status": row.status_text,
                 "elapsed": row.elapsed,
                 "pending-at": row.pending_at,
