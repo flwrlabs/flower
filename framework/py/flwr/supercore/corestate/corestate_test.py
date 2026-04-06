@@ -177,6 +177,26 @@ class StateTest(unittest.TestCase):
             )
         )
 
+    def test_reserve_nonce_invalid_inputs_return_false(self) -> None:
+        """Invalid empty namespace/nonce values should be rejected."""
+        state = self.state_factory()
+        expires_at = now().timestamp() + 60.0
+
+        self.assertFalse(
+            state.reserve_nonce(
+                namespace="",
+                nonce="nonce-1",
+                expires_at=expires_at,
+            )
+        )
+        self.assertFalse(
+            state.reserve_nonce(
+                namespace="superexec:test",
+                nonce="",
+                expires_at=expires_at,
+            )
+        )
+
     def test_reserve_nonce_allows_reuse_after_expiry(self) -> None:
         """Nonce can be reused after its prior reservation expires."""
         state = self.state_factory()
