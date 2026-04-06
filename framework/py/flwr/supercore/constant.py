@@ -94,6 +94,7 @@ MIME_MAP = {
     ".md": "text/markdown; charset=utf-8",
     ".toml": "application/toml; charset=utf-8",
 }
+MAX_APP_NAME_LENGTH = 32 # max length for app names; also used for federation names
 
 # Constants for federations
 NOOP_FEDERATION = f"@{NOOP_ACCOUNT_NAME}/default"
@@ -109,7 +110,6 @@ DEFAULT_SIMULATION_CONFIG = SimulationConfig(
     init_args_logging_level="WARNING",
     init_args_log_to_driver=True,
 )
-MAX_FEDERATION_NAME_LENGTH = 20
 
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function
