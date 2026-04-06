@@ -48,7 +48,14 @@ def load_superexec_auth_secret(
     secret: bytes | None = None
     if secret_file is not None:
         # File input is treated as exact raw bytes.
-        secret = Path(secret_file).expanduser().read_bytes()
+        secret_path = Path(secret_file).expanduser()
+        try:
+            secret = secret_path.read_bytes()
+        except OSError as err:
+            raise ValueError(
+                f"Failed to read SuperExec auth secret from file '{secret_path}': "
+                f"{err}"
+            ) from err
     elif secret_stdin:
         secret = sys.stdin.buffer.read()
         # Shell redirection often appends a trailing newline. Trim at most one
