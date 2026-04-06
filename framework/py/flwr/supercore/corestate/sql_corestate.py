@@ -156,14 +156,21 @@ class SqlCoreState(CoreState, SqlMixin):
         """Atomically reserve a nonce in a namespace."""
         if namespace == "" or nonce == "":
             return False
-        self._cleanup_expired_nonces()
-        query = """
+        cleanup_query = """
+            DELETE FROM nonce_store
+            WHERE expires_at < :current;
+        """
+        insert_query = """
             INSERT INTO nonce_store (namespace, nonce, expires_at)
             VALUES (:namespace, :nonce, :expires_at);
         """
-        data = {"namespace": namespace, "nonce": nonce, "expires_at": expires_at}
         try:
-            self.query(query, data)
+            with self.session() as session:
+                session.execute(text(cleanup_query), {"current": now().timestamp()})
+                session.execute(
+                    text(insert_query),
+                    {"namespace": namespace, "nonce": nonce, "expires_at": expires_at},
+                )
             return True
         except IntegrityError:
             return False
