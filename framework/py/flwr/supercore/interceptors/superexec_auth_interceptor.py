@@ -31,14 +31,12 @@ from flwr.supercore.auth import (
     SUPEREXEC_AUTH_AUDIENCE_HEADER,
     SUPEREXEC_AUTH_BODY_SHA256_HEADER,
     SUPEREXEC_AUTH_NONCE_HEADER,
-    SUPEREXEC_AUTH_RUN_ID_HEADER,
     SUPEREXEC_AUTH_SIGNATURE_HEADER,
     SUPEREXEC_AUTH_TIMESTAMP_HEADER,
     compute_request_body_sha256,
     compute_superexec_signature,
-    derive_run_secret,
+    derive_auth_secret,
     extract_single_str_metadata,
-    extract_superexec_run_id,
     verify_superexec_signature,
 )
 
@@ -91,7 +89,7 @@ class SuperExecAuthClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type:
         audience: str,
         protected_methods: Collection[str],
     ) -> None:
-        self._master_secret = master_secret
+        self._auth_secret = derive_auth_secret(master_secret)
         self._audience = audience
         self._protected_methods = set(protected_methods)
 
@@ -106,18 +104,15 @@ class SuperExecAuthClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type:
         if method not in self._protected_methods:
             return continuation(client_call_details, request)
 
-        run_id = extract_superexec_run_id(request)
         timestamp = int(now().timestamp())
         nonce = secrets.token_hex(16)
         body_sha256 = compute_request_body_sha256(request)
-        run_secret = derive_run_secret(self._master_secret, run_id)
         signature = compute_superexec_signature(
-            run_secret=run_secret,
+            auth_secret=self._auth_secret,
             method=method,
             audience=self._audience,
             timestamp=timestamp,
             nonce=nonce,
-            run_id=run_id,
             body_sha256=body_sha256,
         )
 
@@ -126,7 +121,6 @@ class SuperExecAuthClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type:
             SUPEREXEC_AUTH_AUDIENCE_HEADER,
             SUPEREXEC_AUTH_TIMESTAMP_HEADER,
             SUPEREXEC_AUTH_NONCE_HEADER,
-            SUPEREXEC_AUTH_RUN_ID_HEADER,
             SUPEREXEC_AUTH_BODY_SHA256_HEADER,
             SUPEREXEC_AUTH_SIGNATURE_HEADER,
         }
@@ -136,7 +130,6 @@ class SuperExecAuthClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type:
                 (SUPEREXEC_AUTH_AUDIENCE_HEADER, self._audience),
                 (SUPEREXEC_AUTH_TIMESTAMP_HEADER, str(timestamp)),
                 (SUPEREXEC_AUTH_NONCE_HEADER, nonce),
-                (SUPEREXEC_AUTH_RUN_ID_HEADER, run_id),
                 (SUPEREXEC_AUTH_BODY_SHA256_HEADER, body_sha256),
                 (SUPEREXEC_AUTH_SIGNATURE_HEADER, signature),
             ]
@@ -158,7 +151,7 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         protected_methods: Collection[str],
     ) -> None:
         self._state_provider = state_provider
-        self._master_secret = master_secret
+        self._auth_secret = derive_auth_secret(master_secret)
         self._expected_audience = expected_audience
         self._protected_methods = set(protected_methods)
 
@@ -193,9 +186,6 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 metadata, SUPEREXEC_AUTH_TIMESTAMP_HEADER
             )
             nonce = extract_single_str_metadata(metadata, SUPEREXEC_AUTH_NONCE_HEADER)
-            run_id_header = extract_single_str_metadata(
-                metadata, SUPEREXEC_AUTH_RUN_ID_HEADER
-            )
             body_sha256_header = extract_single_str_metadata(
                 metadata, SUPEREXEC_AUTH_BODY_SHA256_HEADER
             )
@@ -206,7 +196,6 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 audience,
                 ts_raw,
                 nonce,
-                run_id_header,
                 body_sha256_header,
                 signature,
             }:
@@ -223,31 +212,22 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             if not MIN_TIMESTAMP_DIFF_SECONDS < time_diff < MAX_TIMESTAMP_DIFF_SECONDS:
                 _abort_auth_denied(context)
 
-            try:
-                run_id = extract_superexec_run_id(request)
-            except ValueError:
-                _abort_auth_denied(context)
-            if run_id != run_id_header:
-                _abort_auth_denied(context)
-
             body_sha256 = compute_request_body_sha256(request)
             if body_sha256 != body_sha256_header:
                 _abort_auth_denied(context)
 
-            run_secret = derive_run_secret(self._master_secret, run_id)
             expected_signature = compute_superexec_signature(
-                run_secret=run_secret,
+                auth_secret=self._auth_secret,
                 method=method,
                 audience=audience,
                 timestamp=timestamp,
                 nonce=cast(str, nonce),
-                run_id=run_id,
                 body_sha256=body_sha256,
             )
             if not verify_superexec_signature(expected_signature, cast(str, signature)):
                 _abort_auth_denied(context)
 
-            namespace = f"superexec:{self._expected_audience}:{method}:{run_id}"
+            namespace = f"superexec:{self._expected_audience}:{method}"
             expires_at = float(timestamp + MAX_TIMESTAMP_DIFF_SECONDS)
             if not self._state_provider().reserve_nonce(
                 namespace=namespace,
