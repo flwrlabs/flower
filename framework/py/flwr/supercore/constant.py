@@ -109,6 +109,7 @@ DEFAULT_SIMULATION_CONFIG = SimulationConfig(
     init_args_logging_level="WARNING",
     init_args_log_to_driver=True,
 )
+MAX_FEDERATION_NAME_LENGTH = 20
 
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function

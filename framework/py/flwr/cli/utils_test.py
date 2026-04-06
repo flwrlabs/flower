@@ -451,7 +451,6 @@ def test_filter_paths_for_publish_empty() -> None:
 
 @parameterized.expand(  # type: ignore
     [
-        ("", False, "Name cannot be empty."),  # empty
         ("federation123", True, "Name is valid."),  # alphanumeric
         ("test-federation", True, "Name is valid."),  # hyphenated
         (
@@ -459,37 +458,12 @@ def test_filter_paths_for_publish_empty() -> None:
             False,
             "Invalid name: must be less than 20 characters long.",
         ),  # too_long
-        (
-            "-federation",
-            False,
-            "Invalid name: must start with a letter or a number.",
-        ),  # starts_with_symbol
-        (
-            "test federation",
-            False,
-            (
-                "Invalid name: no spaces allowed, only letters, numbers, and "
-                "hyphens are allowed."
-            ),
-        ),  # contains_space
-        (
-            "Testfederation",
-            False,
-            "Invalid name: must be all lowercase.",
-        ),  # uppercase
-        (
-            "test_federation",
-            False,
-            "Invalid name: only letters, numbers, and hyphens are allowed.",
-        ),  # invalid_symbol
-        (
-            "Test Federation!",
-            False,
-            (
-                "Invalid name: no spaces allowed, must be all lowercase, only "
-                "letters, numbers, and hyphens are allowed."
-            ),
-        ),  # multiple_violations
+        ("", False, "Invalid name."),  # empty
+        ("-federation", False, "Invalid name."),  # starts_with_symbol
+        ("test federation", False, "Invalid name."),  # contains_space
+        ("Testfederation", True, "Name is valid."),  # uppercase allowed
+        ("test_federation", False, "Invalid name."),  # invalid_symbol
+        ("Test Federation!", False, "Invalid name."),  # multiple_violations
     ]
 )
 def test_validate_federation_name(

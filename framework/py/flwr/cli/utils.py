@@ -59,6 +59,7 @@ from flwr.supercore.constant import (
     APP_PUBLISH_EXCLUDE_PATTERNS,
     APP_PUBLISH_INCLUDE_PATTERNS,
     MAX_DIR_DEPTH,
+    MAX_FEDERATION_NAME_LENGTH,
 )
 from flwr.supercore.credential_store import get_credential_store
 
@@ -633,16 +634,28 @@ def validate_credentials_content(creds_path: Path) -> str:
 def validate_federation_name(name: str) -> tuple[bool, str]:
     """Validate a federation name based on specific security and formatting rules.
 
+    The same validation rules as project names are applied, with an additional
+    length check to ensure the name is less than 20 characters long.
+
+    Parameters
+    ----------
+    name : str
+        The federation name to validate.
+
     Returns
     -------
         tuple: (bool, str)
                - A boolean indicating if the name is valid (True/False).
                - A string containing a success message or a detailed error message.
     """
+    if len(name) > MAX_FEDERATION_NAME_LENGTH:
+        return (
+            False,
+            "Invalid name: must be less than "
+            f"{MAX_FEDERATION_NAME_LENGTH} characters long.",
+        )
 
     valid = is_valid_project_name(name)
-
-    # Final Decision logic
     if not valid:
         return False, "Invalid name."
 
