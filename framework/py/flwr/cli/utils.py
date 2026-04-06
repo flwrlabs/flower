@@ -635,7 +635,7 @@ def validate_federation_name(name: str) -> tuple[bool, str]:
     """Validate a federation name based on specific security and formatting rules.
 
     The same validation rules as project names are applied, with an additional
-    length check to ensure the name is less than 20 characters long.
+    length check to ensure the name is no longer than 20 characters.
 
     Parameters
     ----------
@@ -651,8 +651,8 @@ def validate_federation_name(name: str) -> tuple[bool, str]:
     if len(name) > MAX_FEDERATION_NAME_LENGTH:
         return (
             False,
-            "Invalid name: must be less than "
-            f"{MAX_FEDERATION_NAME_LENGTH} characters long.",
+            "Invalid name: must be no longer than "
+            f"{MAX_FEDERATION_NAME_LENGTH} characters.",
         )
 
     valid = is_valid_project_name(name)

@@ -453,10 +453,11 @@ def test_filter_paths_for_publish_empty() -> None:
     [
         ("federation123", True, "Name is valid."),  # alphanumeric
         ("test-federation", True, "Name is valid."),  # hyphenated
+        ("federation-name-1234", True, "Name is valid."),  # exactly_20_chars
         (
             "thisfederationnameistoolong",
             False,
-            "Invalid name: must be less than 20 characters long.",
+            "Invalid name: must be no longer than 20 characters.",
         ),  # too_long
         ("", False, "Invalid name."),  # empty
         ("-federation", False, "Invalid name."),  # starts_with_symbol
