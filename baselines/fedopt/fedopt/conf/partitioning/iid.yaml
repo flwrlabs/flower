@@ -1,0 +1,3 @@
+---
+_target_: flwr_datasets.partitioner.IidPartitioner
+num_partitions: ${num_clients}

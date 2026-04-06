@@ -1,0 +1,3 @@
+---
+_target_: flwr_datasets.FederatedDataset.NiidPartitioner # TODO: this isn't available yet
+num_partitions: ${num_clients}
