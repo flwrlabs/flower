@@ -15,7 +15,7 @@
 """SQLAlchemy Core Table definitions for CoreState."""
 
 
-from sqlalchemy import Column, Float, Integer, MetaData, String, Table
+from sqlalchemy import Column, Float, Index, Integer, MetaData, String, Table
 
 
 def create_corestate_metadata() -> MetaData:
@@ -33,12 +33,13 @@ def create_corestate_metadata() -> MetaData:
         Column("active_until", Float),
     )
 
-    Table(
+    nonce_store = Table(
         "nonce_store",
         metadata,
         Column("namespace", String, primary_key=True, nullable=False),
         Column("nonce", String, primary_key=True, nullable=False),
         Column("expires_at", Float, nullable=False),
     )
+    Index("ix_nonce_store_expires_at", nonce_store.c.expires_at)
 
     return metadata
