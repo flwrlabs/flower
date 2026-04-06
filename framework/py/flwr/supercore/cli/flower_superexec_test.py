@@ -43,7 +43,7 @@ def test_parse_superexec_version_flag(
 def test_flower_superexec_checks_for_update(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """SuperExec should run the startup update check after parsing arguments."""
+    """SuperExec should run the startup update check before parsing arguments."""
 
     class _SentinelError(Exception):
         pass
@@ -56,14 +56,19 @@ def test_flower_superexec_checks_for_update(
     def _parse_args() -> _Parser:
         return _Parser()
 
-    captured: dict[str, str] = {}
+    captured: list[str] = []
 
     def _raise_sentinel(process_name: str | None = None) -> None:
+        captured.append("update")
         if process_name is not None:
-            captured["process_name"] = process_name
+            captured.append(process_name)
         raise _SentinelError()
 
-    monkeypatch.setattr(flower_superexec_module, "_parse_args", _parse_args)
+    def _unexpected_parse_args() -> _Parser:
+        captured.append("parse")
+        return _parse_args()
+
+    monkeypatch.setattr(flower_superexec_module, "_parse_args", _unexpected_parse_args)
     monkeypatch.setattr(
         flower_superexec_module, "warn_if_flwr_update_available", _raise_sentinel
     )
@@ -71,4 +76,4 @@ def test_flower_superexec_checks_for_update(
     with pytest.raises(_SentinelError):
         flower_superexec_module.flower_superexec()
 
-    assert captured == {"process_name": "flower-superexec"}
+    assert captured == ["update", "flower-superexec"]
