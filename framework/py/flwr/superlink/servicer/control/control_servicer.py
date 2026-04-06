@@ -27,6 +27,7 @@ from typing import Any, cast
 import grpc
 import requests
 
+from flwr.cli.utils import validate_federation_name
 from flwr.common import Context, RecordDict, now
 from flwr.common.config import (
     flatten_dict,
@@ -658,6 +659,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             # Check that a federation is specified
             if not request.federation_name:
                 raise FederationNotSpecified()
+
+            # Ensure valid federation name is provided
+            success, err_msg = validate_federation_name(request.federation_name)
+            if not success:
+                context.abort(
+                    grpc.StatusCode.FAILED_PRECONDITION,
+                    f"Invalid federation name: '{request.federation_name}'. {err_msg}",
+                )
 
             # Init link state
             state = self.linkstate_factory.state()

@@ -686,6 +686,23 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
 
+    def test_create_federation_raises_on_invalid_name(self) -> None:
+        """Test CreateFederation aborts when federation name is invalid."""
+        request = CreateFederationRequest(
+            federation_name="Invalid Federation Name!",
+            description="A test federation with invalid name",
+            simulation=False,
+        )
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with self.assertRaises(grpc.RpcError):
+            self.servicer.CreateFederation(request, context)
+
+        context.abort.assert_called_once()
+        status_code, _ = context.abort.call_args.args
+        self.assertEqual(status_code, grpc.StatusCode.FAILED_PRECONDITION)
+
     def test_archive_federation_success(self) -> None:
         """Test ArchiveFederation succeeds when federation_manager.archive_federation
         works."""
