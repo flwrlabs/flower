@@ -32,7 +32,6 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
-from flwr.supercore.auth import SERVERAPPIO_SUPEREXEC_AUTH_POLICY
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
 from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.interceptors import (
@@ -45,6 +44,11 @@ from flwr.superlink.federation import NoOpFederationManager
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
 _SUPEREXEC_AUDIENCE = "serverappio:9091"
+_SERVERAPPIO_SUPEREXEC_METHODS = (
+    "/flwr.proto.ServerAppIo/ListAppsToLaunch",
+    "/flwr.proto.ServerAppIo/RequestToken",
+    "/flwr.proto.ServerAppIo/GetRun",
+)
 
 
 class TestServerAppIoAuthIntegration(unittest.TestCase):
@@ -90,7 +94,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
                 audience=_SUPEREXEC_AUDIENCE,
-                method_auth_policy=SERVERAPPIO_SUPEREXEC_AUTH_POLICY,
+                protected_methods=_SERVERAPPIO_SUPEREXEC_METHODS,
             ),
         )
         self._list_apps_to_launch_superexec = superexec_channel.unary_unary(

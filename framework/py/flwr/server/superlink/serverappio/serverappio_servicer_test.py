@@ -84,7 +84,6 @@ from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
 from flwr.server.superlink.serverappio.serverappio_servicer import _raise_if
 from flwr.server.superlink.utils import _STATUS_TO_MSG
-from flwr.supercore.auth import SERVERAPPIO_SUPEREXEC_AUTH_POLICY
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
 from flwr.supercore.date import now
 from flwr.supercore.inflatable.inflatable_object import (
@@ -105,6 +104,11 @@ from flwr.superlink.federation import NoOpFederationManager
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
 _SUPEREXEC_AUDIENCE = "serverappio:9091"
+_SERVERAPPIO_SUPEREXEC_METHODS = (
+    "/flwr.proto.ServerAppIo/ListAppsToLaunch",
+    "/flwr.proto.ServerAppIo/RequestToken",
+    "/flwr.proto.ServerAppIo/GetRun",
+)
 
 
 def test_raise_if_false() -> None:
@@ -341,7 +345,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
                 audience=_SUPEREXEC_AUDIENCE,
-                method_auth_policy=SERVERAPPIO_SUPEREXEC_AUTH_POLICY,
+                protected_methods=_SERVERAPPIO_SUPEREXEC_METHODS,
             ),
         )
         self._get_nodes = self._channel.unary_unary(
