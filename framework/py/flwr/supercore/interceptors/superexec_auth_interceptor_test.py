@@ -31,17 +31,14 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
 from flwr.supercore.auth import (
     MAX_TIMESTAMP_DIFF_SECONDS,
-    SERVERAPPIO_SUPEREXEC_AUTH_POLICY,
     SUPEREXEC_AUTH_AUDIENCE_HEADER,
     SUPEREXEC_AUTH_BODY_SHA256_HEADER,
     SUPEREXEC_AUTH_NONCE_HEADER,
-    SUPEREXEC_AUTH_RUN_ID_HEADER,
     SUPEREXEC_AUTH_SIGNATURE_HEADER,
     SUPEREXEC_AUTH_TIMESTAMP_HEADER,
-    SUPEREXEC_RUN_ID_PLACEHOLDER,
     compute_request_body_sha256,
     compute_superexec_signature,
-    derive_run_secret,
+    derive_auth_secret,
 )
 from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
@@ -52,6 +49,12 @@ from flwr.supercore.interceptors import (
 _ClientCallDetails = namedtuple(
     "_ClientCallDetails",
     ["method", "timeout", "metadata", "credentials", "wait_for_ready", "compression"],
+)
+
+_SERVERAPPIO_SUPEREXEC_METHODS = (
+    "/flwr.proto.ServerAppIo/ListAppsToLaunch",
+    "/flwr.proto.ServerAppIo/RequestToken",
+    "/flwr.proto.ServerAppIo/GetRun",
 )
 
 
@@ -93,7 +96,7 @@ class TestSuperExecAuthClientInterceptor(TestCase):
         interceptor = SuperExecAuthClientInterceptor(
             master_secret=b"secret",
             audience="serverappio:9091",
-            method_auth_policy=SERVERAPPIO_SUPEREXEC_AUTH_POLICY,
+            protected_methods=_SERVERAPPIO_SUPEREXEC_METHODS,
         )
         details = _ClientCallDetails(
             method="/flwr.proto.ServerAppIo/RequestToken",
@@ -123,13 +126,11 @@ class TestSuperExecAuthClientInterceptor(TestCase):
             SUPEREXEC_AUTH_AUDIENCE_HEADER,
             SUPEREXEC_AUTH_TIMESTAMP_HEADER,
             SUPEREXEC_AUTH_NONCE_HEADER,
-            SUPEREXEC_AUTH_RUN_ID_HEADER,
             SUPEREXEC_AUTH_BODY_SHA256_HEADER,
             SUPEREXEC_AUTH_SIGNATURE_HEADER,
         ):
             self.assertIn(header, md)
         self.assertEqual(md[SUPEREXEC_AUTH_AUDIENCE_HEADER], "serverappio:9091")
-        self.assertEqual(md[SUPEREXEC_AUTH_RUN_ID_HEADER], "7")
 
 
 class TestSuperExecAuthServerInterceptor(TestCase):
@@ -151,7 +152,6 @@ class TestSuperExecAuthServerInterceptor(TestCase):
         *,
         method: str,
         request: GrpcMessage,
-        run_id: str,
         audience: str | None = None,
         body_sha256: str | None = None,
         signature_override: str | None = None,
@@ -162,21 +162,19 @@ class TestSuperExecAuthServerInterceptor(TestCase):
         body = (
             compute_request_body_sha256(request) if body_sha256 is None else body_sha256
         )
-        run_secret = derive_run_secret(self._secret, run_id)
+        auth_secret = derive_auth_secret(self._secret)
         signature = compute_superexec_signature(
-            run_secret=run_secret,
+            auth_secret=auth_secret,
             method=method,
             audience=audience or self._audience,
             timestamp=ts,
             nonce=nonce,
-            run_id=run_id,
             body_sha256=body,
         )
         return (
             (SUPEREXEC_AUTH_AUDIENCE_HEADER, audience or self._audience),
             (SUPEREXEC_AUTH_TIMESTAMP_HEADER, str(ts)),
             (SUPEREXEC_AUTH_NONCE_HEADER, nonce),
-            (SUPEREXEC_AUTH_RUN_ID_HEADER, run_id),
             (SUPEREXEC_AUTH_BODY_SHA256_HEADER, body),
             (
                 SUPEREXEC_AUTH_SIGNATURE_HEADER,
@@ -195,7 +193,6 @@ class TestSuperExecAuthServerInterceptor(TestCase):
                 invocation_metadata=self._signed_metadata(
                     method=method,
                     request=request,
-                    run_id="9",
                 ),
             ),
         )
@@ -225,7 +222,6 @@ class TestSuperExecAuthServerInterceptor(TestCase):
         metadata = self._signed_metadata(
             method=method,
             request=request,
-            run_id=SUPEREXEC_RUN_ID_PLACEHOLDER,
             nonce="nonce-replay",
         )
         intercepted = self._interceptor.intercept_service(
@@ -242,26 +238,6 @@ class TestSuperExecAuthServerInterceptor(TestCase):
             grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
         )
 
-    def test_run_id_mismatch_is_denied(self) -> None:
-        """Mismatched run_id metadata should be denied."""
-        method = "/flwr.proto.ServerAppIo/RequestToken"
-        request = RequestTokenRequest(run_id=9)
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
-        intercepted = self._interceptor.intercept_service(
-            lambda _: _make_unary_handler(),
-            _HandlerCallDetails(
-                method=method,
-                invocation_metadata=self._signed_metadata(
-                    method=method,
-                    request=request,
-                    run_id="8",
-                ),
-            ),
-        )
-        with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(request, context)
-
     def test_invalid_body_hash_is_denied(self) -> None:
         """Body hash mismatch should be denied."""
         method = "/flwr.proto.ServerAppIo/RequestToken"
@@ -275,7 +251,6 @@ class TestSuperExecAuthServerInterceptor(TestCase):
                 invocation_metadata=self._signed_metadata(
                     method=method,
                     request=request,
-                    run_id="9",
                     body_sha256="0" * 64,
                 ),
             ),
@@ -297,7 +272,6 @@ class TestSuperExecAuthServerInterceptor(TestCase):
                 invocation_metadata=self._signed_metadata(
                     method=method,
                     request=request,
-                    run_id=SUPEREXEC_RUN_ID_PLACEHOLDER,
                     timestamp=old_ts,
                 ),
             ),
@@ -318,7 +292,6 @@ class TestSuperExecAuthServerInterceptor(TestCase):
                 invocation_metadata=self._signed_metadata(
                     method=method,
                     request=request,
-                    run_id=SUPEREXEC_RUN_ID_PLACEHOLDER,
                     audience="serverappio:9099",
                 ),
             ),
