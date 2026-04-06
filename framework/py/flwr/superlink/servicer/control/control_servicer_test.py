@@ -105,8 +105,8 @@ from flwr.superlink.servicer.control.control_account_auth_interceptor import (
 from .control_servicer import (
     ControlServicer,
     _format_verification,
-    _validate_federation_membership_in_request,
     _validate_federation_and_node_in_request,
+    _validate_federation_membership_in_request,
 )
 
 FLWR_AID_MISMATCH_CASES = (
@@ -1032,7 +1032,9 @@ class TestControlServicerAuth(unittest.TestCase):
                 "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
                 return_value=SimpleNamespace(flwr_aid="user-123"),
             ),
-            patch.object(self.state.federation_manager, "has_member", return_value=False),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=False
+            ),
         ):
             gen = self.servicer.StreamLogs(request, ctx)
             with self.assertRaises(RuntimeError) as cm:
@@ -1058,7 +1060,9 @@ class TestControlServicerAuth(unittest.TestCase):
                 self.state, "get_serverapp_log", new=lambda rid, ts: ("log1", 1.0)
             ),
             patch.object(self.state, "get_run_info", new=mock_get_run_info),
-            patch.object(self.state.federation_manager, "has_member", return_value=True),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=True
+            ),
             patch(
                 "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
                 return_value=SimpleNamespace(flwr_aid="user-123"),
@@ -1084,7 +1088,9 @@ class TestControlServicerAuth(unittest.TestCase):
                 "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
                 return_value=SimpleNamespace(flwr_aid="user-123"),
             ),
-            patch.object(self.state.federation_manager, "has_member", return_value=False),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=False
+            ),
         ):
             with self.assertRaises(RuntimeError) as cm:
                 self.servicer.StopRun(request, ctx)
@@ -1101,7 +1107,9 @@ class TestControlServicerAuth(unittest.TestCase):
                 "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
                 return_value=SimpleNamespace(flwr_aid="user-123"),
             ),
-            patch.object(self.state.federation_manager, "has_member", return_value=True),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=True
+            ),
         ):
             response = self.servicer.StopRun(request, ctx)
             self.assertTrue(response.success)
