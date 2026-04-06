@@ -174,12 +174,3 @@ class SqlCoreState(CoreState, SqlMixin):
             return True
         except IntegrityError:
             return False
-
-    def _cleanup_expired_nonces(self) -> None:
-        """Delete nonce reservations that are no longer active."""
-        current = now().timestamp()
-        query = """
-            DELETE FROM nonce_store
-            WHERE expires_at < :current;
-        """
-        self.query(query, {"current": current})

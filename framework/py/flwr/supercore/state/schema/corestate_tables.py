@@ -40,6 +40,6 @@ def create_corestate_metadata() -> MetaData:
         Column("nonce", String, primary_key=True, nullable=False),
         Column("expires_at", Float, nullable=False),
     )
-    Index("ix_nonce_store_expires_at", nonce_store.c.expires_at)
+    Index("idx_nonce_store_expires_at", nonce_store.c.expires_at)
 
     return metadata

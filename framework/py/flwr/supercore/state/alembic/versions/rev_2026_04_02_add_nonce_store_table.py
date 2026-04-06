@@ -42,10 +42,10 @@ def upgrade() -> None:
         sa.Column("expires_at", sa.Float(), nullable=False),
         sa.PrimaryKeyConstraint("namespace", "nonce"),
     )
-    op.create_index("ix_nonce_store_expires_at", "nonce_store", ["expires_at"])
+    op.create_index("idx_nonce_store_expires_at", "nonce_store", ["expires_at"])
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_index("ix_nonce_store_expires_at", table_name="nonce_store")
+    op.drop_index("idx_nonce_store_expires_at", table_name="nonce_store")
     op.drop_table("nonce_store")
