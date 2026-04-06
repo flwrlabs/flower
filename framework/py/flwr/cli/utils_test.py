@@ -41,7 +41,7 @@ from flwr.common.constant import (
     REFRESH_TOKEN_KEY,
 )
 from flwr.common.grpc import GRPC_MAX_MESSAGE_LENGTH
-from flwr.supercore.constant import MAX_APP_NAME_LENGTH, MAX_DIR_DEPTH
+from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
 
 from .utils import (
     build_pathspec,
@@ -453,11 +453,11 @@ def test_filter_paths_for_publish_empty() -> None:
     [
         ("federation123", True, ""),  # alphanumeric
         ("test-federation", True, ""),  # hyphenated
-        ("f" * MAX_APP_NAME_LENGTH, True, ""),  # exactly_max_length
+        ("f" * MAX_NAME_LENGTH, True, ""),  # exactly_max_length
         (
-            "f" * (MAX_APP_NAME_LENGTH + 1),
+            "f" * (MAX_NAME_LENGTH + 1),
             False,
-            f"Must be no longer than {MAX_APP_NAME_LENGTH} characters.",
+            f"Must be no longer than {MAX_NAME_LENGTH} characters.",
         ),  # too_long
         ("", False, "Cannot be empty."),  # empty
         ("-federation", False, "Must start with a letter."),  # starts_with_symbol
