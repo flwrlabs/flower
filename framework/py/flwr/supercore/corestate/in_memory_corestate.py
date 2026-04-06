@@ -154,6 +154,6 @@ class InMemoryCoreState(CoreState):
     def _cleanup_expired_nonces(self) -> None:
         """Delete nonce reservations that are no longer active."""
         current = now().timestamp()
-        for key, active_until in list(self.nonce_store.items()):
-            if active_until < current:
+        for key, expires_at in list(self.nonce_store.items()):
+            if expires_at < current:
                 del self.nonce_store[key]
