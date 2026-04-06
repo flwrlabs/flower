@@ -288,7 +288,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: StreamLogsRequest, context: grpc.ServicerContext
     ) -> Generator[StreamLogsResponse, Any, None]:
         """Get logs."""
-        log(INFO, "ControlServicer.StreamLogs")
+        log(INFO, rpc_name := self.StreamLogs.__qualname__)
+
+        # Init link state
         state = self.linkstate_factory.state()
 
         # Retrieve run ID and run
@@ -300,9 +302,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
         run = runs[0]
 
-        # Check if `flwr_aid` matches the run's `flwr_aid`
-        flwr_aid = _get_flwr_aid(context)
-        _check_flwr_aid_in_run(flwr_aid=flwr_aid, run=run, context=context)
+        with rpc_error_translator(context, rpc_name):
+            flwr_aid = _get_flwr_aid(context)
+            _validate_federation_membership_in_request(
+                state, flwr_aid, run.federation, context
+            )
 
         after_timestamp = request.after_timestamp + 1e-6
         while context.is_active():
@@ -377,7 +381,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: StopRunRequest, context: grpc.ServicerContext
     ) -> StopRunResponse:
         """Stop a given run ID."""
-        log(INFO, "ControlServicer.StopRun")
+        log(INFO, rpc_name := self.StopRun.__qualname__)
+
+        # Init link state
         state = self.linkstate_factory.state()
 
         # Retrieve run ID and run
@@ -390,9 +396,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             raise grpc.RpcError()  # This line is unreachable
         run = runs[0]
 
-        # Check if `flwr_aid` matches the run's `flwr_aid`
-        flwr_aid = get_current_account_info().flwr_aid
-        _check_flwr_aid_in_run(flwr_aid=flwr_aid, run=run, context=context)
+        with rpc_error_translator(context, rpc_name):
+            flwr_aid = _get_flwr_aid(context)
+            _validate_federation_membership_in_request(
+                state, flwr_aid, run.federation, context
+            )
 
         if run.status.status == Status.FINISHED:
             context.abort(
@@ -1000,9 +1008,25 @@ def _validate_federation_and_node_in_request(
     node_id: int,
     context: grpc.ServicerContext,
 ) -> None:
-    """Validate federation membership and node ID presence for adding/removing a
-    supernode to/from a federation."""
-    # Check that a federation is specified
+    """Validate federation membership and node ownership for federation updates."""
+    _validate_federation_membership_in_request(
+        state, flwr_aid, federation_name, context
+    )
+    nodes_info = state.get_node_info(node_ids=[node_id])
+    if not nodes_info or nodes_info[0].owner_aid != flwr_aid:
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Node {node_id} not found or you are not its owner.",
+        )
+
+
+def _validate_federation_membership_in_request(
+    state: LinkState,
+    flwr_aid: str,
+    federation_name: str,
+    context: grpc.ServicerContext,
+) -> None:
+    """Validate that a federation exists and the requester is one of its members."""
     if not federation_name:
         raise FederationNotSpecified()
 
@@ -1018,16 +1042,6 @@ def _validate_federation_and_node_in_request(
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             FEDERATION_NOT_FOUND_MESSAGE % federation_name,
-        )
-
-    # Ensure the requester owns the specified node
-    # A node that does not exist or is not owned by the requester is
-    # treated the same way.
-    nodes_info = state.get_node_info(node_ids=[node_id])
-    if not nodes_info or nodes_info[0].owner_aid != flwr_aid:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Node {node_id} not found or you are not its owner.",
         )
 
 
