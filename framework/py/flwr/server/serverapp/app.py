@@ -48,7 +48,6 @@ from flwr.common.logger import (
 )
 from flwr.common.serde import (
     context_from_proto,
-    context_to_proto,
     fab_from_proto,
     run_from_proto,
     run_status_to_proto,
@@ -58,7 +57,6 @@ from flwr.common.typing import RunNotRunningException, RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppInputsRequest,
     PullAppInputsResponse,
-    PushAppOutputsRequest,
 )
 from flwr.proto.run_pb2 import UpdateRunStatusRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
@@ -248,12 +246,14 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         )
 
         # Send resulting context
-        context_proto = context_to_proto(updated_context)
-        log(DEBUG, "[flwr-serverapp] Will push ServerAppOutputs")
-        out_req = PushAppOutputsRequest(
-            token=token, run_id=run.run_id, context=context_proto
-        )
-        _ = grid._stub.PushAppOutputs(out_req)
+        # Temporarily disable pushing resulting context to servicer
+        _ = updated_context
+        # context_proto = context_to_proto(updated_context)
+        # log(DEBUG, "[flwr-serverapp] Will push ServerAppOutputs")
+        # out_req = PushAppOutputsRequest(
+        #     token=token, run_id=run.run_id, context=context_proto
+        # )
+        # _ = grid._stub.PushAppOutputs(out_req)
 
         run_status = RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
 
