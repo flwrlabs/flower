@@ -30,7 +30,10 @@ def add_superexec_auth_secret_args(parser: argparse.ArgumentParser) -> None:
         "--superexec-auth-secret-file",
         type=str,
         default=None,
-        help="Path to a file containing the SuperExec shared secret.",
+        help=(
+            "Path to a file containing the SuperExec shared secret. The file "
+            "is read as exact raw bytes; trailing newlines are preserved."
+        ),
     )
     group.add_argument(
         "--superexec-auth-secret-stdin",
