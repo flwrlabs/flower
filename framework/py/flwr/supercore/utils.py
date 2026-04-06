@@ -27,7 +27,7 @@ from flwr.common.constant import FLWR_DIR, FLWR_HOME
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.supercore.version import package_version as flwr_version
 
-from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN
+from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN, MAX_NAME_LENGTH
 
 
 def mask_string(value: str, head: int = 4, tail: int = 4) -> str:
@@ -306,3 +306,28 @@ def check_federation_format(federation: str) -> None:
             f"Invalid federation format: {federation}. "
             f"Expected format: '@<account-name>/<federation-name>'."
         )
+
+
+def is_valid_name(name: str) -> tuple[bool, str]:
+    """Check if the given string is a valid name for an app or federation.
+
+    A valid name must start with a letter and can only contain letters, digits, and
+    hyphens. It must be less than or equal to MAX_NAME_LENGTH characters.
+    """
+    if not name:
+        return False, "Cannot be empty."
+
+    # Check if the name exceeds the maximum length
+    if len(name) > MAX_NAME_LENGTH:
+        return False, f"Must be no longer than {MAX_NAME_LENGTH} characters."
+
+    # Check if the first character is a letter
+    if not name[0].isalpha():
+        return False, "Must start with a letter."
+
+    # Check if the rest of the characters are valid (letter, digit, or dash)
+    for char in name[1:]:
+        if not (char.isalnum() or char in "-"):
+            return False, "Can only contain letters, digits, and hyphens."
+
+    return True, ""
