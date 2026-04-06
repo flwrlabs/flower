@@ -94,6 +94,7 @@ MIME_MAP = {
     ".md": "text/markdown; charset=utf-8",
     ".toml": "application/toml; charset=utf-8",
 }
+MAX_NAME_LENGTH = 32  # max length for app names; also used for federation names
 
 # Constants for federations
 NOOP_FEDERATION = f"@{NOOP_ACCOUNT_NAME}/default"
