@@ -20,7 +20,6 @@ import unittest
 
 import grpc
 
-from flwr.common import ConfigRecord
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS, Status
 from flwr.common.typing import RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
@@ -84,7 +83,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):
 
     def _create_running_run(self) -> int:
         run_id = self.state.create_run(
-            "", "", "", {}, NOOP_FEDERATION, ConfigRecord(), "", RunType.SERVER_APP
+            "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
         )
         _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
         _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
