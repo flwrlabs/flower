@@ -199,38 +199,40 @@ def prompt_options(text: str, options: list[str]) -> str:
     return result
 
 
-def is_valid_project_name(name: str) -> bool:
+def is_valid_project_name(name: str) -> tuple[bool, str]:
     """Check if the given string is a valid Python project name.
 
     A valid project name must start with a letter and can only contain letters, digits,
     and hyphens.
     """
     if not name:
-        return False
+        return False, "Cannot be empty."
 
     # Check if the name exceeds the maximum length
     if len(name) > MAX_APP_NAME_LENGTH:
-        return False
+        return False, f"Must be no longer than {MAX_APP_NAME_LENGTH} characters."
 
     # Check if the first character is a letter
     if not name[0].isalpha():
-        return False
+        return False, "Must start with a letter."
 
     # Check if the rest of the characters are valid (letter, digit, or dash)
     for char in name[1:]:
         if not (char.isalnum() or char in "-"):
-            return False
+            return False, "Can only contain letters, digits, and hyphens."
 
-    return True
+    return True, ""
 
 
 def validate_project_name(name: str, target: str) -> None:
     """Validate a project-related name and raise ValueError if invalid."""
-    if not is_valid_project_name(name):
+    valid, _ = is_valid_project_name(name)
+    if not valid:
         raise ValueError(
             f'{target} "{name}" is invalid, '
             "a valid app name must start with a letter, "
-            "and can only contain letters, digits, and hyphens."
+            "and can only contain letters, digits, and hyphens. The name"
+            f"must also be no longer than {MAX_APP_NAME_LENGTH} characters."
         )
 
 
@@ -651,8 +653,8 @@ def validate_federation_name(name: str) -> tuple[bool, str]:
                - A boolean indicating if the name is valid (True/False).
                - A string containing a success message or a detailed error message.
     """
-    valid = is_valid_project_name(name)
+    valid, reason = is_valid_project_name(name)
     if not valid:
-        return False, "Invalid name."
+        return False, f"{reason}"
 
-    return True, "Name is valid."
+    return True, ""
