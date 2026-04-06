@@ -22,7 +22,7 @@ from queue import Queue
 
 import grpc
 
-from flwr.app import Context
+from flwr.app import RecordDict
 from flwr.app.exception import AppExitException
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
@@ -241,7 +241,7 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         heartbeat_sender.start()
 
         # Load and run the ServerApp with the Grid
-        _ = run_(
+        updated_context = run_(
             grid=grid,
             server_app_dir=app_path,
             server_app_attr=server_app_attr,
@@ -250,7 +250,8 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
         # Send resulting context
         # Temporarily disable pushing resulting context to servicer
-        context_proto = context_to_proto(Context())
+        updated_context.state = RecordDict()
+        context_proto = context_to_proto(updated_context)
         log(DEBUG, "[flwr-serverapp] Will push ServerAppOutputs")
         out_req = PushAppOutputsRequest(
             token=token, run_id=run.run_id, context=context_proto

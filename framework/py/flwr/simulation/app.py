@@ -20,7 +20,7 @@ from dataclasses import replace
 from logging import DEBUG, ERROR, INFO
 from queue import Queue
 
-from flwr.app import Context
+from flwr.app import RecordDict
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
@@ -267,7 +267,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         heartbeat_sender.start()
 
         # Launch the simulation
-        _ = _run_simulation(
+        updated_context = _run_simulation(
             server_app_attr=server_app_attr,
             client_app_attr=client_app_attr,
             num_supernodes=num_supernodes,
@@ -284,7 +284,8 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
         # Send resulting context
         # Temporarily disable pushing resulting context to SuperLink
-        context_proto = context_to_proto(Context())
+        updated_context.state = RecordDict()
+        context_proto = context_to_proto(updated_context)
         out_req = PushAppOutputsRequest(
             token=token, run_id=run.run_id, context=context_proto
         )
