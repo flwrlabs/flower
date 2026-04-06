@@ -22,6 +22,7 @@ from queue import Queue
 
 import grpc
 
+from flwr.app import Context
 from flwr.app.exception import AppExitException
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
@@ -48,6 +49,7 @@ from flwr.common.logger import (
 )
 from flwr.common.serde import (
     context_from_proto,
+    context_to_proto,
     fab_from_proto,
     run_from_proto,
     run_status_to_proto,
@@ -57,6 +59,7 @@ from flwr.common.typing import RunNotRunningException, RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppInputsRequest,
     PullAppInputsResponse,
+    PushAppOutputsRequest,
 )
 from flwr.proto.run_pb2 import UpdateRunStatusRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
@@ -238,7 +241,7 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         heartbeat_sender.start()
 
         # Load and run the ServerApp with the Grid
-        updated_context = run_(
+        _ = run_(
             grid=grid,
             server_app_dir=app_path,
             server_app_attr=server_app_attr,
@@ -247,13 +250,12 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
         # Send resulting context
         # Temporarily disable pushing resulting context to servicer
-        _ = updated_context
-        # context_proto = context_to_proto(updated_context)
-        # log(DEBUG, "[flwr-serverapp] Will push ServerAppOutputs")
-        # out_req = PushAppOutputsRequest(
-        #     token=token, run_id=run.run_id, context=context_proto
-        # )
-        # _ = grid._stub.PushAppOutputs(out_req)
+        context_proto = context_to_proto(Context())
+        log(DEBUG, "[flwr-serverapp] Will push ServerAppOutputs")
+        out_req = PushAppOutputsRequest(
+            token=token, run_id=run.run_id, context=context_proto
+        )
+        _ = grid._stub.PushAppOutputs(out_req)
 
         run_status = RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
 

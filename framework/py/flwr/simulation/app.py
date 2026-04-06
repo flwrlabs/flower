@@ -20,6 +20,7 @@ from dataclasses import replace
 from logging import DEBUG, ERROR, INFO
 from queue import Queue
 
+from flwr.app import Context
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
@@ -46,6 +47,7 @@ from flwr.common.logger import (
 )
 from flwr.common.serde import (
     context_from_proto,
+    context_to_proto,
     fab_from_proto,
     run_from_proto,
     run_status_to_proto,
@@ -54,6 +56,7 @@ from flwr.common.typing import RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppInputsRequest,
     PullAppInputsResponse,
+    PushAppOutputsRequest,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.run_pb2 import UpdateRunStatusRequest  # pylint: disable=E0611
@@ -264,7 +267,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         heartbeat_sender.start()
 
         # Launch the simulation
-        updated_context = _run_simulation(
+        _ = _run_simulation(
             server_app_attr=server_app_attr,
             client_app_attr=client_app_attr,
             num_supernodes=num_supernodes,
@@ -280,13 +283,12 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         )
 
         # Send resulting context
-        # Temporarily disable pushing resulting context to servicer
-        _ = updated_context
-        # context_proto = context_to_proto(updated_context)
-        # out_req = PushAppOutputsRequest(
-        #     token=token, run_id=run.run_id, context=context_proto
-        # )
-        # _ = conn._stub.PushAppOutputs(out_req)
+        # Temporarily disable pushing resulting context to SuperLink
+        context_proto = context_to_proto(Context())
+        out_req = PushAppOutputsRequest(
+            token=token, run_id=run.run_id, context=context_proto
+        )
+        _ = conn._stub.PushAppOutputs(out_req)
 
         run_status = RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
 
