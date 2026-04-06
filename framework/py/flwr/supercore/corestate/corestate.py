@@ -108,14 +108,18 @@ class CoreState(ABC):
         Parameters
         ----------
         namespace : str
-            Namespace for the nonce reservation.
+            Namespace for the nonce reservation. Empty values are treated as
+            invalid and return False.
         nonce : str
-            Nonce value to reserve.
+            Nonce value to reserve. Empty values are treated as invalid and
+            return False.
         expires_at : float
-            POSIX timestamp when the reservation expires.
+            POSIX timestamp when the reservation expires. Values in the past
+            are accepted.
 
         Returns
         -------
         bool
-            True if the nonce was reserved, False if it already exists and is active.
+            True if the nonce was reserved. False if the request is invalid or
+            the nonce already exists and is active.
         """

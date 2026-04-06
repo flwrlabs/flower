@@ -49,32 +49,30 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 ### Run with the Simulation Engine
 
 > [!TIP]
-> This example runs faster when the `ClientApp`s have access to a GPU. If your system has one, you can make use of it by configuring the `backend.client-resources` component in your Flower Configuration. Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
+> This example runs faster when the `ClientApp`s have access to a GPU. If your system has one follow the instructions below for updating the Simulation Configuration in your SuperLink. Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
 ```bash
-flwr run .
+flwr run . --stream
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
 
 ```bash
-flwr run . --run-config "num-server-rounds=5 batch-size=64"
+flwr run . --run-config "num-server-rounds=5 batch-size=64" --stream
 ```
 
-You can add a new connection in your Flower Configuration (find if via `flwr config list`):
+To configure your SuperLink to use a GPU for simulations when running the `ClientApp`, use the `flwr federation simulation-config` command.
 
-```TOML
-[superlink.local-gpu]
-options.num-supernodes = 10
-options.backend.client-resources.num-cpus = 2 # each ClientApp assumes to use 2CPUs
-options.backend.client-resources.num-gpus = 0.2 # at most 5 ClientApp will run in a given GPU
+```bash
+flwr federation simulation-config \
+    --client-resources-num-cpus=2 \ # each ClientApp assumes to use 2CPUs
+--client-resources-num-gpus=0.2 # at most 5 ClientApp will run in a given GPU
 ```
 
 And then run the app
 
 ```bash
-# Run with the `local-gpu` connection
-flwr run . local-gpu
+flwr run . --stream
 ```
 
 ![](_static/central_evaluation.png)

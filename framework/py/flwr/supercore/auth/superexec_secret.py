@@ -30,7 +30,10 @@ def add_superexec_auth_secret_args(parser: argparse.ArgumentParser) -> None:
         "--superexec-auth-secret-file",
         type=str,
         default=None,
-        help="Path to a file containing the SuperExec shared secret.",
+        help=(
+            "Path to a file containing the SuperExec shared secret. The file "
+            "is read as exact raw bytes; trailing newlines are preserved."
+        ),
     )
     group.add_argument(
         "--superexec-auth-secret-stdin",
@@ -48,7 +51,14 @@ def load_superexec_auth_secret(
     secret: bytes | None = None
     if secret_file is not None:
         # File input is treated as exact raw bytes.
-        secret = Path(secret_file).expanduser().read_bytes()
+        secret_path = Path(secret_file).expanduser()
+        try:
+            secret = secret_path.read_bytes()
+        except OSError as err:
+            raise ValueError(
+                f"Failed to read SuperExec auth secret from file '{secret_path}': "
+                f"{err}"
+            ) from err
     elif secret_stdin:
         secret = sys.stdin.buffer.read()
         # Shell redirection often appends a trailing newline. Trim at most one
@@ -68,4 +78,6 @@ def load_superexec_auth_secret(
 
 def generate_superexec_auth_secret(num_bytes: int = 32) -> bytes:
     """Generate a random SuperExec shared secret."""
+    if num_bytes <= 0:
+        raise ValueError("SuperExec auth secret size must be greater than 0")
     return secrets.token_bytes(num_bytes)

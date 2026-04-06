@@ -75,13 +75,27 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsResponse,
     UnregisterNodeRequest,
 )
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_DB_NAME,
+    NOOP_FEDERATION,
+    ActionType,
+    RunTime,
+    RunType,
+)
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
+from flwr.supercore.typing import (
+    AcceptInvitationContext,
+    CreateFederationContext,
+    CreateInvitationContext,
+    RegisterSupernodeContext,
+    StartRunContext,
+)
 from flwr.superlink.auth_plugin import NoOpControlAuthnPlugin
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.servicer.control.control_account_auth_interceptor import (
@@ -253,6 +267,76 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(status_code, grpc.StatusCode.FAILED_PRECONDITION)
         self.assertIn("unknown.key", details)
 
+    def test_start_run_denied_when_not_entitled(self) -> None:
+        """Test StartRun aborts when federation manager denies execution."""
+        request = StartRunRequest()
+        request.fab.hash_str = hashlib.sha256(b"test FAB content").hexdigest()
+        request.fab.content = b"test FAB content"
+        request.federation = NOOP_FEDERATION
+
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch.object(
+                self.state.federation_manager,
+                "can_execute",
+                return_value=False,
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.StartRun(request, context)
+
+        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
+
+    @parameterized.expand(
+        [
+            (RunTime.DEPLOYMENT, False),
+            (RunTime.SIMULATION, True),
+        ]
+    )  # type: ignore
+    def test_start_run_calls_can_execute_with_expected_args(
+        self, expected_runtime: RunTime, simulation: bool
+    ) -> None:
+        """Test StartRun calls can_execute with correct runtime in StartRunContext."""
+        fab_content = b"test FAB content 777"
+        request = StartRunRequest()
+        request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
+        request.fab.content = fab_content
+        request.federation = NOOP_FEDERATION
+
+        sim_cfg = SimulationConfig() if simulation else None
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+            ) as mock_get_fab_config,
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+            ) as mock_get_metadata_from_config,
+            patch.object(
+                self.state.federation_manager,
+                "can_execute",
+                return_value=True,
+            ) as mock_can_execute,
+            patch.object(
+                self.state.federation_manager,
+                "get_simulation_config",
+                return_value=sim_cfg,
+            ),
+        ):
+            mock_get_fab_config.return_value = {
+                "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
+            }
+            mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
+            _ = self.servicer.StartRun(request, Mock())
+
+        mock_can_execute.assert_called_once_with(
+            self.aid,
+            ActionType.START_RUN,
+            StartRunContext(federation_name=NOOP_FEDERATION, runtime=expected_runtime),
+        )
+
     @parameterized.expand([(None,), (1,), (2,), (3,), (9,)])  # type: ignore
     def test_list_runs(self, limit: int | None) -> None:
         """Test List method of ControlServicer with --runs option."""
@@ -346,6 +430,47 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             )
         else:
             assert node_id
+
+    def test_register_node_denied_when_not_entitled(self) -> None:
+        """Test RegisterNode aborts when federation manager denies execution."""
+        req = RegisterNodeRequest(
+            public_key=public_key_to_bytes(generate_key_pairs()[1])
+        )
+        ctx = Mock()
+        ctx.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch.object(self.state, "create_node") as mock_create_node,
+            patch.object(
+                self.state.federation_manager,
+                "can_execute",
+                return_value=False,
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.RegisterNode(req, ctx)
+
+        _assert_abort_with_flwr_err(ctx, ApiErrorCode.NO_PERMISSIONS)
+        mock_create_node.assert_not_called()
+
+    def test_register_node_calls_can_execute_with_expected_args(self) -> None:
+        """Test RegisterNode calls can_execute with register action."""
+        req = RegisterNodeRequest(
+            public_key=public_key_to_bytes(generate_key_pairs()[1])
+        )
+
+        with patch.object(
+            self.state.federation_manager,
+            "can_execute",
+            return_value=True,
+        ) as mock_can_execute:
+            _ = self.servicer.RegisterNode(req, Mock())
+
+        mock_can_execute.assert_called_once_with(
+            self.aid,
+            ActionType.REGISTER_SUPERNODE,
+            RegisterSupernodeContext(),
+        )
 
     @parameterized.expand(
         [
@@ -480,16 +605,35 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             members=mock_members,
             simulation=True,
         )
+        manager_calls = Mock()
 
         # Execute
-        with patch.object(
-            self.state.federation_manager,
-            "create_federation",
-            return_value=mock_federation,
-        ) as mock_create:
+        with (
+            patch.object(
+                self.state.federation_manager,
+                "can_execute",
+                return_value=True,
+            ) as mock_can_execute,
+            patch.object(
+                self.state.federation_manager,
+                "create_federation",
+                return_value=mock_federation,
+            ) as mock_create,
+        ):
+            manager_calls.attach_mock(mock_can_execute, "can_execute")
+            manager_calls.attach_mock(mock_create, "create_federation")
             response = self.servicer.CreateFederation(request, Mock())
 
         # Assert
+        mock_can_execute.assert_called_once_with(
+            self.aid,
+            ActionType.CREATE_FEDERATION,
+            CreateFederationContext(
+                federation_name=expected_name,
+                runtime=RunTime.SIMULATION,
+                visibility="private",
+            ),
+        )
         mock_create.assert_called_once_with(
             name=expected_name,
             description=description,
@@ -519,6 +663,28 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Execute & Assert
         with self.assertRaises(grpc.RpcError):
             self.servicer.CreateFederation(request, mock_context)
+
+    def test_create_federation_denied_when_not_entitled(self) -> None:
+        """Test CreateFederation aborts when federation manager denies execution."""
+        request = CreateFederationRequest(
+            federation_name="test-federation",
+            description="A test federation",
+            simulation=False,
+        )
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch.object(
+                self.state.federation_manager,
+                "can_execute",
+                return_value=False,
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.CreateFederation(request, context)
+
+        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
 
     def test_archive_federation_success(self) -> None:
         """Test ArchiveFederation succeeds when federation_manager.archive_federation
@@ -676,15 +842,42 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             federation_name="test-federation",
         )
         context = Mock()
+        self.state.federation_manager.can_execute.return_value = True
+        self.state.federation_manager.get_simulation_config.return_value = None
 
         response = self.servicer.CreateInvitation(request, context)
 
+        self.state.federation_manager.can_execute.assert_called_once_with(
+            flwr_aid=self.flwr_aid,
+            action=ActionType.CREATE_INVITATION,
+            context=CreateInvitationContext(
+                federation_name="test-federation",
+                invitee_account_name="invitee-aid",
+                runtime=RunTime.DEPLOYMENT,
+            ),
+        )
         self.state.federation_manager.create_invitation.assert_called_once_with(
             flwr_aid=self.flwr_aid,
             federation="test-federation",
             invitee_account_name="invitee-aid",
         )
         self.assertIsInstance(response, CreateInvitationResponse)
+
+    def test_create_invitation_denied_when_not_permitted(self) -> None:
+        """Test CreateInvitation aborts when can_execute returns False."""
+        request = CreateInvitationRequest(
+            invitee_account_name="invitee-aid",
+            federation_name="test-federation",
+        )
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+        self.state.federation_manager.can_execute.return_value = False
+
+        with self.assertRaises(grpc.RpcError):
+            self.servicer.CreateInvitation(request, context)
+
+        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
+        self.state.federation_manager.create_invitation.assert_not_called()
 
     def test_list_invitations_success(self) -> None:
         """Test ListInvitations success path."""
@@ -705,14 +898,37 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         """Test AcceptInvitation success path."""
         request = AcceptInvitationRequest(federation_name="test-federation")
         context = Mock()
+        self.state.federation_manager.can_execute.return_value = True
+        self.state.federation_manager.get_simulation_config.return_value = None
 
         response = self.servicer.AcceptInvitation(request, context)
 
+        self.state.federation_manager.can_execute.assert_called_once_with(
+            flwr_aid=self.flwr_aid,
+            action=ActionType.ACCEPT_INVITATION,
+            context=AcceptInvitationContext(
+                federation_name="test-federation",
+                runtime=RunTime.DEPLOYMENT,
+            ),
+        )
         self.state.federation_manager.accept_invitation.assert_called_once_with(
             flwr_aid=self.flwr_aid,
             federation="test-federation",
         )
         self.assertIsInstance(response, AcceptInvitationResponse)
+
+    def test_accept_invitation_denied_when_not_permitted(self) -> None:
+        """Test AcceptInvitation aborts when can_execute returns False."""
+        request = AcceptInvitationRequest(federation_name="test-federation")
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+        self.state.federation_manager.can_execute.return_value = False
+
+        with self.assertRaises(grpc.RpcError):
+            self.servicer.AcceptInvitation(request, context)
+
+        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
+        self.state.federation_manager.accept_invitation.assert_not_called()
 
     def test_reject_invitation_success(self) -> None:
         """Test RejectInvitation success path."""
