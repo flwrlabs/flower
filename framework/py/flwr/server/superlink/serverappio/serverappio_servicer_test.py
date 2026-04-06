@@ -253,7 +253,10 @@ def _claim_in_parallel(
     def claim_inputs(idx: int, pull_fn: grpc.UnaryUnaryMultiCallable) -> None:
         try:
             barrier.wait(timeout=timeout)
-            response, call = pull_fn.with_call(PullAppInputsRequest(token=token))
+            response, call = pull_fn.with_call(
+                PullAppInputsRequest(token=token),
+                metadata=((APP_TOKEN_HEADER, token),),
+            )
             del response
             results[idx] = call.code()
         except grpc.RpcError as err:
