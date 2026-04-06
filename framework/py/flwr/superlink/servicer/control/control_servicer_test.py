@@ -109,19 +109,6 @@ from .control_servicer import (
     _validate_federation_membership_in_request,
 )
 
-FLWR_AID_MISMATCH_CASES = (
-    # (context_flwr_aid, run_flwr_aid)
-    ("user-123", "user-xyz"),
-    ("user-234", ""),
-    ("", "user-234"),
-    ("user-345", None),
-    (None, "user-456"),
-    (None, None),
-    ("", ""),
-    ("", None),
-    (None, ""),
-)
-
 
 class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     """Test the Control API servicer."""
@@ -1118,37 +1105,39 @@ class TestControlServicerAuth(unittest.TestCase):
             self.assertEqual(cast(Run, run).status.status, Status.FINISHED)
             self.assertEqual(cast(Run, run).status.sub_status, SubStatus.STOPPED)
 
-    # Test all invalid cases for ListRuns with authentication
-    @parameterized.expand(FLWR_AID_MISMATCH_CASES)  # type: ignore
-    def test_listruns_auth_unsuccessful(
-        self, context_flwr_aid: str | None, run_flwr_aid: str | None
-    ) -> None:
-        """Test ListRuns unsuccessful with missing or mismatched flwr_aid."""
-        # Prepare
-        run_id = self._create_dummy_run(run_flwr_aid)
+    def test_listruns_auth_unsuccessful_when_not_federation_member(self) -> None:
+        """Test ListRuns aborts when requester is not a federation member."""
+        run_id = self._create_dummy_run("run-owner")
         request = ListRunsRequest(run_id=run_id)
         ctx = self.make_context()
 
-        # Execute & Assert
-        with patch(
-            "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
-            return_value=SimpleNamespace(flwr_aid=context_flwr_aid),
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                return_value=SimpleNamespace(flwr_aid="user-123"),
+            ),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=False
+            ),
         ):
             with self.assertRaises(RuntimeError) as cm:
                 self.servicer.ListRuns(request, ctx)
-            self.assertIn("PERMISSION_DENIED", str(cm.exception))
+            self.assertIn("FAILED_PRECONDITION", str(cm.exception))
 
     def test_listruns_auth_run_success(self) -> None:
-        """Test ListRuns successful with matching flwr_aid."""
-        # Prepare
-        run_id = self._create_dummy_run("user-123")
+        """Test ListRuns succeeds for a federation member."""
+        run_id = self._create_dummy_run("run-owner")
         request = ListRunsRequest(run_id=run_id)
         ctx = self.make_context()
 
-        # Execute & Assert
-        with patch(
-            "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
-            return_value=SimpleNamespace(flwr_aid="user-123"),
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                return_value=SimpleNamespace(flwr_aid="user-123"),
+            ),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=True
+            ),
         ):
             response = self.servicer.ListRuns(request, ctx)
             self.assertEqual(set(response.run_dict.keys()), {run_id})
