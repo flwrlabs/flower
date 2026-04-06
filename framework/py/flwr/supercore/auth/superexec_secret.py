@@ -75,4 +75,6 @@ def load_superexec_auth_secret(
 
 def generate_superexec_auth_secret(num_bytes: int = 32) -> bytes:
     """Generate a random SuperExec shared secret."""
+    if num_bytes <= 0:
+        raise ValueError("SuperExec auth secret size must be greater than 0")
     return secrets.token_bytes(num_bytes)
