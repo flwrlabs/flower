@@ -41,6 +41,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
 )
+from flwr.supercore.interceptors import AppIoTokenClientInterceptor
 
 from .grpc_grid import GrpcGrid
 
@@ -58,7 +59,7 @@ class TestGrpcGrid(unittest.TestCase):
         self.mock_run.fab_id = "mock/mock"
         self.mock_run.fab_version = "v1.0.0"
         self.mock_run.fab_hash = "9f86d08"
-        self.grid = GrpcGrid()
+        self.grid = GrpcGrid(token="test-token")
         self.grid._grpc_stub = self.mock_stub  # pylint: disable=protected-access
         self.grid._channel = self.mock_channel  # pylint: disable=protected-access
         self.grid.set_run(self.mock_run)
@@ -259,6 +260,35 @@ class TestGrpcGrid(unittest.TestCase):
         """Test `set_run` rejects invalid input types."""
         with self.assertRaises(TypeError):
             self.grid.set_run(61016)  # type: ignore[arg-type]
+
+    @patch("flwr.server.grid.grpc_grid.wrap_stub")
+    @patch("flwr.server.grid.grpc_grid.ServerAppIoStub")
+    @patch("flwr.server.grid.grpc_grid.create_channel")
+    def test_connect_adds_client_interceptor_when_token_is_set(
+        self,
+        mock_create_channel: Mock,
+        _mock_serverappio_stub: Mock,
+        _mock_wrap_stub: Mock,
+    ) -> None:
+        """`_connect` should pass the token client interceptor to create_channel."""
+        mock_create_channel.return_value = Mock()
+        grid = GrpcGrid(token="test-token")
+
+        grid._connect()  # pylint: disable=protected-access
+
+        kwargs = mock_create_channel.call_args.kwargs
+        interceptors = kwargs["interceptors"]
+        self.assertIsNotNone(interceptors)
+        assert interceptors is not None
+        self.assertEqual(len(interceptors), 1)
+        self.assertIsInstance(interceptors[0], AppIoTokenClientInterceptor)
+
+    def test_init_rejects_empty_token(
+        self,
+    ) -> None:
+        """`GrpcGrid` should reject empty token values."""
+        with self.assertRaises(ValueError):
+            GrpcGrid(token="")
 
     def test_simple_retry_mechanism_get_nodes(self) -> None:
         """Test retry mechanism with the get_node_ids method."""

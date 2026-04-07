@@ -23,7 +23,11 @@ from typing import Any, NoReturn, Protocol, cast
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.supercore.auth import SERVERAPPIO_METHOD_AUTH_POLICY, MethodTokenPolicy
+from flwr.supercore.auth import (
+    CLIENTAPPIO_METHOD_AUTH_POLICY,
+    SERVERAPPIO_METHOD_AUTH_POLICY,
+    MethodTokenPolicy,
+)
 
 APP_TOKEN_HEADER = "flwr-app-token"
 AUTHENTICATION_FAILED_MESSAGE = "Authentication failed."
@@ -155,4 +159,14 @@ def create_serverappio_token_auth_server_interceptor(
     return AppIoTokenServerInterceptor(
         state_provider=state_provider,
         method_auth_policy=SERVERAPPIO_METHOD_AUTH_POLICY,
+    )
+
+
+def create_clientappio_token_auth_server_interceptor(
+    state_provider: Callable[[], _TokenState],
+) -> AppIoTokenServerInterceptor:
+    """Create the default token interceptor for ClientAppIo."""
+    return AppIoTokenServerInterceptor(
+        state_provider=state_provider,
+        method_auth_policy=CLIENTAPPIO_METHOD_AUTH_POLICY,
     )

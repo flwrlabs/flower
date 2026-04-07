@@ -15,9 +15,14 @@
 """Shared auth policy definitions."""
 
 
-from .policy import SERVERAPPIO_METHOD_AUTH_POLICY, MethodTokenPolicy
+from .policy import (
+    CLIENTAPPIO_METHOD_AUTH_POLICY,
+    SERVERAPPIO_METHOD_AUTH_POLICY,
+    MethodTokenPolicy,
+)
 
 __all__ = [
+    "CLIENTAPPIO_METHOD_AUTH_POLICY",
     "MethodTokenPolicy",
     "SERVERAPPIO_METHOD_AUTH_POLICY",
 ]

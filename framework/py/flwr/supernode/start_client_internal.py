@@ -66,6 +66,7 @@ from flwr.supercore.inflatable.inflatable_utils import (
     pull_objects,
     push_object_contents_from_iterable,
 )
+from flwr.supercore.interceptors import create_clientappio_token_auth_server_interceptor
 from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric_ed25519 import (
     create_message_to_sign,
@@ -618,6 +619,9 @@ def run_clientappio_api_grpc(
         state_factory=state_factory,
         objectstore_factory=objectstore_factory,
     )
+    auth_interceptor = create_clientappio_token_auth_server_interceptor(
+        state_provider=state_factory.state
+    )
     clientappio_add_servicer_to_server_fn = add_ClientAppIoServicer_to_server
     clientappio_grpc_server = generic_create_grpc_server(
         servicer_and_add_fn=(
@@ -627,6 +631,7 @@ def run_clientappio_api_grpc(
         server_address=address,
         max_message_length=GRPC_MAX_MESSAGE_LENGTH,
         certificates=certificates,
+        interceptors=[auth_interceptor],
     )
     address = clientappio_grpc_server.bound_address
     log(INFO, "Flower Deployment Runtime: Starting ClientAppIo API on %s", address)

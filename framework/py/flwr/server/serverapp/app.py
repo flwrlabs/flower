@@ -178,6 +178,7 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         grid = GrpcGrid(
             serverappio_service_address=serverappio_api_address,
             root_certificates=certificates,
+            token=token,
         )
 
         # Pull ServerAppInputs from LinkState

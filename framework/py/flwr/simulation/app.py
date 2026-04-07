@@ -164,6 +164,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     conn = SimulationIoConnection(
         serverappio_api_address=serverappio_api_address,
         root_certificates=certificates,
+        token=token,
     )
 
     # Initialize variables for finally block
