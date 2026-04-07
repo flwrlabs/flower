@@ -15,6 +15,7 @@
 """Flower FleetServicer tests."""
 
 
+import hashlib
 import unittest
 from unittest.mock import Mock, patch
 
@@ -79,6 +80,17 @@ from flwr.supercore.inflatable.inflatable_object import (
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
+
+
+def create_fab(
+    content: bytes = b"content", verifications: dict[str, str] | None = None
+) -> Fab:
+    """Create a FAB with a valid content hash."""
+    return Fab(
+        hash_str=hashlib.sha256(content).hexdigest(),
+        content=content,
+        verifications=verifications or {"meta": "data"},
+    )
 
 
 class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
@@ -500,9 +512,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         # Prepare
         node_id = self._create_dummy_node()
         fab_content = b"content"
-        fab_hash = self.state.store_fab(
-            Fab(hash_str="ignored", content=fab_content, verifications={"meta": "data"})
-        )
+        fab_hash = self.state.store_fab(create_fab(content=fab_content))
         run_id = self._create_dummy_run(fab_hash=fab_hash)
 
         # Transition status to running. GetFab RPC is only allowed in running status.
@@ -543,9 +553,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         # Prepare
         node_id = self._create_dummy_node()
         fab_content = b"content"
-        fab_hash = self.state.store_fab(
-            Fab(hash_str="ignored", content=fab_content, verifications={"meta": "data"})
-        )
+        fab_hash = self.state.store_fab(create_fab(content=fab_content))
         run_id = self._create_dummy_run(running=False, fab_hash=fab_hash)
 
         self._transition_run_status(run_id, num_transitions)
@@ -558,9 +566,7 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         # Prepare
         node_id = self._create_dummy_node()
         fab_content = b"content"
-        fab_hash = self.state.store_fab(
-            Fab(hash_str="ignored", content=fab_content, verifications={"meta": "data"})
-        )
+        fab_hash = self.state.store_fab(create_fab(content=fab_content))
         run_id = self._create_dummy_run(fab_hash=fab_hash)
 
         # Mock federation manager to exclude the node
@@ -580,9 +586,8 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
     def test_get_fab_permission_denied_if_hash_mismatches_run(self) -> None:
         """Test `GetFab` rejects hashes that do not match the run FAB hash."""
         node_id = self._create_dummy_node()
-        fab_hash = self.state.store_fab(
-            Fab(hash_str="ignored", content=b"content", verifications={"meta": "data"})
-        )
+        fab_content = b"content"
+        fab_hash = self.state.store_fab(create_fab(content=fab_content))
         run_id = self._create_dummy_run(fab_hash=fab_hash)
         wrong_hash = "0" * len(fab_hash)
 
