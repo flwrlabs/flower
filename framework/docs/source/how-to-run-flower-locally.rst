@@ -133,7 +133,7 @@ These files persist across local runs until you remove them yourself.
 
 .. note::
 
-    FABs are now stored in SuperLink state instead of a separate local ``ffs/``
+    Starting with Flower 1.29 FABs are stored in SuperLink state instead of a separate local ``ffs/``
     directory. This is a breaking change: legacy filesystem FAB data is not migrated,
     and older runs that depended on that storage are not recoverable after upgrade
     without manual migration.
