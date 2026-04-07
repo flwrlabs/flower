@@ -15,7 +15,7 @@
 """SQLAlchemy Core Table definitions for CoreState."""
 
 
-from sqlalchemy import Column, Float, Integer, MetaData, String, Table
+from sqlalchemy import Column, Float, Integer, LargeBinary, MetaData, String, Table
 
 
 def create_corestate_metadata() -> MetaData:
@@ -31,6 +31,17 @@ def create_corestate_metadata() -> MetaData:
         Column("run_id", Integer, primary_key=True, nullable=True),
         Column("token", String, unique=True, nullable=False),
         Column("active_until", Float),
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: fab
+    # --------------------------------------------------------------------------
+    Table(
+        "fab",
+        metadata,
+        Column("fab_hash", String, primary_key=True),
+        Column("content", LargeBinary, nullable=False),
+        Column("verifications", String, nullable=False),
     )
 
     return metadata

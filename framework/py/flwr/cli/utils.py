@@ -59,8 +59,10 @@ from flwr.supercore.constant import (
     APP_PUBLISH_EXCLUDE_PATTERNS,
     APP_PUBLISH_INCLUDE_PATTERNS,
     MAX_DIR_DEPTH,
+    MAX_NAME_LENGTH,
 )
 from flwr.supercore.credential_store import get_credential_store
+from flwr.supercore.utils import is_valid_name
 
 from .auth_plugin import CliAuthPlugin, get_cli_plugin_class
 from .cli_account_auth_interceptor import CliAccountAuthInterceptor
@@ -198,34 +200,15 @@ def prompt_options(text: str, options: list[str]) -> str:
     return result
 
 
-def is_valid_project_name(name: str) -> bool:
-    """Check if the given string is a valid Python project name.
-
-    A valid project name must start with a letter and can only contain letters, digits,
-    and hyphens.
-    """
-    if not name:
-        return False
-
-    # Check if the first character is a letter
-    if not name[0].isalpha():
-        return False
-
-    # Check if the rest of the characters are valid (letter, digit, or dash)
-    for char in name[1:]:
-        if not (char.isalnum() or char in "-"):
-            return False
-
-    return True
-
-
 def validate_project_name(name: str, target: str) -> None:
     """Validate a project-related name and raise ValueError if invalid."""
-    if not is_valid_project_name(name):
+    valid, _ = is_valid_name(name)
+    if not valid:
         raise ValueError(
             f'{target} "{name}" is invalid, '
             "a valid app name must start with a letter, "
-            "and can only contain letters, digits, and hyphens."
+            "and can only contain letters, digits, and hyphens. The name"
+            f"must also be no longer than {MAX_NAME_LENGTH} characters."
         )
 
 
@@ -628,3 +611,22 @@ def validate_credentials_content(creds_path: Path) -> str:
         )
 
     return creds[ACCESS_TOKEN_KEY]
+
+
+def validate_federation_name(name: str) -> tuple[bool, str]:
+    """Validate a federation name based on specific security and formatting rules.
+
+    The same validation rules as project names are applied.
+
+    Parameters
+    ----------
+    name : str
+        The federation name to validate.
+
+    Returns
+    -------
+        tuple: (bool, str)
+               - A boolean indicating if the name is valid (True/False).
+               - A string containing a success message or a detailed error message.
+    """
+    return is_valid_name(name)
