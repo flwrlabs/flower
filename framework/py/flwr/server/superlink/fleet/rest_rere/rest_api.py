@@ -222,7 +222,7 @@ async def get_run(request: GetRunRequest) -> GetRunResponse:
 
 @rest_request_response(GetFabRequest)
 async def get_fab(request: GetFabRequest) -> GetFabResponse:
-    """GetRun."""
+    """GetFab. Retrieve a FAB; access/authorization is enforced by the handler."""
     # Get state from app
     state: LinkState = cast(LinkStateFactory, app.state.STATE_FACTORY).state()
     store: ObjectStore = cast(ObjectStoreFactory, app.state.OBJECTSTORE_FACTORY).store()
