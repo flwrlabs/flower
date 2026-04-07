@@ -65,9 +65,8 @@ except ImportError:
 
 def flower_superexec() -> None:
     """Run `flower-superexec` command."""
-    args = _parse_args().parse_args()
-
     warn_if_flwr_update_available(process_name="flower-superexec")
+    args = _parse_args().parse_args()
 
     if not args.insecure:
         flwr_exit(
