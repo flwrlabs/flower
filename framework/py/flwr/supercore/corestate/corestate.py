@@ -17,6 +17,8 @@
 
 from abc import ABC, abstractmethod
 
+from flwr.common.typing import Fab
+
 from ..object_store import ObjectStore
 
 
@@ -27,6 +29,14 @@ class CoreState(ABC):
     @abstractmethod
     def object_store(self) -> ObjectStore:
         """Return the ObjectStore instance used by this CoreState."""
+
+    @abstractmethod
+    def store_fab(self, fab: Fab) -> str:
+        """Store a FAB and return its canonical SHA-256 hash."""
+
+    @abstractmethod
+    def get_fab(self, fab_hash: str) -> Fab | None:
+        """Return the FAB for the given hash, if present."""
 
     @abstractmethod
     def create_token(self, run_id: int) -> str | None:

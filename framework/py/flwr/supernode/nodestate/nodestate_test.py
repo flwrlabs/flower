@@ -15,6 +15,7 @@
 """Tests all NodeState implementations have to conform to."""
 
 
+import hashlib
 from datetime import timedelta
 from typing import Any
 from unittest.mock import patch
@@ -24,14 +25,14 @@ from parameterized import parameterized
 from flwr.common import ConfigRecord, Context, Message, Metadata, RecordDict, now
 from flwr.common.constant import ErrorCode
 from flwr.common.message import make_message
-from flwr.common.typing import Run
+from flwr.common.typing import Fab, Run
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.object_store import ObjectStoreFactory
 
 from . import InMemoryNodeState, NodeState
 
 
-class StateTest(CoreStateTest):
+class StateTest(CoreStateTest):  # pylint: disable=R0904
     """Test all state implementations."""
 
     # This is to True in each child class
@@ -75,6 +76,31 @@ class StateTest(CoreStateTest):
 
         # Assert
         self.assertEqual(retrieved, run)
+
+    def test_store_and_get_fab(self) -> None:
+        """Test storing and retrieving a FAB."""
+        content = b"fab-content"
+        fab = Fab(hashlib.sha256(content).hexdigest(), content, {"meta": "data"})
+
+        fab_hash = self.state.store_fab(fab)
+        retrieved = self.state.get_fab(fab_hash)
+
+        self.assertIsNotNone(retrieved)
+        assert retrieved is not None
+        self.assertEqual(retrieved.hash_str, fab_hash)
+        self.assertEqual(retrieved.content, fab.content)
+        self.assertEqual(retrieved.verifications, fab.verifications)
+
+        # Retrieved FAB should be a defensive copy.
+        retrieved.verifications["meta"] = "mutated"
+        reloaded = self.state.get_fab(fab_hash)
+        self.assertIsNotNone(reloaded)
+        assert reloaded is not None
+        self.assertEqual(reloaded.verifications, {"meta": "data"})
+
+        # Also verify write-time hash validation rejects mismatched hashes.
+        with self.assertRaisesRegex(ValueError, "FAB hash mismatch"):
+            self.state.store_fab(Fab("not-the-content-hash", b"fab-content", {}))
 
     def test_store_and_get_context(self) -> None:
         """Test storing and retrieving a context."""

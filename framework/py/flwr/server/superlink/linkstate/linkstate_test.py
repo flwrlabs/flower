@@ -16,6 +16,7 @@
 # pylint: disable=invalid-name, too-many-lines, R0904, R0913
 
 
+import hashlib
 import multiprocessing
 import os
 import secrets
@@ -44,7 +45,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.common.typing import RunStatus
+from flwr.common.typing import Fab, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
@@ -76,6 +77,54 @@ class StateTest(CoreStateTest):
         """Create a P-384 public key for node creation."""
         _, public_key = generate_key_pairs()
         return public_key_to_bytes(public_key)
+
+    def test_store_and_get_fab(self) -> None:
+        """Test storing and retrieving a FAB."""
+        state = self.state_factory()
+        content = b"fab-content"
+        fab = Fab(hashlib.sha256(content).hexdigest(), content, {"meta": "data"})
+
+        fab_hash = state.store_fab(fab)
+        retrieved = state.get_fab(fab_hash)
+
+        self.assertIsNotNone(retrieved)
+        assert retrieved is not None
+        self.assertEqual(retrieved.hash_str, fab_hash)
+        self.assertEqual(retrieved.content, fab.content)
+        self.assertEqual(retrieved.verifications, fab.verifications)
+
+        # Retrieved FAB should be a defensive copy.
+        retrieved.verifications["meta"] = "mutated"
+        reloaded = state.get_fab(fab_hash)
+        self.assertIsNotNone(reloaded)
+        assert reloaded is not None
+        self.assertEqual(reloaded.verifications, {"meta": "data"})
+
+    def test_store_fab_deduplicates_by_hash(self) -> None:
+        """Test storing the same FAB content reuses the same hash."""
+        state = self.state_factory()
+        content = b"fab-content"
+        hash_str = hashlib.sha256(content).hexdigest()
+
+        fab_hash = state.store_fab(Fab(hash_str, content, {"meta": "data"}))
+        other_hash = state.store_fab(Fab(hash_str, content, {"meta": "next"}))
+        retrieved = state.get_fab(fab_hash)
+
+        self.assertEqual(fab_hash, other_hash)
+        self.assertIsNotNone(retrieved)
+        assert retrieved is not None
+        self.assertEqual(retrieved.verifications, {"meta": "next"})
+
+    def test_get_fab_missing_returns_none(self) -> None:
+        """Test missing FAB retrieval."""
+        state = self.state_factory()
+        self.assertIsNone(state.get_fab("missing-fab-hash"))
+
+    def test_store_fab_rejects_hash_mismatch(self) -> None:
+        """Test storing a FAB fails when provided hash doesn't match content."""
+        state = self.state_factory()
+        with self.assertRaisesRegex(ValueError, "FAB hash mismatch"):
+            state.store_fab(Fab("not-the-content-hash", b"fab-content", {}))
 
     def test_create_and_get_run_info(self) -> None:
         """Test if create_run and get_run_info work correctly."""
