@@ -16,8 +16,10 @@
 
 
 import time
-from logging import WARN
+from logging import INFO, WARN
 from typing import Any
+
+import grpc
 
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
@@ -37,6 +39,23 @@ from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 
 from .plugin import ExecPlugin
+
+
+def _wait_for_appio_api(channel: grpc.Channel, appio_api_address: str) -> None:
+    """Block until the AppIO gRPC channel becomes ready."""
+    ready_future = grpc.channel_ready_future(channel)
+    logged_wait = False
+
+    while True:
+        try:
+            ready_future.result(timeout=1.0)
+            if logged_wait:
+                log(INFO, "Connected to AppIO API on %s", appio_api_address)
+            return
+        except grpc.FutureTimeoutError:
+            if not logged_wait:
+                log(INFO, "Waiting for AppIO API on %s", appio_api_address)
+                logged_wait = True
 
 
 def run_superexec(  # pylint: disable=R0913,R0914,R0917
@@ -93,6 +112,8 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
         grpc_servers=grpc_servers,
         exit_handlers=[lambda: channel.close()],  # pylint: disable=W0108
     )
+
+    _wait_for_appio_api(channel, appio_api_address)
 
     # Create the gRPC stub for the AppIO API
     stub = stub_class(channel)

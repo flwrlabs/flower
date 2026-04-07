@@ -426,7 +426,6 @@ def run_superlink() -> None:
         command += ["--appio-api-address", appio_address]
         command += ["--plugin-type", ExecPluginType.SERVER_APP]
         command += ["--parent-pid", str(os.getpid())]
-        # pylint: disable-next=consider-using-with
         subprocess.Popen(command)
 
     # Launch gRPC health server
