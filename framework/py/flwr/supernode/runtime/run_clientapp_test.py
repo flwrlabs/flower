@@ -30,41 +30,12 @@ class TestRunClientApp(unittest.TestCase):
 
     def test_run_clientapp_adds_token_client_interceptor(self) -> None:
         """`run_clientapp` should add token interceptor to gRPC channel creation."""
-        mock_channel = Mock()
-        mock_stub = Mock()
-        mock_heartbeat_sender = Mock()
-        mock_heartbeat_sender.is_running = False
-
-        with (
-            patch(
-                "flwr.supernode.runtime.run_clientapp.create_channel",
-                return_value=mock_channel,
-            ) as mock_create_channel,
-            patch(
-                "flwr.supernode.runtime.run_clientapp.ClientAppIoStub",
-                return_value=mock_stub,
-            ),
-            patch("flwr.supernode.runtime.run_clientapp.wrap_stub"),
-            patch(
-                "flwr.supernode.runtime.run_clientapp.make_simple_grpc_retry_invoker"
-            ),
-            patch("flwr.supernode.runtime.run_clientapp.register_signal_handlers"),
-            patch("flwr.supernode.runtime.run_clientapp.event"),
-            patch(
-                "flwr.supernode.runtime.run_clientapp.make_app_heartbeat_fn_grpc",
-                return_value=lambda: True,
-            ),
-            patch(
-                "flwr.supernode.runtime.run_clientapp.HeartbeatSender",
-                return_value=mock_heartbeat_sender,
-            ),
-            patch(
-                "flwr.supernode.runtime.run_clientapp.pull_appinputs",
-                side_effect=grpc.RpcError(),
-            ),
-            patch("flwr.supernode.runtime.run_clientapp.flwr_exit"),
-        ):
-            run_clientapp(clientappio_api_address="127.0.0.1:9094", token="test-token")
+        with patch(
+            "flwr.supernode.runtime.run_clientapp.create_channel",
+            side_effect=RuntimeError,
+        ) as mock_create_channel:
+            with self.assertRaises(RuntimeError):
+                run_clientapp("127.0.0.1:9094", token="test-token")
 
         kwargs = mock_create_channel.call_args.kwargs
         interceptors = kwargs["interceptors"]
