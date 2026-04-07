@@ -16,9 +16,7 @@
 
 
 import unittest
-from unittest.mock import Mock, patch
-
-import grpc
+from unittest.mock import patch
 
 from flwr.supercore.interceptors import AppIoTokenClientInterceptor
 
