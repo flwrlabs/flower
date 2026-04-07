@@ -367,8 +367,10 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         """Push ServerApp process outputs."""
         log(DEBUG, "ServerAppIoServicer.PushAppOutputs")
 
-        # Validate the token
+        # Validate token and bind request to the token-owned run.
         run_id = self._verify_token(request.token, context)
+        if request.run_id != run_id:
+            context.abort(grpc.StatusCode.PERMISSION_DENIED, "Invalid token.")
 
         # Init state and store
         state = self.state_factory.state()
@@ -376,17 +378,17 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
 
         # Abort if the run is not running
         abort_if(
-            request.run_id,
+            run_id,
             [Status.PENDING, Status.STARTING, Status.FINISHED],
             state,
             store,
             context,
         )
 
-        state.set_serverapp_context(request.run_id, context_from_proto(request.context))
+        state.set_serverapp_context(run_id, context_from_proto(request.context))
 
-        # Remove the token
-        state.delete_token(run_id)
+        # Keep token until terminal status is committed. If shutdown finalization fails,
+        # heartbeat expiry still needs the token to trigger run finalization fallback.
         return PushAppOutputsResponse()
 
     def UpdateRunStatus(
@@ -403,14 +405,32 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         abort_if(request.run_id, [Status.FINISHED], state, store, context)
 
         # Update the run status
-        state.update_run_status(
+        updated = state.update_run_status(
             run_id=request.run_id, new_status=run_status_from_proto(request.run_status)
         )
+        if not updated:
+            # Keep token unchanged when the transition fails; it can still expire and
+            # trigger heartbeat-based fallback finalization.
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                f"Failed to update status for run {request.run_id}",
+            )
 
-        # If the run is finished, delete the run from ObjectStore
+        # If the run is finished, delete token immediately after status persistence.
+        # This prevents expiry cleanup from flipping a completed run while cleanup I/O
+        # is still in progress.
         if request.run_status.status == Status.FINISHED:
-            # Delete all objects related to the run
-            store.delete_objects_in_run(request.run_id)
+            state.delete_token(request.run_id)
+            try:
+                # Delete all objects related to the run
+                store.delete_objects_in_run(request.run_id)
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                log(
+                    ERROR,
+                    "Failed to delete objects for run %d: %s",
+                    request.run_id,
+                    exc,
+                )
 
         return UpdateRunStatusResponse()
 

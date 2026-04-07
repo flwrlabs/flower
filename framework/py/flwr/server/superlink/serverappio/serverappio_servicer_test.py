@@ -696,7 +696,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             assert list(object_ids_in_response) == [msg_res.object_id]
 
     def test_push_serverapp_outputs_successful_if_running(self) -> None:
-        """Test `PushServerAppOutputs` success."""
+        """Test `PushServerAppOutputs` success and token retention."""
         # Prepare
         run_id = self._create_dummy_run(running=False)
         token = self.state.create_token(run_id)
@@ -724,6 +724,36 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Assert
         assert isinstance(response, PushAppOutputsResponse)
         assert grpc.StatusCode.OK == call.code()
+        assert self.state.get_run_id_by_token(token) == run_id
+
+    def test_push_serverapp_outputs_fails_if_token_run_id_mismatch(self) -> None:
+        """Reject outputs when request.run_id does not match token-bound run."""
+        # Prepare
+        run_id_a = self._create_dummy_run(running=False)
+        run_id_b = self._create_dummy_run(running=False)
+        token = self.state.create_token(run_id_a)
+        assert token is not None
+        self._transition_run_status(run_id_a, 2)
+        self._transition_run_status(run_id_b, 2)
+
+        maker = RecordMaker()
+        context = Context(
+            run_id=run_id_b,
+            node_id=0,
+            node_config=maker.user_config(),
+            state=maker.recorddict(1, 1, 1),
+            run_config=maker.user_config(),
+        )
+        request = PushAppOutputsRequest(
+            token=token, run_id=run_id_b, context=context_to_proto(context)
+        )
+
+        # Execute/Assert
+        with self.assertRaises(grpc.RpcError) as e:
+            self._push_serverapp_outputs.with_call(request=request)
+        assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
+        assert self.state.get_serverapp_context(run_id_a) is None
+        assert self.state.get_serverapp_context(run_id_b) is None
 
     def _assert_push_serverapp_outputs_not_allowed(
         self, token: str, context: Context
@@ -822,6 +852,113 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             self._update_run_status.with_call(request=request)
         assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
         assert e.exception.details() == self.status_to_msg[run_status.status]
+
+    def test_update_run_status_invalid_transition_returns_failed_precondition(
+        self,
+    ) -> None:
+        """Test invalid transition returns FAILED_PRECONDITION and keeps token."""
+        # Prepare
+        run_id = self._create_dummy_run(running=False)
+        token = self.state.create_token(run_id)
+        assert token is not None
+        self._transition_run_status(run_id, 2)  # Move run to RUNNING
+
+        # RUNNING -> STARTING is invalid and should fail.
+        request = UpdateRunStatusRequest(
+            run_id=run_id,
+            run_status=run_status_to_proto(RunStatus(Status.STARTING, "", "")),
+        )
+
+        # Execute/Assert
+        with self.assertRaises(grpc.RpcError) as e:
+            self._update_run_status.with_call(request=request)
+        assert e.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
+        assert self.state.get_run_id_by_token(token) == run_id
+
+    def test_update_run_status_finished_deletes_token(self) -> None:
+        """Test successful terminal transition deletes token."""
+        # Prepare
+        run_id = self._create_dummy_run(running=False)
+        token = self.state.create_token(run_id)
+        assert token is not None
+        self._transition_run_status(run_id, 2)  # Move run to RUNNING
+
+        request = UpdateRunStatusRequest(
+            run_id=run_id,
+            run_status=run_status_to_proto(
+                RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done")
+            ),
+        )
+
+        # Execute
+        response, call = self._update_run_status.with_call(request=request)
+
+        # Assert
+        assert isinstance(response, UpdateRunStatusResponse)
+        assert grpc.StatusCode.OK == call.code()
+        assert self.state.get_run_id_by_token(token) is None
+
+    def test_update_run_status_finished_deletes_token_if_cleanup_fails(self) -> None:
+        """Delete token even if FINISHED object-store cleanup raises."""
+        # Prepare
+        run_id = self._create_dummy_run(running=False)
+        token = self.state.create_token(run_id)
+        assert token is not None
+        self._transition_run_status(run_id, 2)  # Move run to RUNNING
+        request = UpdateRunStatusRequest(
+            run_id=run_id,
+            run_status=run_status_to_proto(
+                RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done")
+            ),
+        )
+
+        # Execute/Assert
+        with patch.object(
+            self.store,
+            "delete_objects_in_run",
+            side_effect=RuntimeError("object cleanup failed"),
+        ):
+            response, call = self._update_run_status.with_call(request=request)
+        assert isinstance(response, UpdateRunStatusResponse)
+        assert grpc.StatusCode.OK == call.code()
+        assert self.state.get_run_id_by_token(token) is None
+        run_status = self.state.get_run_status({run_id})[run_id]
+        assert run_status.status == Status.FINISHED
+        assert run_status.sub_status == SubStatus.COMPLETED
+
+    def test_update_run_status_finished_deletes_token_before_cleanup(self) -> None:
+        """Delete token before starting FINISHED object-store cleanup."""
+        # Prepare
+        run_id = self._create_dummy_run(running=False)
+        token = self.state.create_token(run_id)
+        assert token is not None
+        self._transition_run_status(run_id, 2)  # Move run to RUNNING
+        request = UpdateRunStatusRequest(
+            run_id=run_id,
+            run_status=run_status_to_proto(
+                RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done")
+            ),
+        )
+        cleanup_called = {"value": False}
+
+        def _cleanup_and_assert_token_deleted(run_id_to_delete: int) -> None:
+            assert run_id_to_delete == run_id
+            cleanup_called["value"] = True
+            assert self.state.get_run_id_by_token(token) is None
+
+        # Execute
+        with patch.object(
+            self.store,
+            "delete_objects_in_run",
+            side_effect=_cleanup_and_assert_token_deleted,
+        ):
+            response, call = self._update_run_status.with_call(request=request)
+
+        # Assert
+        assert isinstance(response, UpdateRunStatusResponse)
+        assert grpc.StatusCode.OK == call.code()
+        assert cleanup_called["value"]
+        assert self.state.get_run_id_by_token(token) is None
 
     @parameterized.expand([(True,), (False,)])  # type: ignore
     def test_send_app_heartbeat(self, success: bool) -> None:
