@@ -21,7 +21,6 @@ import os
 import subprocess
 import sys
 import threading
-import traceback
 from collections.abc import Callable, Sequence
 from logging import ERROR, INFO, WARN
 from pathlib import Path
@@ -654,20 +653,16 @@ def _run_fleet_api_rest(
     fast_api_app.state.FFS_FACTORY = ffs_factory
     fast_api_app.state.OBJECTSTORE_FACTORY = objectstore_factory
 
-    try:
-        uvicorn.run(
-            app="flwr.server.superlink.fleet.rest_rere.rest_api:app",
-            port=port,
-            host=host,
-            reload=False,
-            access_log=True,
-            ssl_keyfile=ssl_keyfile,
-            ssl_certfile=ssl_certfile,
-            workers=num_workers,
-        )
-    except Exception:  # pylint: disable=broad-exception-caught
-        log(ERROR, "Fleet API REST thread crashed:\n%s", traceback.format_exc())
-        raise
+    uvicorn.run(
+        app="flwr.server.superlink.fleet.rest_rere.rest_api:app",
+        port=port,
+        host=host,
+        reload=False,
+        access_log=True,
+        ssl_keyfile=ssl_keyfile,
+        ssl_certfile=ssl_certfile,
+        workers=num_workers,
+    )
 
 
 def _parse_args_run_superlink() -> argparse.ArgumentParser:
