@@ -221,13 +221,13 @@ def _to_json(  # pylint: disable=R0913,R0917
         members_list.append({"member_id": member.account.name, "role": member.role})
 
     for node in nodes:
-        nodes_list.append(
-            {
-                "node_id": f"{node.node_id}",
-                "owner": node.owner_name,
-                "status": node.status,
-            }
-        )
+        node_json: dict[str, Any] = {
+            "node_id": f"{node.node_id}",
+            "owner": node.owner_name,
+        }
+        if not archived:
+            node_json["status"] = node.status
+        nodes_list.append(node_json)
 
     for run in runs:
         runs_list.append(
