@@ -21,8 +21,9 @@ import os
 import subprocess
 import sys
 import threading
+import traceback
 from collections.abc import Callable, Sequence
-from logging import INFO, WARN
+from logging import ERROR, INFO, WARN
 from pathlib import Path
 from time import sleep
 from typing import TypeVar, cast
@@ -426,8 +427,10 @@ def run_superlink() -> None:
         command += ["--appio-api-address", appio_address]
         command += ["--plugin-type", ExecPluginType.SERVER_APP]
         command += ["--parent-pid", str(os.getpid())]
+        log(INFO, "Launching SuperExec with AppIO API on %s", appio_address)
         # pylint: disable-next=consider-using-with
-        subprocess.Popen(command)
+        superexec_process = subprocess.Popen(command)
+        log(INFO, "Launched SuperExec subprocess with PID %s", superexec_process.pid)
 
     # Launch gRPC health server
     if health_server_address is not None:
@@ -447,6 +450,11 @@ def run_superlink() -> None:
 
     # Exit if any thread has exited prematurely
     # This code will not be reached if the SuperLink stops gracefully
+    dead_threads = [thread.name for thread in bckg_threads if not thread.is_alive()]
+    if dead_threads:
+        log(
+            ERROR, "SuperLink background thread(s) exited prematurely: %s", dead_threads
+        )
     flwr_exit(ExitCode.SUPERLINK_THREAD_CRASH)
 
 
@@ -646,16 +654,20 @@ def _run_fleet_api_rest(
     fast_api_app.state.FFS_FACTORY = ffs_factory
     fast_api_app.state.OBJECTSTORE_FACTORY = objectstore_factory
 
-    uvicorn.run(
-        app="flwr.server.superlink.fleet.rest_rere.rest_api:app",
-        port=port,
-        host=host,
-        reload=False,
-        access_log=True,
-        ssl_keyfile=ssl_keyfile,
-        ssl_certfile=ssl_certfile,
-        workers=num_workers,
-    )
+    try:
+        uvicorn.run(
+            app="flwr.server.superlink.fleet.rest_rere.rest_api:app",
+            port=port,
+            host=host,
+            reload=False,
+            access_log=True,
+            ssl_keyfile=ssl_keyfile,
+            ssl_certfile=ssl_certfile,
+            workers=num_workers,
+        )
+    except Exception:  # pylint: disable=broad-exception-caught
+        log(ERROR, "Fleet API REST thread crashed:\n%s", traceback.format_exc())
+        raise
 
 
 def _parse_args_run_superlink() -> argparse.ArgumentParser:

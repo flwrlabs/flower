@@ -16,7 +16,8 @@
 
 
 import time
-from logging import INFO, WARN
+import traceback
+from logging import ERROR, INFO, WARN
 from typing import Any
 
 import grpc
@@ -118,6 +119,7 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
     # Create the gRPC stub for the AppIO API
     stub = stub_class(channel)
     wrap_stub(stub, make_simple_grpc_retry_invoker())
+    log(INFO, "SuperExec connected to AppIO API and initialized gRPC stub")
 
     def get_run(run_id: int) -> Run:
         _req = GetRunRequest(run_id=run_id)
@@ -129,6 +131,7 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
         appio_api_address=appio_api_address,
         get_run=get_run,
     )
+    log(INFO, "SuperExec initialized plugin %s", plugin_class.__name__)
 
     # Load plugin configuration from file if provided
     try:
@@ -163,6 +166,13 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
 
             # Sleep for a while before checking again
             time.sleep(1)
+    except Exception:  # pylint: disable=broad-exception-caught
+        log(
+            ERROR,
+            "SuperExec crashed with an unhandled exception:\n%s",
+            traceback.format_exc(),
+        )
+        raise
     finally:
         channel.close()
 

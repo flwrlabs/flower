@@ -19,6 +19,9 @@ import os
 import signal
 import threading
 import time
+from logging import WARN
+
+from flwr.common.logger import log
 
 if os.name == "nt":
     from ctypes import windll  # type: ignore
@@ -53,6 +56,12 @@ def start_parent_process_monitor(
         while True:
             time.sleep(0.2)
             if not _pid_exists(parent_pid):
+                log(
+                    WARN,
+                    "Parent process %s is no longer running, "
+                    "terminating child process.",
+                    parent_pid,
+                )
                 signal.raise_signal(signal.SIGINT)
                 break
 

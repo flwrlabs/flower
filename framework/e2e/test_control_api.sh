@@ -73,8 +73,10 @@ fi
 # Combine the arguments into a single command for flower-superlink
 combined_args="$server_arg $server_auth $simulation_arg"
 
-timeout 2m flower-superlink $combined_args &
-sl_pid=$(pgrep -f "flower-superlink")
+timeout 2m flower-superlink $combined_args \
+  > >(sed -u 's/^/[superlink] /') \
+  2> >(sed -u 's/^/[superlink] /' >&2) &
+sl_pid=$!
 sleep 2
 
 # Trigger migration
@@ -90,14 +92,18 @@ if [ "$3" = "deployment-engine" ]; then
   timeout 2m flower-supernode $client_arg \
       --superlink $server_address $client_auth_1 \
       --clientappio-api-address localhost:9094 \
-      --node-config "partition-id=0 num-partitions=2" --max-retries 0 &
+      --node-config "partition-id=0 num-partitions=2" --max-retries 0 \
+      > >(sed -u 's/^/[supernode-1] /') \
+      2> >(sed -u 's/^/[supernode-1] /' >&2) &
   cl1_pid=$!
   sleep 2
 
   timeout 2m flower-supernode $client_arg \
       --superlink $server_address $client_auth_2 \
       --clientappio-api-address localhost:9095 \
-      --node-config "partition-id=1 num-partitions=2" --max-retries 0 &
+      --node-config "partition-id=1 num-partitions=2" --max-retries 0 \
+      > >(sed -u 's/^/[supernode-2] /') \
+      2> >(sed -u 's/^/[supernode-2] /' >&2) &
   cl2_pid=$!
   sleep 2
 fi
@@ -113,9 +119,11 @@ engine="$3"
 # Define a cleanup function
 cleanup_and_exit() {
     if [ "$engine" = "deployment-engine" ]; then
-      kill $cl1_pid; kill $cl2_pid;
+      kill $cl1_pid || true
+      kill $cl2_pid || true
     fi
-    sleep 1; kill $sl_pid;
+    sleep 1
+    kill $sl_pid || true
     exit $1
 }
 
