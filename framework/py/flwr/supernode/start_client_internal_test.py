@@ -228,7 +228,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         ) as mock_verify_fab:
             res = _pull_and_store_message(
                 state=self.mock_state,
-                ffs=self.mock_ffs,
                 object_store=self.mock_object_store,
                 node_config={},
                 receive=self.mock_receive,
@@ -245,7 +244,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_get_fab.assert_called_once_with(fab.hash_str, self.run_id)
         self.mock_state.store_context.assert_not_called()
         self.mock_state.store_run.assert_not_called()
-        self.mock_ffs.put.assert_not_called()
         self.mock_confirm_message_received.assert_not_called()
 
         self.mock_state.store_message.assert_called_once()
@@ -284,7 +282,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         ) as mock_verify_fab:
             res = _pull_and_store_message(
                 state=self.mock_state,
-                ffs=self.mock_ffs,
                 object_store=self.mock_object_store,
                 node_config={},
                 receive=self.mock_receive,
@@ -301,7 +298,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         )
         self.mock_state.store_context.assert_not_called()
         self.mock_state.store_run.assert_not_called()
-        self.mock_ffs.put.assert_not_called()
         self.mock_confirm_message_received.assert_not_called()
 
         self.mock_state.store_message.assert_called_once()
