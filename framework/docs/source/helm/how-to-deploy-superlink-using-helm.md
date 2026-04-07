@@ -834,7 +834,7 @@ global:
 | `superlink.imagePullSecrets`                                   | SuperLink image pull secrets which overrides global.imagePullSecrets                                                    | `[]`                      |
 | `superlink.image.registry`                                     | SuperLink image registry                                                                                                | `registry.hub.docker.com` |
 | `superlink.image.repository`                                   | SuperLink image repository                                                                                              | `flwr/superlink-ee`       |
-| `superlink.image.tag`                                          | SuperLink image tag                                                                                                     | `1.26.1-ubuntu`           |
+| `superlink.image.tag`                                          | SuperLink image tag                                                                                                     | `1.28.0-ubuntu`           |
 | `superlink.image.digest`                                       | SuperLink image digest                                                                                                  | `""`                      |
 | `superlink.image.pullPolicy`                                   | SuperLink image pullPolicy which Components image pullPolicy                                                            | `IfNotPresent`            |
 | `superlink.networkPolicy.enabled`                              | Specifies whether a NetworkPolicy should be created                                                                     | `true`                    |
@@ -902,7 +902,7 @@ global:
 | `superexec.imagePullSecrets`                            | SuperExec image pull secrets which overrides global.imagePullSecrets                                              | `[]`                      |
 | `superexec.image.registry`                              | SuperExec image registry                                                                                          | `registry.hub.docker.com` |
 | `superexec.image.repository`                            | SuperExec image repository                                                                                        | `flwr/superexec-ee`       |
-| `superexec.image.tag`                                   | Image tag of SuperExec                                                                                            | `1.26.1-ubuntu`           |
+| `superexec.image.tag`                                   | Image tag of SuperExec                                                                                            | `1.28.0-ubuntu`           |
 | `superexec.image.digest`                                | Image digest of SuperExec                                                                                         | `""`                      |
 | `superexec.image.pullPolicy`                            | Components image pullPolicy                                                                                       | `Always`                  |
 | `superexec.networkPolicy.enabled`                       | Specifies whether a NetworkPolicy should be created                                                               | `true`                    |
