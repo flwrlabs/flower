@@ -30,7 +30,7 @@ from flwr.common.serde import (
     message_to_proto,
     run_to_proto,
 )
-from flwr.common.typing import Fab, InvalidRunStatusException, Run
+from flwr.common.typing import InvalidRunStatusException, Run
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,

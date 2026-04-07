@@ -58,7 +58,6 @@ from flwr.proto.message_pb2 import (
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
-
 from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
 from flwr.supernode.nodestate import NodeStateFactory

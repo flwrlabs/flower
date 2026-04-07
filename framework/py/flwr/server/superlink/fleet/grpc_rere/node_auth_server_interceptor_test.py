@@ -15,8 +15,8 @@
 """Flower server interceptor tests."""
 
 
-import hashlib
 import datetime
+import hashlib
 import unittest
 from collections.abc import Callable
 from typing import Any

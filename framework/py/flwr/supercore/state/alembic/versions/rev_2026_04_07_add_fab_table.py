@@ -15,8 +15,8 @@
 """Add fab table.
 
 Revision ID: 33e2f70642b1
-Revises: c8f4f6e2c1ad
-Create Date: 2026-03-21 12:00:00.000000
+Revises: 795243e997d8
+Create Date: 2026-04-07 12:00:00.000000
 """
 
 from collections.abc import Sequence
@@ -28,7 +28,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "33e2f70642b1"
-down_revision: str | Sequence[str] | None = "c8f4f6e2c1ad"
+down_revision: str | Sequence[str] | None = "795243e997d8"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
