@@ -26,7 +26,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
 )
 
-from .start_client_internal import _pull_and_store_message
+from .start_client_internal import FAB_VERIFICATION_ERROR, _pull_and_store_message
 
 
 class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
@@ -207,3 +207,108 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         assert ctxt.node_id == self.node_id
         assert ctxt.node_config == {}
         assert ctxt.run_config == mock_fused_run_config
+
+    def test_pull_and_store_message_rejects_missing_verification_metadata(self) -> None:
+        """Test that trusted-entity verification fails closed without metadata."""
+        # Prepare
+        self._prepare_for_pull_and_store_message()
+        self.mock_state.get_run.return_value = None
+
+        fab = Fab(
+            hash_str="abc123",
+            content=b"test_fab_content",
+            verifications={},
+        )
+        mock_run = Mock(
+            run_id=self.run_id,
+            fab_hash=fab.hash_str,
+            override_config={},
+        )
+        self.mock_get_run.return_value = mock_run
+        self.mock_get_fab.return_value = fab
+
+        with patch(
+            "flwr.supernode.start_client_internal._verify_fab"
+        ) as mock_verify_fab:
+            res = _pull_and_store_message(
+                state=self.mock_state,
+                ffs=self.mock_ffs,
+                object_store=self.mock_object_store,
+                node_config={},
+                receive=self.mock_receive,
+                get_run=self.mock_get_run,
+                get_fab=self.mock_get_fab,
+                pull_object=self.mock_pull_object,
+                confirm_message_received=self.mock_confirm_message_received,
+                trusted_entities={"trusted": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA"},
+            )
+
+        assert res == self.run_id
+        mock_verify_fab.assert_not_called()
+        self.mock_get_run.assert_called_once_with(self.run_id)
+        self.mock_get_fab.assert_called_once_with(fab.hash_str, self.run_id)
+        self.mock_state.store_context.assert_not_called()
+        self.mock_state.store_run.assert_not_called()
+        self.mock_ffs.put.assert_not_called()
+        self.mock_confirm_message_received.assert_not_called()
+
+        self.mock_state.store_message.assert_called_once()
+        stored_message = self.mock_state.store_message.call_args.args[0]
+        assert stored_message.has_error()
+        assert stored_message.error == FAB_VERIFICATION_ERROR
+        assert (
+            stored_message.metadata.reply_to_message_id
+            == self.mock_receive.return_value[0].metadata.message_id
+        )
+
+    def test_pull_and_store_message_rejects_unverified_fab(self) -> None:
+        """Test that trusted-entity verification rejects invalid FAB signatures."""
+        # Prepare
+        self._prepare_for_pull_and_store_message()
+        self.mock_state.get_run.return_value = None
+
+        fab = Fab(
+            hash_str="abc123",
+            content=b"test_fab_content",
+            verifications={
+                "valid_license": "Valid",
+                "trusted": '{"signature": "x", "signed_at": "y"}',
+            },
+        )
+        mock_run = Mock(
+            run_id=self.run_id,
+            fab_hash=fab.hash_str,
+            override_config={},
+        )
+        self.mock_get_run.return_value = mock_run
+        self.mock_get_fab.return_value = fab
+
+        with patch(
+            "flwr.supernode.start_client_internal._verify_fab", return_value=False
+        ) as mock_verify_fab:
+            res = _pull_and_store_message(
+                state=self.mock_state,
+                ffs=self.mock_ffs,
+                object_store=self.mock_object_store,
+                node_config={},
+                receive=self.mock_receive,
+                get_run=self.mock_get_run,
+                get_fab=self.mock_get_fab,
+                pull_object=self.mock_pull_object,
+                confirm_message_received=self.mock_confirm_message_received,
+                trusted_entities={"trusted": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA"},
+            )
+
+        assert res == self.run_id
+        mock_verify_fab.assert_called_once_with(
+            fab, {"trusted": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA"}
+        )
+        self.mock_state.store_context.assert_not_called()
+        self.mock_state.store_run.assert_not_called()
+        self.mock_ffs.put.assert_not_called()
+        self.mock_confirm_message_received.assert_not_called()
+
+        self.mock_state.store_message.assert_called_once()
+        stored_message = self.mock_state.store_message.call_args.args[0]
+        assert stored_message.has_error()
+        assert stored_message.error == FAB_VERIFICATION_ERROR

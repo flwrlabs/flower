@@ -121,7 +121,7 @@ if __name__ == "__main__":
             "Please provide at least one directory path relative "
             "to your current working directory."
         )
-    for i, _ in enumerate(sys.argv):
-        abs_path: str = os.path.abspath(os.path.join(os.getcwd(), sys.argv[i]))
+    for relative_path in sys.argv[1:]:
+        abs_path = os.path.abspath(os.path.join(os.getcwd(), relative_path))
         init_dirs = check_missing_init_files(abs_path)
         check_all_init_files(init_dirs)

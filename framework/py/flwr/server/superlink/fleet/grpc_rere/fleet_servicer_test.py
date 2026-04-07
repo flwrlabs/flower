@@ -66,7 +66,12 @@ from flwr.server.superlink.linkstate.linkstate_test import (
     create_res_message,
 )
 from flwr.server.superlink.utils import _STATUS_TO_MSG
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, NodeStatus
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_DB_NAME,
+    NOOP_FEDERATION,
+    NodeStatus,
+    RunType,
+)
 from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -189,8 +194,9 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
             fab_hash=fab_hash,
             override_config={},
             federation=NOOP_FEDERATION,
-            federation_options=ConfigRecord(),
+            federation_config=None,
             flwr_aid="",
+            run_type=RunType.SERVER_APP,
         )
         if running:
             self._transition_run_status(run_id, 2)

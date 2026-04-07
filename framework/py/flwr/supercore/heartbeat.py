@@ -34,7 +34,6 @@ from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 # pylint: disable=E0611
 from flwr.proto.heartbeat_pb2 import SendAppHeartbeatRequest
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
-from flwr.proto.simulationio_pb2_grpc import SimulationIoStub
 
 # pylint: enable=E0611
 
@@ -120,14 +119,14 @@ class HeartbeatSender:
 
 
 def make_app_heartbeat_fn_grpc(
-    stub: ServerAppIoStub | SimulationIoStub | ClientAppIoStub,
+    stub: ServerAppIoStub | ClientAppIoStub,
     token: str,
 ) -> Callable[[], bool]:
     """Get the function to send a heartbeat to gRPC endpoint from an app process.
 
     Parameters
     ----------
-    stub : Union[ServerAppIoStub, SimulationIoStub]
+    stub : ServerAppIoStub | ClientAppIoStub
         gRPC stub to send the heartbeat.
     token : str
         The token to use in the heartbeat request.

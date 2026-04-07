@@ -29,6 +29,7 @@ def test_rpc_error_translator_mapped_flower_error() -> None:
     """Translate a mapped FlowerError into its configured gRPC contract."""
     context = Mock(spec=grpc.ServicerContext)
     context.abort.side_effect = grpc.RpcError()
+    context.code.return_value = None
 
     with pytest.raises(grpc.RpcError):
         with rpc_error_translator(context, "MockApi.MockRpc"):
@@ -42,13 +43,16 @@ def test_rpc_error_translator_mapped_flower_error() -> None:
 
 
 def test_rpc_error_translator_grpc_error() -> None:
-    """Allow gRPC errors to propagate unmodified."""
+    """Allow `context.abort()` to propagate unmodified."""
     context = Mock(spec=grpc.ServicerContext)
+    context.code.return_value = grpc.StatusCode.UNKNOWN
 
-    with pytest.raises(grpc.RpcError, match="Mock gRPC failure"):
+    with pytest.raises(Exception) as err:  # noqa: B017
         with rpc_error_translator(context, "MockApi.MockRpc"):
-            raise grpc.RpcError("Mock gRPC failure")
+            raise Exception  # Same as `context.abort()`  # pylint: disable=W0719
 
+    assert err.value.__class__ is Exception
+    context.code.assert_called_once()
     context.abort.assert_not_called()
 
 
@@ -56,6 +60,7 @@ def test_rpc_error_translator_unmapped_flower_error() -> None:
     """Translate an unmapped FlowerError into INTERNAL."""
     context = Mock(spec=grpc.ServicerContext)
     context.abort.side_effect = grpc.RpcError()
+    context.code.return_value = None
 
     with pytest.raises(grpc.RpcError):
         with rpc_error_translator(context, "MockApi.MockRpc"):
@@ -71,6 +76,7 @@ def test_rpc_error_translator_unexpected_error() -> None:
     """Translate unexpected errors into INTERNAL."""
     context = Mock(spec=grpc.ServicerContext)
     context.abort.side_effect = grpc.RpcError()
+    context.code.return_value = None
 
     with pytest.raises(grpc.RpcError):
         with rpc_error_translator(context, "MockApi.MockRpc"):

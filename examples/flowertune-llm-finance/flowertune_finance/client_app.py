@@ -38,11 +38,21 @@ app = ClientApp()
 def train(msg: Message, context: Context):
     """Train the model on local data."""
     # Parse config
+    current_round = msg.content["config"]["server-round"]
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
     num_rounds = context.run_config["num-server-rounds"]
     cfg = DictConfig(replace_keys(unflatten_dict(context.run_config)))
     training_arguments = TrainingArguments(**cfg.train.training_arguments)
+
+    if cfg.train.get("dynamic_data_seed", False):
+        base_seed = int(
+            training_arguments.data_seed
+            if training_arguments.data_seed is not None
+            else training_arguments.seed
+        )
+        # Keep the partition fixed but change the sampling order each round.
+        training_arguments.data_seed = base_seed + current_round - 1
 
     # Let's get the client partition
     trainset = load_data(partition_id, num_partitions, cfg.static.dataset.name)
@@ -58,7 +68,7 @@ def train(msg: Message, context: Context):
 
     # Set learning rate for current round
     new_lr = cosine_annealing(
-        msg.content["config"]["server-round"],
+        current_round,
         num_rounds,
         cfg.train.learning_rate_max,
         cfg.train.learning_rate_min,

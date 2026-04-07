@@ -17,7 +17,7 @@
 
 import json
 from datetime import datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 from rich.console import Console
@@ -53,7 +53,7 @@ def ls(  # pylint: disable=R0914, R0913, R0917
         typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,

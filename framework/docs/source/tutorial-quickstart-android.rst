@@ -15,7 +15,8 @@
     This quickstart tutorial is kept for historical purposes and will be updated once
     the new Android SDK is released.
 
-Let's build a federated learning system using TFLite and Flower on Android!
+Let's build a federated learning system using `TFLite
+<https://ai.google.dev/edge/litert/android>`_ and Flower on Android!
 
 Please refer to the `full code example
 <https://github.com/flwrlabs/flower/tree/main/examples/android>`_ to learn more.

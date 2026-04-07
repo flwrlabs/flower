@@ -172,6 +172,6 @@ class FedAdam(FedOpt):
         }
 
         return (
-            ArrayRecord({k: Array(v) for k, v in new_arrays.items()}),
+            ArrayRecord({k: Array(np.asarray(v)) for k, v in new_arrays.items()}),
             aggregated_metrics,
         )

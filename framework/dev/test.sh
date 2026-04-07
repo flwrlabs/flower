@@ -32,7 +32,7 @@ fi
 echo "- black: done"
 
 echo "- init_py_check: start"
-python -m devtool.init_py_check py/flwr py/flwr_tool
+python -m devtool.init_py_check py/flwr
 echo "- init_py_check: done"
 
 echo "- docformatter: start"

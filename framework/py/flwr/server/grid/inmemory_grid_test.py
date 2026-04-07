@@ -22,7 +22,7 @@ from collections.abc import Iterable
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from flwr.common import ConfigRecord, Message, RecordDict, now
+from flwr.common import Message, RecordDict, now
 from flwr.common.constant import (
     HEARTBEAT_INTERVAL_INF,
     NODE_ID_NUM_BYTES,
@@ -38,7 +38,7 @@ from flwr.server.superlink.linkstate import (
 )
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.linkstate.utils import generate_rand_int_from_bytes
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
@@ -217,7 +217,9 @@ class TestInMemoryGrid(unittest.TestCase):
         state = LinkStateFactory(
             "", NoOpFederationManager(), ObjectStoreFactory()
         ).state()
-        run_id = state.create_run("", "", "", {}, NOOP_FEDERATION, ConfigRecord(), "")
+        run_id = state.create_run(
+            "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
+        )
         self.grid = InMemoryGrid(MagicMock(state=lambda: state))
         runs = state.get_run_info(run_ids=[run_id])
         self.assertEqual(len(runs), 1)
@@ -248,7 +250,9 @@ class TestInMemoryGrid(unittest.TestCase):
             FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), ObjectStoreFactory()
         )
         state = state_factory.state()
-        run_id = state.create_run("", "", "", {}, NOOP_FEDERATION, ConfigRecord(), "")
+        run_id = state.create_run(
+            "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
+        )
         self.grid = InMemoryGrid(state_factory)
         runs = state.get_run_info(run_ids=[run_id])
         self.assertEqual(len(runs), 1)

@@ -37,6 +37,7 @@ from flwr.proto.recorddict_pb2 import ConfigRecord as ProtoConfigRecord
 from flwr.proto.recorddict_pb2 import MetricRecord as ProtoMetricRecord
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.run_pb2 import Run as ProtoRun
+from flwr.supercore.constant import RunType
 from flwr.supercore.date import now
 
 from ..app.error import Error
@@ -488,6 +489,7 @@ def test_run_serialization_deserialization() -> None:
         bytes_sent=2048,
         bytes_recv=1024,
         clientapp_runtime=3.14,
+        run_type=RunType.SIMULATION,
     )
 
     # Execute

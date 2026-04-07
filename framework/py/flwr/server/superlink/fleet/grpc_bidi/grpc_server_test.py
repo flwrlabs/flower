@@ -15,10 +15,7 @@
 """Tests for module server."""
 
 
-import socket
-from contextlib import closing
 from datetime import datetime, timedelta, timezone
-from typing import cast
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -58,14 +55,6 @@ def _generate_test_certificates() -> tuple[bytes, bytes, bytes]:
     )
 
 
-def unused_tcp_port() -> int:
-    """Return an unused port."""
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-        sock.bind(("", 0))
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        return cast(int, sock.getsockname()[1])
-
-
 def test_valid_certificates_when_correct() -> None:
     """Test is validation function works correctly when passed valid list."""
     # Prepare
@@ -93,13 +82,10 @@ def test_valid_certificates_when_wrong() -> None:
 def test_integration_start_and_shutdown_insecure_server() -> None:
     """Create server and check if FlowerServiceServicer is returned."""
     # Prepare
-    port = unused_tcp_port()
     client_manager = SimpleClientManager()
 
     # Execute
-    server = start_grpc_server(
-        client_manager=client_manager, server_address=f"[::]:{port}"
-    )
+    server = start_grpc_server(client_manager=client_manager, server_address="[::]:0")
 
     # Teardown
     server.stop(1)
@@ -108,7 +94,6 @@ def test_integration_start_and_shutdown_insecure_server() -> None:
 def test_integration_start_and_shutdown_secure_server() -> None:
     """Create server and check if FlowerServiceServicer is returned."""
     # Prepare
-    port = unused_tcp_port()
     client_manager = SimpleClientManager()
 
     certificates = _generate_test_certificates()
@@ -116,7 +101,7 @@ def test_integration_start_and_shutdown_secure_server() -> None:
     # Execute
     server = start_grpc_server(
         client_manager=client_manager,
-        server_address=f"[::]:{port}",
+        server_address="[::]:0",
         certificates=certificates,
     )
 

@@ -15,30 +15,40 @@
 """Tests for the CLI."""
 
 
+from typing import Any
+from unittest.mock import patch
+
+import pytest
 from typer.testing import CliRunner
 
 from flwr.supercore.version import package_version
 
+from . import app as app_module
 from .app import app
 
 runner = CliRunner()
 
 
+def _invoke_flwr(args: list[str]) -> Any:
+    with patch("flwr.cli.app.warn_if_flwr_update_available"):
+        return runner.invoke(app, args)
+
+
 def test_version_args() -> None:
     """Test the --version flag."""
-    result = runner.invoke(app, ["--version"])
+    result = _invoke_flwr(["--version"])
     assert result.exit_code == 0
     assert f"Flower version: {package_version}\n" in result.output
 
     # Test the -V flag
-    result = runner.invoke(app, ["-V"])
+    result = _invoke_flwr(["-V"])
     assert result.exit_code == 0
     assert f"Flower version: {package_version}\n" in result.output
 
 
 def test_help_command() -> None:
     """Test the -h flag."""
-    result = runner.invoke(app, ["-h"])
+    result = _invoke_flwr(["-h"])
     assert result.exit_code == 0
     assert "Usage:" in result.output
     assert "Options " in result.output
@@ -47,7 +57,7 @@ def test_help_command() -> None:
 
 def test_new_command() -> None:
     """Add appropriate assertions for the new command."""
-    result = runner.invoke(app, ["new", "--help"])
+    result = _invoke_flwr(["new", "--help"])
     assert result.exit_code == 0
     assert "Usage:" in result.output
     assert "new" in result.output
@@ -55,7 +65,7 @@ def test_new_command() -> None:
 
 def test_run_command() -> None:
     """Add appropriate assertions for the run command."""
-    result = runner.invoke(app, ["run", "--help"])
+    result = _invoke_flwr(["run", "--help"])
     assert result.exit_code == 0
     assert "Usage:" in result.output
     assert "run" in result.output
@@ -63,7 +73,7 @@ def test_run_command() -> None:
 
 def test_build_command() -> None:
     """Add appropriate assertions for the build command."""
-    result = runner.invoke(app, ["build", "--help"])
+    result = _invoke_flwr(["build", "--help"])
     assert result.exit_code == 0
     assert "Usage:" in result.output
     assert "build" in result.output
@@ -71,7 +81,7 @@ def test_build_command() -> None:
 
 def test_install_command() -> None:
     """Add appropriate assertions for the install command."""
-    result = runner.invoke(app, ["install", "--help"])
+    result = _invoke_flwr(["install", "--help"])
     assert result.exit_code == 0
     assert "Usage:" in result.output
     assert "install" in result.output
@@ -79,7 +89,7 @@ def test_install_command() -> None:
 
 def test_log_command() -> None:
     """Add appropriate assertions for the log command."""
-    result = runner.invoke(app, ["log", "--help"])
+    result = _invoke_flwr(["log", "--help"])
     assert result.exit_code == 0
     assert "Usage:" in result.output
     assert "log" in result.output
@@ -87,7 +97,7 @@ def test_log_command() -> None:
 
 def test_ls_command() -> None:
     """Add appropriate assertions for the ls command."""
-    result = runner.invoke(app, ["ls", "--help"])
+    result = _invoke_flwr(["ls", "--help"])
     assert result.exit_code == 0
     assert "Usage:" in result.output
     assert "ls" in result.output
@@ -95,7 +105,7 @@ def test_ls_command() -> None:
 
 def test_stop_command() -> None:
     """Add appropriate assertions for the stop command."""
-    result = runner.invoke(app, ["stop", "--help"])
+    result = _invoke_flwr(["stop", "--help"])
     assert result.exit_code == 0
     assert "Usage:" in result.output
     assert "stop" in result.output
@@ -103,15 +113,82 @@ def test_stop_command() -> None:
 
 def test_login_command() -> None:
     """Add appropriate assertions for the login command."""
-    result = runner.invoke(app, ["login", "--help"])
+    result = _invoke_flwr(["login", "--help"])
     assert result.exit_code == 0
     assert "Usage:" in result.output
     assert "login" in result.output
 
 
+def test_flwr_callback_checks_for_update(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The top-level flwr callback should perform the startup update check."""
+
+    class _SentinelError(Exception):
+        pass
+
+    captured: dict[str, str] = {}
+
+    def _raise_sentinel(process_name: str | None = None) -> None:
+        if process_name is not None:
+            captured["process_name"] = process_name
+        raise _SentinelError()
+
+    monkeypatch.setattr(app_module, "warn_if_flwr_update_available", _raise_sentinel)
+
+    with pytest.raises(_SentinelError):
+        app_module.main(version=False)
+
+    assert captured == {"process_name": "flwr"}
+
+
+@pytest.mark.parametrize(
+    "argv", [["flwr", "ls", "--format", "json"], ["flwr", "ls", "--format=json"]]
+)
+def test_flwr_callback_skips_update_check_for_json_format(
+    monkeypatch: pytest.MonkeyPatch, argv: list[str]
+) -> None:
+    """The top-level flwr callback should skip update checks for JSON output."""
+    monkeypatch.setattr("flwr.cli.app.sys.argv", argv)
+    called = False
+
+    def _warn(*_args: Any, **_kwargs: Any) -> None:
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(app_module, "warn_if_flwr_update_available", _warn)
+
+    app_module.main(version=False)
+
+    assert called is False
+
+
+@pytest.mark.parametrize(
+    ("argv", "should_call"),
+    [
+        (["flwr", "ls", "--format", "default", "--format", "json"], False),
+        (["flwr", "ls", "--format", "json", "--format", "default"], True),
+    ],
+)
+def test_flwr_callback_uses_last_format_value(
+    monkeypatch: pytest.MonkeyPatch, argv: list[str], should_call: bool
+) -> None:
+    """The last provided --format value should decide update-check suppression."""
+    monkeypatch.setattr("flwr.cli.app.sys.argv", argv)
+    called = False
+
+    def _warn(*_args: Any, **_kwargs: Any) -> None:
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(app_module, "warn_if_flwr_update_available", _warn)
+
+    app_module.main(version=False)
+
+    assert called is should_call
+
+
 def test_invalid_command() -> None:
     """Test CLI behavior with invalid commands and arguments."""
     # Test unknown command
-    result = runner.invoke(app, ["nonexistent-command"])
+    result = _invoke_flwr(["nonexistent-command"])
     assert result.exit_code != 0
     assert "No such command" in result.output

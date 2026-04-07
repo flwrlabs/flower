@@ -16,7 +16,7 @@
 
 
 import json
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 from rich.console import Console
@@ -70,10 +70,11 @@ def ls(  # pylint: disable=too-many-locals, too-many-branches, R0913, R0917
         typer.Option(
             "--limit",
             help="Maximum number of runs to display",
+            min=1,
         ),
     ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,
@@ -105,9 +106,7 @@ def ls(  # pylint: disable=too-many-locals, too-many-branches, R0913, R0917
         superlink_connection = read_superlink_connection(superlink)
         channel = None
 
-        # Check `--limit` is positive and not used together with `--run-id`
-        if limit is not None and limit <= 0:
-            raise ValueError("The option '--limit' must be an integer greater than 0.")
+        # Check `--limit` is not used together with `--run-id`
         if limit is not None and run_id is not None:
             raise ValueError(
                 "The options '--run-id' and '--limit' cannot be used together."
@@ -299,7 +298,7 @@ def _to_json(run_list: list[RunRow]) -> str:
                 "fab-id": row.fab_id,
                 "fab-name": row.fab_id.split("/")[-1],
                 "fab-version": row.fab_version,
-                "fab-hash": row.fab_hash[:8],
+                "fab-hash": row.fab_hash,
                 "status": row.status_text,
                 "elapsed": row.elapsed,
                 "pending-at": row.pending_at,

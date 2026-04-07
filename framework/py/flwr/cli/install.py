@@ -204,7 +204,7 @@ def validate_and_install(
             shutil.copy2(item, install_path / item.name)
 
     typer.secho(
-        f"🎊 Successfully installed {project_name} to {install_path}.",
+        f"Successfully installed {project_name} to {install_path}.",
         fg=typer.colors.GREEN,
         bold=True,
     )

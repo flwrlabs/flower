@@ -17,32 +17,29 @@
 
 import hashlib
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import click
 import typer
 
 from flwr.cli.build import build_fab_from_disk, get_fab_filename
-from flwr.cli.config_migration import migrate, warn_if_federation_config_overrides
+from flwr.cli.config_migration import migrate
 from flwr.cli.config_utils import load_and_validate
 from flwr.cli.constant import FEDERATION_CONFIG_HELP_MESSAGE, RUN_CONFIG_HELP_MESSAGE
-from flwr.cli.flower_config import (
-    _serialize_simulation_options,
-    read_superlink_connection,
-)
+from flwr.cli.flower_config import read_superlink_connection
 from flwr.cli.typing import SuperLinkConnection
-from flwr.common.config import (
-    flatten_dict,
-    get_metadata_from_config,
-    parse_config_args,
-    user_config_to_configrecord,
-)
+from flwr.common.config import get_metadata_from_config, parse_config_args
 from flwr.common.constant import FAB_CONFIG_FILE, CliOutputFormat
-from flwr.common.serde import config_record_to_proto, fab_to_proto, user_config_to_proto
+from flwr.common.serde import fab_to_proto, user_config_to_proto
 from flwr.common.typing import Fab
 from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
-from flwr.supercore.utils import check_federation_format, parse_app_spec
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.supercore.utils import (
+    check_federation_format,
+    parse_app_spec,
+    simulation_config_from_json,
+)
 
 from ..log import start_stream
 from ..utils import (
@@ -86,7 +83,6 @@ def run(
         typer.Option(
             "--federation-config",
             help=FEDERATION_CONFIG_HELP_MESSAGE,
-            hidden=True,
         ),
     ] = None,
     stream: Annotated[
@@ -98,7 +94,7 @@ def run(
         ),
     ] = False,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,
@@ -108,9 +104,6 @@ def run(
 ) -> None:
     """Run Flower App."""
     with cli_output_handler(output_format=output_format) as is_json:
-        # Warn `--federation-config` is ignored
-        warn_if_federation_config_overrides(federation_config_overrides)
-
         # Migrate legacy usage if any
         migrate(str(app), [], ignore_legacy_usage=True)
 
@@ -147,19 +140,21 @@ def run(
             federation,
             superlink_connection,
             run_config_overrides,
+            federation_config_overrides,
             stream,
             is_json,
             app_spec,
         )
 
 
-# pylint: disable-next=R0913, R0914, R0917
+# pylint: disable-next=R0912, R0913, R0914, R0917
 def _run_with_control_api(
     app: Path,
     config: dict[str, Any],
     federation: str | None,
     superlink_connection: SuperLinkConnection,
     config_overrides: list[str] | None,
+    federation_config_overrides: list[str] | None,
     stream: bool,
     is_json: bool,
     app_spec: str | None,
@@ -189,20 +184,13 @@ def _run_with_control_api(
             fab_id = fab_version = fab_hash = ""
             fab = Fab(fab_hash, b"", {})
 
-        # Construct a `ConfigRecord` out of a flattened `UserConfig`
-        options = {}
-        if superlink_connection.options:
-            options = flatten_dict(
-                _serialize_simulation_options(superlink_connection.options)
-            )
-
-        c_record = user_config_to_configrecord(options)
-
         req = StartRunRequest(
             fab=fab_to_proto(fab),
             override_config=user_config_to_proto(parse_config_args(config_overrides)),
             federation=federation,
-            federation_options=config_record_to_proto(c_record),
+            override_federation_config=_parse_federation_config_overrides(
+                federation_config_overrides, superlink_connection
+            ),
             app_spec=app_spec or "",
         )
         with flwr_cli_grpc_exc_handler():
@@ -238,3 +226,53 @@ def _run_with_control_api(
     finally:
         if channel:
             channel.close()
+
+
+def _parse_federation_config_overrides(
+    federation_config_overrides: list[str] | None,
+    superlink_connection: SuperLinkConnection,
+) -> SimulationConfig | None:
+    override_federation_config = _parse_deprecated_options(superlink_connection)
+    if federation_config_overrides:
+        if override_federation_config:
+            typer.secho(
+                "⚠️ Warning: `--federation-config` was provided, so deprecated "
+                "`options.` entries from the SuperLink connection in your Flower "
+                "configuration will be ignored.",
+                fg=typer.colors.YELLOW,
+            )
+
+        # Convert CLI overrides to `SimulationConfig`
+        # The `-` in CLI keys shall be replaced with `_` to match proto field names
+        tmp_dict = parse_config_args(federation_config_overrides)
+        tmp_dict = {k.replace("-", "_"): v for k, v in tmp_dict.items()}
+        override_federation_config = simulation_config_from_json(tmp_dict)
+
+    return override_federation_config
+
+
+def _parse_deprecated_options(conn: SuperLinkConnection) -> SimulationConfig | None:
+    if not (opt := conn.options):
+        return None
+    typer.secho(
+        "⚠️ Warning: `options.` fields in the SuperLink connection configuration are "
+        "deprecated. Use `--federation-config` with `flwr run` instead. "
+        "Alternatively, permanently set your simulation configuration via "
+        "`flwr federation simulation-config`.",
+        fg=typer.colors.YELLOW,
+    )
+    kwargs: dict[str, Any] = {
+        "num_supernodes": opt.num_supernodes,
+        "verbose": opt.verbose,
+    }
+    if opt.backend:
+        kwargs["backend"] = opt.backend.name
+        if opt.backend.client_resources:
+            kwargs["client_resources_num_cpus"] = opt.backend.client_resources.num_cpus
+            kwargs["client_resources_num_gpus"] = opt.backend.client_resources.num_gpus
+        if opt.backend.init_args:
+            kwargs["init_args_num_cpus"] = opt.backend.init_args.num_cpus
+            kwargs["init_args_num_gpus"] = opt.backend.init_args.num_gpus
+            kwargs["init_args_logging_level"] = opt.backend.init_args.logging_level
+            kwargs["init_args_log_to_driver"] = opt.backend.init_args.log_to_driver
+    return SimulationConfig(**kwargs)

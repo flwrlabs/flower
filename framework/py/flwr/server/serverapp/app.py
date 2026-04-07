@@ -22,6 +22,7 @@ from queue import Queue
 
 import grpc
 
+from flwr.app import RecordDict
 from flwr.app.exception import AppExitException
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
@@ -189,6 +190,7 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         grid = GrpcGrid(
             serverappio_service_address=serverappio_api_address,
             root_certificates=certificates,
+            token=token,
         )
 
         # Pull ServerAppInputs from LinkState
@@ -283,6 +285,8 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         )
 
         # Send resulting context
+        # Temporarily disable pushing resulting context to servicer
+        updated_context.state = RecordDict()
         context_proto = context_to_proto(updated_context)
         log(DEBUG, "[flwr-serverapp] Will push ServerAppOutputs")
         out_req = PushAppOutputsRequest(

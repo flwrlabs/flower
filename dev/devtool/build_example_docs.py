@@ -20,6 +20,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+CategoryContent = dict[str, str]
+
 ROOT = Path(__file__).resolve().parents[2]
 INDEX = ROOT / "examples" / "docs" / "source" / "index.rst"
 
@@ -55,13 +57,13 @@ TABLE_HEADERS = (
     ":header-rows: 1\n\n   * - Title\n     - Framework\n     - Dataset\n     - Tags\n\n"
 )
 
-CATEGORIES = {
+CATEGORIES: dict[str, CategoryContent] = {
     "quickstart": {"table": TABLE_HEADERS, "list": ""},
     "advanced": {"table": TABLE_HEADERS, "list": ""},
     "other": {"table": TABLE_HEADERS, "list": ""},
 }
 
-URLS = {
+URLS: dict[str, str] = {
     # Frameworks
     "Android": "https://www.android.com/",
     "catboost": "https://catboost.ai/docs/en/",
@@ -110,7 +112,7 @@ URLS = {
 }
 
 
-def _convert_to_link(search_result):
+def _convert_to_link(search_result: str) -> str:
     if "," in search_result:
         result = ""
         for part in search_result.split(","):
@@ -124,7 +126,7 @@ def _convert_to_link(search_result):
     return search_result
 
 
-def _read_metadata(example):
+def _read_metadata(example: str) -> tuple[str, str, str, str]:
     with open(os.path.join(example, "README.md"), encoding="utf-8") as f:
         content = f.read()
 
@@ -162,7 +164,7 @@ def _read_metadata(example):
     return title, tags, dataset, framework
 
 
-def _add_table_entry(example, tag, table_var):
+def _add_table_entry(example: str, tag: str, table_var: str) -> bool:
     title, tags, dataset, framework = _read_metadata(example)
     example_name = Path(example).stem
     table_entry = (
@@ -176,7 +178,7 @@ def _add_table_entry(example, tag, table_var):
     return False
 
 
-def _copy_markdown_files(example):
+def _copy_markdown_files(example: str) -> None:
     for file in os.listdir(example):
         if file.endswith(".md"):
             src = os.path.join(example, file)
@@ -190,7 +192,7 @@ def _copy_markdown_files(example):
             shutil.copyfile(src, dest)
 
 
-def _add_gh_button(example):
+def _add_gh_button(example: str) -> None:
     gh_text = (
         '[<img src="_static/view-gh.png" alt="View on GitHub" width="200"/>]'
         f"(https://github.com/flwrlabs/flower/blob/main/examples/{example})"
@@ -207,7 +209,7 @@ def _add_gh_button(example):
             f.truncate()
 
 
-def _copy_images(example):
+def _copy_images(example: str) -> None:
     static_dir = os.path.join(example, "_static")
     dest_dir = os.path.join(str(ROOT), "examples", "docs", "source", "_static")
     if os.path.isdir(static_dir):
@@ -218,7 +220,7 @@ def _copy_images(example):
                 )
 
 
-def _add_all_entries():
+def _add_all_entries() -> None:
     examples_dir = os.path.join(ROOT, "examples")
     for example in sorted(os.listdir(examples_dir)):
         example_path = os.path.join(examples_dir, example)
@@ -228,7 +230,7 @@ def _add_all_entries():
             _copy_images(example)
 
 
-def _main():
+def _main() -> None:
     if INDEX.exists():
         INDEX.unlink()
 

@@ -23,7 +23,7 @@ import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from functools import partial
-from logging import ERROR, INFO, WARN
+from logging import ERROR, INFO
 from typing import cast
 
 import grpc
@@ -68,6 +68,7 @@ from flwr.supercore.inflatable.inflatable_utils import (
     pull_objects,
     push_object_contents_from_iterable,
 )
+from flwr.supercore.interceptors import create_clientappio_token_auth_server_interceptor
 from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric_ed25519 import (
     create_message_to_sign,
@@ -354,23 +355,27 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
             if trusted_entities:
                 if not fab.verifications.get("valid_license", ""):
                     log(
-                        WARN,
-                        "App verification is not supported by the connected SuperLink.",
+                        ERROR,
+                        "The FAB could not be verified. App verification is "
+                        "not supported by the connected SuperLink.",
                     )
-                else:
-                    fab_verified = _verify_fab(fab, trusted_entities)
-                    if not fab_verified:
-                        # Insert an error message in the state
-                        # when FAB verification fails
-                        log(
-                            ERROR,
-                            "FAB verification failed: the provided trusted entities "
-                            "could not verify the FAB. An error reply "
-                            "has been generated.",
-                        )
-                        reply = Message(FAB_VERIFICATION_ERROR, reply_to=message)
-                        _insert_message(reply, state, object_store)
-                        return run_id
+                    reply = Message(FAB_VERIFICATION_ERROR, reply_to=message)
+                    _insert_message(reply, state, object_store)
+                    return run_id
+
+                fab_verified = _verify_fab(fab, trusted_entities)
+                if not fab_verified:
+                    # Insert an error message in the state
+                    # when FAB verification fails
+                    log(
+                        ERROR,
+                        "FAB verification failed: the provided trusted entities "
+                        "could not verify the FAB. An error reply "
+                        "has been generated.",
+                    )
+                    reply = Message(FAB_VERIFICATION_ERROR, reply_to=message)
+                    _insert_message(reply, state, object_store)
+                    return run_id
 
             # Initialize the context
             run_cfg = get_fused_config_from_fab(fab.content, run_info)
@@ -634,6 +639,9 @@ def run_clientappio_api_grpc(
         ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
     )
+    auth_interceptor = create_clientappio_token_auth_server_interceptor(
+        state_provider=state_factory.state
+    )
     clientappio_add_servicer_to_server_fn = add_ClientAppIoServicer_to_server
     clientappio_grpc_server = generic_create_grpc_server(
         servicer_and_add_fn=(
@@ -643,7 +651,9 @@ def run_clientappio_api_grpc(
         server_address=address,
         max_message_length=GRPC_MAX_MESSAGE_LENGTH,
         certificates=certificates,
+        interceptors=[auth_interceptor],
     )
+    address = clientappio_grpc_server.bound_address
     log(INFO, "Flower Deployment Runtime: Starting ClientAppIo API on %s", address)
     clientappio_grpc_server.start()
     return clientappio_grpc_server

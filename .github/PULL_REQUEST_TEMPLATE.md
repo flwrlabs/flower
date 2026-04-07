@@ -38,6 +38,7 @@ Example: The variable `rnd` was renamed to `server_round` to improve readability
 - [ ] Implement proposed change
 - [ ] Write tests
 - [ ] Update [documentation](https://flower.ai/docs/writing-documentation.html)
+- [ ] Address LLM-reviewer comments, if applicable (e.g., GitHub Copilot)
 - [ ] Make CI checks pass
 - [ ] Ping maintainers on [Slack](https://flower.ai/join-slack/) (channel `#contributions`)
 

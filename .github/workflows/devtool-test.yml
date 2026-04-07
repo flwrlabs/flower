@@ -55,7 +55,7 @@ jobs:
         run: |
           cd dev
           uv sync --frozen
-      - name: Lint devtool
+      - name: Lint and test devtool
         run: |
           cd dev
           uv run ./test-devtool.sh

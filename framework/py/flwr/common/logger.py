@@ -36,7 +36,6 @@ from rich.console import Console
 from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
-from flwr.proto.simulationio_pb2_grpc import SimulationIoStub  # pylint: disable=E0611
 
 from .constant import LOG_UPLOAD_INTERVAL
 
@@ -427,7 +426,7 @@ def start_log_uploader(
     log_queue: Queue[str | None],
     node_id: int,
     run_id: int,
-    stub: ServerAppIoStub | SimulationIoStub,
+    stub: ServerAppIoStub,
 ) -> threading.Thread:
     """Start the log uploader thread and return it."""
     thread = threading.Thread(

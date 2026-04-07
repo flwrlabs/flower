@@ -20,6 +20,7 @@ limitations under the License.
 import builtins
 import collections.abc
 import flwr.proto.fab_pb2
+import flwr.proto.federation_config_pb2
 import flwr.proto.message_pb2
 import flwr.proto.run_pb2
 import google.protobuf.descriptor
@@ -210,21 +211,25 @@ class PullAppInputsResponse(google.protobuf.message.Message):
     CONTEXT_FIELD_NUMBER: builtins.int
     RUN_FIELD_NUMBER: builtins.int
     FAB_FIELD_NUMBER: builtins.int
+    FEDERATION_CONFIG_FIELD_NUMBER: builtins.int
     @property
     def context(self) -> flwr.proto.message_pb2.Context: ...
     @property
     def run(self) -> flwr.proto.run_pb2.Run: ...
     @property
     def fab(self) -> flwr.proto.fab_pb2.Fab: ...
+    @property
+    def federation_config(self) -> flwr.proto.federation_config_pb2.SimulationConfig: ...
     def __init__(
         self,
         *,
         context: flwr.proto.message_pb2.Context | None = ...,
         run: flwr.proto.run_pb2.Run | None = ...,
         fab: flwr.proto.fab_pb2.Fab | None = ...,
+        federation_config: flwr.proto.federation_config_pb2.SimulationConfig | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "run", b"run"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "run", b"run"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run"]) -> None: ...
 
 global___PullAppInputsResponse = PullAppInputsResponse
 

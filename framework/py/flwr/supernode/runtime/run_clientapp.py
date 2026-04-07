@@ -71,6 +71,7 @@ from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
+from flwr.supercore.interceptors import AppIoTokenClientInterceptor
 from flwr.supercore.utils import mask_string
 
 
@@ -92,6 +93,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
         server_address=clientappio_api_address,
         insecure=(certificates is None),
         root_certificates=certificates,
+        interceptors=[AppIoTokenClientInterceptor(token)],
     )
     channel.subscribe(on_channel_state_change)
     heartbeat_sender = None

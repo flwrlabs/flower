@@ -21,8 +21,8 @@ from typing import Literal
 
 from flwr.app.user_config import UserConfig
 from flwr.common import Context, Message
-from flwr.common.record import ConfigRecord
 from flwr.common.typing import Run, RunStatus
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.superlink.federation import FederationManager
@@ -255,28 +255,30 @@ class LinkState(CoreState):  # pylint: disable=R0904
         fab_hash: str | None,
         override_config: UserConfig,
         federation: str,
-        federation_options: ConfigRecord,
+        federation_config: SimulationConfig | None,
         flwr_aid: str | None,
+        run_type: str,
     ) -> int:
         """Create a new run.
 
         Parameters
         ----------
-        fab_id : Optional[str]
+        fab_id : str | None
             The ID of the FAB, of format `<publisher>/<app-name>`.
-        fab_version : Optional[str]
+        fab_version : str | None
             The version of the FAB.
-        fab_hash : Optional[str]
+        fab_hash : str | None
             The SHA256 hex hash of the FAB.
         override_config : UserConfig
             Configuration overrides for the run config.
         federation : str
             The federation this run belongs to.
-        federation_options : ConfigRecord
-            Federation configurations. For now, only `num-supernodes` for
-            the simulation runtime.
-        flwr_aid : Optional[str]
+        federation_config : SimulationConfig | None
+            Optional resolved federation configuration for the run.
+        flwr_aid : str | None
             Flower Account ID of the creator.
+        run_type : str
+            The type of run being created.
 
         Returns
         -------
@@ -331,6 +333,10 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
+    def get_federation_config(self, run_id: int) -> SimulationConfig | None:
+        """Get the resolved federation configuration for the specified `run_id`."""
+
+    @abc.abstractmethod
     def get_run_status(self, run_ids: set[int]) -> dict[int, RunStatus]:
         """Retrieve the statuses for the specified runs.
 
@@ -365,32 +371,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         -------
         bool
             True if the status update is successful; False otherwise.
-        """
-
-    @abc.abstractmethod
-    def get_pending_run_id(self) -> int | None:
-        """Get the `run_id` of a run with `Status.PENDING` status.
-
-        Returns
-        -------
-        Optional[int]
-            The `run_id` of a `Run` that is pending to be started; None if
-            there is no Run pending.
-        """
-
-    @abc.abstractmethod
-    def get_federation_options(self, run_id: int) -> ConfigRecord | None:
-        """Retrieve the federation options for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run.
-
-        Returns
-        -------
-        Optional[ConfigRecord]
-            The federation options for the run if it exists; None otherwise.
         """
 
     @abc.abstractmethod

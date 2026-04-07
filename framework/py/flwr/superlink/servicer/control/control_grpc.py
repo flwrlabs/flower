@@ -56,7 +56,6 @@ def run_control_api_grpc(
     ffs_factory: FfsFactory,
     objectstore_factory: ObjectStoreFactory,
     certificates: tuple[bytes, bytes, bytes] | None,
-    is_simulation: bool,
     authn_plugin: ControlAuthnPlugin,
     authz_plugin: ControlAuthzPlugin,
     event_log_plugin: EventLogWriterPlugin | None = None,
@@ -72,7 +71,6 @@ def run_control_api_grpc(
         linkstate_factory=state_factory,
         ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
-        is_simulation=is_simulation,
         authn_plugin=authn_plugin,
         artifact_provider=artifact_provider,
         fleet_api_type=fleet_api_type,
@@ -93,6 +91,7 @@ def run_control_api_grpc(
         interceptors=interceptors or None,
     )
 
+    address = control_grpc_server.bound_address
     if isinstance(authn_plugin, NoOpControlAuthnPlugin):
         log(INFO, "Flower Deployment Runtime: Starting Control API on %s", address)
     else:

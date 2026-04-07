@@ -19,13 +19,15 @@ import json
 import os
 import re
 from pathlib import Path
+from typing import Any
 
 import requests
 
 from flwr.common.constant import FLWR_DIR, FLWR_HOME
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.supercore.version import package_version as flwr_version
 
-from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN
+from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN, MAX_NAME_LENGTH
 
 
 def mask_string(value: str, head: int = 4, tail: int = 4) -> str:
@@ -195,6 +197,35 @@ def request_download_link(
     return str(data[out_url]), verifications
 
 
+def simulation_config_to_json(config: SimulationConfig) -> dict[str, Any]:
+    """Convert a simulation config protobuf to a JSON-serializable dictionary."""
+    payload: dict[str, Any] = {}
+    for field in config.DESCRIPTOR.fields:
+        if field.has_presence and not config.HasField(field.name):
+            payload[field.name] = None
+            continue
+        payload[field.name] = getattr(config, field.name)
+
+    return payload
+
+
+def simulation_config_from_json(payload: dict[str, Any]) -> SimulationConfig:
+    """Convert a JSON payload into a simulation config protobuf."""
+    config = SimulationConfig()
+    valid_fields = {field.name for field in config.DESCRIPTOR.fields}
+    unknown_fields = set(payload) - valid_fields
+    if unknown_fields:
+        field_names = ", ".join(sorted(unknown_fields))
+        raise ValueError(f"Unknown simulation config field(s): {field_names}")
+
+    for field_name, value in payload.items():
+        if value is None:
+            continue
+        setattr(config, field_name, value)
+
+    return config
+
+
 def humanize_duration(seconds: float) -> str:
     """Convert a duration in seconds to a human-friendly string.
 
@@ -275,3 +306,28 @@ def check_federation_format(federation: str) -> None:
             f"Invalid federation format: {federation}. "
             f"Expected format: '@<account-name>/<federation-name>'."
         )
+
+
+def is_valid_name(name: str) -> tuple[bool, str]:
+    """Check if the given string is a valid name for an app or federation.
+
+    A valid name must start with a letter and can only contain letters, digits, and
+    hyphens. It must be less than or equal to MAX_NAME_LENGTH characters.
+    """
+    if not name:
+        return False, "Cannot be empty."
+
+    # Check if the name exceeds the maximum length
+    if len(name) > MAX_NAME_LENGTH:
+        return False, f"Must be no longer than {MAX_NAME_LENGTH} characters."
+
+    # Check if the first character is a letter
+    if not name[0].isalpha():
+        return False, "Must start with a letter."
+
+    # Check if the rest of the characters are valid (letter, digit, or dash)
+    for char in name[1:]:
+        if not (char.isalnum() or char in "-"):
+            return False, "Can only contain letters, digits, and hyphens."
+
+    return True, ""

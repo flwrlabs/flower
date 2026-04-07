@@ -15,7 +15,7 @@
 """Flower command line interface `federation remove-account` command."""
 
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
@@ -47,7 +47,7 @@ def remove_account(
         typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,

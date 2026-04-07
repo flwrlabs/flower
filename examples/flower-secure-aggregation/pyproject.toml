@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "Secure Aggregation in Flower"
 license = "Apache-2.0"
 dependencies = [
-    "flwr[simulation]>=1.27.0",
+    "flwr[simulation]>=1.28.0",
     "flwr-datasets[vision]>=0.6.0",
     "torch==2.8.0",
     "torchvision==0.23.0",

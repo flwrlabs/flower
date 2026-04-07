@@ -15,6 +15,12 @@ erDiagram
     BLOB context "nullable"
   }
 
+  fab {
+    VARCHAR fab_hash PK
+    BLOB content
+    VARCHAR verifications
+  }
+
   logs {
     INTEGER run_id FK "nullable"
     VARCHAR log "nullable"
@@ -87,15 +93,17 @@ erDiagram
     VARCHAR fab_id "nullable"
     VARCHAR fab_version "nullable"
     VARCHAR federation "nullable"
-    BLOB federation_options "nullable"
+    VARCHAR federation_config "nullable"
     VARCHAR finished_at "nullable"
     VARCHAR flwr_aid "nullable"
     VARCHAR override_config "nullable"
     VARCHAR pending_at "nullable"
     INTEGER run_id UK "nullable"
+    VARCHAR run_type
     VARCHAR running_at "nullable"
     VARCHAR starting_at "nullable"
     VARCHAR sub_status "nullable"
+    VARCHAR usage_reported_at
   }
 
   run_objects {

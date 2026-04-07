@@ -354,33 +354,36 @@ Congratulations! You have created your first custom strategy adding dynamism to 
 ****************************
 
 As a last step in this tutorial, let's see how we can use Flower to experiment with a
-large number of clients. Locate your Flower Configuration file (use ``flwr config
-list``) and increase the number of SuperNodes to 1000:
+large number of clients. The most straightforward way to do this is by overriding the
+default Simulation Runtime configuration via the ``--federation-config`` flag:
 
-.. code-block:: toml
+.. code-block:: shell
 
-    [superlink.local]
-    options.num-supernodes = 1000
+    # Run with 200 clients
+    $ flwr run . --stream --federation-config="num-supernodes=200"
+
+For more details on the Simulation Runtime and its configuration, check out the
+:doc:`Simulation Runtime documentation <how-to-run-simulations>`.
 
 Note that we can reuse the ``ClientApp`` for different ``num-supernodes`` since the
 ``Context`` carries the ``num-partitions`` key and for simulations with Flower, the
 number of partitions is equal to the number of SuperNodes.
 
-We now have 1000 partitions, each holding 45 training and 5 validation examples. Given
+We now have 200 partitions, each holding 45 training and 5 validation examples. Given
 that the number of training examples on each client is quite small, we should probably
 train the model a bit longer, so we configure the clients to perform 3 local training
 epochs. We should also adjust the fraction of clients selected for training during each
-round (we don't want all 1000 clients participating in every round), so we add
-``franction-train = 0.025`` and adjust ``fraction_evaluate`` to ``0.05``, which means
-that only 2.5% of available clients will be selected for training each round (so 25
-clients) and 5% of them for evaluation (so 50 clients). We can add and adjust values in
+round (we don't want all 200 clients participating in every round), so we add
+``fraction-train = 0.025`` and adjust ``fraction-evaluate`` to ``0.05``, which means
+that only 2.5% of available clients will be selected for training each round (so 5
+clients) and 5% of them for evaluation (so 10 clients). We can add and adjust values in
 the ``pyproject.toml`` for ease of experimentation:
 
 .. code-block:: toml
 
     [tool.flwr.app.config]
     num-server-rounds = 3
-    franction-train = 0.025  # <-- new
+    fraction-train = 0.025  # <-- new
     fraction-evaluate = 0.05 # <-- updated
     local-epochs = 1
     learning-rate = 0.1
@@ -396,7 +399,7 @@ following:
         """Main entry point for the ServerApp."""
 
         # ... unchanged
-        fraction_train: float = context.run_config["franction-train"]
+        fraction_train: float = context.run_config["fraction-train"]
         # Initialize FedAdagrad strategy
         strategy = CustomFedAdagrad(
             fraction_train=fraction_train,

@@ -95,7 +95,7 @@ class FedMedian(FedAvg):
                 for msg in valid_replies
             ]
             # Compute median and save as Array in ArrayRecord
-            arrays[array_key] = Array(np.median(np.stack(layers), axis=0))
+            arrays[array_key] = Array(np.asarray(np.median(np.stack(layers), axis=0)))
 
         # Aggregate MetricRecords
         metrics = self.train_metrics_aggr_fn(

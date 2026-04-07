@@ -50,10 +50,24 @@ def rpc_error_translator(
         log(ERROR, msg)
         context.abort(grpc_status, public_message)
         raise grpc.RpcError() from None  # Unreachable, but satisfies type checker
-    except grpc.RpcError:
-        raise  # Allow gRPC errors to propagate unmodified
     except Exception as err:
+        # Let pass through if `context.abort()` is called
+        if _is_aborted(context, err):
+            raise
+
+        # Log unexpected exceptions and translate into INTERNAL
         msg = f"[{rpc_name}][UnexpectedError:{type(err).__name__}] {err}"
         log(ERROR, msg)
         context.abort(StatusCode.INTERNAL, INTERNAL_SERVER_ERROR_MESSAGE)
         raise grpc.RpcError() from None  # Unreachable, but satisfies type checker
+
+
+def _is_aborted(context: grpc.ServicerContext, err: Exception) -> bool:
+    """Check if the gRPC context has been aborted."""
+    # Check `.code()` first (experimental API in grpcio==1.78.1)
+    if hasattr(context, "code") and context.code() not in (None, StatusCode.OK):
+        return True
+    # Fallback: check if the error is `Exception` with no message
+    if err.__class__ is Exception and not str(err):
+        return True
+    return False

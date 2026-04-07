@@ -9,7 +9,8 @@ integration with other tools.
 
     JSON output is available for the commands documented here because they operate
     through the SuperLink Control API. This includes remote SuperLinks as well as the
-    managed local SuperLink used by local simulation profiles.
+    managed local SuperLink used by local simulation profiles marked with ``address =
+    ":local:"``.
 
 This guide shows JSON output for:
 
@@ -41,7 +42,6 @@ Representative default output:
 .. code-block:: bash
 
     $ flwr run . local --stream
-    Successfully built flwrlabs.myawesomeapp.1-0-0.014c8eb3.fab
     Starting local SuperLink on 127.0.0.1:39093...
     Successfully started run 1859953118041441032
     ...

@@ -17,9 +17,10 @@
 
 import hashlib
 import json
+import os
 import re
 import sys
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from io import StringIO
 from pathlib import Path
@@ -36,7 +37,6 @@ from flwr.common.constant import (
     ACCESS_TOKEN_KEY,
     AUTHN_TYPE_JSON_KEY,
     FEDERATION_NOT_FOUND_MESSAGE,
-    FEDERATION_NOT_SPECIFIED_MESSAGE,
     NO_ACCOUNT_AUTH_MESSAGE,
     NO_ARTIFACT_PROVIDER_MESSAGE,
     NODE_NOT_FOUND_MESSAGE,
@@ -55,7 +55,14 @@ from flwr.common.grpc import (
 )
 from flwr.common.logger import print_json_error, redirect_output, restore_output
 from flwr.proto.control_pb2_grpc import ControlStub  # pylint: disable=E0611
+from flwr.supercore.constant import (
+    APP_PUBLISH_EXCLUDE_PATTERNS,
+    APP_PUBLISH_INCLUDE_PATTERNS,
+    MAX_DIR_DEPTH,
+    MAX_NAME_LENGTH,
+)
 from flwr.supercore.credential_store import get_credential_store
+from flwr.supercore.utils import is_valid_name
 
 from .auth_plugin import CliAuthPlugin, get_cli_plugin_class
 from .cli_account_auth_interceptor import CliAccountAuthInterceptor
@@ -193,25 +200,16 @@ def prompt_options(text: str, options: list[str]) -> str:
     return result
 
 
-def is_valid_project_name(name: str) -> bool:
-    """Check if the given string is a valid Python project name.
-
-    A valid project name must start with a letter and can only contain letters, digits,
-    and hyphens.
-    """
-    if not name:
-        return False
-
-    # Check if the first character is a letter
-    if not name[0].isalpha():
-        return False
-
-    # Check if the rest of the characters are valid (letter, digit, or dash)
-    for char in name[1:]:
-        if not (char.isalnum() or char in "-"):
-            return False
-
-    return True
+def validate_project_name(name: str, target: str) -> None:
+    """Validate a project-related name and raise ValueError if invalid."""
+    valid, _ = is_valid_name(name)
+    if not valid:
+        raise ValueError(
+            f'{target} "{name}" is invalid, '
+            "a valid app name must start with a letter, "
+            "and can only contain letters, digits, and hyphens. The name"
+            f"must also be no longer than {MAX_NAME_LENGTH} characters."
+        )
 
 
 def get_sha256_hash(file_path_or_int: Path | int) -> str:
@@ -456,12 +454,6 @@ def flwr_cli_grpc_exc_handler(  # pylint: disable=too-many-branches
                     "The provided public key is invalid. Please provide a valid "
                     "NIST EC public key."
                 ) from None
-            if e.details() == FEDERATION_NOT_SPECIFIED_MESSAGE:  # pylint: disable=E1101
-                raise click.ClickException(
-                    "No federation specified. "
-                    "Please use the `--federation` flag or set a default federation "
-                    "in your SuperLink connection configuration."
-                ) from None
             patten = re.compile(FEDERATION_NOT_FOUND_MESSAGE.replace("%s", "(.+)"))
             if m := patten.match(e.details()):  # pylint: disable=E1101
                 raise click.ClickException(
@@ -518,6 +510,82 @@ def load_gitignore_patterns(file: Path | bytes) -> list[str]:
         return []
 
 
+def depth_of(relative_path: Path) -> int:
+    """Return the directory depth of a relative path."""
+    return max(0, len(relative_path.parts) - 1)
+
+
+def collect_files(root: Path) -> dict[str, Path]:
+    """Collect all files under the root directory and return a mapping of relative POSIX
+    paths to absolute Paths.
+
+    Symlinks (both files and directories) are ignored, and only paths that resolve
+    within ``root`` are included. The traversal uses ``os.walk`` with
+    ``followlinks=False`` so symlinked directories are never entered. The relative
+    paths are in POSIX format (using forward slashes) for consistency across platforms.
+    """
+    resolved_root = root.resolve()
+    files: dict[str, Path] = {}
+    for dirpath, _, filenames in os.walk(root, followlinks=False):
+        for filename in filenames:
+            path = Path(dirpath) / filename
+            # Skip symlink files
+            if path.is_symlink():
+                continue
+            # Skip paths that resolve outside the root directory
+            if not path.resolve().is_relative_to(resolved_root):
+                continue
+            relative_path = path.relative_to(root).as_posix()
+            files[relative_path] = path
+    return files
+
+
+def filter_paths_for_publish(
+    files: Mapping[str, Path | bytes],
+) -> dict[str, Path | bytes]:
+    """Filter paths for app publishing, using publish-specific include/exclude rules.
+
+    Parameters
+    ----------
+    files : Mapping[str, Path | bytes]
+        Mapping of POSIX-style relative paths to file contents (as Path or bytes).
+
+    Returns
+    -------
+    dict[str, Path | bytes]
+        Filtered mapping of paths to contents that match publish include/exclude rules.
+
+    Raises
+    ------
+    ValueError
+        Raised if any path exceeds the maximum directory depth.
+    """
+    # Load gitignore patterns if exists
+    gitignore_patterns = tuple(load_gitignore_patterns(files.get(".gitignore", b"")))
+    gitignore_spec = build_pathspec(gitignore_patterns)
+
+    # Build include/exclude pathspecs for app publish
+    include_spec = build_pathspec(APP_PUBLISH_INCLUDE_PATTERNS)
+    exclude_spec = build_pathspec(APP_PUBLISH_EXCLUDE_PATTERNS)
+
+    # Apply filtering
+    filtered_paths = include_spec.match_files(files.keys())
+    filtered_paths = exclude_spec.match_files(filtered_paths, negate=True)
+    filtered_paths = gitignore_spec.match_files(filtered_paths, negate=True)
+
+    # Collect filtered files and check directory depth
+    ret_files = {}
+    for rel_pth in cast(Iterable[str], filtered_paths):
+        if depth_of(Path(rel_pth)) > MAX_DIR_DEPTH:
+            raise ValueError(
+                f"'{rel_pth}' in the project exceeds the maximum directory depth "
+                f"of {MAX_DIR_DEPTH}. Consider refactoring your project structure to "
+                "reduce nesting."
+            )
+        ret_files[rel_pth] = files[rel_pth]
+    return ret_files
+
+
 def validate_credentials_content(creds_path: Path) -> str:
     """Load and validate the credentials file content.
 
@@ -543,3 +611,22 @@ def validate_credentials_content(creds_path: Path) -> str:
         )
 
     return creds[ACCESS_TOKEN_KEY]
+
+
+def validate_federation_name(name: str) -> tuple[bool, str]:
+    """Validate a federation name based on specific security and formatting rules.
+
+    The same validation rules as project names are applied.
+
+    Parameters
+    ----------
+    name : str
+        The federation name to validate.
+
+    Returns
+    -------
+        tuple: (bool, str)
+               - A boolean indicating if the name is valid (True/False).
+               - A string containing a success message or a detailed error message.
+    """
+    return is_valid_name(name)

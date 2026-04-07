@@ -34,7 +34,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
-from flwr.proto.simulationio_pb2_grpc import SimulationIoStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 
@@ -43,7 +42,7 @@ from .plugin import ExecPlugin
 
 def run_superexec(  # pylint: disable=R0913,R0914,R0917
     plugin_class: type[ExecPlugin],
-    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub] | type[SimulationIoStub],
+    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
     appio_api_address: str,
     plugin_config: dict[str, Any] | None = None,
     parent_pid: int | None = None,
@@ -56,7 +55,7 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
     ----------
     plugin_class : type[ExecPlugin]
         The class of the SuperExec plugin to use.
-    stub_class : type[ClientAppIoStub]
+    stub_class : type[ClientAppIoStub] | type[ServerAppIoStub]
         The gRPC stub class for the AppIO API.
     appio_api_address : str
         The address of the AppIO API.
@@ -156,7 +155,7 @@ def run_with_deprecation_warning(  # pylint: disable=R0913, R0917
     cmd: str,
     plugin_type: str,
     plugin_class: type[ExecPlugin],
-    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub] | type[SimulationIoStub],
+    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
     appio_api_address: str,
     parent_pid: int | None,
     warn_run_once: bool,
