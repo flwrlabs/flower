@@ -89,7 +89,7 @@ def create_fab(
     return Fab(
         hash_str=hashlib.sha256(content).hexdigest(),
         content=content,
-        verifications=verifications or {"meta": "data"},
+        verifications={"meta": "data"} if verifications is None else verifications,
     )
 
 
