@@ -115,7 +115,7 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             method_handler.unary_unary,
         )
         token = get_metadata_str(
-            handler_call_details.invocation_metadata or (),
+            handler_call_details.invocation_metadata,
             APP_TOKEN_HEADER,
         )
 
