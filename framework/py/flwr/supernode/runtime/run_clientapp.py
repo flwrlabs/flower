@@ -67,11 +67,11 @@ from flwr.supercore.inflatable.inflatable_utils import (
     pull_and_inflate_object_from_tree,
     push_objects,
 )
+from flwr.supercore.interceptors import AppIoTokenClientInterceptor
 from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
-from flwr.supercore.interceptors import AppIoTokenClientInterceptor
 from flwr.supercore.utils import mask_string
 
 
