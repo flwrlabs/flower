@@ -297,9 +297,9 @@ def _run_cmd(
                         log(log_output_level, "%s", line)
                         trimmed = line.lstrip()
                         if installed_packages is not None and trimmed.startswith("+ "):
-                            package_name = trimmed[2:].split("==", maxsplit=1)[0].strip()
-                            if package_name:
-                                installed_packages.add(package_name)
+                            package_spec = trimmed[2:].strip()
+                            if package_spec:
+                                installed_packages.add(package_spec)
 
             returncode = proc.wait()
         if returncode != 0:
