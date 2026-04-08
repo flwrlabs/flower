@@ -36,6 +36,9 @@ from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import SuperExecAuthClientInterceptor
+from flwr.supercore.interceptors.superexec_auth_interceptor import (
+    SERVERAPPIO_SUPEREXEC_METHODS,
+)
 
 from .plugin import ExecPlugin
 
@@ -71,17 +74,16 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
         The address of the health server. If `None` is provided, the health server will
         NOT be started.
     """
-    interceptors = []
+    interceptors: list[SuperExecAuthClientInterceptor] | None = None
     if (
         stub_class is ServerAppIoStub
         and superexec_auth_secret is not None
         and superexec_auth_secret != b""
     ):
-        protected_methods = _resolve_superexec_protected_methods(stub_class)
         interceptors = [
             SuperExecAuthClientInterceptor(
                 master_secret=superexec_auth_secret,
-                protected_methods=protected_methods,
+                protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
             )
         ]
 
@@ -204,21 +206,3 @@ def run_with_deprecation_warning(  # pylint: disable=R0913, R0917
         superexec_auth_secret=superexec_auth_secret,
         parent_pid=parent_pid,
     )
-
-
-def _resolve_superexec_protected_methods(
-    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
-) -> tuple[str, ...]:
-    if stub_class is ServerAppIoStub:
-        return (
-            "/flwr.proto.ServerAppIo/ListAppsToLaunch",
-            "/flwr.proto.ServerAppIo/RequestToken",
-            "/flwr.proto.ServerAppIo/GetRun",
-        )
-    if stub_class is ClientAppIoStub:
-        return (
-            "/flwr.proto.ClientAppIo/ListAppsToLaunch",
-            "/flwr.proto.ClientAppIo/RequestToken",
-            "/flwr.proto.ClientAppIo/GetRun",
-        )
-    raise ValueError(f"Unsupported AppIo stub class for SuperExec auth: {stub_class}")

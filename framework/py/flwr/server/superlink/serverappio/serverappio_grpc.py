@@ -15,7 +15,7 @@
 """ServerAppIo gRPC API."""
 
 
-from logging import INFO, WARN
+from logging import INFO, WARNING
 
 import grpc
 
@@ -45,7 +45,7 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
     """Run ServerAppIo API (gRPC, request-response)."""
     if superexec_auth_secret is not None and certificates is None:
         log(
-            WARN,
+            WARNING,
             "SuperExec auth is enabled on insecure ServerAppIo transport. "
             "Request metadata confidentiality is not guaranteed without TLS.",
         )
