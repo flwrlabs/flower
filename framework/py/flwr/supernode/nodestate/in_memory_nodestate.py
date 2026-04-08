@@ -190,7 +190,7 @@ class InMemoryNodeState(
             }
 
         # Remove run IDs that have tokens stored (indicating they are in progress)
-        with self._locks["token_store"]:
+        with self.lock_token_store:
             ret -= set(self.token_store.keys())
             return list(ret)
 
