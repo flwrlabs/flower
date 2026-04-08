@@ -121,7 +121,7 @@ def install_app_dependencies(
 
     log(
         INFO,
-        "Installing app dependencies via uv sync in %s (runtime env: %s).",
+        "Installing application dependencies (project: %s, runtime env: %s).",
         project_dir,
         runtime_env_dir,
     )
@@ -146,7 +146,9 @@ def install_app_dependencies(
     sync_env["UV_PROJECT_ENVIRONMENT"] = str(runtime_env_dir)
     log(DEBUG, "Using UV_PROJECT_ENVIRONMENT=%s", sync_env["UV_PROJECT_ENVIRONMENT"])
 
-    sync_error = _run_cmd(sync_cmd, cwd=project_dir, env=sync_env)
+    sync_error = _run_cmd(
+        sync_cmd, cwd=project_dir, env=sync_env, log_output_level=DEBUG
+    )
     if sync_error is not None:
         raise RuntimeError(f"uv sync failed: {sync_error}")
 
@@ -251,7 +253,7 @@ def _ensure_uv_available(dependency_index_url: str | None) -> None:
     """Ensure `uv` is available in the current runtime environment."""
     _ = dependency_index_url
     uv_version_cmd = [sys.executable, "-m", "uv", "--version"]
-    uv_check_error = _run_cmd(uv_version_cmd)
+    uv_check_error = _run_cmd(uv_version_cmd, log_output_level=DEBUG)
     if uv_check_error is None:
         return
 
@@ -265,6 +267,7 @@ def _run_cmd(
     cmd: list[str],
     cwd: Path | None = None,
     env: dict[str, str] | None = None,
+    log_output_level: int = INFO,
 ) -> str | None:
     """Run command and return error details, or None on success."""
     log(DEBUG, "Running: %s", " ".join(cmd))
@@ -284,7 +287,7 @@ def _run_cmd(
                     line = line.rstrip()
                     if line:
                         output_lines.append(line)
-                        log(INFO, "%s", line)
+                        log(log_output_level, "%s", line)
 
             returncode = proc.wait()
         if returncode != 0:
