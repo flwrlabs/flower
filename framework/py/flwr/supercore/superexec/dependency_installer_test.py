@@ -124,6 +124,8 @@ def test_install_app_dependencies_uses_resolved_index_url(tmp_path: Path) -> Non
         "-m",
         "uv",
         "sync",
+        "--python",
+        sys.executable,
         "--no-install-project",
         "--no-install-package",
         "flwr",
@@ -222,37 +224,13 @@ def test_cleanup_app_runtime_environment_removes_directory(tmp_path: Path) -> No
     assert not runtime_env_dir.exists()
 
 
-def test_ensure_uv_available_uses_index_url_for_pip_install() -> None:
-    """Ensure uv bootstrap uses the configured package index."""
-    dependency_index_url = "http://127.0.0.1:3141/root/pypi/+simple/"
-
-    with patch.object(
-        dependency_installer,
-        "_run_cmd",
-        side_effect=["uv missing", None, None],
-    ) as run_cmd:
-        dependency_installer._ensure_uv_available(
-            dependency_index_url=dependency_index_url
-        )
-
-    assert run_cmd.call_args_list[0].args[0] == [
-        sys.executable,
-        "-m",
-        "uv",
-        "--version",
-    ]
-    assert run_cmd.call_args_list[1].args[0] == [
-        sys.executable,
-        "-m",
-        "pip",
-        "install",
-        "uv",
-        "--index-url",
-        dependency_index_url,
-    ]
-    assert run_cmd.call_args_list[2].args[0] == [
-        sys.executable,
-        "-m",
-        "uv",
-        "--version",
-    ]
+def test_ensure_uv_available_raises_when_uv_is_missing() -> None:
+    """Ensure missing uv fails fast without bootstrap installation."""
+    with patch.object(dependency_installer, "_run_cmd", return_value="uv missing"):
+        with pytest.raises(
+            RuntimeError,
+            match="`uv` is not available in the current environment",
+        ):
+            dependency_installer._ensure_uv_available(
+                dependency_index_url="http://127.0.0.1:3141/root/pypi/+simple/"
+            )

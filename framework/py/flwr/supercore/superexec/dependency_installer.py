@@ -249,42 +249,16 @@ def cleanup_app_runtime_environment(runtime_env_dir: Path | None) -> None:
 
 def _ensure_uv_available(dependency_index_url: str | None) -> None:
     """Ensure `uv` is available in the current runtime environment."""
+    _ = dependency_index_url
     uv_version_cmd = [sys.executable, "-m", "uv", "--version"]
     uv_check_error = _run_cmd(uv_version_cmd)
     if uv_check_error is None:
         return
 
-    log(
-        INFO,
-        "`uv` is not available in the current environment, installing it now.",
+    raise RuntimeError(
+        "`uv` is not available in the current environment. "
+        "Please install `uv` and retry."
     )
-    pip_install_uv_cmd: list[str] = [
-        sys.executable,
-        "-m",
-        "pip",
-        "install",
-        "uv",
-    ]
-    if dependency_index_url is not None:
-        pip_install_uv_cmd += ["--index-url", dependency_index_url]
-
-    install_error = _run_cmd(pip_install_uv_cmd)
-    if install_error is not None:
-        source_hint = (
-            "the configured private index"
-            if dependency_index_url
-            else "the default index"
-        )
-        raise RuntimeError(
-            f"Failed to install `uv` from {source_hint}: {install_error}"
-        )
-
-    recheck_error = _run_cmd(uv_version_cmd)
-    if recheck_error is not None:
-        raise RuntimeError(
-            "`uv` installation completed but it is still unavailable: "
-            f"{recheck_error}"
-        )
 
 
 def _run_cmd(
