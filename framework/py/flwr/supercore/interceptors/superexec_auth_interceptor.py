@@ -126,7 +126,11 @@ class SuperExecAuthClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type:
             SUPEREXEC_AUTH_BODY_SHA256_HEADER,
             SUPEREXEC_AUTH_SIGNATURE_HEADER,
         }
-        metadata = [(key, value) for key, value in metadata if key not in auth_headers]
+        metadata = [
+            (key, value)
+            for key, value in metadata
+            if key not in auth_headers
+        ]
         metadata.extend(
             [
                 (SUPEREXEC_AUTH_TIMESTAMP_HEADER, str(timestamp)),
