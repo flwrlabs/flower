@@ -210,13 +210,14 @@ class SqlCoreState(CoreState, SqlMixin):
             INSERT INTO nonce_store (namespace, nonce, expires_at)
             VALUES (:namespace, :nonce, :expires_at);
         """
+        self.query(cleanup_query, {"current": now().timestamp()})
         try:
-            with self.session() as session:
-                session.execute(text(cleanup_query), {"current": now().timestamp()})
-                session.execute(
-                    text(insert_query),
-                    {"namespace": namespace, "nonce": nonce, "expires_at": expires_at},
-                )
+            self.query(
+                insert_query,
+                {"namespace": namespace, "nonce": nonce, "expires_at": expires_at},
+            )
             return True
+        # Duplicate nonce detected, treated as a replay attempt.
+        # IntegrityError can only arise from (namespace, nonce) uniqueness.
         except IntegrityError:
             return False

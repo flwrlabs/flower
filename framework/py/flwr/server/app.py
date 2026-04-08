@@ -60,11 +60,9 @@ from flwr.proto.grpcadapter_pb2_grpc import add_GrpcAdapterServicer_to_server
 from flwr.server.fleet_event_log_interceptor import FleetEventLogInterceptor
 from flwr.supercore.address import parse_address, resolve_bind_address
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
-from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.update_check import warn_if_flwr_update_available
-from flwr.supercore.utils import get_flwr_home
 from flwr.supercore.version import package_version
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import (
@@ -84,7 +82,6 @@ from .superlink.fleet.grpc_rere.node_auth_server_interceptor import (
 from .superlink.linkstate import LinkStateFactory
 from .superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
 
-BASE_DIR = get_flwr_home() / "superlink" / "ffs"
 P = TypeVar("P", ControlAuthnPlugin, ControlAuthzPlugin)
 
 
@@ -307,15 +304,11 @@ def run_superlink() -> None:
     )
     state_factory.state()  # Force initialization before starting servers
 
-    # Initialize FfsFactory
-    ffs_factory = FfsFactory(args.storage_dir)
-
     # Start Control API
     is_simulation = args.simulation
     control_server: grpc.Server = run_control_api_grpc(
         address=control_address,
         state_factory=state_factory,
-        ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
         certificates=certificates,
         authn_plugin=authn_plugin,
@@ -331,7 +324,6 @@ def run_superlink() -> None:
     serverappio_server: grpc.Server = run_serverappio_api_grpc(
         address=serverappio_address,
         state_factory=state_factory,
-        ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
         certificates=None,  # ServerAppIo API doesn't support SSL yet
     )
@@ -378,7 +370,6 @@ def run_superlink() -> None:
                     args.ssl_keyfile,
                     args.ssl_certfile,
                     state_factory,
-                    ffs_factory,
                     objectstore_factory,
                     num_workers,
                 ),
@@ -398,7 +389,6 @@ def run_superlink() -> None:
             fleet_server = _run_fleet_api_grpc_rere(
                 address=fleet_address,
                 state_factory=state_factory,
-                ffs_factory=ffs_factory,
                 objectstore_factory=objectstore_factory,
                 enable_supernode_auth=enable_supernode_auth,
                 certificates=certificates,
@@ -409,7 +399,6 @@ def run_superlink() -> None:
             fleet_server = _run_fleet_api_grpc_adapter(
                 address=fleet_address,
                 state_factory=state_factory,
-                ffs_factory=ffs_factory,
                 objectstore_factory=objectstore_factory,
                 certificates=certificates,
             )
@@ -552,7 +541,6 @@ def _try_obtain_fleet_event_log_writer_plugin() -> EventLogWriterPlugin | None:
 def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917
     address: str,
     state_factory: LinkStateFactory,
-    ffs_factory: FfsFactory,
     objectstore_factory: ObjectStoreFactory,
     enable_supernode_auth: bool,
     certificates: tuple[bytes, bytes, bytes] | None,
@@ -562,7 +550,6 @@ def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917
     # Create Fleet API gRPC server
     fleet_servicer = FleetServicer(
         state_factory=state_factory,
-        ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
         enable_supernode_auth=enable_supernode_auth,
     )
@@ -589,7 +576,6 @@ def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917
 def _run_fleet_api_grpc_adapter(
     address: str,
     state_factory: LinkStateFactory,
-    ffs_factory: FfsFactory,
     objectstore_factory: ObjectStoreFactory,
     certificates: tuple[bytes, bytes, bytes] | None,
 ) -> grpc.Server:
@@ -597,7 +583,6 @@ def _run_fleet_api_grpc_adapter(
     # Create Fleet API gRPC server
     fleet_servicer = GrpcAdapterServicer(
         state_factory=state_factory,
-        ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
         enable_supernode_auth=False,
     )
@@ -627,7 +612,6 @@ def _run_fleet_api_rest(
     ssl_keyfile: str | None,
     ssl_certfile: str | None,
     state_factory: LinkStateFactory,
-    ffs_factory: FfsFactory,
     objectstore_factory: ObjectStoreFactory,
     num_workers: int,
 ) -> None:
@@ -643,7 +627,6 @@ def _run_fleet_api_rest(
 
     # See: https://www.starlette.io/applications/#accessing-the-app-instance
     fast_api_app.state.STATE_FACTORY = state_factory
-    fast_api_app.state.FFS_FACTORY = ffs_factory
     fast_api_app.state.OBJECTSTORE_FACTORY = objectstore_factory
 
     uvicorn.run(
@@ -727,11 +710,6 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         "file that will be opened. If nothing is provided, "
         "Flower will just create a state in memory.",
         default=FLWR_IN_MEMORY_DB_NAME,
-    )
-    parser.add_argument(
-        "--storage-dir",
-        help="The base directory to store the objects for the Flower File System.",
-        default=BASE_DIR,
     )
     parser.add_argument(
         "--auth-list-public-keys",
