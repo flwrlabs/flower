@@ -38,7 +38,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.node_id = 111
         self.run_id = 110
         self.mock_state.get_node_id.return_value = self.node_id
-        self.mock_ffs = Mock()
         self.mock_object_store = Mock()
         self.mock_receive = Mock()
         self.mock_get_run = Mock()
@@ -56,7 +55,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         # Execute
         res = _pull_and_store_message(
             state=self.mock_state,
-            ffs=self.mock_ffs,
             object_store=self.mock_object_store,
             node_config={},  # No need for this test
             receive=self.mock_receive,
@@ -127,7 +125,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         # Execute
         res = _pull_and_store_message(
             state=self.mock_state,
-            ffs=self.mock_ffs,
             object_store=self.mock_object_store,
             node_config={},  # No need for this test
             receive=self.mock_receive,
@@ -145,7 +142,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         # Assert: All are not called if run_id is known
         self.mock_get_run.assert_not_called()
         self.mock_get_fab.assert_not_called()
-        self.mock_ffs.put.assert_not_called()
+        self.mock_state.store_fab.assert_not_called()
         self.mock_state.store_run.assert_not_called()
         self.mock_state.store_context.assert_not_called()
 
@@ -177,7 +174,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             mock_get_fused_config.return_value = mock_fused_run_config
             res = _pull_and_store_message(
                 state=self.mock_state,
-                ffs=self.mock_ffs,
                 object_store=self.mock_object_store,
                 node_config={},  # No need for this test
                 receive=self.mock_receive,
@@ -195,7 +191,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         # Assert: the Run and FAB should be fetched and stored if run_id is unknown
         self.mock_get_run.assert_called_once_with(self.run_id)
         self.mock_get_fab.assert_called_once_with(fab.hash_str, self.run_id)
-        self.mock_ffs.put.assert_called_once_with(fab.content, fab.verifications)
+        self.mock_state.store_fab.assert_called_once_with(fab)
         self.mock_state.store_run.assert_called_once_with(mock_run)
 
         # Assert: the Context should be created and stored if run_id is unknown
@@ -232,7 +228,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         ) as mock_verify_fab:
             res = _pull_and_store_message(
                 state=self.mock_state,
-                ffs=self.mock_ffs,
                 object_store=self.mock_object_store,
                 node_config={},
                 receive=self.mock_receive,
@@ -249,7 +244,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_get_fab.assert_called_once_with(fab.hash_str, self.run_id)
         self.mock_state.store_context.assert_not_called()
         self.mock_state.store_run.assert_not_called()
-        self.mock_ffs.put.assert_not_called()
         self.mock_confirm_message_received.assert_not_called()
 
         self.mock_state.store_message.assert_called_once()
@@ -288,7 +282,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         ) as mock_verify_fab:
             res = _pull_and_store_message(
                 state=self.mock_state,
-                ffs=self.mock_ffs,
                 object_store=self.mock_object_store,
                 node_config={},
                 receive=self.mock_receive,
@@ -305,7 +298,6 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         )
         self.mock_state.store_context.assert_not_called()
         self.mock_state.store_run.assert_not_called()
-        self.mock_ffs.put.assert_not_called()
         self.mock_confirm_message_received.assert_not_called()
 
         self.mock_state.store_message.assert_called_once()
