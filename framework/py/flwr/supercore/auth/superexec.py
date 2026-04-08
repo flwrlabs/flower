@@ -23,36 +23,12 @@ from typing import Any
 
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.common.constant import SYSTEM_TIME_TOLERANCE, TIMESTAMP_TOLERANCE
-from flwr.supercore.address import parse_address
-
-SUPEREXEC_AUTH_AUDIENCE_HEADER = "flwr-superexec-audience"
-SUPEREXEC_AUTH_TIMESTAMP_HEADER = "flwr-superexec-ts"
-SUPEREXEC_AUTH_NONCE_HEADER = "flwr-superexec-nonce"
-SUPEREXEC_AUTH_BODY_SHA256_HEADER = "flwr-superexec-body-sha256"
-SUPEREXEC_AUTH_SIGNATURE_HEADER = "flwr-superexec-signature"
-
-SUPEREXEC_AUTH_SECRET_CONTEXT = b"superexec-auth-v1"
-
-MIN_TIMESTAMP_DIFF_SECONDS = -SYSTEM_TIME_TOLERANCE
-MAX_TIMESTAMP_DIFF_SECONDS = TIMESTAMP_TOLERANCE + SYSTEM_TIME_TOLERANCE
-
-
-def derive_superexec_audience(service_kind: str, address: str) -> str:
-    """Derive a canonical audience string in `<service-kind>:<port>` form."""
-    parsed = parse_address(address)
-    if parsed is None:
-        raise ValueError(f"Cannot parse address: {address}")
-    _, port, _ = parsed
-    if port <= 0:
-        raise ValueError(f"Invalid audience port in address: {address}")
-    return f"{service_kind}:{port}"
+from flwr.supercore.constant import SUPEREXEC_AUTH_SECRET_CONTEXT
 
 
 def canonicalize_superexec_auth_input(  # pylint: disable=R0913
     *,
     method: str,
-    audience: str,
     timestamp: int,
     nonce: str,
     body_sha256: str,
@@ -60,7 +36,6 @@ def canonicalize_superexec_auth_input(  # pylint: disable=R0913
     """Serialize SuperExec auth fields to canonical bytes for HMAC input."""
     canonical = (
         f"method={method}\n"
-        f"audience={audience}\n"
         f"ts={timestamp}\n"
         f"nonce={nonce}\n"
         f"body_sha256={body_sha256}"
@@ -85,7 +60,6 @@ def compute_superexec_signature(  # pylint: disable=R0913
     *,
     auth_secret: bytes,
     method: str,
-    audience: str,
     timestamp: int,
     nonce: str,
     body_sha256: str,
@@ -93,7 +67,6 @@ def compute_superexec_signature(  # pylint: disable=R0913
     """Compute SuperExec HMAC-SHA256 signature as a lowercase hex string."""
     canonical = canonicalize_superexec_auth_input(
         method=method,
-        audience=audience,
         timestamp=timestamp,
         nonce=nonce,
         body_sha256=body_sha256,
