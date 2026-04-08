@@ -223,22 +223,26 @@ def run_superlink() -> None:
     # Obtain certificates
     certificates = try_obtain_server_certificates(args)
 
-    try:
-        configured_superexec_secret = load_superexec_auth_secret(
-            secret_file=args.superexec_auth_secret_file,
-        )
-    except (OSError, ValueError) as err:
-        flwr_exit(
-            ExitCode.SUPERLINK_INVALID_ARGS,
-            f"Failed to load SuperExec auth secret: {err}",
-        )
-
-    if configured_superexec_secret is None:
+    requires_superexec_auth = args.isolation == ISOLATION_MODE_PROCESS
+    configured_superexec_secret: bytes | None = None
+    if args.superexec_auth_secret_file is not None:
+        try:
+            configured_superexec_secret = load_superexec_auth_secret(
+                secret_file=args.superexec_auth_secret_file,
+            )
+        except (OSError, ValueError) as err:
+            flwr_exit(
+                ExitCode.SUPERLINK_INVALID_ARGS,
+                f"Failed to load SuperExec auth secret: {err}",
+            )
+    if requires_superexec_auth and configured_superexec_secret is None:
         flwr_exit(
             ExitCode.SUPERLINK_INVALID_ARGS,
             "Missing SuperExec auth secret. Provide --superexec-auth-secret-file.",
         )
-    superexec_auth_secret = configured_superexec_secret
+    superexec_auth_secret = (
+        configured_superexec_secret if requires_superexec_auth else None
+    )
 
     # Disable the account auth TLS check if args.disable_oidc_tls_cert_verification is
     # provided
@@ -447,7 +451,6 @@ def run_superlink() -> None:
         command = ["flower-superexec", "--insecure"]
         command += ["--appio-api-address", appio_address]
         command += ["--plugin-type", ExecPluginType.SERVER_APP]
-        command += ["--superexec-auth-secret-file", args.superexec_auth_secret_file]
         command += ["--parent-pid", str(os.getpid())]
         # pylint: disable-next=consider-using-with
         subprocess.Popen(command)

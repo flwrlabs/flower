@@ -40,6 +40,7 @@ class TokenRecord:
     active_until: float
 
 
+# pylint: disable=R0902
 class InMemoryCoreState(CoreState):
     """In-memory CoreState implementation."""
 

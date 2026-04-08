@@ -71,13 +71,19 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
         The address of the health server. If `None` is provided, the health server will
         NOT be started.
     """
-    if superexec_auth_secret is None or superexec_auth_secret == b"":
-        flwr_exit(
-            ExitCode.SUPEREXEC_INVALID_PLUGIN_CONFIG,
-            "Missing SuperExec auth secret.",
-        )
-
-    protected_methods = _resolve_superexec_protected_methods(stub_class)
+    interceptors = []
+    if (
+        stub_class is ServerAppIoStub
+        and superexec_auth_secret is not None
+        and superexec_auth_secret != b""
+    ):
+        protected_methods = _resolve_superexec_protected_methods(stub_class)
+        interceptors = [
+            SuperExecAuthClientInterceptor(
+                master_secret=superexec_auth_secret,
+                protected_methods=protected_methods,
+            )
+        ]
 
     # Start monitoring the parent process if a PID is provided
     if parent_pid is not None:
@@ -95,12 +101,7 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
         server_address=appio_api_address,
         insecure=True,
         root_certificates=None,
-        interceptors=[
-            SuperExecAuthClientInterceptor(
-                master_secret=superexec_auth_secret,
-                protected_methods=protected_methods,
-            )
-        ],
+        interceptors=interceptors,
     )
     channel.subscribe(on_channel_state_change)
 
@@ -170,9 +171,9 @@ def run_with_deprecation_warning(  # pylint: disable=R0913, R0917
     plugin_class: type[ExecPlugin],
     stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
     appio_api_address: str,
-    superexec_auth_secret: bytes,
     parent_pid: int | None,
     warn_run_once: bool,
+    superexec_auth_secret: bytes | None = None,
 ) -> None:
     """Log a deprecation warning and run the equivalent `flower-superexec` command.
 

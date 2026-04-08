@@ -73,9 +73,7 @@ def _abort_auth_denied(context: grpc.ServicerContext) -> NoReturn:
 
 
 def _unauthenticated_terminator() -> grpc.RpcMethodHandler:
-    def _terminate(
-        _request: GrpcMessage, context: grpc.ServicerContext
-    ) -> GrpcMessage:
+    def _terminate(_request: GrpcMessage, context: grpc.ServicerContext) -> GrpcMessage:
         context.abort(
             grpc.StatusCode.UNAUTHENTICATED,
             AUTHENTICATION_FAILED_MESSAGE,
@@ -126,11 +124,7 @@ class SuperExecAuthClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type:
             SUPEREXEC_AUTH_BODY_SHA256_HEADER,
             SUPEREXEC_AUTH_SIGNATURE_HEADER,
         }
-        metadata = [
-            (key, value)
-            for key, value in metadata
-            if key not in auth_headers
-        ]
+        metadata = [(key, value) for key, value in metadata if key not in auth_headers]
         metadata.extend(
             [
                 (SUPEREXEC_AUTH_TIMESTAMP_HEADER, str(timestamp)),
@@ -206,9 +200,7 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 _abort_auth_denied(context)
             time_diff = now().timestamp() - timestamp
             is_timestamp_in_window = (
-                MIN_TIMESTAMP_DIFF_SECONDS
-                < time_diff
-                < MAX_TIMESTAMP_DIFF_SECONDS
+                MIN_TIMESTAMP_DIFF_SECONDS < time_diff < MAX_TIMESTAMP_DIFF_SECONDS
             )
             if not is_timestamp_in_window:
                 _abort_auth_denied(context)
@@ -224,9 +216,7 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 nonce=cast(str, nonce),
                 body_sha256=body_sha256,
             )
-            if not verify_superexec_signature(
-                expected_signature, cast(str, signature)
-            ):
+            if not verify_superexec_signature(expected_signature, cast(str, signature)):
                 _abort_auth_denied(context)
 
             namespace = f"superexec:{method}"

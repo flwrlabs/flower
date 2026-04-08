@@ -42,10 +42,10 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
     ffs_factory: FfsFactory,
     objectstore_factory: ObjectStoreFactory,
     certificates: tuple[bytes, bytes, bytes] | None,
-    superexec_auth_secret: bytes,
+    superexec_auth_secret: bytes | None = None,
 ) -> grpc.Server:
     """Run ServerAppIo API (gRPC, request-response)."""
-    if certificates is None:
+    if superexec_auth_secret is not None and certificates is None:
         log(
             WARN,
             "SuperExec auth is enabled on insecure ServerAppIo transport. "
@@ -58,13 +58,19 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
         ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
     )
-    superexec_auth_interceptor = create_serverappio_superexec_auth_server_interceptor(
-        state_provider=state_factory.state,
-        master_secret=superexec_auth_secret,
-    )
     auth_interceptor = create_serverappio_token_auth_server_interceptor(
         state_provider=state_factory.state
     )
+    interceptors: list[grpc.ServerInterceptor] = []
+    if superexec_auth_secret is not None:
+        superexec_auth_interceptor = (
+            create_serverappio_superexec_auth_server_interceptor(
+                state_provider=state_factory.state,
+                master_secret=superexec_auth_secret,
+            )
+        )
+        interceptors.append(superexec_auth_interceptor)
+    interceptors.append(auth_interceptor)
     serverappio_add_servicer_to_server_fn = add_ServerAppIoServicer_to_server
     serverappio_grpc_server = generic_create_grpc_server(
         servicer_and_add_fn=(
@@ -74,7 +80,7 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
         server_address=address,
         max_message_length=GRPC_MAX_MESSAGE_LENGTH,
         certificates=certificates,
-        interceptors=[superexec_auth_interceptor, auth_interceptor],
+        interceptors=interceptors,
     )
 
     address = serverappio_grpc_server.bound_address
