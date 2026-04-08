@@ -118,13 +118,9 @@ def install_app_dependencies(
 
     runtime_env_dir = _create_runtime_env_dir(project_dir, launch_id, run_id)
     runtime_env_dir.parent.mkdir(parents=True, exist_ok=True)
+    log(INFO, "Created env for run in: %s", runtime_env_dir)
 
-    log(
-        INFO,
-        "Installing application dependencies (project: %s, runtime env: %s).",
-        project_dir,
-        runtime_env_dir,
-    )
+    log(INFO, "Installing application dependencies...")
 
     sync_cmd: list[str] = [
         sys.executable,
@@ -146,11 +142,21 @@ def install_app_dependencies(
     sync_env["UV_PROJECT_ENVIRONMENT"] = str(runtime_env_dir)
     log(DEBUG, "Using UV_PROJECT_ENVIRONMENT=%s", sync_env["UV_PROJECT_ENVIRONMENT"])
 
+    installed_packages: set[str] = set()
     sync_error = _run_cmd(
-        sync_cmd, cwd=project_dir, env=sync_env, log_output_level=DEBUG
+        sync_cmd,
+        cwd=project_dir,
+        env=sync_env,
+        log_output_level=DEBUG,
+        installed_packages=installed_packages,
     )
     if sync_error is not None:
         raise RuntimeError(f"uv sync failed: {sync_error}")
+
+    if installed_packages:
+        log(INFO, "Installed: [%s]", ", ".join(sorted(installed_packages)))
+    else:
+        log(INFO, "No additional application dependencies needed installation.")
 
     _activate_runtime_env(runtime_env_dir)
     if run_id is not None:
@@ -268,6 +274,7 @@ def _run_cmd(
     cwd: Path | None = None,
     env: dict[str, str] | None = None,
     log_output_level: int = INFO,
+    installed_packages: set[str] | None = None,
 ) -> str | None:
     """Run command and return error details, or None on success."""
     log(DEBUG, "Running: %s", " ".join(cmd))
@@ -288,6 +295,11 @@ def _run_cmd(
                     if line:
                         output_lines.append(line)
                         log(log_output_level, "%s", line)
+                        trimmed = line.lstrip()
+                        if installed_packages is not None and trimmed.startswith("+ "):
+                            package_name = trimmed[2:].split("==", maxsplit=1)[0].strip()
+                            if package_name:
+                                installed_packages.add(package_name)
 
             returncode = proc.wait()
         if returncode != 0:
