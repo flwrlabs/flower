@@ -143,7 +143,7 @@ EXIT_CODE_HELP = {
         "The YAML configuration for the SuperExec plugin is invalid."
     ),
     ExitCode.SUPEREXEC_AUTH_SECRET_LOAD_FAILED: (
-        "Failed to load the SuperExec auth secret."
+        "Failed to load the SuperExec authentication secret."
     ),
     # FlowerCLI-specific exit codes (500-599)
     ExitCode.FLWRCLI_NODE_AUTH_PUBLIC_KEY_INVALID: (
