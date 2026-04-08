@@ -26,18 +26,19 @@ from google.protobuf.message import Message as GrpcMessage
 
 from flwr.common import now
 from flwr.supercore.auth import (
-    MAX_TIMESTAMP_DIFF_SECONDS,
-    MIN_TIMESTAMP_DIFF_SECONDS,
-    SUPEREXEC_AUTH_AUDIENCE_HEADER,
-    SUPEREXEC_AUTH_BODY_SHA256_HEADER,
-    SUPEREXEC_AUTH_NONCE_HEADER,
-    SUPEREXEC_AUTH_SIGNATURE_HEADER,
-    SUPEREXEC_AUTH_TIMESTAMP_HEADER,
     compute_request_body_sha256,
     compute_superexec_signature,
     derive_auth_secret,
     extract_single_str_metadata,
     verify_superexec_signature,
+)
+from flwr.supercore.constant import (
+    MAX_TIMESTAMP_DIFF_SECONDS,
+    MIN_TIMESTAMP_DIFF_SECONDS,
+    SUPEREXEC_AUTH_BODY_SHA256_HEADER,
+    SUPEREXEC_AUTH_NONCE_HEADER,
+    SUPEREXEC_AUTH_SIGNATURE_HEADER,
+    SUPEREXEC_AUTH_TIMESTAMP_HEADER,
 )
 
 from .appio_token_interceptor import AUTHENTICATION_FAILED_MESSAGE
@@ -86,11 +87,9 @@ class SuperExecAuthClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type:
         self,
         *,
         master_secret: bytes,
-        audience: str,
         protected_methods: Collection[str],
     ) -> None:
         self._auth_secret = derive_auth_secret(master_secret)
-        self._audience = audience
         self._protected_methods = set(protected_methods)
 
     def intercept_unary_unary(
@@ -110,7 +109,6 @@ class SuperExecAuthClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type:
         signature = compute_superexec_signature(
             auth_secret=self._auth_secret,
             method=method,
-            audience=self._audience,
             timestamp=timestamp,
             nonce=nonce,
             body_sha256=body_sha256,
@@ -118,7 +116,6 @@ class SuperExecAuthClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type:
 
         metadata = list(client_call_details.metadata or [])
         auth_headers = {
-            SUPEREXEC_AUTH_AUDIENCE_HEADER,
             SUPEREXEC_AUTH_TIMESTAMP_HEADER,
             SUPEREXEC_AUTH_NONCE_HEADER,
             SUPEREXEC_AUTH_BODY_SHA256_HEADER,
@@ -127,7 +124,6 @@ class SuperExecAuthClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type:
         metadata = [(key, value) for key, value in metadata if key not in auth_headers]
         metadata.extend(
             [
-                (SUPEREXEC_AUTH_AUDIENCE_HEADER, self._audience),
                 (SUPEREXEC_AUTH_TIMESTAMP_HEADER, str(timestamp)),
                 (SUPEREXEC_AUTH_NONCE_HEADER, nonce),
                 (SUPEREXEC_AUTH_BODY_SHA256_HEADER, body_sha256),
@@ -147,12 +143,10 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         *,
         state_provider: Callable[[], _NonceState],
         master_secret: bytes,
-        expected_audience: str,
         protected_methods: Collection[str],
     ) -> None:
         self._state_provider = state_provider
         self._auth_secret = derive_auth_secret(master_secret)
-        self._expected_audience = expected_audience
         self._protected_methods = set(protected_methods)
 
     def intercept_service(
@@ -179,9 +173,6 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             request: GrpcMessage,
             context: grpc.ServicerContext,
         ) -> GrpcMessage:
-            audience = extract_single_str_metadata(
-                metadata, SUPEREXEC_AUTH_AUDIENCE_HEADER
-            )
             ts_raw = extract_single_str_metadata(
                 metadata, SUPEREXEC_AUTH_TIMESTAMP_HEADER
             )
@@ -193,15 +184,11 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 metadata, SUPEREXEC_AUTH_SIGNATURE_HEADER
             )
             if None in {
-                audience,
                 ts_raw,
                 nonce,
                 body_sha256_header,
                 signature,
             }:
-                _abort_auth_denied(context)
-
-            if audience != self._expected_audience:
                 _abort_auth_denied(context)
 
             try:
@@ -219,7 +206,6 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             expected_signature = compute_superexec_signature(
                 auth_secret=self._auth_secret,
                 method=method,
-                audience=audience,
                 timestamp=timestamp,
                 nonce=cast(str, nonce),
                 body_sha256=body_sha256,
@@ -227,7 +213,7 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             if not verify_superexec_signature(expected_signature, cast(str, signature)):
                 _abort_auth_denied(context)
 
-            namespace = f"superexec:{self._expected_audience}:{method}"
+            namespace = f"superexec:{method}"
             expires_at = float(timestamp + MAX_TIMESTAMP_DIFF_SECONDS)
             if not self._state_provider().reserve_nonce(
                 namespace=namespace,
@@ -249,13 +235,11 @@ def create_serverappio_superexec_auth_server_interceptor(
     *,
     state_provider: Callable[[], _NonceState],
     master_secret: bytes,
-    expected_audience: str,
 ) -> SuperExecAuthServerInterceptor:
     """Create SuperExec auth interceptor for ServerAppIo."""
     return SuperExecAuthServerInterceptor(
         state_provider=state_provider,
         master_secret=master_secret,
-        expected_audience=expected_audience,
         protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
     )
 
@@ -264,12 +248,10 @@ def create_clientappio_superexec_auth_server_interceptor(
     *,
     state_provider: Callable[[], _NonceState],
     master_secret: bytes,
-    expected_audience: str,
 ) -> SuperExecAuthServerInterceptor:
     """Create SuperExec auth interceptor for ClientAppIo."""
     return SuperExecAuthServerInterceptor(
         state_provider=state_provider,
         master_secret=master_secret,
-        expected_audience=expected_audience,
         protected_methods=CLIENTAPPIO_SUPEREXEC_METHODS,
     )
