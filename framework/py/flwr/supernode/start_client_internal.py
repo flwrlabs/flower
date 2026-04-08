@@ -105,7 +105,6 @@ def start_client_internal(
     health_server_address: str | None = None,
     trusted_entities: dict[str, str] | None = None,
     superexec_auth_secret: bytes | None = None,
-    superexec_auth_secret_file: str | None = None,
 ) -> None:
     """Start a Flower client node which connects to a Flower server.
 
@@ -161,8 +160,6 @@ def start_client_internal(
         entities can run on a supernode.
     superexec_auth_secret : Optional[bytes] (default: None)
         Secret used by ClientAppIo SuperExec metadata auth.
-    superexec_auth_secret_file : Optional[str] (default: None)
-        Secret file path used for optional process-mode SuperExec auth.
     """
     if insecure is None:
         insecure = root_certificates is None
@@ -185,7 +182,7 @@ def start_client_internal(
     state_factory = NodeStateFactory(objectstore_factory=object_store_factory)
 
     if isolation == ISOLATION_MODE_SUBPROCESS:
-        if superexec_auth_secret is not None or superexec_auth_secret_file is not None:
+        if superexec_auth_secret is not None:
             log(
                 WARN,
                 "SuperExec auth is disabled for ClientAppIo in subprocess isolation "
@@ -665,7 +662,7 @@ def run_clientappio_api_grpc(  # pylint: disable=R0913,R0917
                 master_secret=superexec_auth_secret,
             )
         )
-        interceptors = [superexec_auth_interceptor, auth_interceptor]
+        interceptors.append(superexec_auth_interceptor)
     clientappio_add_servicer_to_server_fn = add_ClientAppIoServicer_to_server
     clientappio_grpc_server = generic_create_grpc_server(
         servicer_and_add_fn=(

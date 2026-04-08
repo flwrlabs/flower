@@ -64,15 +64,20 @@ def flower_supernode() -> None:
         _validate_public_keys_ed25519(trusted_entities)
     root_certificates = try_obtain_root_certificates(args, args.superlink)
     authentication_keys = _try_setup_client_authentication(args)
-    try:
-        superexec_auth_secret = load_superexec_auth_secret(
-            secret_file=args.superexec_auth_secret_file,
-        )
-    except (OSError, ValueError) as err:
-        flwr_exit(
-            ExitCode.SUPERNODE_INVALID_TRUSTED_ENTITIES,
-            f"Failed to load SuperExec auth secret: {err}",
-        )
+    superexec_auth_secret = None
+    if (
+        args.isolation != ISOLATION_MODE_SUBPROCESS
+        and args.superexec_auth_secret_file is not None
+    ):
+        try:
+            superexec_auth_secret = load_superexec_auth_secret(
+                secret_file=args.superexec_auth_secret_file,
+            )
+        except (OSError, ValueError) as err:
+            flwr_exit(
+                ExitCode.SUPEREXEC_AUTH_SECRET_LOAD_FAILED,
+                f"Failed to load SuperExec auth secret: {err}",
+            )
 
     # Warn if authentication keys are provided but transport is not grpc-rere
     if authentication_keys is not None and args.transport != TRANSPORT_TYPE_GRPC_RERE:
@@ -99,7 +104,6 @@ def flower_supernode() -> None:
         health_server_address=args.health_server_address,
         trusted_entities=trusted_entities,
         superexec_auth_secret=superexec_auth_secret,
-        superexec_auth_secret_file=args.superexec_auth_secret_file,
     )
 
 
