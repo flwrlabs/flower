@@ -224,7 +224,9 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 nonce=cast(str, nonce),
                 body_sha256=body_sha256,
             )
-            if not verify_superexec_signature(expected_signature, cast(str, signature)):
+            if not verify_superexec_signature(
+                expected_signature, cast(str, signature)
+            ):
                 _abort_auth_denied(context)
 
             namespace = f"superexec:{method}"
