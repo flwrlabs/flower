@@ -73,8 +73,13 @@ def _abort_auth_denied(context: grpc.ServicerContext) -> NoReturn:
 
 
 def _unauthenticated_terminator() -> grpc.RpcMethodHandler:
-    def _terminate(_request: GrpcMessage, context: grpc.ServicerContext) -> GrpcMessage:
-        context.abort(grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE)
+    def _terminate(
+        _request: GrpcMessage, context: grpc.ServicerContext
+    ) -> GrpcMessage:
+        context.abort(
+            grpc.StatusCode.UNAUTHENTICATED,
+            AUTHENTICATION_FAILED_MESSAGE,
+        )
         raise RuntimeError("Should not reach this point")
 
     return grpc.unary_unary_rpc_method_handler(_terminate)
