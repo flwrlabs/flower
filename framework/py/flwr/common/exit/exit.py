@@ -69,6 +69,7 @@ def flwr_exit(
     -----
     This function MUST be called from the main thread.
     """
+    print(f"DEBUG: `flwr_exit` called with code {code} and message: {message}")
     is_error = not 0 <= code < 100  # 0-99 are success exit codes
 
     # Construct exit message
@@ -98,6 +99,7 @@ def flwr_exit(
 
     # Start a daemon thread to force exit if graceful exit fails
     def force_exit() -> None:
+        print(f"DEBUG: Force exit thread started, will exit in {FORCE_EXIT_TIMEOUT_SECONDS} seconds if not already exited.")
         time.sleep(FORCE_EXIT_TIMEOUT_SECONDS)
         os._exit(sys_exit_code)
 

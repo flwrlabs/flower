@@ -86,6 +86,7 @@ def register_signal_handlers(
         When called will reset signal handler to original signal handler from
         default_handlers.
         """
+        print(f"DEBUG: Received signal {signalnum}, initiating graceful shutdown.")
         # Reset to default handler
         signal.signal(signalnum, default_handlers[signalnum])  # type: ignore
 
