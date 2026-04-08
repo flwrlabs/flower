@@ -43,7 +43,6 @@ from flwr.supernode.nodestate import NodeStateFactory
 from flwr.supernode.start_client_internal import run_clientappio_api_grpc
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
-_SUPEREXEC_AUDIENCE = "clientappio:9094"
 _CLIENTAPPIO_SUPEREXEC_METHODS = (
     "/flwr.proto.ClientAppIo/ListAppsToLaunch",
     "/flwr.proto.ClientAppIo/RequestToken",
@@ -92,7 +91,6 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):
             grpc.insecure_channel(CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS),
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
-                audience=_SUPEREXEC_AUDIENCE,
                 protected_methods=_CLIENTAPPIO_SUPEREXEC_METHODS,
             ),
         )
