@@ -32,7 +32,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PullObjectRequest,
     PullObjectResponse,
 )
-from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.interceptors import APP_TOKEN_HEADER, AUTHENTICATION_FAILED_MESSAGE
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supernode.nodestate import NodeStateFactory
@@ -49,7 +48,6 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):
 
         objectstore_factory = ObjectStoreFactory()
         state_factory = NodeStateFactory(objectstore_factory=objectstore_factory)
-        ffs_factory = FfsFactory(self.temp_dir.name)
 
         state = state_factory.state()
         token = state.create_token(99)
@@ -59,7 +57,6 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):
         self._server: grpc.Server = run_clientappio_api_grpc(
             CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
             state_factory,
-            ffs_factory,
             objectstore_factory,
             None,
         )
