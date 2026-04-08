@@ -55,7 +55,7 @@ class Array(InflatableObject):
     A dataclass containing serialized data from an array-like or tensor-like object
     along with metadata about it. The class can be initialized in one of three ways:
 
-    1. By specifying explicit values for `dtype`, `shape`, `stype`, and `data`.
+    1. By specifying explicit values for ``dtype``, ``shape``, ``stype``, and ``data``.
     2. By providing a NumPy ndarray (via the `ndarray` argument).
     3. By providing a PyTorch tensor (via the `torch_tensor` argument).
 
