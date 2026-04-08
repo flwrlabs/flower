@@ -29,7 +29,6 @@ from flwr.supercore.auth import (
     compute_request_body_sha256,
     compute_superexec_signature,
     derive_auth_secret,
-    extract_single_str_metadata,
     verify_superexec_signature,
 )
 from flwr.supercore.constant import (
@@ -40,6 +39,7 @@ from flwr.supercore.constant import (
     SUPEREXEC_AUTH_SIGNATURE_HEADER,
     SUPEREXEC_AUTH_TIMESTAMP_HEADER,
 )
+from flwr.supercore.utils import get_metadata_str
 
 from .appio_token_interceptor import AUTHENTICATION_FAILED_MESSAGE
 
@@ -176,26 +176,17 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             request: GrpcMessage,
             context: grpc.ServicerContext,
         ) -> GrpcMessage:
-            ts_raw = extract_single_str_metadata(
-                metadata, SUPEREXEC_AUTH_TIMESTAMP_HEADER
-            )
-            nonce = extract_single_str_metadata(metadata, SUPEREXEC_AUTH_NONCE_HEADER)
-            body_sha256_header = extract_single_str_metadata(
+            ts_raw = get_metadata_str(metadata, SUPEREXEC_AUTH_TIMESTAMP_HEADER)
+            nonce = get_metadata_str(metadata, SUPEREXEC_AUTH_NONCE_HEADER)
+            body_sha256_header = get_metadata_str(
                 metadata, SUPEREXEC_AUTH_BODY_SHA256_HEADER
             )
-            signature = extract_single_str_metadata(
-                metadata, SUPEREXEC_AUTH_SIGNATURE_HEADER
-            )
-            if None in {
-                ts_raw,
-                nonce,
-                body_sha256_header,
-                signature,
-            }:
+            signature = get_metadata_str(metadata, SUPEREXEC_AUTH_SIGNATURE_HEADER)
+            if not ts_raw or not nonce or not body_sha256_header or not signature:
                 _abort_auth_denied(context)
 
             try:
-                timestamp = int(cast(str, ts_raw))
+                timestamp = int(ts_raw)
             except (TypeError, ValueError):
                 _abort_auth_denied(context)
             time_diff = now().timestamp() - timestamp
@@ -213,17 +204,17 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 auth_secret=self._auth_secret,
                 method=method,
                 timestamp=timestamp,
-                nonce=cast(str, nonce),
+                nonce=nonce,
                 body_sha256=body_sha256,
             )
-            if not verify_superexec_signature(expected_signature, cast(str, signature)):
+            if not verify_superexec_signature(expected_signature, signature):
                 _abort_auth_denied(context)
 
             namespace = f"superexec:{method}"
             expires_at = float(timestamp + MAX_TIMESTAMP_DIFF_SECONDS)
             if not self._state_provider().reserve_nonce(
                 namespace=namespace,
-                nonce=cast(str, nonce),
+                nonce=nonce,
                 expires_at=expires_at,
             ):
                 _abort_auth_denied(context)

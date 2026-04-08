@@ -130,6 +130,6 @@ class CoreState(ABC):
         Returns
         -------
         bool
-            True if the nonce was reserved. False if the request is invalid or
+            True if the nonce was reserved. False if the input is invalid or
             the nonce already exists and is active.
         """

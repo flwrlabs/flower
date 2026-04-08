@@ -17,7 +17,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from typing import Any, NoReturn, Protocol, cast
 
 import grpc
@@ -28,6 +28,7 @@ from flwr.supercore.auth import (
     SERVERAPPIO_METHOD_AUTH_POLICY,
     MethodTokenPolicy,
 )
+from flwr.supercore.utils import get_metadata_str
 
 APP_TOKEN_HEADER = "flwr-app-token"
 AUTHENTICATION_FAILED_MESSAGE = "Authentication failed."
@@ -54,18 +55,6 @@ def _unauthenticated_terminator() -> grpc.RpcMethodHandler:
         raise RuntimeError("Should not reach this point")
 
     return grpc.unary_unary_rpc_method_handler(_terminate)
-
-
-def _extract_token_from_metadata(
-    metadata: Sequence[tuple[str, str | bytes]] | None,
-) -> str | None:
-    values = [value for key, value in metadata or () if key == APP_TOKEN_HEADER]
-    if len(values) != 1:
-        return None
-    token = values[0]
-    if not isinstance(token, str) or token == "":
-        return None
-    return token
 
 
 class AppIoTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ignore
@@ -125,15 +114,15 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             Callable[[GrpcMessage, grpc.ServicerContext], GrpcMessage],
             method_handler.unary_unary,
         )
-        metadata_token = _extract_token_from_metadata(
-            handler_call_details.invocation_metadata
+        token = get_metadata_str(
+            handler_call_details.invocation_metadata,
+            APP_TOKEN_HEADER,
         )
 
         def _authenticated_handler(
             request: GrpcMessage,
             context: grpc.ServicerContext,
         ) -> GrpcMessage:
-            token = metadata_token
             if token is None:
                 _abort_auth_denied(context)
 

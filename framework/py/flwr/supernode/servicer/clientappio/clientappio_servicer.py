@@ -30,7 +30,7 @@ from flwr.common.serde import (
     message_to_proto,
     run_to_proto,
 )
-from flwr.common.typing import Fab, Run
+from flwr.common.typing import Run
 
 # pylint: disable=E0611
 from flwr.proto import clientappio_pb2_grpc
@@ -58,9 +58,6 @@ from flwr.proto.message_pb2 import (
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
-
-# pylint: disable=E0601
-from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
 from flwr.supernode.nodestate import NodeStateFactory
@@ -73,11 +70,9 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
     def __init__(
         self,
         state_factory: NodeStateFactory,
-        ffs_factory: FfsFactory,
         objectstore_factory: ObjectStoreFactory,
     ) -> None:
         self.state_factory = state_factory
-        self.ffs_factory = ffs_factory
         self.objectstore_factory = objectstore_factory
 
     def ListAppsToLaunch(
@@ -135,9 +130,8 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
         """Pull Message, Context, and Run."""
         log(DEBUG, "ClientAppIo.PullAppInputs")
 
-        # Initialize state and ffs connection
+        # Initialize state connection
         state = self.state_factory.state()
-        ffs = self.ffs_factory.ffs()
 
         # Validate the token
         run_id = state.get_run_id_by_token(request.token)
@@ -152,21 +146,19 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
         context = cast(Context, state.get_context(run_id))
         run = cast(Run, state.get_run(run_id))
 
-        # Retrieve FAB from FFS
-        if result := ffs.get(run.fab_hash):
-            content, verifications = result
+        # Retrieve FAB from NodeState
+        if fab := state.get_fab(run.fab_hash):
             log(
                 DEBUG,
                 "Retrieved FAB: hash=%s, content_len=%d, verifications=%s",
                 run.fab_hash,
-                len(content),
-                verifications,
+                len(fab.content),
+                fab.verifications,
             )
-            fab = Fab(run.fab_hash, content, verifications)
         else:
             context.abort(
                 grpc.StatusCode.NOT_FOUND,
-                f"FAB with hash {run.fab_hash} not found in FFS.",
+                f"FAB with hash {run.fab_hash} not found in NodeState.",
             )
             raise RuntimeError("This line should never be reached.")
 
