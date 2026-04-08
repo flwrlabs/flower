@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-07 01:25+0000\n"
+"POT-Creation-Date: 2026-04-08 01:25+0000\n"
 "PO-Revision-Date: 2024-08-23 13:09+0000\n"
 "Last-Translator: Seulki Yun <icstuckyi@gmail.com>\n"
 "Language: ko\n"
@@ -7248,15 +7248,6 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
-msgid "`superlink.simulation.enabled`"
-msgstr "flower 초연결"
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Launch the SimulationIo API server in place of the"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
 msgid "`superlink.isolationMode`"
 msgstr "해결법"
 
@@ -7442,39 +7433,6 @@ msgid "Node port for SuperLink Fleet API"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "`superlink.service.servicePortSimulationIoName`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Prefix of the SuperLink SimulationIo API port"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
-msgid "`simulationio`"
-msgstr "CLI 시뮬레이션"
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "`superlink.service.servicePortSimulationIo`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Port to expose for the SuperLink SimulationIo API"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "`9096`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "`superlink.service.nodePortSimulationIo`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Node port for SuperLink SimulationIo API"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
 msgid "`superlink.containerPorts.control`"
 msgstr "SuperNode Dockerfile 만들기"
@@ -7501,14 +7459,6 @@ msgstr "SuperNode Dockerfile 만들기"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Container port for SuperLink Fleet API"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "`superlink.containerPorts.simulationIo`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Container port for SuperLink SimulationIo API"
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
@@ -7930,39 +7880,6 @@ msgid "`superlink.ingress.serverAppIo.pathType`"
 msgstr "flower 초연결"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "`superlink.ingress.simulationIo.enabled`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Enable an ingress resource for SuperLink SimulationIo API"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "`superlink.ingress.simulationIo.hostname`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "Ingress hostname for the SuperLink SimulationIo API ingress"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-#, fuzzy
-msgid "`simulation.example.com`"
-msgstr "시뮬레이션 예제"
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "`superlink.ingress.simulationIo.path`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "SuperLink SimulationIo API ingress path"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "`superlink.ingress.simulationIo.pathType`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "`superlink.ingress.extraHosts`"
 msgstr ""
 
@@ -8081,7 +7998,7 @@ msgstr "flower 초연결"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
-msgid "`1.26.1-ubuntu`"
+msgid "`1.28.0-ubuntu`"
 msgstr "``ubuntu``"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
@@ -8201,19 +8118,7 @@ msgstr ""
 msgid "`superlink.networkPolicy.control.ingressNSPodMatchLabels`"
 msgstr ""
 
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "`superlink.networkPolicy.simulationIo.ingressPodMatchLabels`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "`superlink.networkPolicy.simulationIo.ingressNSMatchLabels`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
-msgid "`superlink.networkPolicy.simulationIo.ingressNSPodMatchLabels`"
-msgstr ""
-
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:858
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:846
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:347
 #, fuzzy
 msgid "Component SuperExec"
@@ -8677,7 +8582,7 @@ msgstr ""
 msgid "`superexec.networkPolicy.extraEgress`"
 msgstr ""
 
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:912
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:900
 #, fuzzy
 msgid "Component OpenFGA"
 msgstr "공통"
@@ -70986,5 +70891,74 @@ msgstr ""
 #~ msgstr "``flwr/base``"
 
 #~ msgid "Here's how this looks in code:"
+#~ msgstr ""
+
+#~ msgid "`superlink.simulation.enabled`"
+#~ msgstr "flower 초연결"
+
+#~ msgid "Launch the SimulationIo API server in place of the"
+#~ msgstr ""
+
+#~ msgid "`superlink.service.servicePortSimulationIoName`"
+#~ msgstr ""
+
+#~ msgid "Prefix of the SuperLink SimulationIo API port"
+#~ msgstr ""
+
+#~ msgid "`simulationio`"
+#~ msgstr "CLI 시뮬레이션"
+
+#~ msgid "`superlink.service.servicePortSimulationIo`"
+#~ msgstr ""
+
+#~ msgid "Port to expose for the SuperLink SimulationIo API"
+#~ msgstr ""
+
+#~ msgid "`9096`"
+#~ msgstr ""
+
+#~ msgid "`superlink.service.nodePortSimulationIo`"
+#~ msgstr ""
+
+#~ msgid "Node port for SuperLink SimulationIo API"
+#~ msgstr ""
+
+#~ msgid "`superlink.containerPorts.simulationIo`"
+#~ msgstr ""
+
+#~ msgid "Container port for SuperLink SimulationIo API"
+#~ msgstr ""
+
+#~ msgid "`superlink.ingress.simulationIo.enabled`"
+#~ msgstr ""
+
+#~ msgid "Enable an ingress resource for SuperLink SimulationIo API"
+#~ msgstr ""
+
+#~ msgid "`superlink.ingress.simulationIo.hostname`"
+#~ msgstr ""
+
+#~ msgid "Ingress hostname for the SuperLink SimulationIo API ingress"
+#~ msgstr ""
+
+#~ msgid "`simulation.example.com`"
+#~ msgstr "시뮬레이션 예제"
+
+#~ msgid "`superlink.ingress.simulationIo.path`"
+#~ msgstr ""
+
+#~ msgid "SuperLink SimulationIo API ingress path"
+#~ msgstr ""
+
+#~ msgid "`superlink.ingress.simulationIo.pathType`"
+#~ msgstr ""
+
+#~ msgid "`superlink.networkPolicy.simulationIo.ingressPodMatchLabels`"
+#~ msgstr ""
+
+#~ msgid "`superlink.networkPolicy.simulationIo.ingressNSMatchLabels`"
+#~ msgstr ""
+
+#~ msgid "`superlink.networkPolicy.simulationIo.ingressNSPodMatchLabels`"
 #~ msgstr ""
 

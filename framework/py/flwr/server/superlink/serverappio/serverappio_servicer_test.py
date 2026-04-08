@@ -17,6 +17,7 @@
 # pylint: disable=too-many-lines
 
 
+import hashlib
 import os
 import tempfile
 import threading
@@ -37,7 +38,7 @@ from flwr.common.constant import (
 from flwr.common.message import get_message_to_descendant_id_mapping
 from flwr.common.serde import context_to_proto, message_from_proto, run_status_to_proto
 from flwr.common.serde_test import RecordMaker
-from flwr.common.typing import RunStatus
+from flwr.common.typing import Fab, RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ListAppsToLaunchRequest,
     ListAppsToLaunchResponse,
@@ -85,7 +86,6 @@ from flwr.server.superlink.serverappio.serverappio_servicer import _raise_if
 from flwr.server.superlink.utils import _STATUS_TO_MSG
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
 from flwr.supercore.date import now
-from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_id,
@@ -145,7 +145,6 @@ def test_raise_if_true() -> None:
 
 def _start_serverappio_with_port_retry(
     state_factory: LinkStateFactory,
-    ffs_factory: FfsFactory,
     objectstore_factory: ObjectStoreFactory,
     start_port: int,
 ) -> grpc.Server:
@@ -155,7 +154,6 @@ def _start_serverappio_with_port_retry(
             return run_serverappio_api_grpc(
                 address,
                 state_factory,
-                ffs_factory,
                 objectstore_factory,
                 None,
             )
@@ -173,8 +171,6 @@ def _create_shared_runtime(
     tmpdir: str,
 ) -> tuple[int, LinkState, grpc.Server, grpc.Server]:
     database_path = os.path.join(tmpdir, "shared.db")
-    storage_dir = os.path.join(tmpdir, "ffs")
-    os.makedirs(storage_dir, exist_ok=True)
 
     objectstore_factory_0 = ObjectStoreFactory()
     objectstore_factory_1 = ObjectStoreFactory()
@@ -185,9 +181,10 @@ def _create_shared_runtime(
         database_path, NoOpFederationManager(), objectstore_factory_1
     )
     state_0 = state_factory_0.state()
-    ffs_factory_0 = FfsFactory(storage_dir)
-    ffs_factory_1 = FfsFactory(storage_dir)
-    fab_hash = ffs_factory_0.ffs().put(b"mock fab content", {})
+    fab_content = b"mock fab content"
+    fab_hash = state_0.store_fab(
+        Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
+    )
 
     run_id = state_0.create_run(
         "",
@@ -204,13 +201,11 @@ def _create_shared_runtime(
     )
     server_0 = _start_serverappio_with_port_retry(
         state_factory_0,
-        ffs_factory_0,
         objectstore_factory_0,
         start_port=19091,
     )
     server_1 = _start_serverappio_with_port_retry(
         state_factory_1,
-        ffs_factory_1,
         objectstore_factory_1,
         start_port=19141,
     )
@@ -293,17 +288,11 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 
     def setUp(self) -> None:
         """Initialize mock stub and server interceptor."""
-        # Create a temporary directory
-        self.temp_dir = tempfile.TemporaryDirectory()  # pylint: disable=R1732
-        self.addCleanup(self.temp_dir.cleanup)  # Ensures cleanup after test
-
         objectstore_factory = ObjectStoreFactory()
         state_factory = LinkStateFactory(
             FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), objectstore_factory
         )
         self.state = state_factory.state()
-        ffs_factory = FfsFactory(self.temp_dir.name)
-        self.ffs = ffs_factory.ffs()
         self.store = objectstore_factory.store()
         self.node_pk = b"fake public key"
         self.node_id = self.state.create_node(
@@ -316,7 +305,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         self._server: grpc.Server = run_serverappio_api_grpc(
             SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
             state_factory,
-            ffs_factory,
             objectstore_factory,
             None,
         )
@@ -1110,7 +1098,10 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         """Test `RequestToken` and `PullAppInputs` transitions run status from PENDING
         to STARTING to RUNNING."""
         # Prepare: Create a run with FAB
-        fab_hash = self.ffs.put(b"mock fab content", {})
+        fab_content = b"mock fab content"
+        fab_hash = self.state.store_fab(
+            Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
+        )
         run_id = self._create_dummy_run(running=False, fab_hash=fab_hash)
 
         # Set serverapp context
