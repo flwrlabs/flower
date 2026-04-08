@@ -73,9 +73,7 @@ def _abort_auth_denied(context: grpc.ServicerContext) -> NoReturn:
 
 
 def _unauthenticated_terminator() -> grpc.RpcMethodHandler:
-    def _terminate(
-        _request: GrpcMessage, context: grpc.ServicerContext
-    ) -> GrpcMessage:
+    def _terminate(_request: GrpcMessage, context: grpc.ServicerContext) -> GrpcMessage:
         context.abort(
             grpc.StatusCode.UNAUTHENTICATED,
             AUTHENTICATION_FAILED_MESSAGE,
@@ -120,17 +118,6 @@ class SuperExecAuthClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type:
         )
 
         metadata = list(client_call_details.metadata or [])
-        auth_headers = {
-            SUPEREXEC_AUTH_TIMESTAMP_HEADER,
-            SUPEREXEC_AUTH_NONCE_HEADER,
-            SUPEREXEC_AUTH_BODY_SHA256_HEADER,
-            SUPEREXEC_AUTH_SIGNATURE_HEADER,
-        }
-        metadata = [
-            (key, value)
-            for key, value in metadata
-            if key not in auth_headers
-        ]
         metadata.extend(
             [
                 (SUPEREXEC_AUTH_TIMESTAMP_HEADER, str(timestamp)),
@@ -192,23 +179,16 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             signature = extract_single_str_metadata(
                 metadata, SUPEREXEC_AUTH_SIGNATURE_HEADER
             )
-            if None in {
-                ts_raw,
-                nonce,
-                body_sha256_header,
-                signature,
-            }:
+            if not ts_raw or not nonce or not body_sha256_header or not signature:
                 _abort_auth_denied(context)
 
             try:
-                timestamp = int(cast(str, ts_raw))
+                timestamp = int(ts_raw)
             except (TypeError, ValueError):
                 _abort_auth_denied(context)
             time_diff = now().timestamp() - timestamp
             is_timestamp_in_window = (
-                MIN_TIMESTAMP_DIFF_SECONDS
-                < time_diff
-                < MAX_TIMESTAMP_DIFF_SECONDS
+                MIN_TIMESTAMP_DIFF_SECONDS < time_diff < MAX_TIMESTAMP_DIFF_SECONDS
             )
             if not is_timestamp_in_window:
                 _abort_auth_denied(context)
@@ -221,19 +201,17 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 auth_secret=self._auth_secret,
                 method=method,
                 timestamp=timestamp,
-                nonce=cast(str, nonce),
+                nonce=nonce,
                 body_sha256=body_sha256,
             )
-            if not verify_superexec_signature(
-                expected_signature, cast(str, signature)
-            ):
+            if not verify_superexec_signature(expected_signature, signature):
                 _abort_auth_denied(context)
 
             namespace = f"superexec:{method}"
             expires_at = float(timestamp + MAX_TIMESTAMP_DIFF_SECONDS)
             if not self._state_provider().reserve_nonce(
                 namespace=namespace,
-                nonce=cast(str, nonce),
+                nonce=nonce,
                 expires_at=expires_at,
             ):
                 _abort_auth_denied(context)
