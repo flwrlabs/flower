@@ -1,0 +1,37 @@
+{
+  "name": "flwr",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "demo": "tsc && ts-node demo/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/elliptic": "^6.4.18",
+    "@types/jest": "^29.5.13",
+    "@types/lodash": "^4.17.10",
+    "@types/node": "^22.7.4",
+    "@types/yauzl": "^2.10.3",
+    "eslint": "^9.10.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.3.3",
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.11.3",
+    "@iarna/toml": "^2.2.5",
+    "@protobuf-ts/grpc-transport": "^2.9.4",
+    "@protobuf-ts/runtime-rpc": "^2.9.4",
+    "commander": "^12.1.0",
+    "elliptic": "^6.5.7",
+    "lodash": "^4.17.21",
+    "yauzl": "^3.1.3"
+  }
+}

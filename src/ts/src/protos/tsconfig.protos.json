@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noUnusedLocals": false, // Disable unused locals only for protos
+    "noUnusedParameters": false
+  },
+  "include": ["**/*.ts"]
+}
