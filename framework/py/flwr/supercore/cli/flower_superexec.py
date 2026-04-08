@@ -116,9 +116,9 @@ def flower_superexec() -> None:
             superexec_auth_secret = load_superexec_auth_secret(
                 secret_file=args.superexec_auth_secret_file,
             )
-        except (OSError, ValueError) as err:
+        except ValueError as err:
             flwr_exit(
-                ExitCode.SUPEREXEC_INVALID_PLUGIN_CONFIG,
+                ExitCode.SUPEREXEC_AUTH_SECRET_LOAD_FAILED,
                 f"Failed to load SuperExec auth secret: {err}",
             )
     run_superexec(
