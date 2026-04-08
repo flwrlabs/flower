@@ -67,7 +67,6 @@ def flower_supernode() -> None:
     try:
         superexec_auth_secret = load_superexec_auth_secret(
             secret_file=args.superexec_auth_secret_file,
-            secret_stdin=args.superexec_auth_secret_stdin,
         )
     except (OSError, ValueError) as err:
         flwr_exit(
@@ -100,6 +99,7 @@ def flower_supernode() -> None:
         health_server_address=args.health_server_address,
         trusted_entities=trusted_entities,
         superexec_auth_secret=superexec_auth_secret,
+        superexec_auth_secret_file=args.superexec_auth_secret_file,
     )
 
 
