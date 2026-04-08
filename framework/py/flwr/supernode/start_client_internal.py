@@ -190,10 +190,7 @@ def start_client_internal(
             ExitCode.COMMON_ADDRESS_INVALID,
             "Missing SuperExec auth secret. Provide --superexec-auth-secret-file.",
         )
-    if (
-        isolation == ISOLATION_MODE_SUBPROCESS
-        and superexec_auth_secret_file is None
-    ):
+    if isolation == ISOLATION_MODE_SUBPROCESS and superexec_auth_secret_file is None:
         flwr_exit(
             ExitCode.COMMON_ADDRESS_INVALID,
             "Missing SuperExec auth secret file for subprocess mode. "
@@ -229,6 +226,7 @@ def start_client_internal(
 
     # Launch the SuperExec if the isolation mode is `subprocess`
     if isolation == ISOLATION_MODE_SUBPROCESS:
+        assert superexec_auth_secret_file is not None
         command = ["flower-superexec", "--insecure"]
         command += [
             "--appio-api-address",
