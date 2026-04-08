@@ -27,7 +27,10 @@ from .superexec import (
     extract_single_str_metadata,
     verify_superexec_signature,
 )
-from .superexec_secret import add_superexec_auth_secret_args, load_superexec_auth_secret
+from .superexec_secret import (
+    add_superexec_auth_secret_args,
+    load_superexec_auth_secret,
+)
 
 __all__ = [
     "CLIENTAPPIO_METHOD_AUTH_POLICY",
