@@ -421,11 +421,8 @@ class TestFactoryFunctions(TestCase):
             ),
         )
 
-        response = cast(
-            str,
-            intercepted.unary_unary(
-                PushObjectRequest(object_id="obj", object_content=b"x"),
-                Mock(),
-            ),
+        response = intercepted.unary_unary(
+            PushObjectRequest(object_id="obj", object_content=b"x"),
+            Mock(),
         )
         self.assertEqual(response, "ok")

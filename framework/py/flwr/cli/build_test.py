@@ -20,6 +20,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import pytest
+from parameterized import parameterized
 
 from .build import build_fab_from_files
 
@@ -65,13 +66,23 @@ def test_build_fab_from_files_missing_pyproject_raises() -> None:
         build_fab_from_files({"client.py": _DUMMY_PY})
 
 
-def test_build_fab_from_files_rejects_invalid_project_name() -> None:
+@parameterized.expand(  # type: ignore
+    [
+        ("app_numpy33",),
+        ("-appnumpy33",),
+        ("1appnumpy33",),
+        ("this-project-name-is-far-too-long-for-flower",),
+    ]
+)
+def test_build_fab_from_files_rejects_invalid_project_name(
+    project_name: str,
+) -> None:
     """Test shared FAB build rejects invalid project names."""
     files = {
         "pyproject.toml": (
-            b'[project]\nname = "app_numpy33"\nversion = "1.0.0"\n'
-            b'[tool.flwr.app]\npublisher = "alice"\n'
-        ),
+            f'[project]\nname = "{project_name}"\nversion = "1.0.0"\n'
+            '[tool.flwr.app]\npublisher = "alice"\n'
+        ).encode(),
         "client.py": _DUMMY_PY,
     }
 

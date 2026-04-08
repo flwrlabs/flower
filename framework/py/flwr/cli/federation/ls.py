@@ -121,7 +121,7 @@ def ls(  # pylint: disable=R0914, R0913, R0917, R0912
                     if simulation:
                         Console().print(_to_simulation_config_table(config))
                     else:
-                        Console().print(_to_nodes_table(nodes))
+                        Console().print(_to_nodes_table(nodes, archived))
                     Console().print(_to_runs_table(runs))
             else:
                 # List federations
@@ -221,13 +221,13 @@ def _to_json(  # pylint: disable=R0913,R0917
         members_list.append({"member_id": member.account.name, "role": member.role})
 
     for node in nodes:
-        nodes_list.append(
-            {
-                "node_id": f"{node.node_id}",
-                "owner": node.owner_name,
-                "status": node.status,
-            }
-        )
+        node_json: dict[str, Any] = {
+            "node_id": f"{node.node_id}",
+            "owner": node.owner_name,
+        }
+        if not archived:
+            node_json["status"] = node.status
+        nodes_list.append(node_json)
 
     for run in runs:
         runs_list.append(
@@ -311,13 +311,17 @@ def _to_members_table(members: list[Member]) -> Table:
     return table
 
 
-def _to_nodes_table(nodes: list[NodeInfo]) -> Table:
+def _to_nodes_table(nodes: list[NodeInfo], archived: bool) -> Table:
     """Format the provided list of federation nodes as a rich Table.
 
     Parameters
     ----------
     nodes : list[NodeInfo]
         List of NodeInfo objects containing node details.
+
+    archived : bool
+        Whether the federation is archived. If True, the status
+        column for nodes will not be rendered.
 
     Returns
     -------
@@ -338,7 +342,8 @@ def _to_nodes_table(nodes: list[NodeInfo]) -> Table:
         Text("Node ID", justify="center"), style="bright_black", no_wrap=True
     )
     table.add_column(Text("Owner", justify="center"))
-    table.add_column(Text("Status", justify="center"))
+    if not archived:
+        table.add_column(Text("Status", justify="center"))
 
     for row in nodes:
         owner_name = row.owner_name
@@ -355,15 +360,16 @@ def _to_nodes_table(nodes: list[NodeInfo]) -> Table:
         else:
             raise ValueError(f"Unexpected node status '{status}'")
 
-        formatted_row = (
+        formatted_row: list[str] = [
             f"[bold]{row.node_id}[/bold]",
             (
                 f"{owner_name}"
                 if owner_name != NOOP_ACCOUNT_NAME
                 else f"[dim]{owner_name}[/dim]"
             ),
-            f"[{status_style}]{status}",
-        )
+        ]
+        if not archived:
+            formatted_row.append(f"[{status_style}]{status}[/{status_style}]")
         table.add_row(*formatted_row)
 
     return table
