@@ -14,6 +14,8 @@
 # ==============================================================================
 """ServerAppIoServicer tests."""
 
+# pylint: disable=too-many-lines
+
 
 import os
 import tempfile
@@ -30,6 +32,7 @@ from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
     SUPERLINK_NODE_ID,
     Status,
+    SubStatus,
 )
 from flwr.common.message import get_message_to_descendant_id_mapping
 from flwr.common.serde import context_to_proto, message_from_proto, run_status_to_proto
@@ -89,6 +92,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     iterate_object_tree,
 )
+from flwr.supercore.interceptors import APP_TOKEN_HEADER, AppIoTokenClientInterceptor
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
@@ -249,7 +253,10 @@ def _claim_in_parallel(
     def claim_inputs(idx: int, pull_fn: grpc.UnaryUnaryMultiCallable) -> None:
         try:
             barrier.wait(timeout=timeout)
-            response, call = pull_fn.with_call(PullAppInputsRequest(token=token))
+            response, call = pull_fn.with_call(
+                PullAppInputsRequest(token=token),
+                metadata=((APP_TOKEN_HEADER, token),),
+            )
             del response
             results[idx] = call.code()
         except grpc.RpcError as err:
@@ -314,7 +321,24 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             None,
         )
 
-        self._channel = grpc.insecure_channel("localhost:9091")
+        # Provide a valid metadata token on the default test channel so existing
+        # servicer behavior tests continue to exercise business logic paths.
+        self._auth_run_id = self.state.create_run(
+            "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
+        )
+        auth_token = self.state.create_token(self._auth_run_id)
+        assert auth_token is not None
+        self._auth_token = auth_token
+        _ = self.state.update_run_status(
+            self._auth_run_id, RunStatus(Status.STARTING, "", "")
+        )
+        _ = self.state.update_run_status(
+            self._auth_run_id, RunStatus(Status.RUNNING, "", "")
+        )
+        self._channel = grpc.intercept_channel(
+            grpc.insecure_channel("localhost:9091"),
+            AppIoTokenClientInterceptor(token=self._auth_token),
+        )
         self._get_nodes = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/GetNodes",
             request_serializer=GetNodesRequest.SerializeToString,
@@ -675,10 +699,20 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = future_dt  # over TTL limit
 
+            token = self.state.create_token(run_id)
+            assert token is not None
             request = PullAppMessagesRequest(message_ids=[str(msg_id)], run_id=run_id)
+            pull_messages_plain = grpc.insecure_channel("localhost:9091").unary_unary(
+                "/flwr.proto.ServerAppIo/PullMessages",
+                request_serializer=PullAppMessagesRequest.SerializeToString,
+                response_deserializer=PullAppMessagesResponse.FromString,
+            )
 
             # Execute
-            response, call = self._pull_messages.with_call(request=request)
+            response, call = pull_messages_plain.with_call(
+                request=request,
+                metadata=((APP_TOKEN_HEADER, token),),
+            )
 
             # Assert
             assert isinstance(response, PullAppMessagesResponse)
@@ -1039,6 +1073,38 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Assert: Only one token is issued
         assert response1.token != ""
         assert response2.token == ""
+
+    def test_request_token_fail_closed_for_finished_run(self) -> None:
+        """Ensure `RequestToken` returns empty token for finished runs."""
+        # Prepare
+        run_id = self._create_dummy_run(running=False)
+        self._transition_run_status(run_id, 2)
+        assert self.state.update_run_status(
+            run_id,
+            RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done"),
+        )
+        before = self.state.get_run_status({run_id})[run_id]
+
+        # Execute
+        response, call = self._request_token.with_call(
+            request=RequestTokenRequest(run_id=run_id)
+        )
+
+        # Assert: token issuance fails closed
+        assert isinstance(response, RequestTokenResponse)
+        assert grpc.StatusCode.OK == call.code()
+        assert response.token == ""
+
+        # Assert: terminal run status/details remain unchanged
+        after = self.state.get_run_status({run_id})[run_id]
+        assert before.status == after.status == Status.FINISHED
+        assert before.sub_status == after.sub_status == SubStatus.COMPLETED
+        assert before.details == after.details == "done"
+
+        # Assert: no token was left behind for this run
+        token = self.state.create_token(run_id)
+        assert token is not None
+        self.state.delete_token(run_id)
 
     def test_run_status_transitions(self) -> None:
         """Test `RequestToken` and `PullAppInputs` transitions run status from PENDING

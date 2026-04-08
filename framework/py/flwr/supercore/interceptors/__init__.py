@@ -20,6 +20,7 @@ from .appio_token_interceptor import (
     AUTHENTICATION_FAILED_MESSAGE,
     AppIoTokenClientInterceptor,
     AppIoTokenServerInterceptor,
+    create_clientappio_token_auth_server_interceptor,
     create_serverappio_token_auth_server_interceptor,
 )
 
@@ -28,5 +29,6 @@ __all__ = [
     "AUTHENTICATION_FAILED_MESSAGE",
     "AppIoTokenClientInterceptor",
     "AppIoTokenServerInterceptor",
+    "create_clientappio_token_auth_server_interceptor",
     "create_serverappio_token_auth_server_interceptor",
 ]

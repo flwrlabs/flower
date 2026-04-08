@@ -20,6 +20,11 @@ Next, select the app you want to download. For example, to create an app from `@
 
 This command downloads the application from Flower Hub into your local environment.
 
+.. note::
+   Flower Hub apps can declare a FAB format version and Flower version compatibility
+   metadata. If your installed Flower version is incompatible with the selected
+   app, :code:`flwr new` can fail before download. See :doc:`fab-format-version`.
+
 
 Run a Hub App
 -------------
@@ -89,10 +94,17 @@ Finally, launch the run using :code:`flwr run`, pointing to the appropriate Supe
 Run a Hub App Without Creating It Locally
 -----------------------------------------
 
-In the Deployment Runtime, you can run an app directly from Flower Hub without first creating it locally. Note this assumes SuperNodes are already connected to the SuperLink:
+In both Simulation and Deployment Runtime (:code:`flwr>=1.27.0`), you can run an app directly from Flower Hub without first creating it locally.
+In the Deployment Runtime, this requires that SuperNodes are already connected to the SuperLink.
 
 .. code-block:: bash
 
-    flwr run @<account_name>/<app_name> --stream
+    flwr run @flwrlabs/quickstart-pytorch --stream
 
-In this case, the SuperLink downloads the app from Flower Hub and distributes the :code:`FAB` file to each SuperNode for execution.
+In this setup, the SuperLink downloads the app from Flower Hub and—when using the Deployment Runtime—distributes the :code:`FAB` file to each SuperNode for execution.
+
+.. note::
+   Remote Flower Hub runs may be rejected before download if the app's declared
+   Flower version compatibility does not match the Flower version used by the
+   local environment (Simulation) or the SuperNodes (Deployment). See
+   :doc:`fab-format-version`.

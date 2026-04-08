@@ -127,33 +127,16 @@ All corpora used in this work were derived from the MedRAG toolkit [[4]](#ref4).
 
 ## Run with Simulation Engine
 
-This example is designed to run with two virtual clients. Let's first locate the Flower Configuration file and modify one of the existing connections to make use of two nodes.
+This example is designed to run with two virtual `SuperNodes`. First we need to change the configuration of the Simulation Runtime (which by default uses 10 nodes). This guide assumes your default `SuperLink` connection points to one ready for simulations. If you aren't sure, please refer to the [How-to run Flower locally](https://flower.ai/docs/framework/how-to-run-flower-locally.html) guide.
 
-Locate your Flower configuration file by running:
-
-```shell
-flwr config list
-```
-
-```console
-# Example output:
-Flower Config file: /path/to/your/.flwr/config.toml
-SuperLink connections:
- supergrid
- local (default)
-```
-
-Modify the `local` connection so it has two supernodes:
-
-```TOML
-[superlink.local]
-options.num-supernodes = 2
+```bash
+flwr federation simulation-config --num-supernodes=2
 ```
 
 From the top-level directory for this example, launch the simulation:
 
 ```bash
-flwr run .
+flwr run .  --stream
 ```
 
 > [!TIP]

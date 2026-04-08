@@ -15,7 +15,7 @@
 """ServerAppIo API servicer."""
 
 
-from logging import DEBUG, ERROR, INFO
+from logging import DEBUG, ERROR, INFO, WARNING
 
 import grpc
 
@@ -133,15 +133,26 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         # Attempt to create a token for the provided run ID
         token = state.create_token(request.run_id)
 
-        # Transition the run to STARTING if token creation was successful
-        if token:
-            state.update_run_status(
-                run_id=request.run_id,
-                new_status=RunStatus(Status.STARTING, "", ""),
+        if not token:
+            return RequestTokenResponse(token="")
+
+        # Transition the run to STARTING. If this fails (e.g., stale run_id pointing
+        # to a non-launchable run), roll back token creation and fail closed.
+        if not state.update_run_status(
+            run_id=request.run_id,
+            new_status=RunStatus(Status.STARTING, "", ""),
+        ):
+            state.delete_token(request.run_id)
+            log(
+                WARNING,
+                "ServerAppIoServicer.RequestToken rolled back token for run %d: "
+                "failed to transition to STARTING.",
+                request.run_id,
             )
+            return RequestTokenResponse(token="")
 
         # Return the token
-        return RequestTokenResponse(token=token or "")
+        return RequestTokenResponse(token=token)
 
     def GetNodes(
         self, request: GetNodesRequest, context: grpc.ServicerContext
@@ -357,7 +368,7 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         log(DEBUG, "ServerAppIoServicer.PushAppOutputs")
 
         # Validate the token
-        run_id = self._verify_token(request.token, context)
+        _ = self._verify_token(request.token, context)
 
         # Init state and store
         state = self.state_factory.state()
@@ -373,9 +384,6 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         )
 
         state.set_serverapp_context(request.run_id, context_from_proto(request.context))
-
-        # Remove the token
-        state.delete_token(run_id)
         return PushAppOutputsResponse()
 
     def UpdateRunStatus(
@@ -398,6 +406,8 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
 
         # If the run is finished, delete the run from ObjectStore
         if request.run_status.status == Status.FINISHED:
+            # Remove the token once the run completes.
+            state.delete_token(request.run_id)
             # Delete all objects related to the run
             store.delete_objects_in_run(request.run_id)
 

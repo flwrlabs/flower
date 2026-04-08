@@ -27,6 +27,7 @@ from unittest.mock import Mock, patch
 import click
 import grpc
 import pytest
+from parameterized import parameterized
 
 from flwr.cli.constant import (
     LOCAL_CONTROL_API_ADDRESS,
@@ -40,7 +41,7 @@ from flwr.common.constant import (
     REFRESH_TOKEN_KEY,
 )
 from flwr.common.grpc import GRPC_MAX_MESSAGE_LENGTH
-from flwr.supercore.constant import MAX_DIR_DEPTH
+from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
 
 from .utils import (
     build_pathspec,
@@ -53,6 +54,7 @@ from .utils import (
     init_channel_from_connection,
     load_gitignore_patterns,
     validate_credentials_content,
+    validate_federation_name,
 )
 
 
@@ -445,3 +447,43 @@ def test_filter_paths_for_publish_max_depth_exceeded(
 def test_filter_paths_for_publish_empty() -> None:
     """Empty input returns empty output."""
     assert not filter_paths_for_publish({})
+
+
+@parameterized.expand(  # type: ignore
+    [
+        ("federation123", True, ""),  # alphanumeric
+        ("test-federation", True, ""),  # hyphenated
+        ("f" * MAX_NAME_LENGTH, True, ""),  # exactly_max_length
+        (
+            "f" * (MAX_NAME_LENGTH + 1),
+            False,
+            f"Must be no longer than {MAX_NAME_LENGTH} characters.",
+        ),  # too_long
+        ("", False, "Cannot be empty."),  # empty
+        ("-federation", False, "Must start with a letter."),  # starts_with_symbol
+        (
+            "test federation",
+            False,
+            "Can only contain letters, digits, and hyphens.",
+        ),  # contains_space
+        ("Testfederation", True, ""),  # uppercase allowed
+        (
+            "test_federation",
+            False,
+            "Can only contain letters, digits, and hyphens.",
+        ),  # invalid_symbol
+        (
+            "Test Federation!",
+            False,
+            "Can only contain letters, digits, and hyphens.",
+        ),  # multiple_violations
+    ]
+)
+def test_validate_federation_name(
+    name: str, expected_valid: bool, expected_message: str
+) -> None:
+    """Test federation name validator function."""
+    valid, message = validate_federation_name(name)
+
+    assert valid is expected_valid
+    assert message == expected_message

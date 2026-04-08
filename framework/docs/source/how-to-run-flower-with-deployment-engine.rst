@@ -225,6 +225,13 @@ testing locally, real deployments require TLS).
    If you want to rerun the project or test an updated version by making changes to the
    code, simply re-run the command above.
 
+.. tip::
+
+    You can setup your ``local-deployment`` profile as the default so you don't have to
+    specify it in every Flower CLI command that needs to connect to the SuperLink. For
+    that and more details about the Flower configuration, refer to the :doc:`the Flower
+    Configuration <ref-flower-configuration>` guide.
+
 ******************
  Step 4: Clean Up
 ******************

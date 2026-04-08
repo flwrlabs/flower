@@ -29,14 +29,20 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppMessagesRequest,
     PushAppOutputsRequest,
 )
+from flwr.proto.clientappio_pb2_grpc import ClientAppIoServicer
+from flwr.proto.message_pb2 import PushObjectRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoServicer
-from flwr.supercore.auth import SERVERAPPIO_METHOD_AUTH_POLICY
+from flwr.supercore.auth import (
+    CLIENTAPPIO_METHOD_AUTH_POLICY,
+    SERVERAPPIO_METHOD_AUTH_POLICY,
+)
 from flwr.supercore.interceptors import (
     APP_TOKEN_HEADER,
     AUTHENTICATION_FAILED_MESSAGE,
     AppIoTokenClientInterceptor,
     AppIoTokenServerInterceptor,
+    create_clientappio_token_auth_server_interceptor,
     create_serverappio_token_auth_server_interceptor,
 )
 
@@ -344,6 +350,14 @@ class TestMethodPolicyMaps(TestCase):
             if inspect.isfunction(ref) and not name.startswith("_")
         }
 
+    @staticmethod
+    def _clientappio_rpc_methods() -> set[str]:
+        return {
+            f"/flwr.proto.ClientAppIo/{name}"
+            for name, ref in inspect.getmembers(ClientAppIoServicer)
+            if inspect.isfunction(ref) and not name.startswith("_")
+        }
+
     def test_serverappio_policy_has_full_coverage(self) -> None:
         """ServerAppIo policy map should cover all RPC methods exactly."""
         expected_methods = self._serverappio_rpc_methods()
@@ -355,6 +369,21 @@ class TestMethodPolicyMaps(TestCase):
         no_auth_methods = {
             method.rsplit("/", maxsplit=1)[-1]
             for method, policy in SERVERAPPIO_METHOD_AUTH_POLICY.items()
+            if not policy.requires_token
+        }
+        self.assertEqual(no_auth_methods, expected_suffixes)
+
+    def test_clientappio_policy_has_full_coverage(self) -> None:
+        """ClientAppIo policy map should cover all RPC methods exactly."""
+        expected_methods = self._clientappio_rpc_methods()
+        self.assertEqual(set(CLIENTAPPIO_METHOD_AUTH_POLICY), expected_methods)
+
+    def test_clientappio_only_expected_no_auth_methods_exist(self) -> None:
+        """ClientAppIo should only mark bootstrap methods as no-auth."""
+        expected_suffixes = {"ListAppsToLaunch", "RequestToken", "GetRun"}
+        no_auth_methods = {
+            method.rsplit("/", maxsplit=1)[-1]
+            for method, policy in CLIENTAPPIO_METHOD_AUTH_POLICY.items()
             if not policy.requires_token
         }
         self.assertEqual(no_auth_methods, expected_suffixes)
@@ -377,4 +406,23 @@ class TestFactoryFunctions(TestCase):
         )
 
         response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=1), Mock()))
+        self.assertEqual(response, "ok")
+
+    def test_clientappio_factory_uses_client_policy(self) -> None:
+        """ClientAppIo factory should enforce ClientAppIo policy semantics."""
+        state = _TokenState({"valid-token": 1})
+        interceptor = create_clientappio_token_auth_server_interceptor(lambda: state)
+
+        intercepted = interceptor.intercept_service(
+            lambda _: _make_unary_handler(),
+            _HandlerCallDetails(
+                "/flwr.proto.ClientAppIo/PushObject",
+                invocation_metadata=((APP_TOKEN_HEADER, "valid-token"),),
+            ),
+        )
+
+        response = intercepted.unary_unary(
+            PushObjectRequest(object_id="obj", object_content=b"x"),
+            Mock(),
+        )
         self.assertEqual(response, "ok")

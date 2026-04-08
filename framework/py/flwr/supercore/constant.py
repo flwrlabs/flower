@@ -94,6 +94,7 @@ MIME_MAP = {
     ".md": "text/markdown; charset=utf-8",
     ".toml": "application/toml; charset=utf-8",
 }
+MAX_NAME_LENGTH = 32  # max length for app names; also used for federation names
 
 # Constants for federations
 NOOP_FEDERATION = f"@{NOOP_ACCOUNT_NAME}/default"
@@ -112,6 +113,7 @@ DEFAULT_SIMULATION_CONFIG = SimulationConfig(
 
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function
+TELEMETRY_TIMEOUT_SECONDS = 4  # Timeout for sending telemetry events during exit
 
 # Constants for message processing timing
 MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS = 3600
@@ -160,3 +162,20 @@ class RunType(str, Enum):
 
     SERVER_APP = "serverapp"
     SIMULATION = "simulation"
+
+
+class RunTime(str, Enum):
+    """Supported runtimes."""
+
+    DEPLOYMENT = "deployment"
+    SIMULATION = "simulation"
+
+
+class ActionType(str, Enum):
+    """Supported control action types."""
+
+    REGISTER_SUPERNODE = "register_supernode"
+    START_RUN = "start_run"
+    CREATE_FEDERATION = "create_federation"
+    CREATE_INVITATION = "create_invitation"
+    ACCEPT_INVITATION = "accept_invitation"

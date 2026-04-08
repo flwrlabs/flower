@@ -12,7 +12,7 @@ authors = [
     { name = "Kaushik Amar Das", email = "kaushik.das@iiitg.ac.in" },
 ]
 dependencies = [
-    "flwr[simulation]>=1.27.0",
+    "flwr[simulation]>=1.28.0",
     "flwr-datasets>=0.6.0",
     "torch==2.8.0",
     "transformers>=4.30.0,<5.0",
