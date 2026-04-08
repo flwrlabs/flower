@@ -334,7 +334,6 @@ def is_valid_name(name: str) -> tuple[bool, str]:
             return False, "Can only contain letters, digits, and hyphens."
 
     return True, ""
-    
 
 
 def _get_metadata_typed(

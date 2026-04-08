@@ -80,6 +80,8 @@ def test_flower_superexec_checks_for_update(
         flower_superexec_module.flower_superexec()
 
     assert captured == ["update", "flower-superexec"]
+
+
 def test_flower_superexec_clientapp_allows_missing_secret(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
