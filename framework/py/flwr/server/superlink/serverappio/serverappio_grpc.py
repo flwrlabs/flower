@@ -55,6 +55,8 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
         state_factory=state_factory,
         objectstore_factory=objectstore_factory,
     )
+
+    # Create interceptors
     interceptors = [
         create_serverappio_token_auth_server_interceptor(
             state_provider=state_factory.state
