@@ -205,7 +205,12 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             except (TypeError, ValueError):
                 _abort_auth_denied(context)
             time_diff = now().timestamp() - timestamp
-            if not MIN_TIMESTAMP_DIFF_SECONDS < time_diff < MAX_TIMESTAMP_DIFF_SECONDS:
+            is_timestamp_in_window = (
+                MIN_TIMESTAMP_DIFF_SECONDS
+                < time_diff
+                < MAX_TIMESTAMP_DIFF_SECONDS
+            )
+            if not is_timestamp_in_window:
                 _abort_auth_denied(context)
 
             body_sha256 = compute_request_body_sha256(request)
