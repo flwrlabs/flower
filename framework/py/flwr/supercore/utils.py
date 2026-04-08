@@ -19,7 +19,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 import requests
 
@@ -28,6 +28,8 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.supercore.version import package_version as flwr_version
 
 from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN, MAX_NAME_LENGTH
+
+T = TypeVar("T", str, bytes)
 
 
 def mask_string(value: str, head: int = 4, tail: int = 4) -> str:
@@ -331,3 +333,38 @@ def is_valid_name(name: str) -> tuple[bool, str]:
             return False, "Can only contain letters, digits, and hyphens."
 
     return True, ""
+
+
+def _get_metadata_typed(
+    metadata: list[tuple[str, str | bytes]] | tuple[tuple[str, str | bytes], ...],
+    key: str,
+    value_type: type[T],
+) -> T | None:
+    """Return exactly one non-empty string or bytes metadata value for `key`."""
+    values: list[Any] = [
+        value for metadata_key, value in metadata if metadata_key == key
+    ]
+    if len(values) != 1:
+        return None
+    value = values[0]
+    if not isinstance(value, value_type):
+        return None
+    if value in ("", b""):
+        return None
+    return value
+
+
+def get_metadata_str(
+    metadata: list[tuple[str, str | bytes]] | tuple[tuple[str, str | bytes], ...],
+    key: str,
+) -> str | None:
+    """Return exactly one non-empty string metadata value for `key`."""
+    return _get_metadata_typed(metadata, key, str)
+
+
+def get_metadata_bytes(
+    metadata: list[tuple[str, str | bytes]] | tuple[tuple[str, str | bytes], ...],
+    key: str,
+) -> bytes | None:
+    """Return exactly one non-empty bytes metadata value for `key`."""
+    return _get_metadata_typed(metadata, key, bytes)
