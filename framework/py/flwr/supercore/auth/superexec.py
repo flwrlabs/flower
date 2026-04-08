@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-from typing import Any
 
 from google.protobuf.message import Message as GrpcMessage
 
@@ -79,19 +78,3 @@ def verify_superexec_signature(
 ) -> bool:
     """Verify signatures with constant-time comparison."""
     return hmac.compare_digest(expected_signature, received_signature)
-
-
-def extract_single_str_metadata(
-    metadata: list[tuple[str, str | bytes]] | tuple[tuple[str, str | bytes], ...],
-    key: str,
-) -> str | None:
-    """Return exactly one non-empty string metadata value for `key`."""
-    values: list[Any] = [
-        value for metadata_key, value in metadata if metadata_key == key
-    ]
-    if len(values) != 1:
-        return None
-    value = values[0]
-    if not isinstance(value, str) or value == "":
-        return None
-    return value

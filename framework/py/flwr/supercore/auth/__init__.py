@@ -24,7 +24,6 @@ from .superexec import (
     compute_request_body_sha256,
     compute_superexec_signature,
     derive_auth_secret,
-    extract_single_str_metadata,
     verify_superexec_signature,
 )
 from .superexec_secret import add_superexec_auth_secret_args, load_superexec_auth_secret
@@ -37,7 +36,6 @@ __all__ = [
     "compute_request_body_sha256",
     "compute_superexec_signature",
     "derive_auth_secret",
-    "extract_single_str_metadata",
     "load_superexec_auth_secret",
     "verify_superexec_signature",
 ]
