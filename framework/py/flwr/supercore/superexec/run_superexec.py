@@ -34,9 +34,6 @@ from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.auth import (
-    derive_superexec_audience,
-)
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import SuperExecAuthClientInterceptor
 
@@ -63,7 +60,7 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
     appio_api_address : str
         The address of the AppIO API.
     superexec_auth_secret : Optional[bytes] (default: None)
-        Secret used to derive per-run HMAC signing keys for SuperExec auth.
+        Secret used to derive an HMAC signing key for SuperExec auth.
     plugin_config : Optional[dict[str, Any]] (default: None)
         The configuration dictionary for the plugin. If `None`, the plugin will use
         its default configuration.
@@ -81,9 +78,6 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
         )
 
     protected_methods = _resolve_superexec_protected_methods(stub_class)
-    superexec_auth_audience = _resolve_superexec_auth_audience(
-        stub_class, appio_api_address
-    )
 
     # Start monitoring the parent process if a PID is provided
     if parent_pid is not None:
@@ -104,7 +98,6 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
         interceptors=[
             SuperExecAuthClientInterceptor(
                 master_secret=superexec_auth_secret,
-                audience=superexec_auth_audience,
                 protected_methods=protected_methods,
             )
         ],
@@ -227,15 +220,4 @@ def _resolve_superexec_protected_methods(
             "/flwr.proto.ClientAppIo/RequestToken",
             "/flwr.proto.ClientAppIo/GetRun",
         )
-    raise ValueError(f"Unsupported AppIo stub class for SuperExec auth: {stub_class}")
-
-
-def _resolve_superexec_auth_audience(
-    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
-    appio_api_address: str,
-) -> str:
-    if stub_class is ServerAppIoStub:
-        return derive_superexec_audience("serverappio", appio_api_address)
-    if stub_class is ClientAppIoStub:
-        return derive_superexec_audience("clientappio", appio_api_address)
     raise ValueError(f"Unsupported AppIo stub class for SuperExec auth: {stub_class}")

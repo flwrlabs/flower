@@ -113,7 +113,6 @@ def flower_superexec() -> None:
     try:
         superexec_auth_secret = load_superexec_auth_secret(
             secret_file=args.superexec_auth_secret_file,
-            secret_stdin=args.superexec_auth_secret_stdin,
         )
     except (OSError, ValueError) as err:
         flwr_exit(
@@ -123,8 +122,7 @@ def flower_superexec() -> None:
     if superexec_auth_secret is None:
         flwr_exit(
             ExitCode.SUPEREXEC_INVALID_PLUGIN_CONFIG,
-            "Missing SuperExec auth secret. Provide "
-            "--superexec-auth-secret-file or --superexec-auth-secret-stdin.",
+            "Missing SuperExec auth secret. Provide --superexec-auth-secret-file.",
         )
     run_superexec(
         plugin_class=plugin_class,

@@ -61,7 +61,6 @@ from flwr.server.fleet_event_log_interceptor import FleetEventLogInterceptor
 from flwr.supercore.address import parse_address, resolve_bind_address
 from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
-    generate_superexec_auth_secret,
     load_superexec_auth_secret,
 )
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
@@ -227,7 +226,6 @@ def run_superlink() -> None:
     try:
         configured_superexec_secret = load_superexec_auth_secret(
             secret_file=args.superexec_auth_secret_file,
-            secret_stdin=args.superexec_auth_secret_stdin,
         )
     except (OSError, ValueError) as err:
         flwr_exit(
@@ -235,19 +233,12 @@ def run_superlink() -> None:
             f"Failed to load SuperExec auth secret: {err}",
         )
 
-    if args.isolation == ISOLATION_MODE_SUBPROCESS:
-        superexec_auth_secret = (
-            configured_superexec_secret or generate_superexec_auth_secret()
+    if configured_superexec_secret is None:
+        flwr_exit(
+            ExitCode.SUPERLINK_INVALID_ARGS,
+            "Missing SuperExec auth secret. Provide --superexec-auth-secret-file.",
         )
-    else:
-        if configured_superexec_secret is None:
-            flwr_exit(
-                ExitCode.SUPERLINK_INVALID_ARGS,
-                "Missing SuperExec auth secret in process isolation mode. "
-                "Provide --superexec-auth-secret-file or "
-                "--superexec-auth-secret-stdin.",
-            )
-        superexec_auth_secret = configured_superexec_secret
+    superexec_auth_secret = configured_superexec_secret
 
     # Disable the account auth TLS check if args.disable_oidc_tls_cert_verification is
     # provided
@@ -456,13 +447,10 @@ def run_superlink() -> None:
         command = ["flower-superexec", "--insecure"]
         command += ["--appio-api-address", appio_address]
         command += ["--plugin-type", ExecPluginType.SERVER_APP]
-        command += ["--superexec-auth-secret-stdin"]
+        command += ["--superexec-auth-secret-file", args.superexec_auth_secret_file]
         command += ["--parent-pid", str(os.getpid())]
         # pylint: disable-next=consider-using-with
-        process = subprocess.Popen(command, stdin=subprocess.PIPE)
-        assert process.stdin is not None
-        process.stdin.write(superexec_auth_secret + b"\n")
-        process.stdin.close()
+        subprocess.Popen(command)
 
     # Launch gRPC health server
     if health_server_address is not None:

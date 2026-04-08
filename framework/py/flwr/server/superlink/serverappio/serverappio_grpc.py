@@ -26,7 +26,6 @@ from flwr.proto.serverappio_pb2_grpc import (  # pylint: disable=E0611
     add_ServerAppIoServicer_to_server,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
-from flwr.supercore.auth import derive_superexec_audience
 from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.interceptors import (
     create_serverappio_superexec_auth_server_interceptor,
@@ -62,7 +61,6 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
     superexec_auth_interceptor = create_serverappio_superexec_auth_server_interceptor(
         state_provider=state_factory.state,
         master_secret=superexec_auth_secret,
-        expected_audience=derive_superexec_audience("serverappio", address),
     )
     auth_interceptor = create_serverappio_token_auth_server_interceptor(
         state_provider=state_factory.state
