@@ -131,6 +131,8 @@ def install_app_dependencies(
         "-m",
         "uv",
         "sync",
+        "--python",
+        sys.executable,
         "--no-install-project",
         "--no-install-package",
         "flwr",
