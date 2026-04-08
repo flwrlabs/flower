@@ -29,7 +29,6 @@ from flwr.supercore.auth import (
     compute_request_body_sha256,
     compute_superexec_signature,
     derive_auth_secret,
-    extract_single_str_metadata,
     verify_superexec_signature,
 )
 from flwr.supercore.constant import (
@@ -40,6 +39,7 @@ from flwr.supercore.constant import (
     SUPEREXEC_AUTH_SIGNATURE_HEADER,
     SUPEREXEC_AUTH_TIMESTAMP_HEADER,
 )
+from flwr.supercore.utils import get_metadata_str
 
 from .appio_token_interceptor import AUTHENTICATION_FAILED_MESSAGE
 
@@ -169,16 +169,12 @@ class SuperExecAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             request: GrpcMessage,
             context: grpc.ServicerContext,
         ) -> GrpcMessage:
-            ts_raw = extract_single_str_metadata(
-                metadata, SUPEREXEC_AUTH_TIMESTAMP_HEADER
-            )
-            nonce = extract_single_str_metadata(metadata, SUPEREXEC_AUTH_NONCE_HEADER)
-            body_sha256_header = extract_single_str_metadata(
+            ts_raw = get_metadata_str(metadata, SUPEREXEC_AUTH_TIMESTAMP_HEADER)
+            nonce = get_metadata_str(metadata, SUPEREXEC_AUTH_NONCE_HEADER)
+            body_sha256_header = get_metadata_str(
                 metadata, SUPEREXEC_AUTH_BODY_SHA256_HEADER
             )
-            signature = extract_single_str_metadata(
-                metadata, SUPEREXEC_AUTH_SIGNATURE_HEADER
-            )
+            signature = get_metadata_str(metadata, SUPEREXEC_AUTH_SIGNATURE_HEADER)
             if not ts_raw or not nonce or not body_sha256_header or not signature:
                 _abort_auth_denied(context)
 
