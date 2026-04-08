@@ -19,7 +19,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Sequence
 
 import requests
 
@@ -336,11 +336,13 @@ def is_valid_name(name: str) -> tuple[bool, str]:
 
 
 def _get_metadata_typed(
-    metadata: list[tuple[str, str | bytes]] | tuple[tuple[str, str | bytes], ...],
+    metadata: Sequence[tuple[str, str | bytes]] | None,
     key: str,
     value_type: type[T],
 ) -> T | None:
     """Return exactly one non-empty string or bytes metadata value for `key`."""
+    if metadata is None:
+        return None
     values: list[Any] = [
         value for metadata_key, value in metadata if metadata_key == key
     ]
@@ -355,7 +357,7 @@ def _get_metadata_typed(
 
 
 def get_metadata_str(
-    metadata: list[tuple[str, str | bytes]] | tuple[tuple[str, str | bytes], ...],
+    metadata: Sequence[tuple[str, str | bytes]] | None,
     key: str,
 ) -> str | None:
     """Return exactly one non-empty string metadata value for `key`."""
@@ -363,7 +365,7 @@ def get_metadata_str(
 
 
 def get_metadata_bytes(
-    metadata: list[tuple[str, str | bytes]] | tuple[tuple[str, str | bytes], ...],
+    metadata: Sequence[tuple[str, str | bytes]] | None,
     key: str,
 ) -> bytes | None:
     """Return exactly one non-empty bytes metadata value for `key`."""

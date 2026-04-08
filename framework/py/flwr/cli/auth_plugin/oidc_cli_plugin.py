@@ -152,9 +152,8 @@ class OidcCliPlugin(CliAuthPlugin):
         self, metadata: Sequence[tuple[str, str | bytes]]
     ) -> AccountAuthCredentials | None:
         """Read authentication tokens from the provided metadata."""
-        metadata_items = list(metadata)
-        access_token = get_metadata_str(metadata_items, ACCESS_TOKEN_KEY)
-        refresh_token = get_metadata_str(metadata_items, REFRESH_TOKEN_KEY)
+        access_token = get_metadata_str(metadata, ACCESS_TOKEN_KEY)
+        refresh_token = get_metadata_str(metadata, REFRESH_TOKEN_KEY)
 
         if access_token is not None and refresh_token is not None:
             return AccountAuthCredentials(

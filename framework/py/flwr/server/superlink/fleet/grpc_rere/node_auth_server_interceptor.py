@@ -79,7 +79,7 @@ class NodeAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         if not handler_call_details.method.startswith("/flwr.proto.Fleet/"):
             return continuation(handler_call_details)
 
-        metadata = list(handler_call_details.invocation_metadata or [])
+        metadata = handler_call_details.invocation_metadata
 
         # Retrieve info from the metadata
         node_pk_bytes = get_metadata_bytes(metadata, PUBLIC_KEY_HEADER)
