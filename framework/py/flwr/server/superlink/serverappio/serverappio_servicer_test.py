@@ -103,7 +103,6 @@ from flwr.superlink.federation import NoOpFederationManager
 # pylint: disable=broad-except,too-many-lines
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
-_SUPEREXEC_AUDIENCE = "serverappio:9091"
 _SERVERAPPIO_SUPEREXEC_METHODS = (
     "/flwr.proto.ServerAppIo/ListAppsToLaunch",
     "/flwr.proto.ServerAppIo/RequestToken",
@@ -168,6 +167,7 @@ def _start_serverappio_with_port_retry(
                 state_factory,
                 objectstore_factory,
                 None,
+                superexec_auth_secret=_SUPEREXEC_SECRET,
             )
         except RuntimeError as err:
             if "Failed to bind to address" in str(err):
@@ -225,7 +225,14 @@ def _create_shared_runtime(
 
 
 def _request_token(channel: grpc.Channel, run_id: int) -> str:
-    request_token = channel.unary_unary(
+    superexec_channel = grpc.intercept_channel(
+        channel,
+        SuperExecAuthClientInterceptor(
+            master_secret=_SUPEREXEC_SECRET,
+            protected_methods=_SERVERAPPIO_SUPEREXEC_METHODS,
+        ),
+    )
+    request_token = superexec_channel.unary_unary(
         "/flwr.proto.ServerAppIo/RequestToken",
         request_serializer=RequestTokenRequest.SerializeToString,
         response_deserializer=RequestTokenResponse.FromString,
@@ -344,7 +351,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             grpc.insecure_channel("localhost:9091"),
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
-                audience=_SUPEREXEC_AUDIENCE,
                 protected_methods=_SERVERAPPIO_SUPEREXEC_METHODS,
             ),
         )

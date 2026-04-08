@@ -43,7 +43,6 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
-_SUPEREXEC_AUDIENCE = "serverappio:9091"
 _SERVERAPPIO_SUPEREXEC_METHODS = (
     "/flwr.proto.ServerAppIo/ListAppsToLaunch",
     "/flwr.proto.ServerAppIo/RequestToken",
@@ -93,7 +92,6 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):
             grpc.insecure_channel("localhost:9091"),
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
-                audience=_SUPEREXEC_AUDIENCE,
                 protected_methods=_SERVERAPPIO_SUPEREXEC_METHODS,
             ),
         )
