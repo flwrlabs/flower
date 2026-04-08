@@ -129,7 +129,8 @@ def test_warn_if_flwr_update_available_prints_cached_message(
     warn_if_flwr_update_available(process_name="flower-superlink")
 
     captured = capsys.readouterr()
-    assert captured.err == "A newer Flower version is available: 1.0.0 -> 1.1.0\n"
+    assert "Update available" in captured.err
+    assert "A newer Flower version is available: 1.0.0 -> 1.1.0" in captured.err
     cache = _read_update_check_cache(tmp_path)
     assert cache is not None
     assert cache["last_shown_at"] == now.isoformat()
