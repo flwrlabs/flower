@@ -18,36 +18,27 @@
 from __future__ import annotations
 
 import argparse
-import secrets
-import sys
 from pathlib import Path
 
 
 def add_superexec_auth_secret_args(parser: argparse.ArgumentParser) -> None:
     """Add shared-secret arguments for SuperExec HMAC auth."""
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument(
+    parser.add_argument(
         "--superexec-auth-secret-file",
         type=str,
         default=None,
         help=(
             "Path to a file containing the SuperExec shared secret. The file "
-            "is read as exact raw bytes; trailing newlines are preserved."
+            "is read as exact raw bytes."
         ),
-    )
-    group.add_argument(
-        "--superexec-auth-secret-stdin",
-        action="store_true",
-        help="Read the SuperExec shared secret from stdin.",
     )
 
 
 def load_superexec_auth_secret(
     *,
     secret_file: str | None,
-    secret_stdin: bool,
 ) -> bytes | None:
-    """Load the SuperExec shared secret from file or stdin."""
+    """Load the SuperExec shared secret from file."""
     secret: bytes | None = None
     if secret_file is not None:
         # File input is treated as exact raw bytes.
@@ -59,14 +50,6 @@ def load_superexec_auth_secret(
                 f"Failed to read SuperExec auth secret from file '{secret_path}': "
                 f"{err}"
             ) from err
-    elif secret_stdin:
-        secret = sys.stdin.buffer.read()
-        # Shell redirection often appends a trailing newline. Trim at most one
-        # line ending sequence for stdin input only, without stripping other bytes.
-        if secret.endswith(b"\r\n"):
-            secret = secret[:-2]
-        elif secret.endswith(b"\n") or secret.endswith(b"\r"):
-            secret = secret[:-1]
 
     if secret is None:
         return None
@@ -74,10 +57,3 @@ def load_superexec_auth_secret(
     if secret == b"":
         raise ValueError("SuperExec auth secret must not be empty")
     return secret
-
-
-def generate_superexec_auth_secret(num_bytes: int = 32) -> bytes:
-    """Generate a random SuperExec shared secret."""
-    if num_bytes <= 0:
-        raise ValueError("SuperExec auth secret size must be greater than 0")
-    return secrets.token_bytes(num_bytes)

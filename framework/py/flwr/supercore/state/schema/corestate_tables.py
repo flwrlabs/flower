@@ -15,7 +15,16 @@
 """SQLAlchemy Core Table definitions for CoreState."""
 
 
-from sqlalchemy import Column, Float, Index, Integer, MetaData, String, Table
+from sqlalchemy import (
+    Column,
+    Float,
+    Index,
+    Integer,
+    LargeBinary,
+    MetaData,
+    String,
+    Table,
+)
 
 
 def create_corestate_metadata() -> MetaData:
@@ -41,5 +50,16 @@ def create_corestate_metadata() -> MetaData:
         Column("expires_at", Float, nullable=False),
     )
     Index("idx_nonce_store_expires_at", nonce_store.c.expires_at)
+
+    # --------------------------------------------------------------------------
+    #  Table: fab
+    # --------------------------------------------------------------------------
+    Table(
+        "fab",
+        metadata,
+        Column("fab_hash", String, primary_key=True),
+        Column("content", LargeBinary, nullable=False),
+        Column("verifications", String, nullable=False),
+    )
 
     return metadata
