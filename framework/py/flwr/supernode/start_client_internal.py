@@ -55,7 +55,6 @@ from flwr.common.typing import Fab, Run, RunNotRunningException
 from flwr.proto.clientappio_pb2_grpc import add_ClientAppIoServicer_to_server
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.supercore.address import parse_address, resolve_bind_address
-from flwr.supercore.ffs import Ffs, FfsFactory
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -163,7 +162,7 @@ def start_client_internal(
     superexec_auth_secret : Optional[bytes] (default: None)
         Secret used by ClientAppIo SuperExec metadata auth.
     superexec_auth_secret_file : Optional[str] (default: None)
-        Secret file path passed through to subprocess-launched SuperExec.
+        Secret file path used for optional process-mode SuperExec auth.
     """
     if insecure is None:
         insecure = root_certificates is None
@@ -185,17 +184,22 @@ def start_client_internal(
     object_store_factory = ObjectStoreFactory()
     state_factory = NodeStateFactory(objectstore_factory=object_store_factory)
 
-    if superexec_auth_secret is None:
-        flwr_exit(
-            ExitCode.COMMON_ADDRESS_INVALID,
-            "Missing SuperExec auth secret. Provide --superexec-auth-secret-file.",
-        )
-    if isolation == ISOLATION_MODE_SUBPROCESS and superexec_auth_secret_file is None:
-        flwr_exit(
-            ExitCode.COMMON_ADDRESS_INVALID,
-            "Missing SuperExec auth secret file for subprocess mode. "
-            "Provide --superexec-auth-secret-file.",
-        )
+    if isolation == ISOLATION_MODE_SUBPROCESS:
+        if superexec_auth_secret is not None or superexec_auth_secret_file is not None:
+            log(
+                WARN,
+                "SuperExec auth is disabled for ClientAppIo in subprocess isolation "
+                "mode. Provided SuperExec auth secret is ignored.",
+            )
+        effective_superexec_auth_secret = None
+    else:
+        effective_superexec_auth_secret = superexec_auth_secret
+        if effective_superexec_auth_secret is None:
+            log(
+                WARN,
+                "No SuperExec auth secret configured in process isolation mode. "
+                "ClientAppIo SuperExec auth is disabled.",
+            )
 
     # Launch ClientAppIo API server
     grpc_servers = []
@@ -204,7 +208,7 @@ def start_client_internal(
         state_factory=state_factory,
         objectstore_factory=object_store_factory,
         certificates=None,
-        superexec_auth_secret=superexec_auth_secret,
+        superexec_auth_secret=effective_superexec_auth_secret,
     )
     grpc_servers.append(clientappio_server)
 
@@ -226,14 +230,12 @@ def start_client_internal(
 
     # Launch the SuperExec if the isolation mode is `subprocess`
     if isolation == ISOLATION_MODE_SUBPROCESS:
-        assert superexec_auth_secret_file is not None
         command = ["flower-superexec", "--insecure"]
         command += [
             "--appio-api-address",
             resolve_bind_address(clientappio_api_address),
         ]
         command += ["--plugin-type", ExecPluginType.CLIENT_APP]
-        command += ["--superexec-auth-secret-file", superexec_auth_secret_file]
         command += ["--parent-pid", str(os.getpid())]
         # pylint: disable-next=consider-using-with
         subprocess.Popen(command)
@@ -638,10 +640,10 @@ def run_clientappio_api_grpc(  # pylint: disable=R0913,R0917
     state_factory: NodeStateFactory,
     objectstore_factory: ObjectStoreFactory,
     certificates: tuple[bytes, bytes, bytes] | None,
-    superexec_auth_secret: bytes,
+    superexec_auth_secret: bytes | None,
 ) -> grpc.Server:
     """Run ClientAppIo API gRPC server."""
-    if certificates is None:
+    if certificates is None and superexec_auth_secret is not None:
         log(
             WARN,
             "SuperExec auth is enabled on insecure ClientAppIo transport. "
@@ -652,13 +654,18 @@ def run_clientappio_api_grpc(  # pylint: disable=R0913,R0917
         state_factory=state_factory,
         objectstore_factory=objectstore_factory,
     )
-    superexec_auth_interceptor = create_clientappio_superexec_auth_server_interceptor(
-        state_provider=state_factory.state,
-        master_secret=superexec_auth_secret,
-    )
     auth_interceptor = create_clientappio_token_auth_server_interceptor(
         state_provider=state_factory.state
     )
+    interceptors: list[grpc.ServerInterceptor] = [auth_interceptor]
+    if superexec_auth_secret is not None:
+        superexec_auth_interceptor = (
+            create_clientappio_superexec_auth_server_interceptor(
+                state_provider=state_factory.state,
+                master_secret=superexec_auth_secret,
+            )
+        )
+        interceptors = [superexec_auth_interceptor, auth_interceptor]
     clientappio_add_servicer_to_server_fn = add_ClientAppIoServicer_to_server
     clientappio_grpc_server = generic_create_grpc_server(
         servicer_and_add_fn=(
@@ -668,7 +675,7 @@ def run_clientappio_api_grpc(  # pylint: disable=R0913,R0917
         server_address=address,
         max_message_length=GRPC_MAX_MESSAGE_LENGTH,
         certificates=certificates,
-        interceptors=[superexec_auth_interceptor, auth_interceptor],
+        interceptors=interceptors,
     )
     address = clientappio_grpc_server.bound_address
     log(INFO, "Flower Deployment Runtime: Starting ClientAppIo API on %s", address)
