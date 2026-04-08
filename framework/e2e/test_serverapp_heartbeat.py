@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 
 from flwr.common.constant import (
@@ -20,22 +21,24 @@ plugin_type_arg = "simulation" if use_sim else "serverapp"
 app_cmd = "flwr-simulation" if use_sim else "flwr-serverapp"
 
 
-def run_superlink() -> subprocess.Popen:
+def run_superlink(superexec_auth_secret_file: str) -> subprocess.Popen:
     """Run the SuperLink."""
     cmd = ["flower-superlink", "--insecure"]
     cmd += ["--database", "tmp.db"]
     cmd += ["--isolation", "process"]
+    cmd += ["--superexec-auth-secret-file", superexec_auth_secret_file]
     if use_sim:
         cmd += ["--simulation"]
 
     return subprocess.Popen(cmd)
 
 
-def run_superexec() -> subprocess.Popen:
+def run_superexec(superexec_auth_secret_file: str) -> subprocess.Popen:
     """Run the SuperExec."""
     cmd = ["flower-superexec", "--insecure"]
     cmd += ["--appio-api-address", SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS]
     cmd += ["--plugin-type", plugin_type_arg]
+    cmd += ["--superexec-auth-secret-file", superexec_auth_secret_file]
     return subprocess.Popen(cmd)
 
 
@@ -106,6 +109,27 @@ def get_pids(command: str) -> list[int]:
     return [int(pid) for pid in pids if pid]
 
 
+def _terminate_process(process: subprocess.Popen | None) -> None:
+    """Terminate a subprocess safely if it is still running."""
+    if process is None or process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
+
+
+def _kill_app_processes() -> None:
+    """Best-effort cleanup for app processes started by this e2e."""
+    for pid in get_pids(app_cmd):
+        try:
+            os.kill(pid, 9)
+        except ProcessLookupError:
+            pass
+
+
 def main() -> None:
     """."""
     # Trigger migration to Flower configuration
@@ -116,89 +140,106 @@ def main() -> None:
         stderr=subprocess.DEVNULL,
     )
 
-    # Start the SuperLink
-    print("Starting SuperLink...")
-    superlink_proc = run_superlink()
+    secret_path: str | None = None
+    superlink_proc: subprocess.Popen | None = None
+    superexec_proc: subprocess.Popen | None = None
 
-    # Allow time for SuperLink to start
-    time.sleep(3)
+    try:
+        secret_file = tempfile.NamedTemporaryFile(
+            mode="wb",
+            prefix="superexec-auth-",
+            delete=False,
+        )
+        secret_file.write(b"e2e-superexec-shared-secret")
+        secret_file.close()
+        secret_path = secret_file.name
 
-    # Start the SuperExec
-    print("Starting SuperExec...")
-    superexec_proc = run_superexec()
-    time.sleep(1)
+        # Start the SuperLink
+        print("Starting SuperLink...")
+        superlink_proc = run_superlink(secret_path)
 
-    # Submit the first run
-    print("Starting the first run...")
-    run_id1 = flwr_run()
+        # Allow time for SuperLink to start
+        time.sleep(3)
 
-    # Get the PID of the first app process
-    while True:
-        if pids := get_pids(app_cmd):
-            app_pid = pids[0]
-            break
-        time.sleep(0.1)
-
-    # Submit the second run
-    print("Starting the second run...")
-    run_id2 = flwr_run()
-
-    # Wait up to 6 seconds for both runs to reach RUNNING status
-    tic = time.time()
-    is_running = False
-    while (time.time() - tic) < 6:
-        run_status = flwr_ls()
-        if (
-            run_status.get(run_id1) == Status.RUNNING
-            and run_status.get(run_id2) == Status.RUNNING
-        ):
-            is_running = True
-            break
+        # Start the SuperExec
+        print("Starting SuperExec...")
+        superexec_proc = run_superexec(secret_path)
         time.sleep(1)
-    assert is_running, "Run IDs did not start within 6 seconds"
-    print("Both runs are running.")
 
-    # Kill SuperLink process first to simulate restart scenario
-    # This prevents ServerApp from notifying SuperLink, isolating the heartbeat test
-    print("Terminating SuperLink process...")
-    superlink_proc.terminate()
-    superlink_proc.wait()
+        # Submit the first run
+        print("Starting the first run...")
+        run_id1 = flwr_run()
 
-    # Kill the first ServerApp process
-    print("Terminating the first ServerApp process...")
-    os.kill(app_pid, 9)  # SIGKILL to ensure it stops immediately
+        # Get the PID of the first app process
+        while True:
+            if pids := get_pids(app_cmd):
+                app_pid = pids[0]
+                break
+            time.sleep(0.1)
 
-    # Restart the SuperLink
-    print("Restarting SuperLink...")
-    superlink_proc = run_superlink()
+        # Submit the second run
+        print("Starting the second run...")
+        run_id2 = flwr_run()
 
-    # Allow time for SuperLink to start
-    time.sleep(1)
+        # Wait up to 6 seconds for both runs to reach RUNNING status
+        tic = time.time()
+        is_running = False
+        while (time.time() - tic) < 6:
+            run_status = flwr_ls()
+            if (
+                run_status.get(run_id1) == Status.RUNNING
+                and run_status.get(run_id2) == Status.RUNNING
+            ):
+                is_running = True
+                break
+            time.sleep(1)
+        assert is_running, "Run IDs did not start within 6 seconds"
+        print("Both runs are running.")
 
-    # Allow enough time for token expiry based heartbeat detection:
-    # HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL (+ buffer for restart/retries)
-    heartbeat_timeout = HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 30
+        # Kill SuperLink process first to simulate restart scenario
+        # This prevents ServerApp from notifying SuperLink, isolating the heartbeat test
+        print("Terminating SuperLink process...")
+        superlink_proc.terminate()
+        superlink_proc.wait()
 
-    # Allow time for SuperLink to detect heartbeat failures and update statuses
-    tic = time.time()
-    is_valid = False
-    while (time.time() - tic) < heartbeat_timeout:
-        run_status = flwr_ls()
-        if (
-            run_status[run_id1] == f"{Status.FINISHED}:{SubStatus.FAILED}"
-            and run_status[run_id2] == f"{Status.FINISHED}:{SubStatus.COMPLETED}"
-        ):
-            is_valid = True
-            break
+        # Kill the first ServerApp process
+        print("Terminating the first ServerApp process...")
+        os.kill(app_pid, 9)  # SIGKILL to ensure it stops immediately
+
+        # Restart the SuperLink
+        print("Restarting SuperLink...")
+        superlink_proc = run_superlink(secret_path)
+
+        # Allow time for SuperLink to start
         time.sleep(1)
-    assert is_valid, f"Run statuses are not updated correctly:\n{run_status}"
-    print("Run statuses are updated correctly.")
 
-    # Clean up
-    superexec_proc.terminate()
-    superexec_proc.wait()
-    superlink_proc.terminate()
-    superlink_proc.wait()
+        # Allow enough time for token expiry based heartbeat detection:
+        # HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL (+ buffer for restart/retries)
+        heartbeat_timeout = HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 30
+
+        # Allow time for SuperLink to detect heartbeat failures and update statuses
+        tic = time.time()
+        is_valid = False
+        while (time.time() - tic) < heartbeat_timeout:
+            run_status = flwr_ls()
+            if (
+                run_status[run_id1] == f"{Status.FINISHED}:{SubStatus.FAILED}"
+                and run_status[run_id2] == f"{Status.FINISHED}:{SubStatus.COMPLETED}"
+            ):
+                is_valid = True
+                break
+            time.sleep(1)
+        assert is_valid, f"Run statuses are not updated correctly:\n{run_status}"
+        print("Run statuses are updated correctly.")
+    finally:
+        _terminate_process(superexec_proc)
+        _terminate_process(superlink_proc)
+        _kill_app_processes()
+        if secret_path is not None:
+            try:
+                os.remove(secret_path)
+            except FileNotFoundError:
+                pass
 
 
 if __name__ == "__main__":
