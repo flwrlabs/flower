@@ -22,6 +22,7 @@ packages = ["."]
 publisher = "flwrlabs"
 fab-format-version = 1
 flwr-version-target = "1.28.0"
+fab-include = ["fedvaeexample/**/*.py", "LICENSE"]
 
 [tool.flwr.app.components]
 serverapp = "fedvaeexample.server_app:app"

@@ -22,6 +22,7 @@ packages = ["."]
 publisher = "flwrlabs"
 fab-format-version = 1
 flwr-version-target = "1.28.0"
+fab-include = ["custom_mods/**/*.py", "LICENSE"]
 
 [tool.flwr.app.components]
 serverapp = "custom_mods.server_app:app"
