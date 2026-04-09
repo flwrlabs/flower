@@ -16,6 +16,7 @@
 
 
 import importlib
+from dataclasses import dataclass, field
 from types import SimpleNamespace
 
 import pytest
@@ -61,6 +62,18 @@ class _FixedArgsParser:
         return self._args
 
 
+@dataclass
+class _CliHarness:
+    """Shared harness for CLI tests with patched startup hooks."""
+
+    args: SimpleNamespace
+    start_kwargs: dict[str, object] = field(default_factory=dict)
+
+    def capture_start_client_internal(self, **kwargs: object) -> None:
+        """Capture `start_client_internal` kwargs for assertions."""
+        self.start_kwargs.update(kwargs)
+
+
 def _return_none(*_args: object, **_kwargs: object) -> None:
     """Return None for monkeypatched dependency stubs."""
 
@@ -71,12 +84,12 @@ def _parse_config_args_stub(*_args: object, **_kwargs: object) -> dict[str, str]
 
 
 def _patch_common_supernode_startup(
-    monkeypatch: pytest.MonkeyPatch, args: SimpleNamespace
+    monkeypatch: pytest.MonkeyPatch, harness: _CliHarness
 ) -> None:
     """Patch common SuperNode startup dependencies for CLI tests."""
 
     def _parse_args_run_supernode() -> _FixedArgsParser:
-        return _FixedArgsParser(args)
+        return _FixedArgsParser(harness.args)
 
     monkeypatch.setattr(
         flower_supernode_module, "warn_if_flwr_update_available", _return_none
@@ -97,6 +110,19 @@ def _patch_common_supernode_startup(
         flower_supernode_module, "parse_config_args", _parse_config_args_stub
     )
     monkeypatch.setattr(flower_supernode_module, "event", _return_none)
+    monkeypatch.setattr(
+        flower_supernode_module,
+        "start_client_internal",
+        harness.capture_start_client_internal,
+    )
+
+
+@pytest.fixture(name="cli_harness")
+def fixture_cli_harness(monkeypatch: pytest.MonkeyPatch) -> _CliHarness:
+    """Create and patch a reusable SuperNode CLI test harness."""
+    harness = _CliHarness(args=_make_args())
+    _patch_common_supernode_startup(monkeypatch, harness)
+    return harness
 
 
 @pytest.mark.parametrize("flag", ["--version", "-V"])
@@ -154,47 +180,36 @@ def test_flower_supernode_checks_for_update(
 
 
 def test_flower_supernode_subprocess_does_not_load_superexec_secret(
+    cli_harness: _CliHarness,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Subprocess mode should not load a SuperExec secret file."""
-    args = _make_args(
-        isolation=ISOLATION_MODE_SUBPROCESS,
-        superexec_auth_secret_file="ignored-secret-file",
-    )
-    captured: dict[str, object] = {}
-
-    def _start_client_internal(**kwargs: object) -> None:
-        """Capture startup kwargs for assertions."""
-        captured.update(kwargs)
+    cli_harness.args.isolation = ISOLATION_MODE_SUBPROCESS
+    cli_harness.args.superexec_auth_secret_file = "ignored-secret-file"
 
     def _unexpected_load_superexec_auth_secret(**_: object) -> bytes:
         """Fail fast if subprocess path unexpectedly loads a secret."""
         raise AssertionError("should not be called")
 
-    _patch_common_supernode_startup(monkeypatch, args)
     monkeypatch.setattr(
         flower_supernode_module,
         "load_superexec_auth_secret",
         _unexpected_load_superexec_auth_secret,
     )
-    monkeypatch.setattr(
-        flower_supernode_module, "start_client_internal", _start_client_internal
-    )
 
     flower_supernode_module.flower_supernode()
 
-    assert captured["superexec_auth_secret"] is None
-    assert captured["isolation"] == ISOLATION_MODE_SUBPROCESS
+    assert cli_harness.start_kwargs["superexec_auth_secret"] is None
+    assert cli_harness.start_kwargs["isolation"] == ISOLATION_MODE_SUBPROCESS
 
 
 def test_flower_supernode_process_exits_on_invalid_superexec_secret_file(
+    cli_harness: _CliHarness,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Process mode should exit with dedicated code if secret load fails."""
-    args = _make_args(
-        isolation=ISOLATION_MODE_PROCESS,
-        superexec_auth_secret_file="bad-secret-file",
-    )
+    cli_harness.args.isolation = ISOLATION_MODE_PROCESS
+    cli_harness.args.superexec_auth_secret_file = "bad-secret-file"
 
     class _ExitCalled(Exception):
         def __init__(self, code: int, message: str) -> None:
@@ -209,7 +224,6 @@ def test_flower_supernode_process_exits_on_invalid_superexec_secret_file(
         """Simulate invalid secret-file parsing failure."""
         raise ValueError("invalid")
 
-    _patch_common_supernode_startup(monkeypatch, args)
     monkeypatch.setattr(
         flower_supernode_module,
         "load_superexec_auth_secret",
