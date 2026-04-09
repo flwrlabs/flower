@@ -36,6 +36,7 @@ from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, Run
 from flwr.supercore.interceptors import (
     APP_TOKEN_HEADER,
     AUTHENTICATION_FAILED_MESSAGE,
+    AppIoTokenClientInterceptor,
     SuperExecAuthClientInterceptor,
 )
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
@@ -72,26 +73,37 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):
             superexec_auth_secret=_SUPEREXEC_SECRET,
         )
 
-        # Create a single base channel and wrap it for SuperExec
+        # Seed one authenticated run/token and reuse it for token-protected RPC checks.
+        self._auth_run_id = self._create_running_run()
+        auth_token = self.state.create_token(self._auth_run_id)
+        assert auth_token is not None
+
+        # Create a single base channel and wrap it for authenticated calls.
         base_channel = grpc.insecure_channel("localhost:9091")
-        self._get_nodes = base_channel.unary_unary(
+        self._get_nodes_no_auth = base_channel.unary_unary(
             "/flwr.proto.ServerAppIo/GetNodes",
             request_serializer=GetNodesRequest.SerializeToString,
             response_deserializer=GetNodesResponse.FromString,
         )
-        self._list_apps_to_launch = base_channel.unary_unary(
+        self._list_apps_to_launch_no_auth = base_channel.unary_unary(
             "/flwr.proto.ServerAppIo/ListAppsToLaunch",
             request_serializer=ListAppsToLaunchRequest.SerializeToString,
             response_deserializer=ListAppsToLaunchResponse.FromString,
         )
         auth_channel = grpc.intercept_channel(
             base_channel,
+            AppIoTokenClientInterceptor(token=auth_token),
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
                 protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
             ),
         )
-        self._list_apps_to_launch_auth = auth_channel.unary_unary(
+        self._get_nodes = auth_channel.unary_unary(
+            "/flwr.proto.ServerAppIo/GetNodes",
+            request_serializer=GetNodesRequest.SerializeToString,
+            response_deserializer=GetNodesResponse.FromString,
+        )
+        self._list_apps_to_launch = auth_channel.unary_unary(
             "/flwr.proto.ServerAppIo/ListAppsToLaunch",
             request_serializer=ListAppsToLaunchRequest.SerializeToString,
             response_deserializer=ListAppsToLaunchResponse.FromString,
@@ -111,20 +123,18 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):
 
     def test_get_nodes_denied_without_metadata_token(self) -> None:
         """Protected RPC should deny requests missing metadata token."""
-        run_id = self._create_running_run()
-
         with self.assertRaises(grpc.RpcError) as err:
-            self._get_nodes.with_call(request=GetNodesRequest(run_id=run_id))
+            self._get_nodes_no_auth.with_call(
+                request=GetNodesRequest(run_id=self._auth_run_id)
+            )
         assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
         assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE
 
     def test_get_nodes_denied_with_invalid_metadata_token(self) -> None:
         """Protected RPC should deny requests with invalid metadata token."""
-        run_id = self._create_running_run()
-
         with self.assertRaises(grpc.RpcError) as err:
-            self._get_nodes.with_call(
-                request=GetNodesRequest(run_id=run_id),
+            self._get_nodes_no_auth.with_call(
+                request=GetNodesRequest(run_id=self._auth_run_id),
                 metadata=((APP_TOKEN_HEADER, "invalid-token"),),
             )
         assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
@@ -132,13 +142,8 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):
 
     def test_get_nodes_allows_with_valid_metadata_token(self) -> None:
         """Protected RPC should allow requests with a valid metadata token."""
-        run_id = self._create_running_run()
-        token = self.state.create_token(run_id)
-        assert token is not None
-
         response, call = self._get_nodes.with_call(
-            request=GetNodesRequest(run_id=run_id),
-            metadata=((APP_TOKEN_HEADER, token),),
+            request=GetNodesRequest(run_id=self._auth_run_id)
         )
 
         assert isinstance(response, GetNodesResponse)
@@ -147,14 +152,14 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):
     def test_list_apps_to_launch_denied_without_superexec_metadata(self) -> None:
         """SuperExec RPC should deny requests missing signed metadata."""
         with self.assertRaises(grpc.RpcError) as err:
-            self._list_apps_to_launch.with_call(request=ListAppsToLaunchRequest())
+            self._list_apps_to_launch_no_auth.with_call(
+                request=ListAppsToLaunchRequest()
+            )
         assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
         assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE
 
     def test_list_apps_to_launch_allows_with_superexec_metadata(self) -> None:
         """SuperExec RPC should allow requests with valid signed metadata."""
-        response, call = self._list_apps_to_launch_auth.with_call(
-            request=ListAppsToLaunchRequest()
-        )
+        response, call = self._list_apps_to_launch.with_call(request=ListAppsToLaunchRequest())
         assert isinstance(response, ListAppsToLaunchResponse)
         assert call.code() == grpc.StatusCode.OK
