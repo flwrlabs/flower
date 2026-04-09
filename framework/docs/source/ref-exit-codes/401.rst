@@ -1,0 +1,17 @@
+#########################################
+ [401] SUPEREXEC_AUTH_SECRET_LOAD_FAILED
+#########################################
+
+*************
+ Description
+*************
+
+The SuperExec auth secret could not be loaded from the provided secret file.
+
+****************
+ How to Resolve
+****************
+
+1. Confirm the `--superexec-auth-secret-file` path exists and is readable.
+2. Ensure the secret file is not empty.
+3. Check the accompanying error message for the exact file access/validation failure.
