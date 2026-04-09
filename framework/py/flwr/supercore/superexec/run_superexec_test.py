@@ -48,6 +48,7 @@ def test_run_with_deprecation_warning_logs_and_forwards_runtime_flags() -> None:
         plugin_class=object,
         stub_class=object,
         appio_api_address="127.0.0.1:9091",
+        superexec_auth_secret=None,
         parent_pid=321,
         runtime_dependency_install=True,
     )
