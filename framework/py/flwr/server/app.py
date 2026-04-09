@@ -220,26 +220,25 @@ def run_superlink() -> None:
     # Obtain certificates
     certificates = try_obtain_server_certificates(args)
 
+    superexec_auth_secret: bytes | None = None
     if args.isolation == ISOLATION_MODE_SUBPROCESS:
         if args.superexec_auth_secret_file is not None:
             log(
                 WARN,
                 "SuperExec auth secret is ignored in subprocess isolation mode.",
             )
-        superexec_auth_secret = None
     else:
-        configured_superexec_secret: bytes | None = None
+        # Enable SuperExec auth in process mode when secret is provided
         if args.superexec_auth_secret_file is not None:
             try:
-                configured_superexec_secret = load_superexec_auth_secret(
+                superexec_auth_secret = load_superexec_auth_secret(
                     secret_file=args.superexec_auth_secret_file,
                 )
             except ValueError as err:
                 flwr_exit(
                     ExitCode.SUPERLINK_INVALID_ARGS,
-                    f"Failed to load SuperExec auth secret: {err}",
+                    f"Failed to load SuperExec authentication secret: {err}",
                 )
-        superexec_auth_secret = configured_superexec_secret
 
     # Disable the account auth TLS check if args.disable_oidc_tls_cert_verification is
     # provided
