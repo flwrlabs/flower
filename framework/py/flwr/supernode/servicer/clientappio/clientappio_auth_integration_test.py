@@ -20,10 +20,6 @@ import unittest
 
 import grpc
 
-from flwr.common.constant import (
-    CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS,
-    CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
-)
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ListAppsToLaunchRequest,
     ListAppsToLaunchResponse,
@@ -37,16 +33,20 @@ from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
     SuperExecAuthClientInterceptor,
 )
+from flwr.supercore.interceptors.superexec_auth_interceptor import (
+    CLIENTAPPIO_SUPEREXEC_METHODS,
+)
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supernode.nodestate import NodeStateFactory
 from flwr.supernode.start_client_internal import run_clientappio_api_grpc
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
-_CLIENTAPPIO_SUPEREXEC_METHODS = (
-    "/flwr.proto.ClientAppIo/ListAppsToLaunch",
-    "/flwr.proto.ClientAppIo/RequestToken",
-    "/flwr.proto.ClientAppIo/GetRun",
-)
+
+
+def _to_loopback_target(bound_address: str) -> str:
+    """Convert a bound server address to a client-connectable loopback target."""
+    _host, port = bound_address.rsplit(":", maxsplit=1)
+    return f"127.0.0.1:{port}"
 
 
 class TestClientAppIoAuthIntegration(unittest.TestCase):
@@ -66,14 +66,15 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):
         self.valid_token = token
 
         self._server: grpc.Server = run_clientappio_api_grpc(
-            address=CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
+            address="127.0.0.1:0",
             state_factory=state_factory,
             objectstore_factory=objectstore_factory,
             certificates=None,
             superexec_auth_secret=_SUPEREXEC_SECRET,
         )
 
-        channel = grpc.insecure_channel(CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS)
+        server_target = _to_loopback_target(self._server.bound_address)
+        channel = grpc.insecure_channel(server_target)
         self._pull_object = channel.unary_unary(
             "/flwr.proto.ClientAppIo/PullObject",
             request_serializer=PullObjectRequest.SerializeToString,
@@ -85,10 +86,10 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):
             response_deserializer=ListAppsToLaunchResponse.FromString,
         )
         superexec_channel = grpc.intercept_channel(
-            grpc.insecure_channel(CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS),
+            grpc.insecure_channel(server_target),
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
-                protected_methods=_CLIENTAPPIO_SUPEREXEC_METHODS,
+                protected_methods=CLIENTAPPIO_SUPEREXEC_METHODS,
             ),
         )
         self._list_apps_to_launch_superexec = superexec_channel.unary_unary(
@@ -156,14 +157,14 @@ class TestClientAppIoAuthIntegrationWithoutSuperExecSecret(unittest.TestCase):
         state_factory = NodeStateFactory(objectstore_factory=objectstore_factory)
 
         self._server: grpc.Server = run_clientappio_api_grpc(
-            address=CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
+            address="127.0.0.1:0",
             state_factory=state_factory,
             objectstore_factory=objectstore_factory,
             certificates=None,
             superexec_auth_secret=None,
         )
 
-        channel = grpc.insecure_channel(CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS)
+        channel = grpc.insecure_channel(_to_loopback_target(self._server.bound_address))
         self._list_apps_to_launch = channel.unary_unary(
             "/flwr.proto.ClientAppIo/ListAppsToLaunch",
             request_serializer=ListAppsToLaunchRequest.SerializeToString,

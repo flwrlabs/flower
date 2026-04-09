@@ -100,6 +100,7 @@ def test_flower_supernode_subprocess_does_not_load_superexec_secret(
         superexec_auth_secret_file="ignored-secret-file",
         insecure=True,
         auth_supernode_private_key=None,
+        runtime_dependency_install=False,
     )
     captured: dict[str, object] = {}
 
@@ -171,6 +172,7 @@ def test_flower_supernode_process_exits_on_invalid_superexec_secret_file(
         superexec_auth_secret_file="bad-secret-file",
         insecure=True,
         auth_supernode_private_key=None,
+        runtime_dependency_install=False,
     )
 
     class _Parser:
