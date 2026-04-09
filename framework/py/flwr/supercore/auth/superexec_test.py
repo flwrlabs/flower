@@ -77,7 +77,7 @@ class TestSuperExecAuthPrimitives(TestCase):
         self.assertTrue(first)
 
     def test_verify_superexec_signature(self) -> None:
-        """Signature verification should use constant-time equality semantics."""
+        """Signature verification should return True only for matching signatures."""
         auth_secret = derive_auth_secret(b"master-secret")
         good_signature = compute_superexec_signature(
             auth_secret=auth_secret,
