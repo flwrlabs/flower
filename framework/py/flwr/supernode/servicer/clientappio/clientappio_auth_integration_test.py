@@ -31,6 +31,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.supercore.interceptors import (
     APP_TOKEN_HEADER,
     AUTHENTICATION_FAILED_MESSAGE,
+    AppIoTokenClientInterceptor,
     SuperExecAuthClientInterceptor,
 )
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
@@ -74,25 +75,26 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):
         )
 
         server_target = _to_loopback_target(self._server.bound_address)
-        channel = grpc.insecure_channel(server_target)
-        self._pull_object = channel.unary_unary(
+        self._base_channel = grpc.insecure_channel(server_target)
+        self._pull_object = self._base_channel.unary_unary(
             "/flwr.proto.ClientAppIo/PullObject",
             request_serializer=PullObjectRequest.SerializeToString,
             response_deserializer=PullObjectResponse.FromString,
         )
-        self._list_apps_to_launch = channel.unary_unary(
+        self._list_apps_to_launch_no_auth = self._base_channel.unary_unary(
             "/flwr.proto.ClientAppIo/ListAppsToLaunch",
             request_serializer=ListAppsToLaunchRequest.SerializeToString,
             response_deserializer=ListAppsToLaunchResponse.FromString,
         )
-        superexec_channel = grpc.intercept_channel(
-            grpc.insecure_channel(server_target),
+        self._auth_channel = grpc.intercept_channel(
+            self._base_channel,
+            AppIoTokenClientInterceptor(token=self.valid_token),
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
                 protected_methods=CLIENTAPPIO_SUPEREXEC_METHODS,
             ),
         )
-        self._list_apps_to_launch_superexec = superexec_channel.unary_unary(
+        self._list_apps_to_launch_with_superexec_auth = self._auth_channel.unary_unary(
             "/flwr.proto.ClientAppIo/ListAppsToLaunch",
             request_serializer=ListAppsToLaunchRequest.SerializeToString,
             response_deserializer=ListAppsToLaunchResponse.FromString,
@@ -132,13 +134,15 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):
     def test_list_apps_to_launch_denied_without_superexec_metadata(self) -> None:
         """SuperExec RPC should deny requests missing signed metadata."""
         with self.assertRaises(grpc.RpcError) as err:
-            self._list_apps_to_launch.with_call(request=ListAppsToLaunchRequest())
+            self._list_apps_to_launch_no_auth.with_call(
+                request=ListAppsToLaunchRequest()
+            )
         assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
         assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE
 
     def test_list_apps_to_launch_allows_with_superexec_metadata(self) -> None:
         """SuperExec RPC should allow requests with valid signed metadata."""
-        response, call = self._list_apps_to_launch_superexec.with_call(
+        response, call = self._list_apps_to_launch_with_superexec_auth.with_call(
             request=ListAppsToLaunchRequest()
         )
         assert isinstance(response, ListAppsToLaunchResponse)
