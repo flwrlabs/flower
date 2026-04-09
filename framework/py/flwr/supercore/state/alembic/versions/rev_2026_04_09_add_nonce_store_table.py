@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Add nonce store table.
+"""Add nonce_store table.
 
 Revision ID: b277e6f3656c
 Revises: 33e2f70642b1
