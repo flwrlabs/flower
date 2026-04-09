@@ -14,8 +14,10 @@
 # ==============================================================================
 """Flower command line interface `config` command."""
 
+from .add import add as add
 from .ls import ls as ls
 
 __all__ = [
+    "add",
     "ls",
 ]

@@ -27,6 +27,7 @@ from flwr.supercore.version import package_version
 from .app_cmd import publish as app_publish
 from .app_cmd import review as app_review
 from .build import build
+from .config import add as config_add
 from .config import ls as config_list
 from .federation import add_supernode as federation_add_supernode
 from .federation import archive as federation_archive
@@ -130,6 +131,7 @@ app.add_typer(federation_app, name="federation")
 
 # Create config command group
 config_app = typer.Typer(help="Manage Configuration")
+config_app.command()(config_add)
 config_app.command("list")(config_list)
 # Hide "ls" command (left as alias)
 config_app.command(hidden=True)(config_list)
