@@ -20,7 +20,8 @@ import subprocess
 from collections.abc import Sequence
 
 from flwr.common.exit import ExitCode, flwr_exit
-from flwr.supercore.superexec.plugin import ExecPlugin
+
+from .exec_plugin import ExecPlugin
 
 
 class BaseEphemeralExecPlugin(ExecPlugin):

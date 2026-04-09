@@ -36,35 +36,12 @@ from flwr.supercore.grpc_health import add_args_health
 from flwr.supercore.superexec.plugin import (
     ClientAppExecPlugin,
     ExecPlugin,
+    ServerAppEphemeralExecPlugin,
     ServerAppExecPlugin,
 )
 from flwr.supercore.superexec.run_superexec import run_superexec
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.version import package_version
-
-try:
-    from flwr.ee import add_ee_args_superexec
-    from flwr.ee.constant import ExecEePluginType
-    from flwr.ee.exec_plugin import get_ee_plugin_and_stub_class
-except ImportError:
-
-    class ExecEePluginType:  # type: ignore[no-redef]
-        """SuperExec EE plugin types."""
-
-        @staticmethod
-        def all() -> list[str]:
-            """Return all SuperExec EE plugin types."""
-            return []
-
-    def get_ee_plugin_and_stub_class(  # pylint: disable=unused-argument
-        plugin_type: str,
-    ) -> tuple[type[ExecPlugin], type[object]] | None:
-        """Get the EE plugin class and stub class based on the plugin type."""
-        return None
-
-    # pylint: disable-next=unused-argument
-    def add_ee_args_superexec(parser: argparse.ArgumentParser) -> None:
-        """Add EE-specific arguments to the parser."""
 
 
 def flower_superexec() -> None:
@@ -149,7 +126,7 @@ def _parse_args() -> argparse.ArgumentParser:
     parser.add_argument(
         "--plugin-type",
         type=str,
-        choices=ExecPluginType.all() + ExecEePluginType.all(),
+        choices=ExecPluginType.all(),
         required=True,
         help="The type of plugin to use.",
     )
@@ -168,7 +145,6 @@ def _parse_args() -> argparse.ArgumentParser:
         "when the parent process exits.",
     )
     add_superexec_auth_secret_args(parser)
-    add_ee_args_superexec(parser)
     add_args_health(parser)
     return parser
 
@@ -180,9 +156,11 @@ def _get_plugin_and_stub_class(
     mapping: dict[str, tuple[type[ExecPlugin], type[object]]] = {
         ExecPluginType.CLIENT_APP: (ClientAppExecPlugin, ClientAppIoStub),
         ExecPluginType.SERVER_APP: (ServerAppExecPlugin, ServerAppIoStub),
+        ExecPluginType.SERVER_APP_EPHEMERAL: (
+            ServerAppEphemeralExecPlugin,
+            ServerAppIoStub,
+        ),
     }
     if plugin_type in mapping:
         return mapping[plugin_type]
-    if ret := get_ee_plugin_and_stub_class(plugin_type):
-        return ret  # type: ignore[no-any-return]
     raise ValueError(f"Unknown plugin type: {plugin_type}")
