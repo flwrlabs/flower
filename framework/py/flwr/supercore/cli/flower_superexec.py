@@ -22,6 +22,7 @@ from typing import Any
 import yaml
 
 from flwr.common import EventType, event
+from flwr.common.args import add_args_runtime_dependency_install
 from flwr.common.constant import ExecPluginType
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
@@ -129,6 +130,7 @@ def flower_superexec() -> None:
         plugin_config=plugin_config,
         parent_pid=args.parent_pid,
         health_server_address=args.health_server_address,
+        runtime_dependency_install=args.runtime_dependency_install,
     )
 
 
@@ -170,6 +172,7 @@ def _parse_args() -> argparse.ArgumentParser:
     add_superexec_auth_secret_args(parser)
     add_ee_args_superexec(parser)
     add_args_health(parser)
+    add_args_runtime_dependency_install(parser)
     return parser
 
 

@@ -32,6 +32,7 @@ from flwr.common.config import (
     get_project_dir,
 )
 from flwr.common.constant import (
+    RUNTIME_DEPENDENCY_INSTALL,
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
     ExecPluginType,
     Status,
@@ -67,6 +68,10 @@ from flwr.simulation.simulationio_connection import SimulationIoConnection
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import NOOP_FEDERATION
 from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
+from flwr.supercore.superexec.dependency_installer import (
+    cleanup_app_runtime_environment,
+    install_app_dependencies,
+)
 from flwr.supercore.superexec.plugin import ServerAppExecPlugin
 from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning
 
@@ -128,6 +133,7 @@ def flwr_simulation() -> None:
             appio_api_address=args.serverappio_api_address,
             parent_pid=args.parent_pid,
             warn_run_once=args.run_once,
+            runtime_dependency_install=args.runtime_dependency_install,
         )
         return
 
@@ -143,6 +149,7 @@ def flwr_simulation() -> None:
         token=args.token,
         certificates=None,
         parent_pid=args.parent_pid,
+        runtime_dependency_install=args.runtime_dependency_install,
     )
 
     # Restore stdout/stderr
@@ -155,6 +162,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     token: str,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
+    runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
     """Run Flower Simulation process."""
     # Start monitoring the parent process if a PID is provided
@@ -173,6 +181,8 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     heartbeat_sender = None
     run = None
     run_status = None
+    run_id_hash = None
+    runtime_env_dir = None
     exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
@@ -190,6 +200,8 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             conn._stub.UpdateRunStatus(
                 UpdateRunStatusRequest(run_id=run.run_id, run_status=run_status_proto)
             )
+
+        cleanup_app_runtime_environment(runtime_env_dir)
 
     register_signal_handlers(
         event_type=EventType.FLWR_SIMULATION_RUN_LEAVE,
@@ -219,6 +231,26 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         fab_id, fab_version = get_fab_metadata(fab.content)
 
         app_path = get_project_dir(fab_id, fab_version, fab.hash_str)
+
+        if runtime_dependency_install:
+            log(DEBUG, "Simulation process starts app dependency installation.")
+            runtime_env_dir = install_app_dependencies(
+                app_path,
+                launch_id=token,
+                run_id=run.run_id,
+                index_context={
+                    "component": "simulation",
+                    "project_dir": str(app_path),
+                    "run_id": run.run_id,
+                    "launch_id": token,
+                    "fab_id": run.fab_id,
+                    "fab_version": run.fab_version,
+                    "fab_hash": fab.hash_str,
+                },
+            )
+        else:
+            log(DEBUG, "Simulation runtime dependency installation is disabled.")
+
         config = get_project_config(app_path)
 
         # Get ClientApp and SeverApp components
