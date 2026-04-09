@@ -22,6 +22,7 @@ import logging
 import platform
 import threading
 import traceback
+from collections.abc import Callable
 from logging import DEBUG, ERROR, INFO, WARNING
 from queue import Empty, Queue
 from typing import Any, cast
@@ -55,8 +56,14 @@ from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION,
 )
+from flwr.supercore.heartbeat import HeartbeatSender
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
+
+
+def _noop_heartbeat_fn() -> bool:
+    """Return a successful heartbeat result for local simulation runs."""
+    return True
 
 
 def _replace_keys(d: Any, match: str, target: str) -> Any:
@@ -156,6 +163,7 @@ def run_simulation(
 
     _ = _run_simulation(
         num_supernodes=num_supernodes,
+        heartbeat_fn=_noop_heartbeat_fn,
         client_app=client_app,
         server_app=server_app,
         backend_name=backend_name,
@@ -241,6 +249,7 @@ def run_serverapp_th(
 def _main_loop(
     num_supernodes: int,
     backend_name: str,
+    heartbeat_fn: Callable[[], bool],
     backend_config_stream: str,
     app_dir: str,
     is_app: bool,
@@ -260,9 +269,11 @@ def _main_loop(
     )
 
     f_stop = threading.Event()
-    # A Threading event to indicate if an exception was raised in the ServerApp thread
+    # A threading event to indicate if any simulation-managed thread failed.
     server_app_thread_has_exception = threading.Event()
     serverapp_th = None
+    heartbeat_sender = HeartbeatSender(heartbeat_fn)
+    previous_threading_excepthook = threading.excepthook
     success = True
     if server_app_context is None:
         server_app_context = Context(
@@ -298,6 +309,18 @@ def _main_loop(
             enable_tf_gpu_growth=enable_tf_gpu_growth,
             ctx_queue=output_context_queue,
         )
+
+        def on_thread_exception(
+            args: threading.ExceptHookArgs,
+        ) -> None:
+            if args.thread is heartbeat_sender._thread:  # pylint: disable=protected-access
+                log(ERROR, "Heartbeat thread raised an exception: %s", args.exc_value)
+                # Trigger stop event for Simulation Engine
+                f_stop.set()
+            previous_threading_excepthook(args)
+
+        threading.excepthook = on_thread_exception
+        heartbeat_sender.start()
 
         # Start Simulation Engine
         vce.start_vce(
@@ -338,6 +361,9 @@ def _main_loop(
             serverapp_th.join(timeout=5)
             if server_app_thread_has_exception.is_set():
                 raise RuntimeError("Exception in ServerApp thread")
+        threading.excepthook = previous_threading_excepthook
+        if heartbeat_sender.is_running:
+            heartbeat_sender.stop()
 
     log(DEBUG, "Stopping Simulation Engine now.")
     return updated_context
@@ -347,6 +373,7 @@ def _main_loop(
 def _run_simulation(
     num_supernodes: int,
     exit_event: EventType,
+    heartbeat_fn: Callable[[], bool],
     client_app: ClientApp | None = None,
     server_app: ServerApp | None = None,
     backend_name: str = "ray",
@@ -428,6 +455,7 @@ def _run_simulation(
     args = (
         num_supernodes,
         backend_name,
+        heartbeat_fn,
         backend_config_stream,
         app_dir,
         is_app,
