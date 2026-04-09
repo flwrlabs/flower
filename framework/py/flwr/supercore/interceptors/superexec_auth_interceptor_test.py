@@ -244,6 +244,9 @@ class TestSuperExecAuthServerInterceptor(TestCase):
         )
         with self.assertRaises(grpc.RpcError):
             intercepted.unary_unary(request, context)
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
+        )
 
     def test_stale_timestamp_is_denied(self) -> None:
         """Requests outside timestamp tolerance should be denied."""
