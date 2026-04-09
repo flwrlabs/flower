@@ -647,7 +647,7 @@ def run_clientappio_api_grpc(  # pylint: disable=R0913,R0917
             "Request metadata confidentiality is not guaranteed without TLS.",
         )
 
-    clientappio_servicer: grpc.Server = ClientAppIoServicer(
+    clientappio_servicer: ClientAppIoServicer = ClientAppIoServicer(
         state_factory=state_factory,
         objectstore_factory=objectstore_factory,
     )
