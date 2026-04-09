@@ -220,6 +220,7 @@ def run_superlink() -> None:
     # Obtain certificates
     certificates = try_obtain_server_certificates(args)
 
+    # Load SuperExec auth secret
     superexec_auth_secret: bytes | None = None
     if args.isolation == ISOLATION_MODE_SUBPROCESS:
         if args.superexec_auth_secret_file is not None:
