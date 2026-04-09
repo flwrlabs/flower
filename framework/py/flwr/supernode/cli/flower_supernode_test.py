@@ -32,7 +32,7 @@ flower_supernode_module = importlib.import_module("flwr.supernode.cli.flower_sup
 
 def _make_args(**overrides: object) -> SimpleNamespace:
     """Build a default SuperNode CLI args namespace with optional overrides."""
-    args = {
+    args: dict[str, object] = {
         "trusted_entities": None,
         "superlink": "127.0.0.1:9092",
         "transport": "grpc-rere",

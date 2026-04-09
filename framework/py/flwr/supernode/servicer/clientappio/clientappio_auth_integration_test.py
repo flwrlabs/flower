@@ -50,7 +50,7 @@ def _to_loopback_target(bound_address: str) -> str:
     return f"127.0.0.1:{port}"
 
 
-class TestClientAppIoAuthIntegration(unittest.TestCase):
+class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R0902
     """Integration tests for ClientAppIo token-auth interceptor behavior."""
 
     def setUp(self) -> None:
