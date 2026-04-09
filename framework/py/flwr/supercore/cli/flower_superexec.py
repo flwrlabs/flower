@@ -27,6 +27,10 @@ from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.supercore.auth import (
+    add_superexec_auth_secret_args,
+    load_superexec_auth_secret,
+)
 from flwr.supercore.constant import EXEC_PLUGIN_SECTION
 from flwr.supercore.grpc_health import add_args_health
 from flwr.supercore.superexec.plugin import (
@@ -106,10 +110,22 @@ def flower_superexec() -> None:
         )
         args.plugin_type = ExecPluginType.SERVER_APP
     plugin_class, stub_class = _get_plugin_and_stub_class(args.plugin_type)
+    superexec_auth_secret = None
+    if args.superexec_auth_secret_file is not None:
+        try:
+            superexec_auth_secret = load_superexec_auth_secret(
+                secret_file=args.superexec_auth_secret_file,
+            )
+        except ValueError as err:
+            flwr_exit(
+                ExitCode.SUPEREXEC_AUTH_SECRET_LOAD_FAILED,
+                f"Failed to load SuperExec auth secret: {err}",
+            )
     run_superexec(
         plugin_class=plugin_class,
         stub_class=stub_class,  # type: ignore
         appio_api_address=args.appio_api_address,
+        superexec_auth_secret=superexec_auth_secret,
         plugin_config=plugin_config,
         parent_pid=args.parent_pid,
         health_server_address=args.health_server_address,
@@ -151,6 +167,7 @@ def _parse_args() -> argparse.ArgumentParser:
         help="The PID of the parent process. When set, the process will terminate "
         "when the parent process exits.",
     )
+    add_superexec_auth_secret_args(parser)
     add_ee_args_superexec(parser)
     add_args_health(parser)
     return parser
