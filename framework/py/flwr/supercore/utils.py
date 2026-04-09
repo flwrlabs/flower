@@ -121,7 +121,7 @@ def parse_app_spec(app_spec: str) -> tuple[str, str | None]:
 
 def request_download_link(
     app_id: str, app_version: str | None, in_url: str, out_url: str
-) -> tuple[str, list[dict[str, str]] | None]:
+) -> tuple[str, list[dict[str, str]] | None, str | None]:
     """Request a download link for the given app from Flower Hub.
 
     Parameters
@@ -137,10 +137,11 @@ def request_download_link(
 
     Returns
     -------
-    tuple[str, list[dict[str, str]] | None]
+    tuple[str, list[dict[str, str]] | None, str | None]
         A tuple containing:
         - The download URL for the application.
         - A list of verification dictionaries if provided by the API, otherwise None.
+        - A compatibility note if provided by the API, otherwise None.
 
     Raises
     ------
@@ -196,8 +197,9 @@ def request_download_link(
         raise ValueError("Invalid response from Platform API")
 
     verifications = data["verifications"] if "verifications" in data else None
+    note = data["note"] if "note" in data else None
 
-    return str(data[out_url]), verifications
+    return str(data[out_url]), verifications, note
 
 
 def simulation_config_to_json(config: SimulationConfig) -> dict[str, Any]:

@@ -1141,7 +1141,7 @@ def _get_remote_fab(
     # Request download link and verification information
     url = f"{PLATFORM_API_URL}/hub/fetch-fab"
     try:
-        presigned_url, verifications = request_download_link(
+        presigned_url, verifications, note = request_download_link(
             app_id, app_version, url, "fab_url"
         )
     except ValueError as e:
@@ -1149,6 +1149,9 @@ def _get_remote_fab(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"{e}",
         )
+
+    if note:
+        log(INFO, "%s", note)
 
     # Format verification information
     verification_dict = (
