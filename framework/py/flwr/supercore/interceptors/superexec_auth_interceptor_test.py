@@ -45,19 +45,14 @@ from flwr.supercore.interceptors import (
     SuperExecAuthClientInterceptor,
     create_serverappio_superexec_auth_server_interceptor,
 )
+from flwr.supercore.interceptors.superexec_auth_interceptor import (
+    _SERVERAPPIO_SUPEREXEC_METHODS,
+)
 
 _ClientCallDetails = namedtuple(
     "_ClientCallDetails",
     ["method", "timeout", "metadata", "credentials", "wait_for_ready", "compression"],
 )
-
-_SERVERAPPIO_SUPEREXEC_METHODS = (
-    "/flwr.proto.ServerAppIo/ListAppsToLaunch",
-    "/flwr.proto.ServerAppIo/RequestToken",
-    "/flwr.proto.ServerAppIo/GetRun",
-)
-
-
 class _HandlerCallDetails:
     def __init__(
         self,
