@@ -2062,6 +2062,29 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state.initialize()
         return state
 
+    def test_token_expiry_does_not_fail_pending_run(self) -> None:
+        """Ensure token cleanup doesn't mark never-started runs as failed."""
+        # Prepare
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        assert state.create_token(run_id) is not None
+
+        # Execute: force token expiry and trigger cleanup
+        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = patched_dt
+            status = state.get_run_status({run_id})[run_id]
+
+        # Assert: pending run remains non-terminal
+        assert status.status == Status.PENDING
+        assert status.sub_status == ""
+        assert status.details == ""
+
+        # Assert: expired token was removed and run can be re-claimed
+        token = state.create_token(run_id)
+        assert token is not None
+        state.delete_token(run_id)
+
     def test_token_expiry_does_not_overwrite_finished_completed_run(self) -> None:
         """Ensure token cleanup doesn't mutate terminal COMPLETED status."""
         # Prepare
