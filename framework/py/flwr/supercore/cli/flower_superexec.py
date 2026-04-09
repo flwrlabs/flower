@@ -86,6 +86,16 @@ def flower_superexec() -> None:
             ExecPluginType.SERVER_APP,
         )
         args.plugin_type = ExecPluginType.SERVER_APP
+
+    if args.plugin_type == ExecPluginType.SERVER_APP_EPHEMERAL:
+        log(
+            WARN,
+            "The '%s' plugin type is experimental and may be removed in a future "
+            "release. Please use '%s' for production deployments.",
+            ExecPluginType.SERVER_APP_EPHEMERAL,
+            ExecPluginType.SERVER_APP,
+        )
+
     plugin_class, stub_class = _get_plugin_and_stub_class(args.plugin_type)
     superexec_auth_secret = None
     if args.superexec_auth_secret_file is not None:
