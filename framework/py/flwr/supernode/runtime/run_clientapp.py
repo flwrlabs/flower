@@ -24,7 +24,8 @@ from flwr.cli.install import install_from_fab
 from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
 from flwr.common import Context, Message
-from flwr.common.constant import ErrorCode
+from flwr.common.config import get_project_dir
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
@@ -67,6 +68,10 @@ from flwr.supercore.inflatable.inflatable_utils import (
     push_objects,
 )
 from flwr.supercore.interceptors import AppIoTokenClientInterceptor
+from flwr.supercore.superexec.dependency_installer import (
+    cleanup_app_runtime_environment,
+    install_app_dependencies,
+)
 from flwr.supercore.utils import mask_string
 
 
@@ -75,6 +80,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
     token: str,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
+    runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
     """Run Flower ClientApp process."""
     # Monitor the main process in case of SIGKILL
@@ -91,11 +97,13 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
     )
     channel.subscribe(on_channel_state_change)
     heartbeat_sender = None
+    runtime_env_dir = None
 
     def on_exit() -> None:
         if heartbeat_sender is not None and heartbeat_sender.is_running:
             heartbeat_sender.stop()
         channel.close()
+        cleanup_app_runtime_environment(runtime_env_dir)
 
     register_signal_handlers(
         event_type=EventType.FLWR_CLIENTAPP_RUN_LEAVE,
@@ -119,6 +127,29 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
             if fab:
                 log(DEBUG, "[flwr-clientapp] Start FAB installation.")
                 install_from_fab(fab.content, skip_prompt=True)
+
+                app_path = get_project_dir(run.fab_id, run.fab_version, fab.hash_str)
+                if runtime_dependency_install:
+                    log(DEBUG, "[flwr-clientapp] Installing app dependencies.")
+                    runtime_env_dir = install_app_dependencies(
+                        app_path,
+                        launch_id=token,
+                        run_id=run.run_id,
+                        index_context={
+                            "component": "clientapp",
+                            "project_dir": str(app_path),
+                            "run_id": run.run_id,
+                            "launch_id": token,
+                            "fab_id": run.fab_id,
+                            "fab_version": run.fab_version,
+                            "fab_hash": fab.hash_str,
+                        },
+                    )
+                else:
+                    log(
+                        DEBUG,
+                        "[flwr-clientapp] Runtime dependency installation is disabled.",
+                    )
 
             load_client_app_fn = get_load_client_app_fn(
                 default_app_ref="",
