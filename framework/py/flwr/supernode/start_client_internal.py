@@ -656,13 +656,12 @@ def run_clientappio_api_grpc(  # pylint: disable=R0913,R0917
     )
     interceptors: list[grpc.ServerInterceptor] = [auth_interceptor]
     if superexec_auth_secret is not None:
-        superexec_auth_interceptor = (
+        interceptors.append(
             create_clientappio_superexec_auth_server_interceptor(
                 state_provider=state_factory.state,
                 master_secret=superexec_auth_secret,
             )
         )
-        interceptors.append(superexec_auth_interceptor)
     clientappio_add_servicer_to_server_fn = add_ClientAppIoServicer_to_server
     clientappio_grpc_server = generic_create_grpc_server(
         servicer_and_add_fn=(
