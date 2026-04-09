@@ -16,79 +16,48 @@
 
 
 import argparse
-from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from types import SimpleNamespace
 from unittest import TestCase
-from unittest.mock import patch
 
-from .superexec_secret import (
-    add_superexec_auth_secret_args,
-    generate_superexec_auth_secret,
-    load_superexec_auth_secret,
-)
+from .superexec_secret import add_superexec_auth_secret_args, load_superexec_auth_secret
 
 
 class TestSuperExecSecret(TestCase):
     """Unit tests for SuperExec shared-secret loading helpers."""
 
-    def test_add_superexec_auth_secret_args_are_mutually_exclusive(self) -> None:
-        """CLI args should reject specifying both file and stdin."""
+    def test_add_superexec_auth_secret_args(self) -> None:
+        """CLI should accept a secret file argument."""
         parser = argparse.ArgumentParser()
         add_superexec_auth_secret_args(parser)
 
-        with self.assertRaises(SystemExit):
-            _ = parser.parse_args(
-                [
-                    "--superexec-auth-secret-file",
-                    "/tmp/secret",
-                    "--superexec-auth-secret-stdin",
-                ]
-            )
+        args = parser.parse_args(["--superexec-auth-secret-file", "/tmp/secret"])
+        self.assertEqual(args.superexec_auth_secret_file, "/tmp/secret")
 
     def test_load_secret_returns_none_when_unset(self) -> None:
         """No secret source should return None."""
-        loaded = load_superexec_auth_secret(secret_file=None, secret_stdin=False)
+        loaded = load_superexec_auth_secret(secret_file=None)
         self.assertIsNone(loaded)
 
     def test_load_secret_from_file(self) -> None:
-        """File source should be read and normalized."""
+        """File source should be read as raw bytes."""
         with TemporaryDirectory() as temp_dir:
             secret_path = Path(temp_dir) / "secret.txt"
-            secret_path.write_bytes(b"  abc123  \n")
+            secret_path.write_bytes(b"abc123")
 
-            loaded = load_superexec_auth_secret(
-                secret_file=str(secret_path), secret_stdin=False
-            )
+            loaded = load_superexec_auth_secret(secret_file=str(secret_path))
 
         self.assertEqual(loaded, b"abc123")
 
-    def test_load_secret_from_stdin(self) -> None:
-        """Stdin source should be read and normalized."""
-        fake_stdin = SimpleNamespace(buffer=BytesIO(b"  stdin-secret \n"))
-        with patch("sys.stdin", fake_stdin):
-            loaded = load_superexec_auth_secret(secret_file=None, secret_stdin=True)
-
-        self.assertEqual(loaded, b"stdin-secret")
-
-    def test_load_secret_rejects_empty_after_strip(self) -> None:
-        """Empty (or whitespace-only) secrets should be rejected."""
+    def test_load_secret_rejects_empty_file(self) -> None:
+        """Empty secret files should be rejected."""
         with TemporaryDirectory() as temp_dir:
             secret_path = Path(temp_dir) / "empty-secret.txt"
-            secret_path.write_bytes(b"  \n\t ")
+            secret_path.write_bytes(b"")
             with self.assertRaises(ValueError):
-                _ = load_superexec_auth_secret(
-                    secret_file=str(secret_path), secret_stdin=False
-                )
+                _ = load_superexec_auth_secret(secret_file=str(secret_path))
 
-        fake_stdin = SimpleNamespace(buffer=BytesIO(b"   "))
-        with patch("sys.stdin", fake_stdin):
-            with self.assertRaises(ValueError):
-                _ = load_superexec_auth_secret(secret_file=None, secret_stdin=True)
-
-    def test_generate_superexec_auth_secret(self) -> None:
-        """Secret generation should return bytes of requested length."""
-        secret = generate_superexec_auth_secret(48)
-        self.assertIsInstance(secret, bytes)
-        self.assertEqual(len(secret), 48)
+    def test_load_secret_rejects_missing_file(self) -> None:
+        """A missing secret file should raise ValueError."""
+        with self.assertRaises(ValueError):
+            _ = load_superexec_auth_secret(secret_file="/nonexistent/path/secret.txt")

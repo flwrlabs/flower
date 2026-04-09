@@ -17,17 +17,13 @@
 
 from unittest import TestCase
 
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    RequestTokenRequest,
-)
+from flwr.proto.appio_pb2 import RequestTokenRequest  # pylint: disable=E0611
 
 from .superexec import (
     canonicalize_superexec_auth_input,
     compute_request_body_sha256,
     compute_superexec_signature,
     derive_auth_secret,
-    derive_superexec_audience,
-    extract_single_str_metadata,
     verify_superexec_signature,
 )
 
@@ -39,7 +35,6 @@ class TestSuperExecAuthPrimitives(TestCase):
         """Canonicalization should produce deterministic UTF-8 bytes."""
         canonical = canonicalize_superexec_auth_input(
             method="/flwr.proto.ServerAppIo/RequestToken",
-            audience="serverappio:9091",
             timestamp=123,
             nonce="nonce-1",
             body_sha256="abc",
@@ -49,7 +44,6 @@ class TestSuperExecAuthPrimitives(TestCase):
             canonical,
             (
                 b"method=/flwr.proto.ServerAppIo/RequestToken\n"
-                b"audience=serverappio:9091\n"
                 b"ts=123\n"
                 b"nonce=nonce-1\n"
                 b"body_sha256=abc"
@@ -88,7 +82,6 @@ class TestSuperExecAuthPrimitives(TestCase):
         good_signature = compute_superexec_signature(
             auth_secret=auth_secret,
             method="/flwr.proto.ServerAppIo/RequestToken",
-            audience="serverappio:9091",
             timestamp=456,
             nonce="nonce-2",
             body_sha256="f" * 64,
@@ -97,24 +90,3 @@ class TestSuperExecAuthPrimitives(TestCase):
 
         self.assertTrue(verify_superexec_signature(good_signature, good_signature))
         self.assertFalse(verify_superexec_signature(good_signature, bad_signature))
-
-    def test_extract_single_str_metadata(self) -> None:
-        """Metadata extraction should enforce a single non-empty string value."""
-        metadata: tuple[tuple[str, str], ...] = (
-            ("k1", "v1"),
-            ("k2", "v2"),
-        )
-        self.assertEqual(extract_single_str_metadata(metadata, "k1"), "v1")
-        self.assertIsNone(extract_single_str_metadata(metadata, "missing"))
-        self.assertIsNone(
-            extract_single_str_metadata((("k1", "v1"), ("k1", "v2")), "k1")
-        )
-        self.assertIsNone(extract_single_str_metadata((("k1", ""),), "k1"))
-
-    def test_derive_superexec_audience(self) -> None:
-        """Audience should be normalized to `<service-kind>:<port>`."""
-        audience = derive_superexec_audience("serverappio", "127.0.0.1:9091")
-        self.assertEqual(audience, "serverappio:9091")
-
-        with self.assertRaises(ValueError):
-            _ = derive_superexec_audience("serverappio", "not-an-address")
