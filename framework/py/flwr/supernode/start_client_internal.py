@@ -188,9 +188,7 @@ def start_client_internal(
                 "SuperExec auth is disabled for ClientAppIo in subprocess isolation "
                 "mode. Provided SuperExec auth secret is ignored.",
             )
-        effective_superexec_auth_secret = None
-    else:
-        effective_superexec_auth_secret = superexec_auth_secret
+        superexec_auth_secret = None
 
     # Launch ClientAppIo API server
     grpc_servers = []
@@ -199,7 +197,7 @@ def start_client_internal(
         state_factory=state_factory,
         objectstore_factory=object_store_factory,
         certificates=None,
-        superexec_auth_secret=effective_superexec_auth_secret,
+        superexec_auth_secret=superexec_auth_secret,
     )
     grpc_servers.append(clientappio_server)
 
