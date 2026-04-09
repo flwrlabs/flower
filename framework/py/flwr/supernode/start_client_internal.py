@@ -46,7 +46,6 @@ from flwr.common.constant import (
     ErrorCode,
     ExecPluginType,
 )
-from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import generic_create_grpc_server
 from flwr.common.logger import log
 from flwr.common.retry_invoker import RetryInvoker, make_simple_grpc_retry_invoker
@@ -55,6 +54,7 @@ from flwr.common.typing import Fab, Run, RunNotRunningException
 from flwr.proto.clientappio_pb2_grpc import add_ClientAppIoServicer_to_server
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.supercore.address import parse_address, resolve_bind_address
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,

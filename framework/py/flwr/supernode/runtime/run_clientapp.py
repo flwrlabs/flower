@@ -25,7 +25,6 @@ from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
 from flwr.common import Context, Message
 from flwr.common.constant import ErrorCode
-from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
 from flwr.common.message import remove_content_from_message
@@ -51,6 +50,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,

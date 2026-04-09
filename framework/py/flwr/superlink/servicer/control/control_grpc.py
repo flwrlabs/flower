@@ -21,11 +21,11 @@ import grpc
 
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.event_log_plugin import EventLogWriterPlugin
-from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.common.grpc import generic_create_grpc_server
 from flwr.common.logger import log
 from flwr.proto.control_pb2_grpc import add_ControlServicer_to_server
 from flwr.server.superlink.linkstate import LinkStateFactory
+from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.license_plugin import LicensePlugin
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.artifact_provider import ArtifactProvider

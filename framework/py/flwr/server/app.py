@@ -50,7 +50,6 @@ from flwr.common.constant import (
     ExecPluginType,
 )
 from flwr.common.event_log_plugin import EventLogWriterPlugin
-from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import generic_create_grpc_server
 from flwr.common.logger import configure_superlink_log_file, log
 from flwr.proto.fleet_pb2_grpc import (  # pylint: disable=E0611
@@ -60,6 +59,7 @@ from flwr.proto.grpcadapter_pb2_grpc import add_GrpcAdapterServicer_to_server
 from flwr.server.fleet_event_log_interceptor import FleetEventLogInterceptor
 from flwr.supercore.address import parse_address, resolve_bind_address
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.update_check import warn_if_flwr_update_available

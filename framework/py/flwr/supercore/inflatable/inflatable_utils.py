@@ -24,7 +24,6 @@ from collections.abc import Callable, Iterable, Iterator
 from queue import Queue
 from typing import TypeVar
 
-from flwr.supercore.exit import add_exit_handler
 from flwr.common.message import Message
 from flwr.common.record import (
     Array,
@@ -35,6 +34,7 @@ from flwr.common.record import (
 )
 from flwr.common.record.arraychunk import ArrayChunk
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.supercore.exit import add_exit_handler
 
 from ..constant import (
     FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PULLS,
