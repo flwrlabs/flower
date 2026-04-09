@@ -105,16 +105,28 @@ def test_flower_supernode_subprocess_does_not_load_superexec_secret(
 
     class _Parser:
         def parse_args(self) -> SimpleNamespace:
+            """Return fixed args namespace for subprocess-mode test."""
             return args
 
     def _start_client_internal(**kwargs: object) -> None:
+        """Capture startup kwargs for assertions."""
         captured.update(kwargs)
 
+    def _warn_if_flwr_update_available(**_: object) -> None:
+        """Disable update check side effects in unit test."""
+        return
+
+    def _parse_args_run_supernode() -> _Parser:
+        """Return parser stub with fixed args."""
+        return _Parser()
+
     monkeypatch.setattr(
-        flower_supernode_module, "warn_if_flwr_update_available", lambda **_: None
+        flower_supernode_module,
+        "warn_if_flwr_update_available",
+        _warn_if_flwr_update_available,
     )
     monkeypatch.setattr(
-        flower_supernode_module, "_parse_args_run_supernode", lambda: _Parser()
+        flower_supernode_module, "_parse_args_run_supernode", _parse_args_run_supernode
     )
     monkeypatch.setattr(
         flower_supernode_module, "_try_obtain_trusted_entities", lambda *_: None
@@ -163,6 +175,7 @@ def test_flower_supernode_process_exits_on_invalid_superexec_secret_file(
 
     class _Parser:
         def parse_args(self) -> SimpleNamespace:
+            """Return fixed args namespace for process-mode test."""
             return args
 
     class _ExitCalled(Exception):
@@ -171,13 +184,24 @@ def test_flower_supernode_process_exits_on_invalid_superexec_secret_file(
             self.code = code
 
     def _flwr_exit(code: int, message: str) -> None:
+        """Raise captured exception instead of exiting test process."""
         raise _ExitCalled(code, message)
 
+    def _warn_if_flwr_update_available(**_: object) -> None:
+        """Disable update check side effects in unit test."""
+        return
+
+    def _parse_args_run_supernode() -> _Parser:
+        """Return parser stub with fixed args."""
+        return _Parser()
+
     monkeypatch.setattr(
-        flower_supernode_module, "warn_if_flwr_update_available", lambda **_: None
+        flower_supernode_module,
+        "warn_if_flwr_update_available",
+        _warn_if_flwr_update_available,
     )
     monkeypatch.setattr(
-        flower_supernode_module, "_parse_args_run_supernode", lambda: _Parser()
+        flower_supernode_module, "_parse_args_run_supernode", _parse_args_run_supernode
     )
     monkeypatch.setattr(
         flower_supernode_module, "_try_obtain_trusted_entities", lambda *_: None
