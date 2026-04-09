@@ -37,6 +37,7 @@ from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import SuperExecAuthClientInterceptor
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
+    CLIENTAPPIO_SUPEREXEC_METHODS,
     SERVERAPPIO_SUPEREXEC_METHODS,
 )
 
@@ -75,11 +76,15 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
         NOT be started.
     """
     interceptors: list[SuperExecAuthClientInterceptor] | None = None
-    if stub_class is ServerAppIoStub and superexec_auth_secret:
+    if superexec_auth_secret:
+        if stub_class is ServerAppIoStub:
+            protected_methods = SERVERAPPIO_SUPEREXEC_METHODS
+        else:
+            protected_methods = CLIENTAPPIO_SUPEREXEC_METHODS
         interceptors = [
             SuperExecAuthClientInterceptor(
                 master_secret=superexec_auth_secret,
-                protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
+                protected_methods=protected_methods,
             )
         ]
 

@@ -39,6 +39,10 @@ from flwr.common.constant import (
 )
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
+from flwr.supercore.auth import (
+    add_superexec_auth_secret_args,
+    load_superexec_auth_secret,
+)
 from flwr.supercore.grpc_health import add_args_health
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.version import package_version
@@ -60,6 +64,26 @@ def flower_supernode() -> None:
         _validate_public_keys_ed25519(trusted_entities)
     root_certificates = try_obtain_root_certificates(args, args.superlink)
     authentication_keys = _try_setup_client_authentication(args)
+    superexec_auth_secret = None
+    if args.superexec_auth_secret_file is not None:
+        log(
+            WARN,
+            "EXPERIMENTAL: SuperExec authentication is experimental and "
+            "may change in future releases.",
+        )
+    if (
+        args.isolation == ISOLATION_MODE_PROCESS
+        and args.superexec_auth_secret_file is not None
+    ):
+        try:
+            superexec_auth_secret = load_superexec_auth_secret(
+                secret_file=args.superexec_auth_secret_file,
+            )
+        except ValueError as err:
+            flwr_exit(
+                ExitCode.SUPEREXEC_AUTH_SECRET_LOAD_FAILED,
+                f"Failed to load SuperExec auth secret: {err}",
+            )
 
     # Warn if authentication keys are provided but transport is not grpc-rere
     if authentication_keys is not None and args.transport != TRANSPORT_TYPE_GRPC_RERE:
@@ -85,6 +109,7 @@ def flower_supernode() -> None:
         clientappio_api_address=args.clientappio_api_address,
         health_server_address=args.health_server_address,
         trusted_entities=trusted_entities,
+        superexec_auth_secret=superexec_auth_secret,
     )
 
 
@@ -131,6 +156,7 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
             "fpk_UUID2: 'ssh-ed25519 <key2> [comment2]' }"
         ),
     )
+    add_superexec_auth_secret_args(parser)
     add_args_health(parser)
 
     return parser

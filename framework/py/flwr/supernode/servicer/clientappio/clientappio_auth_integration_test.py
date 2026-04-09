@@ -59,6 +59,7 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):
             state_factory,
             objectstore_factory,
             None,
+            None,
         )
 
         channel = grpc.insecure_channel(CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS)
