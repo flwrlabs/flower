@@ -66,7 +66,7 @@ def flower_supernode() -> None:
     authentication_keys = _try_setup_client_authentication(args)
     superexec_auth_secret = None
     if (
-        args.isolation != ISOLATION_MODE_SUBPROCESS
+        args.isolation == ISOLATION_MODE_PROCESS
         and args.superexec_auth_secret_file is not None
     ):
         try:
