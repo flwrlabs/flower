@@ -306,6 +306,7 @@ class ExecPluginType:
     CLIENT_APP = "clientapp"
     SERVER_APP = "serverapp"
     SIMULATION = "simulation"  # Deprecated
+    SERVER_APP_EPHEMERAL = "serverapp-ephemeral"
 
     def __new__(cls) -> ExecPluginType:
         """Prevent instantiation."""
