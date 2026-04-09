@@ -200,7 +200,8 @@ class InMemoryObjectStore(ObjectStore):
 
                 # Only message objects are allowed to have a `ref_count` of 0,
                 # and every message object must have a `ref_count` of 0
-                if object_entry.ref_count == 0:
+                # Do not delete objects still referenced by other runs.
+                if object_entry.ref_count == 0 and not object_entry.runs:
                     # Delete the message object and its unreferenced descendants
                     self.delete(object_id)
 

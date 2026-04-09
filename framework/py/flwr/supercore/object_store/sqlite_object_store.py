@@ -229,7 +229,18 @@ class SqliteObjectStore(ObjectStore, SqliteMixin):
                 row = self.conn.execute(
                     "SELECT ref_count FROM objects WHERE object_id=?", (object_id,)
                 ).fetchone()
-                if row and row["ref_count"] == 0:
+                # Keep objects that are still referenced by at least one other run.
+                other_runs = self.conn.execute(
+                    "SELECT COUNT(*) AS cnt FROM run_objects "
+                    "WHERE object_id=? AND run_id != ?",
+                    (object_id, run_id_sint),
+                ).fetchone()
+                if (
+                    row
+                    and row["ref_count"] == 0
+                    and other_runs
+                    and other_runs["cnt"] == 0
+                ):
                     self.delete(object_id)
             self.conn.execute("DELETE FROM run_objects WHERE run_id=?", (run_id_sint,))
 
