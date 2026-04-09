@@ -341,7 +341,7 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'flwrlabs/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
         run: |
           cd framework
-          python -m pip install --no-deps .
+          python -m pip install .
       - name: Install Flower wheel from artifact store
         if: ${{ needs.changes.outputs.framework == 'true' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
         run: |
