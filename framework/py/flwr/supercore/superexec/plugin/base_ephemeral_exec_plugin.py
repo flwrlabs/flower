@@ -47,6 +47,6 @@ class BaseEphemeralExecPlugin(ExecPlugin):
         cmds += [self.appio_api_address_arg, self.appio_api_address]
         cmds += ["--token", token]
         cmds += ["--parent-pid", str(os.getpid())]
-        # Launch the client app and wait for it to finish
+        # Launch the app process and wait for it to finish
         subprocess.run(cmds, check=False)
         flwr_exit(ExitCode.SUCCESS, "App process finished, exiting SuperExec.")
