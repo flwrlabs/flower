@@ -66,6 +66,7 @@ from flwr.supercore.inflatable.inflatable_utils import (
     pull_and_inflate_object_from_tree,
     push_objects,
 )
+from flwr.supercore.interceptors import AppIoTokenClientInterceptor
 from flwr.supercore.utils import mask_string
 
 
@@ -86,6 +87,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
         server_address=clientappio_api_address,
         insecure=(certificates is None),
         root_certificates=certificates,
+        interceptors=[AppIoTokenClientInterceptor(token)],
     )
     channel.subscribe(on_channel_state_change)
     heartbeat_sender = None

@@ -62,7 +62,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_state = Mock()
         mock_state_factory = Mock()
         mock_state_factory.state.return_value = self.mock_state
-        self.servicer = ClientAppIoServicer(mock_state_factory, Mock(), Mock())
+        self.servicer = ClientAppIoServicer(mock_state_factory, Mock())
 
     def test_pull_clientapp_inputs(self) -> None:
         """Test pulling messages from SuperNode."""

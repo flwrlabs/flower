@@ -53,7 +53,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.fleet.message_handler import message_handler
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
-from flwr.supercore.ffs import Ffs, FfsFactory
 from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
 
 try:
@@ -223,16 +222,13 @@ async def get_run(request: GetRunRequest) -> GetRunResponse:
 
 @rest_request_response(GetFabRequest)
 async def get_fab(request: GetFabRequest) -> GetFabResponse:
-    """GetRun."""
-    # Get ffs from app
-    ffs: Ffs = cast(FfsFactory, app.state.FFS_FACTORY).ffs()
-
+    """GetFab."""
     # Get state from app
     state: LinkState = cast(LinkStateFactory, app.state.STATE_FACTORY).state()
     store: ObjectStore = cast(ObjectStoreFactory, app.state.OBJECTSTORE_FACTORY).store()
 
     # Handle message
-    return message_handler.get_fab(request=request, ffs=ffs, state=state, store=store)
+    return message_handler.get_fab(request=request, state=state, store=store)
 
 
 @rest_request_response(ConfirmMessageReceivedRequest)

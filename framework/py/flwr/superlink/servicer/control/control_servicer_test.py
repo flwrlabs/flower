@@ -19,7 +19,6 @@
 import hashlib
 import json
 import os
-import tempfile
 import time
 import unittest
 from datetime import datetime
@@ -87,7 +86,6 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.error.catalog import API_ERROR_MAP
-from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.supercore.typing import (
     AcceptInvitationContext,
@@ -106,19 +104,7 @@ from .control_servicer import (
     ControlServicer,
     _format_verification,
     _validate_federation_and_node_in_request,
-)
-
-FLWR_AID_MISMATCH_CASES = (
-    # (context_flwr_aid, run_flwr_aid)
-    ("user-123", "user-xyz"),
-    ("user-234", ""),
-    ("", "user-234"),
-    ("user-345", None),
-    (None, "user-456"),
-    (None, None),
-    ("", ""),
-    ("", None),
-    (None, ""),
+    _validate_federation_membership_in_request,
 )
 
 
@@ -128,13 +114,11 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     def setUp(self) -> None:
         """Set up test fixtures."""
         self.store = Mock()
-        self.tmp_dir = tempfile.TemporaryDirectory()  # pylint: disable=R1732
         objectstore_factory = Mock(store=Mock(return_value=self.store))
         self.servicer = ControlServicer(
             linkstate_factory=LinkStateFactory(
                 FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), objectstore_factory
             ),
-            ffs_factory=FfsFactory(self.tmp_dir.name),
             objectstore_factory=objectstore_factory,
             authn_plugin=(authn_plugin := NoOpControlAuthnPlugin(Mock(), False)),
         )
@@ -144,10 +128,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.aid: str = account_info.flwr_aid
         shared_account_info.set(account_info)
         self.state = self.servicer.linkstate_factory.state()
-
-    def tearDown(self) -> None:
-        """Clean up after tests."""
-        self.tmp_dir.cleanup()
 
     def _create_dummy_run(self, flwr_aid: str | None) -> int:
         return self.state.create_run(
@@ -572,7 +552,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 NoOpFederationManager(simulation=True),
                 objectstore_factory,
             ),
-            ffs_factory=FfsFactory(self.tmp_dir.name),
             objectstore_factory=objectstore_factory,
             authn_plugin=NoOpControlAuthnPlugin(Mock(), False),
         )
@@ -685,6 +664,23 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             self.servicer.CreateFederation(request, context)
 
         _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
+
+    def test_create_federation_raises_on_invalid_name(self) -> None:
+        """Test CreateFederation aborts when federation name is invalid."""
+        request = CreateFederationRequest(
+            federation_name="Invalid Federation Name!",
+            description="A test federation with invalid name",
+            simulation=False,
+        )
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with self.assertRaises(grpc.RpcError):
+            self.servicer.CreateFederation(request, context)
+
+        context.abort.assert_called_once()
+        status_code, _ = context.abort.call_args.args
+        self.assertEqual(status_code, grpc.StatusCode.FAILED_PRECONDITION)
 
     def test_archive_federation_success(self) -> None:
         """Test ArchiveFederation succeeds when federation_manager.archive_federation
@@ -824,7 +820,6 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         self.linkstate_factory.state.return_value = self.state
         self.servicer = ControlServicer(
             linkstate_factory=self.linkstate_factory,
-            ffs_factory=Mock(),
             objectstore_factory=Mock(),
             authn_plugin=Mock(),
         )
@@ -966,20 +961,14 @@ class TestControlServicerAuth(unittest.TestCase):
 
     def setUp(self) -> None:
         """Set up test fixtures."""
-        self.tmp_dir = tempfile.TemporaryDirectory()  # pylint: disable=R1732
         self.servicer = ControlServicer(
             linkstate_factory=LinkStateFactory(
                 FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), Mock()
             ),
-            ffs_factory=FfsFactory(self.tmp_dir.name),
             objectstore_factory=Mock(),
             authn_plugin=Mock(),
         )
         self.state = self.servicer.linkstate_factory.state()
-
-    def tearDown(self) -> None:
-        """Clean up after tests."""
-        self.tmp_dir.cleanup()
 
     def _create_dummy_run(self, flwr_aid: str | None) -> int:
         return self.state.create_run(
@@ -1003,37 +992,35 @@ class TestControlServicerAuth(unittest.TestCase):
         ctx.is_active.return_value = False
         return ctx
 
-    # Test all invalid cases for StreamLogs with authentication
-    @parameterized.expand(FLWR_AID_MISMATCH_CASES)  # type: ignore
-    def test_streamlogs_auth_unsucessful(
-        self, context_flwr_aid: str | None, run_flwr_aid: str | None
-    ) -> None:
-        """Test StreamLogs unsuccessful."""
-        # Prepare
-        run_id = self._create_dummy_run(run_flwr_aid)
+    def test_streamlogs_auth_unsuccessful_when_not_federation_member(self) -> None:
+        """Test StreamLogs aborts when requester is not a federation member."""
+        run_id = self._create_dummy_run("run-owner")
         request = StreamLogsRequest(run_id=run_id, after_timestamp=0)
         ctx = self.make_context()
 
-        # Execute & Assert
-        with patch(
-            "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
-            return_value=SimpleNamespace(flwr_aid=context_flwr_aid),
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                return_value=SimpleNamespace(flwr_aid="user-123"),
+            ),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=False
+            ),
         ):
             gen = self.servicer.StreamLogs(request, ctx)
             with self.assertRaises(RuntimeError) as cm:
                 next(gen)
-            self.assertIn("PERMISSION_DENIED", str(cm.exception))
+            self.assertIn("FAILED_PRECONDITION", str(cm.exception))
 
     def test_streamlogs_auth_successful(self) -> None:
-        """Test StreamLogs successful with matching flwr_aid."""
-        # Prepare
+        """Test StreamLogs succeeds for a federation member."""
         run_id = 789
         request = StreamLogsRequest(run_id=run_id, after_timestamp=0)
         ctx = self.make_context()
         ctx.is_active.return_value = True
         mock_get_run_info = Mock()
         mock_run = Mock(
-            flwr_aid="user-123",
+            federation=NOOP_FEDERATION,
             status=RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
         )
         mock_get_run_info.return_value = [mock_run]
@@ -1044,6 +1031,9 @@ class TestControlServicerAuth(unittest.TestCase):
                 self.state, "get_serverapp_log", new=lambda rid, ts: ("log1", 1.0)
             ),
             patch.object(self.state, "get_run_info", new=mock_get_run_info),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=True
+            ),
             patch(
                 "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
                 return_value=SimpleNamespace(flwr_aid="user-123"),
@@ -1058,37 +1048,39 @@ class TestControlServicerAuth(unittest.TestCase):
             self.assertEqual(msgs[0].log_output, "log1")
             self.assertEqual(msgs[0].latest_timestamp, 1.0)
 
-    # Test all invalid cases for StopRun with authentication
-    @parameterized.expand(FLWR_AID_MISMATCH_CASES)  # type: ignore
-    def test_stoprun_auth_unsuccessful(
-        self, context_flwr_aid: str | None, run_flwr_aid: str | None
-    ) -> None:
-        """Test StopRun unsuccessful with missing or mismatched flwr_aid."""
-        # Prepare
-        run_id = self._create_dummy_run(run_flwr_aid)
+    def test_stoprun_auth_unsuccessful_when_not_federation_member(self) -> None:
+        """Test StopRun aborts when requester is not a federation member."""
+        run_id = self._create_dummy_run("run-owner")
         request = StopRunRequest(run_id=run_id)
         ctx = self.make_context()
 
-        # Execute & Assert
-        with patch(
-            "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
-            return_value=SimpleNamespace(flwr_aid=context_flwr_aid),
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                return_value=SimpleNamespace(flwr_aid="user-123"),
+            ),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=False
+            ),
         ):
             with self.assertRaises(RuntimeError) as cm:
                 self.servicer.StopRun(request, ctx)
-            self.assertIn("PERMISSION_DENIED", str(cm.exception))
+            self.assertIn("FAILED_PRECONDITION", str(cm.exception))
 
     def test_stoprun_auth_successful(self) -> None:
-        """Test StopRun successful with matching flwr_aid."""
-        # Prepare
-        run_id = self._create_dummy_run("user-123")
+        """Test StopRun succeeds for a federation member."""
+        run_id = self._create_dummy_run("run-owner")
         request = StopRunRequest(run_id=run_id)
         ctx = self.make_context()
 
-        # Execute & Assert
-        with patch(
-            "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
-            return_value=SimpleNamespace(flwr_aid="user-123"),
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                return_value=SimpleNamespace(flwr_aid="user-123"),
+            ),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=True
+            ),
         ):
             response = self.servicer.StopRun(request, ctx)
             self.assertTrue(response.success)
@@ -1097,54 +1089,54 @@ class TestControlServicerAuth(unittest.TestCase):
             self.assertEqual(cast(Run, run).status.status, Status.FINISHED)
             self.assertEqual(cast(Run, run).status.sub_status, SubStatus.STOPPED)
 
-    # Test all invalid cases for ListRuns with authentication
-    @parameterized.expand(FLWR_AID_MISMATCH_CASES)  # type: ignore
-    def test_listruns_auth_unsuccessful(
-        self, context_flwr_aid: str | None, run_flwr_aid: str | None
-    ) -> None:
-        """Test ListRuns unsuccessful with missing or mismatched flwr_aid."""
-        # Prepare
-        run_id = self._create_dummy_run(run_flwr_aid)
+    def test_listruns_auth_unsuccessful_when_not_federation_member(self) -> None:
+        """Test ListRuns aborts when requester is not a federation member."""
+        run_id = self._create_dummy_run("run-owner")
         request = ListRunsRequest(run_id=run_id)
         ctx = self.make_context()
 
-        # Execute & Assert
-        with patch(
-            "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
-            return_value=SimpleNamespace(flwr_aid=context_flwr_aid),
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                return_value=SimpleNamespace(flwr_aid="user-123"),
+            ),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=False
+            ),
         ):
             with self.assertRaises(RuntimeError) as cm:
                 self.servicer.ListRuns(request, ctx)
-            self.assertIn("PERMISSION_DENIED", str(cm.exception))
+            self.assertIn("FAILED_PRECONDITION", str(cm.exception))
 
     def test_listruns_auth_run_success(self) -> None:
-        """Test ListRuns successful with matching flwr_aid."""
-        # Prepare
-        run_id = self._create_dummy_run("user-123")
+        """Test ListRuns succeeds for a federation member."""
+        run_id = self._create_dummy_run("run-owner")
         request = ListRunsRequest(run_id=run_id)
         ctx = self.make_context()
 
-        # Execute & Assert
-        with patch(
-            "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
-            return_value=SimpleNamespace(flwr_aid="user-123"),
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                return_value=SimpleNamespace(flwr_aid="user-123"),
+            ),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=True
+            ),
         ):
             response = self.servicer.ListRuns(request, ctx)
             self.assertEqual(set(response.run_dict.keys()), {run_id})
 
 
 class TestValidateFederationAndNodesInRequest(unittest.TestCase):
-    """Tests for the _validate_federation_and_node_in_request helper."""
+    """Tests for federation and node validation helpers."""
 
     def setUp(self) -> None:
         """Set up test fixtures."""
-        self.tmp_dir = tempfile.TemporaryDirectory()  # pylint: disable=R1732
         objectstore_factory = Mock(store=Mock(return_value=Mock()))
         self.servicer = ControlServicer(
             linkstate_factory=LinkStateFactory(
                 FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), objectstore_factory
             ),
-            ffs_factory=FfsFactory(self.tmp_dir.name),
             objectstore_factory=objectstore_factory,
             authn_plugin=(authn_plugin := NoOpControlAuthnPlugin(Mock(), False)),
         )
@@ -1154,10 +1146,6 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
         self.aid: str = account_info.flwr_aid
         shared_account_info.set(account_info)
         self.state = self.servicer.linkstate_factory.state()
-
-    def tearDown(self) -> None:
-        """Clean up after tests."""
-        self.tmp_dir.cleanup()
 
     def _make_context(self) -> MagicMock:
         """Create a mock gRPC context that raises on abort."""
@@ -1177,6 +1165,35 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
             heartbeat_interval=10,
         )
 
+    # --- _validate_federation_membership_in_request tests ---
+
+    def test_validate_membership_raises_when_federation_not_specified(self) -> None:
+        """Test raises FlowerError when federation name is empty."""
+        ctx = self._make_context()
+        with self.assertRaises(FlowerError) as cm:
+            _validate_federation_membership_in_request(self.state, self.aid, "", ctx)
+        self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
+
+    def test_validate_membership_aborts_when_federation_not_found(self) -> None:
+        """Test abort when federation does not exist."""
+        ctx = self._make_context()
+        with self.assertRaises(RuntimeError) as cm:
+            _validate_federation_membership_in_request(
+                self.state, self.aid, "nonexistent-fed", ctx
+            )
+        ctx.abort.assert_called_once()
+        self.assertIn("nonexistent-fed", str(cm.exception))
+
+    def test_validate_membership_aborts_when_not_a_member(self) -> None:
+        """Test abort when flwr_aid is not a member of the federation."""
+        ctx = self._make_context()
+        with self.assertRaises(RuntimeError) as cm:
+            _validate_federation_membership_in_request(
+                self.state, "wrong-aid", NOOP_FEDERATION, ctx
+            )
+        ctx.abort.assert_called_once()
+        self.assertIn("does not exist", str(cm.exception))
+
     # --- _validate_federation_and_node_in_request tests ---
 
     def test_validate_raises_when_federation_not_specified(self) -> None:
@@ -1185,26 +1202,6 @@ class TestValidateFederationAndNodesInRequest(unittest.TestCase):
         with self.assertRaises(FlowerError) as cm:
             _validate_federation_and_node_in_request(self.state, self.aid, "", 1, ctx)
         self.assertEqual(cm.exception.code, ApiErrorCode.FEDERATION_NOT_SPECIFIED)
-
-    def test_validate_aborts_when_federation_not_found(self) -> None:
-        """Test abort when federation does not exist."""
-        ctx = self._make_context()
-        with self.assertRaises(RuntimeError) as cm:
-            _validate_federation_and_node_in_request(
-                self.state, self.aid, "nonexistent-fed", 1, ctx
-            )
-        ctx.abort.assert_called_once()
-        self.assertIn("nonexistent-fed", str(cm.exception))
-
-    def test_validate_aborts_when_not_a_member(self) -> None:
-        """Test abort when flwr_aid is not a member of the federation."""
-        ctx = self._make_context()
-        with self.assertRaises(RuntimeError) as cm:
-            _validate_federation_and_node_in_request(
-                self.state, "wrong-aid", NOOP_FEDERATION, 1, ctx
-            )
-        ctx.abort.assert_called_once()
-        self.assertIn("does not exist", str(cm.exception))
 
     def test_validate_aborts_when_node_not_owned(self) -> None:
         """Test abort when a node is not owned by the requester."""

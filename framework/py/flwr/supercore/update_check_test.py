@@ -129,7 +129,8 @@ def test_warn_if_flwr_update_available_prints_cached_message(
     warn_if_flwr_update_available(process_name="flower-superlink")
 
     captured = capsys.readouterr()
-    assert captured.err == "A newer Flower version is available: 1.0.0 -> 1.1.0\n"
+    assert "Update available" in captured.err
+    assert "A newer Flower version is available: 1.0.0 -> 1.1.0" in captured.err
     cache = _read_update_check_cache(tmp_path)
     assert cache is not None
     assert cache["last_shown_at"] == now.isoformat()
@@ -168,6 +169,41 @@ def test_warn_if_flwr_update_available_suppresses_recent_cached_message(
 
     captured = capsys.readouterr()
     assert captured.err == ""
+
+
+def test_warn_if_flwr_update_available_renders_brackets_as_plain_text(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    """Server-provided Rich markup-like text should be rendered literally."""
+    monkeypatch.delenv(FLWR_DISABLE_UPDATE_CHECK, raising=False)
+    monkeypatch.setattr(update_check_module, "get_flwr_home", lambda: tmp_path)
+    monkeypatch.setattr(
+        update_check_module,
+        "_start_flwr_update_check_refresh_thread",
+        lambda process_name=None: None,
+    )
+
+    now = datetime(2026, 3, 18, 15, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(update_check_module, "utcnow", lambda: now)
+    _write_update_check_cache(
+        tmp_path,
+        {
+            "package_name": "flwr-nightly",
+            "flwr_version": "1.28.0",
+            "update_available": True,
+            "message": "[bold]literal[/bold] [link=https://flower.ai]text[/link]",
+            "last_shown_at": (now - timedelta(days=2)).isoformat(),
+        },
+    )
+    monkeypatch.setattr(update_check_module, "flwr_package_name", "flwr-nightly")
+    monkeypatch.setattr(update_check_module, "flwr_version", "1.28.0")
+
+    warn_if_flwr_update_available(process_name="flower-superlink")
+
+    captured = capsys.readouterr()
+    assert "[bold]literal[/bold] [link=https://flower.ai]text[/link]" in captured.err
 
 
 def test_warn_if_flwr_update_available_skips_refresh_if_checked_today(

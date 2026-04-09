@@ -68,6 +68,7 @@ from flwr.supercore.inflatable.inflatable_utils import (
     pull_objects,
     push_objects,
 )
+from flwr.supercore.interceptors import AppIoTokenClientInterceptor
 
 from .grid import Grid
 
@@ -100,7 +101,7 @@ at once, or pull messages individually, for example:
 """
 
 
-class GrpcGrid(Grid):
+class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
     """`GrpcGrid` provides an interface to the ServerAppIo API.
 
     Parameters
@@ -111,6 +112,8 @@ class GrpcGrid(Grid):
         The PEM-encoded root certificates as a byte string.
         If provided, a secure connection using the certificates will be
         established to an SSL-enabled Flower server.
+    token : str
+        Executor token used for ServerAppIo authentication.
     """
 
     _deprecation_warning_logged = False
@@ -119,9 +122,14 @@ class GrpcGrid(Grid):
         self,
         serverappio_service_address: str = SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
         root_certificates: bytes | None = None,
+        *,
+        token: str,
     ) -> None:
+        if token == "":
+            raise ValueError("`token` must be a non-empty string")
         self._addr = serverappio_service_address
         self._cert = root_certificates
+        self._token = token
         self._run: Run | None = None
         self._grpc_stub: ServerAppIoStub | None = None
         self._channel: grpc.Channel | None = None
@@ -146,6 +154,7 @@ class GrpcGrid(Grid):
             server_address=self._addr,
             insecure=(self._cert is None),
             root_certificates=self._cert,
+            interceptors=[AppIoTokenClientInterceptor(token=self._token)],
         )
         self._channel.subscribe(on_channel_state_change)
         self._grpc_stub = ServerAppIoStub(self._channel)

@@ -55,7 +55,6 @@ from flwr.common.typing import Fab, Run, RunNotRunningException
 from flwr.proto.clientappio_pb2_grpc import add_ClientAppIoServicer_to_server
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.supercore.address import parse_address, resolve_bind_address
-from flwr.supercore.ffs import Ffs, FfsFactory
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -67,13 +66,13 @@ from flwr.supercore.inflatable.inflatable_utils import (
     pull_objects,
     push_object_contents_from_iterable,
 )
+from flwr.supercore.interceptors import create_clientappio_token_auth_server_interceptor
 from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric_ed25519 import (
     create_message_to_sign,
     decode_base64url,
     verify_signature,
 )
-from flwr.supercore.utils import get_flwr_home
 from flwr.supercore.version import package_version
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
 from flwr.supernode.servicer.clientappio import ClientAppIoServicer
@@ -175,14 +174,12 @@ def start_client_internal(
     # Initialize factories
     object_store_factory = ObjectStoreFactory()
     state_factory = NodeStateFactory(objectstore_factory=object_store_factory)
-    ffs_factory = FfsFactory(str(get_flwr_home() / "supernode" / "ffs"))
 
     # Launch ClientAppIo API server
     grpc_servers = []
     clientappio_server = run_clientappio_api_grpc(
         address=clientappio_api_address,
         state_factory=state_factory,
-        ffs_factory=ffs_factory,
         objectstore_factory=object_store_factory,
         certificates=None,
     )
@@ -200,9 +197,8 @@ def start_client_internal(
         grpc_servers=grpc_servers,
     )
 
-    # Initialize NodeState, Ffs, and ObjectStore
+    # Initialize NodeState and ObjectStore
     state = state_factory.state()
-    ffs = ffs_factory.ffs()
     store = object_store_factory.store()
 
     # Launch the SuperExec if the isolation mode is `subprocess`
@@ -242,11 +238,8 @@ def start_client_internal(
 
         # pylint: disable=too-many-nested-blocks
         while True:
-            # The signature of the function will change after
-            # completing the transition to the `NodeState`-based SuperNode
             run_id = _pull_and_store_message(
                 state=state,
-                ffs=ffs,
                 object_store=store,
                 node_config=node_config,
                 receive=receive,
@@ -289,7 +282,6 @@ def _insert_message(msg: Message, state: NodeState, store: ObjectStore) -> None:
 
 def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
     state: NodeState,
-    ffs: Ffs,
     object_store: ObjectStore,
     node_config: UserConfig,
     receive: Callable[[], tuple[Message, ObjectTree] | None],
@@ -301,10 +293,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
 ) -> int | None:
     """Pull a message from the SuperLink and store it in the state.
 
-    This function current returns None if no message is received,
-    or run_id if a message is received and processed successfully.
-    This behavior will change in the future to return None after
-    completing transition to the `NodeState`-based SuperNode.
+    Return None if no message is received, otherwise return the processed run_id.
     """
     # pylint: disable=too-many-nested-blocks
     message = None
@@ -383,7 +372,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
             # Store in the state
             state.store_context(run_ctx)
             state.store_run(run_info)
-            ffs.put(fab.content, fab.verifications)
+            state.store_fab(fab)
 
         # Preregister the object tree of the message
         obj_ids_to_pull = object_store.preregister(run_id, object_tree)
@@ -622,15 +611,16 @@ def _make_fleet_connection_retry_invoker(
 def run_clientappio_api_grpc(
     address: str,
     state_factory: NodeStateFactory,
-    ffs_factory: FfsFactory,
     objectstore_factory: ObjectStoreFactory,
     certificates: tuple[bytes, bytes, bytes] | None,
 ) -> grpc.Server:
     """Run ClientAppIo API gRPC server."""
     clientappio_servicer: grpc.Server = ClientAppIoServicer(
         state_factory=state_factory,
-        ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
+    )
+    auth_interceptor = create_clientappio_token_auth_server_interceptor(
+        state_provider=state_factory.state
     )
     clientappio_add_servicer_to_server_fn = add_ClientAppIoServicer_to_server
     clientappio_grpc_server = generic_create_grpc_server(
@@ -641,6 +631,7 @@ def run_clientappio_api_grpc(
         server_address=address,
         max_message_length=GRPC_MAX_MESSAGE_LENGTH,
         certificates=certificates,
+        interceptors=[auth_interceptor],
     )
     address = clientappio_grpc_server.bound_address
     log(INFO, "Flower Deployment Runtime: Starting ClientAppIo API on %s", address)

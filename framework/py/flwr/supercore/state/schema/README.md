@@ -15,6 +15,12 @@ erDiagram
     BLOB context "nullable"
   }
 
+  fab {
+    VARCHAR fab_hash PK
+    BLOB content
+    VARCHAR verifications
+  }
+
   logs {
     INTEGER run_id FK "nullable"
     VARCHAR log "nullable"
@@ -64,6 +70,12 @@ erDiagram
     VARCHAR registered_at "nullable"
     VARCHAR status "nullable"
     VARCHAR unregistered_at "nullable"
+  }
+
+  nonce_store {
+    VARCHAR namespace PK
+    VARCHAR nonce PK
+    FLOAT expires_at
   }
 
   object_children {

@@ -17,6 +17,8 @@
 
 from abc import ABC, abstractmethod
 
+from flwr.common.typing import Fab
+
 from ..object_store import ObjectStore
 
 
@@ -27,6 +29,14 @@ class CoreState(ABC):
     @abstractmethod
     def object_store(self) -> ObjectStore:
         """Return the ObjectStore instance used by this CoreState."""
+
+    @abstractmethod
+    def store_fab(self, fab: Fab) -> str:
+        """Store a FAB and return its canonical SHA-256 hash."""
+
+    @abstractmethod
+    def get_fab(self, fab_hash: str) -> Fab | None:
+        """Return the FAB for the given hash, if present."""
 
     @abstractmethod
     def create_token(self, run_id: int) -> str | None:
@@ -99,4 +109,27 @@ class CoreState(ABC):
         -------
         bool
             True if the heartbeat is acknowledged successfully, False otherwise.
+        """
+
+    @abstractmethod
+    def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:
+        """Atomically reserve a nonce in a namespace until `expires_at`.
+
+        Parameters
+        ----------
+        namespace : str
+            Namespace for the nonce reservation. Empty values are treated as
+            invalid and return False.
+        nonce : str
+            Nonce value to reserve. Empty values are treated as invalid and
+            return False.
+        expires_at : float
+            POSIX timestamp when the reservation expires. Values in the past
+            are accepted.
+
+        Returns
+        -------
+        bool
+            True if the nonce was reserved. False if the input is invalid or
+            the nonce already exists and is active.
         """

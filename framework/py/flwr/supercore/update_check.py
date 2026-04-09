@@ -25,6 +25,9 @@ from pathlib import Path
 from typing import Any
 
 import requests
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
 from flwr.supercore.date import now as utcnow
 from flwr.supercore.version import package_name as flwr_package_name
@@ -229,7 +232,13 @@ def warn_if_flwr_update_available(process_name: str | None = None) -> None:
     if cache is not None and _should_show_cached_flwr_update_message(cache):
         message = cache.get("message")
         if isinstance(message, str):
-            print(message, file=sys.stderr)
+            Console(file=sys.stderr).print(
+                Panel.fit(
+                    Text(message),
+                    title="Update available",
+                    border_style="yellow",
+                )
+            )
             _mark_cached_flwr_update_message_shown(cache)
 
     if _should_refresh_flwr_update_check_cache(cache):

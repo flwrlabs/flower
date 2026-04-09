@@ -106,6 +106,16 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
+    def test_migrations_create_fab_table(self) -> None:
+        """Ensure FAB state storage is present after migrations."""
+        engine = self.create_engine()
+        try:
+            run_migrations(engine)
+            inspector = inspect(engine)
+            self.assertTrue(inspector.has_table("fab"))
+        finally:
+            engine.dispose()
+
     def test_legacy_database_is_stamped_and_upgraded_successfully(self) -> None:
         """Ensure legacy databases without alembic_version is stamped and upgraded."""
         # Prepare
