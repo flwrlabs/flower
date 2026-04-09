@@ -23,6 +23,7 @@ We would like to give our special thanks to all the contributors who made the ne
 - **refactor(framework): Replace LLM generated migration with Alembic-generated table** ([#6982](https://github.com/flwrlabs/flower/pull/6982))
 - **fix(framework): Show update warning in a yellow box** ([#6970](https://github.com/flwrlabs/flower/pull/6970))
 - **refactor(framework): Remove SimulationIo gRPC servicer** ([#6946](https://github.com/flwrlabs/flower/pull/6946))
+- **feat(framework): Introduce ephemeral plugins** ([#6988](https://github.com/flwrlabs/flower/pull/6988))
 - **refactor(framework): Disable** `Context` **pushing in** `PushAppOutput` **stage at the end of a run execution** ([#6955](https://github.com/flwrlabs/flower/pull/6955))
 - **fix(framework): Run update check before parsing args in** `flower-superexec` ([#6944](https://github.com/flwrlabs/flower/pull/6944))
 
@@ -53,6 +54,10 @@ We would like to give our special thanks to all the contributors who made the ne
 
 
 ### SuperExec Auth
+
+- **fix(framework): Add Appio authn/pr 5 clientappio superexec wiring tests** ([#6981](https://github.com/flwrlabs/flower/pull/6981))
+
+- **fix(framework): Add Appio authn/pr 4 serverappio superexec wiring tests** ([#6980](https://github.com/flwrlabs/flower/pull/6980))
 - **feat(framework): Wire SuperExec auth for ClientAppIo** ([#6952](https://github.com/flwrlabs/flower/pull/6952))
 - **fix(framework): Add Appio authn/pr 1 superexec auth primitives tests** ([#6977](https://github.com/flwrlabs/flower/pull/6977))
 - **feat(framework): Wire SuperExec auth for ServerAppIo** ([#6951](https://github.com/flwrlabs/flower/pull/6951))
