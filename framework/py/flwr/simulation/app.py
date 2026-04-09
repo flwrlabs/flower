@@ -138,6 +138,7 @@ def flwr_simulation() -> None:
         serverappio_api_address=args.serverappio_api_address,
         log_queue=log_queue,
         token=args.token,
+        insecure=args.insecure,
         certificates=certificates,
         parent_pid=args.parent_pid,
     )
@@ -150,6 +151,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     serverappio_api_address: str,
     log_queue: Queue[str | None],
     token: str,
+    insecure: bool,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
 ) -> None:
@@ -160,6 +162,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
     conn = SimulationIoConnection(
         serverappio_api_address=serverappio_api_address,
+        insecure=insecure,
         root_certificates=certificates,
         token=token,
     )

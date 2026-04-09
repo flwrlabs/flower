@@ -57,6 +57,7 @@ def flwr_clientapp() -> None:
     run_clientapp(
         clientappio_api_address=args.clientappio_api_address,
         token=args.token,
+        insecure=args.insecure,
         certificates=load_root_certificates(args.root_certificates, args.insecure),
         parent_pid=args.parent_pid,
     )

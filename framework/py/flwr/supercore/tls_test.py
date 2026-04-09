@@ -60,3 +60,8 @@ def test_load_root_certificates_rejects_invalid_path() -> None:
     mock_exit.assert_called_once()
     input_code = mock_exit.call_args.args[0]
     assert input_code == ExitCode.COMMON_PATH_INVALID
+
+
+def test_load_root_certificates_returns_none_when_no_path() -> None:
+    """The helper should return `None` when no path is provided."""
+    assert load_root_certificates(None, insecure=False) is None

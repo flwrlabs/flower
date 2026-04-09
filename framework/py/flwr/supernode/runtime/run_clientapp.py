@@ -73,6 +73,7 @@ from flwr.supercore.utils import mask_string
 def run_clientapp(  # pylint: disable=R0913, R0914, R0917
     clientappio_api_address: str,
     token: str,
+    insecure: bool,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
 ) -> None:
@@ -85,7 +86,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
 
     channel = create_channel(
         server_address=clientappio_api_address,
-        insecure=(certificates is None),
+        insecure=insecure,
         root_certificates=certificates,
         interceptors=[AppIoTokenClientInterceptor(token)],
     )

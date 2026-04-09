@@ -34,10 +34,19 @@ def load_root_certificates(
             )
         return None
 
+    if root_cert_path is None:
+        return None  # None in gRPC means the default system root certificates
+
     if not Path(root_cert_path).expanduser().is_file():
         flwr_exit(
             ExitCode.COMMON_PATH_INVALID,
             "Path argument `--root-certificates` does not point to a file.",
         )
 
-    return Path(root_cert_path).expanduser().read_bytes()
+    try:
+        return Path(root_cert_path).expanduser().read_bytes()
+    except OSError as e:
+        flwr_exit(
+            ExitCode.COMMON_PATH_INVALID,
+            f"Failed to read root certificates from '{root_cert_path}': {e}",
+        )
