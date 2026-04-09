@@ -9,9 +9,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-numpy"
-version = "1.0.1"
+version = "1.1.0"
 description = "Federated Learning with Numpy and Flower (Quickstart Example)"
-license = "Apache-2.0"
+license = {file = "LICENSE"}
 # Dependencies for your Flower App
 dependencies = [
     "flwr[simulation]>=1.28.0",
@@ -26,6 +26,9 @@ publisher = "flwrlabs"
 
 # Point to your ServerApp and ClientApp objects
 # Format: "<module>:<object>"
+fab-format-version = 1
+flwr-version-target = "1.28.0"
+
 [tool.flwr.app.components]
 serverapp = "quickstart_numpy.server_app:app"
 clientapp = "quickstart_numpy.client_app:app"
