@@ -37,7 +37,6 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import (
     log,
     mirror_output_to_queue,
@@ -66,6 +65,7 @@ from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import NOOP_FEDERATION
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
 from flwr.supercore.superexec.plugin import ServerAppExecPlugin
 from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning

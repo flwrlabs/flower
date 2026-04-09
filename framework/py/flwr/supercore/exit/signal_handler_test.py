@@ -20,7 +20,8 @@ import signal
 import unittest
 from unittest.mock import Mock, patch
 
-from ..telemetry import EventType
+from flwr.common.telemetry import EventType
+
 from .exit_handler import (
     add_exit_handler,
     registered_exit_handlers,
@@ -36,7 +37,7 @@ class TestExitHandlers(unittest.TestCase):
         """Clear all exit handlers before each test."""
         registered_exit_handlers.clear()
 
-    @patch("flwr.common.exit.signal_handler.flwr_exit")
+    @patch("flwr.supercore.exit.signal_handler.flwr_exit")
     def test_register_exit_handlers(self, mock_flwr_exit: Mock) -> None:
         """Test register_exit_handlers."""
         # Prepare

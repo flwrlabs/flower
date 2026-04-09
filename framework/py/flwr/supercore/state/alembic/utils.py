@@ -24,8 +24,8 @@ from alembic.config import Config
 from sqlalchemy import MetaData, create_engine, inspect, pool
 from sqlalchemy.engine import Engine
 
-from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
+from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
 from flwr.supercore.state.schema.objectstore_tables import create_objectstore_metadata
