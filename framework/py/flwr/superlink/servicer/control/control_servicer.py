@@ -1150,9 +1150,6 @@ def _get_remote_fab(
             f"{e}",
         )
 
-    if note:
-        log(INFO, "%s", note)
-
     # Format verification information
     verification_dict = (
         _format_verification(verifications)
