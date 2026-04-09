@@ -39,6 +39,7 @@ from flwr.common.config import get_fused_config_from_fab
 from flwr.common.constant import (
     CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
     ISOLATION_MODE_SUBPROCESS,
+    RUNTIME_DEPENDENCY_INSTALL,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
     TRANSPORT_TYPE_REST,
@@ -105,6 +106,7 @@ def start_client_internal(
     health_server_address: str | None = None,
     trusted_entities: dict[str, str] | None = None,
     superexec_auth_secret: bytes | None = None,
+    runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
     """Start a Flower client node which connects to a Flower server.
 
@@ -160,6 +162,8 @@ def start_client_internal(
         entities can run on a supernode.
     superexec_auth_secret : Optional[bytes] (default: None)
         Secret used by ClientAppIo SuperExec metadata auth.
+    runtime_dependency_install : bool (default: False)
+        Whether runtime dependency installation is allowed.
     """
     if insecure is None:
         insecure = root_certificates is None
@@ -226,6 +230,8 @@ def start_client_internal(
         ]
         command += ["--plugin-type", ExecPluginType.CLIENT_APP]
         command += ["--parent-pid", str(os.getpid())]
+        if runtime_dependency_install:
+            command += ["--allow-runtime-dependency-installation"]
         # pylint: disable-next=consider-using-with
         subprocess.Popen(command)
 
