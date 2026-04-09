@@ -25,6 +25,7 @@ from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.inflatable import (
     UnexpectedObjectContentError,
     get_all_nested_objects,
+    get_object_children_ids_from_object_content,
     get_object_tree,
     no_object_id_recompute,
 )
@@ -67,6 +68,7 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
     ConfirmMessageReceivedResponse,
+    ObjectTree,
     PullObjectRequest,
     PullObjectResponse,
     PushObjectRequest,
@@ -503,6 +505,22 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
             stored = True
         except (NoObjectInStoreError, ValueError) as e:
             log(ERROR, str(e))
+            # Best-effort recovery for preregistration mismatches under load:
+            # derive direct children from object content, preregister, then retry.
+            if isinstance(e, NoObjectInStoreError):
+                try:
+                    child_ids = get_object_children_ids_from_object_content(
+                        request.object_content
+                    )
+                    tree = ObjectTree(
+                        object_id=request.object_id,
+                        children=[ObjectTree(object_id=child_id) for child_id in child_ids],
+                    )
+                    store.preregister(request.run_id, tree)
+                    store.put(request.object_id, request.object_content)
+                    stored = True
+                except (NoObjectInStoreError, ValueError) as retry_err:
+                    log(ERROR, str(retry_err))
         except UnexpectedObjectContentError as e:
             # Object content is not valid
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
