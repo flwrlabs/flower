@@ -1,0 +1,2 @@
+_target_: fedmix.models.LeNet5
+num_classes: 62
