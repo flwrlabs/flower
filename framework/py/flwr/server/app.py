@@ -31,7 +31,10 @@ import grpc
 import yaml
 
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH, EventType, event
-from flwr.common.args import try_obtain_server_certificates
+from flwr.common.args import (
+    add_args_runtime_dependency_install,
+    try_obtain_server_certificates,
+)
 from flwr.common.constant import (
     AUTHN_TYPE_YAML_KEY,
     AUTHZ_TYPE_YAML_KEY,
@@ -59,12 +62,14 @@ from flwr.proto.fleet_pb2_grpc import (  # pylint: disable=E0611
 from flwr.proto.grpcadapter_pb2_grpc import add_GrpcAdapterServicer_to_server
 from flwr.server.fleet_event_log_interceptor import FleetEventLogInterceptor
 from flwr.supercore.address import parse_address, resolve_bind_address
+from flwr.supercore.auth import (
+    add_superexec_auth_secret_args,
+    load_superexec_auth_secret,
+)
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
-from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.update_check import warn_if_flwr_update_available
-from flwr.supercore.utils import get_flwr_home
 from flwr.supercore.version import package_version
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import (
@@ -84,7 +89,6 @@ from .superlink.fleet.grpc_rere.node_auth_server_interceptor import (
 from .superlink.linkstate import LinkStateFactory
 from .superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
 
-BASE_DIR = get_flwr_home() / "superlink" / "ffs"
 P = TypeVar("P", ControlAuthnPlugin, ControlAuthzPlugin)
 
 
@@ -219,6 +223,33 @@ def run_superlink() -> None:
     # Obtain certificates
     certificates = try_obtain_server_certificates(args)
 
+    # Load SuperExec auth secret
+    superexec_auth_secret: bytes | None = None
+    if args.superexec_auth_secret_file is not None:
+        log(
+            WARN,
+            "EXPERIMENTAL: SuperExec authentication is experimental and "
+            "may change in future releases.",
+        )
+    if args.isolation == ISOLATION_MODE_SUBPROCESS:
+        if args.superexec_auth_secret_file is not None:
+            log(
+                WARN,
+                "SuperExec auth secret is ignored in subprocess isolation mode.",
+            )
+    else:
+        # Enable SuperExec auth in process mode when secret is provided
+        if args.superexec_auth_secret_file is not None:
+            try:
+                superexec_auth_secret = load_superexec_auth_secret(
+                    secret_file=args.superexec_auth_secret_file,
+                )
+            except ValueError as err:
+                flwr_exit(
+                    ExitCode.SUPERLINK_INVALID_ARGS,
+                    f"Failed to load SuperExec authentication secret: {err}",
+                )
+
     # Disable the account auth TLS check if args.disable_oidc_tls_cert_verification is
     # provided
     verify_tls_cert = not getattr(args, "disable_oidc_tls_cert_verification", None)
@@ -307,15 +338,11 @@ def run_superlink() -> None:
     )
     state_factory.state()  # Force initialization before starting servers
 
-    # Initialize FfsFactory
-    ffs_factory = FfsFactory(args.storage_dir)
-
     # Start Control API
     is_simulation = args.simulation
     control_server: grpc.Server = run_control_api_grpc(
         address=control_address,
         state_factory=state_factory,
-        ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
         certificates=certificates,
         authn_plugin=authn_plugin,
@@ -331,9 +358,9 @@ def run_superlink() -> None:
     serverappio_server: grpc.Server = run_serverappio_api_grpc(
         address=serverappio_address,
         state_factory=state_factory,
-        ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
         certificates=None,  # ServerAppIo API doesn't support SSL yet
+        superexec_auth_secret=superexec_auth_secret,
     )
     grpc_servers.append(serverappio_server)
 
@@ -378,7 +405,6 @@ def run_superlink() -> None:
                     args.ssl_keyfile,
                     args.ssl_certfile,
                     state_factory,
-                    ffs_factory,
                     objectstore_factory,
                     num_workers,
                 ),
@@ -398,7 +424,6 @@ def run_superlink() -> None:
             fleet_server = _run_fleet_api_grpc_rere(
                 address=fleet_address,
                 state_factory=state_factory,
-                ffs_factory=ffs_factory,
                 objectstore_factory=objectstore_factory,
                 enable_supernode_auth=enable_supernode_auth,
                 certificates=certificates,
@@ -409,7 +434,6 @@ def run_superlink() -> None:
             fleet_server = _run_fleet_api_grpc_adapter(
                 address=fleet_address,
                 state_factory=state_factory,
-                ffs_factory=ffs_factory,
                 objectstore_factory=objectstore_factory,
                 certificates=certificates,
             )
@@ -426,6 +450,8 @@ def run_superlink() -> None:
         command += ["--appio-api-address", appio_address]
         command += ["--plugin-type", ExecPluginType.SERVER_APP]
         command += ["--parent-pid", str(os.getpid())]
+        if args.runtime_dependency_install:
+            command += ["--allow-runtime-dependency-installation"]
         # pylint: disable-next=consider-using-with
         subprocess.Popen(command)
 
@@ -552,7 +578,6 @@ def _try_obtain_fleet_event_log_writer_plugin() -> EventLogWriterPlugin | None:
 def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917
     address: str,
     state_factory: LinkStateFactory,
-    ffs_factory: FfsFactory,
     objectstore_factory: ObjectStoreFactory,
     enable_supernode_auth: bool,
     certificates: tuple[bytes, bytes, bytes] | None,
@@ -562,7 +587,6 @@ def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917
     # Create Fleet API gRPC server
     fleet_servicer = FleetServicer(
         state_factory=state_factory,
-        ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
         enable_supernode_auth=enable_supernode_auth,
     )
@@ -589,7 +613,6 @@ def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917
 def _run_fleet_api_grpc_adapter(
     address: str,
     state_factory: LinkStateFactory,
-    ffs_factory: FfsFactory,
     objectstore_factory: ObjectStoreFactory,
     certificates: tuple[bytes, bytes, bytes] | None,
 ) -> grpc.Server:
@@ -597,7 +620,6 @@ def _run_fleet_api_grpc_adapter(
     # Create Fleet API gRPC server
     fleet_servicer = GrpcAdapterServicer(
         state_factory=state_factory,
-        ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
         enable_supernode_auth=False,
     )
@@ -627,7 +649,6 @@ def _run_fleet_api_rest(
     ssl_keyfile: str | None,
     ssl_certfile: str | None,
     state_factory: LinkStateFactory,
-    ffs_factory: FfsFactory,
     objectstore_factory: ObjectStoreFactory,
     num_workers: int,
 ) -> None:
@@ -643,7 +664,6 @@ def _run_fleet_api_rest(
 
     # See: https://www.starlette.io/applications/#accessing-the-app-instance
     fast_api_app.state.STATE_FACTORY = state_factory
-    fast_api_app.state.FFS_FACTORY = ffs_factory
     fast_api_app.state.OBJECTSTORE_FACTORY = objectstore_factory
 
     uvicorn.run(
@@ -729,11 +749,6 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         default=FLWR_IN_MEMORY_DB_NAME,
     )
     parser.add_argument(
-        "--storage-dir",
-        help="The base directory to store the objects for the Flower File System.",
-        default=BASE_DIR,
-    )
-    parser.add_argument(
         "--auth-list-public-keys",
         type=str,
         help="This argument is deprecated and will be removed in a future release.",
@@ -743,6 +758,7 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Enable supernode authentication.",
     )
+    add_args_runtime_dependency_install(parser)
     parser.add_argument(
         "--log-file",
         type=str,
@@ -762,6 +778,7 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         default=7,
         help="Maximum number of rotated SuperLink log files to keep.",
     )
+    add_superexec_auth_secret_args(parser)
 
 
 def _add_args_serverappio_api(parser: argparse.ArgumentParser) -> None:

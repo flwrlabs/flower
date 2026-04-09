@@ -33,3 +33,19 @@ When reviewing a PR, output:
 - Consistency concerns
 - Whether the PR should be split
 - A brief overall verdict
+
+## Development Patterns
+
+### Database Migrations
+
+Python services with databases use Alembic:
+
+```bash
+cd framework && uv run --no-sync --python=3.10.19 python -m dev.generate_migration "Description"  # Create migration
+```
+
+For Alembic-backed services, do not write a new migration file from scratch when
+the intended change is a schema diff. Help the user use
+`python -m dev.generate_migration` from the `framework/` directory instead, then
+review the generated revision and make only the minimal adjustments needed. This
+helps avoid schema drift between SQLAlchemy models and committed migrations.

@@ -36,10 +36,11 @@ from flwr.proto.run_pb2 import (  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
-from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.interceptors import APP_TOKEN_HEADER
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
+
+_SUPEREXEC_SECRET = b"test-superexec-secret"
 
 
 class TestServerAppIoTokenLifecycleIntegration(unittest.TestCase):
@@ -54,7 +55,6 @@ class TestServerAppIoTokenLifecycleIntegration(unittest.TestCase):
         state_factory = LinkStateFactory(
             FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), objectstore_factory
         )
-        ffs_factory = FfsFactory(self.temp_dir.name)
 
         self.state = state_factory.state()
         node_id = self.state.create_node("mock_owner", "fake_name", b"pk", 30)
@@ -63,9 +63,9 @@ class TestServerAppIoTokenLifecycleIntegration(unittest.TestCase):
         self._server: grpc.Server = run_serverappio_api_grpc(
             SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
             state_factory,
-            ffs_factory,
             objectstore_factory,
             None,
+            superexec_auth_secret=_SUPEREXEC_SECRET,
         )
 
         channel = grpc.insecure_channel("localhost:9091")

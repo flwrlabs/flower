@@ -20,7 +20,12 @@ from __future__ import annotations
 import os
 from enum import Enum
 
-from flwr.common.constant import FLWR_DIR, NOOP_ACCOUNT_NAME
+from flwr.common.constant import (
+    FLWR_DIR,
+    NOOP_ACCOUNT_NAME,
+    SYSTEM_TIME_TOLERANCE,
+    TIMESTAMP_TOLERANCE,
+)
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # Constants for Inflatable
@@ -117,6 +122,15 @@ TELEMETRY_TIMEOUT_SECONDS = 4  # Timeout for sending telemetry events during exi
 
 # Constants for message processing timing
 MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS = 3600
+
+# SuperExec auth constants
+SUPEREXEC_AUTH_TIMESTAMP_HEADER = "flwr-superexec-ts"
+SUPEREXEC_AUTH_NONCE_HEADER = "flwr-superexec-nonce"
+SUPEREXEC_AUTH_BODY_SHA256_HEADER = "flwr-superexec-body-sha256"
+SUPEREXEC_AUTH_SIGNATURE_HEADER = "flwr-superexec-signature"
+SUPEREXEC_AUTH_SECRET_CONTEXT = b"superexec-auth-v1"
+MIN_TIMESTAMP_DIFF_SECONDS = -SYSTEM_TIME_TOLERANCE
+MAX_TIMESTAMP_DIFF_SECONDS = TIMESTAMP_TOLERANCE + SYSTEM_TIME_TOLERANCE
 
 
 # System message type

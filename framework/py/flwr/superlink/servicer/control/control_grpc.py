@@ -26,7 +26,6 @@ from flwr.common.grpc import generic_create_grpc_server
 from flwr.common.logger import log
 from flwr.proto.control_pb2_grpc import add_ControlServicer_to_server
 from flwr.server.superlink.linkstate import LinkStateFactory
-from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.license_plugin import LicensePlugin
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.artifact_provider import ArtifactProvider
@@ -53,7 +52,6 @@ except ImportError:
 def run_control_api_grpc(
     address: str,
     state_factory: LinkStateFactory,
-    ffs_factory: FfsFactory,
     objectstore_factory: ObjectStoreFactory,
     certificates: tuple[bytes, bytes, bytes] | None,
     authn_plugin: ControlAuthnPlugin,
@@ -69,7 +67,6 @@ def run_control_api_grpc(
 
     control_servicer: grpc.Server = ControlServicer(
         linkstate_factory=state_factory,
-        ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
         authn_plugin=authn_plugin,
         artifact_provider=artifact_provider,

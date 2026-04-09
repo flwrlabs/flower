@@ -72,6 +72,12 @@ erDiagram
     VARCHAR unregistered_at "nullable"
   }
 
+  nonce_store {
+    VARCHAR namespace PK
+    VARCHAR nonce PK
+    FLOAT expires_at
+  }
+
   object_children {
     VARCHAR child_id PK,FK
     VARCHAR parent_id PK,FK

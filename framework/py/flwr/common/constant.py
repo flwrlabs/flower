@@ -136,6 +136,9 @@ MESSAGE_TTL_TOLERANCE = 1e-1
 ISOLATION_MODE_SUBPROCESS = "subprocess"
 ISOLATION_MODE_PROCESS = "process"
 
+# Runtime dependency installation toggle
+RUNTIME_DEPENDENCY_INSTALL = False
+
 # Log streaming configurations
 CONN_REFRESH_PERIOD = 60  # Stream connection refresh period
 CONN_RECONNECT_INTERVAL = 0.5  # Reconnect interval between two stream connections
@@ -303,6 +306,7 @@ class ExecPluginType:
     CLIENT_APP = "clientapp"
     SERVER_APP = "serverapp"
     SIMULATION = "simulation"  # Deprecated
+    SERVER_APP_EPHEMERAL = "serverapp-ephemeral"
 
     def __new__(cls) -> ExecPluginType:
         """Prevent instantiation."""
