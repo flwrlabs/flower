@@ -222,6 +222,12 @@ def run_superlink() -> None:
 
     # Load SuperExec auth secret
     superexec_auth_secret: bytes | None = None
+    if args.superexec_auth_secret_file is not None:
+        log(
+            WARN,
+            "EXPERIMENTAL: SuperExec authentication is experimental and "
+            "may change in future releases.",
+        )
     if args.isolation == ISOLATION_MODE_SUBPROCESS:
         if args.superexec_auth_secret_file is not None:
             log(
