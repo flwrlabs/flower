@@ -27,7 +27,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from flwr.cli.config_migration import migrate
 from flwr.cli.flower_config import read_superlink_connection
 from flwr.common.constant import CliOutputFormat
-from flwr.common.exit import ExitCode, flwr_exit
+from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     RegisterNodeRequest,
     RegisterNodeResponse,

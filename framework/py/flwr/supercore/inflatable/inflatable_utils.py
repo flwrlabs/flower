@@ -24,7 +24,7 @@ from collections.abc import Callable, Iterable, Iterator
 from queue import Queue
 from typing import TypeVar
 
-from flwr.common.exit import add_exit_handler
+from flwr.supercore.exit import add_exit_handler
 from flwr.common.message import Message
 from flwr.common.record import (
     Array,

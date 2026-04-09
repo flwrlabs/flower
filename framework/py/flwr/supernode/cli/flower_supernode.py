@@ -37,7 +37,7 @@ from flwr.common.constant import (
     TRANSPORT_TYPE_GRPC_RERE,
     TRANSPORT_TYPE_REST,
 )
-from flwr.common.exit import ExitCode, flwr_exit
+from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
 from flwr.supercore.grpc_health import add_args_health
 from flwr.supercore.update_check import warn_if_flwr_update_available

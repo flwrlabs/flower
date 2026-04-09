@@ -26,7 +26,7 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import Column, Integer, MetaData, String, Table, create_engine, inspect
 from sqlalchemy.engine import Engine
 
-from flwr.common.exit import ExitCode
+from flwr.supercore.exit import ExitCode
 from flwr.supercore.state.alembic.utils import (
     ALEMBIC_DIR,
     ALEMBIC_VERSION_TABLE,

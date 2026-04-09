@@ -20,7 +20,7 @@ from logging import INFO
 
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH, EventType, event
 from flwr.common.constant import FLEET_API_GRPC_BIDI_DEFAULT_ADDRESS
-from flwr.common.exit import register_signal_handlers
+from flwr.supercore.exit import register_signal_handlers
 from flwr.common.logger import log, warn_deprecated_feature
 from flwr.server.client_manager import ClientManager
 from flwr.server.history import History

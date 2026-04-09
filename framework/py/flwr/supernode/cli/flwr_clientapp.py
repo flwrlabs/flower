@@ -20,7 +20,7 @@ from logging import DEBUG, INFO
 
 from flwr.common.args import add_args_flwr_app_common
 from flwr.common.constant import CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS, ExecPluginType
-from flwr.common.exit import ExitCode, flwr_exit
+from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.supercore.superexec.plugin import ClientAppExecPlugin

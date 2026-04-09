@@ -39,7 +39,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import (
     log,
     mirror_output_to_queue,

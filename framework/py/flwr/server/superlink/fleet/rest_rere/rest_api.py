@@ -22,7 +22,7 @@ from typing import TypeVar, cast
 
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.common.exit import ExitCode, flwr_exit
+from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,

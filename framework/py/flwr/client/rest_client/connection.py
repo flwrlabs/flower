@@ -26,7 +26,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL
-from flwr.common.exit import ExitCode, flwr_exit
+from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
 from flwr.common.message import Message, remove_content_from_message
 from flwr.common.retry_invoker import RetryInvoker

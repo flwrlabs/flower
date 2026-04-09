@@ -23,7 +23,7 @@ import yaml
 
 from flwr.common import EventType, event
 from flwr.common.constant import ExecPluginType
-from flwr.common.exit import ExitCode, flwr_exit
+from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub

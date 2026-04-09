@@ -33,7 +33,7 @@ from .exit import _get_code_url
 )
 def test_get_code_url(version: str, subdir: str) -> None:
     """Test that the correct URL is generated for a given exit code."""
-    with patch("flwr.common.exit.exit.package_version", version):
+    with patch("flwr.supercore.exit.exit.package_version", version):
         for code in [0, 42, 999]:
             actual_url = _get_code_url(code)
             expected_url = "https://flower.ai/docs/framework/"

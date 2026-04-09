@@ -35,7 +35,7 @@ from flwr.client.typing import ClientFnExt
 from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH, Context, EventType, Message, event
 from flwr.common.constant import MAX_RETRY_DELAY, ErrorCode
-from flwr.common.exit import ExitCode, flwr_exit
+from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.common.logger import log, warn_deprecated_feature
 from flwr.common.retry_invoker import RetryInvoker, RetryState, exponential
 from flwr.common.typing import Fab, Run, RunNotRunningException

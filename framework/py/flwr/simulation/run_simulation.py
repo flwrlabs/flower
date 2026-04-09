@@ -31,7 +31,7 @@ from flwr.cli.utils import get_sha256_hash
 from flwr.clientapp import ClientApp
 from flwr.common import Context, EventType, RecordDict, event, log, now
 from flwr.common.constant import RUN_ID_NUM_BYTES, Status
-from flwr.common.exit import ExitCode, flwr_exit
+from flwr.supercore.exit import ExitCode, flwr_exit
 from flwr.common.logger import (
     set_logger_propagation,
     update_console_handler,

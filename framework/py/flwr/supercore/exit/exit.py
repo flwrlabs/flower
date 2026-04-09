@@ -30,7 +30,7 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.version import package_version
 
-from ..logger import log
+from ...common.logger import log
 from .exit_code import EXIT_CODE_HELP
 from .exit_handler import trigger_exit_handlers
 

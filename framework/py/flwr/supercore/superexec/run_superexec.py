@@ -19,7 +19,7 @@ import time
 from logging import WARN
 from typing import Any
 
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
 from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub

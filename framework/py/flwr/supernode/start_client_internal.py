@@ -46,7 +46,7 @@ from flwr.common.constant import (
     ErrorCode,
     ExecPluginType,
 )
-from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
+from flwr.supercore.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import generic_create_grpc_server
 from flwr.common.logger import log
 from flwr.common.retry_invoker import RetryInvoker, make_simple_grpc_retry_invoker
