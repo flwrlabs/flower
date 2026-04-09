@@ -20,6 +20,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from flwr.common.constant import ISOLATION_MODE_PROCESS, ISOLATION_MODE_SUBPROCESS
+from flwr.common.exit import ExitCode
 from flwr.supercore.version import package_version
 
 from .flower_supernode import _parse_args_run_supernode
@@ -79,3 +81,122 @@ def test_flower_supernode_checks_for_update(
         flower_supernode_module.flower_supernode()
 
     assert captured == ["update", "flower-supernode"]
+
+
+def test_flower_supernode_subprocess_does_not_load_superexec_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Subprocess mode should not load a SuperExec secret file."""
+    args = SimpleNamespace(
+        trusted_entities=None,
+        superlink="127.0.0.1:9092",
+        transport="grpc-rere",
+        max_retries=None,
+        max_wait_time=None,
+        node_config=None,
+        isolation=ISOLATION_MODE_SUBPROCESS,
+        clientappio_api_address="127.0.0.1:9094",
+        health_server_address=None,
+        superexec_auth_secret_file="ignored-secret-file",
+        insecure=True,
+        auth_supernode_private_key=None,
+    )
+    captured: dict[str, object] = {}
+
+    class _Parser:
+        def parse_args(self) -> SimpleNamespace:
+            return args
+
+    def _start_client_internal(**kwargs: object) -> None:
+        captured.update(kwargs)
+
+    monkeypatch.setattr(
+        flower_supernode_module, "warn_if_flwr_update_available", lambda **_: None
+    )
+    monkeypatch.setattr(
+        flower_supernode_module, "_parse_args_run_supernode", lambda: _Parser()
+    )
+    monkeypatch.setattr(
+        flower_supernode_module, "_try_obtain_trusted_entities", lambda *_: None
+    )
+    monkeypatch.setattr(
+        flower_supernode_module, "try_obtain_root_certificates", lambda *_: None
+    )
+    monkeypatch.setattr(
+        flower_supernode_module, "_try_setup_client_authentication", lambda *_: None
+    )
+    monkeypatch.setattr(flower_supernode_module, "parse_config_args", lambda *_: {})
+    monkeypatch.setattr(flower_supernode_module, "event", lambda *_: None)
+    monkeypatch.setattr(
+        flower_supernode_module,
+        "load_superexec_auth_secret",
+        lambda **_: (_ for _ in ()).throw(AssertionError("should not be called")),
+    )
+    monkeypatch.setattr(
+        flower_supernode_module, "start_client_internal", _start_client_internal
+    )
+
+    flower_supernode_module.flower_supernode()
+
+    assert captured["superexec_auth_secret"] is None
+    assert captured["isolation"] == ISOLATION_MODE_SUBPROCESS
+
+
+def test_flower_supernode_process_exits_on_invalid_superexec_secret_file(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Process mode should exit with dedicated code if secret load fails."""
+    args = SimpleNamespace(
+        trusted_entities=None,
+        superlink="127.0.0.1:9092",
+        transport="grpc-rere",
+        max_retries=None,
+        max_wait_time=None,
+        node_config=None,
+        isolation=ISOLATION_MODE_PROCESS,
+        clientappio_api_address="127.0.0.1:9094",
+        health_server_address=None,
+        superexec_auth_secret_file="bad-secret-file",
+        insecure=True,
+        auth_supernode_private_key=None,
+    )
+
+    class _Parser:
+        def parse_args(self) -> SimpleNamespace:
+            return args
+
+    class _ExitCalled(Exception):
+        def __init__(self, code: int, message: str) -> None:
+            super().__init__(message)
+            self.code = code
+
+    def _flwr_exit(code: int, message: str) -> None:
+        raise _ExitCalled(code, message)
+
+    monkeypatch.setattr(
+        flower_supernode_module, "warn_if_flwr_update_available", lambda **_: None
+    )
+    monkeypatch.setattr(
+        flower_supernode_module, "_parse_args_run_supernode", lambda: _Parser()
+    )
+    monkeypatch.setattr(
+        flower_supernode_module, "_try_obtain_trusted_entities", lambda *_: None
+    )
+    monkeypatch.setattr(
+        flower_supernode_module, "try_obtain_root_certificates", lambda *_: None
+    )
+    monkeypatch.setattr(
+        flower_supernode_module, "_try_setup_client_authentication", lambda *_: None
+    )
+    monkeypatch.setattr(flower_supernode_module, "event", lambda *_: None)
+    monkeypatch.setattr(
+        flower_supernode_module,
+        "load_superexec_auth_secret",
+        lambda **_: (_ for _ in ()).throw(ValueError("invalid")),
+    )
+    monkeypatch.setattr(flower_supernode_module, "flwr_exit", _flwr_exit)
+
+    with pytest.raises(_ExitCalled) as err:
+        flower_supernode_module.flower_supernode()
+
+    assert err.value.code == ExitCode.SUPEREXEC_AUTH_SECRET_LOAD_FAILED

@@ -142,3 +142,42 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):
         )
         assert isinstance(response, ListAppsToLaunchResponse)
         assert call.code() == grpc.StatusCode.OK
+
+
+class TestClientAppIoAuthIntegrationWithoutSuperExecSecret(unittest.TestCase):
+    """Integration tests for ClientAppIo when SuperExec auth is disabled."""
+
+    def setUp(self) -> None:
+        """Start the ClientAppIo API with only token interceptor enabled."""
+        self.temp_dir = tempfile.TemporaryDirectory()  # pylint: disable=R1732
+        self.addCleanup(self.temp_dir.cleanup)
+
+        objectstore_factory = ObjectStoreFactory()
+        state_factory = NodeStateFactory(objectstore_factory=objectstore_factory)
+
+        self._server: grpc.Server = run_clientappio_api_grpc(
+            address=CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
+            state_factory=state_factory,
+            objectstore_factory=objectstore_factory,
+            certificates=None,
+            superexec_auth_secret=None,
+        )
+
+        channel = grpc.insecure_channel(CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS)
+        self._list_apps_to_launch = channel.unary_unary(
+            "/flwr.proto.ClientAppIo/ListAppsToLaunch",
+            request_serializer=ListAppsToLaunchRequest.SerializeToString,
+            response_deserializer=ListAppsToLaunchResponse.FromString,
+        )
+
+    def tearDown(self) -> None:
+        """Stop the gRPC API server."""
+        self._server.stop(None)
+
+    def test_list_apps_to_launch_allows_without_superexec_metadata(self) -> None:
+        """No SuperExec signing should be required when auth is disabled."""
+        response, call = self._list_apps_to_launch.with_call(
+            request=ListAppsToLaunchRequest()
+        )
+        assert isinstance(response, ListAppsToLaunchResponse)
+        assert call.code() == grpc.StatusCode.OK
