@@ -29,6 +29,76 @@ from .flower_supernode import _parse_args_run_supernode
 flower_supernode_module = importlib.import_module("flwr.supernode.cli.flower_supernode")
 
 
+def _make_args(**overrides: object) -> SimpleNamespace:
+    """Build a default SuperNode CLI args namespace with optional overrides."""
+    args = {
+        "trusted_entities": None,
+        "superlink": "127.0.0.1:9092",
+        "transport": "grpc-rere",
+        "max_retries": None,
+        "max_wait_time": None,
+        "node_config": None,
+        "isolation": ISOLATION_MODE_SUBPROCESS,
+        "clientappio_api_address": "127.0.0.1:9094",
+        "health_server_address": None,
+        "superexec_auth_secret_file": None,
+        "insecure": True,
+        "auth_supernode_private_key": None,
+        "runtime_dependency_install": False,
+    }
+    args.update(overrides)
+    return SimpleNamespace(**args)
+
+
+class _FixedArgsParser:
+    """Simple parser stub that always returns a fixed args namespace."""
+
+    def __init__(self, args: SimpleNamespace) -> None:
+        self._args = args
+
+    def parse_args(self) -> SimpleNamespace:
+        """Return fixed args namespace for test paths."""
+        return self._args
+
+
+def _return_none(*_args: object, **_kwargs: object) -> None:
+    """Return None for monkeypatched dependency stubs."""
+
+
+def _parse_config_args_stub(*_args: object, **_kwargs: object) -> dict[str, str]:
+    """Return empty parsed config for monkeypatched CLI test paths."""
+    return {}
+
+
+def _patch_common_supernode_startup(
+    monkeypatch: pytest.MonkeyPatch, args: SimpleNamespace
+) -> None:
+    """Patch common SuperNode startup dependencies for CLI tests."""
+
+    def _parse_args_run_supernode() -> _FixedArgsParser:
+        return _FixedArgsParser(args)
+
+    monkeypatch.setattr(
+        flower_supernode_module, "warn_if_flwr_update_available", _return_none
+    )
+    monkeypatch.setattr(
+        flower_supernode_module, "_parse_args_run_supernode", _parse_args_run_supernode
+    )
+    monkeypatch.setattr(
+        flower_supernode_module, "_try_obtain_trusted_entities", _return_none
+    )
+    monkeypatch.setattr(
+        flower_supernode_module, "try_obtain_root_certificates", _return_none
+    )
+    monkeypatch.setattr(
+        flower_supernode_module, "_try_setup_client_authentication", _return_none
+    )
+    monkeypatch.setattr(
+        flower_supernode_module, "parse_config_args", _parse_config_args_stub
+    )
+    monkeypatch.setattr(flower_supernode_module, "event", _return_none)
+
+
 @pytest.mark.parametrize("flag", ["--version", "-V"])
 def test_parse_supernode_version_flag(
     flag: str, capsys: pytest.CaptureFixture[str]
@@ -87,63 +157,25 @@ def test_flower_supernode_subprocess_does_not_load_superexec_secret(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Subprocess mode should not load a SuperExec secret file."""
-    args = SimpleNamespace(
-        trusted_entities=None,
-        superlink="127.0.0.1:9092",
-        transport="grpc-rere",
-        max_retries=None,
-        max_wait_time=None,
-        node_config=None,
+    args = _make_args(
         isolation=ISOLATION_MODE_SUBPROCESS,
-        clientappio_api_address="127.0.0.1:9094",
-        health_server_address=None,
         superexec_auth_secret_file="ignored-secret-file",
-        insecure=True,
-        auth_supernode_private_key=None,
-        runtime_dependency_install=False,
     )
     captured: dict[str, object] = {}
-
-    class _Parser:
-        def parse_args(self) -> SimpleNamespace:
-            """Return fixed args namespace for subprocess-mode test."""
-            return args
 
     def _start_client_internal(**kwargs: object) -> None:
         """Capture startup kwargs for assertions."""
         captured.update(kwargs)
 
-    def _warn_if_flwr_update_available(**_: object) -> None:
-        """Disable update check side effects in unit test."""
-        return
+    def _unexpected_load_superexec_auth_secret(**_: object) -> bytes:
+        """Fail fast if subprocess path unexpectedly loads a secret."""
+        raise AssertionError("should not be called")
 
-    def _parse_args_run_supernode() -> _Parser:
-        """Return parser stub with fixed args."""
-        return _Parser()
-
-    monkeypatch.setattr(
-        flower_supernode_module,
-        "warn_if_flwr_update_available",
-        _warn_if_flwr_update_available,
-    )
-    monkeypatch.setattr(
-        flower_supernode_module, "_parse_args_run_supernode", _parse_args_run_supernode
-    )
-    monkeypatch.setattr(
-        flower_supernode_module, "_try_obtain_trusted_entities", lambda *_: None
-    )
-    monkeypatch.setattr(
-        flower_supernode_module, "try_obtain_root_certificates", lambda *_: None
-    )
-    monkeypatch.setattr(
-        flower_supernode_module, "_try_setup_client_authentication", lambda *_: None
-    )
-    monkeypatch.setattr(flower_supernode_module, "parse_config_args", lambda *_: {})
-    monkeypatch.setattr(flower_supernode_module, "event", lambda *_: None)
+    _patch_common_supernode_startup(monkeypatch, args)
     monkeypatch.setattr(
         flower_supernode_module,
         "load_superexec_auth_secret",
-        lambda **_: (_ for _ in ()).throw(AssertionError("should not be called")),
+        _unexpected_load_superexec_auth_secret,
     )
     monkeypatch.setattr(
         flower_supernode_module, "start_client_internal", _start_client_internal
@@ -159,26 +191,10 @@ def test_flower_supernode_process_exits_on_invalid_superexec_secret_file(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Process mode should exit with dedicated code if secret load fails."""
-    args = SimpleNamespace(
-        trusted_entities=None,
-        superlink="127.0.0.1:9092",
-        transport="grpc-rere",
-        max_retries=None,
-        max_wait_time=None,
-        node_config=None,
+    args = _make_args(
         isolation=ISOLATION_MODE_PROCESS,
-        clientappio_api_address="127.0.0.1:9094",
-        health_server_address=None,
         superexec_auth_secret_file="bad-secret-file",
-        insecure=True,
-        auth_supernode_private_key=None,
-        runtime_dependency_install=False,
     )
-
-    class _Parser:
-        def parse_args(self) -> SimpleNamespace:
-            """Return fixed args namespace for process-mode test."""
-            return args
 
     class _ExitCalled(Exception):
         def __init__(self, code: int, message: str) -> None:
@@ -189,36 +205,15 @@ def test_flower_supernode_process_exits_on_invalid_superexec_secret_file(
         """Raise captured exception instead of exiting test process."""
         raise _ExitCalled(code, message)
 
-    def _warn_if_flwr_update_available(**_: object) -> None:
-        """Disable update check side effects in unit test."""
-        return
+    def _raise_invalid_secret(**_: object) -> bytes:
+        """Simulate invalid secret-file parsing failure."""
+        raise ValueError("invalid")
 
-    def _parse_args_run_supernode() -> _Parser:
-        """Return parser stub with fixed args."""
-        return _Parser()
-
-    monkeypatch.setattr(
-        flower_supernode_module,
-        "warn_if_flwr_update_available",
-        _warn_if_flwr_update_available,
-    )
-    monkeypatch.setattr(
-        flower_supernode_module, "_parse_args_run_supernode", _parse_args_run_supernode
-    )
-    monkeypatch.setattr(
-        flower_supernode_module, "_try_obtain_trusted_entities", lambda *_: None
-    )
-    monkeypatch.setattr(
-        flower_supernode_module, "try_obtain_root_certificates", lambda *_: None
-    )
-    monkeypatch.setattr(
-        flower_supernode_module, "_try_setup_client_authentication", lambda *_: None
-    )
-    monkeypatch.setattr(flower_supernode_module, "event", lambda *_: None)
+    _patch_common_supernode_startup(monkeypatch, args)
     monkeypatch.setattr(
         flower_supernode_module,
         "load_superexec_auth_secret",
-        lambda **_: (_ for _ in ()).throw(ValueError("invalid")),
+        _raise_invalid_secret,
     )
     monkeypatch.setattr(flower_supernode_module, "flwr_exit", _flwr_exit)
 
