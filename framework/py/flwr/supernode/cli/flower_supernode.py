@@ -65,6 +65,12 @@ def flower_supernode() -> None:
     root_certificates = try_obtain_root_certificates(args, args.superlink)
     authentication_keys = _try_setup_client_authentication(args)
     superexec_auth_secret = None
+    if args.superexec_auth_secret_file is not None:
+        log(
+            WARN,
+            "EXPERIMENTAL: SuperExec authentication is experimental and "
+            "may change in future releases.",
+        )
     if (
         args.isolation == ISOLATION_MODE_PROCESS
         and args.superexec_auth_secret_file is not None
