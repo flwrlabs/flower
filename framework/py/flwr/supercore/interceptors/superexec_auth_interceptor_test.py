@@ -268,6 +268,9 @@ class TestSuperExecAuthServerInterceptor(TestCase):
         )
         with self.assertRaises(grpc.RpcError):
             intercepted.unary_unary(request, context)
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
+        )
 
     def test_non_superexec_methods_passthrough(self) -> None:
         """Methods outside SuperExec policy should pass through unchanged."""
