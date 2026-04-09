@@ -191,12 +191,6 @@ def start_client_internal(
         effective_superexec_auth_secret = None
     else:
         effective_superexec_auth_secret = superexec_auth_secret
-        if effective_superexec_auth_secret is None:
-            log(
-                WARN,
-                "No SuperExec auth secret configured in process isolation mode. "
-                "ClientAppIo SuperExec auth is disabled.",
-            )
 
     # Launch ClientAppIo API server
     grpc_servers = []
