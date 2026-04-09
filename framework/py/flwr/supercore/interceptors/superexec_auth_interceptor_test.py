@@ -28,17 +28,17 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ListAppsToLaunchRequest,
     RequestTokenRequest,
 )
-from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
 from flwr.supercore.auth import (
+    compute_request_body_sha256,
+    compute_superexec_signature,
+    derive_auth_secret,
+)
+from flwr.supercore.constant import (
     MAX_TIMESTAMP_DIFF_SECONDS,
-    SUPEREXEC_AUTH_AUDIENCE_HEADER,
     SUPEREXEC_AUTH_BODY_SHA256_HEADER,
     SUPEREXEC_AUTH_NONCE_HEADER,
     SUPEREXEC_AUTH_SIGNATURE_HEADER,
     SUPEREXEC_AUTH_TIMESTAMP_HEADER,
-    compute_request_body_sha256,
-    compute_superexec_signature,
-    derive_auth_secret,
 )
 from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
@@ -95,7 +95,6 @@ class TestSuperExecAuthClientInterceptor(TestCase):
         """Protected SuperExec methods should receive signed metadata."""
         interceptor = SuperExecAuthClientInterceptor(
             master_secret=b"secret",
-            audience="serverappio:9091",
             protected_methods=_SERVERAPPIO_SUPEREXEC_METHODS,
         )
         details = _ClientCallDetails(
@@ -123,14 +122,12 @@ class TestSuperExecAuthClientInterceptor(TestCase):
         self.assertEqual(response, "ok")
         md = dict(captured["metadata"])
         for header in (
-            SUPEREXEC_AUTH_AUDIENCE_HEADER,
             SUPEREXEC_AUTH_TIMESTAMP_HEADER,
             SUPEREXEC_AUTH_NONCE_HEADER,
             SUPEREXEC_AUTH_BODY_SHA256_HEADER,
             SUPEREXEC_AUTH_SIGNATURE_HEADER,
         ):
             self.assertIn(header, md)
-        self.assertEqual(md[SUPEREXEC_AUTH_AUDIENCE_HEADER], "serverappio:9091")
 
 
 class TestSuperExecAuthServerInterceptor(TestCase):
@@ -139,12 +136,10 @@ class TestSuperExecAuthServerInterceptor(TestCase):
     def setUp(self) -> None:
         """Create the default server interceptor under test."""
         self._secret = b"secret"
-        self._audience = "serverappio:9091"
         self._state = _NonceState()
         self._interceptor = create_serverappio_superexec_auth_server_interceptor(
             state_provider=lambda: self._state,
             master_secret=self._secret,
-            expected_audience=self._audience,
         )
 
     def _signed_metadata(  # pylint: disable=R0913
@@ -152,7 +147,6 @@ class TestSuperExecAuthServerInterceptor(TestCase):
         *,
         method: str,
         request: GrpcMessage,
-        audience: str | None = None,
         body_sha256: str | None = None,
         signature_override: str | None = None,
         nonce: str = "nonce-1",
@@ -166,13 +160,11 @@ class TestSuperExecAuthServerInterceptor(TestCase):
         signature = compute_superexec_signature(
             auth_secret=auth_secret,
             method=method,
-            audience=audience or self._audience,
             timestamp=ts,
             nonce=nonce,
             body_sha256=body,
         )
         return (
-            (SUPEREXEC_AUTH_AUDIENCE_HEADER, audience or self._audience),
             (SUPEREXEC_AUTH_TIMESTAMP_HEADER, str(ts)),
             (SUPEREXEC_AUTH_NONCE_HEADER, nonce),
             (SUPEREXEC_AUTH_BODY_SHA256_HEADER, body),
@@ -279,26 +271,6 @@ class TestSuperExecAuthServerInterceptor(TestCase):
         with self.assertRaises(grpc.RpcError):
             intercepted.unary_unary(request, context)
 
-    def test_audience_mismatch_is_denied(self) -> None:
-        """Audience mismatch should be denied."""
-        method = "/flwr.proto.ServerAppIo/ListAppsToLaunch"
-        request = ListAppsToLaunchRequest()
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
-        intercepted = self._interceptor.intercept_service(
-            lambda _: _make_unary_handler(),
-            _HandlerCallDetails(
-                method=method,
-                invocation_metadata=self._signed_metadata(
-                    method=method,
-                    request=request,
-                    audience="serverappio:9099",
-                ),
-            ),
-        )
-        with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(request, context)
-
     def test_non_superexec_methods_passthrough(self) -> None:
         """Methods outside SuperExec policy should pass through unchanged."""
         method = "/flwr.proto.ServerAppIo/GetNodes"
@@ -306,5 +278,7 @@ class TestSuperExecAuthServerInterceptor(TestCase):
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(method=method, invocation_metadata=()),
         )
-        response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=1), Mock()))
+        response = cast(
+            str, intercepted.unary_unary(RequestTokenRequest(run_id=1), Mock())
+        )
         self.assertEqual(response, "ok")
