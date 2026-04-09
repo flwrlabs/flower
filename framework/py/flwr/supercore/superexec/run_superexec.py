@@ -35,11 +35,11 @@ from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
-from flwr.supercore.tls import load_root_certificates
 from flwr.supercore.interceptors import SuperExecAuthClientInterceptor
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
     SERVERAPPIO_SUPEREXEC_METHODS,
 )
+from flwr.supercore.tls import load_root_certificates
 
 from .plugin import ExecPlugin
 
@@ -106,8 +106,6 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
         server_address=appio_api_address,
         insecure=insecure,
         root_certificates=load_root_certificates(root_certificates_path, insecure),
-        insecure=True,
-        root_certificates=None,
         interceptors=interceptors,
     )
     channel.subscribe(on_channel_state_change)
