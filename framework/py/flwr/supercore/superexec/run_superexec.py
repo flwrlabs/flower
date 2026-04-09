@@ -75,11 +75,7 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
         NOT be started.
     """
     interceptors: list[SuperExecAuthClientInterceptor] | None = None
-    if (
-        stub_class is ServerAppIoStub
-        and superexec_auth_secret is not None
-        and superexec_auth_secret != b""
-    ):
+    if stub_class is ServerAppIoStub and superexec_auth_secret:
         interceptors = [
             SuperExecAuthClientInterceptor(
                 master_secret=superexec_auth_secret,
