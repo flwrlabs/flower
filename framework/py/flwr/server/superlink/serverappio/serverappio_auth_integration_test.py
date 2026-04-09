@@ -48,7 +48,7 @@ from flwr.superlink.federation import NoOpFederationManager
 _SUPEREXEC_SECRET = b"test-superexec-secret"
 
 
-class TestServerAppIoAuthIntegration(unittest.TestCase):
+class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R0902
     """Integration tests for ServerAppIo token-auth interceptor behavior."""
 
     def setUp(self) -> None:
@@ -160,6 +160,8 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):
 
     def test_list_apps_to_launch_allows_with_superexec_metadata(self) -> None:
         """SuperExec RPC should allow requests with valid signed metadata."""
-        response, call = self._list_apps_to_launch.with_call(request=ListAppsToLaunchRequest())
+        response, call = self._list_apps_to_launch.with_call(
+            request=ListAppsToLaunchRequest()
+        )
         assert isinstance(response, ListAppsToLaunchResponse)
         assert call.code() == grpc.StatusCode.OK
