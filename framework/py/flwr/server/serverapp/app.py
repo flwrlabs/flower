@@ -69,7 +69,7 @@ from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
 from flwr.supercore.superexec.plugin import ServerAppExecPlugin
 from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning
-from flwr.supercore.utils import load_root_certificates
+from flwr.supercore.tls import load_root_certificates
 
 
 def flwr_serverapp() -> None:

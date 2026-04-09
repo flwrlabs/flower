@@ -35,7 +35,7 @@ from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
-from flwr.supercore.utils import load_root_certificates
+from flwr.supercore.tls import load_root_certificates
 
 from .plugin import ExecPlugin
 
@@ -62,7 +62,7 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
         The address of the AppIO API.
     insecure : bool
         Whether to connect to the AppIO API without TLS.
-    root_certificates : Optional[str] (default: None)
+    root_certificates_path : Optional[str] (default: None)
         The path to the PEM-encoded root certificate file used for secure TLS
         connections.
     plugin_config : Optional[dict[str, Any]] (default: None)

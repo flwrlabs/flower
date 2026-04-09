@@ -24,7 +24,8 @@ from flwr.common.logger import log
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.supercore.superexec.plugin import ClientAppExecPlugin
 from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning
-from flwr.supercore.utils import load_root_certificates, mask_string
+from flwr.supercore.tls import load_root_certificates
+from flwr.supercore.utils import mask_string
 from flwr.supernode.runtime.run_clientapp import run_clientapp
 
 
