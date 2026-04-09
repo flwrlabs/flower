@@ -92,11 +92,20 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     iterate_object_tree,
 )
-from flwr.supercore.interceptors import APP_TOKEN_HEADER, AppIoTokenClientInterceptor
+from flwr.supercore.interceptors import (
+    APP_TOKEN_HEADER,
+    AppIoTokenClientInterceptor,
+    SuperExecAuthClientInterceptor,
+)
+from flwr.supercore.interceptors.superexec_auth_interceptor import (
+    SERVERAPPIO_SUPEREXEC_METHODS,
+)
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
 # pylint: disable=broad-except,too-many-lines
+
+_SUPEREXEC_SECRET = b"test-superexec-secret"
 
 
 def test_raise_if_false() -> None:
@@ -156,6 +165,7 @@ def _start_serverappio_with_port_retry(
                 state_factory,
                 objectstore_factory,
                 None,
+                superexec_auth_secret=_SUPEREXEC_SECRET,
             )
         except RuntimeError as err:
             if "Failed to bind to address" in str(err):
@@ -213,7 +223,14 @@ def _create_shared_runtime(
 
 
 def _request_token(channel: grpc.Channel, run_id: int) -> str:
-    request_token = channel.unary_unary(
+    superexec_channel = grpc.intercept_channel(
+        channel,
+        SuperExecAuthClientInterceptor(
+            master_secret=_SUPEREXEC_SECRET,
+            protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
+        ),
+    )
+    request_token = superexec_channel.unary_unary(
         "/flwr.proto.ServerAppIo/RequestToken",
         request_serializer=RequestTokenRequest.SerializeToString,
         response_deserializer=RequestTokenResponse.FromString,
@@ -307,6 +324,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             state_factory,
             objectstore_factory,
             None,
+            superexec_auth_secret=_SUPEREXEC_SECRET,
         )
 
         # Provide a valid metadata token on the default test channel so existing
@@ -326,6 +344,10 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         self._channel = grpc.intercept_channel(
             grpc.insecure_channel("localhost:9091"),
             AppIoTokenClientInterceptor(token=self._auth_token),
+            SuperExecAuthClientInterceptor(
+                master_secret=_SUPEREXEC_SECRET,
+                protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
+            ),
         )
         self._get_nodes = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/GetNodes",
