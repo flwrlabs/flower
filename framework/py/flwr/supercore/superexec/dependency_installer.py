@@ -45,7 +45,7 @@ def _resolve_index_url_from_ee(
 def _resolve_runtime_dependency_index_url(
     context: RuntimeDependencyIndexContext,
 ) -> str | None:
-    resolved = _resolve_index_url_from_ee(context)
+    resolved = _resolve_index_url_from_ee(context)  # pylint: disable=E1128
     if resolved is not None and not isinstance(resolved, str):
         raise TypeError(
             "Runtime dependency index resolver must return `str | None`, "
