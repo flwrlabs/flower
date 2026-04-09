@@ -129,10 +129,9 @@ class TestSuperExecAuthClientInterceptor(TestCase):
     def test_preexisting_auth_headers_are_replaced(self) -> None:
         """Pre-existing SUPEREXEC_AUTH_* headers must be replaced, not duplicated.
 
-        Duplicate keys cause get_metadata_str to return None, which would make
-        the server deny the request.  The interceptor should strip any existing
-        auth headers before attaching fresh signed ones so each key appears
-        exactly once.
+        Duplicate keys cause get_metadata_str to return None, which would make the
+        server deny the request.  The interceptor should strip any existing auth headers
+        before attaching fresh signed ones so each key appears exactly once.
         """
         interceptor = SuperExecAuthClientInterceptor(
             master_secret=b"secret",
