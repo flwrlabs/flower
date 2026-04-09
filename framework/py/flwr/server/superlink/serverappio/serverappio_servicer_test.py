@@ -97,17 +97,16 @@ from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     SuperExecAuthClientInterceptor,
 )
+from flwr.supercore.interceptors.superexec_auth_interceptor import (
+    SERVERAPPIO_SUPEREXEC_METHODS,
+)
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
 # pylint: disable=broad-except,too-many-lines
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
-_SERVERAPPIO_SUPEREXEC_METHODS = (
-    "/flwr.proto.ServerAppIo/ListAppsToLaunch",
-    "/flwr.proto.ServerAppIo/RequestToken",
-    "/flwr.proto.ServerAppIo/GetRun",
-)
+_SERVERAPPIO_SUPEREXEC_METHODS = SERVERAPPIO_SUPEREXEC_METHODS
 
 
 def test_raise_if_false() -> None:
