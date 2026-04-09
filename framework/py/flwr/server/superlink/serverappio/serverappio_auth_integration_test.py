@@ -38,15 +38,13 @@ from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
     SuperExecAuthClientInterceptor,
 )
+from flwr.supercore.interceptors.superexec_auth_interceptor import (
+    SERVERAPPIO_SUPEREXEC_METHODS,
+)
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
-_SERVERAPPIO_SUPEREXEC_METHODS = (
-    "/flwr.proto.ServerAppIo/ListAppsToLaunch",
-    "/flwr.proto.ServerAppIo/RequestToken",
-    "/flwr.proto.ServerAppIo/GetRun",
-)
 
 
 class TestServerAppIoAuthIntegration(unittest.TestCase):
@@ -74,22 +72,23 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):
             superexec_auth_secret=_SUPEREXEC_SECRET,
         )
 
-        channel = grpc.insecure_channel("localhost:9091")
-        self._get_nodes = channel.unary_unary(
+        # Create a single base channel and wrap it for SuperExec
+        base_channel = grpc.insecure_channel("localhost:9091")
+        self._get_nodes = base_channel.unary_unary(
             "/flwr.proto.ServerAppIo/GetNodes",
             request_serializer=GetNodesRequest.SerializeToString,
             response_deserializer=GetNodesResponse.FromString,
         )
-        self._list_apps_to_launch = channel.unary_unary(
+        self._list_apps_to_launch = base_channel.unary_unary(
             "/flwr.proto.ServerAppIo/ListAppsToLaunch",
             request_serializer=ListAppsToLaunchRequest.SerializeToString,
             response_deserializer=ListAppsToLaunchResponse.FromString,
         )
         superexec_channel = grpc.intercept_channel(
-            grpc.insecure_channel("localhost:9091"),
+            base_channel,
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
-                protected_methods=_SERVERAPPIO_SUPEREXEC_METHODS,
+                protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
             ),
         )
         self._list_apps_to_launch_superexec = superexec_channel.unary_unary(

@@ -106,7 +106,6 @@ from flwr.superlink.federation import NoOpFederationManager
 # pylint: disable=broad-except,too-many-lines
 
 _SUPEREXEC_SECRET = b"test-superexec-secret"
-_SERVERAPPIO_SUPEREXEC_METHODS = SERVERAPPIO_SUPEREXEC_METHODS
 
 
 def test_raise_if_false() -> None:
@@ -228,7 +227,7 @@ def _request_token(channel: grpc.Channel, run_id: int) -> str:
         channel,
         SuperExecAuthClientInterceptor(
             master_secret=_SUPEREXEC_SECRET,
-            protected_methods=_SERVERAPPIO_SUPEREXEC_METHODS,
+            protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
         ),
     )
     request_token = superexec_channel.unary_unary(
@@ -350,7 +349,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             grpc.insecure_channel("localhost:9091"),
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
-                protected_methods=_SERVERAPPIO_SUPEREXEC_METHODS,
+                protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
             ),
         )
         self._get_nodes = self._channel.unary_unary(
