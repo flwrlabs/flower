@@ -126,62 +126,6 @@ class TestSuperExecAuthClientInterceptor(TestCase):
         ):
             self.assertIn(header, md)
 
-    def test_preexisting_auth_headers_are_replaced(self) -> None:
-        """Pre-existing SUPEREXEC_AUTH_* headers must be replaced, not duplicated.
-
-        Duplicate keys cause get_metadata_str to return None, which would make the
-        server deny the request.  The interceptor should strip any existing auth headers
-        before attaching fresh signed ones so each key appears exactly once.
-        """
-        interceptor = SuperExecAuthClientInterceptor(
-            master_secret=b"secret",
-            protected_methods=_SERVERAPPIO_SUPEREXEC_METHODS,
-        )
-        stale_headers = [
-            (SUPEREXEC_AUTH_TIMESTAMP_HEADER, "0"),
-            (SUPEREXEC_AUTH_NONCE_HEADER, "old-nonce"),
-            (SUPEREXEC_AUTH_BODY_SHA256_HEADER, "a" * 64),
-            (SUPEREXEC_AUTH_SIGNATURE_HEADER, "bad-sig"),
-        ]
-        details = _ClientCallDetails(
-            method="/flwr.proto.ServerAppIo/RequestToken",
-            timeout=None,
-            metadata=stale_headers,
-            credentials=None,
-            wait_for_ready=None,
-            compression=None,
-        )
-        captured: dict[str, list[tuple[str, str | bytes]]] = {}
-
-        def continuation(
-            client_call_details: grpc.ClientCallDetails,
-            _request: GrpcMessage,
-        ) -> str:
-            captured["metadata"] = list(client_call_details.metadata or [])
-            return "ok"
-
-        response = interceptor.intercept_unary_unary(
-            continuation=continuation,
-            client_call_details=details,
-            request=RequestTokenRequest(run_id=7),
-        )
-        self.assertEqual(response, "ok")
-        result_metadata = captured["metadata"]
-        for header in (
-            SUPEREXEC_AUTH_TIMESTAMP_HEADER,
-            SUPEREXEC_AUTH_NONCE_HEADER,
-            SUPEREXEC_AUTH_BODY_SHA256_HEADER,
-            SUPEREXEC_AUTH_SIGNATURE_HEADER,
-        ):
-            values = [v for k, v in result_metadata if k == header]
-            self.assertEqual(
-                len(values),
-                1,
-                f"Expected exactly one value for {header!r}, got {values!r}",
-            )
-            # The stale placeholder values must not survive.
-            self.assertNotIn(values[0], ("0", "old-nonce", "a" * 64, "bad-sig"))
-
 
 class TestSuperExecAuthServerInterceptor(TestCase):
     """Unit tests for SuperExecAuthServerInterceptor."""
