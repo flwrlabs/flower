@@ -34,10 +34,7 @@ def add_superexec_auth_secret_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def load_superexec_auth_secret(
-    *,
-    secret_file: str | None,
-) -> bytes | None:
+def load_superexec_auth_secret(secret_file: str | None) -> bytes | None:
     """Load the SuperExec shared secret from file."""
     secret: bytes | None = None
     if secret_file is not None:

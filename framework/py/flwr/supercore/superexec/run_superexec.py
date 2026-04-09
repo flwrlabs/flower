@@ -36,6 +36,10 @@ from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.tls import load_root_certificates
+from flwr.supercore.interceptors import SuperExecAuthClientInterceptor
+from flwr.supercore.interceptors.superexec_auth_interceptor import (
+    SERVERAPPIO_SUPEREXEC_METHODS,
+)
 
 from .plugin import ExecPlugin
 
@@ -46,6 +50,7 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
     appio_api_address: str,
     insecure: bool,
     root_certificates_path: str | None = None,
+    superexec_auth_secret: bytes | None = None,
     plugin_config: dict[str, Any] | None = None,
     parent_pid: int | None = None,
     health_server_address: str | None = None,
@@ -65,6 +70,8 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
     root_certificates_path : Optional[str] (default: None)
         The path to the PEM-encoded root certificate file used for secure TLS
         connections.
+    superexec_auth_secret : Optional[bytes] (default: None)
+        Secret used to derive an HMAC signing key for SuperExec auth.
     plugin_config : Optional[dict[str, Any]] (default: None)
         The configuration dictionary for the plugin. If `None`, the plugin will use
         its default configuration.
@@ -75,6 +82,15 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
         The address of the health server. If `None` is provided, the health server will
         NOT be started.
     """
+    interceptors: list[SuperExecAuthClientInterceptor] | None = None
+    if stub_class is ServerAppIoStub and superexec_auth_secret:
+        interceptors = [
+            SuperExecAuthClientInterceptor(
+                master_secret=superexec_auth_secret,
+                protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
+            )
+        ]
+
     # Start monitoring the parent process if a PID is provided
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
@@ -90,6 +106,9 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
         server_address=appio_api_address,
         insecure=insecure,
         root_certificates=load_root_certificates(root_certificates_path, insecure),
+        insecure=True,
+        root_certificates=None,
+        interceptors=interceptors,
     )
     channel.subscribe(on_channel_state_change)
 
@@ -163,6 +182,7 @@ def run_with_deprecation_warning(  # pylint: disable=R0913, R0917
     appio_api_address: str,
     parent_pid: int | None,
     warn_run_once: bool,
+    superexec_auth_secret: bytes | None = None,
 ) -> None:
     """Log a deprecation warning and run the equivalent `flower-superexec` command.
 
@@ -192,5 +212,6 @@ def run_with_deprecation_warning(  # pylint: disable=R0913, R0917
         appio_api_address=appio_api_address,
         insecure=True,
         root_certificates_path=None,
+        superexec_auth_secret=superexec_auth_secret,
         parent_pid=parent_pid,
     )

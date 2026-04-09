@@ -554,10 +554,6 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install build tools
         run: python -m pip install -U pip==26.0.1
-      - name: Overwrite ping interval and patience
-        run: |
-          sed -i 's/\(HEARTBEAT_DEFAULT_INTERVAL *= *\).*/\120/' framework/py/flwr/common/constant.py
-          sed -i 's/\(HEARTBEAT_PATIENCE *= *\).*/\11/' framework/py/flwr/common/constant.py
       - name: Install dependencies
         run: |
           cd framework
