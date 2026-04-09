@@ -38,6 +38,7 @@ try:
 except Exception:  # pragma: no cover - optional dependency
     psutil = None
 from flwr.common.constant import (
+    FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PUSHES,
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
     SUPERLINK_NODE_ID,
     ErrorCode,
@@ -240,7 +241,13 @@ class GrpcGrid(Grid):
         )
         return [node.node_id for node in res.nodes]
 
-    def _try_push_messages(self, run_id: int, messages: Iterable[Message]) -> list[str]:
+    def _try_push_messages(
+        self,
+        run_id: int,
+        messages: Iterable[Message],
+        *,
+        max_concurrent_pushes: int | None = None,
+    ) -> list[str]:
         """Push all messages and its associated objects."""
         # Prepare all Messages to be sent in a single request
         proto_messages = []
@@ -270,6 +277,11 @@ class GrpcGrid(Grid):
                 run_id=run_id,
             ),
             object_ids_to_push=set(res.objects_to_push),
+            max_concurrent_pushes=(
+                max_concurrent_pushes
+                if max_concurrent_pushes is not None
+                else FLWR_PRIVATE_MAX_CONCURRENT_OBJ_PUSHES
+            ),
         )
         return cast(list[str], res.message_ids)
 
@@ -307,7 +319,13 @@ class GrpcGrid(Grid):
                         run_id,
                         err,
                     )
-                    message_ids = self._try_push_messages(run_id, messages)
+                    message_ids = self._try_push_messages(
+                        run_id,
+                        messages,
+                        # Force serialized object push on retry to minimize race windows
+                        # in object preregistration/object upload under load.
+                        max_concurrent_pushes=1,
+                    )
 
         except grpc.RpcError as e:
             if e.code() == grpc.StatusCode.RESOURCE_EXHAUSTED:  # pylint: disable=E1101
