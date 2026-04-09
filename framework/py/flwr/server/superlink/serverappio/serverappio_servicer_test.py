@@ -344,9 +344,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         self._channel = grpc.intercept_channel(
             grpc.insecure_channel("localhost:9091"),
             AppIoTokenClientInterceptor(token=self._auth_token),
-        )
-        self._superexec_channel = grpc.intercept_channel(
-            grpc.insecure_channel("localhost:9091"),
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
                 protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
@@ -397,12 +394,12 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=ConfirmMessageReceivedRequest.SerializeToString,
             response_deserializer=ConfirmMessageReceivedResponse.FromString,
         )
-        self._list_apps_to_launch = self._superexec_channel.unary_unary(
+        self._list_apps_to_launch = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/ListAppsToLaunch",
             request_serializer=ListAppsToLaunchRequest.SerializeToString,
             response_deserializer=ListAppsToLaunchResponse.FromString,
         )
-        self._request_token = self._superexec_channel.unary_unary(
+        self._request_token = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/RequestToken",
             request_serializer=RequestTokenRequest.SerializeToString,
             response_deserializer=RequestTokenResponse.FromString,

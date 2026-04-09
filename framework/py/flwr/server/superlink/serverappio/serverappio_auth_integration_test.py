@@ -84,14 +84,14 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):
             request_serializer=ListAppsToLaunchRequest.SerializeToString,
             response_deserializer=ListAppsToLaunchResponse.FromString,
         )
-        superexec_channel = grpc.intercept_channel(
+        auth_channel = grpc.intercept_channel(
             base_channel,
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
                 protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
             ),
         )
-        self._list_apps_to_launch_superexec = superexec_channel.unary_unary(
+        self._list_apps_to_launch_auth = auth_channel.unary_unary(
             "/flwr.proto.ServerAppIo/ListAppsToLaunch",
             request_serializer=ListAppsToLaunchRequest.SerializeToString,
             response_deserializer=ListAppsToLaunchResponse.FromString,
@@ -153,7 +153,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):
 
     def test_list_apps_to_launch_allows_with_superexec_metadata(self) -> None:
         """SuperExec RPC should allow requests with valid signed metadata."""
-        response, call = self._list_apps_to_launch_superexec.with_call(
+        response, call = self._list_apps_to_launch_auth.with_call(
             request=ListAppsToLaunchRequest()
         )
         assert isinstance(response, ListAppsToLaunchResponse)
