@@ -25,14 +25,13 @@ def load_root_certificates(
     insecure: bool,
 ) -> bytes | None:
     """Validate and return root certificate bytes for gRPC connections."""
-    if insecure and root_cert_path is not None:
-        flwr_exit(
-            ExitCode.COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE,
-            "Conflicting options: The '--insecure' flag disables HTTPS, but "
-            "'--root-certificates' was also specified.",
-        )
-
-    if insecure or root_cert_path is None:
+    if insecure:
+        if root_cert_path is not None:
+            flwr_exit(
+                ExitCode.COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE,
+                "Conflicting options: The '--insecure' flag disables HTTPS, but "
+                "'--root-certificates' was also specified.",
+            )
         return None
 
     if not Path(root_cert_path).expanduser().is_file():
