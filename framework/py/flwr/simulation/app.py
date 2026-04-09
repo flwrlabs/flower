@@ -69,6 +69,7 @@ from flwr.supercore.constant import NOOP_FEDERATION
 from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
 from flwr.supercore.superexec.plugin import ServerAppExecPlugin
 from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning
+from flwr.supercore.utils import load_root_certificates
 
 
 def _run_simulation_settings(
@@ -112,12 +113,6 @@ def flwr_simulation() -> None:
 
     args = _parse_args_run_flwr_simulation().parse_args()
 
-    if not args.insecure:
-        flwr_exit(
-            ExitCode.COMMON_TLS_NOT_SUPPORTED,
-            "`flwr-simulation` does not support TLS yet.",
-        )
-
     # Disallow long-running `flwr-simulation` processes
     if args.token is None:
         run_with_deprecation_warning(
@@ -131,6 +126,8 @@ def flwr_simulation() -> None:
         )
         return
 
+    certificates = load_root_certificates(args.root_certificates, args.insecure)
+
     log(INFO, "Starting Flower Simulation")
     log(
         DEBUG,
@@ -141,7 +138,7 @@ def flwr_simulation() -> None:
         serverappio_api_address=args.serverappio_api_address,
         log_queue=log_queue,
         token=args.token,
-        certificates=None,
+        certificates=certificates,
         parent_pid=args.parent_pid,
     )
 

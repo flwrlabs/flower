@@ -28,9 +28,13 @@ class ExecPlugin(ABC):
     def __init__(
         self,
         appio_api_address: str,
+        insecure: bool,
+        root_certificates_path: str | None,
         get_run: Callable[[int], Run],
     ) -> None:
         self.appio_api_address = appio_api_address
+        self.insecure = insecure
+        self.root_certificates_path = root_certificates_path
         self.get_run = get_run
 
     @abstractmethod

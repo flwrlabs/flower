@@ -19,7 +19,18 @@ import unittest
 from queue import Queue
 from unittest.mock import Mock, patch
 
-from .app import run_simulation_process
+from .app import _parse_args_run_flwr_simulation, run_simulation_process
+
+
+class TestSimulationCliParsing(unittest.TestCase):
+    """Tests for `flwr-simulation` CLI parsing."""
+
+    def test_parse_root_certificate_flag(self) -> None:
+        """The root certificate flag should parse."""
+        args = _parse_args_run_flwr_simulation().parse_args(
+            ["--root-certificates", "/tmp/root.pem"]
+        )
+        self.assertEqual(args.root_certificates, "/tmp/root.pem")
 
 
 class TestRunSimulationProcess(unittest.TestCase):
@@ -50,6 +61,36 @@ class TestRunSimulationProcess(unittest.TestCase):
         mock_connection_cls.assert_called_once_with(
             serverappio_api_address="127.0.0.1:9091",
             root_certificates=None,
+            token="test-token",
+        )
+        mock_flwr_exit.assert_called_once()
+
+    @patch("flwr.simulation.app.flwr_exit")
+    @patch("flwr.simulation.app.register_signal_handlers")
+    @patch("flwr.simulation.app.SimulationIoConnection")
+    def test_run_simulation_process_passes_certificates_to_connection(
+        self,
+        mock_connection_cls: Mock,
+        _mock_register_signal_handlers: Mock,
+        mock_flwr_exit: Mock,
+    ) -> None:
+        """`run_simulation_process` should pass TLS certificates into the connection."""
+        mock_conn = Mock()
+        mock_conn.configure_mock(
+            **{"_stub.PullAppInputs.side_effect": RuntimeError("boom")}
+        )
+        mock_connection_cls.return_value = mock_conn
+
+        run_simulation_process(
+            serverappio_api_address="127.0.0.1:9091",
+            log_queue=Queue(),
+            token="test-token",
+            certificates=b"root-cert",
+        )
+
+        mock_connection_cls.assert_called_once_with(
+            serverappio_api_address="127.0.0.1:9091",
+            root_certificates=b"root-cert",
             token="test-token",
         )
         mock_flwr_exit.assert_called_once()

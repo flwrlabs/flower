@@ -19,6 +19,8 @@ import json
 import os
 import re
 from collections.abc import Sequence
+from flwr.common.exit.exit_code import ExitCode
+from flwr.common.exit.exit import flwr_exit
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -257,6 +259,30 @@ def humanize_duration(seconds: float) -> str:
     # 1+ days → Days and hours
     days, hours = divmod(hours, 24)
     return f"{days}d {hours}h"
+
+
+def load_root_certificates(
+    root_cert_path: str | None,
+    insecure: bool,
+) -> bytes | None:
+    """Validate and return root certificate bytes for gRPC connections."""
+    if insecure and root_cert_path is not None:
+        flwr_exit(
+            ExitCode.COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE,
+            "Conflicting options: The '--insecure' flag disables HTTPS, but "
+            "'--root-certificates' was also specified.",
+        )
+
+    if insecure or root_cert_path is None:
+        return None
+
+    if not Path(root_cert_path).expanduser().is_file():
+        flwr_exit(
+            ExitCode.COMMON_PATH_INVALID,
+            "Path argument `--root-certificates` does not point to a file.",
+        )
+
+    return Path(root_cert_path).expanduser().read_bytes()
 
 
 def humanize_bytes(num_bytes: int) -> str:

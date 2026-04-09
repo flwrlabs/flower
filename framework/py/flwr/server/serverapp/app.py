@@ -69,6 +69,7 @@ from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
 from flwr.supercore.superexec.plugin import ServerAppExecPlugin
 from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning
+from flwr.supercore.utils import load_root_certificates
 
 
 def flwr_serverapp() -> None:
@@ -78,12 +79,6 @@ def flwr_serverapp() -> None:
     mirror_output_to_queue(log_queue)
 
     args = _parse_args_run_flwr_serverapp().parse_args()
-
-    if not args.insecure:
-        flwr_exit(
-            ExitCode.COMMON_TLS_NOT_SUPPORTED,
-            "`flwr-serverapp` does not support TLS yet.",
-        )
 
     # Disallow long-running `flwr-serverapp` processes
     if args.token is None:
@@ -109,7 +104,7 @@ def flwr_serverapp() -> None:
         serverappio_api_address=args.serverappio_api_address,
         log_queue=log_queue,
         token=args.token,
-        certificates=None,
+        certificates=load_root_certificates(args.root_certificates, args.insecure),
         parent_pid=args.parent_pid,
     )
 

@@ -16,12 +16,14 @@
 
 
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
 import requests
 from parameterized import parameterized
 
+from flwr.common.exit import ExitCode
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 from .utils import (
@@ -30,6 +32,7 @@ from .utils import (
     humanize_bytes,
     humanize_duration,
     int64_to_uint64,
+    load_root_certificates,
     mask_string,
     parse_app_spec,
     request_download_link,
@@ -162,6 +165,53 @@ def test_parse_app_spec_rejects_invalid_formats(value: str) -> None:
     """For an invalid string, the function should fail fast with ValueError."""
     with pytest.raises(ValueError):
         parse_app_spec(value)
+
+
+def test_load_root_certificates_returns_none_when_insecure() -> None:
+    """The helper should return `None` for insecure connections."""
+    assert load_root_certificates(None, insecure=True) is None
+
+
+def test_load_root_certificates_reads_file(tmp_path: Path) -> None:
+    """The helper should read certificate bytes from disk."""
+    cert_path = tmp_path / "root.pem"
+    cert_path.write_bytes(b"root-cert")
+
+    assert load_root_certificates(str(cert_path), insecure=False) == b"root-cert"
+
+
+def test_load_root_certificates_rejects_conflicting_flags(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The helper should reject insecure mode with root certificates."""
+
+    def _flwr_exit(code: int, message: str | None = None, **_: Any) -> None:
+        raise RuntimeError((code, message))
+
+    monkeypatch.setattr("flwr.common.exit.flwr_exit", _flwr_exit)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        load_root_certificates("/tmp/root.pem", insecure=True)
+
+    assert (
+        exc_info.value.args[0][0] == ExitCode.COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE
+    )
+
+
+def test_load_root_certificates_rejects_invalid_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The helper should reject invalid certificate paths."""
+
+    def _flwr_exit(code: int, message: str | None = None, **_: Any) -> None:
+        raise RuntimeError((code, message))
+
+    monkeypatch.setattr("flwr.common.exit.flwr_exit", _flwr_exit)
+
+    with pytest.raises(RuntimeError) as exc_info:
+        load_root_certificates("/tmp/missing-root.pem", insecure=False)
+
+    assert exc_info.value.args[0][0] == ExitCode.COMMON_PATH_INVALID
 
 
 def test_request_download_link_all_scenarios(

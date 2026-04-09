@@ -35,6 +35,7 @@ from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
+from flwr.supercore.utils import load_root_certificates
 
 from .plugin import ExecPlugin
 
@@ -43,6 +44,8 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
     plugin_class: type[ExecPlugin],
     stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
     appio_api_address: str,
+    insecure: bool,
+    root_certificates_path: str | None = None,
     plugin_config: dict[str, Any] | None = None,
     parent_pid: int | None = None,
     health_server_address: str | None = None,
@@ -57,6 +60,11 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
         The gRPC stub class for the AppIO API.
     appio_api_address : str
         The address of the AppIO API.
+    insecure : bool
+        Whether to connect to the AppIO API without TLS.
+    root_certificates : Optional[str] (default: None)
+        The path to the PEM-encoded root certificate file used for secure TLS
+        connections.
     plugin_config : Optional[dict[str, Any]] (default: None)
         The configuration dictionary for the plugin. If `None`, the plugin will use
         its default configuration.
@@ -78,11 +86,10 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
         grpc_servers.append(health_server)
 
     # Create the channel to the AppIO API
-    # No TLS support for now, so insecure connection
     channel = create_channel(
         server_address=appio_api_address,
-        insecure=True,
-        root_certificates=None,
+        insecure=insecure,
+        root_certificates=load_root_certificates(root_certificates_path, insecure),
     )
     channel.subscribe(on_channel_state_change)
 
@@ -106,6 +113,8 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
     # Create the SuperExec plugin instance
     plugin = plugin_class(
         appio_api_address=appio_api_address,
+        insecure=insecure,
+        root_certificates_path=root_certificates_path,
         get_run=get_run,
     )
 
@@ -181,5 +190,7 @@ def run_with_deprecation_warning(  # pylint: disable=R0913, R0917
         plugin_class=plugin_class,
         stub_class=stub_class,
         appio_api_address=appio_api_address,
+        insecure=True,
+        root_certificates_path=None,
         parent_pid=parent_pid,
     )
