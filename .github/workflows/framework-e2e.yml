@@ -346,7 +346,7 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
         run: |
           WHEEL_URL="https://${{ env.ARTIFACT_BUCKET }}/py/${{ needs.wheel.outputs.dir }}/${{ needs.wheel.outputs.short_sha }}/${{ needs.wheel.outputs.whl_path }}"
-          python -m pip install --no-deps "flwr[simulation] @ ${WHEEL_URL}"
+          python -m pip install "flwr[simulation] @ ${WHEEL_URL}"
       - name: Run project
         if: ${{ needs.changes.outputs.framework == 'true' }}
         working-directory: examples/${{ matrix.example }}
