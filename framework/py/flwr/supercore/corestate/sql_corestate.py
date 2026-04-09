@@ -197,3 +197,27 @@ class SqlCoreState(CoreState, SqlMixin):
             List of tuples containing (run_id, active_until timestamp)
             for expired tokens.
         """
+
+    def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:
+        """Atomically reserve a nonce in a namespace."""
+        if namespace == "" or nonce == "":
+            return False
+        cleanup_query = """
+            DELETE FROM nonce_store
+            WHERE expires_at < :current;
+        """
+        insert_query = """
+            INSERT INTO nonce_store (namespace, nonce, expires_at)
+            VALUES (:namespace, :nonce, :expires_at);
+        """
+        self.query(cleanup_query, {"current": now().timestamp()})
+        try:
+            self.query(
+                insert_query,
+                {"namespace": namespace, "nonce": nonce, "expires_at": expires_at},
+            )
+            return True
+        # Duplicate nonce detected, treated as a replay attempt.
+        # IntegrityError can only arise from (namespace, nonce) uniqueness.
+        except IntegrityError:
+            return False
