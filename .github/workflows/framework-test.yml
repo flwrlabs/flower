@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - main
-      - 'release/framework-*'
+      - "release/framework-*"
   pull_request:
     branches:
       - main
-      - 'release/framework-*'
+      - "release/framework-*"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       framework: ${{ steps.filter.outputs.framework }}
-      ex_bench: ${{ steps.filter.outputs.ex_bench }}  # Examples and Benchmarks
+      ex_bench: ${{ steps.filter.outputs.ex_bench }} # Examples and Benchmarks
     steps:
       - uses: actions/checkout@v5
 
@@ -51,7 +51,7 @@ jobs:
         # Latest version which comes cached in the host image can be found here:
         # https://github.com/actions/runner-images/blob/main/images/linux/Ubuntu2204-Readme.md#python
         # In case of a mismatch, the job has to download Python to install it.
-        python: ['3.10', '3.11', '3.12', '3.13']
+        python: ["3.10", "3.11", "3.12", "3.13"]
 
     name: Python ${{ matrix.python }}
 
@@ -72,6 +72,9 @@ jobs:
       - name: Check if protos need recompilation
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: ./framework/dev/check-protos.sh
+      - name: Check if migrations are up to date
+        if: ${{ needs.changes.outputs.framework == 'true' }}
+        run: ./framework/dev/check-migrations.sh
       - name: Lint + Test (isort/black/docformatter/mypy/pylint/flake8/pytest)
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: ./framework/dev/test.sh
