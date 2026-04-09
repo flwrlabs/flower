@@ -107,7 +107,8 @@ def test_download_remote_app_via_api_surfaces_platform_api_warning(
         lambda *_args, **_kwargs: (
             "https://example.invalid/fake.zip",
             None,
-            "Using app version 1.0.0 because the latest published version requires a newer Flower version.",
+            "Using app version 1.0.0 because the latest published version "
+            "requires a newer Flower version.",
         ),
     )
     monkeypatch.setattr(
