@@ -79,7 +79,7 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
     if superexec_auth_secret:
         if stub_class is ServerAppIoStub:
             protected_methods = SERVERAPPIO_SUPEREXEC_METHODS
-        elif stub_class is ClientAppIoStub:
+        else:
             protected_methods = CLIENTAPPIO_SUPEREXEC_METHODS
         interceptors = [
             SuperExecAuthClientInterceptor(
