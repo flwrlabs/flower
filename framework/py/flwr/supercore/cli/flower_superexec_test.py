@@ -94,6 +94,7 @@ def test_flower_superexec_clientapp_allows_missing_secret(
         appio_api_address="127.0.0.1:9091",
         parent_pid=None,
         health_server_address=None,
+        runtime_dependency_install=False,
     )
     captured: dict[str, object] = {}
 
@@ -135,6 +136,7 @@ def test_flower_superexec_serverapp_allows_missing_secret(
         appio_api_address="127.0.0.1:9091",
         parent_pid=None,
         health_server_address=None,
+        runtime_dependency_install=False,
     )
 
     class _Parser:
