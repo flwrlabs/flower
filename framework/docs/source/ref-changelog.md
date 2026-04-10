@@ -38,17 +38,9 @@ We would like to give our special thanks to all the contributors who made the ne
 
 - **Stabilize CI pipelines and improve test reliability** ([#6911](https://github.com/flwrlabs/flower/pull/6911), [#6974](https://github.com/flwrlabs/flower/pull/6974), [#6985](https://github.com/flwrlabs/flower/pull/6985), [#6987](https://github.com/flwrlabs/flower/pull/6987))
 
-### General
+- **General improvements** ([#6931](https://github.com/flwrlabs/flower/pull/6931), [#6944](https://github.com/flwrlabs/flower/pull/6944), [#6946](https://github.com/flwrlabs/flower/pull/6946), [#6955](https://github.com/flwrlabs/flower/pull/6955), [#6970](https://github.com/flwrlabs/flower/pull/6970), [#6973](https://github.com/flwrlabs/flower/pull/6973), [#6982](https://github.com/flwrlabs/flower/pull/6982), [#6983](https://github.com/flwrlabs/flower/pull/6983), [#6988](https://github.com/flwrlabs/flower/pull/6988), [#6990](https://github.com/flwrlabs/flower/pull/6990))
 
-- **feat(:skip): Update** `AGENTS.md` **to specify guidance for handling database migration** ([#6983](https://github.com/flwrlabs/flower/pull/6983))
-- **feat(framework): Add** `get_metadata_` **utility functions to extract values from gRPC metadata** ([#6973](https://github.com/flwrlabs/flower/pull/6973))
-- **ci(:skip): Bump dev versions to** `v1.29.0` ([#6931](https://github.com/flwrlabs/flower/pull/6931))
-- **refactor(framework): Replace LLM generated migration with Alembic-generated table** ([#6982](https://github.com/flwrlabs/flower/pull/6982))
-- **fix(framework): Show update warning in a yellow box** ([#6970](https://github.com/flwrlabs/flower/pull/6970))
-- **refactor(framework): Remove SimulationIo gRPC servicer** ([#6946](https://github.com/flwrlabs/flower/pull/6946))
-- **feat(framework): Introduce ephemeral plugins** ([#6988](https://github.com/flwrlabs/flower/pull/6988))
-- **refactor(framework): Disable** `Context` **pushing in** `PushAppOutput` **stage at the end of a run execution** ([#6955](https://github.com/flwrlabs/flower/pull/6955))
-- **fix(framework): Run update check before parsing args in** `flower-superexec` ([#6944](https://github.com/flwrlabs/flower/pull/6944))
+  As always, many parts of the Flower framework and quality infrastructure were improved and updated.
 
 ### Incompatible changes
 
