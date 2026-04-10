@@ -160,8 +160,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         verification_dict: dict[str, str] = {}
+        note: str | None = None
         if request.app_spec:
-            fab_file, verification_dict = _get_remote_fab(
+            fab_file, verification_dict, note = _get_remote_fab(
                 self.fleet_api_type, request.app_spec, context
             )
         else:
@@ -278,7 +279,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
 
         log(INFO, "Created %s run %s", run_type, str(run_id))
-        return StartRunResponse(run_id=run_id)
+        return StartRunResponse(run_id=run_id, note=note)
 
     def StreamLogs(  # pylint: disable=C0103
         self, request: StreamLogsRequest, context: grpc.ServicerContext
@@ -1120,7 +1121,7 @@ def _get_remote_fab(
     fleet_api_type: str | None,
     app_spec: str,
     context: grpc.ServicerContext,
-) -> tuple[bytes, dict[str, str]]:
+) -> tuple[bytes, dict[str, str], str | None]:
     """Get remote FAB from Flower Hub."""
     if fleet_api_type == TRANSPORT_TYPE_GRPC_ADAPTER:
         context.abort(
@@ -1141,7 +1142,7 @@ def _get_remote_fab(
     # Request download link and verification information
     url = f"{PLATFORM_API_URL}/hub/fetch-fab"
     try:
-        presigned_url, verifications, _ = request_download_link(
+        presigned_url, verifications, note = request_download_link(
             app_id, app_version, url, "fab_url"
         )
     except ValueError as e:
@@ -1167,4 +1168,4 @@ def _get_remote_fab(
             f"FAB download failed: {str(e)}",
         )
     fab_file = r.content
-    return fab_file, verification_dict
+    return fab_file, verification_dict, note
