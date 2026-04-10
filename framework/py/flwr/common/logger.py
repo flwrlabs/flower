@@ -441,7 +441,7 @@ def stop_log_uploader(
 ) -> None:
     """Stop the log uploader thread."""
     log_queue.put(None)
-    log_uploader.join()
+    log_uploader.join(timeout=0)
 
 
 def _remove_emojis(text: str) -> str:
