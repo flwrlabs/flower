@@ -104,9 +104,6 @@ def run(
 ) -> None:
     """Run Flower App."""
     with cli_output_handler(output_format=output_format) as is_json:
-        # Read superlink connection configuration
-        superlink_connection = read_superlink_connection(superlink)
-
         # Determine if app is remote
         app_spec = None
         config: dict[str, Any] = {}
@@ -135,6 +132,9 @@ def run(
                     fg=typer.colors.YELLOW,
                     bold=True,
                 )
+
+        # Read superlink connection configuration
+        superlink_connection = read_superlink_connection(superlink)
 
         _run_with_control_api(
             app_path,
