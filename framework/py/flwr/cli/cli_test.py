@@ -15,6 +15,7 @@
 """Tests for the CLI."""
 
 
+import importlib
 import inspect
 from types import SimpleNamespace
 from typing import Annotated, Any, get_args, get_origin
@@ -27,7 +28,9 @@ from flwr.supercore.version import package_version
 
 from . import app as app_module
 from .app import app
-from .run.run import run as run_command
+
+run_module = importlib.import_module("flwr.cli.run.run")
+run_command = run_module.run
 
 runner = CliRunner()
 
@@ -82,8 +85,8 @@ def test_run_command_accepts_remote_app_spec() -> None:
 
     with (
         patch("flwr.cli.app.warn_if_flwr_update_available"),
-        patch("flwr.cli.run.run.read_superlink_connection") as mock_read_connection,
-        patch("flwr.cli.run.run._run_with_control_api") as mock_run_with_control_api,
+        patch.object(run_module, "read_superlink_connection") as mock_read_connection,
+        patch.object(run_module, "_run_with_control_api") as mock_run_with_control_api,
     ):
         mock_read_connection.return_value = SimpleNamespace(federation=None)
 
