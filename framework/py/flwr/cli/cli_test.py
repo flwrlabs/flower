@@ -15,8 +15,9 @@
 """Tests for the CLI."""
 
 
+import inspect
 from types import SimpleNamespace
-from typing import Any
+from typing import Annotated, Any, get_args, get_origin
 from unittest.mock import patch
 
 import pytest
@@ -26,6 +27,7 @@ from flwr.supercore.version import package_version
 
 from . import app as app_module
 from .app import app
+from .run.run import run as run_command
 
 runner = CliRunner()
 
@@ -74,6 +76,10 @@ def test_run_command() -> None:
 
 def test_run_command_accepts_remote_app_spec() -> None:
     """Remote app specs should stay as raw strings instead of path-normalized values."""
+    app_annotation = inspect.signature(run_command).parameters["app"].annotation
+    assert get_origin(app_annotation) is Annotated
+    assert get_args(app_annotation)[0] is str
+
     with (
         patch("flwr.cli.app.warn_if_flwr_update_available"),
         patch("flwr.cli.run.run.read_superlink_connection") as mock_read_connection,
