@@ -19,7 +19,7 @@ This guide describes how to establish secure TLS Superlink ↔ SuperNodes as wel
 .. tip::
 
     Checkout the `Flower Authentication
-    <https://github.com/adap/flower/tree/main/examples/supernode-authentication>`_
+    <https://github.com/flwrlabs/flower/tree/main/examples/supernode-authentication>`_
     example for a complete self-contained example on how to setup TLS and (optionally)
     node authentication. Check out the :doc:`how-to-authenticate-supernodes` guide to
     learn more about adding an authentication layer to SuperLink ↔ SuperNode
@@ -139,6 +139,13 @@ Now, you can run the example by executing ``flwr run``:
 .. code-block:: bash
 
     $ flwr run . local-deployment --stream
+
+.. tip::
+
+    You can setup your ``local-deployment`` profile as the default so you don't have to
+    specify it in every Flower CLI command that needs to connect to the SuperLink. For
+    that and more details about the Flower configuration, refer to the :doc:`the Flower
+    Configuration <ref-flower-configuration>` guide.
 
 ************
  Conclusion

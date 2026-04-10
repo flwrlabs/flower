@@ -1,6 +1,6 @@
-:og:description: Guide to manage Flower federations using the Deployment Engine.
+:og:description: Guide to manage Flower federations using the Deployment Runtime.
 .. meta::
-    :description: Guide to manage Flower federations using the Deployment Engine.
+    :description: Guide to manage Flower federations using the Deployment Runtime.
 
 .. |flower_cli_federation_link| replace:: ``Flower CLI``
 
@@ -49,11 +49,11 @@ In this case there is only one federation named ``default`` under the account ``
 .. code-block:: shell
 
     📄 Listing federations...
-    ┏━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-    ┃  Federation   ┃                    Description                     ┃
-    ┡━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-    │ @none/default │ A federation for testing and development purposes. │
-    └───────────────┴────────────────────────────────────────────────────┘
+    ┏━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┓
+    ┃  Federation   ┃                    Description                     ┃  Runtime   ┃ Status ┃
+    ┡━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━┩
+    │ @none/default │ A federation for testing and development purposes. │ deployment │ active │
+    └───────────────┴────────────────────────────────────────────────────┴────────────┴────────┘
 
 **********************
  Inspect a Federation

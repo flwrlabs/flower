@@ -16,9 +16,11 @@
 
 
 import argparse
+from dataclasses import replace
 from logging import DEBUG, ERROR, INFO
 from queue import Queue
 
+from flwr.app import RecordDict
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
@@ -28,10 +30,10 @@ from flwr.common.config import (
     get_fused_config_from_dir,
     get_project_config,
     get_project_dir,
-    unflatten_dict,
 )
 from flwr.common.constant import (
-    SIMULATIONIO_API_DEFAULT_CLIENT_ADDRESS,
+    RUNTIME_DEPENDENCY_INSTALL,
+    SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
     ExecPluginType,
     Status,
     SubStatus,
@@ -45,7 +47,6 @@ from flwr.common.logger import (
     stop_log_uploader,
 )
 from flwr.common.serde import (
-    config_record_from_proto,
     context_from_proto,
     context_to_proto,
     fab_from_proto,
@@ -58,19 +59,54 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppInputsResponse,
     PushAppOutputsRequest,
 )
-from flwr.proto.run_pb2 import (  # pylint: disable=E0611
-    GetFederationOptionsRequest,
-    GetFederationOptionsResponse,
-    UpdateRunStatusRequest,
-)
-from flwr.proto.simulationio_pb2_grpc import SimulationIoStub
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.proto.run_pb2 import UpdateRunStatusRequest  # pylint: disable=E0611
+from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
 from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
 from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.constant import NOOP_FEDERATION
 from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
-from flwr.supercore.superexec.plugin import SimulationExecPlugin
+from flwr.supercore.superexec.dependency_installer import (
+    cleanup_app_runtime_environment,
+    install_app_dependencies,
+)
+from flwr.supercore.superexec.plugin import ServerAppExecPlugin
 from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning
+
+
+def _run_simulation_settings(
+    sim_cfg: SimulationConfig,
+) -> tuple[int, str, BackendConfig, bool, bool]:
+    """Extract simulation runtime settings from a run."""
+    if sim_cfg is None or not sim_cfg.HasField("num_supernodes"):
+        raise ValueError(
+            "Simulation run expects `run.federation_config.num_supernodes` to be set."
+        )
+
+    backend_name = sim_cfg.backend if sim_cfg.HasField("backend") else "ray"
+    backend_config: BackendConfig = {"client_resources": {}, "init_args": {}}
+
+    if sim_cfg.HasField("client_resources_num_cpus"):
+        backend_config["client_resources"][
+            "num_cpus"
+        ] = sim_cfg.client_resources_num_cpus
+    if sim_cfg.HasField("client_resources_num_gpus"):
+        backend_config["client_resources"][
+            "num_gpus"
+        ] = sim_cfg.client_resources_num_gpus
+    if sim_cfg.HasField("init_args_num_cpus"):
+        backend_config["init_args"]["num_cpus"] = sim_cfg.init_args_num_cpus
+    if sim_cfg.HasField("init_args_num_gpus"):
+        backend_config["init_args"]["num_gpus"] = sim_cfg.init_args_num_gpus
+    if sim_cfg.HasField("init_args_logging_level"):
+        backend_config["init_args"]["logging_level"] = sim_cfg.init_args_logging_level
+    if sim_cfg.HasField("init_args_log_to_driver"):
+        backend_config["init_args"]["log_to_driver"] = sim_cfg.init_args_log_to_driver
+
+    verbose = sim_cfg.verbose if sim_cfg.HasField("verbose") else False
+    return sim_cfg.num_supernodes, backend_name, backend_config, verbose, False
 
 
 def flwr_simulation() -> None:
@@ -91,28 +127,29 @@ def flwr_simulation() -> None:
     if args.token is None:
         run_with_deprecation_warning(
             cmd="flwr-simulation",
-            plugin_type=ExecPluginType.SIMULATION,
-            plugin_class=SimulationExecPlugin,
-            stub_class=SimulationIoStub,
-            appio_api_address=args.simulationio_api_address,
+            plugin_type=ExecPluginType.SERVER_APP,
+            plugin_class=ServerAppExecPlugin,
+            stub_class=ServerAppIoStub,
+            appio_api_address=args.serverappio_api_address,
             parent_pid=args.parent_pid,
             warn_run_once=args.run_once,
+            runtime_dependency_install=args.runtime_dependency_install,
         )
         return
 
     log(INFO, "Starting Flower Simulation")
     log(
         DEBUG,
-        "Starting isolated `Simulation` connected to SuperLink SimulationAppIo API "
-        "at %s",
-        args.simulationio_api_address,
+        "Starting isolated `Simulation` connected to SuperLink ServerAppIo API at %s",
+        args.serverappio_api_address,
     )
     run_simulation_process(
-        simulationio_api_address=args.simulationio_api_address,
+        serverappio_api_address=args.serverappio_api_address,
         log_queue=log_queue,
         token=args.token,
         certificates=None,
         parent_pid=args.parent_pid,
+        runtime_dependency_install=args.runtime_dependency_install,
     )
 
     # Restore stdout/stderr
@@ -120,11 +157,12 @@ def flwr_simulation() -> None:
 
 
 def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
-    simulationio_api_address: str,
+    serverappio_api_address: str,
     log_queue: Queue[str | None],
     token: str,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
+    runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
     """Run Flower Simulation process."""
     # Start monitoring the parent process if a PID is provided
@@ -132,15 +170,19 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         start_parent_process_monitor(parent_pid)
 
     conn = SimulationIoConnection(
-        simulationio_service_address=simulationio_api_address,
+        serverappio_api_address=serverappio_api_address,
         root_certificates=certificates,
+        token=token,
     )
 
     # Initialize variables for finally block
     log_uploader = None
+    run_id_hash = None
     heartbeat_sender = None
     run = None
     run_status = None
+    run_id_hash = None
+    runtime_env_dir = None
     exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
@@ -150,7 +192,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
         # Stop log uploader for this run and upload final logs
         if log_uploader:
-            stop_log_uploader(log_queue, log_uploader)
+            stop_log_uploader(log_queue)
 
         # Update run status
         if run and run_status:
@@ -158,6 +200,8 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             conn._stub.UpdateRunStatus(
                 UpdateRunStatusRequest(run_id=run.run_id, run_status=run_status_proto)
             )
+
+        cleanup_app_runtime_environment(runtime_env_dir)
 
     register_signal_handlers(
         event_type=EventType.FLWR_SIMULATION_RUN_LEAVE,
@@ -187,6 +231,26 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         fab_id, fab_version = get_fab_metadata(fab.content)
 
         app_path = get_project_dir(fab_id, fab_version, fab.hash_str)
+
+        if runtime_dependency_install:
+            log(DEBUG, "Simulation process starts app dependency installation.")
+            runtime_env_dir = install_app_dependencies(
+                app_path,
+                launch_id=token,
+                run_id=run.run_id,
+                index_context={
+                    "component": "simulation",
+                    "project_dir": str(app_path),
+                    "run_id": run.run_id,
+                    "launch_id": token,
+                    "fab_id": run.fab_id,
+                    "fab_version": run.fab_version,
+                    "fab_hash": fab.hash_str,
+                },
+            )
+        else:
+            log(DEBUG, "Simulation runtime dependency installation is disabled.")
+
         config = get_project_config(app_path)
 
         # Get ClientApp and SeverApp components
@@ -211,23 +275,13 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             app_path,
         )
 
-        # Pull Federation Options
-        fed_opt_res: GetFederationOptionsResponse = conn._stub.GetFederationOptions(
-            GetFederationOptionsRequest(run_id=run.run_id)
-        )
-        federation_options = config_record_from_proto(fed_opt_res.federation_options)
-
-        # Unflatten underlying dict
-        fed_opt = unflatten_dict({**federation_options})
-
-        # Extract configs values of interest
-        num_supernodes = fed_opt.get("num-supernodes")
-        if num_supernodes is None:
-            raise ValueError("Federation options expects `num-supernodes` to be set.")
-        backend_name: str = fed_opt.get("backend", {}).get("name", "ray")
-        backend_config: BackendConfig = fed_opt.get("backend", {})
-        verbose: bool = fed_opt.get("verbose", False)
-        enable_tf_gpu_growth: bool = fed_opt.get("enable_tf_gpu_growth", False)
+        (
+            num_supernodes,
+            backend_name,
+            backend_config,
+            verbose,
+            enable_tf_gpu_growth,
+        ) = _run_simulation_settings(res.federation_config)
 
         run_id_hash = get_sha256_hash(run.run_id)
         event(
@@ -253,7 +307,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             backend_name=backend_name,
             backend_config=backend_config,
             app_dir=str(app_path),
-            run=run,
+            run=replace(run, federation=NOOP_FEDERATION),
             enable_tf_gpu_growth=enable_tf_gpu_growth,
             verbose_logging=verbose,
             server_app_context=context,
@@ -262,6 +316,8 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         )
 
         # Send resulting context
+        # Temporarily disable pushing resulting context to SuperLink
+        updated_context.state = RecordDict()
         context_proto = context_to_proto(updated_context)
         out_req = PushAppOutputsRequest(
             token=token, run_id=run.run_id, context=context_proto
@@ -294,11 +350,14 @@ def _parse_args_run_flwr_simulation() -> argparse.ArgumentParser:
         description="Run a Flower Simulation",
     )
     parser.add_argument(
+        "--serverappio-api-address",
         "--simulationio-api-address",
-        default=SIMULATIONIO_API_DEFAULT_CLIENT_ADDRESS,
+        dest="serverappio_api_address",
+        default=SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
         type=str,
-        help="Address of SuperLink's SimulationIO API (IPv4, IPv6, or a domain name)."
-        f"By default, it is set to {SIMULATIONIO_API_DEFAULT_CLIENT_ADDRESS}.",
+        help="Address of SuperLink's ServerAppIo API (IPv4, IPv6, or a domain name). "
+        "`--simulationio-api-address` is accepted as a deprecated alias. "
+        f"By default, it is set to {SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS}.",
     )
     add_args_flwr_app_common(parser=parser)
     return parser

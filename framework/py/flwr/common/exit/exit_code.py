@@ -50,6 +50,7 @@ class ExitCode:
 
     # SuperExec-specific exit codes (400-499)
     SUPEREXEC_INVALID_PLUGIN_CONFIG = 400
+    SUPEREXEC_AUTH_SECRET_LOAD_FAILED = 401
 
     # FlowerCLI-specific exit codes (500-599)
     FLWRCLI_NODE_AUTH_PUBLIC_KEY_INVALID = 500
@@ -61,6 +62,7 @@ class ExitCode:
 
     # Simulation exit codes (700-799)
     SIMULATION_EXCEPTION = 700
+    SIMULATION_MISSING_EXTRA = 701
 
     def __new__(cls) -> ExitCode:
         """Prevent instantiation."""
@@ -140,6 +142,9 @@ EXIT_CODE_HELP = {
     ExitCode.SUPEREXEC_INVALID_PLUGIN_CONFIG: (
         "The YAML configuration for the SuperExec plugin is invalid."
     ),
+    ExitCode.SUPEREXEC_AUTH_SECRET_LOAD_FAILED: (
+        "Failed to load the SuperExec authentication secret."
+    ),
     # FlowerCLI-specific exit codes (500-599)
     ExitCode.FLWRCLI_NODE_AUTH_PUBLIC_KEY_INVALID: (
         "Node authentication requires a valid elliptic curve public key in the "
@@ -163,4 +168,11 @@ To use the REST API, install `flwr` with the `rest` extra:
     ExitCode.SIMULATION_EXCEPTION: (
         "An unhandled exception occurred when running the simulation."
     ),
+    ExitCode.SIMULATION_MISSING_EXTRA: """
+Extra dependencies required for simulation are missing.
+
+To use simulation with the Ray backend, install `flwr` with the `simulation` extra:
+
+    `pip install "flwr[simulation]"`.
+""",
 }

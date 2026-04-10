@@ -198,3 +198,6 @@ pyrightconfig.json
 
 # ruff Python linter
 .ruff_cache/
+
+# pylint cache
+.pylint.d/

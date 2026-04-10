@@ -2,7 +2,7 @@ name: "bootstrap"
 description: "Bootstrap Python environment (install and configure Python version and build tools)"
 inputs:
   python-version:
-    description: "Version range or exact version of Python or PyPy to use, using SemVer's version range syntax."
+    description: "Version range or exact version of Python to use, using SemVer's version range syntax."
     default: 3.10.19
   pip-version:
     description: "Version of pip to be installed using pip"
@@ -26,7 +26,7 @@ inputs:
     default: "true"
 outputs:
   python-version:
-    description: "Version range or exact version of Python or PyPy"
+    description: "Version range or exact version of Python"
     value: ${{ steps.versions.outputs.python-version }}
   pip-version:
     description: "Installed version of pip"

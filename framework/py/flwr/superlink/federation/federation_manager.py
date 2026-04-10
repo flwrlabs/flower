@@ -19,12 +19,16 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from flwr.common.typing import Federation
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Invitation  # pylint: disable=E0611
+from flwr.supercore.constant import ActionType
+from flwr.supercore.typing import ActionContext
 
 if TYPE_CHECKING:
     from flwr.server.superlink.linkstate.linkstate import LinkState
 
 
+# pylint: disable=too-many-public-methods
 class FederationManager(ABC):
     """Abstract base class for FederationManager."""
 
@@ -68,8 +72,59 @@ class FederationManager(ABC):
         """Get details of the federation."""
 
     @abstractmethod
+    def get_simulation_config(self, federation: str) -> SimulationConfig | None:
+        """Get the simulation configuration for a federation. This method is called by
+        the SuperLink only.
+
+        Note that this method will treat non-simulation federations and non-existent
+        federations differently.
+
+        Parameters
+        ----------
+        federation : str
+            The name of the federation.
+
+        Returns
+        -------
+        SimulationConfig | None
+            The simulation configuration stored for the federation. If the federation
+            is not configured for simulation, None is returned.
+
+        Raises
+        ------
+        FlowerError
+            If the federation does not exist.
+        """
+
+    @abstractmethod
+    def set_simulation_config(
+        self, flwr_aid: str, federation: str, config: SimulationConfig
+    ) -> None:
+        """Set the simulation configuration for a federation.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            The ID of the account setting the simulation configuration.
+        federation : str
+            The name of the federation.
+        config : SimulationConfig
+            The simulation configuration to store for the federation.
+
+        Raises
+        ------
+        FlowerError
+            If the federation does not exist, the caller account is not a
+            member, or the federation is not configured for simulation.
+        """
+
+    @abstractmethod
     def create_federation(
-        self, flwr_aid: str, name: str, description: str
+        self,
+        flwr_aid: str,
+        name: str,
+        description: str,
+        simulation: bool | None = None,
     ) -> Federation:
         """Create a new federation.
 
@@ -81,6 +136,9 @@ class FederationManager(ABC):
             The unique name of the federation.
         description : str
             A human-readable description of the federation.
+        simulation : bool | None
+            Whether this federation is intended for simulation. If unset
+            (``None``), the manager assumes a deployment runtime should be used.
 
         Returns
         -------
@@ -126,6 +184,40 @@ class FederationManager(ABC):
             The name of the federation.
         node_id : int
             The ID of the SuperNode to remove.
+        """
+
+    @abstractmethod
+    def remove_account(
+        self, flwr_aid: str, federation: str, target_account_name: str | None
+    ) -> str:
+        """Remove an account from a federation.
+
+        If `target_account_name` is `None` the caller removes themselves
+        (leave). Otherwise only the owner may remove another account. The
+        owner can never be removed. All supernodes owned by the removed
+        account are also soft-removed from the federation.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            The ID of the account initiating the removal (or leaving).
+        federation : str
+            The name of the federation.
+        target_account_name : str | None
+            The name of the account to remove. If `None`, the caller removes
+            themselves from the federation. The owner cannot remove themselves.
+
+        Returns
+        -------
+        str
+            The Flower account ID (`flwr_aid`) of the removed account.
+
+        Raises
+        ------
+        FlowerError
+            If the federation does not exist, the target account is not a
+            member, the owner tries to remove themselves, or a non-owner
+            tries to remove another account.
         """
 
     @abstractmethod
@@ -231,4 +323,33 @@ class FederationManager(ABC):
             for the invitee.
         PermissionError
             If the caller is not an owner of the federation.
+        """
+
+    @abstractmethod
+    def report_run_usage(self) -> None:
+        """Call hook to report usage for runs.
+
+        This method is called on successful run status transition to FINISHED and when
+        runs are marked as failed due to expired tokens.
+        """
+
+    @abstractmethod
+    def can_execute(
+        self, flwr_aid: str, action: ActionType, context: ActionContext
+    ) -> bool:
+        """Check if an account can execute an action under a given context.
+
+        Parameters
+        ----------
+        flwr_aid : str
+            Flower account ID of the subject.
+        action : ActionType
+            The action to authorize.
+        context : ActionContext
+            Action-specific context required for authorization.
+
+        Returns
+        -------
+        bool
+            ``True`` if the action is allowed, otherwise ``False``.
         """

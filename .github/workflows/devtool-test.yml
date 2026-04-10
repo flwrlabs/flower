@@ -1,0 +1,61 @@
+name: Devtool
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "dev/devtool/**"
+      - "dev/pyproject.toml"
+      - "dev/uv.lock"
+      - "dev/test-devtool.sh"
+      - "dev/format-devtool.sh"
+      - ".github/actions/bootstrap/**"
+      - ".github/workflows/devtool-test.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "dev/devtool/**"
+      - "dev/pyproject.toml"
+      - "dev/uv.lock"
+      - "dev/test-devtool.sh"
+      - "dev/format-devtool.sh"
+      - ".github/actions/bootstrap/**"
+      - ".github/workflows/devtool-test.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLWR_TELEMETRY_ENABLED: 0
+  UV_NO_MANAGED_PYTHON: 1
+  UV_PYTHON_DOWNLOADS: never
+
+jobs:
+  lint:
+    runs-on: ubuntu-22.04
+    strategy:
+      max-parallel: 2
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+
+    name: Python ${{ matrix.python }}
+
+    steps:
+      - uses: actions/checkout@v5
+      - name: Bootstrap
+        uses: ./.github/actions/bootstrap
+        with:
+          python-version: ${{ matrix.python }}
+          uv-skip: "false"
+          poetry-skip: "true"
+      - name: Install dependencies
+        run: |
+          cd dev
+          uv sync --frozen
+      - name: Lint and test devtool
+        run: |
+          cd dev
+          uv run ./test-devtool.sh

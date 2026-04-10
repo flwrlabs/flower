@@ -16,7 +16,7 @@
 
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import click
 import typer
@@ -56,7 +56,7 @@ def register(  # pylint: disable=R0914
         typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,

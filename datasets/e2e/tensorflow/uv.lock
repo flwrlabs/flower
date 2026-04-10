@@ -505,13 +505,30 @@ requires-dist = [
     { name = "matplotlib", specifier = ">=3.7.5,<4.0.0" },
     { name = "numpy", specifier = ">=1.26.0,<3.0.0" },
     { name = "pillow", marker = "extra == 'vision'", specifier = ">=12.1.1" },
-    { name = "rich", specifier = ">=13.5.0,<14.0.0" },
+    { name = "rich", specifier = ">=13.5.0" },
     { name = "seaborn", specifier = ">=0.13.0,<0.14.0" },
-    { name = "torch", marker = "python_full_version >= '3.10' and python_full_version < '3.14' and extra == 'audio'", specifier = ">=2.8.0" },
-    { name = "torchcodec", marker = "python_full_version >= '3.10' and python_full_version < '3.14' and extra == 'audio'", specifier = ">=0.7.0" },
+    { name = "torch", marker = "extra == 'audio'", specifier = ">=2.8.0" },
+    { name = "torchcodec", marker = "extra == 'audio'", specifier = ">=0.7.0" },
     { name = "tqdm", specifier = ">=4.66.1,<5.0.0" },
 ]
-provides-extras = ["audio", "vision"]
+provides-extras = ["vision", "audio"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "black", extras = ["jupyter"], specifier = "==25.11.0" },
+    { name = "devtool", editable = "../../../dev" },
+    { name = "docformatter", specifier = "==1.7.5" },
+    { name = "isort", specifier = "==5.13.2" },
+    { name = "mypy", specifier = "==1.8.0" },
+    { name = "parameterized", specifier = "==0.9.0" },
+    { name = "pylint", specifier = "==3.3.1" },
+    { name = "pytest", specifier = "==7.4.4" },
+    { name = "pytest-watcher", specifier = "==0.4.3" },
+    { name = "ruff", specifier = "==0.14.5" },
+    { name = "taplo", specifier = "==0.9.3" },
+    { name = "types-requests", specifier = "==2.31.0.20240125" },
+    { name = "types-setuptools", specifier = "==80.9.0.20250822" },
+]
 
 [[package]]
 name = "fonttools"

@@ -11,7 +11,7 @@ jobs:
   release-nightly:
     runs-on: ubuntu-22.04
     name: Relase nightly on PyPI
-    if: github.repository == 'adap/flower'
+    if: github.repository == 'flwrlabs/flower'
     outputs:
       skip: ${{ steps.release.outputs.skip }}
       pip-version: ${{ steps.release.outputs.pip-version }}
@@ -43,7 +43,7 @@ jobs:
 
   build-docker-base-images:
     name: Build nightly base images
-    if: github.repository == 'adap/flower' && needs.release-nightly.outputs.skip != 'true'
+    if: github.repository == 'flwrlabs/flower' && needs.release-nightly.outputs.skip != 'true'
     uses: ./.github/workflows/_docker-build.yml
     needs: release-nightly
     strategy:
@@ -63,7 +63,7 @@ jobs:
 
   build-docker-binary-images:
     name: Build nightly binary images
-    if: github.repository == 'adap/flower' && needs.release-nightly.outputs.skip != 'true'
+    if: github.repository == 'flwrlabs/flower' && needs.release-nightly.outputs.skip != 'true'
     uses: ./.github/workflows/_docker-build.yml
     needs: [release-nightly, build-docker-base-images]
     strategy:

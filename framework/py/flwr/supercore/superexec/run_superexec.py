@@ -19,6 +19,7 @@ import time
 from logging import WARN
 from typing import Any
 
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
@@ -33,20 +34,26 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
-from flwr.proto.simulationio_pb2_grpc import SimulationIoStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
+from flwr.supercore.interceptors import SuperExecAuthClientInterceptor
+from flwr.supercore.interceptors.superexec_auth_interceptor import (
+    CLIENTAPPIO_SUPEREXEC_METHODS,
+    SERVERAPPIO_SUPEREXEC_METHODS,
+)
 
 from .plugin import ExecPlugin
 
 
 def run_superexec(  # pylint: disable=R0913,R0914,R0917
     plugin_class: type[ExecPlugin],
-    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub] | type[SimulationIoStub],
+    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
     appio_api_address: str,
+    superexec_auth_secret: bytes | None = None,
     plugin_config: dict[str, Any] | None = None,
     parent_pid: int | None = None,
     health_server_address: str | None = None,
+    runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
     """Run Flower SuperExec.
 
@@ -54,10 +61,12 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
     ----------
     plugin_class : type[ExecPlugin]
         The class of the SuperExec plugin to use.
-    stub_class : type[ClientAppIoStub]
+    stub_class : type[ClientAppIoStub] | type[ServerAppIoStub]
         The gRPC stub class for the AppIO API.
     appio_api_address : str
         The address of the AppIO API.
+    superexec_auth_secret : Optional[bytes] (default: None)
+        Secret used to derive an HMAC signing key for SuperExec auth.
     plugin_config : Optional[dict[str, Any]] (default: None)
         The configuration dictionary for the plugin. If `None`, the plugin will use
         its default configuration.
@@ -67,7 +76,22 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
     health_server_address : Optional[str] (default: None)
         The address of the health server. If `None` is provided, the health server will
         NOT be started.
+    runtime_dependency_install : bool (default: False)
+        Whether runtime dependency installation is allowed.
     """
+    interceptors: list[SuperExecAuthClientInterceptor] | None = None
+    if superexec_auth_secret:
+        if stub_class is ServerAppIoStub:
+            protected_methods = SERVERAPPIO_SUPEREXEC_METHODS
+        else:
+            protected_methods = CLIENTAPPIO_SUPEREXEC_METHODS
+        interceptors = [
+            SuperExecAuthClientInterceptor(
+                master_secret=superexec_auth_secret,
+                protected_methods=protected_methods,
+            )
+        ]
+
     # Start monitoring the parent process if a PID is provided
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
@@ -84,6 +108,7 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
         server_address=appio_api_address,
         insecure=True,
         root_certificates=None,
+        interceptors=interceptors,
     )
     channel.subscribe(on_channel_state_change)
 
@@ -108,6 +133,7 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
     plugin = plugin_class(
         appio_api_address=appio_api_address,
         get_run=get_run,
+        runtime_dependency_install=runtime_dependency_install,
     )
 
     # Load plugin configuration from file if provided
@@ -151,10 +177,12 @@ def run_with_deprecation_warning(  # pylint: disable=R0913, R0917
     cmd: str,
     plugin_type: str,
     plugin_class: type[ExecPlugin],
-    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub] | type[SimulationIoStub],
+    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
     appio_api_address: str,
     parent_pid: int | None,
     warn_run_once: bool,
+    superexec_auth_secret: bytes | None = None,
+    runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
     """Log a deprecation warning and run the equivalent `flower-superexec` command.
 
@@ -172,6 +200,8 @@ def run_with_deprecation_warning(  # pylint: disable=R0913, R0917
     new_cmd += f"--appio-api-address {appio_api_address} "
     if parent_pid is not None:
         new_cmd += f"--parent-pid {parent_pid}"
+    if runtime_dependency_install:
+        new_cmd += " --allow-runtime-dependency-installation"
     log(WARN, new_cmd)
 
     # Warn about unsupported `--run-once` flag
@@ -182,5 +212,7 @@ def run_with_deprecation_warning(  # pylint: disable=R0913, R0917
         plugin_class=plugin_class,
         stub_class=stub_class,
         appio_api_address=appio_api_address,
+        superexec_auth_secret=superexec_auth_secret,
         parent_pid=parent_pid,
+        runtime_dependency_install=runtime_dependency_install,
     )

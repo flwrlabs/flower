@@ -20,7 +20,13 @@ from __future__ import annotations
 import os
 from enum import Enum
 
-from flwr.common.constant import FLWR_DIR, NOOP_ACCOUNT_NAME
+from flwr.common.constant import (
+    FLWR_DIR,
+    NOOP_ACCOUNT_NAME,
+    SYSTEM_TIME_TOLERANCE,
+    TIMESTAMP_TOLERANCE,
+)
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # Constants for Inflatable
 HEAD_BODY_DIVIDER = b"\x00"
@@ -52,6 +58,15 @@ APP_ID_PATTERN = r"^@[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
 APP_VERSION_PATTERN = r"^\d+\.\d+\.\d+$"
 PLATFORM_API_URL = "https://api.flower.ai/v1"
 
+# Constants for Flower CLI update check
+FLWR_DISABLE_UPDATE_CHECK = "FLWR_DISABLE_UPDATE_CHECK"
+FLWR_UPDATE_CHECK_URL = f"{PLATFORM_API_URL}/update-check/flwr"
+FLWR_UPDATE_CHECK_CONNECT_TIMEOUT_SECONDS = 1
+FLWR_UPDATE_CHECK_READ_TIMEOUT_SECONDS = 2
+FLWR_UPDATE_CHECK_CACHE_DIR = ".cache"
+FLWR_UPDATE_CHECK_CACHE_FILENAME = "update-check.json"
+FLWR_UPDATE_CHECK_SHOW_INTERVAL_SECONDS = 12 * 60 * 60
+
 # SuperGrid constants
 SUPERGRID_ADDRESS = "supergrid.flower.ai"
 
@@ -70,7 +85,7 @@ APP_PUBLISH_INCLUDE_PATTERNS = (
     "/LICENSE",
     "/LICENSE.md",
 )
-APP_PUBLISH_EXCLUDE_PATTERNS = FAB_EXCLUDE_PATTERNS = (
+APP_PUBLISH_EXCLUDE_PATTERNS = (
     f"{FLWR_DIR}/**",  # Exclude the .flwr directory
     "**/__pycache__/**",
 )
@@ -84,16 +99,38 @@ MIME_MAP = {
     ".md": "text/markdown; charset=utf-8",
     ".toml": "application/toml; charset=utf-8",
 }
+MAX_NAME_LENGTH = 32  # max length for app names; also used for federation names
 
 # Constants for federations
 NOOP_FEDERATION = f"@{NOOP_ACCOUNT_NAME}/default"
 NOOP_FEDERATION_DESCRIPTION = "A federation for testing and development purposes."
+DEFAULT_SIMULATION_CONFIG = SimulationConfig(
+    num_supernodes=10,
+    client_resources_num_cpus=2,
+    client_resources_num_gpus=0.0,
+    backend="ray",
+    verbose=False,
+    init_args_num_cpus=None,
+    init_args_num_gpus=None,
+    init_args_logging_level="WARNING",
+    init_args_log_to_driver=True,
+)
 
 # Constants for exit handling
 FORCE_EXIT_TIMEOUT_SECONDS = 5  # Used in `flwr_exit` function
+TELEMETRY_TIMEOUT_SECONDS = 4  # Timeout for sending telemetry events during exit
 
 # Constants for message processing timing
 MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS = 3600
+
+# SuperExec auth constants
+SUPEREXEC_AUTH_TIMESTAMP_HEADER = "flwr-superexec-ts"
+SUPEREXEC_AUTH_NONCE_HEADER = "flwr-superexec-nonce"
+SUPEREXEC_AUTH_BODY_SHA256_HEADER = "flwr-superexec-body-sha256"
+SUPEREXEC_AUTH_SIGNATURE_HEADER = "flwr-superexec-signature"
+SUPEREXEC_AUTH_SECRET_CONTEXT = b"superexec-auth-v1"
+MIN_TIMESTAMP_DIFF_SECONDS = -SYSTEM_TIME_TOLERANCE
+MAX_TIMESTAMP_DIFF_SECONDS = TIMESTAMP_TOLERANCE + SYSTEM_TIME_TOLERANCE
 
 
 # System message type
@@ -132,3 +169,27 @@ class InvitationStatus(str, Enum):
     REJECTED = "rejected"
     REVOKED = "revoked"
     EXPIRED = "expired"
+
+
+class RunType(str, Enum):
+    """Supported run types."""
+
+    SERVER_APP = "serverapp"
+    SIMULATION = "simulation"
+
+
+class RunTime(str, Enum):
+    """Supported runtimes."""
+
+    DEPLOYMENT = "deployment"
+    SIMULATION = "simulation"
+
+
+class ActionType(str, Enum):
+    """Supported control action types."""
+
+    REGISTER_SUPERNODE = "register_supernode"
+    START_RUN = "start_run"
+    CREATE_FEDERATION = "create_federation"
+    CREATE_INVITATION = "create_invitation"
+    ACCEPT_INVITATION = "accept_invitation"

@@ -1,7 +1,7 @@
 How to develop flwr-datasets
 ============================
 
-Flower Datasets uses ``uv`` for development and CI. The commands presented in this guide assume you have cloned the `Flower Github repository <https://github.com/adap/flower>`_.
+Flower Datasets uses ``uv`` for development and CI. The commands presented in this guide assume you have cloned the `Flower GitHub repository <https://github.com/flwrlabs/flower>`_.
 
 
 Setup

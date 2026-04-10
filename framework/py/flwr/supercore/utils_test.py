@@ -22,13 +22,19 @@ import pytest
 import requests
 from parameterized import parameterized
 
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+
 from .utils import (
+    get_metadata_bytes,
+    get_metadata_str,
     humanize_bytes,
     humanize_duration,
     int64_to_uint64,
     mask_string,
     parse_app_spec,
     request_download_link,
+    simulation_config_from_json,
+    simulation_config_to_json,
     uint64_to_int64,
 )
 
@@ -42,6 +48,44 @@ def test_mask_string() -> None:
     assert mask_string("") == ""
     assert mask_string("1234567890", head=2, tail=3) == "12...890"
     assert mask_string("1234567890", head=5, tail=4) == "12345...7890"
+
+
+@pytest.mark.parametrize(
+    ("metadata", "key", "expected"),
+    [
+        ([("x-token", "value")], "x-token", "value"),
+        (
+            [
+                ("x-token", ""),
+            ],
+            "x-token",
+            None,
+        ),
+        ([("x-token", "value"), ("x-token", "other")], "x-token", None),
+        ([("x-token", b"value")], "x-token", None),
+    ],
+)
+def test_get_metadata_str(
+    metadata: list[tuple[str, str | bytes]], key: str, expected: str | None
+) -> None:
+    """Return exactly one non-empty string value of the expected type."""
+    assert get_metadata_str(metadata, key) == expected
+
+
+@pytest.mark.parametrize(
+    ("metadata", "key", "expected"),
+    [
+        ([("x-bin", b"value")], "x-bin", b"value"),
+        ([("x-bin", b"")], "x-bin", None),
+        ([("x-bin", b"value"), ("x-bin", b"other")], "x-bin", None),
+        ([("x-bin", "value")], "x-bin", None),
+    ],
+)
+def test_get_metadata_bytes(
+    metadata: list[tuple[str, str | bytes]], key: str, expected: bytes | None
+) -> None:
+    """Return exactly one non-empty bytes value of the expected type."""
+    assert get_metadata_bytes(metadata, key) == expected
 
 
 @parameterized.expand(  # type: ignore
@@ -261,6 +305,86 @@ def test_request_download_link_all_scenarios(
                 app_id, app_version, in_url, out_url
             )
             assert case["assert"](result), f"Assertion failed for {case['name']}"
+
+
+def test_simulation_config_to_json_includes_unset_optional_fields() -> None:
+    """Serialize simulation config with unset optional fields as null."""
+    config = SimulationConfig(
+        num_supernodes=10,
+        client_resources_num_cpus=2,
+        client_resources_num_gpus=0.25,
+        backend="ray",
+        verbose=True,
+    )
+
+    assert simulation_config_to_json(config) == {
+        "num_supernodes": 10,
+        "client_resources_num_cpus": 2,
+        "client_resources_num_gpus": 0.25,
+        "backend": "ray",
+        "verbose": True,
+        "init_args_num_cpus": None,
+        "init_args_num_gpus": None,
+        "init_args_logging_level": None,
+        "init_args_log_to_driver": None,
+    }
+
+
+def test_simulation_config_from_json_preserves_falsey_optional_values() -> None:
+    """Deserialize optional values without dropping explicit zero/false settings."""
+    payload = {
+        "num_supernodes": 5,
+        "client_resources_num_cpus": 1,
+        "client_resources_num_gpus": 0.0,
+        "backend": "ray",
+        "verbose": False,
+        "init_args_num_cpus": 4,
+        "init_args_num_gpus": 0,
+        "init_args_logging_level": "",
+        "init_args_log_to_driver": False,
+    }
+
+    config = simulation_config_from_json(payload)
+
+    assert config.num_supernodes == 5
+    assert config.client_resources_num_cpus == 1
+    assert config.client_resources_num_gpus == 0.0
+    assert config.backend == "ray"
+    assert not config.verbose
+    assert config.init_args_num_cpus == 4
+    assert config.init_args_num_gpus == 0
+    assert config.init_args_logging_level == ""
+    assert not config.init_args_log_to_driver
+    assert config.HasField("init_args_num_cpus")
+    assert config.HasField("init_args_num_gpus")
+    assert config.HasField("init_args_logging_level")
+    assert config.HasField("init_args_log_to_driver")
+
+
+def test_simulation_config_json_round_trip_preserves_presence() -> None:
+    """Round-trip simulation config JSON without inventing optional fields."""
+    original = SimulationConfig(
+        num_supernodes=12,
+        client_resources_num_cpus=3,
+        client_resources_num_gpus=1.5,
+        backend="ray",
+        verbose=False,
+        init_args_num_gpus=2,
+    )
+
+    restored = simulation_config_from_json(simulation_config_to_json(original))
+
+    assert restored == original
+    assert not restored.HasField("init_args_num_cpus")
+    assert restored.HasField("init_args_num_gpus")
+    assert not restored.HasField("init_args_logging_level")
+    assert not restored.HasField("init_args_log_to_driver")
+
+
+def test_simulation_config_from_json_rejects_unknown_fields() -> None:
+    """Reject unknown JSON keys when deserializing simulation configs."""
+    with pytest.raises(ValueError, match="unknown_field"):
+        simulation_config_from_json({"unknown_field": 1})
 
 
 @parameterized.expand(  # type: ignore

@@ -10,19 +10,15 @@ from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
-    SIMULATIONIO_API_DEFAULT_CLIENT_ADDRESS,
     Status,
     SubStatus,
 )
 
 use_sim = sys.argv[1] == "simulation" if len(sys.argv) > 1 else False
+superlink_connection = "e2e-sim" if use_sim else "e2e"
 plugin_type_arg = "simulation" if use_sim else "serverapp"
-address_arg = (
-    SIMULATIONIO_API_DEFAULT_CLIENT_ADDRESS
-    if use_sim
-    else SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
-)
 app_cmd = "flwr-simulation" if use_sim else "flwr-serverapp"
+SUPEREXEC_AUTH_SECRET_FILE = "_e2e_superexec_secret.bin"
 
 
 def run_superlink() -> subprocess.Popen:
@@ -30,6 +26,7 @@ def run_superlink() -> subprocess.Popen:
     cmd = ["flower-superlink", "--insecure"]
     cmd += ["--database", "tmp.db"]
     cmd += ["--isolation", "process"]
+    cmd += ["--superexec-auth-secret-file", SUPEREXEC_AUTH_SECRET_FILE]
     if use_sim:
         cmd += ["--simulation"]
 
@@ -39,8 +36,9 @@ def run_superlink() -> subprocess.Popen:
 def run_superexec() -> subprocess.Popen:
     """Run the SuperExec."""
     cmd = ["flower-superexec", "--insecure"]
-    cmd += ["--appio-api-address", address_arg]
+    cmd += ["--appio-api-address", SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS]
     cmd += ["--plugin-type", plugin_type_arg]
+    cmd += ["--superexec-auth-secret-file", SUPEREXEC_AUTH_SECRET_FILE]
     return subprocess.Popen(cmd)
 
 
@@ -48,7 +46,7 @@ def flwr_run() -> str:
     """Run the `flwr run` command and return `run_id`."""
     # Run the command
     result = subprocess.run(
-        ["flwr", "run", ".", "e2e", "--format", "json"],
+        ["flwr", "run", ".", superlink_connection, "--format", "json"],
         capture_output=True,
         text=True,
         check=True,
@@ -80,7 +78,7 @@ def flwr_ls(max_retries: int = 5, retry_delay: float = 0.5) -> dict[str, str]:
     last_error: str = ""
     for attempt in range(max_retries):
         result = subprocess.run(
-            ["flwr", "ls", "e2e", "--format", "json"],
+            ["flwr", "ls", superlink_connection, "--format", "json"],
             capture_output=True,
             text=True,
             check=False,
@@ -121,8 +119,8 @@ def main() -> None:
         stderr=subprocess.DEVNULL,
     )
 
-    # Determine if the test is running in simulation mode
-    print(f"Running in {'simulation' if use_sim else 'deployment'} mode.")
+    with open(SUPEREXEC_AUTH_SECRET_FILE, "wb") as secret_file:
+        secret_file.write(b"e2e-superexec-shared-secret")
 
     # Start the SuperLink
     print("Starting SuperLink...")
@@ -207,6 +205,7 @@ def main() -> None:
     superexec_proc.wait()
     superlink_proc.terminate()
     superlink_proc.wait()
+    os.remove(SUPEREXEC_AUTH_SECRET_FILE)
 
 
 if __name__ == "__main__":

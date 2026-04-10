@@ -37,7 +37,7 @@ copyright = f"{datetime.date.today().year} Flower Labs GmbH"
 author = "The Flower Authors"
 
 # The full version, including alpha/beta/rc tags
-release = "1.27.0"
+release = "1.29.0"
 
 
 # -- General configuration ---------------------------------------------------
@@ -83,16 +83,46 @@ redirects = {
 #
 html_theme = "furo"
 html_title = f"Flower Baselines {release}"
-html_logo = "_static/flower-logo.png"
 html_favicon = "_static/favicon.ico"
 html_baseurl = "https://flower.ai/docs/baselines/"
 
 html_theme_options = {
+    "light_logo": "baselines-light-mode.png",
+    "dark_logo": "baselines-dark-mode.png",
+    "light_css_variables": {
+        "color-announcement-background": "#17222d",
+        "color-announcement-text": "#ffffff",
+        # Left sidebar
+        "color-sidebar-link-text": "#5e5e5e",
+        "color-sidebar-link-text--top-level": "#404040",
+        "color-sidebar-item-background--hover": "#e5e5e5",
+        "color-sidebar-search-background": "#f2f2f2",
+        "color-sidebar-search-background--focus": "#e2e2e2",
+        "color-sidebar-background": "#f2f2f2",
+        # Right sidebar (On this page)
+        "color-toc-item-text--active": "#404040",
+    },
+    "dark_css_variables": {
+        "color-announcement-text": "#ffffff",
+        "color-announcement-background": "#17222d",
+        # Left sidebar
+        "color-sidebar-link-text": "#ffffff",
+        "color-sidebar-link-text--top-level": "#ababab",
+        "color-sidebar-item-background--hover": "#222222",
+        "color-sidebar-background": "#161616",
+        "color-sidebar-search-background": "#161616",
+        "color-sidebar-search-background--focus": "#1c1c1c",
+        # Right sidebar (On this page)
+        "color-toc-title-text": "#ffffff",
+        "color-toc-item-text": "#ababab",
+        "color-toc-item-text--hover": "#d2d2d2",
+        "color-toc-item-text--active": "#fff5bf",
+    },
     #
     # Sphinx Book Theme
     #
     # https://sphinx-book-theme.readthedocs.io/en/latest/configure.html
-    # "repository_url": "https://github.com/adap/flower",
+    # "repository_url": "https://github.com/flwrlabs/flower",
     # "repository_branch": "main",
     # "path_to_docs": "doc/source/",
     # "home_page_in_toc": True,
@@ -121,7 +151,7 @@ html_css_files = ["custom.css"]
 nbsphinx_execute = "never"
 
 colab_link = (
-    "https://colab.research.google.com/github/adap/flower/blob/main/"
+    "https://colab.research.google.com/github/flwrlabs/flower/blob/main/"
     "framework/docs/source/{{ env.doc2path(env.docname, base=None) }}"
 )
 _open_in_colab_button = f"""

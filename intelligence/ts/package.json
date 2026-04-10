@@ -15,7 +15,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/adap/flower.git"
+    "url": "git+https://github.com/flwrlabs/flower.git"
   },
   "author": "The Flower Authors <hello@flower.ai>",
   "version": "0.2.6",

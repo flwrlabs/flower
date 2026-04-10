@@ -14,8 +14,10 @@ virtual environment and run everything within a :doc:`virtualenv
 <contributor-how-to-set-up-a-virtual-env>`.
 
 Let's use ``flwr new`` to create a complete Flower+🤗 Hugging Face project. It will
-generate all the files needed to run, by default with the Flower Simulation Engine, a
-federation of 10 nodes using |fedavg|_ The dataset will be partitioned using
+generate all the files needed to run a federation of 10 nodes using |fedavg|_. By
+default, the generated app uses a local simulation profile that ``flwr run`` submits to
+a managed local SuperLink, which then executes the run with the Flower Simulation
+Runtime. The dataset will be partitioned using
 |flowerdatasets|_'s |iidpartitioner|_.
 
 Now that we have a rough idea of what this example is about, let's get started. First,
@@ -24,7 +26,7 @@ install Flower in your new environment:
 .. code-block:: shell
 
     # In a new Python environment
-    $ pip install flwr
+    $ pip install flwr[simulation]
 
 Then, run the command below:
 
@@ -57,30 +59,20 @@ To run the project, do:
 
 .. code-block:: shell
 
-    # Run with default arguments
-    $ flwr run .
+    # Run with default arguments and stream logs
+    $ flwr run . --stream
 
-With default arguments you will see an output like this one:
+Plain ``flwr run .`` submits the run, prints the run ID, and returns without streaming
+logs. For the full local workflow, see :doc:`how-to-run-flower-locally`.
+
+With default arguments you will see streamed output like this:
 
 .. code-block:: shell
 
-    Loading project configuration...
-    Success
+    Starting local SuperLink on 127.0.0.1:39093...
+    Successfully started run 1859953118041441032
     INFO :      Starting FedAvg strategy:
     INFO :          ├── Number of rounds: 3
-    INFO :          ├── ArrayRecord (16.74 MB)
-    INFO :          ├── ConfigRecord (train): (empty!)
-    INFO :          ├── ConfigRecord (evaluate): (empty!)
-    INFO :          ├──> Sampling:
-    INFO :          │       ├──Fraction: train (0.50) | evaluate ( 1.00)
-    INFO :          │       ├──Minimum nodes: train (2) | evaluate (2)
-    INFO :          │       └──Minimum available nodes: 2
-    INFO :          └──> Keys in records:
-    INFO :                  ├── Weighted by: 'num-examples'
-    INFO :                  ├── ArrayRecord key: 'arrays'
-    INFO :                  └── ConfigRecord key: 'config'
-    INFO :
-    INFO :
     INFO :      [ROUND 1/3]
     INFO :      configure_train: Sampled 5 nodes (out of 10)
     INFO :      aggregate_train: Received 5 results and 0 failures
@@ -88,44 +80,14 @@ With default arguments you will see an output like this one:
     INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
     INFO :      aggregate_evaluate: Received 10 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'val_loss': 0.0223, 'val_accuracy': 0.5024}
-    INFO :
     INFO :      [ROUND 2/3]
-    INFO :      configure_train: Sampled 5 nodes (out of 10)
-    INFO :      aggregate_train: Received 5 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'train_loss': 0.7019}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'val_loss': 0.0221, 'val_accuracy': 0.5176}
-    INFO :
+    INFO :      ...
     INFO :      [ROUND 3/3]
-    INFO :      configure_train: Sampled 5 nodes (out of 10)
-    INFO :      aggregate_train: Received 5 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'train_loss': 0.6845}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'val_loss': 0.0221, 'val_accuracy': 0.5042}
-    INFO :
+    INFO :      ...
     INFO :      Strategy execution finished in 151.02s
-    INFO :
     INFO :      Final results:
-    INFO :
-    INFO :          Global Arrays:
-    INFO :                  ArrayRecord (16.737 MB)
-    INFO :
-    INFO :          Aggregated ClientApp-side Train Metrics:
-    INFO :          { 1: {'train_loss': '6.9738e-01'},
-    INFO :            2: {'train_loss': '7.0191e-01'},
-    INFO :            3: {'train_loss': '6.8449e-01'}}
-    INFO :
-    INFO :          Aggregated ClientApp-side Evaluate Metrics:
-    INFO :          { 1: {'val_accuracy': '5.0240e-01', 'val_loss': '2.2265e-02'},
-    INFO :            2: {'val_accuracy': '5.1760e-01', 'val_loss': '2.2134e-02'},
-    INFO :            3: {'val_accuracy': '5.0420e-01', 'val_loss': '2.2124e-02'}}
-    INFO :
     INFO :          ServerApp-side Evaluate Metrics:
     INFO :          {}
-    INFO :
-
     Saving final model to disk...
 
 You can also run the project with GPU as follows:
@@ -133,7 +95,7 @@ You can also run the project with GPU as follows:
 .. code-block:: shell
 
     # Run with default arguments
-    $ flwr run . localhost-gpu
+    $ flwr run . localhost-gpu --stream
 
 This will use the default arguments where each ``ClientApp`` will use 4 CPUs and at most
 4 ``ClientApp``\s will run in a given GPU.
@@ -440,13 +402,13 @@ for an LLM.
 
 .. _flowerdatasets: https://flower.ai/docs/datasets/
 
-.. _flowertune: https://github.com/adap/flower/tree/main/examples/flowertune-llm
+.. _flowertune: https://github.com/flwrlabs/flower/tree/main/examples/flowertune-llm
 
 .. _iidpartitioner: https://flower.ai/docs/datasets/ref-api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner
 
 .. _otherpartitioners: https://flower.ai/docs/datasets/ref-api/flwr_datasets.partitioner.html
 
-.. _quickstart_hf_link: https://github.com/adap/flower/tree/main/examples/quickstart-huggingface
+.. _quickstart_hf_link: https://github.com/flwrlabs/flower/tree/main/examples/quickstart-huggingface
 
 .. |arrayrecord_link| replace:: ``ArrayRecord``
 

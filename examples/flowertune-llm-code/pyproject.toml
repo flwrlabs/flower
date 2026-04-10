@@ -9,12 +9,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flowertune-llm-code"
-version = "1.0.2"
+version = "1.2.0"
 description = "Base App for the Code challenge in the FlowerTune LLM Leaderboard"
-license = "Apache-2.0"
+license = {file = "LICENSE"}
 # Dependencies for your Flower App
 dependencies = [
-    "flwr[simulation]>=1.26.1",
+    "flwr[simulation]>=1.28.0",
     "flwr-datasets>=0.6.0",
     "torch==2.9.1",
     "trl==0.8.1",
@@ -35,6 +35,9 @@ publisher = "flwrlabs"
 
 # Point to your ServerApp and ClientApp objects
 # Format: "<module>:<object>"
+fab-format-version = 1
+flwr-version-target = "1.28.0"
+
 [tool.flwr.app.components]
 serverapp = "flowertune_code.server_app:app"
 clientapp = "flowertune_code.client_app:app"
@@ -47,6 +50,7 @@ model.gradient-checkpointing = true
 model.lora.peft-lora-r = 32
 model.lora.peft-lora-alpha = 64
 train.save-every-round = 5
+train.dynamic-data-seed = false
 train.learning-rate-max = 5e-5
 train.learning-rate-min = 1e-6
 train.seq-length = 512

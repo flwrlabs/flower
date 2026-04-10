@@ -18,10 +18,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from flwr.cli.constant import (
-    DEFAULT_SIMULATION_BACKEND_NAME,
-    SuperLinkConnectionTomlKey,
-)
+from flwr.cli.constant import SuperLinkConnectionTomlKey
+from flwr.supercore.constant import DEFAULT_SIMULATION_CONFIG
 from flwr.supercore.utils import check_federation_format
 
 _ERROR_MSG_FMT = "SuperLinkConnection.%s is None"
@@ -49,7 +47,7 @@ class SimulationInitArgs:
     num_cpus: int | None = None
     num_gpus: int | None = None
     logging_level: str | None = None
-    log_to_drive: bool | None = None
+    log_to_driver: bool | None = None
 
     def __post_init__(self) -> None:
         """Validate initialization arguments."""
@@ -59,8 +57,8 @@ class SimulationInitArgs:
             raise ValueError("init-args.num-gpus must be an integer.")
         if self.logging_level is not None and not isinstance(self.logging_level, str):
             raise ValueError("init-args.logging-level must be a string.")
-        if self.log_to_drive is not None and not isinstance(self.log_to_drive, bool):
-            raise ValueError("init-args.log-to-drive must be a boolean.")
+        if self.log_to_driver is not None and not isinstance(self.log_to_driver, bool):
+            raise ValueError("init-args.log-to-driver must be a boolean.")
 
 
 @dataclass
@@ -69,7 +67,7 @@ class SimulationBackendConfig:
 
     client_resources: SimulationClientResources | None = None
     init_args: SimulationInitArgs | None = None
-    name: str = DEFAULT_SIMULATION_BACKEND_NAME
+    name: str = DEFAULT_SIMULATION_CONFIG.backend
 
     def __post_init__(self) -> None:
         """Validate backend configuration."""

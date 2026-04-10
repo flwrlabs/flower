@@ -10,7 +10,6 @@ python -m devtool.init_py_fix py/flwr
 python -m isort --skip py/flwr/proto py
 python -m black -q --exclude py/flwr/proto py
 python -m docformatter -i -r py/flwr -e py/flwr/proto
-python -m docformatter -i -r py/flwr_tool
 python -m ruff check --fix py/flwr
 
 # Protos

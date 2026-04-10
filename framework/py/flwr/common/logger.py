@@ -24,7 +24,8 @@ import threading
 import time
 from io import StringIO
 from logging import ERROR, WARN, LogRecord
-from logging.handlers import HTTPHandler
+from logging.handlers import HTTPHandler, TimedRotatingFileHandler
+from pathlib import Path
 from queue import Empty, Queue
 from typing import TYPE_CHECKING, Any, TextIO
 
@@ -35,7 +36,6 @@ from rich.console import Console
 from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
-from flwr.proto.simulationio_pb2_grpc import SimulationIoStub  # pylint: disable=E0611
 
 from .constant import LOG_UPLOAD_INTERVAL
 
@@ -206,6 +206,48 @@ def configure(
         http_handler.setLevel(logging.DEBUG)
         # Override mapLogRecords as setFormatter has no effect on what is send via http
         FLOWER_LOGGER.addHandler(http_handler)
+
+
+def configure_superlink_log_file(
+    *,
+    filename: str,
+    interval_hours: int,
+    backup_count: int,
+) -> None:
+    """Configure timed file rotation for SuperLink process logs."""
+    path = Path(filename).expanduser().resolve()
+    matching_handlers: list[TimedRotatingFileHandler] = []
+
+    for handler in FLOWER_LOGGER.handlers:
+        if not isinstance(handler, TimedRotatingFileHandler):
+            continue
+        if Path(handler.baseFilename).resolve() != path:
+            continue
+        matching_handlers.append(handler)
+        if handler.interval != interval_hours * 60 * 60:
+            continue
+        if handler.backupCount != backup_count:
+            continue
+        return
+
+    for handler in matching_handlers:
+        FLOWER_LOGGER.removeHandler(handler)
+        handler.close()
+
+    formatter = logging.Formatter(
+        "%(levelname)s %(name)s %(asctime)s | %(filename)s:%(lineno)d | %(message)s"
+    )
+    file_handler = TimedRotatingFileHandler(
+        filename=str(path),
+        when="H",
+        interval=interval_hours,
+        backupCount=backup_count,
+        encoding="utf-8",
+        utc=True,
+    )
+    file_handler.setLevel(console_handler.level)
+    file_handler.setFormatter(formatter)
+    FLOWER_LOGGER.addHandler(file_handler)
 
 
 def warn_preview_feature(name: str) -> None:
@@ -384,7 +426,7 @@ def start_log_uploader(
     log_queue: Queue[str | None],
     node_id: int,
     run_id: int,
-    stub: ServerAppIoStub | SimulationIoStub,
+    stub: ServerAppIoStub,
 ) -> threading.Thread:
     """Start the log uploader thread and return it."""
     thread = threading.Thread(
@@ -394,12 +436,9 @@ def start_log_uploader(
     return thread
 
 
-def stop_log_uploader(
-    log_queue: Queue[str | None], log_uploader: threading.Thread
-) -> None:
+def stop_log_uploader(log_queue: Queue[str | None]) -> None:
     """Stop the log uploader thread."""
     log_queue.put(None)
-    log_uploader.join()
 
 
 def _remove_emojis(text: str) -> str:

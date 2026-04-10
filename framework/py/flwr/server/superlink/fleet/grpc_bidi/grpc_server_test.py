@@ -15,43 +15,44 @@
 """Tests for module server."""
 
 
-import socket
-import subprocess
-from contextlib import closing
-from os.path import abspath, dirname, join
-from pathlib import Path
-from typing import cast
+from datetime import datetime, timedelta, timezone
+
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import NameOID
 
 from flwr.common.grpc import valid_certificates
 from flwr.server.client_manager import SimpleClientManager
 from flwr.server.superlink.fleet.grpc_bidi.grpc_server import start_grpc_server
 
-root_dir = dirname(abspath(join(__file__, "../../../../../../..")))
 
+def _generate_test_certificates() -> tuple[bytes, bytes, bytes]:
+    """Create in-memory test certificates for a TLS-enabled gRPC server."""
+    now = datetime.now(timezone.utc)
 
-def load_certificates() -> tuple[str, str, str]:
-    """Generate and load SSL credentials/certificates.
-
-    Utility function for loading for SSL-enabled gRPC servertests.
-    """
-    # Trigger script which generates the certificates
-    subprocess.run(["bash", "./dev/certificates/generate.sh"], check=True, cwd=root_dir)
-
-    certificates = (
-        join(root_dir, ".cache/certificates/ca.crt"),
-        join(root_dir, ".cache/certificates/server.pem"),
-        join(root_dir, ".cache/certificates/server.key"),
+    server_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    server_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "localhost")])
+    server_cert = (
+        x509.CertificateBuilder()
+        .subject_name(server_name)
+        .issuer_name(server_name)
+        .public_key(server_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(days=1))
+        .not_valid_after(now + timedelta(days=7))
+        .sign(private_key=server_key, algorithm=hashes.SHA256())
     )
 
-    return certificates
-
-
-def unused_tcp_port() -> int:
-    """Return an unused port."""
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-        sock.bind(("", 0))
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        return cast(int, sock.getsockname()[1])
+    return (
+        server_cert.public_bytes(serialization.Encoding.PEM),
+        server_cert.public_bytes(serialization.Encoding.PEM),
+        server_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption(),
+        ),
+    )
 
 
 def test_valid_certificates_when_correct() -> None:
@@ -81,13 +82,10 @@ def test_valid_certificates_when_wrong() -> None:
 def test_integration_start_and_shutdown_insecure_server() -> None:
     """Create server and check if FlowerServiceServicer is returned."""
     # Prepare
-    port = unused_tcp_port()
     client_manager = SimpleClientManager()
 
     # Execute
-    server = start_grpc_server(
-        client_manager=client_manager, server_address=f"[::]:{port}"
-    )
+    server = start_grpc_server(client_manager=client_manager, server_address="[::]:0")
 
     # Teardown
     server.stop(1)
@@ -96,20 +94,15 @@ def test_integration_start_and_shutdown_insecure_server() -> None:
 def test_integration_start_and_shutdown_secure_server() -> None:
     """Create server and check if FlowerServiceServicer is returned."""
     # Prepare
-    port = unused_tcp_port()
     client_manager = SimpleClientManager()
 
-    certificates = load_certificates()
+    certificates = _generate_test_certificates()
 
     # Execute
     server = start_grpc_server(
         client_manager=client_manager,
-        server_address=f"[::]:{port}",
-        certificates=(
-            Path(certificates[0]).read_bytes(),
-            Path(certificates[1]).read_bytes(),
-            Path(certificates[2]).read_bytes(),
-        ),
+        server_address="[::]:0",
+        certificates=certificates,
     )
 
     # Teardown

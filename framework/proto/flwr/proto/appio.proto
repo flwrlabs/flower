@@ -19,6 +19,7 @@ package flwr.proto;
 
 import "flwr/proto/message.proto";
 import "flwr/proto/fab.proto";
+import "flwr/proto/federation_config.proto";
 import "flwr/proto/run.proto";
 
 // These messages are used by both ServerAppIo and ClientAppIo services
@@ -61,6 +62,7 @@ message PullAppInputsResponse {
   Context context = 1;
   Run run = 2;
   Fab fab = 3;
+  SimulationConfig federation_config = 4;
 }
 
 // PushAppInputs messages

@@ -40,7 +40,7 @@ navigate to it and run ``git pull``.
 
 .. code-block:: bash
 
-    git clone https://github.com/adap/flower.git
+    git clone https://github.com/flwrlabs/flower.git
     cd flower/
 
 **********************

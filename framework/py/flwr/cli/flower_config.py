@@ -26,7 +26,6 @@ import typer
 
 from flwr.cli.constant import (
     DEFAULT_FLOWER_CONFIG_TOML,
-    DEFAULT_SIMULATION_BACKEND_NAME,
     FLOWER_CONFIG_FILE,
     SimulationBackendConfigTomlKey,
     SimulationClientResourcesTomlKey,
@@ -42,6 +41,7 @@ from flwr.cli.typing import (
     SuperLinkSimulationOptions,
 )
 from flwr.common.config import flatten_dict
+from flwr.supercore.constant import DEFAULT_SIMULATION_CONFIG
 from flwr.supercore.utils import get_flwr_home
 
 
@@ -80,12 +80,15 @@ def _parse_simulation_options(options: dict[str, Any]) -> SuperLinkSimulationOpt
                 logging_level=init_args_dict.get(
                     SimulationInitArgsTomlKey.LOGGING_LEVEL
                 ),
-                log_to_drive=init_args_dict.get(SimulationInitArgsTomlKey.LOG_TO_DRIVE),
+                log_to_driver=init_args_dict.get(
+                    SimulationInitArgsTomlKey.LOG_TO_DRIVER
+                ),
             )
 
         simulation_backend = SimulationBackendConfig(
             name=backend_dict.get(
-                SimulationBackendConfigTomlKey.NAME, DEFAULT_SIMULATION_BACKEND_NAME
+                SimulationBackendConfigTomlKey.NAME,
+                DEFAULT_SIMULATION_CONFIG.backend,
             ),
             client_resources=client_resources,
             init_args=init_args,
@@ -132,7 +135,7 @@ def _serialize_simulation_options(
                 SimulationInitArgsTomlKey.NUM_CPUS: init_args.num_cpus,
                 SimulationInitArgsTomlKey.NUM_GPUS: init_args.num_gpus,
                 SimulationInitArgsTomlKey.LOGGING_LEVEL: init_args.logging_level,
-                SimulationInitArgsTomlKey.LOG_TO_DRIVE: init_args.log_to_drive,
+                SimulationInitArgsTomlKey.LOG_TO_DRIVER: init_args.log_to_driver,
             }
             # Remove None values
             init_args_dict = {k: v for k, v in init_args_dict.items() if v is not None}

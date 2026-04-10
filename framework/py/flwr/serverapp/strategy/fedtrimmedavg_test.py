@@ -12,21 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""FedMedian tests."""
+"""FedTrimmedAvg tests."""
 
 
 import numpy as np
 
 from flwr.common import ArrayRecord
 
-from .fedmedian import FedMedian
+from .fedtrimmedavg import FedTrimmedAvg
 from .strategy_utils_test import create_mock_reply
 
 
 def test_aggregate_fit() -> None:
-    """Tests if FedMedian is aggregating correctly."""
+    """Tests if FedTrimmedAvg is aggregating correctly."""
     # Prepare
-    strategy = FedMedian()
+    strategy = FedTrimmedAvg(beta=0.25)
     replies = [
         create_mock_reply(ArrayRecord([np.array([0.5, 0.5, 0.5, 0.5])]), 1),
         create_mock_reply(ArrayRecord([np.array([1.0, 0.2, 0.5, 1.0])]), 5),
@@ -42,3 +42,21 @@ def test_aggregate_fit() -> None:
     assert actual_aggregated
     actual = actual_aggregated.to_numpy_ndarrays()[0]
     np.testing.assert_equal(actual, expected)
+
+
+def test_aggregate_fit_with_scalar_weights() -> None:
+    """Tests if FedTrimmedAvg preserves 0-dim arrays."""
+    strategy = FedTrimmedAvg(beta=0.25)
+    replies = [
+        create_mock_reply(ArrayRecord([np.array(0.5)]), 1),
+        create_mock_reply(ArrayRecord([np.array(1.0)]), 1),
+        create_mock_reply(ArrayRecord([np.array(2.0)]), 1),
+        create_mock_reply(ArrayRecord([np.array(100.0)]), 1),
+    ]
+
+    actual_aggregated, _ = strategy.aggregate_train(1, replies)
+
+    assert actual_aggregated
+    actual = actual_aggregated.to_numpy_ndarrays()[0]
+    assert actual.shape == ()
+    np.testing.assert_equal(actual, np.array(1.5))

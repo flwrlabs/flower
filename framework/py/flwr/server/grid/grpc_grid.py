@@ -33,7 +33,7 @@ from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log, warn_deprecated_feature
 from flwr.common.message import make_message, remove_content_from_message
 from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
-from flwr.common.serde import message_to_proto, run_from_proto
+from flwr.common.serde import message_to_proto
 from flwr.common.typing import Run
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppMessagesRequest,
@@ -45,7 +45,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
-from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
@@ -69,6 +68,7 @@ from flwr.supercore.inflatable.inflatable_utils import (
     pull_objects,
     push_objects,
 )
+from flwr.supercore.interceptors import AppIoTokenClientInterceptor
 
 from .grid import Grid
 
@@ -101,7 +101,7 @@ at once, or pull messages individually, for example:
 """
 
 
-class GrpcGrid(Grid):
+class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
     """`GrpcGrid` provides an interface to the ServerAppIo API.
 
     Parameters
@@ -112,6 +112,8 @@ class GrpcGrid(Grid):
         The PEM-encoded root certificates as a byte string.
         If provided, a secure connection using the certificates will be
         established to an SSL-enabled Flower server.
+    token : str
+        Executor token used for ServerAppIo authentication.
     """
 
     _deprecation_warning_logged = False
@@ -120,9 +122,14 @@ class GrpcGrid(Grid):
         self,
         serverappio_service_address: str = SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
         root_certificates: bytes | None = None,
+        *,
+        token: str,
     ) -> None:
+        if token == "":
+            raise ValueError("`token` must be a non-empty string")
         self._addr = serverappio_service_address
         self._cert = root_certificates
+        self._token = token
         self._run: Run | None = None
         self._grpc_stub: ServerAppIoStub | None = None
         self._channel: grpc.Channel | None = None
@@ -147,6 +154,7 @@ class GrpcGrid(Grid):
             server_address=self._addr,
             insecure=(self._cert is None),
             root_certificates=self._cert,
+            interceptors=[AppIoTokenClientInterceptor(token=self._token)],
         )
         self._channel.subscribe(on_channel_state_change)
         self._grpc_stub = ServerAppIoStub(self._channel)
@@ -164,14 +172,12 @@ class GrpcGrid(Grid):
         channel.close()
         log(DEBUG, "[flwr-serverapp] Disconnected")
 
-    def set_run(self, run_id: int) -> None:
+    def set_run(self, run: Run) -> None:
         """Set the run."""
-        # Get the run info
-        req = GetRunRequest(run_id=run_id)
-        res: GetRunResponse = self._stub.GetRun(req)
-        if not res.HasField("run"):
-            raise RuntimeError(f"Cannot find the run with ID: {run_id}")
-        self._run = run_from_proto(res.run)
+        if not isinstance(run, Run):
+            run_type = type(run).__name__
+            raise TypeError(f"`run` must be an instance of Run, got {run_type}")
+        self._run = run
 
     @property
     def run(self) -> Run:

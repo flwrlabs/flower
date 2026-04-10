@@ -2,8 +2,8 @@ name: Label PR Authors (Scheduled)
 
 on:
   schedule:
-    - cron: '0 * * * *'  # every hour
-  workflow_dispatch:     # allow manual run too
+    - cron: "0 * * * *" # every hour
+  workflow_dispatch: # allow manual run too
 
 permissions:
   pull-requests: write
@@ -17,7 +17,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const org = "adap";
+            const org = "flwrlabs";
 
             const prs = await github.rest.pulls.list({
               owner: context.repo.owner,

@@ -22,7 +22,6 @@ import "flwr/proto/log.proto";
 import "flwr/proto/node.proto";
 import "flwr/proto/message.proto";
 import "flwr/proto/run.proto";
-import "flwr/proto/fab.proto";
 import "flwr/proto/appio.proto";
 
 service ServerAppIo {
@@ -70,8 +69,12 @@ service ServerAppIo {
       returns (ConfirmMessageReceivedResponse) {}
 
   /////////////////////////////////////////////////////////////////////////////
-  // Specific endpoints shared by ServerAppIo and SimulationIo
+  // Specific endpoints for ServerAppIo
   /////////////////////////////////////////////////////////////////////////////
+
+  // Get Federation Options (only used by flwr-simulation)
+  rpc GetFederationOptions(GetFederationOptionsRequest)
+      returns (GetFederationOptionsResponse) {}
 
   // Update the status of a given run
   rpc UpdateRunStatus(UpdateRunStatusRequest)
@@ -79,10 +82,6 @@ service ServerAppIo {
 
   // Push ServerApp logs
   rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
-
-  /////////////////////////////////////////////////////////////////////////////
-  // Specific endpoints for ServerAppIo
-  /////////////////////////////////////////////////////////////////////////////
 
   // Create one or more messages
   rpc PushMessages(PushAppMessagesRequest) returns (PushAppMessagesResponse) {}

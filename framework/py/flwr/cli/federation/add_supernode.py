@@ -14,7 +14,7 @@
 # ==============================================================================
 """Flower command line interface `federation add-supernode` command."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
@@ -50,7 +50,7 @@ def add_supernode(
         typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,

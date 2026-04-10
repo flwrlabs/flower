@@ -107,16 +107,22 @@ class ServerAppIoStub:
     ]
     """Confirm Message Received"""
 
+    GetFederationOptions: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.run_pb2.GetFederationOptionsRequest,
+        flwr.proto.run_pb2.GetFederationOptionsResponse,
+    ]
+    """///////////////////////////////////////////////////////////////////////////
+    Specific endpoints for ServerAppIo
+    ///////////////////////////////////////////////////////////////////////////
+
+    Get Federation Options (only used by flwr-simulation)
+    """
+
     UpdateRunStatus: grpc.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.UpdateRunStatusRequest,
         flwr.proto.run_pb2.UpdateRunStatusResponse,
     ]
-    """///////////////////////////////////////////////////////////////////////////
-    Specific endpoints shared by ServerAppIo and SimulationIo
-    ///////////////////////////////////////////////////////////////////////////
-
-    Update the status of a given run
-    """
+    """Update the status of a given run"""
 
     PushLogs: grpc.UnaryUnaryMultiCallable[
         flwr.proto.log_pb2.PushLogsRequest,
@@ -128,12 +134,7 @@ class ServerAppIoStub:
         flwr.proto.appio_pb2.PushAppMessagesRequest,
         flwr.proto.appio_pb2.PushAppMessagesResponse,
     ]
-    """///////////////////////////////////////////////////////////////////////////
-    Specific endpoints for ServerAppIo
-    ///////////////////////////////////////////////////////////////////////////
-
-    Create one or more messages
-    """
+    """Create one or more messages"""
 
     PullMessages: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullAppMessagesRequest,
@@ -217,16 +218,22 @@ class ServerAppIoAsyncStub:
     ]
     """Confirm Message Received"""
 
+    GetFederationOptions: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.run_pb2.GetFederationOptionsRequest,
+        flwr.proto.run_pb2.GetFederationOptionsResponse,
+    ]
+    """///////////////////////////////////////////////////////////////////////////
+    Specific endpoints for ServerAppIo
+    ///////////////////////////////////////////////////////////////////////////
+
+    Get Federation Options (only used by flwr-simulation)
+    """
+
     UpdateRunStatus: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.UpdateRunStatusRequest,
         flwr.proto.run_pb2.UpdateRunStatusResponse,
     ]
-    """///////////////////////////////////////////////////////////////////////////
-    Specific endpoints shared by ServerAppIo and SimulationIo
-    ///////////////////////////////////////////////////////////////////////////
-
-    Update the status of a given run
-    """
+    """Update the status of a given run"""
 
     PushLogs: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.log_pb2.PushLogsRequest,
@@ -238,12 +245,7 @@ class ServerAppIoAsyncStub:
         flwr.proto.appio_pb2.PushAppMessagesRequest,
         flwr.proto.appio_pb2.PushAppMessagesResponse,
     ]
-    """///////////////////////////////////////////////////////////////////////////
-    Specific endpoints for ServerAppIo
-    ///////////////////////////////////////////////////////////////////////////
-
-    Create one or more messages
-    """
+    """Create one or more messages"""
 
     PullMessages: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullAppMessagesRequest,
@@ -346,17 +348,25 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         """Confirm Message Received"""
 
     @abc.abstractmethod
+    def GetFederationOptions(
+        self,
+        request: flwr.proto.run_pb2.GetFederationOptionsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.run_pb2.GetFederationOptionsResponse, collections.abc.Awaitable[flwr.proto.run_pb2.GetFederationOptionsResponse]]:
+        """///////////////////////////////////////////////////////////////////////////
+        Specific endpoints for ServerAppIo
+        ///////////////////////////////////////////////////////////////////////////
+
+        Get Federation Options (only used by flwr-simulation)
+        """
+
+    @abc.abstractmethod
     def UpdateRunStatus(
         self,
         request: flwr.proto.run_pb2.UpdateRunStatusRequest,
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.run_pb2.UpdateRunStatusResponse, collections.abc.Awaitable[flwr.proto.run_pb2.UpdateRunStatusResponse]]:
-        """///////////////////////////////////////////////////////////////////////////
-        Specific endpoints shared by ServerAppIo and SimulationIo
-        ///////////////////////////////////////////////////////////////////////////
-
-        Update the status of a given run
-        """
+        """Update the status of a given run"""
 
     @abc.abstractmethod
     def PushLogs(
@@ -372,12 +382,7 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         request: flwr.proto.appio_pb2.PushAppMessagesRequest,
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.appio_pb2.PushAppMessagesResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushAppMessagesResponse]]:
-        """///////////////////////////////////////////////////////////////////////////
-        Specific endpoints for ServerAppIo
-        ///////////////////////////////////////////////////////////////////////////
-
-        Create one or more messages
-        """
+        """Create one or more messages"""
 
     @abc.abstractmethod
     def PullMessages(

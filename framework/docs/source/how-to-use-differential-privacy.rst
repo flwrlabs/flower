@@ -195,4 +195,4 @@ Local Training using Privacy Engines
 For ensuring data instance-level privacy during local model training on the client side,
 consider leveraging privacy engines such as Opacus. For examples of using Flower with
 these engines, please refer to the Flower examples directory (`Opacus
-<https://github.com/adap/flower/tree/main/examples/opacus>`_).
+<https://github.com/flwrlabs/flower/tree/main/examples/opacus>`_).

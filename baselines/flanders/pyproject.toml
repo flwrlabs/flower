@@ -10,7 +10,7 @@ license = "Apache-2.0"
 authors = ["Edoardo Gabrielli <edoardo.gabrielli@uniroma1.it>"]
 readme = "README.md"
 homepage = "https://flower.dev"
-repository = "https://github.com/adap/flower"
+repository = "https://github.com/flwrlabs/flower"
 documentation = "https://flower.dev"
 classifiers = [
     "Development Status :: 3 - Alpha",

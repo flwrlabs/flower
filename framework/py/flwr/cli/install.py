@@ -30,6 +30,7 @@ from flwr.common.config import get_metadata_from_config
 from flwr.common.constant import APP_DIR, FAB_HASH_TRUNCATION
 from flwr.supercore.utils import get_flwr_home
 
+from .archive_utils import safe_extract_zip
 from .config_utils import load_and_validate
 from .utils import get_sha256_hash
 
@@ -110,8 +111,8 @@ def install_from_fab(
 
     with tempfile.TemporaryDirectory() as tmpdir:
         with zipfile.ZipFile(fab_file_archive, "r") as zipf:
-            zipf.extractall(tmpdir)
             tmpdir_path = Path(tmpdir)
+            safe_extract_zip(zipf, tmpdir_path)
             info_dir = tmpdir_path / ".info"
             if not info_dir.exists():
                 raise click.ClickException("FAB file has incorrect format.")
@@ -203,7 +204,7 @@ def validate_and_install(
             shutil.copy2(item, install_path / item.name)
 
     typer.secho(
-        f"🎊 Successfully installed {project_name} to {install_path}.",
+        f"Successfully installed {project_name} to {install_path}.",
         fg=typer.colors.GREEN,
         bold=True,
     )

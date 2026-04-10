@@ -102,12 +102,12 @@ Here is an example output when a user runs ``flwr run`` (note the ``"action":
     INFO :      ControlServicer.StartRun
     INFO :      [AUDIT] {"timestamp": "2025-07-12T10:24:21Z", "actor": {"actor_id": "...", "description": "...", "ip_address": "..."}, "event": {"action": "ControlServicer.StartRun", "run_id": "...", "fab_hash": "..."}, "status": "completed"}
 
-Here is another example output when a user runs ``flwr ls``:
+Here is another example output when a user runs ``flwr list``:
 
 .. code-block:: shell
 
     INFO :      [AUDIT] {"timestamp": "2025-07-12T10:26:35Z", "actor": {"actor_id": "...", "description": "...", "ip_address": "..."}, "event": {"action": "ControlServicer.ListRuns", "run_id": null, "fab_hash": null}, "status": "started"}
-    INFO :      ControlServicer.List
+    INFO :      ControlServicer.ListRuns
     INFO :      [AUDIT] {"timestamp": "2025-07-12T10:26:35Z", "actor": {"actor_id": "...", "description": "...", "ip_address": "..."}, "event": {"action": "ControlServicer.ListRuns", "run_id": null, "fab_hash": null}, "status": "completed"}
 
 And here is an example when a SuperNode pulls a message from the SuperLink:

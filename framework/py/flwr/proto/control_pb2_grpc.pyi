@@ -129,6 +129,12 @@ class ControlStub:
     ]
     """Remove SuperNode from Federation"""
 
+    RemoveAccountFromFederation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.RemoveAccountFromFederationRequest,
+        flwr.proto.control_pb2.RemoveAccountFromFederationResponse,
+    ]
+    """Remove Account from Federation"""
+
     CreateInvitation: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.CreateInvitationRequest,
         flwr.proto.control_pb2.CreateInvitationResponse,
@@ -158,6 +164,23 @@ class ControlStub:
         flwr.proto.control_pb2.RevokeInvitationResponse,
     ]
     """Revoke Invitation"""
+
+    ConfigureSimulationFederation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ConfigureSimulationFederationRequest,
+        flwr.proto.control_pb2.ConfigureSimulationFederationResponse,
+    ]
+    """Set Simulation Configuration"""
+
+    StreamRunEvents: grpc.UnaryStreamMultiCallable[
+        flwr.proto.control_pb2.StreamRunEventsRequest,
+        flwr.proto.control_pb2.StreamRunEventsResponse,
+    ]
+    """##############
+    Unused for now
+    ##############
+
+    Start run event stream
+    """
 
 class ControlAsyncStub:
     StartRun: grpc.aio.UnaryUnaryMultiCallable[
@@ -256,6 +279,12 @@ class ControlAsyncStub:
     ]
     """Remove SuperNode from Federation"""
 
+    RemoveAccountFromFederation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.RemoveAccountFromFederationRequest,
+        flwr.proto.control_pb2.RemoveAccountFromFederationResponse,
+    ]
+    """Remove Account from Federation"""
+
     CreateInvitation: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.CreateInvitationRequest,
         flwr.proto.control_pb2.CreateInvitationResponse,
@@ -285,6 +314,23 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.RevokeInvitationResponse,
     ]
     """Revoke Invitation"""
+
+    ConfigureSimulationFederation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ConfigureSimulationFederationRequest,
+        flwr.proto.control_pb2.ConfigureSimulationFederationResponse,
+    ]
+    """Set Simulation Configuration"""
+
+    StreamRunEvents: grpc.aio.UnaryStreamMultiCallable[
+        flwr.proto.control_pb2.StreamRunEventsRequest,
+        flwr.proto.control_pb2.StreamRunEventsResponse,
+    ]
+    """##############
+    Unused for now
+    ##############
+
+    Start run event stream
+    """
 
 class ControlServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -416,6 +462,14 @@ class ControlServicer(metaclass=abc.ABCMeta):
         """Remove SuperNode from Federation"""
 
     @abc.abstractmethod
+    def RemoveAccountFromFederation(
+        self,
+        request: flwr.proto.control_pb2.RemoveAccountFromFederationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.RemoveAccountFromFederationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.RemoveAccountFromFederationResponse]]:
+        """Remove Account from Federation"""
+
+    @abc.abstractmethod
     def CreateInvitation(
         self,
         request: flwr.proto.control_pb2.CreateInvitationRequest,
@@ -454,5 +508,26 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.RevokeInvitationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.RevokeInvitationResponse]]:
         """Revoke Invitation"""
+
+    @abc.abstractmethod
+    def ConfigureSimulationFederation(
+        self,
+        request: flwr.proto.control_pb2.ConfigureSimulationFederationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ConfigureSimulationFederationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ConfigureSimulationFederationResponse]]:
+        """Set Simulation Configuration"""
+
+    @abc.abstractmethod
+    def StreamRunEvents(
+        self,
+        request: flwr.proto.control_pb2.StreamRunEventsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[collections.abc.Iterator[flwr.proto.control_pb2.StreamRunEventsResponse], collections.abc.AsyncIterator[flwr.proto.control_pb2.StreamRunEventsResponse]]:
+        """##############
+        Unused for now
+        ##############
+
+        Start run event stream
+        """
 
 def add_ControlServicer_to_server(servicer: ControlServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...
