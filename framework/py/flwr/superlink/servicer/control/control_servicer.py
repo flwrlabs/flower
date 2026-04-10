@@ -27,6 +27,7 @@ from typing import Any, cast
 import grpc
 import requests
 
+from flwr.cli.utils import validate_federation_name
 from flwr.common import Context, RecordDict, now
 from flwr.common.config import (
     flatten_dict,
@@ -109,11 +110,23 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
-from flwr.supercore.constant import NOOP_FEDERATION, PLATFORM_API_URL, RunType
+from flwr.supercore.constant import (
+    NOOP_FEDERATION,
+    PLATFORM_API_URL,
+    ActionType,
+    RunTime,
+    RunType,
+)
 from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
-from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
+from flwr.supercore.typing import (
+    AcceptInvitationContext,
+    CreateFederationContext,
+    CreateInvitationContext,
+    RegisterSupernodeContext,
+    StartRunContext,
+)
 from flwr.supercore.utils import parse_app_spec, request_download_link
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
@@ -128,14 +141,12 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
     def __init__(  # pylint: disable=R0913, R0917
         self,
         linkstate_factory: LinkStateFactory,
-        ffs_factory: FfsFactory,
         objectstore_factory: ObjectStoreFactory,
         authn_plugin: ControlAuthnPlugin,
         artifact_provider: ArtifactProvider | None = None,
         fleet_api_type: str | None = None,
     ) -> None:
         self.linkstate_factory = linkstate_factory
-        self.ffs_factory = ffs_factory
         self.objectstore_factory = objectstore_factory
         self.authn_plugin = authn_plugin
         self.artifact_provider = artifact_provider
@@ -147,7 +158,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         """Create run ID."""
         log(INFO, rpc_name := self.StartRun.__qualname__)
         state = self.linkstate_factory.state()
-        ffs = self.ffs_factory.ffs()
 
         verification_dict: dict[str, str] = {}
         if request.app_spec:
@@ -192,11 +202,24 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             # federation config overrides
             run_type = RunType.SERVER_APP
             resolved_federation_config = None
+            runtime = RunTime.DEPLOYMENT
             if sim_cfg := state.federation_manager.get_simulation_config(federation):
                 run_type = RunType.SIMULATION
+                runtime = RunTime.SIMULATION
                 resolved_federation_config = SimulationConfig()
                 resolved_federation_config.CopyFrom(sim_cfg)
                 resolved_federation_config.MergeFrom(request.override_federation_config)
+
+            if not state.federation_manager.can_execute(
+                flwr_aid,
+                ActionType.START_RUN,
+                StartRunContext(federation_name=federation, runtime=runtime),
+            ):
+                raise FlowerError(
+                    ApiErrorCode.NO_PERMISSIONS,
+                    f"'{ActionType.START_RUN}' action cannot be executed on federation "
+                    f"'{federation}'.",
+                )
 
         try:
             # Validate user config overrides matches keys in run config in FAB
@@ -210,7 +233,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 fab_file,
                 verification_dict,
             )
-            fab_hash = ffs.put(fab.content, fab.verifications)
+            fab_hash = state.store_fab(fab)
 
             if fab_hash != fab.hash_str:
                 raise ValueError(
@@ -261,7 +284,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: StreamLogsRequest, context: grpc.ServicerContext
     ) -> Generator[StreamLogsResponse, Any, None]:
         """Get logs."""
-        log(INFO, "ControlServicer.StreamLogs")
+        log(INFO, rpc_name := self.StreamLogs.__qualname__)
+
+        # Init link state
         state = self.linkstate_factory.state()
 
         # Retrieve run ID and run
@@ -273,9 +298,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
         run = runs[0]
 
-        # Check if `flwr_aid` matches the run's `flwr_aid`
-        flwr_aid = _get_flwr_aid(context)
-        _check_flwr_aid_in_run(flwr_aid=flwr_aid, run=run, context=context)
+        with rpc_error_translator(context, rpc_name):
+            flwr_aid = _get_flwr_aid(context)
+            _validate_federation_membership_in_request(
+                state, flwr_aid, run.federation, context
+            )
 
         after_timestamp = request.after_timestamp + 1e-6
         while context.is_active():
@@ -306,7 +333,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: ListRunsRequest, context: grpc.ServicerContext
     ) -> ListRunsResponse:
         """Handle `flwr ls` command."""
-        log(INFO, "ControlServicer.ListRuns")
+        log(INFO, rpc_name := self.ListRuns.__qualname__)
+
+        # Init link state
         state = self.linkstate_factory.state()
 
         flwr_aid = _get_flwr_aid(context)
@@ -331,8 +360,12 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
                 raise grpc.RpcError()  # This line is unreachable
 
-            # Check if `flwr_aid` matches the run's `flwr_aid`
-            _check_flwr_aid_in_run(flwr_aid=flwr_aid, run=runs[0], context=context)
+            # Check if requester is a member of the federation
+            # that the run belongs to
+            with rpc_error_translator(context, rpc_name):
+                _validate_federation_membership_in_request(
+                    state, flwr_aid, runs[0].federation, context
+                )
 
         # Clear objects of finished runs
         store = self.objectstore_factory.store()
@@ -350,7 +383,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: StopRunRequest, context: grpc.ServicerContext
     ) -> StopRunResponse:
         """Stop a given run ID."""
-        log(INFO, "ControlServicer.StopRun")
+        log(INFO, rpc_name := self.StopRun.__qualname__)
+
+        # Init link state
         state = self.linkstate_factory.state()
 
         # Retrieve run ID and run
@@ -363,9 +398,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             raise grpc.RpcError()  # This line is unreachable
         run = runs[0]
 
-        # Check if `flwr_aid` matches the run's `flwr_aid`
-        flwr_aid = get_current_account_info().flwr_aid
-        _check_flwr_aid_in_run(flwr_aid=flwr_aid, run=run, context=context)
+        with rpc_error_translator(context, rpc_name):
+            flwr_aid = _get_flwr_aid(context)
+            _validate_federation_membership_in_request(
+                state, flwr_aid, run.federation, context
+            )
 
         if run.status.status == Status.FINISHED:
             context.abort(
@@ -497,6 +534,17 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         node_id = 0
 
         flwr_aid = _get_flwr_aid(context)
+        with rpc_error_translator(context, self.RegisterNode.__qualname__):
+            if not state.federation_manager.can_execute(
+                flwr_aid,
+                ActionType.REGISTER_SUPERNODE,
+                RegisterSupernodeContext(),
+            ):
+                raise FlowerError(
+                    ApiErrorCode.NO_PERMISSIONS,
+                    f"'{ActionType.REGISTER_SUPERNODE}' action cannot be executed.",
+                )
+
         # Account name exists if `flwr_aid` exists
         account_name = cast(str, get_current_account_info().account_name)
         try:
@@ -622,6 +670,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             if not request.federation_name:
                 raise FederationNotSpecified()
 
+            # Ensure valid federation name is provided
+            success, err_msg = validate_federation_name(request.federation_name)
+            if not success:
+                context.abort(
+                    grpc.StatusCode.FAILED_PRECONDITION,
+                    f"Invalid federation name: '{request.federation_name}'. {err_msg}",
+                )
+
             # Init link state
             state = self.linkstate_factory.state()
 
@@ -629,11 +685,28 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             account = _get_account(context)
             federation_name = f"@{account.account_name}/{request.federation_name}"
 
+            runtime = RunTime.SIMULATION if request.simulation else RunTime.DEPLOYMENT
+            flwr_aid = cast(str, account.flwr_aid)
+            if not state.federation_manager.can_execute(
+                flwr_aid,
+                ActionType.CREATE_FEDERATION,
+                CreateFederationContext(
+                    federation_name=federation_name,
+                    runtime=runtime,
+                    visibility="private",
+                ),
+            ):
+                raise FlowerError(
+                    ApiErrorCode.NO_PERMISSIONS,
+                    f"'{ActionType.CREATE_FEDERATION}' action cannot be executed with "
+                    f"a '{runtime}' runtime.",
+                )
+
             # Create federation
             federation = state.federation_manager.create_federation(
                 name=federation_name,
                 description=request.description,
-                flwr_aid=cast(str, account.flwr_aid),
+                flwr_aid=flwr_aid,
                 simulation=request.simulation,
             )
 
@@ -762,10 +835,35 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         with rpc_error_translator(context, rpc_name):
+            flwr_aid = _get_flwr_aid(context)
+            federation = request.federation_name
+            invitee_account_name = request.invitee_account_name
+
+            runtime = (
+                RunTime.SIMULATION
+                if state.federation_manager.get_simulation_config(federation)
+                else RunTime.DEPLOYMENT
+            )
+
+            if not state.federation_manager.can_execute(
+                flwr_aid=flwr_aid,
+                action=ActionType.CREATE_INVITATION,
+                context=CreateInvitationContext(
+                    federation_name=federation,
+                    invitee_account_name=invitee_account_name,
+                    runtime=runtime,
+                ),
+            ):
+                raise FlowerError(
+                    ApiErrorCode.NO_PERMISSIONS,
+                    f"'{ActionType.CREATE_INVITATION}' action cannot be executed on "
+                    f"federation '{federation}' for account '{invitee_account_name}'.",
+                )
+
             state.federation_manager.create_invitation(
-                flwr_aid=_get_flwr_aid(context),
-                federation=request.federation_name,
-                invitee_account_name=request.invitee_account_name,
+                flwr_aid=flwr_aid,
+                federation=federation,
+                invitee_account_name=invitee_account_name,
             )
         return CreateInvitationResponse()
 
@@ -795,6 +893,29 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         with rpc_error_translator(context, rpc_name):
+            flwr_aid = _get_flwr_aid(context)
+            federation = request.federation_name
+
+            runtime = (
+                RunTime.SIMULATION
+                if state.federation_manager.get_simulation_config(federation)
+                else RunTime.DEPLOYMENT
+            )
+
+            if not state.federation_manager.can_execute(
+                flwr_aid=flwr_aid,
+                action=ActionType.ACCEPT_INVITATION,
+                context=AcceptInvitationContext(
+                    federation_name=federation,
+                    runtime=runtime,
+                ),
+            ):
+                raise FlowerError(
+                    ApiErrorCode.NO_PERMISSIONS,
+                    f"'{ActionType.ACCEPT_INVITATION}' action cannot be executed on "
+                    f"federation '{federation}'.",
+                )
+
             state.federation_manager.accept_invitation(
                 flwr_aid=_get_flwr_aid(context),
                 federation=request.federation_name,
@@ -889,9 +1010,25 @@ def _validate_federation_and_node_in_request(
     node_id: int,
     context: grpc.ServicerContext,
 ) -> None:
-    """Validate federation membership and node ID presence for adding/removing a
-    supernode to/from a federation."""
-    # Check that a federation is specified
+    """Validate federation membership and node ownership for federation updates."""
+    _validate_federation_membership_in_request(
+        state, flwr_aid, federation_name, context
+    )
+    nodes_info = state.get_node_info(node_ids=[node_id])
+    if not nodes_info or nodes_info[0].owner_aid != flwr_aid:
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Node {node_id} not found or you are not its owner.",
+        )
+
+
+def _validate_federation_membership_in_request(
+    state: LinkState,
+    flwr_aid: str,
+    federation_name: str,
+    context: grpc.ServicerContext,
+) -> None:
+    """Validate that a federation exists and the requester is one of its members."""
     if not federation_name:
         raise FederationNotSpecified()
 
@@ -907,16 +1044,6 @@ def _validate_federation_and_node_in_request(
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             FEDERATION_NOT_FOUND_MESSAGE % federation_name,
-        )
-
-    # Ensure the requester owns the specified node
-    # A node that does not exist or is not owned by the requester is
-    # treated the same way.
-    nodes_info = state.get_node_info(node_ids=[node_id])
-    if not nodes_info or nodes_info[0].owner_aid != flwr_aid:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Node {node_id} not found or you are not its owner.",
         )
 
 

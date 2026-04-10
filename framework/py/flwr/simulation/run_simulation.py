@@ -335,7 +335,6 @@ def _main_loop(
             },
         )
         if serverapp_th:
-            serverapp_th.join()
             if server_app_thread_has_exception.is_set():
                 raise RuntimeError("Exception in ServerApp thread")
 

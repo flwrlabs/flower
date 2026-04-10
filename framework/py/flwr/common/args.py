@@ -21,8 +21,20 @@ from logging import DEBUG, ERROR, INFO, WARN
 from os.path import isfile
 from pathlib import Path
 
-from flwr.common.constant import TRANSPORT_TYPE_REST
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, TRANSPORT_TYPE_REST
 from flwr.common.logger import log
+
+
+def add_args_runtime_dependency_install(parser: argparse.ArgumentParser) -> None:
+    """Add arguments controlling runtime dependency installation."""
+    parser.add_argument(
+        "--allow-runtime-dependency-installation",
+        action="store_true",
+        dest="runtime_dependency_install",
+        default=RUNTIME_DEPENDENCY_INSTALL,
+        help="Allow runtime installation of app dependencies via `uv sync`. "
+        "By default, runtime dependency installation is disabled.",
+    )
 
 
 def add_args_flwr_app_common(parser: argparse.ArgumentParser) -> None:
@@ -53,6 +65,7 @@ def add_args_flwr_app_common(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="This flag is deprecated and will be removed in a future release.",
     )
+    add_args_runtime_dependency_install(parser)
 
 
 def try_obtain_root_certificates(

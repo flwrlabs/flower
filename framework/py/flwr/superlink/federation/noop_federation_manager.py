@@ -29,8 +29,10 @@ from flwr.supercore.constant import (
     DEFAULT_SIMULATION_CONFIG,
     NOOP_FEDERATION,
     NOOP_FEDERATION_DESCRIPTION,
+    ActionType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.typing import ActionContext
 
 from .federation_manager import FederationManager
 
@@ -215,3 +217,17 @@ class NoOpFederationManager(FederationManager):
         raise UnsupportedError(
             "`revoke_invitation` is not supported by NoOpFederationManager."
         )
+
+    def report_run_usage(self) -> None:
+        """Call hook to report usage for runs.
+
+        This method is called on successful run status transition to FINISHED and when
+        runs are marked as failed due to expired tokens.
+        """
+
+    def can_execute(
+        self, flwr_aid: str, action: ActionType, context: ActionContext
+    ) -> bool:
+        """Check if an account can execute an action under a given context."""
+        _ = (flwr_aid, action, context)
+        return True

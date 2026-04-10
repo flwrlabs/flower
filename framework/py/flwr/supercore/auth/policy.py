@@ -37,7 +37,7 @@ class MethodTokenPolicy:
         return MethodTokenPolicy(requires_token=True)
 
 
-# In a follow-up PR, create this explicit map using a shared builder.
+# In a follow-up PR, create explicit method maps using a shared builder.
 SERVERAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ServerAppIo/ListAppsToLaunch": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ServerAppIo/RequestToken": MethodTokenPolicy.no_auth(),
@@ -55,4 +55,19 @@ SERVERAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ServerAppIo/PushMessages": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PullMessages": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/GetNodes": MethodTokenPolicy.token_required(),
+}
+
+CLIENTAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
+    "/flwr.proto.ClientAppIo/ListAppsToLaunch": MethodTokenPolicy.no_auth(),
+    "/flwr.proto.ClientAppIo/RequestToken": MethodTokenPolicy.no_auth(),
+    "/flwr.proto.ClientAppIo/GetRun": MethodTokenPolicy.no_auth(),
+    "/flwr.proto.ClientAppIo/SendAppHeartbeat": MethodTokenPolicy.token_required(),
+    "/flwr.proto.ClientAppIo/PullAppInputs": MethodTokenPolicy.token_required(),
+    "/flwr.proto.ClientAppIo/PushAppOutputs": MethodTokenPolicy.token_required(),
+    "/flwr.proto.ClientAppIo/PushObject": MethodTokenPolicy.token_required(),
+    "/flwr.proto.ClientAppIo/PullObject": MethodTokenPolicy.token_required(),
+    # pylint: disable-next=line-too-long
+    "/flwr.proto.ClientAppIo/ConfirmMessageReceived": MethodTokenPolicy.token_required(),  # noqa: E501
+    "/flwr.proto.ClientAppIo/PushMessage": MethodTokenPolicy.token_required(),
+    "/flwr.proto.ClientAppIo/PullMessage": MethodTokenPolicy.token_required(),
 }

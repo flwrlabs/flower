@@ -37,7 +37,6 @@ SERVERAPPIO_PORT = "9091"
 FLEETAPI_GRPC_RERE_PORT = "9092"
 FLEETAPI_PORT = "9095"
 CONTROL_API_PORT = "9093"
-SIMULATIONIO_PORT = "9096"
 # Octets
 SERVER_OCTET = "0.0.0.0"
 CLIENT_OCTET = "127.0.0.1"
@@ -53,8 +52,6 @@ FLEET_API_GRPC_BIDI_DEFAULT_ADDRESS = (
 )
 FLEET_API_REST_DEFAULT_ADDRESS = f"{SERVER_OCTET}:{FLEETAPI_PORT}"
 CONTROL_API_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{CONTROL_API_PORT}"
-SIMULATIONIO_API_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{SIMULATIONIO_PORT}"
-SIMULATIONIO_API_DEFAULT_CLIENT_ADDRESS = f"{CLIENT_OCTET}:{SIMULATIONIO_PORT}"
 
 # Constants for heartbeat
 HEARTBEAT_DEFAULT_INTERVAL = 30
@@ -138,6 +135,9 @@ MESSAGE_TTL_TOLERANCE = 1e-1
 # Isolation modes
 ISOLATION_MODE_SUBPROCESS = "subprocess"
 ISOLATION_MODE_PROCESS = "process"
+
+# Runtime dependency installation toggle
+RUNTIME_DEPENDENCY_INSTALL = False
 
 # Log streaming configurations
 CONN_REFRESH_PERIOD = 60  # Stream connection refresh period
@@ -306,6 +306,7 @@ class ExecPluginType:
     CLIENT_APP = "clientapp"
     SERVER_APP = "serverapp"
     SIMULATION = "simulation"  # Deprecated
+    SERVER_APP_EPHEMERAL = "serverapp-ephemeral"
 
     def __new__(cls) -> ExecPluginType:
         """Prevent instantiation."""

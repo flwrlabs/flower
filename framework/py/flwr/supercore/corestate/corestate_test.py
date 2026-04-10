@@ -147,3 +147,74 @@ class StateTest(unittest.TestCase):
             # Assert: token1 should be cleaned up, token2 should still be valid
             self.assertFalse(state.verify_token(run_id1, token1))
             self.assertTrue(state.verify_token(run_id2, token2))
+
+    def test_reserve_nonce_first_reservation_succeeds(self) -> None:
+        """A new nonce reservation should succeed."""
+        state = self.state_factory()
+        reserved = state.reserve_nonce(
+            namespace="superexec:test",
+            nonce="nonce-1",
+            expires_at=now().timestamp() + 60.0,
+        )
+        self.assertTrue(reserved)
+
+    def test_reserve_nonce_duplicate_is_rejected(self) -> None:
+        """Reserving the same active nonce twice should fail on the second call."""
+        state = self.state_factory()
+        expires_at = now().timestamp() + 60.0
+        self.assertTrue(
+            state.reserve_nonce(
+                namespace="superexec:test",
+                nonce="nonce-1",
+                expires_at=expires_at,
+            )
+        )
+        self.assertFalse(
+            state.reserve_nonce(
+                namespace="superexec:test",
+                nonce="nonce-1",
+                expires_at=expires_at + 30.0,
+            )
+        )
+
+    def test_reserve_nonce_invalid_inputs_return_false(self) -> None:
+        """Invalid empty namespace/nonce values should be rejected."""
+        state = self.state_factory()
+        expires_at = now().timestamp() + 60.0
+
+        self.assertFalse(
+            state.reserve_nonce(
+                namespace="",
+                nonce="nonce-1",
+                expires_at=expires_at,
+            )
+        )
+        self.assertFalse(
+            state.reserve_nonce(
+                namespace="superexec:test",
+                nonce="",
+                expires_at=expires_at,
+            )
+        )
+
+    def test_reserve_nonce_allows_reuse_after_expiry(self) -> None:
+        """Nonce can be reused after its prior reservation expires."""
+        state = self.state_factory()
+        created_at = now()
+        self.assertTrue(
+            state.reserve_nonce(
+                namespace="superexec:test",
+                nonce="nonce-1",
+                expires_at=created_at.timestamp() + 1.0,
+            )
+        )
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = created_at + timedelta(seconds=5)
+            self.assertTrue(
+                state.reserve_nonce(
+                    namespace="superexec:test",
+                    nonce="nonce-1",
+                    expires_at=created_at.timestamp() + 10.0,
+                )
+            )

@@ -58,19 +58,19 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 > Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
 ```bash
-flwr run .
+flwr run .  --stream
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example
 
 ```bash
-flwr run . --run-config "num-server-rounds=5 learning-rate=0.25"
+flwr run . --run-config "num-server-rounds=5 learning-rate=0.25"  --stream
 ```
 
-To adapt the example for a practial usage, set `is-demo=false` like shown below. You might want to adjust the `num-shares` and `reconstruction-threshold` settings to suit your requirements. You can override those via `--run-config` as well.
+To adapt the example for a practical usage, set `is-demo=false` like shown below. You might want to adjust the `num-shares` and `reconstruction-threshold` settings to suit your requirements. You can override those via `--run-config` as well.
 
 ```bash
-flwr run . --run-config is-demo=false
+flwr run . --run-config is-demo=false  --stream
 ```
 
 ### Run with the Deployment Engine
