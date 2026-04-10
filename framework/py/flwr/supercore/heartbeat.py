@@ -151,6 +151,7 @@ def make_app_heartbeat_fn_grpc(
                 return False
             if status_code == grpc.StatusCode.UNAUTHENTICATED:
                 # Authentication failure should trigger shutdown, not retry
+                # This may happen when user run `flwr stop`
                 signal.raise_signal(signal.SIGINT)
             raise
 
