@@ -17,6 +17,7 @@
 
 import itertools
 import random
+import signal
 import threading
 import time
 from collections.abc import Callable, Generator, Iterable
@@ -352,6 +353,14 @@ def make_simple_grpc_retry_invoker() -> RetryInvoker:
     def _should_giveup_fn(e: Exception) -> bool:
         if e.code() == grpc.StatusCode.PERMISSION_DENIED:  # type: ignore
             raise RunNotRunningException
+        if e.code() == grpc.StatusCode.UNAUTHENTICATED:  # type: ignore
+            # Authentication failure should trigger shutdown, not retry
+            # This may happen when user run `flwr stop`
+            print("DEBUG: Authentication failure detected, raising SIGINT to trigger graceful shutdown...")
+            import os
+            os.kill(os.getpid(), signal.SIGINT)
+            time.sleep(10)  # Sleep to allow signal handler to execute and initiate shutdown
+            return True
         if e.code() == grpc.StatusCode.UNAVAILABLE:  # type: ignore
             # Check if this is an SSL handshake failure - these should fail fast
             details = str(e.details() if hasattr(e, "details") else "").lower()

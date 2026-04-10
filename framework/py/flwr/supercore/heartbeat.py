@@ -142,6 +142,7 @@ def make_app_heartbeat_fn_grpc(
     def fn() -> bool:
         # Call ServerAppIo API
         try:
+            print("DEBUG: Sending heartbeat...")
             res = stub.SendAppHeartbeat(req)
         except grpc.RpcError as e:
             status_code = e.code()
