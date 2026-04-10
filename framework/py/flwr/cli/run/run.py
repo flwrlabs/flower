@@ -56,7 +56,10 @@ CONN_REFRESH_PERIOD = 60  # Connection refresh period for log streaming (seconds
 def run(
     app: Annotated[
         str,
-        typer.Argument(help="Path of the Flower App to run."),
+        typer.Argument(
+            help="Path of the Flower App to run, or a remote app spec "
+            "like '@account_name/app_name'."
+        ),
     ] = ".",
     superlink: Annotated[
         str | None,
