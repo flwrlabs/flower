@@ -40,6 +40,8 @@ from flwr.supercore.interceptors import APP_TOKEN_HEADER
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
+_SUPEREXEC_SECRET = b"test-superexec-secret"
+
 
 class TestServerAppIoTokenLifecycleIntegration(unittest.TestCase):
     """Integration tests for token deletion timing on ServerAppIo."""
@@ -63,6 +65,7 @@ class TestServerAppIoTokenLifecycleIntegration(unittest.TestCase):
             state_factory,
             objectstore_factory,
             None,
+            superexec_auth_secret=_SUPEREXEC_SECRET,
         )
 
         channel = grpc.insecure_channel("localhost:9091")

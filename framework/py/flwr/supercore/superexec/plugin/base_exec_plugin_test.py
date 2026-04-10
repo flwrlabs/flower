@@ -16,9 +16,10 @@
 
 
 import subprocess
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from flwr.common.typing import Run
+from flwr.supercore.superexec.plugin.base_exec_plugin import BaseExecPlugin
 from flwr.supercore.superexec.plugin.clientapp_exec_plugin import ClientAppExecPlugin
 
 from .serverapp_exec_plugin import ServerAppExecPlugin
@@ -55,3 +56,57 @@ def test_serverapp_launch_isolates_stdio() -> None:
 
     assert popen.call_args.kwargs["stdout"] is subprocess.DEVNULL
     assert popen.call_args.kwargs["stderr"] is subprocess.DEVNULL
+
+
+class DummyExecPlugin(BaseExecPlugin):
+    """Minimal plugin for testing command construction."""
+
+    command = "dummy-app"
+    appio_api_address_arg = "--appio-api-address"
+
+
+def test_launch_app_forwards_runtime_dependency_install_flag() -> None:
+    """Ensure app launch forwards runtime install flag."""
+    plugin = DummyExecPlugin(
+        appio_api_address="127.0.0.1:9091",
+        get_run=Mock(),
+        runtime_dependency_install=True,
+    )
+
+    with (
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.os.getpid",
+            return_value=1234,
+        ),
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.subprocess.Popen"
+        ) as popen,
+    ):
+        plugin.launch_app(token="token-123", run_id=7)
+
+    assert popen.call_args.args[0] == [
+        "dummy-app",
+        "--insecure",
+        "--appio-api-address",
+        "127.0.0.1:9091",
+        "--token",
+        "token-123",
+        "--parent-pid",
+        "1234",
+        "--allow-runtime-dependency-installation",
+    ]
+
+
+def test_launch_app_skips_optional_runtime_flags_by_default() -> None:
+    """Ensure app launch omits optional runtime install flags by default."""
+    plugin = DummyExecPlugin(
+        appio_api_address="127.0.0.1:9091",
+        get_run=Mock(),
+    )
+
+    with patch(
+        "flwr.supercore.superexec.plugin.base_exec_plugin.subprocess.Popen"
+    ) as popen:
+        plugin.launch_app(token="token-123", run_id=7)
+
+    assert "--allow-runtime-dependency-installation" not in popen.call_args.args[0]
