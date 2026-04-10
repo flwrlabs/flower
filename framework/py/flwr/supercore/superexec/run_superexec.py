@@ -43,6 +43,7 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 )
 
 from .plugin import ExecPlugin
+from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
 
 
 def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
@@ -167,10 +168,12 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
                 if tk_res.token:
 
                     # Destroy the auth secret before launching the app
-                    if superexec_auth_secret is not None:
-                        del superexec_auth_secret
-                    if interceptors:
-                        del interceptors[0]._auth_secret
+                    # for ephemeral plugins
+                    if isinstance(plugin, BaseEphemeralExecPlugin):
+                        if superexec_auth_secret is not None:
+                            del superexec_auth_secret
+                        if interceptors:
+                            del interceptors[0]._auth_secret
 
                     plugin.launch_app(token=tk_res.token, run_id=run_id)
 
