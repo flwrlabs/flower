@@ -35,10 +35,11 @@ class ServerAppExecPlugin(BaseExecPlugin):
 
     def get_popen_kwargs(self) -> dict[str, Any]:
         """Isolate ServerApp stdio from the parent SuperLink process streams."""
-        return {
-            "stdout": subprocess.DEVNULL,
-            "stderr": subprocess.DEVNULL,
-        }
+        # return {
+        #     "stdout": subprocess.DEVNULL,
+        #     "stderr": subprocess.DEVNULL,
+        # }
+        return {}
 
     def launch_app(self, token: str, run_id: int) -> None:
         """Launch the application associated with a given run ID and token."""

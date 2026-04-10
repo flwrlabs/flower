@@ -142,6 +142,7 @@ def make_app_heartbeat_fn_grpc(
     def fn() -> bool:
         # Call ServerAppIo API
         try:
+            print("DEBUG: Sending heartbeat...")
             res = stub.SendAppHeartbeat(req)
         except grpc.RpcError as e:
             status_code = e.code()
@@ -149,10 +150,6 @@ def make_app_heartbeat_fn_grpc(
                 return False
             if status_code == grpc.StatusCode.DEADLINE_EXCEEDED:
                 return False
-            if status_code == grpc.StatusCode.UNAUTHENTICATED:
-                # Authentication failure should trigger shutdown, not retry
-                # This may happen when user run `flwr stop`
-                signal.raise_signal(signal.SIGINT)
             raise
 
         # Raise SIGINT to trigger graceful shutdown if heartbeat failed
