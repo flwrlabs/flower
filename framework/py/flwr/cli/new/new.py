@@ -192,14 +192,14 @@ def download_remote_app_via_api(app_spec: str) -> None:
         raise click.ClickException(str(e)) from e
 
     typer.secho(
-        "🔽 Downloading ZIP into memory...",
+        "🔽 Downloading app...",
         fg=typer.colors.GREEN,
         bold=True,
     )
     zip_buf = _download_zip_to_memory(presigned_url)
 
     typer.secho(
-        f"📦 Unpacking into {project_dir}...",
+        f"📦 Unpacking app into {project_dir}...",
         fg=typer.colors.GREEN,
         bold=True,
     )
