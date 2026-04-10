@@ -159,7 +159,7 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
         # Stop log uploader for this run and upload final logs
         if log_uploader:
-            stop_log_uploader(log_queue)
+            stop_log_uploader(log_queue, log_uploader)
 
         # Update run status
         if run and run_status and grid:
