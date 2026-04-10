@@ -55,9 +55,9 @@ CONN_REFRESH_PERIOD = 60  # Connection refresh period for log streaming (seconds
 # pylint: disable-next=too-many-locals, too-many-branches, R0913, R0917
 def run(
     app: Annotated[
-        Path,
+        str,
         typer.Argument(help="Path of the Flower App to run."),
-    ] = Path("."),
+    ] = ".",
     superlink: Annotated[
         str | None,
         typer.Argument(help="Name of the SuperLink connection."),
@@ -104,38 +104,40 @@ def run(
 ) -> None:
     """Run Flower App."""
     with cli_output_handler(output_format=output_format) as is_json:
-        # Migrate legacy usage if any
-        migrate(str(app), [], ignore_legacy_usage=True)
-
         # Read superlink connection configuration
         superlink_connection = read_superlink_connection(superlink)
 
         # Determine if app is remote
         app_spec = None
         config: dict[str, Any] = {}
-        if (app_str := str(app)).startswith("@"):
+        if app.startswith("@"):
             # Validate app version and ID format
             try:
-                _ = parse_app_spec(app_str)
+                _ = parse_app_spec(app)
             except ValueError as e:
                 raise click.ClickException(str(e)) from e
 
-            app_spec = app_str
+            app_path = Path(".")
+            app_spec = app
 
         # Validate TOML configuration for local app
         else:
-            app = app.expanduser().resolve()  # Resolve path to absolute
-            config, warnings = load_and_validate(app / FAB_CONFIG_FILE)
+            app_path = Path(app).expanduser().resolve()  # Resolve path to absolute
+
+            # Migrate legacy usage if any
+            migrate(str(app_path), [], ignore_legacy_usage=True)
+
+            config, warnings = load_and_validate(app_path / FAB_CONFIG_FILE)
             if warnings:
                 typer.secho(
-                    f"Flower App configuration warnings in '{app / FAB_CONFIG_FILE}':\n"
+                    f"Flower App configuration warnings in '{app_path / FAB_CONFIG_FILE}':\n"
                     + "\n".join([f"- {line}" for line in warnings]),
                     fg=typer.colors.YELLOW,
                     bold=True,
                 )
 
         _run_with_control_api(
-            app,
+            app_path,
             config,
             federation,
             superlink_connection,

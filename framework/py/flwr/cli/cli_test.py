@@ -15,6 +15,7 @@
 """Tests for the CLI."""
 
 
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import patch
 
@@ -69,6 +70,22 @@ def test_run_command() -> None:
     assert result.exit_code == 0
     assert "Usage:" in result.output
     assert "run" in result.output
+
+
+def test_run_command_accepts_remote_app_spec() -> None:
+    """Remote app specs should stay as raw strings instead of path-normalized values."""
+    with (
+        patch("flwr.cli.app.warn_if_flwr_update_available"),
+        patch("flwr.cli.run.run.read_superlink_connection") as mock_read_connection,
+        patch("flwr.cli.run.run._run_with_control_api") as mock_run_with_control_api,
+    ):
+        mock_read_connection.return_value = SimpleNamespace(federation=None)
+
+        result = runner.invoke(app, ["run", "@flwrlabs/quickstart-numpy"])
+
+    assert result.exit_code == 0
+    assert mock_run_with_control_api.call_args is not None
+    assert mock_run_with_control_api.call_args.args[-1] == "@flwrlabs/quickstart-numpy"
 
 
 def test_build_command() -> None:
