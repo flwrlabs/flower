@@ -149,6 +149,9 @@ def make_app_heartbeat_fn_grpc(
                 return False
             if status_code == grpc.StatusCode.DEADLINE_EXCEEDED:
                 return False
+            if status_code == grpc.StatusCode.UNAUTHENTICATED:
+                # Authentication failure should trigger shutdown, not retry
+                signal.raise_signal(signal.SIGINT)
             raise
 
         # Raise SIGINT to trigger graceful shutdown if heartbeat failed
