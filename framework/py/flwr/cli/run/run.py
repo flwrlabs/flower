@@ -129,8 +129,9 @@ def run(
 
             config, warnings = load_and_validate(app_path / FAB_CONFIG_FILE)
             if warnings:
+                warning_path = app_path / FAB_CONFIG_FILE
                 typer.secho(
-                    f"Flower App configuration warnings in '{app_path / FAB_CONFIG_FILE}':\n"
+                    f"Flower App configuration warnings in '{warning_path}':\n"
                     + "\n".join([f"- {line}" for line in warnings]),
                     fg=typer.colors.YELLOW,
                     bold=True,
