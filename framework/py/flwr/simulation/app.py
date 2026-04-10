@@ -187,29 +187,21 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
     def on_exit() -> None:
         # Stop heartbeat sender
-        print("\n onexit starts!!")
         if heartbeat_sender and heartbeat_sender.is_running:
-            print("Stopping heartbeat sender...")
             heartbeat_sender.stop()
-            print("\n onexit stops heartbeat sender!!")
-    
+
         # Stop log uploader for this run and upload final logs
         if log_uploader:
-            print("Stopping log uploader and uploading final logs...")
-            stop_log_uploader(log_queue, log_uploader)
-            print("Stopped log uploader and uploaded final logs.")
+            stop_log_uploader(log_queue)
 
         # Update run status
-        print("Updating run status to FINISHED...")
         if run and run_status:
             run_status_proto = run_status_to_proto(run_status)
             conn._stub.UpdateRunStatus(
                 UpdateRunStatusRequest(run_id=run.run_id, run_status=run_status_proto)
             )
 
-        print("Cleaning up app runtime environment...")
         cleanup_app_runtime_environment(runtime_env_dir)
-        print("Cleanup of app runtime environment completed.")
 
     register_signal_handlers(
         event_type=EventType.FLWR_SIMULATION_RUN_LEAVE,
