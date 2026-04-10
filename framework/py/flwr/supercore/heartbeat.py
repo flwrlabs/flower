@@ -153,6 +153,7 @@ def make_app_heartbeat_fn_grpc(
 
         # Raise SIGINT to trigger graceful shutdown if heartbeat failed
         if not res.success:
+            print("DEBUG: Heartbeat failed, raising SIGINT to trigger graceful shutdown.")
             signal.raise_signal(signal.SIGINT)
         return True
 

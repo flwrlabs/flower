@@ -67,7 +67,7 @@ from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import NOOP_FEDERATION
-from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
+from flwr.supercore.heartbeat import make_app_heartbeat_fn_grpc
 from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
@@ -178,7 +178,6 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     # Initialize variables for finally block
     log_uploader = None
     run_id_hash = None
-    heartbeat_sender = None
     run = None
     run_status = None
     run_id_hash = None
@@ -186,10 +185,6 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
-        # Stop heartbeat sender
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
-
         # Stop log uploader for this run and upload final logs
         if log_uploader:
             stop_log_uploader(log_queue, log_uploader)
@@ -293,12 +288,6 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             },
         )
 
-        # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(
-            make_app_heartbeat_fn_grpc(conn._stub, token)
-        )
-        heartbeat_sender.start()
-
         # Launch the simulation
         updated_context = _run_simulation(
             server_app_attr=server_app_attr,
@@ -312,6 +301,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             verbose_logging=verbose,
             server_app_context=context,
             is_app=True,
+            heartbeat_fn=make_app_heartbeat_fn_grpc(conn._stub, token),
             exit_event=EventType.FLWR_SIMULATION_RUN_LEAVE,
         )
 
