@@ -16,6 +16,7 @@
 
 
 import argparse
+import os
 from logging import INFO, WARN
 from typing import Any
 
@@ -109,6 +110,11 @@ def flower_superexec() -> None:
                 ExitCode.SUPEREXEC_AUTH_SECRET_LOAD_FAILED,
                 f"Failed to load SuperExec auth secret: {err}",
             )
+
+        # Destroy the auth secret in memory immediately after loading
+        if args.plugin_type == ExecPluginType.SERVER_APP_EPHEMERAL:
+            os.remove(args.superexec_auth_secret_file)
+
     run_superexec(
         plugin_class=plugin_class,
         stub_class=stub_class,  # type: ignore

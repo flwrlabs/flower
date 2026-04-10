@@ -45,7 +45,7 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 from .plugin import ExecPlugin
 
 
-def run_superexec(  # pylint: disable=R0913,R0914,R0917
+def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
     plugin_class: type[ExecPlugin],
     stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
     appio_api_address: str,
@@ -165,6 +165,13 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
 
                 # Launch the app if a token was granted; do nothing if not
                 if tk_res.token:
+
+                    # Destroy the auth secret before launching the app
+                    if superexec_auth_secret is not None:
+                        del superexec_auth_secret
+                    if interceptors:
+                        del interceptors[0]._auth_secret
+
                     plugin.launch_app(token=tk_res.token, run_id=run_id)
 
             # Sleep for a while before checking again
