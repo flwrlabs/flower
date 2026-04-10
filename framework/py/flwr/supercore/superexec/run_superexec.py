@@ -170,10 +170,16 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
                     # Destroy the auth secret before launching the app
                     # for ephemeral plugins
                     if isinstance(plugin, BaseEphemeralExecPlugin):
-                        if superexec_auth_secret is not None:
-                            del superexec_auth_secret
-                        if interceptors:
-                            del interceptors[0]._auth_secret
+
+                        def cleanup_auth_secret() -> None:
+                            nonlocal superexec_auth_secret, interceptors
+                            if superexec_auth_secret is not None:
+                                superexec_auth_secret = None
+                            if interceptors:
+                                # pylint: disable-next=protected-access
+                                interceptors[0]._auth_secret = b"\x00" * 32
+
+                        plugin.cleanup_before_launch = cleanup_auth_secret
 
                     plugin.launch_app(token=tk_res.token, run_id=run_id)
 
