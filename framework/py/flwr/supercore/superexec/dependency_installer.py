@@ -33,23 +33,19 @@ from flwr.supercore.utils import get_flwr_home
 _RUNTIME_ENV_DIR = "runtime-envs"
 RuntimeDependencyIndexContext = dict[str, str | int | None]
 
-try:
-    from flwr.ee import (
-        resolve_runtime_dependency_index_url as _resolve_index_url_from_ee,
-    )
-except ImportError:
 
-    def _resolve_index_url_from_ee(
-        _context: RuntimeDependencyIndexContext,
-    ) -> str | None:
-        """Fallback when `flwr.ee` resolver hook is unavailable."""
-        return None
+# The corresponding resolver is not ready in `flwr.ee` yet
+def _resolve_index_url_from_ee(
+    _context: RuntimeDependencyIndexContext,
+) -> str | None:
+    """Fallback when `flwr.ee` resolver hook is unavailable."""
+    return None
 
 
 def _resolve_runtime_dependency_index_url(
     context: RuntimeDependencyIndexContext,
 ) -> str | None:
-    resolved = _resolve_index_url_from_ee(context)
+    resolved = _resolve_index_url_from_ee(context)  # pylint: disable=E1128
     if resolved is not None and not isinstance(resolved, str):
         raise TypeError(
             "Runtime dependency index resolver must return `str | None`, "
