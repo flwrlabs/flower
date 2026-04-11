@@ -186,11 +186,6 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     )
 
     try:
-        # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(
-            make_app_heartbeat_fn_grpc(grid._stub, token)
-        )
-        heartbeat_sender.start()
 
         # Initialize the GrpcGrid
         grid = GrpcGrid(
@@ -198,6 +193,12 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             root_certificates=certificates,
             token=token,
         )
+
+        # Set up heartbeat sender
+        heartbeat_sender = HeartbeatSender(
+            make_app_heartbeat_fn_grpc(grid._stub, token)
+        )
+        heartbeat_sender.start()
 
         # Pull ServerAppInputs from LinkState
         try:
