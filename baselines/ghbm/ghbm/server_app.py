@@ -130,17 +130,6 @@ def _maybe_get_wandb_round_logger(context: Context, num_rounds: int, ghbm_tau: i
     return run, log_round
 
 
-def _maybe_upload_wandb(
-    context: Context, num_rounds: int, ghbm_tau: int, result: Any
-) -> None:
-    """Upload metrics to W&B after training so logging cannot block startup."""
-    try:
-        run = _maybe_init_wandb(context, num_rounds, ghbm_tau)
-        _maybe_log_wandb(run, result)
-    except Exception as err:  # pylint: disable=broad-except
-        print(f"W&B upload failed: {err}")
-
-
 def _print_run_summary(context: Context, num_rounds: int, ghbm_tau: int) -> None:
     """Print a compact summary of the configured experiment."""
     algorithm_name = parse_enum(context.run_config["algorithm-name"], AlgorithmName)
