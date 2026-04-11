@@ -236,7 +236,7 @@ def load_data(
     """Load a client partition using the original GHBM CIFAR splits."""
     train_transform = _get_train_transforms()
     test_transform = _get_test_transforms()
-    assert dirichlet_alpha >= 0, "dirichlet_alpha must be non-negative"
+
     if dirichlet_alpha > 0:
         fds = _get_federated_dataset(dataset_name, num_partitions, dirichlet_alpha)
         label_column = _get_partition_label_column(dataset_name)
