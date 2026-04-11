@@ -10,9 +10,9 @@ We would like to give our special thanks to all the contributors who made the ne
 
 ### What's new?
 
-- **Add runtime dependency installation option for isolated execution** ([#6741](https://github.com/flwrlabs/flower/pull/6741))
+- **Introduce runtime dependency installation option for isolated execution** ([#6741](https://github.com/flwrlabs/flower/pull/6741))
 
-  Introduces the `--allow-runtime-dependency-installation` flag to `flower-superexec`, enabling runtime dependency installation via `uv` so that applications with differing dependencies can run independently. Propagates this option from `flower-superlink`/`flower-supernode` to automatically started `flower-superexec` instances when using subprocess isolation mode.
+  Introduces the `--allow-runtime-dependency-installation` flag to `flower-superexec`, enabling runtime dependency installation via `uv` so that applications with differing dependencies can run independently. Runtime dependency installation automatically creates an independent venv for each run, even if those runs happen concurrently. Propagates this option from `flower-superlink`/`flower-supernode` to automatically started `flower-superexec` instances when using subprocess isolation mode.
 
 - **Improve federation run management and validation** ([#6943](https://github.com/flwrlabs/flower/pull/6943), [#6956](https://github.com/flwrlabs/flower/pull/6956), [#6957](https://github.com/flwrlabs/flower/pull/6957), [#6961](https://github.com/flwrlabs/flower/pull/6961))
 
@@ -22,9 +22,9 @@ We would like to give our special thanks to all the contributors who made the ne
 
   Introduces an experimental SuperExec authentication mechanism based on shared-secret HMAC. Establishes core primitives, nonce replay protection, and interceptor foundations, and integrates authentication into ServerAppIo and ClientAppIo.
 
-- **Show FlowerHub compatibility note in CLI download and review flows** ([#6989](https://github.com/flwrlabs/flower/pull/6989), [#6992](https://github.com/flwrlabs/flower/pull/6992))
+- **Show Flower Hub compatibility note in CLI download and review flows** ([#6989](https://github.com/flwrlabs/flower/pull/6989), [#6992](https://github.com/flwrlabs/flower/pull/6992))
 
-  Surfaces the FlowerHub-provided compatibility note when an app download resolves to an older compatible version instead of the latest release. Reads the returned `note` field and displays it in `flwr run`, `flwr new` and `flwr app review`, improving transparency around version selection.
+  Surfaces the Flower Hub-provided compatibility note when an app download resolves to an older compatible version instead of the latest release. Reads the returned `note` field and displays it in `flwr run`, `flwr new` and `flwr app review`, improving transparency around version selection.
 
 - **Enhance authentication for `flwr-*` processes** ([#6796](https://github.com/flwrlabs/flower/pull/6796))
 
@@ -50,7 +50,7 @@ We would like to give our special thanks to all the contributors who made the ne
 
 - **Remove Flower File Storage (FFS)** ([#6809](https://github.com/flwrlabs/flower/pull/6809), [#6810](https://github.com/flwrlabs/flower/pull/6810))
 
-  Removes Flower File Storage (FFS) and transitions to LinkState-based storage, introducing replacement methods in LinkState and NodeState. Eliminates the `--storage-dir` option from `flower-superlink` as part of this change.
+  Removes Flower File Storage (FFS) and transitions to `LinkState`-based storage, introducing replacement methods in `LinkState` and `NodeState`. Eliminates the `--storage-dir` option from `flower-superlink` as part of this change.
 
 ## v1.28.0 (2026-04-02)
 
