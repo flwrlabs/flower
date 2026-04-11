@@ -50,7 +50,7 @@ def train(
             optimizer.step()
             running_loss += loss.item()
 
-    return running_loss / len(trainloader)
+    return running_loss / total_steps
 
 
 def test(
