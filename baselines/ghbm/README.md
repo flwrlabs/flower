@@ -44,7 +44,7 @@ dataset: [CIFAR-10, CIFAR-100]
 | --- | --- | --- | --- |
 | CIFAR-10/100 | Dirichlet via `DirichletPartitioner` when `dirichlet-alpha > 0`; original sorted contiguous-shard split when `dirichlet-alpha = 0` | Global test set is deterministically sharded across clients for distributed evaluation | 100 by default |
 
-**Training Hyperparameters:** The reproduction hyperparameters live in the launcher scripts under [`scripts/`](/home/rzaccone/flower/baselines/ghbm/scripts). The values in `pyproject.toml` are lightweight smoke-test defaults so that `flwr run .` still works without a script.
+**Training Hyperparameters:** The reproduction hyperparameters live in the launcher scripts under [`scripts/`](scripts/). The values in `pyproject.toml` are lightweight smoke-test defaults so that `flwr run .` still works without a script.
 
 
 ## Environment Setup
@@ -108,11 +108,11 @@ The [`scripts/`](/home/rzaccone/flower/baselines/ghbm/scripts) directory contain
 
 The available launchers are:
 
-- [`run_cifar10_noniid_fedavg.sh`](/home/rzaccone/flower/baselines/ghbm/scripts/run_cifar10_noniid_fedavg.sh)
-- [`run_cifar10_noniid_ghbm.sh`](/home/rzaccone/flower/baselines/ghbm/scripts/run_cifar10_noniid_ghbm.sh)
-- [`run_cifar10_noniid_localghbm.sh`](/home/rzaccone/flower/baselines/ghbm/scripts/run_cifar10_noniid_localghbm.sh)
-- [`run_cifar10_noniid_fedhbm.sh`](/home/rzaccone/flower/baselines/ghbm/scripts/run_cifar10_noniid_fedhbm.sh)
-- [`run_cifar10_noniid_fedcm.sh`](/home/rzaccone/flower/baselines/ghbm/scripts/run_cifar10_noniid_fedcm.sh)
+- [`run_cifar10_noniid_fedavg.sh`](scripts/run_cifar10_noniid_fedavg.sh)
+- [`run_cifar10_noniid_ghbm.sh`](scripts/run_cifar10_noniid_ghbm.sh)
+- [`run_cifar10_noniid_localghbm.sh`](scripts/run_cifar10_noniid_localghbm.sh)
+- [`run_cifar10_noniid_fedhbm.sh`](scripts/run_cifar10_noniid_fedhbm.sh)
+- [`run_cifar10_noniid_fedcm.sh`](scripts/run_cifar10_noniid_fedcm.sh)
 
 The algorithm-specific settings are:
 

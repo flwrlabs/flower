@@ -129,7 +129,7 @@ ignore = ["B024", "B027", "D205", "D209"]
 convention = "numpy"
 
 [tool.hatch.build.targets.wheel]
-packages = ["."]
+packages = ["ghbm"]
 
 [tool.flwr.app]
 publisher = "flwrlabs"
