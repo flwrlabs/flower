@@ -22,6 +22,10 @@ We would like to give our special thanks to all the contributors who made the ne
 
   Introduces an experimental SuperExec authentication mechanism based on shared-secret HMAC. Establishes core primitives, nonce replay protection, and interceptor foundations, and integrates authentication into ServerAppIo and ClientAppIo.
 
+- **Show Hub compatibility note in CLI download and review flows** ([#6989](https://github.com/flwrlabs/flower/pull/6989), [#6992](https://github.com/flwrlabs/flower/pull/6992))
+
+  Surfaces the Hub-provided compatibility note when an app download resolves to an older compatible version instead of the latest release. Reads the returned `note` field and displays it in `flwr run`, `flwr new` and `flwr app review`, improving transparency around version selection.
+
 - **Enhance authentication for `flwr-*` processes** ([#6796](https://github.com/flwrlabs/flower/pull/6796))
 
   Improves security by authenticating RPC calls from `flwr-serverapp`, `flwr-simulation`, and `flwr-clientapp` using token-based mechanism.
@@ -38,7 +42,7 @@ We would like to give our special thanks to all the contributors who made the ne
 
 - **Stabilize CI pipelines and improve test reliability** ([#6911](https://github.com/flwrlabs/flower/pull/6911), [#6974](https://github.com/flwrlabs/flower/pull/6974), [#6985](https://github.com/flwrlabs/flower/pull/6985), [#6987](https://github.com/flwrlabs/flower/pull/6987))
 
-- **General improvements** ([#6931](https://github.com/flwrlabs/flower/pull/6931), [#6944](https://github.com/flwrlabs/flower/pull/6944), [#6946](https://github.com/flwrlabs/flower/pull/6946), [#6955](https://github.com/flwrlabs/flower/pull/6955), [#6970](https://github.com/flwrlabs/flower/pull/6970), [#6973](https://github.com/flwrlabs/flower/pull/6973), [#6982](https://github.com/flwrlabs/flower/pull/6982), [#6983](https://github.com/flwrlabs/flower/pull/6983), [#6988](https://github.com/flwrlabs/flower/pull/6988), [#6989](https://github.com/flwrlabs/flower/pull/6989), [#6990](https://github.com/flwrlabs/flower/pull/6990), [#6992](https://github.com/flwrlabs/flower/pull/6992), [#6994](https://github.com/flwrlabs/flower/pull/6994), [#6995](https://github.com/flwrlabs/flower/pull/6995), [#6996](https://github.com/flwrlabs/flower/pull/6996), [#6999](https://github.com/flwrlabs/flower/pull/6999), [#7003](https://github.com/flwrlabs/flower/pull/7003))
+- **General improvements** ([#6931](https://github.com/flwrlabs/flower/pull/6931), [#6944](https://github.com/flwrlabs/flower/pull/6944), [#6946](https://github.com/flwrlabs/flower/pull/6946), [#6955](https://github.com/flwrlabs/flower/pull/6955), [#6970](https://github.com/flwrlabs/flower/pull/6970), [#6973](https://github.com/flwrlabs/flower/pull/6973), [#6982](https://github.com/flwrlabs/flower/pull/6982), [#6983](https://github.com/flwrlabs/flower/pull/6983), [#6988](https://github.com/flwrlabs/flower/pull/6988), [#6990](https://github.com/flwrlabs/flower/pull/6990), [#6994](https://github.com/flwrlabs/flower/pull/6994), [#6995](https://github.com/flwrlabs/flower/pull/6995), [#6996](https://github.com/flwrlabs/flower/pull/6996), [#6997](https://github.com/flwrlabs/flower/pull/6997), [#6999](https://github.com/flwrlabs/flower/pull/6999), [#7003](https://github.com/flwrlabs/flower/pull/7003))
 
   As always, many parts of the Flower framework and quality infrastructure were improved and updated.
 
