@@ -15,22 +15,27 @@
 """Utility functions for the infrastructure."""
 
 
+import ctypes
 import json
 import os
 import re
+import sys
 from collections.abc import Sequence
+from logging import WARN
 from pathlib import Path
 from typing import Any, TypeVar
 
 import requests
 
 from flwr.common.constant import FLWR_DIR, FLWR_HOME
+from flwr.common.logger import log
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.supercore.version import package_version as flwr_version
 
 from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN, MAX_NAME_LENGTH
 
 T = TypeVar("T", str, bytes)
+PR_SET_DUMPABLE = 4  # from /usr/include/linux/prctl.h
 
 
 def mask_string(value: str, head: int = 4, tail: int = 4) -> str:
@@ -373,3 +378,25 @@ def get_metadata_bytes(
 ) -> bytes | None:
     """Return exactly one non-empty bytes metadata value for `key`."""
     return _get_metadata_typed(metadata, key, bytes)
+
+
+def disable_process_dumping(strict: bool) -> None:
+    """Disable process dumping (core dumps + ptrace) on Linux."""
+    if not sys.platform.startswith("linux"):
+        return  # No-op on non-Linux systems
+
+    try:
+        libc = ctypes.CDLL(None)
+
+        # Define argument and return types for prctl
+        libc.prctl.argtypes = [ctypes.c_int, ctypes.c_ulong]
+        libc.prctl.restype = ctypes.c_int
+
+        result = libc.prctl(PR_SET_DUMPABLE, 0)
+        if result != 0:
+            raise OSError("prctl(PR_SET_DUMPABLE, 0) failed")
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        if strict:
+            raise RuntimeError(f"Failed to disable process dumping: {e!r}") from e
+        log(WARN, "Failed to disable process dumping: %s", e)

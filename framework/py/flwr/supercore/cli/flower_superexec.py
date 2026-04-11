@@ -43,11 +43,13 @@ from flwr.supercore.superexec.plugin import (
 )
 from flwr.supercore.superexec.run_superexec import run_superexec
 from flwr.supercore.update_check import warn_if_flwr_update_available
+from flwr.supercore.utils import disable_process_dumping
 from flwr.supercore.version import package_version
 
 
 def flower_superexec() -> None:
     """Run `flower-superexec` command."""
+    disable_process_dumping(strict=False)
     warn_if_flwr_update_available(process_name="flower-superexec")
     args = _parse_args().parse_args()
 
