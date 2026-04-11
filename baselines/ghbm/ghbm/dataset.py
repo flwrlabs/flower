@@ -33,7 +33,7 @@ TEST_PARTITION_CACHE = {}
 
 CIFAR_MEAN = (0.4914, 0.4822, 0.4465)
 CIFAR_STD = (0.2023, 0.1994, 0.2010)
-TorchvisionDataset: TypeAlias = type[CIFAR10] | type[CIFAR100]
+TorchvisionDataset: TypeAlias = type[CIFAR10] | type[CIFAR100]  # noqa: UP040
 
 
 def _get_dataset_class(dataset_name: DatasetName) -> TorchvisionDataset:
@@ -152,7 +152,10 @@ def _create_from_contiguous_shards(
         client_indices = [
             np.arange(
                 shard_start_index[start + offset],
-                shard_start_index[start + offset] + shard_size,
+                min(
+                    shard_start_index[start + offset] + shard_size,
+                    len(targets),
+                ),
             )
             for offset in range(num_shards)
         ]

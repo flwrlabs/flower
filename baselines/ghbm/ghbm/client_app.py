@@ -1,16 +1,9 @@
 """ClientApp for the GHBM Flower baseline."""
 
 from dataclasses import dataclass
-from typing import Final
 
 import torch
-from flwr.app import (
-    ArrayRecord,
-    Context,
-    Message,
-    MetricRecord,
-    RecordDict,
-)
+from flwr.app import ArrayRecord, Context, Message, MetricRecord, RecordDict
 from flwr.clientapp import ClientApp
 
 from ghbm.algorithm import (

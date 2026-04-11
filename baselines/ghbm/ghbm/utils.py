@@ -5,10 +5,10 @@ from typing import TypeAlias
 
 import torch
 
-StateDict: TypeAlias = OrderedDict[str, torch.Tensor]
+StateDict: TypeAlias = OrderedDict[str, torch.Tensor]  # noqa: UP040
 MetricScalar = int | float
-MetricValue: TypeAlias = MetricScalar | list[int] | list[float]
-MetricDict: TypeAlias = dict[str, MetricValue]
+MetricValue: TypeAlias = MetricScalar | list[int] | list[float]  # noqa: UP040
+MetricDict: TypeAlias = dict[str, MetricValue]  # noqa: UP040
 
 
 def clone_state_dict(state_dict: StateDict) -> StateDict:

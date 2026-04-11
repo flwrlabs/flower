@@ -8,15 +8,10 @@ import torch
 from flwr.app import ArrayRecord, ConfigRecord, Message, MetricRecord
 from flwr.serverapp.strategy import FedAvg
 
+from ghbm.utils import clone_state_dict
+
 StateDict = OrderedDict[str, torch.Tensor]
 RoundLogger = Callable[[str, int, MetricRecord | None], None]
-
-
-def _clone_state_dict(state_dict: StateDict) -> StateDict:
-    """Clone a torch state dict onto CPU tensors."""
-    return OrderedDict(
-        (name, tensor.detach().cpu().clone()) for name, tensor in state_dict.items()
-    )
 
 
 class EvalLoggingFedAvg(FedAvg):
@@ -50,7 +45,8 @@ class EvalLoggingFedAvg(FedAvg):
         config: ConfigRecord,
         grid,
     ) -> Iterable[Message]:
-        """Run federated evaluation on scheduled rounds and throughout the final tail."""
+        """Run federated evaluation on scheduled rounds and throughout the final
+        tail."""
         if not self._should_evaluate(server_round):
             return []
         return super().configure_evaluate(server_round, arrays, config, grid)
@@ -97,7 +93,7 @@ class GHBMStrategy(EvalLoggingFedAvg):
         grid,
     ) -> Iterable[Message]:
         """Attach the current GHBM server momentum to each training message."""
-        self._current_model = _clone_state_dict(arrays.to_torch_state_dict())
+        self._current_model = clone_state_dict(arrays.to_torch_state_dict())
         messages = list(super().configure_train(server_round, arrays, config, grid))
         if self._current_momentum is not None:
             momentum_record = ArrayRecord(torch_state_dict=self._current_momentum)
@@ -112,7 +108,7 @@ class GHBMStrategy(EvalLoggingFedAvg):
             return arrays, metrics
 
         self._past_models.append(self._current_model)
-        aggregated_state = _clone_state_dict(arrays.to_torch_state_dict())
+        aggregated_state = clone_state_dict(arrays.to_torch_state_dict())
         if len(self._past_models) == self.tau:
             oldest_model = self._past_models[0]
             self._current_momentum = OrderedDict(

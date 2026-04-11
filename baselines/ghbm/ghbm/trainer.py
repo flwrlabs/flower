@@ -58,6 +58,7 @@ def test(
 ) -> tuple[float, float]:
     """Validate the model on the test set."""
     net.to(device)
+    net.eval()
     criterion = torch.nn.CrossEntropyLoss()
     correct, loss = 0, 0.0
     with torch.no_grad():
