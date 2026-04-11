@@ -186,6 +186,12 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     )
 
     try:
+        # Set up heartbeat sender
+        heartbeat_sender = HeartbeatSender(
+            make_app_heartbeat_fn_grpc(grid._stub, token)
+        )
+        heartbeat_sender.start()
+
         # Initialize the GrpcGrid
         grid = GrpcGrid(
             serverappio_service_address=serverappio_api_address,
@@ -269,12 +275,6 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             EventType.FLWR_SERVERAPP_RUN_ENTER,
             event_details={"run-id-hash": hash_run_id},
         )
-
-        # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(
-            make_app_heartbeat_fn_grpc(grid._stub, token)
-        )
-        heartbeat_sender.start()
 
         # Load and run the ServerApp with the Grid
         updated_context = run_(
