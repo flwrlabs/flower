@@ -49,7 +49,6 @@ from flwr.supercore.version import package_version
 def flower_superexec() -> None:
     """Run `flower-superexec` command."""
     disable_process_dumping(strict=False)
-
     warn_if_flwr_update_available(process_name="flower-superexec")
     args = _parse_args().parse_args()
 
