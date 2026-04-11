@@ -145,21 +145,22 @@ def _create_from_contiguous_shards(
     random_state = RandomState(PARTITION_SEED)
     random_state.shuffle(shard_start_index)
 
-    num_shards = len(shard_start_index) // num_clients
     partitions = []
-    for client_id in range(num_clients):
-        start = num_shards * client_id
+    for client_shard_starts in np.array_split(shard_start_index, num_clients):
         client_indices = [
             np.arange(
-                shard_start_index[start + offset],
+                start,
                 min(
-                    shard_start_index[start + offset] + shard_size,
+                    start + shard_size,
                     len(targets),
                 ),
             )
-            for offset in range(num_shards)
+            for start in client_shard_starts.tolist()
         ]
-        partitions.append(np.concatenate(client_indices, axis=0))
+        if client_indices:
+            partitions.append(np.concatenate(client_indices, axis=0))
+        else:
+            partitions.append(np.array([], dtype=np.int64))
     return partitions
 
 
@@ -167,7 +168,7 @@ def _create_non_iid_partitions(
     targets: np.ndarray, num_clients: int
 ) -> list[np.ndarray]:
     sorted_indices = np.argsort(targets)
-    shard_size = len(targets) // num_clients
+    shard_size = max(1, len(targets) // num_clients)
     sorted_targets = targets[sorted_indices]
     sorted_partition_indices = _create_from_contiguous_shards(
         sorted_targets, num_clients, shard_size
@@ -235,7 +236,7 @@ def load_data(
     """Load a client partition using the original GHBM CIFAR splits."""
     train_transform = _get_train_transforms()
     test_transform = _get_test_transforms()
-
+    assert dirichlet_alpha >= 0, "dirichlet_alpha must be non-negative"
     if dirichlet_alpha > 0:
         fds = _get_federated_dataset(dataset_name, num_partitions, dirichlet_alpha)
         label_column = _get_partition_label_column(dataset_name)

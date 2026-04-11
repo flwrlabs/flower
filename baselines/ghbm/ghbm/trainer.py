@@ -1,10 +1,13 @@
 """Local training and evaluation utilities."""
 
+from collections import OrderedDict
+
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
 from ghbm.algorithm import TrainingModifiers
+from ghbm.utils import StateDict
 
 
 def train(
@@ -30,7 +33,11 @@ def train(
     )
     net.train()
     running_loss = 0.0
-    modifiers = modifiers or TrainingModifiers()
+    modifiers = _materialize_training_modifiers(
+        net=net,
+        modifiers=modifiers or TrainingModifiers(),
+        device=device,
+    )
     total_steps = max(1, epochs * len(trainloader))
     momentum_scale = beta / (learning_rate * total_steps)
     for _ in range(epochs):
@@ -44,7 +51,6 @@ def train(
                 net=net,
                 modifiers=modifiers,
                 beta=beta,
-                device=device,
                 momentum_scale=momentum_scale,
             )
             optimizer.step()
@@ -71,11 +77,51 @@ def test(
     return loss / len(testloader), correct / len(testloader.dataset)
 
 
+def _materialize_training_modifiers(
+    net: nn.Module,
+    modifiers: TrainingModifiers,
+    device: torch.device,
+) -> TrainingModifiers:
+    """Move static correction tensors to the training device once per round."""
+    parameter_dtypes = {
+        name: parameter.dtype for name, parameter in net.named_parameters()
+    }
+    return TrainingModifiers(
+        server_momentum=_move_state_dict_to_device(
+            modifiers.server_momentum,
+            device=device,
+            parameter_dtypes=parameter_dtypes,
+        ),
+        anchor_model=_move_state_dict_to_device(
+            modifiers.anchor_model,
+            device=device,
+            parameter_dtypes=parameter_dtypes,
+        ),
+        anchor_scale=modifiers.anchor_scale,
+    )
+
+
+def _move_state_dict_to_device(
+    state_dict: StateDict | None,
+    device: torch.device,
+    parameter_dtypes: dict[str, torch.dtype],
+) -> StateDict | None:
+    """Move a state dict to the target device using parameter dtypes."""
+    if state_dict is None:
+        return None
+    return OrderedDict(
+        (
+            name,
+            tensor.to(device=device, dtype=parameter_dtypes[name]),
+        )
+        for name, tensor in state_dict.items()
+    )
+
+
 def _apply_training_modifiers(
     net: nn.Module,
     modifiers: TrainingModifiers,
     beta: float,
-    device: torch.device,
     momentum_scale: float,
 ) -> None:
     """Apply the algorithm-specific gradient correction before optimizer step."""
@@ -83,10 +129,7 @@ def _apply_training_modifiers(
         for name, parameter in net.named_parameters():
             if parameter.grad is None:
                 continue
-            correction = modifiers.anchor_model[name].to(
-                device=device, dtype=parameter.grad.dtype
-            )
-            correction = correction - parameter.detach()
+            correction = modifiers.anchor_model[name] - parameter.detach()
             parameter.grad.add_(
                 correction,
                 alpha=momentum_scale * modifiers.anchor_scale,
@@ -97,7 +140,4 @@ def _apply_training_modifiers(
         for name, parameter in net.named_parameters():
             if parameter.grad is None:
                 continue
-            correction = modifiers.server_momentum[name].to(
-                device=device, dtype=parameter.grad.dtype
-            )
-            parameter.grad.add_(correction, alpha=momentum_scale)
+            parameter.grad.add_(modifiers.server_momentum[name], alpha=momentum_scale)
