@@ -64,6 +64,7 @@ def finalize_training_state(
             torch_state_dict=clone_state_dict(trained_model_state)
         )
 
+
 def _resolve_server_momentum(message: Message) -> StateDict | None:
     """Read the server-sent GHBM momentum from the incoming message."""
     momentum_record = message.content.array_records.get("server_momentum")

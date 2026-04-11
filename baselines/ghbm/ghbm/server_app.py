@@ -1,10 +1,10 @@
 """ServerApp for the GHBM Flower baseline."""
 
-from collections.abc import ItemsView, Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 import torch
-from flwr.app import ArrayRecord, Context
+from flwr.app import ArrayRecord, Context, MetricRecord
 from flwr.serverapp import Grid, ServerApp
 
 from ghbm.config import AlgorithmName, DatasetName, ModelName, NormLayer, parse_enum
@@ -25,11 +25,13 @@ def _as_bool(value: object) -> bool:
 
 def _metric_record_to_dict(record: object) -> dict[str, float]:
     """Convert Flower metric containers into plain numeric dicts."""
-    items: ItemsView[Any, Any] | list[tuple[object, object]]
-    if isinstance(record, Mapping):
+    items: Iterable[tuple[object, object]]
+    if isinstance(record, MetricRecord):
+        items = record.items()
+    elif isinstance(record, Mapping):
         items = record.items()
     else:
-        items = []
+        items = ()
     metrics = {}
     for key, value in items:
         if isinstance(value, int | float):
