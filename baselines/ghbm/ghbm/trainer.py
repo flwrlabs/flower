@@ -84,7 +84,7 @@ def _materialize_training_modifiers(
 ) -> TrainingModifiers:
     """Move static correction tensors to the training device once per round."""
     parameter_dtypes = {
-        name: parameter.dtype for name, parameter in net.named_parameters()
+        name: parameter.dtype for name, parameter in net.state_dict().items()
     }
     return TrainingModifiers(
         server_momentum=_move_state_dict_to_device(
