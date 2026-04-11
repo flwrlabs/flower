@@ -38,15 +38,22 @@ class ClientRunConfig:
     learning_rate: float
     weight_decay: float
     ghbm_beta: float
-    
+
     def __post_init__(self):
-        assert self.dirichlet_alpha >= 0, "Dirichlet alpha must be mon-negative"
-        assert self.batch_size > 0, "Batch size must be positive"
-        assert self.local_epochs > 0, "Local epochs must be positive"
-        assert 0 < self.fraction_train <= 1, "Fraction train must be in (0, 1]"
-        assert self.learning_rate > 0, "Learning rate must be positive"
-        assert self.weight_decay >= 0, "Weight decay must be non-negative"
-        assert self.ghbm_beta >= 0, "GHBM beta must be non-negative"
+        if self.dirichlet_alpha < 0:
+            raise ValueError("Dirichlet alpha must be mon-negative")
+        if self.batch_size <= 0:
+            raise ValueError("Batch size must be positive")
+        if self.local_epochs <= 0:
+            raise ValueError("Local epochs must be positive")
+        if not 0 < self.fraction_train <= 1:
+            raise ValueError("Fraction train must be in (0, 1]")
+        if self.learning_rate <= 0:
+            raise ValueError("Learning rate must be positive")
+        if self.weight_decay < 0:
+            raise ValueError("Weight decay must be non-negative")
+        if self.ghbm_beta < 0:
+            raise ValueError("GHBM beta must be non-negative")
 
 
 def _parse_client_run_config(context: Context) -> ClientRunConfig:
