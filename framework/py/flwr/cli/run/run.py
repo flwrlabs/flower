@@ -202,6 +202,9 @@ def _run_with_control_api(
         with flwr_cli_grpc_exc_handler():
             res = stub.StartRun(req)
 
+        if res.HasField("note"):
+            typer.secho(f"Note: {res.note}", fg=typer.colors.YELLOW, err=True)
+
         if res.HasField("run_id"):
             typer.secho(
                 f"🎊 Successfully started run {res.run_id}", fg=typer.colors.GREEN
@@ -215,6 +218,8 @@ def _run_with_control_api(
                 "success": res.HasField("run_id"),
                 "run-id": f"{res.run_id}" if res.HasField("run_id") else None,
             }
+            if res.HasField("note"):
+                payload["note"] = res.note
             if not is_remote_app:
                 payload.update(
                     {
