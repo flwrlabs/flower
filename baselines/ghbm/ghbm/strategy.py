@@ -4,11 +4,11 @@ from collections import OrderedDict, deque
 from collections.abc import Callable, Iterable
 from typing import Any
 
-import torch
 from flwr.app import ArrayRecord, ConfigRecord, Message, MetricRecord
 from flwr.serverapp.strategy import FedAvg
 
 from ghbm.utils import StateDict, clone_state_dict
+
 RoundLogger = Callable[[str, int, MetricRecord | None], None]
 
 
