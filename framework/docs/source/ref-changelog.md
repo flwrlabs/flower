@@ -24,7 +24,7 @@ We would like to give our special thanks to all the contributors who made the ne
 
 - **Show FlowerHub compatibility note in CLI download and review flows** ([#6989](https://github.com/flwrlabs/flower/pull/6989), [#6992](https://github.com/flwrlabs/flower/pull/6992))
 
-  Surfaces the Hub-provided compatibility note when an app download resolves to an older compatible version instead of the latest release. Reads the returned `note` field and displays it in `flwr run`, `flwr new` and `flwr app review`, improving transparency around version selection.
+  Surfaces the FlowerHub-provided compatibility note when an app download resolves to an older compatible version instead of the latest release. Reads the returned `note` field and displays it in `flwr run`, `flwr new` and `flwr app review`, improving transparency around version selection.
 
 - **Enhance authentication for `flwr-*` processes** ([#6796](https://github.com/flwrlabs/flower/pull/6796))
 
