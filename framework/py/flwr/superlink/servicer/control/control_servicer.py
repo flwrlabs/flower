@@ -279,10 +279,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
 
         log(INFO, "Created %s run %s", run_type, str(run_id))
-        response = StartRunResponse(run_id=run_id)
-        if note is not None:
-            response.note = note
-        return response
+        return StartRunResponse(run_id=run_id, note=note)
 
     def StreamLogs(  # pylint: disable=C0103
         self, request: StreamLogsRequest, context: grpc.ServicerContext
