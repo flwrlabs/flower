@@ -65,7 +65,7 @@ def test(
     """Validate the model on the test set."""
     net.to(device)
     net.eval()
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.CrossEntropyLoss(reduction='sum')
     correct, loss = 0, 0.0
     with torch.no_grad():
         for batch in testloader:
@@ -74,7 +74,7 @@ def test(
             outputs = net(images)
             loss += criterion(outputs, labels).item()
             correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
-    return loss / len(testloader), correct / len(testloader.dataset)
+    return loss / len(testloader.dataset), correct / len(testloader.dataset)
 
 
 def _materialize_training_modifiers(
