@@ -46,24 +46,6 @@ dataset: [CIFAR-10, CIFAR-100]
 
 **Training Hyperparameters:** The reproduction hyperparameters live in the launcher scripts under [`scripts/`](/home/rzaccone/flower/baselines/ghbm/scripts). The values in `pyproject.toml` are lightweight smoke-test defaults so that `flwr run .` still works without a script.
 
-| Hyperparameter | Default |
-| --- | --- |
-| `algorithm-name` | `fedavg` |
-| `num-server-rounds` | `3` |
-| `fraction-train` | `0.1` |
-| `local-epochs` | `1` |
-| `learning-rate` | `0.01` |
-| `weight-decay` | `1e-5` |
-| `ghbm-beta` | `0.9` |
-| `ghbm-tau` | `0` which defaults to `round(1 / fraction-train)` as suggested in the paper |
-| `batch-size` | `32` |
-| `evaluate-every` | `1` |
-| `dataset-name` | `cifar10` |
-| `dirichlet-alpha` | `0.1` |
-| `model-name` | `resnet` |
-| `resnet-version` | `20` |
-| `norm-layer` | `group` |
-
 
 ## Environment Setup
 
@@ -137,23 +119,12 @@ The algorithm-specific settings are:
 | Launcher | Flower algorithm | Key settings |
 | --- | --- | --- |
 | `fedavg` | `algorithm-name='fedavg'` | `ghbm-beta=0.0` |
-| `ghbm` | `algorithm-name='ghbm'` | `ghbm-beta=0.9`, `ghbm-tau=0` |
+| `ghbm` | `algorithm-name='ghbm'` | `ghbm-beta=0.9`, `ghbm-tau=0` (defaults to `1/fraction-train`)|
 | `localghbm` | `algorithm-name='localghbm'` | `ghbm-beta=0.9` |
 | `fedhbm` | `algorithm-name='fedhbm'` | `ghbm-beta=1.0` |
 | `fedcm` | implemented via `ghbm` | `ghbm-beta=0.9`, `ghbm-tau=1` |
 
-For `fedcm`, this baseline uses the GHBM implementation with `tau=1`, and the launcher sets `ghbm-beta=0.9`.
-
-Each launcher also embeds the shared reproduction settings explicitly:
-
-- `num-server-rounds=10000`
-- `fraction-train=0.1`
-- `local-epochs=1`
-- `weight-decay=1e-5`
-- `batch-size=64`
-- `model-name='resnet'`
-- `resnet-version=20`
-- `norm-layer='group'`
+For `fedcm`, this baseline uses the GHBM implementation with `tau=1`, and the launcher sets `ghbm-beta=0.9`, which is equivalent to the formulation proposed in the original FedCM paper.
 
 The reporting protocol follows the original codebase: the server forces evaluation on every one of the last 100 rounds and reports the average loss/accuracy over those 100 evaluations as the final result.
 
