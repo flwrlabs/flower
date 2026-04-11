@@ -129,7 +129,7 @@ For `fedcm`, this baseline uses the GHBM implementation with `tau=1`, and the la
 The reporting protocol follows the original codebase: the server forces evaluation on every one of the last 100 rounds and reports the average loss/accuracy over those 100 evaluations as the final result.
 
 #### 4.2 Results
-Executing the above scripts produces the following results, reproducing a subset of results presented in fig.3 (middle) of the official paper:
+Executing the above scripts produces the following results, reproducing a subset of results presented in fig.2 (middle) of the official paper:
 
 <img src="plots/eval_loss.png" alt="drawing" width="600"/>
 <img src="plots/eval_acc.png" alt="drawing" width="600"/>
