@@ -8,9 +8,7 @@ import torch
 from flwr.app import ArrayRecord, ConfigRecord, Message, MetricRecord
 from flwr.serverapp.strategy import FedAvg
 
-from ghbm.utils import clone_state_dict
-
-StateDict = OrderedDict[str, torch.Tensor]
+from ghbm.utils import StateDict, clone_state_dict
 RoundLogger = Callable[[str, int, MetricRecord | None], None]
 
 
