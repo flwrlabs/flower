@@ -1,1 +1,1 @@
-"""baseline: A Flower Baseline."""
+"""ghbm: A Flower baseline package."""

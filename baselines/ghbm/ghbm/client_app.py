@@ -29,9 +29,6 @@ from ghbm.utils import MetricDict
 app = ClientApp()
 
 
-TRAIN_SUMMARY_KEY: Final[str] = "train_summary_printed"
-
-
 @dataclass(frozen=True)
 class ClientRunConfig:
     """Parsed client-side run configuration."""
@@ -123,7 +120,7 @@ def train(msg: Message, context: Context):
     finalize_training_state(context, config.algorithm_name, model.state_dict())
 
     # Construct and return reply Message
-    model_record = ArrayRecord(model.state_dict())
+    model_record = ArrayRecord(torch_state_dict=model.state_dict())
     metrics: MetricDict = {
         "train_loss": train_loss,
         "num-examples": len(trainloader.dataset),
