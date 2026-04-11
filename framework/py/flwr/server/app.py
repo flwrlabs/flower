@@ -31,7 +31,10 @@ import grpc
 import yaml
 
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH, EventType, event
-from flwr.common.args import try_obtain_server_certificates
+from flwr.common.args import (
+    add_args_runtime_dependency_install,
+    try_obtain_server_certificates,
+)
 from flwr.common.constant import (
     AUTHN_TYPE_YAML_KEY,
     AUTHZ_TYPE_YAML_KEY,
@@ -59,6 +62,10 @@ from flwr.proto.fleet_pb2_grpc import (  # pylint: disable=E0611
 from flwr.proto.grpcadapter_pb2_grpc import add_GrpcAdapterServicer_to_server
 from flwr.server.fleet_event_log_interceptor import FleetEventLogInterceptor
 from flwr.supercore.address import parse_address, resolve_bind_address
+from flwr.supercore.auth import (
+    add_superexec_auth_secret_args,
+    load_superexec_auth_secret,
+)
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
 from flwr.supercore.object_store import ObjectStoreFactory
@@ -216,6 +223,33 @@ def run_superlink() -> None:
     # Obtain certificates
     certificates = try_obtain_server_certificates(args)
 
+    # Load SuperExec auth secret
+    superexec_auth_secret: bytes | None = None
+    if args.superexec_auth_secret_file is not None:
+        log(
+            WARN,
+            "EXPERIMENTAL: SuperExec authentication is experimental and "
+            "may change in future releases.",
+        )
+    if args.isolation == ISOLATION_MODE_SUBPROCESS:
+        if args.superexec_auth_secret_file is not None:
+            log(
+                WARN,
+                "SuperExec auth secret is ignored in subprocess isolation mode.",
+            )
+    else:
+        # Enable SuperExec auth in process mode when secret is provided
+        if args.superexec_auth_secret_file is not None:
+            try:
+                superexec_auth_secret = load_superexec_auth_secret(
+                    secret_file=args.superexec_auth_secret_file,
+                )
+            except ValueError as err:
+                flwr_exit(
+                    ExitCode.SUPERLINK_INVALID_ARGS,
+                    f"Failed to load SuperExec authentication secret: {err}",
+                )
+
     # Disable the account auth TLS check if args.disable_oidc_tls_cert_verification is
     # provided
     verify_tls_cert = not getattr(args, "disable_oidc_tls_cert_verification", None)
@@ -326,6 +360,7 @@ def run_superlink() -> None:
         state_factory=state_factory,
         objectstore_factory=objectstore_factory,
         certificates=None,  # ServerAppIo API doesn't support SSL yet
+        superexec_auth_secret=superexec_auth_secret,
     )
     grpc_servers.append(serverappio_server)
 
@@ -415,6 +450,8 @@ def run_superlink() -> None:
         command += ["--appio-api-address", appio_address]
         command += ["--plugin-type", ExecPluginType.SERVER_APP]
         command += ["--parent-pid", str(os.getpid())]
+        if args.runtime_dependency_install:
+            command += ["--allow-runtime-dependency-installation"]
         # pylint: disable-next=consider-using-with
         subprocess.Popen(command)
 
@@ -721,6 +758,7 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Enable supernode authentication.",
     )
+    add_args_runtime_dependency_install(parser)
     parser.add_argument(
         "--log-file",
         type=str,
@@ -740,6 +778,7 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         default=7,
         help="Maximum number of rotated SuperLink log files to keep.",
     )
+    add_superexec_auth_secret_args(parser)
 
 
 def _add_args_serverappio_api(parser: argparse.ArgumentParser) -> None:
