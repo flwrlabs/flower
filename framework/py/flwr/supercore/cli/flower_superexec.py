@@ -114,7 +114,7 @@ def flower_superexec() -> None:
         # Destroy the auth secret file immediately after loading
         if args.plugin_type == ExecPluginType.SERVER_APP_EPHEMERAL:
             try:
-                secret_path = Path(args.superexec_auth_secret_file)
+                secret_path = Path(args.superexec_auth_secret_file).expanduser()
                 secret_path.write_bytes(b"\x00" * secret_path.stat().st_size)
                 secret_path.unlink()
             except OSError as e:
