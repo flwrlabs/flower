@@ -16,7 +16,9 @@
 
 
 import itertools
+import os
 import random
+import signal
 import threading
 import time
 from collections.abc import Callable, Generator, Iterable
@@ -33,6 +35,7 @@ from flwr.common.typing import RunNotRunningException
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.fleet_pb2_grpc import FleetStub
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.supercore.constant import FORCE_EXIT_TIMEOUT_SECONDS
 
 
 def exponential(
@@ -352,6 +355,14 @@ def make_simple_grpc_retry_invoker() -> RetryInvoker:
     def _should_giveup_fn(e: Exception) -> bool:
         if e.code() == grpc.StatusCode.PERMISSION_DENIED:  # type: ignore
             raise RunNotRunningException
+        if e.code() == grpc.StatusCode.UNAUTHENTICATED:  # type: ignore
+            # Authentication failures should trigger shutdown rather than retrying
+            # This can occur, for example, when the user runs `flwr stop`
+            # Note: On Windows, `os.kill` terminates the process abruptly, not ideal
+            # Note: `signal.raise_signal` is not effective in `flwr-simulation`
+            os.kill(os.getpid(), signal.SIGINT)
+            time.sleep(FORCE_EXIT_TIMEOUT_SECONDS + 1)
+            return False
         if e.code() == grpc.StatusCode.UNAVAILABLE:  # type: ignore
             # Check if this is an SSL handshake failure - these should fail fast
             details = str(e.details() if hasattr(e, "details") else "").lower()

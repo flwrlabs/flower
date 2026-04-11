@@ -186,12 +186,14 @@ def test_request_download_link_all_scenarios(
                     "verifications": [
                         {"public_key_id": "key1", "sig": "abc", "algo": "ed25519"}
                     ],
+                    "note": "Compatibility fallback applied.",
                 },
             },
             "assert": lambda out: (
                 out[0] == "https://example.ai/fab.fab"
                 and isinstance(out[1], list)
                 and out[1][0]["public_key_id"] == "key1"
+                and out[2] == "Compatibility fallback applied."
             ),
         },
         {
@@ -202,7 +204,8 @@ def test_request_download_link_all_scenarios(
                 "json": {"fab_url": "https://example.ai/fab.fab"},
             },
             "assert": lambda out: out[0] == "https://example.ai/fab.fab"
-            and out[1] is None,
+            and out[1] is None
+            and out[2] is None,
         },
         {
             "name": "http_404_not_found",
@@ -300,9 +303,9 @@ def test_request_download_link_all_scenarios(
             if case["name"] == "http_404_not_found":
                 assert app_id in msg
         else:
-            # Expect a (fab_url, verifications) tuple
-            result: tuple[str, list[dict[str, str]] | None] = request_download_link(
-                app_id, app_version, in_url, out_url
+            # Expect a (fab_url, verifications, note) tuple
+            result: tuple[str, list[dict[str, str]] | None, str | None] = (
+                request_download_link(app_id, app_version, in_url, out_url)
             )
             assert case["assert"](result), f"Assertion failed for {case['name']}"
 
