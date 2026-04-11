@@ -97,7 +97,7 @@ This matches the official standard FedHBM composition: FedAvg aggregation on the
 
 #### 4.1 Scripts and setup
 
-The [`scripts/`](/home/rzaccone/flower/baselines/ghbm/scripts) directory contains one fixed launcher per algorithm for a like-for-like comparison on:
+The `scripts/` directory contains one fixed launcher per algorithm for a like-for-like comparison on:
 
 - 100 virtual clients
 - 4 GPUs
