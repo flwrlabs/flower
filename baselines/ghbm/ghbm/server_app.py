@@ -34,7 +34,7 @@ def _metric_record_to_dict(record: object) -> dict[str, float]:
         items = ()
     metrics = {}
     for key, value in items:
-        if isinstance(value, int | float):
+        if isinstance(value, (int, float)):
             metrics[str(key)] = float(value)
     return metrics
 

@@ -32,7 +32,7 @@ class LeNet(nn.Module):
 
 
 def _weights_init(module: nn.Module) -> None:
-    if isinstance(module, nn.Linear | nn.Conv2d):
+    if isinstance(module, (nn.Linear, nn.Conv2d)):
         init.kaiming_normal_(module.weight)
 
 
