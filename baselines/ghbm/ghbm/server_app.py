@@ -81,33 +81,6 @@ def _maybe_init_wandb(context: Context, num_rounds: int, ghbm_tau: int):
     )
 
 
-def _maybe_log_wandb(run: Any, result: Any) -> None:
-    """Log aggregated per-round metrics to W&B."""
-    if run is None:
-        return
-
-    import wandb  # pylint: disable=import-outside-toplevel
-
-    rounds = set(result.train_metrics_clientapp.keys()) | set(
-        result.evaluate_metrics_clientapp.keys()
-    )
-    for server_round in sorted(rounds):
-        payload = {"round": server_round}
-        if server_round in result.train_metrics_clientapp:
-            train_metrics = _metric_record_to_dict(
-                result.train_metrics_clientapp[server_round]
-            )
-            payload.update({f"train/{k}": v for k, v in train_metrics.items()})
-        if server_round in result.evaluate_metrics_clientapp:
-            eval_metrics = _metric_record_to_dict(
-                result.evaluate_metrics_clientapp[server_round]
-            )
-            payload.update({f"eval/{k}": v for k, v in eval_metrics.items()})
-        wandb.log(payload, step=server_round)
-
-    run.finish()
-
-
 def _maybe_get_wandb_round_logger(context: Context, num_rounds: int, ghbm_tau: int):
     """Create a per-round W&B logger callback when enabled."""
     try:
