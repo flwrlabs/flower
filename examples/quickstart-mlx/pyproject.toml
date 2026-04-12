@@ -8,7 +8,7 @@ version = "1.1.0"
 description = "Federated Learning with MLX and Flower (Quickstart Example)"
 license = {file = "LICENSE"}
 dependencies = [
-    "flwr[simulation]>=1.28.0",
+    "flwr[simulation]>=1.29.0",
     "flwr-datasets[vision]>=0.6.0",
     "mlx==0.29.4",
 ]
