@@ -173,6 +173,38 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(run_info.fab_id, fab_id)
         self.assertEqual(run_info.fab_version, fab_version)
         self.assertEqual(run_info.run_type, RunType.SERVER_APP)
+        self.assertFalse(response.HasField("note"))
+
+    def test_start_run_returns_note_for_remote_app(self) -> None:
+        """Test StartRun includes the Hub compatibility note for remote apps."""
+        request = StartRunRequest(
+            app_spec="@anne-dev/simple-legacy-127",
+            federation=NOOP_FEDERATION,
+        )
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer._get_remote_fab",
+                return_value=(
+                    b"test FAB content 123456",
+                    {"valid_license": ""},
+                    "Using app version 0.1.0 because the latest published version "
+                    "requires a newer Flower version.",
+                ),
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+            ) as mock_get_fab_config,
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+            ) as mock_get_metadata_from_config,
+        ):
+            mock_get_fab_config.return_value = {"tool": {"flwr": {"app": {}}}}
+            mock_get_metadata_from_config.return_value = ("flwr/demo", "0.1.0")
+            response = self.servicer.StartRun(request, Mock())
+
+        assert response.HasField("note")
+        assert response.note
 
     def test_start_run_accepts_valid_nested_override_keys(self) -> None:
         """Test StartRun accepts valid dotted override keys from nested FAB config."""
