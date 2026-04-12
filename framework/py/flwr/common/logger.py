@@ -437,7 +437,7 @@ def start_log_uploader(
 
 
 def stop_log_uploader(
-    log_queue: Queue[str | None], log_uploader: threading.Thread, timeout: float = 1.0
+    log_queue: Queue[str | None], log_uploader: threading.Thread, timeout: float = 3.0
 ) -> None:
     """Stop the log uploader thread."""
     log_queue.put(None)

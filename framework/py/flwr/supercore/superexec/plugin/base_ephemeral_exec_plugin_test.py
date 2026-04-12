@@ -91,3 +91,27 @@ def test_launch_app_runs_expected_command_and_exits() -> None:
         ExitCode.SUCCESS,
         "App process finished, exiting SuperExec.",
     )
+
+
+def test_launch_app_calls_cleanup_before_launch() -> None:
+    """Launch should invoke cleanup_before_launch before running the subprocess."""
+    # Prepare
+    call_log: list[str] = []
+    plugin = _EphemeralExecPlugin(
+        appio_api_address="127.0.0.1:9091",
+        get_run=_get_run,
+    )
+    plugin.cleanup_before_launch = lambda: call_log.append("cleanup")
+
+    # Execute
+    with (
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.run",
+            side_effect=lambda *_, **__: call_log.append("subprocess"),
+        ),
+        patch("flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"),
+    ):
+        plugin.launch_app(token="token-abc", run_id=1)
+
+    # Assert
+    assert call_log == ["cleanup", "subprocess"]
