@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-08 01:25+0000\n"
+"POT-Creation-Date: 2026-04-12 01:43+0000\n"
 "PO-Revision-Date: 2024-06-12 10:09+0000\n"
 "Last-Translator: Yan Gao <y.gaogy@gmail.com>\n"
 "Language: zh_Hans\n"
@@ -377,10 +377,10 @@ msgstr "构建文档"
 #: ../../source/ref-exit-codes/203.rst:7 ../../source/ref-exit-codes/3.rst:7
 #: ../../source/ref-exit-codes/300.rst:7 ../../source/ref-exit-codes/302.rst:7
 #: ../../source/ref-exit-codes/303.rst:7 ../../source/ref-exit-codes/304.rst:7
-#: ../../source/ref-exit-codes/400.rst:7 ../../source/ref-exit-codes/500.rst:7
-#: ../../source/ref-exit-codes/600.rst:7 ../../source/ref-exit-codes/601.rst:7
-#: ../../source/ref-exit-codes/602.rst:7 ../../source/ref-exit-codes/700.rst:7
-#: ../../source/ref-exit-codes/701.rst:7
+#: ../../source/ref-exit-codes/400.rst:7 ../../source/ref-exit-codes/401.rst:7
+#: ../../source/ref-exit-codes/500.rst:7 ../../source/ref-exit-codes/600.rst:7
+#: ../../source/ref-exit-codes/601.rst:7 ../../source/ref-exit-codes/602.rst:7
+#: ../../source/ref-exit-codes/700.rst:7 ../../source/ref-exit-codes/701.rst:7
 #, fuzzy
 msgid "Description"
 msgstr "停用"
@@ -11731,70 +11731,74 @@ msgid "``state.db`` stores the local SuperLink state"
 msgstr ""
 
 #: ../../source/how-to-run-flower-locally.rst:130
-msgid "``ffs/`` stores SuperLink file artifacts"
-msgstr ""
-
-#: ../../source/how-to-run-flower-locally.rst:131
 msgid "``superlink.log`` stores the local SuperLink process output"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:133
+#: ../../source/how-to-run-flower-locally.rst:132
 msgid "These files persist across local runs until you remove them yourself."
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:139
+#: ../../source/how-to-run-flower-locally.rst:136
+msgid ""
+"Starting with Flower 1.29 FABs are stored in SuperLink state instead of a"
+" separate local ``ffs/`` directory. This is a breaking change: legacy "
+"filesystem FAB data is not migrated, and older runs that depended on that"
+" storage are not recoverable after upgrade without manual migration."
+msgstr ""
+
+#: ../../source/how-to-run-flower-locally.rst:145
 msgid "Stop the background local SuperLink"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:141
+#: ../../source/how-to-run-flower-locally.rst:147
 msgid ""
 "There is currently no dedicated ``flwr`` command to stop the managed "
 "local SuperLink process. To stop it, first inspect the matching process "
 "and then terminate it."
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:145
+#: ../../source/how-to-run-flower-locally.rst:151
 msgid "macOS/Linux"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:147
-#: ../../source/how-to-run-flower-locally.rst:162
+#: ../../source/how-to-run-flower-locally.rst:153
+#: ../../source/how-to-run-flower-locally.rst:168
 msgid "Inspect the process:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:153
-#: ../../source/how-to-run-flower-locally.rst:172
+#: ../../source/how-to-run-flower-locally.rst:159
+#: ../../source/how-to-run-flower-locally.rst:178
 #, fuzzy
 msgid "Stop the process:"
 msgstr "启动服务器"
 
-#: ../../source/how-to-run-flower-locally.rst:160
+#: ../../source/how-to-run-flower-locally.rst:166
 msgid "Windows PowerShell"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:182
+#: ../../source/how-to-run-flower-locally.rst:188
 msgid ""
 "If you changed the local Control API port with "
 "``FLWR_LOCAL_CONTROL_API_PORT``, replace ``39093`` in the commands above."
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:187
+#: ../../source/how-to-run-flower-locally.rst:193
 msgid "Troubleshooting"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:189
+#: ../../source/how-to-run-flower-locally.rst:195
 msgid ""
 "If you see SQL database errors such as ``database is locked``, see "
 ":ref:`FAQ <faq-local-superlink-db-error>`."
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:192
+#: ../../source/how-to-run-flower-locally.rst:198
 msgid ""
 "If a local run fails before it starts, or if the managed local SuperLink "
 "does not come up correctly, inspect:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-locally.rst:199
+#: ../../source/how-to-run-flower-locally.rst:205
 msgid ""
 "That log contains the output of the background ``flower-superlink`` "
 "process and is the first place to check for startup errors, port "
@@ -17340,9 +17344,10 @@ msgid ""
 msgstr ""
 
 #: ../../flwr run:1
-#, fuzzy
-msgid "Path of the Flower App to run."
-msgstr "基础镜像的存储库名称。"
+msgid ""
+"Path of the Flower App to run, or a remote app spec like "
+"'@account_name/app_name'."
+msgstr ""
 
 #: ../../flwr stop:1
 #, fuzzy
@@ -36362,6 +36367,7 @@ msgstr ""
 #: ../../source/ref-exit-codes/303.rst:14
 #: ../../source/ref-exit-codes/304.rst:15
 #: ../../source/ref-exit-codes/400.rst:14
+#: ../../source/ref-exit-codes/401.rst:13
 #: ../../source/ref-exit-codes/500.rst:17
 #: ../../source/ref-exit-codes/600.rst:14
 #: ../../source/ref-exit-codes/601.rst:13
@@ -36810,6 +36816,30 @@ msgstr ""
 msgid ""
 "Review the accompanying error message for details on the invalid portion,"
 " and correct any syntax or structural issues."
+msgstr ""
+
+#: ../../source/ref-exit-codes/401.rst:3
+msgid "[401] SUPEREXEC_AUTH_SECRET_LOAD_FAILED"
+msgstr ""
+
+#: ../../source/ref-exit-codes/401.rst:9
+msgid ""
+"The SuperExec auth secret could not be loaded from the provided secret "
+"file."
+msgstr ""
+
+#: ../../source/ref-exit-codes/401.rst:15
+msgid "Confirm the ``--superexec-auth-secret-file`` path exists and is readable."
+msgstr ""
+
+#: ../../source/ref-exit-codes/401.rst:16
+msgid "Ensure the secret file is not empty."
+msgstr ""
+
+#: ../../source/ref-exit-codes/401.rst:17
+msgid ""
+"Check the accompanying error message for the exact file access/validation"
+" failure."
 msgstr ""
 
 #: ../../source/ref-exit-codes/500.rst:3
@@ -70574,5 +70604,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "`superlink.networkPolicy.simulationIo.ingressNSPodMatchLabels`"
+#~ msgstr ""
+
+#~ msgid "``ffs/`` stores SuperLink file artifacts"
 #~ msgstr ""
 
