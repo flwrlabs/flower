@@ -306,6 +306,7 @@ supernode:
 | `supernode.replicas`                                                | The number of SuperNode pods to run                                                                                     | `1`                        |
 | `supernode.labels`                                                  | Extra labels for SuperNode pods                                                                                         | `{}`                       |
 | `supernode.extraArgs`                                               | Add extra arguments to the default arguments for the SuperNode                                                          | `[]`                       |
+| `supernode.superexecAuthSecretFile`                                 | Path to a file containing the SuperExec shared secret.                                                                  | `""`                       |
 | `supernode.nodeSelector`                                            | Node labels for SuperNode pods which merges with global.nodeSelector                                                    | `{}`                       |
 | `supernode.tolerations`                                             | Node tolerations for SuperNode pods which merges with global.tolerations                                                | `[]`                       |
 | `supernode.updateStrategy.type`                                     | SuperNode deployment strategy type                                                                                      | `RollingUpdate`            |
@@ -332,7 +333,7 @@ supernode:
 | `supernode.imagePullSecrets`                                        | SuperNode image pull secrets which overrides global.imagePullSecrets                                                    | `[]`                       |
 | `supernode.image.registry`                                          | SuperNode image registry                                                                                                | `registry.hub.docker.com`  |
 | `supernode.image.repository`                                        | SuperNode image repository                                                                                              | `flwr/supernode-ee`        |
-| `supernode.image.tag`                                               | Image tag of SuperNode                                                                                                  | `1.28.0-ubuntu`            |
+| `supernode.image.tag`                                               | Image tag of SuperNode                                                                                                  | `1.29.0-ubuntu`            |
 | `supernode.image.digest`                                            | Image digest of SuperNode                                                                                               | `""`                       |
 | `supernode.image.pullPolicy`                                        | Components image pullPolicy                                                                                             | `IfNotPresent`             |
 | `supernode.networkPolicy.enabled`                                   | Specifies whether a NetworkPolicy should be created                                                                     | `true`                     |
@@ -353,6 +354,7 @@ supernode:
 | `superexec.pluginType`                                  | The type of plugin to use.                                                                                        | `clientapp`               |
 | `superexec.resources`                                   | Set container requests and limits for different resources like CPU or memory (essential for production workloads) | `{}`                      |
 | `superexec.supernode`                                   | Address of the supernode the SuperExec should connect to                                                          | `{}`                      |
+| `superexec.superexecAuthSecretFile`                     | Path to a file containing the SuperExec shared secret.                                                            | `""`                      |
 | `superexec.volumes`                                     | Specify a list of volumes for the SuperExec pod(s)                                                                | `[]`                      |
 | `superexec.volumeMounts`                                | Allows to specify additional VolumeMounts                                                                         | `[]`                      |
 | `superexec.automountServiceAccountToken`                | Automount SA-Token into the pod.                                                                                  | `true`                    |
@@ -391,7 +393,7 @@ supernode:
 | `superexec.imagePullSecrets`                            | SuperExec image pull secrets which overrides global.imagePullSecrets                                              | `[]`                      |
 | `superexec.image.registry`                              | SuperExec image registry                                                                                          | `registry.hub.docker.com` |
 | `superexec.image.repository`                            | SuperExec image repository                                                                                        | `flwr/superexec-ee`       |
-| `superexec.image.tag`                                   | Image tag of SuperExec                                                                                            | `1.28.0-ubuntu`           |
+| `superexec.image.tag`                                   | Image tag of SuperExec                                                                                            | `1.29.0-ubuntu`           |
 | `superexec.image.digest`                                | Image digest of SuperExec                                                                                         | `""`                      |
 | `superexec.image.pullPolicy`                            | Components image pullPolicy                                                                                       | `IfNotPresent`            |
 | `superexec.networkPolicy.enabled`                       | Specifies whether a NetworkPolicy should be created                                                               | `true`                    |
