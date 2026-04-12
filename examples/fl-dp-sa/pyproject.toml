@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fl-dp-sa"
-version = "1.1.0"
+version = "1.1.1"
 description = "Central Differential Privacy and Secure Aggregation in Flower"
 license = { file = "LICENSE" }
 dependencies = [
@@ -20,7 +20,7 @@ packages = ["."]
 [tool.flwr.app]
 publisher = "flwrlabs"
 fab-format-version = 1
-flwr-version-target = "1.28.0"
+flwr-version-target = "1.29.0"
 
 [tool.flwr.app.components]
 serverapp = "fl_dp_sa.server_app:app"
