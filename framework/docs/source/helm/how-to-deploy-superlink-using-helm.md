@@ -851,7 +851,6 @@ global:
 | `superexec.enabled`                                     | Enable or disable SuperExec                                                                                       | `false`                   |
 | `superexec.pluginType`                                  | The type of plugin to use.                                                                                        | `serverapp`               |
 | `superexec.superlink`                                   | Address of the SuperLink the SuperExec should connect to                                                          | `{}`                      |
-| `superexec.allowRuntimeDependencyInstallation`          | Allow SuperExec to install runtime dependencies for ServerApps.                                                   | `false`                   |
 | `superexec.resources`                                   | Set container requests and limits for different resources like CPU or memory (essential for production workloads) | `{}`                      |
 | `superexec.volumes`                                     | Optionally specify list of volumes for the SuperExec pod(s)                                                       | `[]`                      |
 | `superexec.volumeMounts`                                | Allows to specify additional VolumeMounts                                                                         | `[]`                      |
