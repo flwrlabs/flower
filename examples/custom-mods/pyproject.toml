@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "custom-mods"
-version = "1.1.0"
+version = "1.1.1"
 description = "Custom Flower Mods in Flower Apps"
 license = { file = "LICENSE" }
 dependencies = [

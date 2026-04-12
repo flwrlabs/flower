@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-pennylane"
-version = "1.1.0"
+version = "1.1.1"
 description = "Quantum Federated Learning with PennyLane and Flower"
 license = {file = "LICENSE"}
 authors = [

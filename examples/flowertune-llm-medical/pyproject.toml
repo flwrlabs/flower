@@ -9,7 +9,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flowertune-llm-medical"
-version = "1.2.0"
+version = "1.2.1"
 description = "Base App for the Medical challenge in the FlowerTune LLM Leaderboard"
 license = {file = "LICENSE"}
 # Dependencies for your Flower App

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-pytorch"
-version = "1.1.0"
+version = "1.1.1"
 description = "Federated Learning with PyTorch and Flower (Quickstart Example)"
 license = {file = "LICENSE"}
 dependencies = [

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fl-tabular"
-version = "1.1.0"
+version = "1.1.1"
 description = "Adult Census Income Tabular Dataset and Federated Learning in Flower"
 license = { file = "LICENSE" }
 dependencies = [

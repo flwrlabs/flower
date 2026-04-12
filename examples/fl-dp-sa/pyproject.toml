@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fl-dp-sa"
-version = "1.1.0"
+version = "1.1.1"
 description = "Central Differential Privacy and Secure Aggregation in Flower"
 license = { file = "LICENSE" }
 dependencies = [
