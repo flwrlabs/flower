@@ -306,6 +306,7 @@ supernode:
 | `supernode.replicas`                                                | The number of SuperNode pods to run                                                                                     | `1`                        |
 | `supernode.labels`                                                  | Extra labels for SuperNode pods                                                                                         | `{}`                       |
 | `supernode.extraArgs`                                               | Add extra arguments to the default arguments for the SuperNode                                                          | `[]`                       |
+| `supernode.superexecAuthSecretFile`                                 | Path to a file containing the SuperExec shared secret.                                                                  | `""`                       |
 | `supernode.nodeSelector`                                            | Node labels for SuperNode pods which merges with global.nodeSelector                                                    | `{}`                       |
 | `supernode.tolerations`                                             | Node tolerations for SuperNode pods which merges with global.tolerations                                                | `[]`                       |
 | `supernode.updateStrategy.type`                                     | SuperNode deployment strategy type                                                                                      | `RollingUpdate`            |
@@ -353,6 +354,7 @@ supernode:
 | `superexec.pluginType`                                  | The type of plugin to use.                                                                                        | `clientapp`               |
 | `superexec.resources`                                   | Set container requests and limits for different resources like CPU or memory (essential for production workloads) | `{}`                      |
 | `superexec.supernode`                                   | Address of the supernode the SuperExec should connect to                                                          | `{}`                      |
+| `superexec.superexecAuthSecretFile`                     | Path to a file containing the SuperExec shared secret.                                                            | `""`                      |
 | `superexec.volumes`                                     | Specify a list of volumes for the SuperExec pod(s)                                                                | `[]`                      |
 | `superexec.volumeMounts`                                | Allows to specify additional VolumeMounts                                                                         | `[]`                      |
 | `superexec.automountServiceAccountToken`                | Automount SA-Token into the pod.                                                                                  | `true`                    |

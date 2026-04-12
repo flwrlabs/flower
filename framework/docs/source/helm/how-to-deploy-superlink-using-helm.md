@@ -777,6 +777,7 @@ global:
 | `superlink.replicaCount`                                      | The number of SuperLink pods to run                                                                                     | `1`                       |
 | `superlink.labels`                                            | Extra labels for SuperLink pods                                                                                         | `{}`                      |
 | `superlink.extraArgs`                                         | Add extra arguments to the default arguments for the SuperLink                                                          | `[]`                      |
+| `superlink.superexecAuthSecretFile`                           | Path to a file containing the SuperExec shared secret.                                                                  | `""`                      |
 | `superlink.nodeSelector`                                      | Node labels for SuperLink pods which merges with global.nodeSelector                                                    | `{}`                      |
 | `superlink.tolerations`                                       | Node tolerations for SuperLink pods which merges with global.tolerations                                                | `[]`                      |
 | `superlink.updateStrategy.type`                               | SuperLink deployment strategy type                                                                                      | `RollingUpdate`           |
@@ -851,6 +852,8 @@ global:
 | `superexec.enabled`                                     | Enable or disable SuperExec                                                                                       | `false`                   |
 | `superexec.pluginType`                                  | The type of plugin to use.                                                                                        | `serverapp`               |
 | `superexec.superlink`                                   | Address of the SuperLink the SuperExec should connect to                                                          | `{}`                      |
+| `superexec.superexecAuthSecretFile`                     | Path to a file containing the SuperExec shared secret.                                                            | `""`                      |
+| `superexec.allowRuntimeDependencyInstallation`          | Allow SuperExec to install runtime dependencies for ServerApps.                                                   | `false`                   |
 | `superexec.resources`                                   | Set container requests and limits for different resources like CPU or memory (essential for production workloads) | `{}`                      |
 | `superexec.volumes`                                     | Optionally specify list of volumes for the SuperExec pod(s)                                                       | `[]`                      |
 | `superexec.volumeMounts`                                | Allows to specify additional VolumeMounts                                                                         | `[]`                      |
