@@ -27,7 +27,7 @@ publisher = "flwrlabs"
 # Point to your ServerApp and ClientApp objects
 # Format: "<module>:<object>"
 fab-format-version = 1
-flwr-version-target = "1.28.0"
+flwr-version-target = "1.29.0"
 
 [tool.flwr.app.components]
 serverapp = "quickstart_numpy.server_app:app"
