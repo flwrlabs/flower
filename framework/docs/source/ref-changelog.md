@@ -1,6 +1,56 @@
 # Changelog
 
-## Unreleased
+## v1.29.0 (2026-04-11)
+
+### Thanks to our contributors
+
+We would like to give our special thanks to all the contributors who made the new version of Flower possible (in `git shortlog` order):
+
+`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Heng Pan`, `Javier`, `Micah Sheller`, `Mohammad Naseri`, `Patrick Foley`, `Yan Gao` <!---TOKEN_v1.29.0-->
+
+### What's new?
+
+- **Introduce runtime dependency installation option for isolated execution** ([#6741](https://github.com/flwrlabs/flower/pull/6741))
+
+  Introduces the `--allow-runtime-dependency-installation` flag to `flower-superexec`, enabling runtime dependency installation via `uv` so that applications with differing dependencies can run independently. Runtime dependency installation automatically creates an independent venv for each run, even if those runs happen concurrently. Propagates this option from `flower-superlink`/`flower-supernode` to automatically started `flower-superexec` instances when using subprocess isolation mode.
+
+- **Improve federation run management and validation** ([#6943](https://github.com/flwrlabs/flower/pull/6943), [#6956](https://github.com/flwrlabs/flower/pull/6956), [#6957](https://github.com/flwrlabs/flower/pull/6957), [#6961](https://github.com/flwrlabs/flower/pull/6961))
+
+  Enhances federation functionality by enabling members to inspect run details, stream logs, and stop runs directly within a federation. Introduces validation for federation names during creation. Hides the SuperNode status column when a federation is archived.
+
+- **Introduce SuperExec authentication with HMAC and shared secrets** ([#6948](https://github.com/flwrlabs/flower/pull/6948), [#6949](https://github.com/flwrlabs/flower/pull/6949), [#6950](https://github.com/flwrlabs/flower/pull/6950), [#6951](https://github.com/flwrlabs/flower/pull/6951), [#6952](https://github.com/flwrlabs/flower/pull/6952), [#6977](https://github.com/flwrlabs/flower/pull/6977), [#6978](https://github.com/flwrlabs/flower/pull/6978), [#6979](https://github.com/flwrlabs/flower/pull/6979), [#6980](https://github.com/flwrlabs/flower/pull/6980), [#6981](https://github.com/flwrlabs/flower/pull/6981))
+
+  Introduces an experimental SuperExec authentication mechanism based on shared-secret HMAC. Establishes core primitives, nonce replay protection, and interceptor foundations, and integrates authentication into ServerAppIo and ClientAppIo.
+
+- **Show Flower Hub compatibility note in CLI download and review flows** ([#6989](https://github.com/flwrlabs/flower/pull/6989), [#6992](https://github.com/flwrlabs/flower/pull/6992))
+
+  Surfaces the Flower Hub-provided compatibility note when an app download resolves to an older compatible version instead of the latest release. Reads the returned `note` field and displays it in `flwr run`, `flwr new` and `flwr app review`, improving transparency around version selection.
+
+- **Enhance authentication for `flwr-*` processes** ([#6796](https://github.com/flwrlabs/flower/pull/6796))
+
+  Improves security by authenticating RPC calls from `flwr-serverapp`, `flwr-simulation`, and `flwr-clientapp` using token-based mechanism.
+
+- **Update examples with FAB metadata and improved documentation** ([#6890](https://github.com/flwrlabs/flower/pull/6890), [#6935](https://github.com/flwrlabs/flower/pull/6935))
+
+  Enhances examples by updating README files to use local SuperLink and adding FAB format metadata (`fab-format-version = 1` and `flwr-version-target`). Introduces LICENSE files across published apps and bumps application versions at the minor level to reflect these updates.
+
+- **Display full FAB hash in `flwr list` JSON output** ([#6958](https://github.com/flwrlabs/flower/pull/6958))
+
+  Replaces truncated FAB hash with the full hash value in the JSON output of `flwr list`, ensuring complete and accurate identification of FABs.
+
+- **Update documentation** ([#6959](https://github.com/flwrlabs/flower/pull/6959), [#6964](https://github.com/flwrlabs/flower/pull/6964), [#6966](https://github.com/flwrlabs/flower/pull/6966))
+
+- **Stabilize CI pipelines and improve test reliability** ([#6911](https://github.com/flwrlabs/flower/pull/6911), [#6974](https://github.com/flwrlabs/flower/pull/6974), [#6985](https://github.com/flwrlabs/flower/pull/6985), [#6987](https://github.com/flwrlabs/flower/pull/6987))
+
+- **General improvements** ([#6931](https://github.com/flwrlabs/flower/pull/6931), [#6944](https://github.com/flwrlabs/flower/pull/6944), [#6946](https://github.com/flwrlabs/flower/pull/6946), [#6955](https://github.com/flwrlabs/flower/pull/6955), [#6970](https://github.com/flwrlabs/flower/pull/6970), [#6973](https://github.com/flwrlabs/flower/pull/6973), [#6982](https://github.com/flwrlabs/flower/pull/6982), [#6983](https://github.com/flwrlabs/flower/pull/6983), [#6988](https://github.com/flwrlabs/flower/pull/6988), [#6990](https://github.com/flwrlabs/flower/pull/6990), [#6994](https://github.com/flwrlabs/flower/pull/6994), [#6995](https://github.com/flwrlabs/flower/pull/6995), [#6996](https://github.com/flwrlabs/flower/pull/6996), [#6997](https://github.com/flwrlabs/flower/pull/6997), [#6999](https://github.com/flwrlabs/flower/pull/6999), [#7003](https://github.com/flwrlabs/flower/pull/7003), [#7004](https://github.com/flwrlabs/flower/pull/7004), [#7005](https://github.com/flwrlabs/flower/pull/7005))
+
+  As always, many parts of the Flower framework and quality infrastructure were improved and updated.
+
+### Incompatible changes
+
+- **Remove Flower File Storage (FFS)** ([#6809](https://github.com/flwrlabs/flower/pull/6809), [#6810](https://github.com/flwrlabs/flower/pull/6810))
+
+  Removes Flower File Storage (FFS) and transitions to `LinkState`-based storage, introducing replacement methods in `LinkState` and `NodeState`. Eliminates the `--storage-dir` option from `flower-superlink` as part of this change.
 
 ## v1.28.0 (2026-04-02)
 

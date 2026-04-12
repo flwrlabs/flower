@@ -15,6 +15,7 @@
 """In-memory CoreState implementation."""
 
 
+import hashlib
 import secrets
 from dataclasses import dataclass
 from threading import Lock
@@ -25,6 +26,7 @@ from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
 )
+from flwr.common.typing import Fab
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -38,20 +40,54 @@ class TokenRecord:
     active_until: float
 
 
-class InMemoryCoreState(CoreState):
+class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attributes
     """In-memory CoreState implementation."""
 
     def __init__(self, object_store: ObjectStore) -> None:
         self._object_store = object_store
+        self.fab_store: dict[str, Fab] = {}
+        self.lock_fab_store = Lock()
         # Store run ID to token mapping and token to run ID mapping
         self.token_store: dict[int, TokenRecord] = {}
         self.token_to_run_id: dict[str, int] = {}
         self.lock_token_store = Lock()
+        self.nonce_store: dict[tuple[str, str], float] = {}
+        self.lock_nonce_store = Lock()
 
     @property
     def object_store(self) -> ObjectStore:
         """Return the ObjectStore instance used by this CoreState."""
         return self._object_store
+
+    def store_fab(self, fab: Fab) -> str:
+        """Store a FAB."""
+        fab_hash = hashlib.sha256(fab.content).hexdigest()
+        if fab.hash_str and fab.hash_str != fab_hash:
+            raise ValueError(
+                f"FAB hash mismatch: provided {fab.hash_str}, computed {fab_hash}"
+            )
+        with self.lock_fab_store:
+            # Keep launch behavior: last write wins for metadata under the same
+            # content hash.
+            self.fab_store[fab_hash] = Fab(
+                hash_str=fab_hash,
+                content=fab.content,
+                verifications=dict(fab.verifications),
+            )
+        return fab_hash
+
+    def get_fab(self, fab_hash: str) -> Fab | None:
+        """Return a FAB by hash."""
+        with self.lock_fab_store:
+            if (fab := self.fab_store.get(fab_hash)) is None:
+                return None
+            # Launch tradeoff: do not recompute content hash on reads; rely on
+            # write-time validation and hash-addressed lookup.
+            return Fab(
+                hash_str=fab.hash_str,
+                content=fab.content,
+                verifications=dict(fab.verifications),
+            )
 
     def create_token(self, run_id: int) -> str | None:
         """Create a token for the given run ID."""
@@ -136,3 +172,22 @@ class InMemoryCoreState(CoreState):
             List of tuples containing (run_id, active_until timestamp)
             for expired tokens.
         """
+
+    def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:
+        """Atomically reserve a nonce in a namespace."""
+        if namespace == "" or nonce == "":
+            return False
+        with self.lock_nonce_store:
+            self._cleanup_expired_nonces()
+            key = (namespace, nonce)
+            if key in self.nonce_store:
+                return False
+            self.nonce_store[key] = expires_at
+            return True
+
+    def _cleanup_expired_nonces(self) -> None:
+        """Delete nonce reservations that are no longer active."""
+        current = now().timestamp()
+        for key, expires_at in list(self.nonce_store.items()):
+            if expires_at < current:
+                del self.nonce_store[key]

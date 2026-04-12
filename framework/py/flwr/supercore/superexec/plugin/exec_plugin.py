@@ -19,6 +19,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from typing import Any
 
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.typing import Run
 
 
@@ -29,9 +30,11 @@ class ExecPlugin(ABC):
         self,
         appio_api_address: str,
         get_run: Callable[[int], Run],
+        runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
     ) -> None:
         self.appio_api_address = appio_api_address
         self.get_run = get_run
+        self.runtime_dependency_install = runtime_dependency_install
 
     @abstractmethod
     def select_run_id(self, candidate_run_ids: Sequence[int]) -> int | None:

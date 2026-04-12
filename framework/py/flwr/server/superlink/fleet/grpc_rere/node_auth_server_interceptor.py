@@ -17,7 +17,7 @@
 
 import datetime
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any
 
 import grpc
 from google.protobuf.message import Message as GrpcMessage
@@ -36,6 +36,7 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, verify_signature
+from flwr.supercore.utils import get_metadata_bytes, get_metadata_str
 
 MIN_TIMESTAMP_DIFF = -SYSTEM_TIME_TOLERANCE
 MAX_TIMESTAMP_DIFF = TIMESTAMP_TOLERANCE + SYSTEM_TIME_TOLERANCE
@@ -78,14 +79,13 @@ class NodeAuthServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         if not handler_call_details.method.startswith("/flwr.proto.Fleet/"):
             return continuation(handler_call_details)
 
-        metadata_dict = dict(handler_call_details.invocation_metadata)
+        metadata = handler_call_details.invocation_metadata
 
         # Retrieve info from the metadata
-        try:
-            node_pk_bytes = cast(bytes, metadata_dict[PUBLIC_KEY_HEADER])
-            timestamp_iso = cast(str, metadata_dict[TIMESTAMP_HEADER])
-            signature = cast(bytes, metadata_dict[SIGNATURE_HEADER])
-        except KeyError:
+        node_pk_bytes = get_metadata_bytes(metadata, PUBLIC_KEY_HEADER)
+        timestamp_iso = get_metadata_str(metadata, TIMESTAMP_HEADER)
+        signature = get_metadata_bytes(metadata, SIGNATURE_HEADER)
+        if not node_pk_bytes or not timestamp_iso or not signature:
             return _unary_unary_rpc_terminator("Missing authentication metadata")
 
         # Verify the signature
