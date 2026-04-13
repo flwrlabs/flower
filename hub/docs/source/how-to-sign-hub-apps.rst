@@ -36,11 +36,11 @@ Prerequisites
 - The corresponding public key added to your Flower account profile
 - An app on Flower Hub to review and sign
 
-Log in to your Flower account:
+Log in to your Flower account on SuperGrid:
 
 .. code-block:: bash
 
-    flwr login
+    flwr login supergrid
 
 
 Create a Signing Key
