@@ -93,10 +93,10 @@ Examples:
 .. code-block:: bash
 
     # Sign latest version
-    flwr app review @myorg/myapp
+    flwr app review @flwrlabs/quickstart-pytorch
 
     # Sign a specific version
-    flwr app review @myorg/myapp==1.2.0
+    flwr app review @flwrlabs/quickstart-pytorch==1.1.0
 
 
 Review and Sign the App
