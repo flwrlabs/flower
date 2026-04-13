@@ -41,6 +41,7 @@ How-to guides provide step-by-step instructions to help you accomplish specific 
 
   how-to-use-app-from-hub
   how-to-publish-app-on-hub
+  how-to-sign-hub-apps
 
 
 Explanations
