@@ -12,6 +12,7 @@
 #include <cstring>
 #include <ctime>
 #include <iostream>
+#include <stdexcept>
 #include <unistd.h>
 
 gRPCRereCommunicator::gRPCRereCommunicator(std::string server_address,
@@ -35,7 +36,8 @@ gRPCRereCommunicator::gRPCRereCommunicator(std::string server_address,
 
   FILE *f = fopen("/dev/urandom", "rb");
   if (f) {
-    fread(key_bytes, 1, sizeof(key_bytes), f);
+    if (fread(key_bytes, 1, sizeof(key_bytes), f) != sizeof(key_bytes))
+      std::cerr << "Warning: short read from /dev/urandom" << std::endl;
     fclose(f);
   }
 
@@ -57,19 +59,44 @@ gRPCRereCommunicator::gRPCRereCommunicator(std::string server_address,
 
   // Construct the EC key from our private key scalar.
   EC_GROUP *group = EC_GROUP_new_by_curve_name(NID_secp384r1);
+  if (!group)
+    throw std::runtime_error("Failed to create EC group for SECP384R1");
+
   EC_KEY *ec_key = EC_KEY_new();
-  EC_KEY_set_group(ec_key, group);
+  if (!ec_key)
+    throw std::runtime_error("Failed to create EC_KEY");
+  if (!EC_KEY_set_group(ec_key, group))
+    throw std::runtime_error("Failed to set EC group on key");
 
   BIGNUM *priv_bn = BN_bin2bn(key_bytes, sizeof(key_bytes), nullptr);
-  EC_KEY_set_private_key(ec_key, priv_bn);
+  if (!priv_bn)
+    throw std::runtime_error("Failed to create BIGNUM from key bytes");
+
+  // Reduce private key modulo curve order into valid range [1, order-1].
+  const BIGNUM *order = EC_GROUP_get0_order(group);
+  BIGNUM *one = BN_new();
+  BN_one(one);
+  BN_CTX *bn_ctx = BN_CTX_new();
+  if (!BN_mod(priv_bn, priv_bn, order, bn_ctx))
+    throw std::runtime_error("Failed to reduce private key modulo order");
+  if (BN_is_zero(priv_bn))
+    BN_copy(priv_bn, one);  // Avoid zero — use 1 instead
+  BN_CTX_free(bn_ctx);
+  BN_free(one);
+
+  if (!EC_KEY_set_private_key(ec_key, priv_bn))
+    throw std::runtime_error("Failed to set EC private key");
 
   // Derive public key from private key scalar.
   EC_POINT *pub_pt = EC_POINT_new(group);
-  EC_POINT_mul(group, pub_pt, priv_bn, nullptr, nullptr, nullptr);
-  EC_KEY_set_public_key(ec_key, pub_pt);
+  if (!pub_pt || !EC_POINT_mul(group, pub_pt, priv_bn, nullptr, nullptr, nullptr))
+    throw std::runtime_error("Failed to derive EC public key");
+  if (!EC_KEY_set_public_key(ec_key, pub_pt))
+    throw std::runtime_error("Failed to set EC public key");
 
   pkey_ = EVP_PKEY_new();
-  EVP_PKEY_assign_EC_KEY(pkey_, ec_key);
+  if (!pkey_ || !EVP_PKEY_assign_EC_KEY(pkey_, ec_key))
+    throw std::runtime_error("Failed to assign EC key to EVP_PKEY");
 
   EC_POINT_free(pub_pt);
   BN_free(priv_bn);
@@ -77,7 +104,8 @@ gRPCRereCommunicator::gRPCRereCommunicator(std::string server_address,
 
   // Serialize public key to PEM format
   BIO *bio = BIO_new(BIO_s_mem());
-  PEM_write_bio_PUBKEY(bio, pkey_);
+  if (!bio || !PEM_write_bio_PUBKEY(bio, pkey_))
+    throw std::runtime_error("Failed to serialize public key to PEM");
   BUF_MEM *bptr;
   BIO_get_mem_ptr(bio, &bptr);
   public_key_pem_ = std::string(bptr->data, bptr->length);
@@ -112,12 +140,28 @@ void gRPCRereCommunicator::add_auth_metadata(grpc::ClientContext &ctx) {
 
   // Sign the timestamp with ECDSA/SHA256
   EVP_MD_CTX *md = EVP_MD_CTX_new();
-  EVP_DigestSignInit(md, nullptr, EVP_sha256(), nullptr, pkey_);
-  EVP_DigestSignUpdate(md, timestamp.data(), timestamp.size());
+  if (!md) {
+    std::cerr << "Failed to create EVP_MD_CTX for signing" << std::endl;
+    return;
+  }
+  if (EVP_DigestSignInit(md, nullptr, EVP_sha256(), nullptr, pkey_) != 1 ||
+      EVP_DigestSignUpdate(md, timestamp.data(), timestamp.size()) != 1) {
+    std::cerr << "Failed to initialize/update digest signing" << std::endl;
+    EVP_MD_CTX_free(md);
+    return;
+  }
   size_t sig_len = 0;
-  EVP_DigestSignFinal(md, nullptr, &sig_len);
+  if (EVP_DigestSignFinal(md, nullptr, &sig_len) != 1) {
+    std::cerr << "Failed to determine signature length" << std::endl;
+    EVP_MD_CTX_free(md);
+    return;
+  }
   std::string signature(sig_len, '\0');
-  EVP_DigestSignFinal(md, reinterpret_cast<uint8_t *>(&signature[0]), &sig_len);
+  if (EVP_DigestSignFinal(md, reinterpret_cast<uint8_t *>(&signature[0]), &sig_len) != 1) {
+    std::cerr << "Failed to finalize signature" << std::endl;
+    EVP_MD_CTX_free(md);
+    return;
+  }
   signature.resize(sig_len);
   EVP_MD_CTX_free(md);
 

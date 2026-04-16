@@ -76,6 +76,11 @@ void start::start_client(std::string server_address, flwr_local::Client *client,
     }
 
     if (!keep_going) {
+      if (sleep_duration > 0) {
+        std::cout << "Reconnect requested; sleeping " << sleep_duration
+                  << "s before shutdown." << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(sleep_duration));
+      }
       break;
     }
   }

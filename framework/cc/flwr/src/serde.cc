@@ -900,17 +900,16 @@ inflate_recorddict(const std::string &recorddict_obj_id,
         // Array body JSON: {"dtype":..., "shape":..., "stype":..., "arraychunk_ids":[...]}
         auto chunk_indices = parse_arraychunk_ids(arr_parsed.body);
 
-        // Extract stype
+        // Extract stype from JSON body: "stype": "value"
         std::string stype = "numpy.ndarray";
         {
           auto s_idx = arr_parsed.body.find("\"stype\"");
           if (s_idx != std::string::npos) {
-            auto q1 = arr_parsed.body.find('"', s_idx + 7);
-            auto q2 = arr_parsed.body.find('"', q1 + 1);
-            auto q3 = arr_parsed.body.find('"', q2 + 1);
-            auto q4 = arr_parsed.body.find('"', q3 + 1);
-            if (q3 != std::string::npos && q4 != std::string::npos)
-              stype = arr_parsed.body.substr(q3 + 1, q4 - q3 - 1);
+            // Skip past "stype" key, then find the value's opening and closing quotes
+            auto q1 = arr_parsed.body.find('"', s_idx + 7); // opening quote of value
+            auto q2 = arr_parsed.body.find('"', q1 + 1);    // closing quote of value
+            if (q1 != std::string::npos && q2 != std::string::npos)
+              stype = arr_parsed.body.substr(q1 + 1, q2 - q1 - 1);
           }
         }
 

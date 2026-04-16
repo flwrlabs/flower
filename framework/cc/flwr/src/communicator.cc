@@ -136,6 +136,7 @@ std::optional<flwr_local::Message> receive(Communicator *communicator) {
     // Pull all objects from server
     std::cerr << "[DEBUG recv] obj_ids count=" << obj_ids.size() << std::endl;
     std::map<std::string, std::string> objects;
+    bool all_objects_pulled = true;
     for (const auto &obj_id : obj_ids) {
       flwr::proto::PullObjectRequest pull_req;
       flwr::proto::PullObjectResponse pull_resp;
@@ -153,12 +154,27 @@ std::optional<flwr_local::Message> receive(Communicator *communicator) {
                   << " size=" << pull_resp.object_content().size() << std::endl;
         if (pull_resp.object_found() && pull_resp.object_available()) {
           objects[obj_id] = pull_resp.object_content();
+        } else {
+          std::cerr << "[WARN recv] Object " << obj_id.substr(0,16)
+                    << " not ready (found=" << pull_resp.object_found()
+                    << " avail=" << pull_resp.object_available()
+                    << "); will not confirm message" << std::endl;
+          all_objects_pulled = false;
         }
       } else {
         std::cerr << "[DEBUG recv] PullObject RPC failed for " << obj_id.substr(0,16) << std::endl;
+        all_objects_pulled = false;
       }
     }
     std::cerr << "[DEBUG recv] pulled " << objects.size() << " objects" << std::endl;
+
+    // If any objects are missing, do not confirm — return nullopt so the
+    // message remains on the server and can be retried on the next poll.
+    if (!all_objects_pulled) {
+      std::cerr << "[WARN recv] Incomplete objects; not confirming message."
+                << std::endl;
+      return std::nullopt;
+    }
 
     // The Message has one child: the RecordDict (content)
     if (msg_tree.children_size() > 0) {
@@ -167,11 +183,12 @@ std::optional<flwr_local::Message> receive(Communicator *communicator) {
         msg.content = inflate_recorddict(rd_obj_id, objects);
       } catch (const std::exception &e) {
         std::cerr << "Failed to inflate RecordDict: " << e.what() << std::endl;
-        msg.content = std::nullopt;
+        // Inflation failed — don't confirm, allow retry.
+        return std::nullopt;
       }
     }
 
-    // Confirm message received
+    // All objects pulled and inflated successfully — confirm receipt.
     flwr::proto::ConfirmMessageReceivedRequest confirm_req;
     flwr::proto::ConfirmMessageReceivedResponse confirm_resp;
     auto *confirm_node = new flwr::proto::Node();

@@ -26,27 +26,10 @@ handle_message(flwr_local::Client *client,
                const flwr_local::Message &message) {
   const std::string &msg_type = message.metadata.message_type;
 
-  flwr_local::RecordDict result_content;
   int sleep_duration = 0;
   bool keep_going = true;
 
-  if (msg_type == "reconnect") {
-    keep_going = false;
-  } else if (msg_type == "get_parameters") {
-    result_content = _get_parameters(client);
-  } else if (msg_type == "train") {
-    if (message.content) {
-      result_content = _fit(client, *message.content);
-    }
-  } else if (msg_type == "evaluate") {
-    if (message.content) {
-      result_content = _evaluate(client, *message.content);
-    }
-  } else {
-    throw std::runtime_error("Unknown message type: " + msg_type);
-  }
-
-  // Build reply Message
+  // Build reply metadata (common to all message types)
   flwr_local::Message reply;
   reply.metadata.run_id = message.metadata.run_id;
   reply.metadata.src_node_id = message.metadata.dst_node_id;
@@ -59,7 +42,26 @@ handle_message(flwr_local::Client *client,
       static_cast<double>(std::chrono::duration_cast<std::chrono::seconds>(
                               std::chrono::system_clock::now().time_since_epoch())
                               .count());
-  reply.content = result_content;
+
+  if (msg_type == "reconnect") {
+    keep_going = false;
+  } else if (msg_type == "get_parameters") {
+    reply.content = _get_parameters(client);
+  } else if (msg_type == "train") {
+    if (message.content) {
+      reply.content = _fit(client, *message.content);
+    } else {
+      reply.error = flwr_local::Error{0, "Train message has no content"};
+    }
+  } else if (msg_type == "evaluate") {
+    if (message.content) {
+      reply.content = _evaluate(client, *message.content);
+    } else {
+      reply.error = flwr_local::Error{0, "Evaluate message has no content"};
+    }
+  } else {
+    throw std::runtime_error("Unknown message type: " + msg_type);
+  }
 
   return {reply, sleep_duration, keep_going};
 }
