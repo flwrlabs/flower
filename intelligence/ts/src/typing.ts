@@ -350,6 +350,11 @@ export interface ResponseFormat {
  */
 export interface ChatOptions {
   /**
+   * A list of messages to send to the model.
+   */
+  messages: Message[];
+
+  /**
    * The model name to use for the chat. Defaults to a predefined model if not specified.
    */
   model?: string;

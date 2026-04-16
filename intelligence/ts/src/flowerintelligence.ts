@@ -24,7 +24,6 @@ import {
   EmbeddingInput,
   Failure,
   FailureCode,
-  Message,
   Progress,
   Result,
 } from './typing';
@@ -119,26 +118,10 @@ export class FlowerIntelligence {
     }
   }
 
-  // Overload for string input with an optional options object
-  async chat(input: string, options?: ChatOptions): Promise<ChatResponseResult>;
-
-  // Overload for a single object that includes messages along with other options
-  async chat(options: ChatOptions & { messages: Message[] }): Promise<ChatResponseResult>;
-
   /**
    * Conducts a chat interaction using the specified model and options.
    *
-   * This method can be invoked in one of two ways:
-   *
-   * 1. With a string input (plus an optional options object). In this case the string
-   *    is automatically wrapped as a single message with role 'user'.
-   *
-   *    Example:
-   *    ```ts
-   *    fi.chat("Why is the sky blue?", { temperature: 0.7 });
-   *    ```
-   *
-   * 2. With a single object that includes a {@link Message} array along with additional options.
+   * This method can be invoked the following way:
    *
    *    Example:
    *    ```ts
@@ -148,53 +131,36 @@ export class FlowerIntelligence {
    *    });
    *    ```
    *
-   * @param inputOrOptions - Either a string input or a {@link ChatOptions} object that must include a `messages` array.
-   * @param maybeOptions - An optional {@link ChatOptions} object (used only when the first parameter is a string).
+   * @param options - A {@link ChatOptions} object that must include a `messages` array.
    * @returns A Promise that resolves to a {@link ChatResponseResult}. On success, the result contains the
    *          message reply and optionally any tool call details; on failure, it includes an error code and description.
    */
-  async chat(
-    inputOrOptions: string | (ChatOptions & { messages: Message[] }),
-    maybeOptions?: ChatOptions
-  ): Promise<ChatResponseResult> {
-    const chatResult = await this.internalChat(inputOrOptions, maybeOptions);
+  async chat(options: ChatOptions): Promise<ChatResponseResult> {
+    const chatResult = await this.internalChat(options);
     if (!chatResult.ok) {
       if (
         chatResult.failure.code === FailureCode.LocalEngineChatError &&
         this.remoteHandoff &&
         this.apiKey
       ) {
-        return await this.internalChat(inputOrOptions, { ...maybeOptions, forceRemote: true });
+        return await this.internalChat({ ...options, forceRemote: true });
       }
     }
     return chatResult;
   }
 
-  private async internalChat(
-    inputOrOptions: string | (ChatOptions & { messages: Message[] }),
-    maybeOptions?: ChatOptions
-  ): Promise<ChatResponseResult> {
-    let options: ChatOptions;
-    let messages: Message[];
-
-    if (typeof inputOrOptions === 'string') {
-      options = maybeOptions ?? {};
-      messages = [{ role: 'user', content: inputOrOptions }];
-    } else {
-      ({ messages, ...options } = inputOrOptions);
-
-      if (messages.some((msg) => !ALLOWED_ROLES.includes(msg.role))) {
-        return {
-          ok: false,
-          failure: {
-            code: FailureCode.InvalidArgumentsError,
-            description: `Invalid message role${messages.length > 1 ? 's' : ''}: ${messages
-              .filter((msg) => !ALLOWED_ROLES.includes(msg.role))
-              .map((msg) => msg.role)
-              .join(', ')}`,
-          },
-        };
-      }
+  private async internalChat(options: ChatOptions): Promise<ChatResponseResult> {
+    if (options.messages.some((msg) => !ALLOWED_ROLES.includes(msg.role))) {
+      return {
+        ok: false,
+        failure: {
+          code: FailureCode.InvalidArgumentsError,
+          description: `Invalid message role${options.messages.length > 1 ? 's' : ''}: ${options.messages
+            .filter((msg) => !ALLOWED_ROLES.includes(msg.role))
+            .map((msg) => msg.role)
+            .join(', ')}`,
+        },
+      };
     }
 
     const model = options.model ?? DEFAULT_MODEL;
@@ -209,7 +175,7 @@ export class FlowerIntelligence {
     }
 
     return await engineResult.value.chat(
-      messages,
+      options.messages,
       model,
       options.temperature,
       options.topP,
