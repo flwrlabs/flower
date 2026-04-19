@@ -19,7 +19,10 @@ import argparse
 
 import pytest
 
-from flwr.common.args import add_args_flwr_app_common, add_args_runtime_dependency_install
+from flwr.common.args import (
+    add_args_flwr_app_common,
+    add_args_runtime_dependency_install,
+)
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 
 

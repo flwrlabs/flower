@@ -25,8 +25,7 @@ import pytest
 
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
 
-from .app import _parse_args_run_flwr_simulation
-from .app import run_simulation_process
+from .app import _parse_args_run_flwr_simulation, run_simulation_process
 
 simulation_app_module = importlib.import_module("flwr.simulation.app")
 
