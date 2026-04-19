@@ -11,7 +11,7 @@
   intended to be launched by SuperExec. For containerized externally managed app
   processes, use the `flwr/superexec` image with `flower-superexec --plugin-type ...`.
 
-## v1.29.0 (2026-04-11)
+## v1.29.0 (2026-04-12)
 
 ### Thanks to our contributors
 
