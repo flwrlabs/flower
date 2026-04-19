@@ -12,75 +12,38 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for simulation runtime wiring."""
+"""Tests for ServerApp process CLI parsing and wiring."""
 
 
 import importlib
-import unittest
-from queue import Queue
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
 
 import pytest
 
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
 
-from .app import _parse_args_run_flwr_simulation
-from .app import run_simulation_process
+from .app import _parse_args_run_flwr_serverapp
 
-simulation_app_module = importlib.import_module("flwr.simulation.app")
-
-
-class TestRunSimulationProcess(unittest.TestCase):
-    """Tests for `run_simulation_process`."""
-
-    @patch("flwr.simulation.app.flwr_exit")
-    @patch("flwr.simulation.app.register_signal_handlers")
-    @patch("flwr.simulation.app.SimulationIoConnection")
-    def test_run_simulation_process_passes_token_to_connection(
-        self,
-        mock_connection_cls: Mock,
-        _mock_register_signal_handlers: Mock,
-        mock_flwr_exit: Mock,
-    ) -> None:
-        """`run_simulation_process` should pass token into SimulationIoConnection."""
-        mock_conn = Mock()
-        mock_conn.configure_mock(
-            **{"_stub.PullAppInputs.side_effect": RuntimeError("boom")}
-        )
-        mock_connection_cls.return_value = mock_conn
-
-        run_simulation_process(
-            serverappio_api_address="127.0.0.1:9091",
-            log_queue=Queue(),
-            token="test-token",
-        )
-
-        mock_connection_cls.assert_called_once_with(
-            serverappio_api_address="127.0.0.1:9091",
-            root_certificates=None,
-            token="test-token",
-        )
-        mock_flwr_exit.assert_called_once()
+serverapp_module = importlib.import_module("flwr.server.serverapp.app")
 
 
-def test_parse_flwr_simulation_requires_token() -> None:
-    """The simulation process CLI should require a token."""
+def test_parse_flwr_serverapp_requires_token() -> None:
+    """The ServerApp process CLI should require a token."""
     with pytest.raises(SystemExit):
-        _parse_args_run_flwr_simulation().parse_args([])
+        _parse_args_run_flwr_serverapp().parse_args([])
 
 
-def test_parse_flwr_simulation_rejects_run_once() -> None:
+def test_parse_flwr_serverapp_rejects_run_once() -> None:
     """The removed deprecated flag should no longer parse."""
     with pytest.raises(SystemExit):
-        _parse_args_run_flwr_simulation().parse_args(
+        _parse_args_run_flwr_serverapp().parse_args(
             ["--token", "test-token", "--run-once"]
         )
 
 
-def test_parse_flwr_simulation_parses_tokenized_invocation() -> None:
-    """The simulation process CLI should still parse the supported flags."""
-    args = _parse_args_run_flwr_simulation().parse_args(
+def test_parse_flwr_serverapp_parses_tokenized_invocation() -> None:
+    """The ServerApp process CLI should still parse the supported flags."""
+    args = _parse_args_run_flwr_serverapp().parse_args(
         [
             "--token",
             "test-token",
@@ -98,7 +61,7 @@ def test_parse_flwr_simulation_parses_tokenized_invocation() -> None:
     assert args.runtime_dependency_install is True
 
 
-def test_flwr_simulation_parses_args_before_mirroring_output(
+def test_flwr_serverapp_parses_args_before_mirroring_output(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Argument parsing should happen before stdout/stderr redirection."""
@@ -109,25 +72,23 @@ def test_flwr_simulation_parses_args_before_mirroring_output(
 
     calls: list[str] = []
 
+    monkeypatch.setattr(serverapp_module, "_parse_args_run_flwr_serverapp", _Parser)
     monkeypatch.setattr(
-        simulation_app_module, "_parse_args_run_flwr_simulation", _Parser
-    )
-    monkeypatch.setattr(
-        simulation_app_module,
+        serverapp_module,
         "mirror_output_to_queue",
         lambda *_args, **_kwargs: calls.append("mirror"),
     )
 
     with pytest.raises(SystemExit):
-        simulation_app_module.flwr_simulation()
+        serverapp_module.flwr_serverapp()
 
     assert calls == []
 
 
-def test_flwr_simulation_forwards_cli_args(
+def test_flwr_serverapp_forwards_cli_args(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The simulation CLI should forward parsed args to the runtime."""
+    """The ServerApp CLI should forward parsed args to the runtime."""
     args = SimpleNamespace(
         insecure=True,
         serverappio_api_address="127.0.0.1:9091",
@@ -147,24 +108,21 @@ def test_flwr_simulation_forwards_cli_args(
     def _restore_output() -> None:
         captured["calls"].append("restore")
 
-    def _run_simulation_process(**kwargs: object) -> None:
+    def _run_serverapp(**kwargs: object) -> None:
         captured.update(kwargs)
 
+    monkeypatch.setattr(serverapp_module, "_parse_args_run_flwr_serverapp", _Parser)
     monkeypatch.setattr(
-        simulation_app_module, "_parse_args_run_flwr_simulation", _Parser
+        serverapp_module, "mirror_output_to_queue", _mirror_output_to_queue
     )
-    monkeypatch.setattr(
-        simulation_app_module, "mirror_output_to_queue", _mirror_output_to_queue
-    )
-    monkeypatch.setattr(simulation_app_module, "restore_output", _restore_output)
-    monkeypatch.setattr(
-        simulation_app_module, "run_simulation_process", _run_simulation_process
-    )
+    monkeypatch.setattr(serverapp_module, "restore_output", _restore_output)
+    monkeypatch.setattr(serverapp_module, "run_serverapp", _run_serverapp)
 
-    simulation_app_module.flwr_simulation()
+    serverapp_module.flwr_serverapp()
 
     assert captured["calls"] == ["mirror", "restore"]
     assert captured["serverappio_api_address"] == "127.0.0.1:9091"
+    assert captured["log_queue"] is not None
     assert captured["token"] == "test-token"
     assert captured["certificates"] is None
     assert captured["parent_pid"] == 321
