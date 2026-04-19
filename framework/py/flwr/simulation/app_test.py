@@ -104,6 +104,7 @@ def test_flwr_simulation_parses_args_before_mirroring_output(
 
     class _Parser:
         def parse_args(self) -> SimpleNamespace:
+            """Raise a parser error before any side effects happen."""
             raise SystemExit(2)
 
     calls: list[str] = []
@@ -120,7 +121,7 @@ def test_flwr_simulation_parses_args_before_mirroring_output(
     with pytest.raises(SystemExit):
         simulation_app_module.flwr_simulation()
 
-    assert calls == []
+    assert not calls
 
 
 def test_flwr_simulation_forwards_cli_args(
@@ -134,17 +135,19 @@ def test_flwr_simulation_forwards_cli_args(
         parent_pid=321,
         runtime_dependency_install=True,
     )
-    captured: dict[str, object] = {"calls": []}
+    calls: list[str] = []
+    captured: dict[str, object] = {}
 
     class _Parser:
         def parse_args(self) -> SimpleNamespace:
+            """Return a fixed namespace for CLI forwarding tests."""
             return args
 
     def _mirror_output_to_queue(*_args: object, **_kwargs: object) -> None:
-        captured["calls"].append("mirror")
+        calls.append("mirror")
 
     def _restore_output() -> None:
-        captured["calls"].append("restore")
+        calls.append("restore")
 
     def _run_simulation_process(**kwargs: object) -> None:
         captured.update(kwargs)
@@ -162,7 +165,7 @@ def test_flwr_simulation_forwards_cli_args(
 
     simulation_app_module.flwr_simulation()
 
-    assert captured["calls"] == ["mirror", "restore"]
+    assert calls == ["mirror", "restore"]
     assert captured["serverappio_api_address"] == "127.0.0.1:9091"
     assert captured["token"] == "test-token"
     assert captured["certificates"] is None

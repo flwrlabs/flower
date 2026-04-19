@@ -76,6 +76,7 @@ def test_flwr_clientapp_forwards_cli_args(
 
     class _Parser:
         def parse_args(self) -> SimpleNamespace:
+            """Return a fixed namespace for CLI forwarding tests."""
             return args
 
     def _run_clientapp(**kwargs: object) -> None:
