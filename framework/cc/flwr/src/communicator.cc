@@ -4,7 +4,7 @@ const std::string KEY_NODE = "node";
 const std::string KEY_TASK_INS = "current_task_ins";
 
 std::map<std::string, std::optional<flwr::proto::Node>> node_store;
-std::map<std::string, std::optional<flwr::proto::TaskIns>> state;
+std::map<std::string, std::optional<flwr::proto::Message>> state;
 
 std::mutex node_store_mutex;
 std::mutex state_mutex;
@@ -19,44 +19,38 @@ std::optional<flwr::proto::Node> get_node_from_store() {
   return node->second;
 }
 
-bool validate_task_ins(const flwr::proto::TaskIns &task_ins,
+bool validate_task_ins(const flwr::proto::Message &task_ins,
                        const bool discard_reconnect_ins) {
-  return task_ins.has_task() && task_ins.task().has_recordset();
+  return task_ins.has_content();
 }
 
-bool validate_task_res(const flwr::proto::TaskRes &task_res) {
+bool validate_task_res(const flwr::proto::Message &task_res) {
   // Retrieve initialized fields in TaskRes
   return true;
 }
 
-flwr::proto::TaskRes
-configure_task_res(const flwr::proto::TaskRes &task_res,
-                   const flwr::proto::TaskIns &ref_task_ins,
+flwr::proto::Message
+configure_task_res(const flwr::proto::Message &task_res,
+                   const flwr::proto::Message &ref_task_ins,
                    const flwr::proto::Node &producer) {
-  flwr::proto::TaskRes result_task_res;
+  flwr::proto::Message result_task_res;
+  flwr::proto::Metadata metadata;
 
   // Setting scalar fields
-  result_task_res.set_task_id("");
-  result_task_res.set_group_id(ref_task_ins.group_id());
-  result_task_res.set_run_id(ref_task_ins.run_id());
+  metadata.set_message_id("");
+  metadata.set_group_id(ref_task_ins.metadata().group_id());
+  metadata.set_run_id(ref_task_ins.metadata().run_id());
 
   // Merge the task from the input task_res
-  *result_task_res.mutable_task() = task_res.task();
+  *result_task_res.mutable_content() = task_res.content();
 
-  // Construct and set the producer and consumer for the task
-  std::unique_ptr<flwr::proto::Node> new_producer =
-      std::make_unique<flwr::proto::Node>(producer);
-  result_task_res.mutable_task()->set_allocated_producer(
-      new_producer.release());
-
-  std::unique_ptr<flwr::proto::Node> new_consumer =
-      std::make_unique<flwr::proto::Node>(ref_task_ins.task().producer());
-  result_task_res.mutable_task()->set_allocated_consumer(
-      new_consumer.release());
+  metadata.set_src_node_id(producer.node_id());
+  metadata.set_dst_node_id(ref_task_ins.metadata().dst_node_id());
 
   // Set ancestry in the task
-  result_task_res.mutable_task()->add_ancestry(ref_task_ins.task_id());
+  metadata.set_reply_to_message_id(ref_task_ins.metadata().message_id());
 
+  result_task_res.set_allocated_metadata(&metadata);
   return result_task_res;
 }
 
@@ -153,7 +147,7 @@ std::optional<flwr::proto::TaskIns> receive(Communicator *communicator) {
   return std::nullopt;
 }
 
-void send(Communicator *communicator, flwr::proto::TaskRes task_res) {
+void send(Communicator *communicator, flwr::proto::Message task_res) {
   auto node = get_node_from_store();
   if (!node) {
     return;
@@ -171,7 +165,7 @@ void send(Communicator *communicator, flwr::proto::TaskRes task_res) {
     return;
   }
 
-  flwr::proto::TaskRes new_task_res =
+  flwr::proto::Message new_task_res =
       configure_task_res(task_res, *task_ins, *node);
 
   flwr::proto::PushTaskResRequest request;

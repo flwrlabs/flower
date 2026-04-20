@@ -80,7 +80,7 @@ flwr::proto::ClientMessage_EvaluateRes
 evaluate_res_to_proto(flwr_local::EvaluateRes res);
 
 flwr_local::RecordSet
-recordset_from_proto(const flwr::proto::RecordSet &recordset);
+recordset_from_proto(const flwr::proto::RecordDict &recordset);
 
 flwr_local::FitIns recordset_to_fit_ins(const flwr_local::RecordSet &recordset,
                                         bool keep_input);
@@ -97,5 +97,5 @@ flwr_local::RecordSet recordset_from_fit_res(const flwr_local::FitRes &fit_res);
 flwr_local::RecordSet recordset_from_get_parameters_res(
     const flwr_local::ParametersRes &parameters_res);
 
-flwr::proto::RecordSet
+flwr::proto::RecordDict
 recordset_to_proto(const flwr_local::RecordSet &recordset);

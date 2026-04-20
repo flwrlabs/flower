@@ -20,8 +20,7 @@ namespace flwr {
 namespace proto {
 constexpr Node::Node(
   ::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized)
-  : node_id_(int64_t{0})
-  , anonymous_(false){}
+  : node_id_(uint64_t{0u}){}
 struct NodeDefaultTypeInternal {
   constexpr NodeDefaultTypeInternal()
     : _instance(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized{}) {}
@@ -45,7 +44,6 @@ const ::PROTOBUF_NAMESPACE_ID::uint32 TableStruct_flwr_2fproto_2fnode_2eproto::o
   ~0u,  // no _weak_field_map_
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::flwr::proto::Node, node_id_),
-  PROTOBUF_FIELD_OFFSET(::flwr::proto::Node, anonymous_),
 };
 static const ::PROTOBUF_NAMESPACE_ID::internal::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
   { 0, -1, -1, sizeof(::flwr::proto::Node)},
@@ -56,13 +54,12 @@ static ::PROTOBUF_NAMESPACE_ID::Message const * const file_default_instances[] =
 };
 
 const char descriptor_table_protodef_flwr_2fproto_2fnode_2eproto[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) =
-  "\n\025flwr/proto/node.proto\022\nflwr.proto\"*\n\004N"
-  "ode\022\017\n\007node_id\030\001 \001(\022\022\021\n\tanonymous\030\002 \001(\010b"
-  "\006proto3"
+  "\n\025flwr/proto/node.proto\022\nflwr.proto\"\027\n\004N"
+  "ode\022\017\n\007node_id\030\001 \001(\004b\006proto3"
   ;
 static ::PROTOBUF_NAMESPACE_ID::internal::once_flag descriptor_table_flwr_2fproto_2fnode_2eproto_once;
 const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable descriptor_table_flwr_2fproto_2fnode_2eproto = {
-  false, false, 87, descriptor_table_protodef_flwr_2fproto_2fnode_2eproto, "flwr/proto/node.proto", 
+  false, false, 68, descriptor_table_protodef_flwr_2fproto_2fnode_2eproto, "flwr/proto/node.proto", 
   &descriptor_table_flwr_2fproto_2fnode_2eproto_once, nullptr, 0, 1,
   schemas, file_default_instances, TableStruct_flwr_2fproto_2fnode_2eproto::offsets,
   file_level_metadata_flwr_2fproto_2fnode_2eproto, file_level_enum_descriptors_flwr_2fproto_2fnode_2eproto, file_level_service_descriptors_flwr_2fproto_2fnode_2eproto,
@@ -94,17 +91,12 @@ Node::Node(::PROTOBUF_NAMESPACE_ID::Arena* arena,
 Node::Node(const Node& from)
   : ::PROTOBUF_NAMESPACE_ID::Message() {
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
-  ::memcpy(&node_id_, &from.node_id_,
-    static_cast<size_t>(reinterpret_cast<char*>(&anonymous_) -
-    reinterpret_cast<char*>(&node_id_)) + sizeof(anonymous_));
+  node_id_ = from.node_id_;
   // @@protoc_insertion_point(copy_constructor:flwr.proto.Node)
 }
 
 void Node::SharedCtor() {
-::memset(reinterpret_cast<char*>(this) + static_cast<size_t>(
-    reinterpret_cast<char*>(&node_id_) - reinterpret_cast<char*>(this)),
-    0, static_cast<size_t>(reinterpret_cast<char*>(&anonymous_) -
-    reinterpret_cast<char*>(&node_id_)) + sizeof(anonymous_));
+node_id_ = uint64_t{0u};
 }
 
 Node::~Node() {
@@ -134,9 +126,7 @@ void Node::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  ::memset(&node_id_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&anonymous_) -
-      reinterpret_cast<char*>(&node_id_)) + sizeof(anonymous_));
+  node_id_ = uint64_t{0u};
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -146,18 +136,10 @@ const char* Node::_InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::inter
     ::PROTOBUF_NAMESPACE_ID::uint32 tag;
     ptr = ::PROTOBUF_NAMESPACE_ID::internal::ReadTag(ptr, &tag);
     switch (tag >> 3) {
-      // sint64 node_id = 1;
+      // uint64 node_id = 1;
       case 1:
         if (PROTOBUF_PREDICT_TRUE(static_cast<::PROTOBUF_NAMESPACE_ID::uint8>(tag) == 8)) {
-          node_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarintZigZag64(&ptr);
-          CHK_(ptr);
-        } else
-          goto handle_unusual;
-        continue;
-      // bool anonymous = 2;
-      case 2:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<::PROTOBUF_NAMESPACE_ID::uint8>(tag) == 16)) {
-          anonymous_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          node_id_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
           CHK_(ptr);
         } else
           goto handle_unusual;
@@ -191,16 +173,10 @@ failure:
   ::PROTOBUF_NAMESPACE_ID::uint32 cached_has_bits = 0;
   (void) cached_has_bits;
 
-  // sint64 node_id = 1;
+  // uint64 node_id = 1;
   if (this->_internal_node_id() != 0) {
     target = stream->EnsureSpace(target);
-    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteSInt64ToArray(1, this->_internal_node_id(), target);
-  }
-
-  // bool anonymous = 2;
-  if (this->_internal_anonymous() != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteBoolToArray(2, this->_internal_anonymous(), target);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteUInt64ToArray(1, this->_internal_node_id(), target);
   }
 
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
@@ -219,14 +195,9 @@ size_t Node::ByteSizeLong() const {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  // sint64 node_id = 1;
+  // uint64 node_id = 1;
   if (this->_internal_node_id() != 0) {
-    total_size += ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SInt64SizePlusOne(this->_internal_node_id());
-  }
-
-  // bool anonymous = 2;
-  if (this->_internal_anonymous() != 0) {
-    total_size += 1 + 1;
+    total_size += ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::UInt64SizePlusOne(this->_internal_node_id());
   }
 
   return MaybeComputeUnknownFieldsSize(total_size, &_cached_size_);
@@ -254,9 +225,6 @@ void Node::MergeFrom(const Node& from) {
   if (from._internal_node_id() != 0) {
     _internal_set_node_id(from._internal_node_id());
   }
-  if (from._internal_anonymous() != 0) {
-    _internal_set_anonymous(from._internal_anonymous());
-  }
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -274,12 +242,7 @@ bool Node::IsInitialized() const {
 void Node::InternalSwap(Node* other) {
   using std::swap;
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(Node, anonymous_)
-      + sizeof(Node::anonymous_)
-      - PROTOBUF_FIELD_OFFSET(Node, node_id_)>(
-          reinterpret_cast<char*>(&node_id_),
-          reinterpret_cast<char*>(&other->node_id_));
+  swap(node_id_, other->node_id_);
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata Node::GetMetadata() const {

@@ -1,5 +1,5 @@
 #include "serde.h"
-#include "flwr/proto/recordset.pb.h"
+#include "flwr/proto/recorddict.pb.h"
 #include "typing.h"
 
 /**
@@ -76,6 +76,9 @@ flwr_local::Scalar scalar_from_proto(flwr::proto::Scalar scalar_msg) {
     return scalar;
   case 15:
     scalar.setBytes(scalar_msg.bytes());
+    return scalar;
+  case 6:
+    scalar.setDouble(scalar_msg.uint64());
     return scalar;
   case 0:
     break;
@@ -211,9 +214,9 @@ flwr_local::Array array_from_proto(const flwr::proto::Array &protoArray) {
   return array;
 }
 
-flwr::proto::ParametersRecord
+flwr::proto::ArrayRecord
 parameters_record_to_proto(const flwr_local::ParametersRecord &record) {
-  flwr::proto::ParametersRecord protoRecord;
+  flwr::proto::ArrayRecord protoRecord;
   for (const auto &[key, value] : record) {
     *protoRecord.add_data_keys() = key;
     *protoRecord.add_data_values() = array_to_proto(value);
@@ -222,7 +225,7 @@ parameters_record_to_proto(const flwr_local::ParametersRecord &record) {
 }
 
 flwr_local::ParametersRecord
-parameters_record_from_proto(const flwr::proto::ParametersRecord &protoRecord) {
+parameters_record_from_proto(const flwr::proto::ArrayRecord &protoRecord) {
   flwr_local::ParametersRecord record;
 
   auto keys = protoRecord.data_keys();
@@ -233,9 +236,9 @@ parameters_record_from_proto(const flwr::proto::ParametersRecord &protoRecord) {
   return record;
 }
 
-flwr::proto::MetricsRecord
+flwr::proto::MetricRecord
 metrics_record_to_proto(const flwr_local::MetricsRecord &record) {
-  flwr::proto::MetricsRecord protoRecord;
+  flwr::proto::MetricRecord protoRecord;
 
   for (const auto &[key, value] : record) {
     auto &data = (*protoRecord.mutable_data())[key];
@@ -246,7 +249,7 @@ metrics_record_to_proto(const flwr_local::MetricsRecord &record) {
       data.set_double_(std::get<double>(value));
     } else if (std::holds_alternative<std::vector<int>>(value)) {
       auto &int_list = std::get<std::vector<int>>(value);
-      auto *list = data.mutable_sint64_list();
+      auto *list = data.mutable_sint_list();
       for (int val : int_list) {
         list->add_vals(val);
       }
@@ -263,7 +266,7 @@ metrics_record_to_proto(const flwr_local::MetricsRecord &record) {
 }
 
 flwr_local::MetricsRecord
-metrics_record_from_proto(const flwr::proto::MetricsRecord &protoRecord) {
+metrics_record_from_proto(const flwr::proto::MetricRecord &protoRecord) {
   flwr_local::MetricsRecord record;
 
   for (const auto &[key, value] : protoRecord.data()) {
@@ -271,9 +274,9 @@ metrics_record_from_proto(const flwr::proto::MetricsRecord &protoRecord) {
       record[key] = (int)value.sint64();
     } else if (value.has_double_()) {
       record[key] = (double)value.double_();
-    } else if (value.has_sint64_list()) {
+    } else if (value.has_sint_list()) {
       std::vector<int> int_list;
-      for (const auto sint : value.sint64_list().vals()) {
+      for (const auto sint : value.sint_list().vals()) {
         int_list.push_back((int)sint);
       }
       record[key] = int_list;
@@ -288,9 +291,9 @@ metrics_record_from_proto(const flwr::proto::MetricsRecord &protoRecord) {
   return record;
 }
 
-flwr::proto::ConfigsRecord
+flwr::proto::ConfigRecord
 configs_record_to_proto(const flwr_local::ConfigsRecord &record) {
-  flwr::proto::ConfigsRecord protoRecord;
+  flwr::proto::ConfigRecord protoRecord;
 
   for (const auto &[key, value] : record) {
     auto &data = (*protoRecord.mutable_data())[key];
@@ -304,7 +307,7 @@ configs_record_to_proto(const flwr_local::ConfigsRecord &record) {
     } else if (std::holds_alternative<std::string>(value)) {
       data.set_string(std::get<std::string>(value));
     } else if (std::holds_alternative<std::vector<int>>(value)) {
-      auto &list = *data.mutable_sint64_list();
+      auto &list = *data.mutable_sint_list();
       for (int val : std::get<std::vector<int>>(value)) {
         list.add_vals(val);
       }
@@ -330,13 +333,13 @@ configs_record_to_proto(const flwr_local::ConfigsRecord &record) {
 }
 
 flwr_local::ConfigsRecord
-configs_record_from_proto(const flwr::proto::ConfigsRecord &protoRecord) {
+configs_record_from_proto(const flwr::proto::ConfigRecord &protoRecord) {
   flwr_local::ConfigsRecord record;
 
   for (const auto &[key, value] : protoRecord.data()) {
-    if (value.has_sint64_list()) {
+    if (value.has_sint_list()) {
       std::vector<int> int_list;
-      for (const auto sint : value.sint64_list().vals()) {
+      for (const auto sint : value.sint_list().vals()) {
         int_list.push_back((int)sint);
       }
       record[key] = int_list;
@@ -582,13 +585,13 @@ recordset_from_evaluate_res(const flwr_local::EvaluateRes &evaluate_res) {
 }
 
 flwr_local::RecordSet
-recordset_from_proto(const flwr::proto::RecordSet &recordset) {
+recordset_from_proto(const flwr::proto::RecordDict &recordset) {
 
   std::map<std::string, flwr_local::ParametersRecord> parametersRecords;
   std::map<std::string, flwr_local::MetricsRecord> metricsRecords;
   std::map<std::string, flwr_local::ConfigsRecord> configsRecords;
 
-  for (const auto &[key, param_record] : recordset.parameters()) {
+  for (const auto &[key, param_record] : recordset.arrays()) {
     parametersRecords[key] = parameters_record_from_proto(param_record);
   }
 
@@ -604,12 +607,12 @@ recordset_from_proto(const flwr::proto::RecordSet &recordset) {
                                configsRecords);
 }
 
-flwr::proto::RecordSet
+flwr::proto::RecordDict
 recordset_to_proto(const flwr_local::RecordSet &recordset) {
-  flwr::proto::RecordSet proto_recordset;
+  flwr::proto::RecordDict proto_recordset;
 
   for (const auto &[key, param_record] : recordset.getParametersRecords()) {
-    (*(proto_recordset.mutable_parameters()))[key] =
+    (*(proto_recordset.mutable_arrays()))[key] =
         parameters_record_to_proto(param_record);
   }
 

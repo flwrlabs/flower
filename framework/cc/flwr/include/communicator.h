@@ -14,17 +14,17 @@ public:
                                 flwr::proto::DeleteNodeResponse *response) = 0;
 
   virtual bool
-  send_pull_task_ins(flwr::proto::PullTaskInsRequest request,
-                     flwr::proto::PullTaskInsResponse *response) = 0;
+  send_pull_task_ins(flwr::proto::PullMessagesRequest request,
+                     flwr::proto::PullMessagesResponse *response) = 0;
 
   virtual bool
-  send_push_task_res(flwr::proto::PushTaskResRequest request,
-                     flwr::proto::PushTaskResResponse *response) = 0;
+  send_push_task_res(flwr::proto::PushMessagesRequest request,
+                     flwr::proto::PushMessagesResponse *response) = 0;
 };
 
 void create_node(Communicator *communicator);
 void delete_node(Communicator *communicator);
-void send(Communicator *communicator, flwr::proto::TaskRes task_res);
-std::optional<flwr::proto::TaskIns> receive(Communicator *communicator);
+void send(Communicator *communicator, flwr::proto::Message task_res);
+std::optional<flwr::proto::Message> receive(Communicator *communicator);
 
 #endif

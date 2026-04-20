@@ -26,9 +26,10 @@ static const char* Fleet_method_names[] = {
   "/flwr.proto.Fleet/CreateNode",
   "/flwr.proto.Fleet/DeleteNode",
   "/flwr.proto.Fleet/Ping",
-  "/flwr.proto.Fleet/PullTaskIns",
-  "/flwr.proto.Fleet/PushTaskRes",
+  "/flwr.proto.Fleet/PullMessages",
+  "/flwr.proto.Fleet/PushMessages",
   "/flwr.proto.Fleet/GetRun",
+  "/flwr.proto.Fleet/GetFab",
 };
 
 std::unique_ptr< Fleet::Stub> Fleet::NewStub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options) {
@@ -41,9 +42,10 @@ Fleet::Stub::Stub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, con
   : channel_(channel), rpcmethod_CreateNode_(Fleet_method_names[0], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   , rpcmethod_DeleteNode_(Fleet_method_names[1], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   , rpcmethod_Ping_(Fleet_method_names[2], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
-  , rpcmethod_PullTaskIns_(Fleet_method_names[3], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
-  , rpcmethod_PushTaskRes_(Fleet_method_names[4], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_PullMessages_(Fleet_method_names[3], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_PushMessages_(Fleet_method_names[4], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   , rpcmethod_GetRun_(Fleet_method_names[5], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_GetFab_(Fleet_method_names[6], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   {}
 
 ::grpc::Status Fleet::Stub::CreateNode(::grpc::ClientContext* context, const ::flwr::proto::CreateNodeRequest& request, ::flwr::proto::CreateNodeResponse* response) {
@@ -115,48 +117,48 @@ void Fleet::Stub::async::Ping(::grpc::ClientContext* context, const ::flwr::prot
   return result;
 }
 
-::grpc::Status Fleet::Stub::PullTaskIns(::grpc::ClientContext* context, const ::flwr::proto::PullTaskInsRequest& request, ::flwr::proto::PullTaskInsResponse* response) {
-  return ::grpc::internal::BlockingUnaryCall< ::flwr::proto::PullTaskInsRequest, ::flwr::proto::PullTaskInsResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_PullTaskIns_, context, request, response);
+::grpc::Status Fleet::Stub::PullMessages(::grpc::ClientContext* context, const ::flwr::proto::PullMessagesRequest& request, ::flwr::proto::PullMessagesResponse* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::flwr::proto::PullMessagesRequest, ::flwr::proto::PullMessagesResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_PullMessages_, context, request, response);
 }
 
-void Fleet::Stub::async::PullTaskIns(::grpc::ClientContext* context, const ::flwr::proto::PullTaskInsRequest* request, ::flwr::proto::PullTaskInsResponse* response, std::function<void(::grpc::Status)> f) {
-  ::grpc::internal::CallbackUnaryCall< ::flwr::proto::PullTaskInsRequest, ::flwr::proto::PullTaskInsResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_PullTaskIns_, context, request, response, std::move(f));
+void Fleet::Stub::async::PullMessages(::grpc::ClientContext* context, const ::flwr::proto::PullMessagesRequest* request, ::flwr::proto::PullMessagesResponse* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::flwr::proto::PullMessagesRequest, ::flwr::proto::PullMessagesResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_PullMessages_, context, request, response, std::move(f));
 }
 
-void Fleet::Stub::async::PullTaskIns(::grpc::ClientContext* context, const ::flwr::proto::PullTaskInsRequest* request, ::flwr::proto::PullTaskInsResponse* response, ::grpc::ClientUnaryReactor* reactor) {
-  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_PullTaskIns_, context, request, response, reactor);
+void Fleet::Stub::async::PullMessages(::grpc::ClientContext* context, const ::flwr::proto::PullMessagesRequest* request, ::flwr::proto::PullMessagesResponse* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_PullMessages_, context, request, response, reactor);
 }
 
-::grpc::ClientAsyncResponseReader< ::flwr::proto::PullTaskInsResponse>* Fleet::Stub::PrepareAsyncPullTaskInsRaw(::grpc::ClientContext* context, const ::flwr::proto::PullTaskInsRequest& request, ::grpc::CompletionQueue* cq) {
-  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::flwr::proto::PullTaskInsResponse, ::flwr::proto::PullTaskInsRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_PullTaskIns_, context, request);
+::grpc::ClientAsyncResponseReader< ::flwr::proto::PullMessagesResponse>* Fleet::Stub::PrepareAsyncPullMessagesRaw(::grpc::ClientContext* context, const ::flwr::proto::PullMessagesRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::flwr::proto::PullMessagesResponse, ::flwr::proto::PullMessagesRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_PullMessages_, context, request);
 }
 
-::grpc::ClientAsyncResponseReader< ::flwr::proto::PullTaskInsResponse>* Fleet::Stub::AsyncPullTaskInsRaw(::grpc::ClientContext* context, const ::flwr::proto::PullTaskInsRequest& request, ::grpc::CompletionQueue* cq) {
+::grpc::ClientAsyncResponseReader< ::flwr::proto::PullMessagesResponse>* Fleet::Stub::AsyncPullMessagesRaw(::grpc::ClientContext* context, const ::flwr::proto::PullMessagesRequest& request, ::grpc::CompletionQueue* cq) {
   auto* result =
-    this->PrepareAsyncPullTaskInsRaw(context, request, cq);
+    this->PrepareAsyncPullMessagesRaw(context, request, cq);
   result->StartCall();
   return result;
 }
 
-::grpc::Status Fleet::Stub::PushTaskRes(::grpc::ClientContext* context, const ::flwr::proto::PushTaskResRequest& request, ::flwr::proto::PushTaskResResponse* response) {
-  return ::grpc::internal::BlockingUnaryCall< ::flwr::proto::PushTaskResRequest, ::flwr::proto::PushTaskResResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_PushTaskRes_, context, request, response);
+::grpc::Status Fleet::Stub::PushMessages(::grpc::ClientContext* context, const ::flwr::proto::PushMessagesRequest& request, ::flwr::proto::PushMessagesResponse* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::flwr::proto::PushMessagesRequest, ::flwr::proto::PushMessagesResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_PushMessages_, context, request, response);
 }
 
-void Fleet::Stub::async::PushTaskRes(::grpc::ClientContext* context, const ::flwr::proto::PushTaskResRequest* request, ::flwr::proto::PushTaskResResponse* response, std::function<void(::grpc::Status)> f) {
-  ::grpc::internal::CallbackUnaryCall< ::flwr::proto::PushTaskResRequest, ::flwr::proto::PushTaskResResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_PushTaskRes_, context, request, response, std::move(f));
+void Fleet::Stub::async::PushMessages(::grpc::ClientContext* context, const ::flwr::proto::PushMessagesRequest* request, ::flwr::proto::PushMessagesResponse* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::flwr::proto::PushMessagesRequest, ::flwr::proto::PushMessagesResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_PushMessages_, context, request, response, std::move(f));
 }
 
-void Fleet::Stub::async::PushTaskRes(::grpc::ClientContext* context, const ::flwr::proto::PushTaskResRequest* request, ::flwr::proto::PushTaskResResponse* response, ::grpc::ClientUnaryReactor* reactor) {
-  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_PushTaskRes_, context, request, response, reactor);
+void Fleet::Stub::async::PushMessages(::grpc::ClientContext* context, const ::flwr::proto::PushMessagesRequest* request, ::flwr::proto::PushMessagesResponse* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_PushMessages_, context, request, response, reactor);
 }
 
-::grpc::ClientAsyncResponseReader< ::flwr::proto::PushTaskResResponse>* Fleet::Stub::PrepareAsyncPushTaskResRaw(::grpc::ClientContext* context, const ::flwr::proto::PushTaskResRequest& request, ::grpc::CompletionQueue* cq) {
-  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::flwr::proto::PushTaskResResponse, ::flwr::proto::PushTaskResRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_PushTaskRes_, context, request);
+::grpc::ClientAsyncResponseReader< ::flwr::proto::PushMessagesResponse>* Fleet::Stub::PrepareAsyncPushMessagesRaw(::grpc::ClientContext* context, const ::flwr::proto::PushMessagesRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::flwr::proto::PushMessagesResponse, ::flwr::proto::PushMessagesRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_PushMessages_, context, request);
 }
 
-::grpc::ClientAsyncResponseReader< ::flwr::proto::PushTaskResResponse>* Fleet::Stub::AsyncPushTaskResRaw(::grpc::ClientContext* context, const ::flwr::proto::PushTaskResRequest& request, ::grpc::CompletionQueue* cq) {
+::grpc::ClientAsyncResponseReader< ::flwr::proto::PushMessagesResponse>* Fleet::Stub::AsyncPushMessagesRaw(::grpc::ClientContext* context, const ::flwr::proto::PushMessagesRequest& request, ::grpc::CompletionQueue* cq) {
   auto* result =
-    this->PrepareAsyncPushTaskResRaw(context, request, cq);
+    this->PrepareAsyncPushMessagesRaw(context, request, cq);
   result->StartCall();
   return result;
 }
@@ -180,6 +182,29 @@ void Fleet::Stub::async::GetRun(::grpc::ClientContext* context, const ::flwr::pr
 ::grpc::ClientAsyncResponseReader< ::flwr::proto::GetRunResponse>* Fleet::Stub::AsyncGetRunRaw(::grpc::ClientContext* context, const ::flwr::proto::GetRunRequest& request, ::grpc::CompletionQueue* cq) {
   auto* result =
     this->PrepareAsyncGetRunRaw(context, request, cq);
+  result->StartCall();
+  return result;
+}
+
+::grpc::Status Fleet::Stub::GetFab(::grpc::ClientContext* context, const ::flwr::proto::GetFabRequest& request, ::flwr::proto::GetFabResponse* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::flwr::proto::GetFabRequest, ::flwr::proto::GetFabResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_GetFab_, context, request, response);
+}
+
+void Fleet::Stub::async::GetFab(::grpc::ClientContext* context, const ::flwr::proto::GetFabRequest* request, ::flwr::proto::GetFabResponse* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::flwr::proto::GetFabRequest, ::flwr::proto::GetFabResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_GetFab_, context, request, response, std::move(f));
+}
+
+void Fleet::Stub::async::GetFab(::grpc::ClientContext* context, const ::flwr::proto::GetFabRequest* request, ::flwr::proto::GetFabResponse* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_GetFab_, context, request, response, reactor);
+}
+
+::grpc::ClientAsyncResponseReader< ::flwr::proto::GetFabResponse>* Fleet::Stub::PrepareAsyncGetFabRaw(::grpc::ClientContext* context, const ::flwr::proto::GetFabRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::flwr::proto::GetFabResponse, ::flwr::proto::GetFabRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_GetFab_, context, request);
+}
+
+::grpc::ClientAsyncResponseReader< ::flwr::proto::GetFabResponse>* Fleet::Stub::AsyncGetFabRaw(::grpc::ClientContext* context, const ::flwr::proto::GetFabRequest& request, ::grpc::CompletionQueue* cq) {
+  auto* result =
+    this->PrepareAsyncGetFabRaw(context, request, cq);
   result->StartCall();
   return result;
 }
@@ -218,22 +243,22 @@ Fleet::Service::Service() {
   AddMethod(new ::grpc::internal::RpcServiceMethod(
       Fleet_method_names[3],
       ::grpc::internal::RpcMethod::NORMAL_RPC,
-      new ::grpc::internal::RpcMethodHandler< Fleet::Service, ::flwr::proto::PullTaskInsRequest, ::flwr::proto::PullTaskInsResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+      new ::grpc::internal::RpcMethodHandler< Fleet::Service, ::flwr::proto::PullMessagesRequest, ::flwr::proto::PullMessagesResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
           [](Fleet::Service* service,
              ::grpc::ServerContext* ctx,
-             const ::flwr::proto::PullTaskInsRequest* req,
-             ::flwr::proto::PullTaskInsResponse* resp) {
-               return service->PullTaskIns(ctx, req, resp);
+             const ::flwr::proto::PullMessagesRequest* req,
+             ::flwr::proto::PullMessagesResponse* resp) {
+               return service->PullMessages(ctx, req, resp);
              }, this)));
   AddMethod(new ::grpc::internal::RpcServiceMethod(
       Fleet_method_names[4],
       ::grpc::internal::RpcMethod::NORMAL_RPC,
-      new ::grpc::internal::RpcMethodHandler< Fleet::Service, ::flwr::proto::PushTaskResRequest, ::flwr::proto::PushTaskResResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+      new ::grpc::internal::RpcMethodHandler< Fleet::Service, ::flwr::proto::PushMessagesRequest, ::flwr::proto::PushMessagesResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
           [](Fleet::Service* service,
              ::grpc::ServerContext* ctx,
-             const ::flwr::proto::PushTaskResRequest* req,
-             ::flwr::proto::PushTaskResResponse* resp) {
-               return service->PushTaskRes(ctx, req, resp);
+             const ::flwr::proto::PushMessagesRequest* req,
+             ::flwr::proto::PushMessagesResponse* resp) {
+               return service->PushMessages(ctx, req, resp);
              }, this)));
   AddMethod(new ::grpc::internal::RpcServiceMethod(
       Fleet_method_names[5],
@@ -244,6 +269,16 @@ Fleet::Service::Service() {
              const ::flwr::proto::GetRunRequest* req,
              ::flwr::proto::GetRunResponse* resp) {
                return service->GetRun(ctx, req, resp);
+             }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      Fleet_method_names[6],
+      ::grpc::internal::RpcMethod::NORMAL_RPC,
+      new ::grpc::internal::RpcMethodHandler< Fleet::Service, ::flwr::proto::GetFabRequest, ::flwr::proto::GetFabResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+          [](Fleet::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::flwr::proto::GetFabRequest* req,
+             ::flwr::proto::GetFabResponse* resp) {
+               return service->GetFab(ctx, req, resp);
              }, this)));
 }
 
@@ -271,14 +306,14 @@ Fleet::Service::~Service() {
   return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
 }
 
-::grpc::Status Fleet::Service::PullTaskIns(::grpc::ServerContext* context, const ::flwr::proto::PullTaskInsRequest* request, ::flwr::proto::PullTaskInsResponse* response) {
+::grpc::Status Fleet::Service::PullMessages(::grpc::ServerContext* context, const ::flwr::proto::PullMessagesRequest* request, ::flwr::proto::PullMessagesResponse* response) {
   (void) context;
   (void) request;
   (void) response;
   return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
 }
 
-::grpc::Status Fleet::Service::PushTaskRes(::grpc::ServerContext* context, const ::flwr::proto::PushTaskResRequest* request, ::flwr::proto::PushTaskResResponse* response) {
+::grpc::Status Fleet::Service::PushMessages(::grpc::ServerContext* context, const ::flwr::proto::PushMessagesRequest* request, ::flwr::proto::PushMessagesResponse* response) {
   (void) context;
   (void) request;
   (void) response;
@@ -286,6 +321,13 @@ Fleet::Service::~Service() {
 }
 
 ::grpc::Status Fleet::Service::GetRun(::grpc::ServerContext* context, const ::flwr::proto::GetRunRequest* request, ::flwr::proto::GetRunResponse* response) {
+  (void) context;
+  (void) request;
+  (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status Fleet::Service::GetFab(::grpc::ServerContext* context, const ::flwr::proto::GetFabRequest* request, ::flwr::proto::GetFabResponse* response) {
   (void) context;
   (void) request;
   (void) response;
