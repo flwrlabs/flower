@@ -67,7 +67,8 @@ def _get_request_run_id(request: GrpcMessage) -> int | None:
     descriptor = getattr(request, "DESCRIPTOR", None)
     if descriptor is None or "run_id" not in descriptor.fields_by_name:
         return None
-    return cast(int, request.run_id)
+    request_any = cast(Any, request)
+    return cast(int, request_any.run_id)
 
 
 class AppIoTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ignore
