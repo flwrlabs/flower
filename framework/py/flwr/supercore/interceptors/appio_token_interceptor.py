@@ -141,7 +141,6 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
 
             state = self._state_provider()
             run_id = state.get_run_id_by_token(token)
-            
             # Validate both token->run lookup and run->token mapping.
             if run_id is None or not state.verify_token(run_id, token):
                 _abort_auth_denied(context)
