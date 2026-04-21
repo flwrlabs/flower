@@ -19,12 +19,9 @@ import argparse
 from logging import DEBUG, INFO
 
 from flwr.common.args import add_args_flwr_app_common
-from flwr.common.constant import CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS, ExecPluginType
+from flwr.common.constant import CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
-from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
-from flwr.supercore.superexec.plugin import ClientAppExecPlugin
-from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning
 from flwr.supercore.utils import mask_string
 from flwr.supernode.runtime.run_clientapp import run_clientapp
 
@@ -37,20 +34,6 @@ def flwr_clientapp() -> None:
             ExitCode.COMMON_TLS_NOT_SUPPORTED,
             "flwr-clientapp does not support TLS yet.",
         )
-
-    # Disallow long-running `flwr-clientapp` processes
-    if args.token is None:
-        run_with_deprecation_warning(
-            cmd="flwr-clientapp",
-            plugin_type=ExecPluginType.CLIENT_APP,
-            plugin_class=ClientAppExecPlugin,
-            stub_class=ClientAppIoStub,
-            appio_api_address=args.clientappio_api_address,
-            parent_pid=args.parent_pid,
-            warn_run_once=args.run_once,
-            runtime_dependency_install=args.runtime_dependency_install,
-        )
-        return
 
     log(INFO, "Start `flwr-clientapp` process")
     log(

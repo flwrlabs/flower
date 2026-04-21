@@ -15,11 +15,19 @@
 """Tests for simulation runtime wiring."""
 
 
+import importlib
 import unittest
 from queue import Queue
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from .app import run_simulation_process
+import pytest
+
+from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
+
+from .app import _parse_args_run_flwr_simulation, run_simulation_process
+
+simulation_app_module = importlib.import_module("flwr.simulation.app")
 
 
 class TestRunSimulationProcess(unittest.TestCase):
@@ -53,3 +61,113 @@ class TestRunSimulationProcess(unittest.TestCase):
             token="test-token",
         )
         mock_flwr_exit.assert_called_once()
+
+
+def test_parse_flwr_simulation_requires_token() -> None:
+    """The simulation process CLI should require a token."""
+    with pytest.raises(SystemExit):
+        _parse_args_run_flwr_simulation().parse_args([])
+
+
+def test_parse_flwr_simulation_rejects_run_once() -> None:
+    """The removed deprecated flag should no longer parse."""
+    with pytest.raises(SystemExit):
+        _parse_args_run_flwr_simulation().parse_args(
+            ["--token", "test-token", "--run-once"]
+        )
+
+
+def test_parse_flwr_simulation_parses_tokenized_invocation() -> None:
+    """The simulation process CLI should still parse the supported flags."""
+    args = _parse_args_run_flwr_simulation().parse_args(
+        [
+            "--token",
+            "test-token",
+            "--insecure",
+            "--parent-pid",
+            "1234",
+            "--allow-runtime-dependency-installation",
+        ]
+    )
+
+    assert args.serverappio_api_address == SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
+    assert args.token == "test-token"
+    assert args.insecure is True
+    assert args.parent_pid == 1234
+    assert args.runtime_dependency_install is True
+
+
+def test_flwr_simulation_parses_args_before_mirroring_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Argument parsing should happen before stdout/stderr redirection."""
+
+    class _Parser:
+        def parse_args(self) -> SimpleNamespace:
+            """Raise a parser error before any side effects happen."""
+            raise SystemExit(2)
+
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        simulation_app_module, "_parse_args_run_flwr_simulation", _Parser
+    )
+    monkeypatch.setattr(
+        simulation_app_module,
+        "mirror_output_to_queue",
+        lambda *_args, **_kwargs: calls.append("mirror"),
+    )
+
+    with pytest.raises(SystemExit):
+        simulation_app_module.flwr_simulation()
+
+    assert not calls
+
+
+def test_flwr_simulation_forwards_cli_args(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The simulation CLI should forward parsed args to the runtime."""
+    args = SimpleNamespace(
+        insecure=True,
+        serverappio_api_address="127.0.0.1:9091",
+        token="test-token",
+        parent_pid=321,
+        runtime_dependency_install=True,
+    )
+    calls: list[str] = []
+    captured: dict[str, object] = {}
+
+    class _Parser:
+        def parse_args(self) -> SimpleNamespace:
+            """Return a fixed namespace for CLI forwarding tests."""
+            return args
+
+    def _mirror_output_to_queue(*_args: object, **_kwargs: object) -> None:
+        calls.append("mirror")
+
+    def _restore_output() -> None:
+        calls.append("restore")
+
+    def _run_simulation_process(**kwargs: object) -> None:
+        captured.update(kwargs)
+
+    monkeypatch.setattr(
+        simulation_app_module, "_parse_args_run_flwr_simulation", _Parser
+    )
+    monkeypatch.setattr(
+        simulation_app_module, "mirror_output_to_queue", _mirror_output_to_queue
+    )
+    monkeypatch.setattr(simulation_app_module, "restore_output", _restore_output)
+    monkeypatch.setattr(
+        simulation_app_module, "run_simulation_process", _run_simulation_process
+    )
+
+    simulation_app_module.flwr_simulation()
+
+    assert calls == ["mirror", "restore"]
+    assert captured["serverappio_api_address"] == "127.0.0.1:9091"
+    assert captured["token"] == "test-token"
+    assert captured["certificates"] is None
+    assert captured["parent_pid"] == 321
+    assert captured["runtime_dependency_install"] is True
