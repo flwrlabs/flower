@@ -118,38 +118,37 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
         heartbeat_sender = HeartbeatSender(make_app_heartbeat_fn_grpc(stub, token))
         heartbeat_sender.start()
 
-        # Pull Message, Context, Run and (optional) FAB from SuperNode
+        # Pull Message, Context, Run and FAB from SuperNode
         message, context, run, fab = pull_appinputs(stub=stub, token=token)
 
         try:
 
-            # Install FAB, if provided
-            if fab:
-                log(DEBUG, "[flwr-clientapp] Start FAB installation.")
-                install_from_fab(fab.content, skip_prompt=True)
+            # Install FAB
+            log(DEBUG, "[flwr-clientapp] Start FAB installation.")
+            install_from_fab(fab.content, skip_prompt=True)
 
-                app_path = get_project_dir(run.fab_id, run.fab_version, fab.hash_str)
-                if runtime_dependency_install:
-                    log(DEBUG, "[flwr-clientapp] Installing app dependencies.")
-                    runtime_env_dir = install_app_dependencies(
-                        app_path,
-                        launch_id=token,
-                        run_id=run.run_id,
-                        index_context={
-                            "component": "clientapp",
-                            "project_dir": str(app_path),
-                            "run_id": run.run_id,
-                            "launch_id": token,
-                            "fab_id": run.fab_id,
-                            "fab_version": run.fab_version,
-                            "fab_hash": fab.hash_str,
-                        },
-                    )
-                else:
-                    log(
-                        DEBUG,
-                        "[flwr-clientapp] Runtime dependency installation is disabled.",
-                    )
+            app_path = get_project_dir(run.fab_id, run.fab_version, fab.hash_str)
+            if runtime_dependency_install:
+                log(DEBUG, "[flwr-clientapp] Installing app dependencies.")
+                runtime_env_dir = install_app_dependencies(
+                    app_path,
+                    launch_id=token,
+                    run_id=run.run_id,
+                    index_context={
+                        "component": "clientapp",
+                        "project_dir": str(app_path),
+                        "run_id": run.run_id,
+                        "launch_id": token,
+                        "fab_id": run.fab_id,
+                        "fab_version": run.fab_version,
+                        "fab_hash": fab.hash_str,
+                    },
+                )
+            else:
+                log(
+                    DEBUG,
+                    "[flwr-clientapp] Runtime dependency installation is disabled.",
+                )
 
             load_client_app_fn = get_load_client_app_fn(
                 default_app_ref="",
@@ -160,7 +159,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
             # Load ClientApp
             log(DEBUG, "[flwr-clientapp] Start `ClientApp` Loading.")
             client_app: ClientApp = load_client_app_fn(
-                run.fab_id, run.fab_version, fab.hash_str if fab else ""
+                run.fab_id, run.fab_version, fab.hash_str
             )
 
             # Execute ClientApp
@@ -198,18 +197,18 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
 
 def pull_appinputs(
     stub: ClientAppIoStub, token: str
-) -> tuple[Message, Context, Run, Fab | None]:
+) -> tuple[Message, Context, Run, Fab]:
     """Pull AppInputs from SuperNode."""
     masked_token = mask_string(token)
     log(INFO, "[flwr-clientapp] Pull `AppInputs` for token %s", masked_token)
     try:
-        # Pull Context, Run and (optional) FAB
+        # Pull Context, Run and FAB
         res: PullAppInputsResponse = stub.PullAppInputs(
             PullAppInputsRequest(token=token)
         )
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
-        fab = fab_from_proto(res.fab) if res.fab else None
+        fab = fab_from_proto(res.fab)
 
         # Pull and inflate the message
         pull_msg_res: PullAppMessagesResponse = stub.PullMessage(
