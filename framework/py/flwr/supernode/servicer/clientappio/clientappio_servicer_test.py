@@ -114,9 +114,8 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.assertEqual(run.run_id, 61016)
         self.assertEqual(run.fab_id, "mock/mock")
         self.assertEqual(run.fab_version, "v1.0.0")
-        if fab:
-            self.assertEqual(fab.hash_str, mock_fab.hash_str)
-            self.assertEqual(fab.content, mock_fab.content)
+        self.assertEqual(fab.hash_str, mock_fab.hash_str)
+        self.assertEqual(fab.content, mock_fab.content)
 
     def test_push_clientapp_outputs(self) -> None:
         """Test pushing messages to SuperNode."""
