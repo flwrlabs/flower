@@ -45,6 +45,9 @@ from flwr.supercore.interceptors import (
     create_clientappio_token_auth_server_interceptor,
     create_serverappio_token_auth_server_interceptor,
 )
+from flwr.supercore.interceptors.appio_token_interceptor import (
+    RUN_BINDING_FAILED_MESSAGE,
+)
 
 _ClientCallDetails = namedtuple(
     "_ClientCallDetails",
@@ -230,8 +233,30 @@ class TestAppIoTokenServerInterceptor(TestCase):
         # cross-run use is expected.
         response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=7), Mock()))
         self.assertEqual(response, "ok")
-        # Run-id mismatch deny coverage belongs to the
-        # follow-up PR that enforces run binding.
+
+    def test_run_id_mismatch_denied_for_protected_method(self) -> None:
+        """Protected methods should deny token use against a different run."""
+        interceptor = self._new_interceptor(token_to_run_id={"valid": 7})
+        method = self._find_serverappio_method(requires_token=True)
+        if method is None:
+            self.skipTest("No token-required ServerAppIo method found in policy table.")
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        intercepted = interceptor.intercept_service(
+            lambda _: _make_unary_handler(),
+            _HandlerCallDetails(
+                method,
+                invocation_metadata=((APP_TOKEN_HEADER, "valid"),),
+            ),
+        )
+
+        with self.assertRaises(grpc.RpcError):
+            intercepted.unary_unary(GetNodesRequest(run_id=8), context)
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.PERMISSION_DENIED,
+            RUN_BINDING_FAILED_MESSAGE,
+        )
 
     def test_metadata_token_used_even_when_request_has_token(self) -> None:
         """Metadata token should be authoritative when both sources exist."""
@@ -424,7 +449,7 @@ class TestFactoryFunctions(TestCase):
         response = cast(
             str,
             intercepted.unary_unary(
-                PushObjectRequest(object_id="obj", object_content=b"x"),
+                PushObjectRequest(run_id=1, object_id="obj", object_content=b"x"),
                 Mock(),
             ),
         )
