@@ -67,7 +67,7 @@ def _get_request_run_id(request: GrpcMessage) -> int | None:
     descriptor = getattr(request, "DESCRIPTOR", None)
     if descriptor is None or "run_id" not in descriptor.fields_by_name:
         return None
-    return cast(int, getattr(request, "run_id"))
+    return cast(int, request.run_id)
 
 
 class AppIoTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ignore
@@ -141,7 +141,7 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
 
             state = self._state_provider()
             run_id = state.get_run_id_by_token(token)
-            
+
             # Validate both token->run lookup and run->token mapping.
             if run_id is None or not state.verify_token(run_id, token):
                 _abort_auth_denied(context)
