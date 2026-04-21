@@ -17,6 +17,7 @@
 
 import importlib
 from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -61,9 +62,7 @@ def test_parse_flwr_clientapp_parses_tokenized_invocation() -> None:
     assert args.runtime_dependency_install is True
 
 
-def test_flwr_clientapp_forwards_cli_args(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_flwr_clientapp_forwards_cli_args() -> None:
     """The ClientApp CLI should forward parsed args to the runtime."""
     args = SimpleNamespace(
         insecure=True,
@@ -72,25 +71,24 @@ def test_flwr_clientapp_forwards_cli_args(
         parent_pid=321,
         runtime_dependency_install=True,
     )
-    captured: dict[str, object] = {}
 
     class _Parser:
         def parse_args(self) -> SimpleNamespace:
             """Return a fixed namespace for CLI forwarding tests."""
             return args
 
-    def _run_clientapp(**kwargs: object) -> None:
-        captured.update(kwargs)
+    run_clientapp = Mock()
 
-    monkeypatch.setattr(
-        flwr_clientapp_module, "_parse_args_run_flwr_clientapp", _Parser
-    )
-    monkeypatch.setattr(flwr_clientapp_module, "run_clientapp", _run_clientapp)
+    with (
+        patch.object(flwr_clientapp_module, "_parse_args_run_flwr_clientapp", _Parser),
+        patch.object(flwr_clientapp_module, "run_clientapp", run_clientapp),
+    ):
+        flwr_clientapp_module.flwr_clientapp()
 
-    flwr_clientapp_module.flwr_clientapp()
-
-    assert captured["clientappio_api_address"] == "127.0.0.1:9094"
-    assert captured["token"] == "test-token"
-    assert captured["certificates"] is None
-    assert captured["parent_pid"] == 321
-    assert captured["runtime_dependency_install"] is True
+    run_clientapp.assert_called_once()
+    kwargs = run_clientapp.call_args.kwargs
+    assert kwargs["clientappio_api_address"] == "127.0.0.1:9094"
+    assert kwargs["token"] == "test-token"
+    assert kwargs["certificates"] is None
+    assert kwargs["parent_pid"] == 321
+    assert kwargs["runtime_dependency_install"] is True

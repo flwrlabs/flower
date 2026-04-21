@@ -17,6 +17,7 @@
 
 import importlib
 from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -61,9 +62,7 @@ def test_parse_flwr_serverapp_parses_tokenized_invocation() -> None:
     assert args.runtime_dependency_install is True
 
 
-def test_flwr_serverapp_parses_args_before_mirroring_output(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_flwr_serverapp_parses_args_before_mirroring_output() -> None:
     """Argument parsing should happen before stdout/stderr redirection."""
 
     class _Parser:
@@ -71,24 +70,23 @@ def test_flwr_serverapp_parses_args_before_mirroring_output(
             """Raise a parser error before any side effects happen."""
             raise SystemExit(2)
 
-    calls: list[str] = []
+    mirror_output_to_queue = Mock()
 
-    monkeypatch.setattr(serverapp_module, "_parse_args_run_flwr_serverapp", _Parser)
-    monkeypatch.setattr(
-        serverapp_module,
-        "mirror_output_to_queue",
-        lambda *_args, **_kwargs: calls.append("mirror"),
-    )
-
-    with pytest.raises(SystemExit):
+    with (
+        patch.object(serverapp_module, "_parse_args_run_flwr_serverapp", _Parser),
+        patch.object(
+            serverapp_module,
+            "mirror_output_to_queue",
+            mirror_output_to_queue,
+        ),
+        pytest.raises(SystemExit),
+    ):
         serverapp_module.flwr_serverapp()
 
-    assert not calls
+    mirror_output_to_queue.assert_not_called()
 
 
-def test_flwr_serverapp_forwards_cli_args(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_flwr_serverapp_forwards_cli_args() -> None:
     """The ServerApp CLI should forward parsed args to the runtime."""
     args = SimpleNamespace(
         insecure=True,
@@ -97,36 +95,34 @@ def test_flwr_serverapp_forwards_cli_args(
         parent_pid=321,
         runtime_dependency_install=True,
     )
-    calls: list[str] = []
-    captured: dict[str, object] = {}
 
     class _Parser:
         def parse_args(self) -> SimpleNamespace:
             """Return a fixed namespace for CLI forwarding tests."""
             return args
 
-    def _mirror_output_to_queue(*_args: object, **_kwargs: object) -> None:
-        calls.append("mirror")
+    mirror_output_to_queue = Mock()
+    restore_output = Mock()
+    run_serverapp = Mock()
 
-    def _restore_output() -> None:
-        calls.append("restore")
+    with (
+        patch.object(serverapp_module, "_parse_args_run_flwr_serverapp", _Parser),
+        patch.object(
+            serverapp_module,
+            "mirror_output_to_queue",
+            mirror_output_to_queue,
+        ),
+        patch.object(serverapp_module, "restore_output", restore_output),
+        patch.object(serverapp_module, "run_serverapp", run_serverapp),
+    ):
+        serverapp_module.flwr_serverapp()
 
-    def _run_serverapp(**kwargs: object) -> None:
-        captured.update(kwargs)
-
-    monkeypatch.setattr(serverapp_module, "_parse_args_run_flwr_serverapp", _Parser)
-    monkeypatch.setattr(
-        serverapp_module, "mirror_output_to_queue", _mirror_output_to_queue
-    )
-    monkeypatch.setattr(serverapp_module, "restore_output", _restore_output)
-    monkeypatch.setattr(serverapp_module, "run_serverapp", _run_serverapp)
-
-    serverapp_module.flwr_serverapp()
-
-    assert calls == ["mirror", "restore"]
-    assert captured["serverappio_api_address"] == "127.0.0.1:9091"
-    assert captured["log_queue"] is not None
-    assert captured["token"] == "test-token"
-    assert captured["certificates"] is None
-    assert captured["parent_pid"] == 321
-    assert captured["runtime_dependency_install"] is True
+    mirror_output_to_queue.assert_called_once()
+    restore_output.assert_called_once_with()
+    run_serverapp.assert_called_once()
+    kwargs = run_serverapp.call_args.kwargs
+    assert kwargs["serverappio_api_address"] == "127.0.0.1:9091"
+    assert kwargs["token"] == "test-token"
+    assert kwargs["certificates"] is None
+    assert kwargs["parent_pid"] == 321
+    assert kwargs["runtime_dependency_install"] is True

@@ -2,18 +2,6 @@
 
 ## Unreleased
 
-### Incompatible changes
-
-- **Remove tokenless app executor fallback**
-
-  Tokenless direct execution of `flwr-serverapp`, `flwr-simulation`, and
-  `flwr-clientapp` has been removed. These commands now require `--token`, and
-  the previously accepted `--run-once` flag has been removed and now errors.
-  Launch these processes through SuperExec instead, and remove `--run-once`
-  from any existing scripts or invocations. For containerized externally managed
-  app processes, use the `flwr/superexec` image with
-  `flower-superexec --plugin-type ...`.
-
 ## v1.29.0 (2026-04-12)
 
 ### Thanks to our contributors
