@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the Flower Agent runtime stub."""
+"""Tests for the Flower AgentApp process."""
 
 
 import importlib
@@ -28,10 +28,10 @@ run_agentapp_module = importlib.import_module(
 )
 
 
-def test_run_flower_agent_exits_with_stub_message(
+def test_run_flwr_agent_exits_with_stub_message(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The runtime stub should fail fast with a clear message."""
+    """The Flower AgentApp process should fail fast with a clear message."""
     captured: dict[str, object] = {}
 
     def _flwr_exit(
