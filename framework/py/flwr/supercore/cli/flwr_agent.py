@@ -33,8 +33,8 @@ from flwr.supercore.utils import disable_process_dumping
 from flwr.supercore.version import package_version
 
 
-def flower_agent() -> None:
-    """Run `flower-agent` command."""
+def flwr_agent() -> None:
+    """Run `flwr-agent` command."""
     disable_process_dumping(strict=False)
     warn_if_flwr_update_available(process_name="flower-agent")
     args = _parse_args().parse_args()
@@ -45,7 +45,7 @@ def flower_agent() -> None:
             "`flower-agent` does not support TLS yet.",
         )
 
-    log(INFO, "Starting Flower Agent")
+    log(INFO, "Starting flwr-agent")
 
     event(EventType.RUN_AGENT_ENTER)
 
@@ -58,7 +58,7 @@ def flower_agent() -> None:
         except ValueError as err:
             flwr_exit(
                 ExitCode.SUPEREXEC_AUTH_SECRET_LOAD_FAILED,
-                f"Failed to load Flower Agent authentication secret: {err}",
+                f"Failed to load flwr-agent authentication secret: {err}",
             )
 
     run_flower_agent(
@@ -73,7 +73,7 @@ def flower_agent() -> None:
 def _parse_args() -> argparse.ArgumentParser:
     """Parse `flower-agent` command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Run Flower Agent.",
+        description="Run flwr-agent.",
     )
     parser.add_argument(
         "-V",

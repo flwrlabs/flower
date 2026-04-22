@@ -23,7 +23,7 @@ import pytest
 from flwr.common import EventType
 from flwr.supercore.version import package_version
 
-from .flower_agent import _parse_args
+from .flwr_agent import _parse_args
 
 flower_agent_module = importlib.import_module("flwr.supercore.cli.flower_agent")
 

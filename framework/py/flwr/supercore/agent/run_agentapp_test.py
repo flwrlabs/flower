@@ -22,8 +22,8 @@ import pytest
 from flwr.common import EventType
 from flwr.common.exit import ExitCode
 
-run_flower_agent_module = importlib.import_module(
-    "flwr.supercore.agent.run_flower_agent"
+run_agentapp_module = importlib.import_module(
+    "flwr.supercore.agent.run_agentapp"
 )
 
 
@@ -43,10 +43,10 @@ def test_run_flower_agent_exits_with_stub_message(
         captured["event_type"] = event_type
         raise SystemExit(1)
 
-    monkeypatch.setattr(run_flower_agent_module, "flwr_exit", _flwr_exit)
+    monkeypatch.setattr(run_agentapp_module, "flwr_exit", _flwr_exit)
 
     with pytest.raises(SystemExit):
-        run_flower_agent_module.run_flower_agent(
+        run_agentapp_module.run_flower_agent(
             appio_api_address="127.0.0.1:9091",
         )
 

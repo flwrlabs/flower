@@ -19,6 +19,6 @@ from .flower_agent import flower_agent
 from .flower_superexec import flower_superexec
 
 __all__ = [
-    "flower_agent",
+    "flwr_agent",
     "flower_superexec",
 ]
