@@ -17,6 +17,7 @@
 
 import tempfile
 import unittest
+from collections.abc import Callable
 
 import grpc
 
@@ -25,6 +26,18 @@ from flwr.common.typing import RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ListAppsToLaunchRequest,
     ListAppsToLaunchResponse,
+    PullAppMessagesRequest,
+    PullAppMessagesResponse,
+    PushAppMessagesRequest,
+    PushAppMessagesResponse,
+)
+from flwr.proto.message_pb2 import (  # pylint: disable=E0611
+    ConfirmMessageReceivedRequest,
+    ConfirmMessageReceivedResponse,
+    PullObjectRequest,
+    PullObjectResponse,
+    PushObjectRequest,
+    PushObjectResponse,
 )
 from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
@@ -77,22 +90,28 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         self._auth_run_id = self._create_running_run()
         auth_token = self.state.create_token(self._auth_run_id)
         assert auth_token is not None
+        self._auth_token = auth_token
+
+        self._simulation_run_id = self._create_running_run(run_type=RunType.SIMULATION)
+        simulation_token = self.state.create_token(self._simulation_run_id)
+        assert simulation_token is not None
+        self._simulation_token = simulation_token
 
         # Create a single base channel and wrap it for authenticated calls.
-        base_channel = grpc.insecure_channel("localhost:9091")
-        self._get_nodes_no_auth = base_channel.unary_unary(
+        self._base_channel = grpc.insecure_channel("localhost:9091")
+        self._get_nodes_no_auth = self._base_channel.unary_unary(
             "/flwr.proto.ServerAppIo/GetNodes",
             request_serializer=GetNodesRequest.SerializeToString,
             response_deserializer=GetNodesResponse.FromString,
         )
-        self._list_apps_to_launch_no_auth = base_channel.unary_unary(
+        self._list_apps_to_launch_no_auth = self._base_channel.unary_unary(
             "/flwr.proto.ServerAppIo/ListAppsToLaunch",
             request_serializer=ListAppsToLaunchRequest.SerializeToString,
             response_deserializer=ListAppsToLaunchResponse.FromString,
         )
         auth_channel = grpc.intercept_channel(
-            base_channel,
-            AppIoTokenClientInterceptor(token=auth_token),
+            self._base_channel,
+            AppIoTokenClientInterceptor(token=self._auth_token),
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
                 protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
@@ -111,15 +130,35 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
 
     def tearDown(self) -> None:
         """Stop the gRPC API server."""
+        self._base_channel.close()
         self._server.stop(None)
 
-    def _create_running_run(self) -> int:
+    def _create_running_run(self, run_type: str = RunType.SERVER_APP) -> int:
         run_id = self.state.create_run(
-            "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
+            "", "", "", {}, NOOP_FEDERATION, None, "", run_type
         )
         _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
         _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
         return run_id
+
+    def _assert_serverapp_only_endpoint_denied(
+        self,
+        *,
+        method: str,
+        request: object,
+        response_deserializer: Callable[[bytes], object],
+    ) -> None:
+        rpc = self._base_channel.unary_unary(
+            method,
+            request_serializer=request.__class__.SerializeToString,
+            response_deserializer=response_deserializer,
+        )
+        with self.assertRaises(grpc.RpcError) as err:
+            rpc.with_call(
+                request=request,
+                metadata=((APP_TOKEN_HEADER, self._simulation_token),),
+            )
+        assert err.exception.code() == grpc.StatusCode.PERMISSION_DENIED
 
     def test_get_nodes_denied_without_metadata_token(self) -> None:
         """Protected RPC should deny requests missing metadata token."""
@@ -148,6 +187,58 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
 
         assert isinstance(response, GetNodesResponse)
         assert call.code() == grpc.StatusCode.OK
+
+    def test_get_nodes_denied_when_token_targets_different_run(self) -> None:
+        """Protected RPC should deny valid tokens used against another run."""
+        with self.assertRaises(grpc.RpcError) as err:
+            self._get_nodes_no_auth.with_call(
+                request=GetNodesRequest(run_id=self._auth_run_id),
+                metadata=((APP_TOKEN_HEADER, self._simulation_token),),
+            )
+        assert err.exception.code() == grpc.StatusCode.PERMISSION_DENIED
+
+    def test_serverapp_only_endpoints_denied_for_simulation_run(self) -> None:
+        """ServerApp-only RPCs should deny simulation-run tokens."""
+        cases: list[tuple[str, object, Callable[[bytes], object]]] = [
+            (
+                "/flwr.proto.ServerAppIo/GetNodes",
+                GetNodesRequest(run_id=self._simulation_run_id),
+                GetNodesResponse.FromString,
+            ),
+            (
+                "/flwr.proto.ServerAppIo/PushMessages",
+                PushAppMessagesRequest(run_id=self._simulation_run_id),
+                PushAppMessagesResponse.FromString,
+            ),
+            (
+                "/flwr.proto.ServerAppIo/PullMessages",
+                PullAppMessagesRequest(run_id=self._simulation_run_id),
+                PullAppMessagesResponse.FromString,
+            ),
+            (
+                "/flwr.proto.ServerAppIo/PushObject",
+                PushObjectRequest(run_id=self._simulation_run_id),
+                PushObjectResponse.FromString,
+            ),
+            (
+                "/flwr.proto.ServerAppIo/PullObject",
+                PullObjectRequest(run_id=self._simulation_run_id),
+                PullObjectResponse.FromString,
+            ),
+            (
+                "/flwr.proto.ServerAppIo/ConfirmMessageReceived",
+                ConfirmMessageReceivedRequest(run_id=self._simulation_run_id),
+                ConfirmMessageReceivedResponse.FromString,
+            ),
+        ]
+
+        for method, request, response_deserializer in cases:
+            with self.subTest(method=method):
+                self._assert_serverapp_only_endpoint_denied(
+                    method=method,
+                    request=request,
+                    response_deserializer=response_deserializer,
+                )
 
     def test_list_apps_to_launch_denied_without_superexec_metadata(self) -> None:
         """SuperExec RPC should deny requests missing signed metadata."""

@@ -79,13 +79,20 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.superlink.utils import abort_if
 from flwr.server.utils.validator import validate_message
+from flwr.supercore.constant import RunType
 from flwr.supercore.inflatable.inflatable_object import (
     UnexpectedObjectContentError,
     get_all_nested_objects,
     get_object_tree,
     no_object_id_recompute,
 )
+from flwr.supercore.interceptors.appio_token_interceptor import APP_TOKEN_HEADER
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
+from flwr.supercore.utils import get_metadata_str
+
+SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE = (
+    "Some ServerAppIo API endpoints are only available for Deployment Runtime runs."
+)
 
 
 class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
@@ -161,6 +168,8 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
+        _abort_if_not_serverapp_run(request.run_id, state, context)
+
         # Abort if the run is not running
         abort_if(
             request.run_id,
@@ -183,6 +192,8 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         # Init state and store
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
+
+        _abort_if_not_serverapp_run(request.run_id, state, context)
 
         # Abort if the run is not running
         abort_if(
@@ -238,6 +249,8 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         # Init state and store
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
+
+        _abort_if_not_serverapp_run(request.run_id, state, context)
 
         # Abort if the run is not running
         abort_if(
@@ -326,7 +339,7 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         state = self.state_factory.state()
 
         # Validate the token
-        run_id = self._verify_token(request.token, context)
+        run_id = _verify_token(request.token, state, context)
 
         # Retrieve Context, Run and Fab for the run_id
         serverapp_ctxt = state.get_serverapp_context(run_id)
@@ -358,12 +371,12 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         """Push ServerApp process outputs."""
         log(DEBUG, "ServerAppIoServicer.PushAppOutputs")
 
-        # Validate the token
-        _ = self._verify_token(request.token, context)
-
         # Init state and store
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
+
+        # Validate the token
+        _ = _verify_token(request.token, state, context)
 
         # Abort if the run is not running
         abort_if(
@@ -433,7 +446,8 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         state = self.state_factory.state()
 
         # Acknowledge the heartbeat
-        success = state.acknowledge_app_heartbeat(request.token)
+        token = _resolve_app_token_from_metadata_or_request(request.token, context)
+        success = state.acknowledge_app_heartbeat(token)
         return SendAppHeartbeatResponse(success=success)
 
     def PushObject(
@@ -445,6 +459,8 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         # Init state and store
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
+
+        _abort_if_not_serverapp_run(request.run_id, state, context)
 
         # Abort if the run is not running
         abort_if(
@@ -482,6 +498,8 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
+        _abort_if_not_serverapp_run(request.run_id, state, context)
+
         # Abort if the run is not running
         abort_if(
             request.run_id,
@@ -516,6 +534,8 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
+        _abort_if_not_serverapp_run(request.run_id, state, context)
+
         # Abort if the run is not running
         abort_if(
             request.run_id,
@@ -530,17 +550,55 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
 
         return ConfirmMessageReceivedResponse()
 
-    def _verify_token(self, token: str, context: grpc.ServicerContext) -> int:
-        """Verify the token and return the associated run ID."""
-        state = self.state_factory.state()
-        run_id = state.get_run_id_by_token(token)
-        if run_id is None or not state.verify_token(run_id, token):
-            context.abort(
-                grpc.StatusCode.PERMISSION_DENIED,
-                "Invalid token.",
-            )
-            raise RuntimeError("This line should never be reached.")
-        return run_id
+
+def _abort_if_not_serverapp_run(
+    run_id: int, state: LinkState, context: grpc.ServicerContext
+) -> None:
+    runs = state.get_run_info(run_ids=[run_id])
+    if not runs or runs[0].run_type != RunType.SERVER_APP:
+        context.abort(
+            grpc.StatusCode.PERMISSION_DENIED,
+            SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE,
+        )
+
+
+def _resolve_app_token_from_metadata_or_request(
+    request_token: str, context: grpc.ServicerContext
+) -> str:
+    """Return the AppIo token, preferring gRPC metadata over the request payload.
+
+    The AppIo client interceptor attaches the app token in the `APP_TOKEN_HEADER`
+    metadata entry, so this helper checks `context.invocation_metadata()` first and
+    returns that value when present. If metadata is unavailable, it falls back to
+    `request_token` for compatibility with callers and tests that still populate the
+    protobuf field directly.
+
+    This helper only selects which token value to use. It does not validate the
+    token.
+    """
+    metadata = None
+    invocation_metadata = getattr(context, "invocation_metadata", None)
+    if callable(invocation_metadata):
+        candidate = invocation_metadata()
+        if isinstance(candidate, (list, tuple)):
+            metadata = candidate
+
+    return get_metadata_str(metadata, APP_TOKEN_HEADER) or request_token
+
+
+def _verify_token(
+    request_token: str, state: LinkState, context: grpc.ServicerContext
+) -> int:
+    """Verify the token and return the associated run ID."""
+    token = _resolve_app_token_from_metadata_or_request(request_token, context)
+    run_id = state.get_run_id_by_token(token)
+    if run_id is None or not state.verify_token(run_id, token):
+        context.abort(
+            grpc.StatusCode.PERMISSION_DENIED,
+            "Invalid token.",
+        )
+        raise RuntimeError("This line should never be reached.")
+    return run_id
 
 
 def _raise_if(validation_error: bool, request_name: str, detail: str) -> None:
