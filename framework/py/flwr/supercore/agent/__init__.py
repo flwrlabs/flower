@@ -15,8 +15,8 @@
 """Flower Agent."""
 
 
-from .run_flower_agent import run_flower_agent
+from .run_agentapp import run_agentapp
 
 __all__ = [
-    "run_flower_agent",
+    "run_agentapp",
 ]
