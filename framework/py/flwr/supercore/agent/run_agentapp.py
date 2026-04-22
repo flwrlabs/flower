@@ -28,7 +28,7 @@ from flwr.supercore.superexec.dependency_installer import (
 )
 
 
-def run_agentapp(
+def run_agentapp(  # pylint: disable=R0913, R0917
     serverappio_api_address: str,
     log_queue: Queue[str | None],
     token: str,
