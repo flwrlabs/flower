@@ -349,6 +349,79 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             StartRunContext(federation_name=NOOP_FEDERATION, runtime=expected_runtime),
         )
 
+    @parameterized.expand(
+        [
+            (False, False, RunType.SERVER_APP, RunTime.DEPLOYMENT),
+            (True, False, RunType.SIMULATION, RunTime.SIMULATION),
+            (False, True, RunType.AGENT, RunTime.DEPLOYMENT),
+            (True, True, RunType.AGENT, RunTime.SIMULATION),
+        ]
+    )  # type: ignore
+    def test_start_run_derives_run_type_and_runtime(
+        self,
+        simulation: bool,
+        has_input_override: bool,
+        expected_run_type: RunType,
+        expected_runtime: RunTime,
+    ) -> None:
+        """Test StartRun derives run_type and runtime from request inputs."""
+        fab_content = b"test FAB content 888"
+        request = StartRunRequest()
+        request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
+        request.fab.content = fab_content
+        request.federation = NOOP_FEDERATION
+
+        if has_input_override:
+            for key, value in user_config_to_proto({"input": "prompt"}).items():
+                request.override_config[key].CopyFrom(value)
+
+        sim_cfg = SimulationConfig() if simulation else None
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+            ) as mock_get_fab_config,
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+            ) as mock_get_metadata_from_config,
+            patch.object(
+                self.state.federation_manager,
+                "can_execute",
+                return_value=True,
+            ) as mock_can_execute,
+            patch.object(
+                self.state.federation_manager,
+                "get_simulation_config",
+                return_value=sim_cfg,
+            ),
+        ):
+            mock_get_fab_config.return_value = {
+                "tool": {
+                    "flwr": {
+                        "app": {
+                            "config": {
+                                "train": {"lr": 0.1},
+                                "input": "default-prompt",
+                            }
+                        }
+                    }
+                }
+            }
+            mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
+
+            response = self.servicer.StartRun(request, Mock())
+
+        runs = self.state.get_run_info(run_ids=[response.run_id])
+        run_info = runs[0] if runs else None
+
+        assert run_info is not None
+        self.assertEqual(run_info.run_type, expected_run_type)
+        mock_can_execute.assert_called_once_with(
+            self.aid,
+            ActionType.START_RUN,
+            StartRunContext(federation_name=NOOP_FEDERATION, runtime=expected_runtime),
+        )
+
     @parameterized.expand([(None,), (1,), (2,), (3,), (9,)])  # type: ignore
     def test_list_runs(self, limit: int | None) -> None:
         """Test List method of ControlServicer with --runs option."""

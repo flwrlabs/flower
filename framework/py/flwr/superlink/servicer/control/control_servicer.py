@@ -199,8 +199,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     f"federation '{federation}'.",
                 )
 
-            # Derive run type based on the presence of simulation config and apply
-            # federation config overrides
+            # Derive run type:
+            # if targetting a simulation federation, the run type is SIMULATION;
+            # if run config has "input" key, the run type is AGENT;
+            # else it's SERVER_APP
+            # on the presence of simulation config, apply federation config overrides
             run_type = RunType.SERVER_APP
             resolved_federation_config = None
             runtime = RunTime.DEPLOYMENT
@@ -210,6 +213,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 resolved_federation_config = SimulationConfig()
                 resolved_federation_config.CopyFrom(sim_cfg)
                 resolved_federation_config.MergeFrom(request.override_federation_config)
+
+            if "input" in override_config:
+                run_type = RunType.AGENT
 
             if not state.federation_manager.can_execute(
                 flwr_aid,

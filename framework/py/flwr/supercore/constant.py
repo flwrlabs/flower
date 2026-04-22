@@ -174,6 +174,7 @@ class InvitationStatus(str, Enum):
 class RunType(str, Enum):
     """Supported run types."""
 
+    AGENT = "agent"
     SERVER_APP = "serverapp"
     SIMULATION = "simulation"
 
