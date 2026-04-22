@@ -124,7 +124,7 @@ def _try_obtain_telemetry_event() -> EventType | None:
         return EventType.RUN_SUPERLINK_LEAVE
     if sys.argv[0].endswith("flower-supernode"):
         return EventType.RUN_SUPERNODE_LEAVE
-    if sys.argv[0].endswith("flwr-agent"):
+    if sys.argv[0].endswith("flwr-agentapp"):
         return EventType.RUN_AGENT_LEAVE
     if sys.argv[0].endswith("flwr-serverapp"):
         return EventType.FLWR_SERVERAPP_RUN_LEAVE

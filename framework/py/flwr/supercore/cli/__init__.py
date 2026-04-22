@@ -15,10 +15,10 @@
 """Flower command line interface for shared infrastructure components."""
 
 
-from .flwr_agent import flwr_agent
 from .flower_superexec import flower_superexec
+from .flwr_agentapp import flwr_agentapp
 
 __all__ = [
-    "flwr_agent",
     "flower_superexec",
+    "flwr_agentapp",
 ]

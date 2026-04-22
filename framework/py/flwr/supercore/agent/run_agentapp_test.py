@@ -23,12 +23,10 @@ import pytest
 from flwr.common import EventType
 from flwr.common.exit import ExitCode
 
-run_agentapp_module = importlib.import_module(
-    "flwr.supercore.agent.run_agentapp"
-)
+run_agentapp_module = importlib.import_module("flwr.supercore.agent.run_agentapp")
 
 
-def test_run_flwr_agent_exits_with_stub_message(
+def test_run_flwr_agentapp_exits_with_stub_message(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The Flower AgentApp process should fail fast with a clear message."""
@@ -57,7 +55,7 @@ def test_run_flwr_agent_exits_with_stub_message(
 
     assert captured == {
         "code": ExitCode.SERVERAPP_EXCEPTION,
-        "message": "`flwr-agent` is not implemented yet.",
+        "message": "`flwr-agentapp` is not implemented yet.",
         "event_type": EventType.RUN_AGENT_LEAVE,
         "event_details": {"success": False},
     }

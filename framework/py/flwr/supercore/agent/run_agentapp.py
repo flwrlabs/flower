@@ -68,7 +68,7 @@ def run_agentapp(
     )
     flwr_exit(
         ExitCode.SERVERAPP_EXCEPTION,
-        "`flwr-agent` is not implemented yet.",
+        "`flwr-agentapp` is not implemented yet.",
         event_type=EventType.RUN_AGENT_LEAVE,
         event_details={"success": False},
     )
