@@ -201,7 +201,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 )
 
             # Derive run type:
-            # if targetting a simulation federation, the run type is SIMULATION;
+            # if targeting a simulation federation, the run type is SIMULATION;
             # if run config has AGENT_RUN_INPUT_KEY key, the run type is AGENT;
             # else it's SERVER_APP
             # on the presence of simulation config, apply federation config overrides
