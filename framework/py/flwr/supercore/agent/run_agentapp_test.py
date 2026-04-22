@@ -16,6 +16,7 @@
 
 
 import importlib
+from queue import Queue
 
 import pytest
 
@@ -37,21 +38,26 @@ def test_run_flower_agent_exits_with_stub_message(
         code: int,
         message: str | None = None,
         event_type: EventType | None = None,
+        event_details: dict[str, object] | None = None,
     ) -> None:
         captured["code"] = code
         captured["message"] = message
         captured["event_type"] = event_type
+        captured["event_details"] = event_details
         raise SystemExit(1)
 
     monkeypatch.setattr(run_agentapp_module, "flwr_exit", _flwr_exit)
 
     with pytest.raises(SystemExit):
-        run_agentapp_module.run_flower_agent(
-            appio_api_address="127.0.0.1:9091",
+        run_agentapp_module.run_agentapp(
+            serverappio_api_address="127.0.0.1:9091",
+            log_queue=Queue(),
+            token="test-token",
         )
 
     assert captured == {
         "code": ExitCode.SERVERAPP_EXCEPTION,
-        "message": "`flower-agent` is not implemented yet.",
+        "message": "`flwr-agent` is not implemented yet.",
         "event_type": EventType.RUN_AGENT_LEAVE,
+        "event_details": {"success": False},
     }

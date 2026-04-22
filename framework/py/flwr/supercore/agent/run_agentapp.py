@@ -12,34 +12,63 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower Agent runtime stub."""
+"""Flower AgentApp process."""
 
+
+from pathlib import Path
+from queue import Queue
 
 from flwr.common import EventType
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
-from flwr.common.exit import ExitCode, flwr_exit
+from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
+from flwr.common.logger import stop_log_uploader
+from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.superexec.dependency_installer import (
+    cleanup_app_runtime_environment,
+)
 
 
 def run_agentapp(
-    appio_api_address: str,
+    serverappio_api_address: str,
+    log_queue: Queue[str | None],
+    token: str,
+    certificates: bytes | None = None,
     parent_pid: int | None = None,
-    health_server_address: str | None = None,
-    superexec_auth_secret: bytes | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
-    """Run AgentApp.
+    """Run Flower AgentApp process.
 
     This runtime is intentionally a stub until AgentApp execution support is added.
     """
+    # Monitor the main process in case of SIGKILL
+    if parent_pid is not None:
+        start_parent_process_monitor(parent_pid)
+
+    log_uploader = None
+    runtime_env_dir: Path | None = None
+
+    def on_exit() -> None:
+        if log_uploader:
+            stop_log_uploader(log_queue, log_uploader)
+        cleanup_app_runtime_environment(runtime_env_dir)
+
+    register_signal_handlers(
+        event_type=EventType.RUN_AGENT_LEAVE,
+        exit_message="Run stopped by user.",
+        exit_handlers=[on_exit],
+    )
+
     _ = (
-        appio_api_address,
+        serverappio_api_address,
+        log_queue,
+        token,
+        certificates,
         parent_pid,
-        health_server_address,
-        superexec_auth_secret,
         runtime_dependency_install,
     )
     flwr_exit(
         ExitCode.SERVERAPP_EXCEPTION,
-        "`flower-agent` is not implemented yet.",
+        "`flwr-agent` is not implemented yet.",
         event_type=EventType.RUN_AGENT_LEAVE,
+        event_details={"success": False},
     )

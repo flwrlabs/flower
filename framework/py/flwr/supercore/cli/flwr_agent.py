@@ -12,96 +12,65 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""`flower-agent` command."""
+"""`flwr-agent` command."""
 
 
 import argparse
-from logging import INFO
+from logging import DEBUG, INFO
+from queue import Queue
 
-from flwr.common import EventType, event
-from flwr.common.args import add_args_runtime_dependency_install
+from flwr.common.args import add_args_flwr_app_common
+from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
 from flwr.common.exit import ExitCode, flwr_exit
-from flwr.common.logger import log
+from flwr.common.logger import log, mirror_output_to_queue, restore_output
 from flwr.supercore.agent.run_agentapp import run_agentapp
-from flwr.supercore.auth import (
-    add_superexec_auth_secret_args,
-    load_superexec_auth_secret,
-)
-from flwr.supercore.grpc_health import add_args_health
-from flwr.supercore.update_check import warn_if_flwr_update_available
-from flwr.supercore.utils import disable_process_dumping
-from flwr.supercore.version import package_version
 
 
 def flwr_agent() -> None:
-    """Run `flwr-agent` command."""
-    disable_process_dumping(strict=False)
-    warn_if_flwr_update_available(process_name="flwr-agent")
-    args = _parse_args().parse_args()
+    """Run process-isolated Flower AgentApp."""
+    args = _parse_args_run_flwr_agent().parse_args()
 
     if not args.insecure:
         flwr_exit(
             ExitCode.COMMON_TLS_NOT_SUPPORTED,
-            "`flower-agent` does not support TLS yet.",
+            "`flwr-agent` does not support TLS yet.",
         )
 
-    log(INFO, "Starting flwr-agent")
+    # Capture stdout/stderr
+    log_queue: Queue[str | None] = Queue()
+    mirror_output_to_queue(log_queue)
 
-    event(EventType.RUN_AGENT_ENTER)
-
-    superexec_auth_secret = None
-    if args.superexec_auth_secret_file is not None:
-        try:
-            superexec_auth_secret = load_superexec_auth_secret(
-                secret_file=args.superexec_auth_secret_file,
-            )
-        except ValueError as err:
-            flwr_exit(
-                ExitCode.SUPEREXEC_AUTH_SECRET_LOAD_FAILED,
-                f"Failed to load flwr-agent authentication secret: {err}",
-            )
-
+    log(INFO, "Start `flwr-agent` process")
+    log(
+        DEBUG,
+        "`flwr-agent` will attempt to connect to SuperLink's "
+        "ServerAppIo API at %s",
+        args.serverappio_api_address,
+    )
     run_agentapp(
-        appio_api_address=args.appio_api_address,
+        serverappio_api_address=args.serverappio_api_address,
+        log_queue=log_queue,
+        token=args.token,
+        certificates=None,
         parent_pid=args.parent_pid,
-        health_server_address=args.health_server_address,
-        superexec_auth_secret=superexec_auth_secret,
         runtime_dependency_install=args.runtime_dependency_install,
     )
 
+    # Restore stdout/stderr
+    restore_output()
 
-def _parse_args() -> argparse.ArgumentParser:
-    """Parse `flower-agent` command line arguments."""
+
+def _parse_args_run_flwr_agent() -> argparse.ArgumentParser:
+    """Parse `flwr-agent` command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Run flwr-agent.",
+        description="Run a Flower AgentApp",
     )
     parser.add_argument(
-        "-V",
-        "--version",
-        action="version",
-        version=f"Flower version: {package_version}",
-    )
-    parser.add_argument(
-        "--appio-api-address",
+        "--serverappio-api-address",
+        default=SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
         type=str,
-        required=True,
-        help="Address of the AppIO API",
+        help="Address of SuperLink's ServerAppIo API (IPv4, IPv6, or a domain name)."
+        f"By default, it is set to {SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS}.",
     )
-    parser.add_argument(
-        "--insecure",
-        action="store_true",
-        help="Connect to the AppIO API without TLS. "
-        "Data transmitted between the client and server is not encrypted. "
-        "Use this flag only if you understand the risks.",
-    )
-    parser.add_argument(
-        "--parent-pid",
-        type=int,
-        default=None,
-        help="The PID of the parent process. When set, the process will terminate "
-        "when the parent process exits.",
-    )
-    add_superexec_auth_secret_args(parser)
-    add_args_health(parser)
-    add_args_runtime_dependency_install(parser)
+    add_args_flwr_app_common(parser=parser)
     return parser

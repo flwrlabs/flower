@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower Agent."""
+"""Flower AgentApp components."""
 
 
 from .run_agentapp import run_agentapp
