@@ -78,6 +78,7 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import (
+    AGENT_RUN_INPUT_KEY,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION,
     ActionType,
@@ -354,7 +355,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             (False, False, RunType.SERVER_APP, RunTime.DEPLOYMENT),
             (True, False, RunType.SIMULATION, RunTime.SIMULATION),
             (False, True, RunType.AGENT, RunTime.DEPLOYMENT),
-            (True, True, RunType.AGENT, RunTime.SIMULATION),
         ]
     )  # type: ignore
     def test_start_run_derives_run_type_and_runtime(
@@ -372,7 +372,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request.federation = NOOP_FEDERATION
 
         if has_input_override:
-            for key, value in user_config_to_proto({"input": "prompt"}).items():
+            for key, value in user_config_to_proto(
+                {AGENT_RUN_INPUT_KEY: "prompt"}
+            ).items():
                 request.override_config[key].CopyFrom(value)
 
         sim_cfg = SimulationConfig() if simulation else None
@@ -401,7 +403,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                         "app": {
                             "config": {
                                 "train": {"lr": 0.1},
-                                "input": "default-prompt",
+                                AGENT_RUN_INPUT_KEY: "default-prompt",
                             }
                         }
                     }
@@ -421,6 +423,40 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             ActionType.START_RUN,
             StartRunContext(federation_name=NOOP_FEDERATION, runtime=expected_runtime),
         )
+
+    def test_start_run_rejects_agent_run_on_simulation_federation(self) -> None:
+        """Test StartRun rejects agent runs on simulation federations."""
+        fab_content = b"test FAB content 889"
+        request = StartRunRequest()
+        request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
+        request.fab.content = fab_content
+        request.federation = NOOP_FEDERATION
+        for key, value in user_config_to_proto({AGENT_RUN_INPUT_KEY: "prompt"}).items():
+            request.override_config[key].CopyFrom(value)
+
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch.object(
+                self.state.federation_manager,
+                "get_simulation_config",
+                return_value=SimulationConfig(),
+            ),
+            patch.object(
+                self.state.federation_manager,
+                "can_execute",
+                return_value=True,
+            ) as mock_can_execute,
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.StartRun(request, context)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            "Agent runs are not supported on simulation federations.",
+        )
+        mock_can_execute.assert_not_called()
 
     @parameterized.expand([(None,), (1,), (2,), (3,), (9,)])  # type: ignore
     def test_list_runs(self, limit: int | None) -> None:

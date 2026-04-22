@@ -111,6 +111,7 @@ from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.constant import (
+    AGENT_RUN_INPUT_KEY,
     NOOP_FEDERATION,
     PLATFORM_API_URL,
     ActionType,
@@ -201,7 +202,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
             # Derive run type:
             # if targetting a simulation federation, the run type is SIMULATION;
-            # if run config has "input" key, the run type is AGENT;
+            # if run config has AGENT_RUN_INPUT_KEY key, the run type is AGENT;
             # else it's SERVER_APP
             # on the presence of simulation config, apply federation config overrides
             run_type = RunType.SERVER_APP
@@ -214,7 +215,12 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 resolved_federation_config.CopyFrom(sim_cfg)
                 resolved_federation_config.MergeFrom(request.override_federation_config)
 
-            if "input" in override_config:
+            if AGENT_RUN_INPUT_KEY in override_config:
+                if runtime == RunTime.SIMULATION:
+                    context.abort(
+                        grpc.StatusCode.FAILED_PRECONDITION,
+                        "Agent runs are not supported on simulation federations.",
+                    )
                 run_type = RunType.AGENT
 
             if not state.federation_manager.can_execute(

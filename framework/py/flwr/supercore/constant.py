@@ -147,6 +147,9 @@ SQLITE_PRAGMAS = (
     ("mmap_size", "268435456"),  # 256MB memory-mapped I/O
 )
 
+# Constants for runs
+AGENT_RUN_INPUT_KEY = "flwr_agent_input"
+
 
 class NodeStatus:
     """Event log writer types."""
