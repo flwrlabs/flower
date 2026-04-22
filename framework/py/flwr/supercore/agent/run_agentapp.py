@@ -53,7 +53,7 @@ def run_agentapp(
         cleanup_app_runtime_environment(runtime_env_dir)
 
     register_signal_handlers(
-        event_type=EventType.RUN_AGENT_LEAVE,
+        event_type=EventType.FLWR_AGENTAPP_RUN_LEAVE,
         exit_message="Run stopped by user.",
         exit_handlers=[on_exit],
     )
@@ -69,6 +69,6 @@ def run_agentapp(
     flwr_exit(
         ExitCode.SERVERAPP_EXCEPTION,
         "`flwr-agentapp` is not implemented yet.",
-        event_type=EventType.RUN_AGENT_LEAVE,
+        event_type=EventType.FLWR_AGENTAPP_RUN_LEAVE,
         event_details={"success": False},
     )

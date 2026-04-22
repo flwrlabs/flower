@@ -56,6 +56,6 @@ def test_run_flwr_agentapp_exits_with_stub_message(
     assert captured == {
         "code": ExitCode.SERVERAPP_EXCEPTION,
         "message": "`flwr-agentapp` is not implemented yet.",
-        "event_type": EventType.RUN_AGENT_LEAVE,
+        "event_type": EventType.FLWR_AGENTAPP_RUN_LEAVE,
         "event_details": {"success": False},
     }

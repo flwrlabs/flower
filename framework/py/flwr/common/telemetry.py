@@ -156,6 +156,10 @@ class EventType(str, Enum):
     FLWR_CLIENTAPP_RUN_ENTER = auto()
     FLWR_CLIENTAPP_RUN_LEAVE = auto()
 
+    # CLI: flwr-agentapp
+    FLWR_AGENTAPP_RUN_ENTER = auto()
+    FLWR_AGENTAPP_RUN_LEAVE = auto()
+
     # --- Simulation Engine ------------------------------------------------------------
 
     # Python API: `run_simulation`
@@ -171,10 +175,6 @@ class EventType(str, Enum):
     # CLI: `flower-supernode`
     RUN_SUPERNODE_ENTER = auto()
     RUN_SUPERNODE_LEAVE = auto()
-
-    # CLI: `flower-agent`
-    RUN_AGENT_ENTER = auto()
-    RUN_AGENT_LEAVE = auto()
 
     # CLI: `flower-superexec`
     RUN_SUPEREXEC_ENTER = auto()
