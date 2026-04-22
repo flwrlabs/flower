@@ -43,8 +43,7 @@ def flwr_model() -> None:
     log(INFO, "Start `flwr-model` process")
     log(
         DEBUG,
-        "`flwr-model` will attempt to connect to SuperLink's "
-        "ServerAppIo API at %s",
+        "`flwr-model` will attempt to connect to SuperLink's ServerAppIo API at %s",
         args.serverappio_api_address,
     )
     run_model(

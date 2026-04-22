@@ -37,9 +37,7 @@ def test_parse_flwr_model_requires_token() -> None:
 def test_parse_flwr_model_rejects_run_once() -> None:
     """The removed deprecated flag should no longer parse."""
     with pytest.raises(SystemExit):
-        _parse_args_run_flwr_model().parse_args(
-            ["--token", "test-token", "--run-once"]
-        )
+        _parse_args_run_flwr_model().parse_args(["--token", "test-token", "--run-once"])
 
 
 def test_parse_flwr_model_parses_tokenized_invocation() -> None:
