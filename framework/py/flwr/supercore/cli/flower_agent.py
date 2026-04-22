@@ -22,12 +22,12 @@ from flwr.common import EventType, event
 from flwr.common.args import add_args_runtime_dependency_install
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
+from flwr.supercore.agent.run_flower_agent import run_flower_agent
 from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
     load_superexec_auth_secret,
 )
 from flwr.supercore.grpc_health import add_args_health
-from flwr.supercore.agent.run_flower_agent import run_flower_agent
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.utils import disable_process_dumping
 from flwr.supercore.version import package_version

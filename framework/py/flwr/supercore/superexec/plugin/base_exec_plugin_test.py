@@ -19,7 +19,6 @@ import subprocess
 from unittest.mock import Mock, patch
 
 from flwr.common.typing import Run
-from flwr.supercore.superexec.plugin.agent_exec_plugin import AgentExecPlugin
 from flwr.supercore.superexec.plugin.base_exec_plugin import BaseExecPlugin
 from flwr.supercore.superexec.plugin.clientapp_exec_plugin import ClientAppExecPlugin
 
@@ -57,25 +56,6 @@ def test_serverapp_launch_isolates_stdio() -> None:
 
     assert popen.call_args.kwargs["stdout"] is subprocess.DEVNULL
     assert popen.call_args.kwargs["stderr"] is subprocess.DEVNULL
-
-
-def test_agent_launch_uses_flower_agent_command() -> None:
-    """Agent launch should invoke the flower-agent command."""
-    plugin = AgentExecPlugin(
-        appio_api_address="127.0.0.1:9091",
-        get_run=_get_run,
-    )
-
-    with patch("subprocess.Popen") as popen:
-        plugin.launch_app(token="token", run_id=3)
-
-    assert popen.call_args.args[0][:4] == [
-        "flower-agent",
-        "--insecure",
-        "--appio-api-address",
-        "127.0.0.1:9091",
-    ]
-    assert "--token" not in popen.call_args.args[0]
 
 
 class DummyExecPlugin(BaseExecPlugin):

@@ -39,16 +39,6 @@
  Advanced Commands
 *******************
 
-.. _flower-agent-apiref:
-
-``flower-agent``
-================
-
-.. argparse::
-    :module: flwr.supercore.cli.flower_agent
-    :func: _parse_args
-    :prog: flower-agent
-
 .. _flower-superexec-apiref:
 
 ``flower-superexec``

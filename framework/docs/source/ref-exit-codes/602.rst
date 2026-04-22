@@ -6,12 +6,11 @@
  Description
 *************
 
-The ``flower-agent``, ``flower-superexec``, ``flwr-serverapp``,
-``flwr-simulation``, and ``flwr-clientapp`` do not currently support TLS, as they
-are assumed to be executed within the same network as their respective long-running
-processes: ``flower-superlink`` and ``flower-supernode``. Please refer to the
-`Flower Network Communication <../ref-flower-network-communication.html>`_ guide
-for further details.
+The ``flower-superexec``, ``flwr-serverapp``, ``flwr-simulation``, and
+``flwr-clientapp`` do not currently support TLS, as they are assumed to be executed
+within the same network as their respective long-running processes: ``flower-superlink``
+and ``flower-supernode``. Please refer to the `Flower Network Communication
+<../ref-flower-network-communication.html>`_ guide for further details.
 
 ****************
  How to Resolve

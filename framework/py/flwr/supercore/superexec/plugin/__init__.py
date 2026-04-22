@@ -15,7 +15,6 @@
 """Flower SuperExec plugins."""
 
 
-from .agent_exec_plugin import AgentExecPlugin
 from .clientapp_exec_plugin import ClientAppExecPlugin
 from .exec_plugin import ExecPlugin
 from .serverapp_ephemeral_exec_plugin import ServerAppEphemeralExecPlugin

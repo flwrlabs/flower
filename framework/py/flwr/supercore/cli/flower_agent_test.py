@@ -125,9 +125,7 @@ def test_flower_agent_forwards_cli_args(
         ),
     )
     monkeypatch.setattr(flower_agent_module, "_parse_args", _Parser)
-    monkeypatch.setattr(
-        flower_agent_module, "run_flower_agent", _run_flower_agent
-    )
+    monkeypatch.setattr(flower_agent_module, "run_flower_agent", _run_flower_agent)
 
     flower_agent_module.flower_agent()
 
@@ -172,12 +170,8 @@ def test_flower_agent_allows_missing_secret(
         lambda **_: None,
     )
     monkeypatch.setattr(flower_agent_module, "_parse_args", _Parser)
-    monkeypatch.setattr(
-        flower_agent_module, "event", lambda *_args, **_kwargs: None
-    )
-    monkeypatch.setattr(
-        flower_agent_module, "run_flower_agent", _run_flower_agent
-    )
+    monkeypatch.setattr(flower_agent_module, "event", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(flower_agent_module, "run_flower_agent", _run_flower_agent)
 
     flower_agent_module.flower_agent()
 
