@@ -21,7 +21,6 @@ from .serverapp_ephemeral_exec_plugin import ServerAppEphemeralExecPlugin
 from .serverapp_exec_plugin import ServerAppExecPlugin
 
 __all__ = [
-    "AgentExecPlugin",
     "ClientAppExecPlugin",
     "ExecPlugin",
     "ServerAppEphemeralExecPlugin",
