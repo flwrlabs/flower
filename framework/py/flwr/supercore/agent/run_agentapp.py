@@ -20,14 +20,14 @@ from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.exit import ExitCode, flwr_exit
 
 
-def run_flower_agent(
+def run_agentapp(
     appio_api_address: str,
     parent_pid: int | None = None,
     health_server_address: str | None = None,
     superexec_auth_secret: bytes | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
-    """Run Flower Agent.
+    """Run AgentApp.
 
     This runtime is intentionally a stub until AgentApp execution support is added.
     """

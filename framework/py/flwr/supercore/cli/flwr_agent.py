@@ -22,7 +22,7 @@ from flwr.common import EventType, event
 from flwr.common.args import add_args_runtime_dependency_install
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
-from flwr.supercore.agent.run_flower_agent import run_flower_agent
+from flwr.supercore.agent.run_agentapp import run_agentapp
 from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
     load_superexec_auth_secret,
@@ -36,7 +36,7 @@ from flwr.supercore.version import package_version
 def flwr_agent() -> None:
     """Run `flwr-agent` command."""
     disable_process_dumping(strict=False)
-    warn_if_flwr_update_available(process_name="flower-agent")
+    warn_if_flwr_update_available(process_name="flwr-agent")
     args = _parse_args().parse_args()
 
     if not args.insecure:
@@ -61,7 +61,7 @@ def flwr_agent() -> None:
                 f"Failed to load flwr-agent authentication secret: {err}",
             )
 
-    run_flower_agent(
+    run_agentapp(
         appio_api_address=args.appio_api_address,
         parent_pid=args.parent_pid,
         health_server_address=args.health_server_address,
