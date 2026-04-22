@@ -59,8 +59,10 @@ from flwr.proto.message_pb2 import (
 )
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
 from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
+from flwr.supercore.interceptors.appio_token_interceptor import APP_TOKEN_HEADER
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
-from flwr.supernode.nodestate import NodeStateFactory
+from flwr.supercore.utils import get_metadata_str
+from flwr.supernode.nodestate import NodeState, NodeStateFactory
 
 
 # pylint: disable=C0103,W0613,W0201
@@ -134,13 +136,7 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
         state = self.state_factory.state()
 
         # Validate the token
-        run_id = state.get_run_id_by_token(request.token)
-        if run_id is None or not state.verify_token(run_id, request.token):
-            context.abort(
-                grpc.StatusCode.PERMISSION_DENIED,
-                "Invalid token.",
-            )
-            raise RuntimeError("This line should never be reached.")
+        run_id = _verify_token(request.token, state, context)
 
         # Retrieve context, run and fab for this run
         context = cast(Context, state.get_context(run_id))
@@ -178,13 +174,7 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
         state = self.state_factory.state()
 
         # Validate the token
-        run_id = state.get_run_id_by_token(request.token)
-        if run_id is None or not state.verify_token(run_id, request.token):
-            context.abort(
-                grpc.StatusCode.PERMISSION_DENIED,
-                "Invalid token.",
-            )
-            raise RuntimeError("This line should never be reached.")
+        run_id = _verify_token(request.token, state, context)
 
         # Save the context to the state
         state.store_context(context_from_proto(request.context))
@@ -204,13 +194,7 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
         store = self.objectstore_factory.store()
 
         # Validate the token
-        run_id = state.get_run_id_by_token(request.token)
-        if run_id is None or not state.verify_token(run_id, request.token):
-            context.abort(
-                grpc.StatusCode.PERMISSION_DENIED,
-                "Invalid token.",
-            )
-            raise RuntimeError("This line should never be reached.")
+        run_id = _verify_token(request.token, state, context)
 
         # Retrieve message for this run
         message = state.get_messages(run_ids=[run_id], is_reply=False)[0]
@@ -235,13 +219,7 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
         store = self.objectstore_factory.store()
 
         # Validate the token
-        run_id = state.get_run_id_by_token(request.token)
-        if run_id is None or not state.verify_token(run_id, request.token):
-            context.abort(
-                grpc.StatusCode.PERMISSION_DENIED,
-                "Invalid token.",
-            )
-            raise RuntimeError("This line should never be reached.")
+        run_id = _verify_token(request.token, state, context)
 
         # Record message processing end time
         state.record_message_processing_end(
@@ -266,7 +244,8 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
         state = self.state_factory.state()
 
         # Acknowledge the heartbeat
-        success = state.acknowledge_app_heartbeat(request.token)
+        token = _resolve_app_token_from_metadata_or_request(request.token, context)
+        success = state.acknowledge_app_heartbeat(token)
         return SendAppHeartbeatResponse(success=success)
 
     def PushObject(
@@ -324,3 +303,42 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
         store.delete(request.message_object_id)
 
         return ConfirmMessageReceivedResponse()
+
+
+def _resolve_app_token_from_metadata_or_request(
+    request_token: str, context: grpc.ServicerContext
+) -> str:
+    """Return the AppIo token, preferring gRPC metadata over the request payload.
+
+    The AppIo client interceptor attaches the app token in the `APP_TOKEN_HEADER`
+    metadata entry, so this helper checks `context.invocation_metadata()` first and
+    returns that value when present. If metadata is unavailable, it falls back to
+    `request_token` for compatibility with callers and tests that still populate the
+    protobuf field directly.
+
+    This helper only selects which token value to use. It does not validate the
+    token.
+    """
+    metadata = None
+    invocation_metadata = getattr(context, "invocation_metadata", None)
+    if callable(invocation_metadata):
+        candidate = invocation_metadata()
+        if isinstance(candidate, (list, tuple)):
+            metadata = candidate
+
+    return get_metadata_str(metadata, APP_TOKEN_HEADER) or request_token
+
+
+def _verify_token(
+    request_token: str, state: NodeState, context: grpc.ServicerContext
+) -> int:
+    """Verify the token and return the associated run ID."""
+    token = _resolve_app_token_from_metadata_or_request(request_token, context)
+    run_id = state.get_run_id_by_token(token)
+    if run_id is None or not state.verify_token(run_id, token):
+        context.abort(
+            grpc.StatusCode.PERMISSION_DENIED,
+            "Invalid token.",
+        )
+        raise RuntimeError("This line should never be reached.")
+    return run_id
