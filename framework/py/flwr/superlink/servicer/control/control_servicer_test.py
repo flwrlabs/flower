@@ -357,7 +357,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             (False, True, RunType.AGENT, RunTime.DEPLOYMENT),
         ]
     )  # type: ignore
-    def test_start_run_derives_run_type_and_runtime(
+    def test_start_run_derives_run_type_and_runtime(  # pylint: disable=too-many-locals
         self,
         simulation: bool,
         has_input_override: bool,
