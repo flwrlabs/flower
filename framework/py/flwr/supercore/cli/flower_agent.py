@@ -33,7 +33,7 @@ from flwr.supercore.utils import disable_process_dumping
 from flwr.supercore.version import package_version
 
 
-def flower_agent() -> None:
+def flwr_agent() -> None:
     """Run `flower-agent` command."""
     disable_process_dumping(strict=False)
     warn_if_flwr_update_available(process_name="flower-agent")
