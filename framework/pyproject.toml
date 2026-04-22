@@ -80,6 +80,7 @@ flwr-simulation = "flwr.simulation.app:flwr_simulation"
 flower-superlink = "flwr.server.app:run_superlink"
 flower-supernode = "flwr.supernode.cli:flower_supernode"
 flower-superexec = "flwr.supercore.cli:flower_superexec"
+flower-agent = "flwr.supercore.cli:flower_agent"
 flwr-serverapp = "flwr.server.serverapp:flwr_serverapp"
 flwr-clientapp = "flwr.supernode.cli:flwr_clientapp"
 

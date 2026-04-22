@@ -172,6 +172,10 @@ class EventType(str, Enum):
     RUN_SUPERNODE_ENTER = auto()
     RUN_SUPERNODE_LEAVE = auto()
 
+    # CLI: `flower-agent`
+    RUN_AGENT_ENTER = auto()
+    RUN_AGENT_LEAVE = auto()
+
     # CLI: `flower-superexec`
     RUN_SUPEREXEC_ENTER = auto()
     RUN_SUPEREXEC_LEAVE = auto()
