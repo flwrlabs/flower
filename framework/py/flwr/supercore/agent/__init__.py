@@ -12,13 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower AgentApp components."""
+"""Flower process-isolated app runtimes."""
 
 
 from .run_agentapp import run_agentapp
+from .run_connector import run_connector
 from .run_model import run_model
 
 __all__ = [
     "run_agentapp",
+    "run_connector",
     "run_model",
 ]

@@ -164,6 +164,10 @@ class EventType(str, Enum):
     FLWR_MODEL_RUN_ENTER = auto()
     FLWR_MODEL_RUN_LEAVE = auto()
 
+    # CLI: flwr-connector
+    FLWR_CONNECTOR_RUN_ENTER = auto()
+    FLWR_CONNECTOR_RUN_LEAVE = auto()
+
     # --- Simulation Engine ------------------------------------------------------------
 
     # Python API: `run_simulation`
