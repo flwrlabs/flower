@@ -92,7 +92,6 @@ testpaths = [
 [tool.mypy]
 ignore_missing_imports = true
 strict = false
-plugins = "numpy.typing.mypy_plugin"
 
 [[tool.mypy.overrides]]
 module = "flwr_baselines.scripts.*"
