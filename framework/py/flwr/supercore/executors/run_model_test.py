@@ -23,7 +23,7 @@ import pytest
 from flwr.common import EventType
 from flwr.common.exit import ExitCode
 
-run_model_module = importlib.import_module("flwr.supercore.agent.run_model")
+run_model_module = importlib.import_module("flwr.supercore.executors.run_model")
 
 
 def test_run_flwr_model_exits_with_stub_message(
