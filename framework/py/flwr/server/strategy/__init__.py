@@ -64,7 +64,7 @@ __all__ = [
     "FedAvgM",
     "FedMedian",
     "FedOpt",
-    "FedProx",
+    "FedProx"
     "FedTrimmedAvg",
     "FedXgbBagging",
     "FedXgbCyclic",
