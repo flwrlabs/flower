@@ -23,7 +23,7 @@ import pytest
 from flwr.common import EventType
 from flwr.common.exit import ExitCode
 
-run_agentapp_module = importlib.import_module("flwr.supercore.agent.run_agentapp")
+run_agentapp_module = importlib.import_module("flwr.supercore.executors.run_agentapp")
 
 
 def test_run_flwr_agentapp_exits_with_stub_message(
