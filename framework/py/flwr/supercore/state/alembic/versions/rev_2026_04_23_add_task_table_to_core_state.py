@@ -14,9 +14,9 @@
 # ==============================================================================
 """Add task table to core state.
 
-Revision ID: 32a9ee528d3d
+Revision ID: fb960f5973fc
 Revises: b277e6f3656c
-Create Date: 2026-04-23 17:47:52.444299
+Create Date: 2026-04-23 18:02:34.053117
 """
 from collections.abc import Sequence
 
@@ -26,7 +26,7 @@ from alembic import op
 # pylint: disable=no-member
 
 # revision identifiers, used by Alembic.
-revision: str = "32a9ee528d3d"
+revision: str = "fb960f5973fc"
 down_revision: str | Sequence[str] | None = "b277e6f3656c"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
@@ -49,7 +49,7 @@ def upgrade() -> None:
         sa.Column("starting_at", sa.String(), nullable=True),
         sa.Column("running_at", sa.String(), nullable=True),
         sa.Column("finished_at", sa.String(), nullable=True),
-        sa.PrimaryKeyConstraint("task_id"),
+        sa.UniqueConstraint("task_id"),
     )
     # ### end Alembic commands ###
 
