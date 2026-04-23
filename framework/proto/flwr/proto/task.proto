@@ -26,6 +26,3 @@ message Task {
   optional string model_ref = 6;
   optional string connector_ref = 7;
 }
-
-message CreateTaskRequest { Task task = 1; }
-message CreateTaskResponse { optional uint64 exec_id = 1; }

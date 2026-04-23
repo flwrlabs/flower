@@ -63,37 +63,3 @@ class Task(google.protobuf.message.Message):
     def WhichOneof(self, oneof_group: typing.Literal["_model_ref", b"_model_ref"]) -> typing.Literal["model_ref"] | None: ...
 
 global___Task = Task
-
-@typing.final
-class CreateTaskRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    TASK_FIELD_NUMBER: builtins.int
-    @property
-    def task(self) -> global___Task: ...
-    def __init__(
-        self,
-        *,
-        task: global___Task | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["task", b"task"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["task", b"task"]) -> None: ...
-
-global___CreateTaskRequest = CreateTaskRequest
-
-@typing.final
-class CreateTaskResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    EXEC_ID_FIELD_NUMBER: builtins.int
-    exec_id: builtins.int
-    def __init__(
-        self,
-        *,
-        exec_id: builtins.int | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_exec_id", b"_exec_id", "exec_id", b"exec_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_exec_id", b"_exec_id", "exec_id", b"exec_id"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing.Literal["_exec_id", b"_exec_id"]) -> typing.Literal["exec_id"] | None: ...
-
-global___CreateTaskResponse = CreateTaskResponse
