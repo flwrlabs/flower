@@ -101,7 +101,7 @@ class AcceptInvitationContext(ActionContext):
 
 
 @dataclass(frozen=True)
-class Task:
+class Task:  # pylint: disable=too-many-instance-attributes
     """Task details.
 
     Attributes
