@@ -27,6 +27,7 @@ from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
 )
 from flwr.common.typing import Fab
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -53,6 +54,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.lock_token_store = Lock()
         self.nonce_store: dict[tuple[str, str], float] = {}
         self.lock_nonce_store = Lock()
+        self.task_store: dict[int, Task] = {}
+        self.lock_task_store = Lock()
+        self.token_to_task_id: dict[str, int] = {}
 
     @property
     def object_store(self) -> ObjectStore:

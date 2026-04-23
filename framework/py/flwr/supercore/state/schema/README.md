@@ -117,6 +117,21 @@ erDiagram
     INTEGER run_id PK
   }
 
+  task {
+    VARCHAR connector_ref "nullable"
+    VARCHAR fab_hash "nullable"
+    VARCHAR finished_at "nullable"
+    VARCHAR model_ref "nullable"
+    VARCHAR pending_at "nullable"
+    INTEGER run_id
+    VARCHAR running_at "nullable"
+    VARCHAR starting_at "nullable"
+    VARCHAR status
+    INTEGER task_id UK
+    VARCHAR token
+    VARCHAR type
+  }
+
   token_store {
     INTEGER run_id PK "nullable"
     FLOAT active_until "nullable"

@@ -1,4 +1,4 @@
-// Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+// Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,15 +17,16 @@ syntax = "proto3";
 
 package flwr.proto;
 
-import "flwr/proto/node.proto";
-
-// Node Heartbeat messages
-message SendNodeHeartbeatRequest {
-  Node node = 1;
-  double heartbeat_interval = 2;
+message Task {
+  uint64 task_id = 1;
+  string type = 2;
+  uint64 run_id = 3;
+  string status = 4;
+  string pending_at = 5;
+  string starting_at = 6;
+  string running_at = 7;
+  string finished_at = 8;
+  optional string fab_hash = 9;
+  optional string model_ref = 10;
+  optional string connector_ref = 11;
 }
-message SendNodeHeartbeatResponse { bool success = 1; }
-
-// App Heartbeat messages
-message SendAppHeartbeatRequest { string token = 1 [ deprecated = true ]; }
-message SendAppHeartbeatResponse { bool success = 1; }

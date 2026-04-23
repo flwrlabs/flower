@@ -62,4 +62,24 @@ def create_corestate_metadata() -> MetaData:
         Column("verifications", String, nullable=False),
     )
 
+    # --------------------------------------------------------------------------
+    #  Table: task
+    # --------------------------------------------------------------------------
+    Table(
+        "task",
+        metadata,
+        Column("task_id", Integer, nullable=False, unique=True),
+        Column("type", String, nullable=False),
+        Column("run_id", Integer, nullable=False),
+        Column("status", String, nullable=False),
+        Column("fab_hash", String, nullable=True),
+        Column("model_ref", String, nullable=True),
+        Column("connector_ref", String, nullable=True),
+        Column("token", String, nullable=False),
+        Column("pending_at", String),
+        Column("starting_at", String),
+        Column("running_at", String),
+        Column("finished_at", String),
+    )
+
     return metadata
