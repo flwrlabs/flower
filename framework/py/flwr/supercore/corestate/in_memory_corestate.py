@@ -56,6 +56,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.lock_nonce_store = Lock()
         self.task_store: dict[int, Task] = {}
         self.lock_task_store = Lock()
+        self.token_to_task_id: dict[str, int] = {}
 
     @property
     def object_store(self) -> ObjectStore:
