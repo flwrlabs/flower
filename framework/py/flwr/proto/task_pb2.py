@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15\x66lwr/proto/task.proto\x12\nflwr.proto\"\xbd\x01\n\x04Task\x12\x0f\n\x07task_id\x18\x01 \x01(\x04\x12\x0c\n\x04type\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\x04\x12\x0e\n\x06status\x18\x04 \x01(\t\x12\x15\n\x08\x66\x61\x62_hash\x18\x05 \x01(\tH\x00\x88\x01\x01\x12\x16\n\tmodel_ref\x18\x06 \x01(\tH\x01\x88\x01\x01\x12\x1a\n\rconnector_ref\x18\x07 \x01(\tH\x02\x88\x01\x01\x42\x0b\n\t_fab_hashB\x0c\n\n_model_refB\x10\n\x0e_connector_refb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15\x66lwr/proto/task.proto\x12\nflwr.proto\"\x8f\x02\n\x04Task\x12\x0f\n\x07task_id\x18\x01 \x01(\x04\x12\x0c\n\x04type\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\x04\x12\x0e\n\x06status\x18\x04 \x01(\t\x12\x12\n\npending_at\x18\x05 \x01(\t\x12\x13\n\x0bstarting_at\x18\x06 \x01(\t\x12\x12\n\nrunning_at\x18\x07 \x01(\t\x12\x13\n\x0b\x66inished_at\x18\x08 \x01(\t\x12\x15\n\x08\x66\x61\x62_hash\x18\t \x01(\tH\x00\x88\x01\x01\x12\x16\n\tmodel_ref\x18\n \x01(\tH\x01\x88\x01\x01\x12\x1a\n\rconnector_ref\x18\x0b \x01(\tH\x02\x88\x01\x01\x42\x0b\n\t_fab_hashB\x0c\n\n_model_refB\x10\n\x0e_connector_refb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,5 +32,5 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'flwr.proto.task_pb2', _glob
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_TASK']._serialized_start=38
-  _globals['_TASK']._serialized_end=227
+  _globals['_TASK']._serialized_end=309
 # @@protoc_insertion_point(module_scope)

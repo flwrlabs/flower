@@ -22,7 +22,11 @@ message Task {
   string type = 2;
   uint64 run_id = 3;
   string status = 4;
-  optional string fab_hash = 5;
-  optional string model_ref = 6;
-  optional string connector_ref = 7;
+  string pending_at = 5;
+  string starting_at = 6;
+  string running_at = 7;
+  string finished_at = 8;
+  optional string fab_hash = 9;
+  optional string model_ref = 10;
+  optional string connector_ref = 11;
 }

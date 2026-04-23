@@ -27,9 +27,9 @@ from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
 )
 from flwr.common.typing import Fab
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
-from ..typing import Task
 from .corestate import CoreState
 
 
