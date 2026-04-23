@@ -36,7 +36,7 @@ message RequestTokenResponse { string token = 1; }
 
 // PushAppMessages messages
 message PushAppMessagesRequest {
-  string token = 1;
+  string token = 1 [ deprecated = true ];
   repeated Message messages_list = 2;
   uint64 run_id = 3;
   repeated ObjectTree message_object_trees = 4;
@@ -48,7 +48,7 @@ message PushAppMessagesResponse {
 
 // PullAppMessages messages
 message PullAppMessagesRequest {
-  string token = 1;
+  string token = 1 [ deprecated = true ];
   repeated string message_ids = 2;
   uint64 run_id = 3;
 }
@@ -57,7 +57,7 @@ message PullAppMessagesResponse {
   repeated ObjectTree message_object_trees = 2;
 }
 // PullAppInputs messages
-message PullAppInputsRequest { string token = 1; }
+message PullAppInputsRequest { string token = 1 [ deprecated = true ]; }
 message PullAppInputsResponse {
   Context context = 1;
   Run run = 2;
@@ -67,7 +67,7 @@ message PullAppInputsResponse {
 
 // PushAppInputs messages
 message PushAppOutputsRequest {
-  string token = 1;
+  string token = 1 [ deprecated = true ];
   uint64 run_id = 2;
   Context context = 3;
 }
