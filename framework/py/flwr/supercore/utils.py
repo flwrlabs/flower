@@ -191,6 +191,20 @@ def request_download_link(
 
         raise ValueError(f"{app_id} not found in Platform API.")
 
+    if resp.status_code == 412:
+        default_message = (
+            "Requested Flower version is incompatible with this app version."
+        )
+        try:
+            payload = resp.json()
+        except ValueError:
+            raise ValueError(default_message) from None
+
+        error_message = payload.get("detail") if isinstance(payload, dict) else payload
+        if isinstance(error_message, str) and error_message:
+            raise ValueError(error_message)
+        raise ValueError(default_message)
+
     if not resp.ok:
         raise ValueError(
             f"Platform API request failed with status {resp.status_code}. "

@@ -227,6 +227,18 @@ def test_request_download_link_all_scenarios(
             "raises": "status 503",
         },
         {
+            "name": "http_412_incompatible",
+            "fake_resp": {
+                "ok": False,
+                "status": 412,
+                "json": {
+                    "detail": "Requested Flower version is incompatible with this app"
+                    " version.",
+                },
+            },
+            "raises": "incompatible with this app version",
+        },
+        {
             "name": "network_error",
             "fake_exc": requests.RequestException("network down"),
             "raises": "Unable to connect to Platform API",
@@ -244,7 +256,7 @@ def test_request_download_link_all_scenarios(
 
     current_case: dict[str, Any] = {"data": None}
 
-    class _FakeResp:
+    class _FakeResp:  # pylint: disable=too-few-public-methods
         ok: bool
         status_code: int
         _json: dict[str, Any]
