@@ -207,7 +207,7 @@ def validate_project_name(name: str, target: str) -> None:
         raise ValueError(
             f'{target} "{name}" is invalid, '
             "a valid app name must start with a letter, "
-            "and can only contain letters, digits, and hyphens. The name"
+            "and can only contain letters, digits, and hyphens. The name "
             f"must also be no longer than {MAX_NAME_LENGTH} characters."
         )
 

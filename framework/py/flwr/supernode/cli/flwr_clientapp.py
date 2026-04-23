@@ -19,11 +19,8 @@ import argparse
 from logging import DEBUG, INFO
 
 from flwr.common.args import add_args_flwr_app_common
-from flwr.common.constant import CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS, ExecPluginType
+from flwr.common.constant import CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS
 from flwr.common.logger import log
-from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
-from flwr.supercore.superexec.plugin import ClientAppExecPlugin
-from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning
 from flwr.supercore.tls import load_root_certificates
 from flwr.supercore.utils import mask_string
 from flwr.supernode.runtime.run_clientapp import run_clientapp
@@ -32,19 +29,6 @@ from flwr.supernode.runtime.run_clientapp import run_clientapp
 def flwr_clientapp() -> None:
     """Run process-isolated Flower ClientApp."""
     args = _parse_args_run_flwr_clientapp().parse_args()
-
-    # Disallow long-running `flwr-clientapp` processes
-    if args.token is None:
-        run_with_deprecation_warning(
-            cmd="flwr-clientapp",
-            plugin_type=ExecPluginType.CLIENT_APP,
-            plugin_class=ClientAppExecPlugin,
-            stub_class=ClientAppIoStub,
-            appio_api_address=args.clientappio_api_address,
-            parent_pid=args.parent_pid,
-            warn_run_once=args.run_once,
-        )
-        return
 
     log(INFO, "Start `flwr-clientapp` process")
     log(
@@ -60,6 +44,7 @@ def flwr_clientapp() -> None:
         insecure=args.insecure,
         certificates=load_root_certificates(args.root_certificates, args.insecure),
         parent_pid=args.parent_pid,
+        runtime_dependency_install=args.runtime_dependency_install,
     )
 
 

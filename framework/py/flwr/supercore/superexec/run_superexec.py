@@ -16,12 +16,11 @@
 
 
 import time
-from logging import WARN
 from typing import Any
 
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
-from flwr.common.logger import log
 from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.common.serde import run_from_proto
 from flwr.common.telemetry import EventType
@@ -43,9 +42,10 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 from flwr.supercore.tls import load_root_certificates
 
 from .plugin import ExecPlugin
+from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
 
 
-def run_superexec(  # pylint: disable=R0913,R0914,R0917
+def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
     plugin_class: type[ExecPlugin],
     stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
     appio_api_address: str,
@@ -55,6 +55,7 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
     plugin_config: dict[str, Any] | None = None,
     parent_pid: int | None = None,
     health_server_address: str | None = None,
+    runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
     """Run Flower SuperExec.
 
@@ -82,6 +83,8 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
     health_server_address : Optional[str] (default: None)
         The address of the health server. If `None` is provided, the health server will
         NOT be started.
+    runtime_dependency_install : bool (default: False)
+        Whether runtime dependency installation is allowed.
     """
     interceptors: list[SuperExecAuthClientInterceptor] | None = None
     if superexec_auth_secret:
@@ -138,6 +141,7 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
         insecure=insecure,
         root_certificates_path=root_certificates_path,
         get_run=get_run,
+        runtime_dependency_install=runtime_dependency_install,
     )
 
     # Load plugin configuration from file if provided
@@ -169,52 +173,24 @@ def run_superexec(  # pylint: disable=R0913,R0914,R0917
 
                 # Launch the app if a token was granted; do nothing if not
                 if tk_res.token:
+
+                    # Destroy the auth secret before launching the app
+                    # for ephemeral plugins
+                    if isinstance(plugin, BaseEphemeralExecPlugin):
+
+                        def cleanup_auth_secret() -> None:
+                            nonlocal superexec_auth_secret, interceptors
+                            if superexec_auth_secret is not None:
+                                superexec_auth_secret = None
+                            if interceptors:
+                                # pylint: disable-next=protected-access
+                                interceptors[0]._auth_secret = b"\x00" * 32
+
+                        plugin.cleanup_before_launch = cleanup_auth_secret
+
                     plugin.launch_app(token=tk_res.token, run_id=run_id)
 
             # Sleep for a while before checking again
             time.sleep(1)
     finally:
         channel.close()
-
-
-def run_with_deprecation_warning(  # pylint: disable=R0913, R0917
-    cmd: str,
-    plugin_type: str,
-    plugin_class: type[ExecPlugin],
-    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
-    appio_api_address: str,
-    parent_pid: int | None,
-    warn_run_once: bool,
-    superexec_auth_secret: bytes | None = None,
-) -> None:
-    """Log a deprecation warning and run the equivalent `flower-superexec` command.
-
-    Used for legacy long-running `flwr-*` commands (i.e., without `--token`) that will
-    be removed in favor of `flower-superexec`.
-    """
-    log(
-        WARN,
-        "Directly executing `%s` is DEPRECATED and will be prohibited "
-        "in a future release. Please use `flower-superexec` instead.",
-        cmd,
-    )
-    log(WARN, "For now, the following command is being run automatically:")
-    new_cmd = f"flower-superexec --insecure --plugin-type {plugin_type} "
-    new_cmd += f"--appio-api-address {appio_api_address} "
-    if parent_pid is not None:
-        new_cmd += f"--parent-pid {parent_pid}"
-    log(WARN, new_cmd)
-
-    # Warn about unsupported `--run-once` flag
-    if warn_run_once:
-        log(WARN, "`flower-superexec` does not support the `--run-once` flag.")
-
-    run_superexec(
-        plugin_class=plugin_class,
-        stub_class=stub_class,
-        appio_api_address=appio_api_address,
-        insecure=True,
-        root_certificates_path=None,
-        superexec_auth_secret=superexec_auth_secret,
-        parent_pid=parent_pid,
-    )

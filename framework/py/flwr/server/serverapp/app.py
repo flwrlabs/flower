@@ -34,8 +34,8 @@ from flwr.common.config import (
     get_project_dir,
 )
 from flwr.common.constant import (
+    RUNTIME_DEPENDENCY_INSTALL,
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
-    ExecPluginType,
     Status,
     SubStatus,
 )
@@ -62,36 +62,24 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppOutputsRequest,
 )
 from flwr.proto.run_pb2 import UpdateRunStatusRequest  # pylint: disable=E0611
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.server.grid.grpc_grid import GrpcGrid
 from flwr.server.run_serverapp import run as run_
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
-from flwr.supercore.superexec.plugin import ServerAppExecPlugin
-from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning
+from flwr.supercore.superexec.dependency_installer import (
+    cleanup_app_runtime_environment,
+    install_app_dependencies,
+)
 from flwr.supercore.tls import load_root_certificates
 
 
 def flwr_serverapp() -> None:
     """Run process-isolated Flower ServerApp."""
+    args = _parse_args_run_flwr_serverapp().parse_args()
+
     # Capture stdout/stderr
     log_queue: Queue[str | None] = Queue()
     mirror_output_to_queue(log_queue)
-
-    args = _parse_args_run_flwr_serverapp().parse_args()
-
-    # Disallow long-running `flwr-serverapp` processes
-    if args.token is None:
-        run_with_deprecation_warning(
-            cmd="flwr-serverapp",
-            plugin_type=ExecPluginType.SERVER_APP,
-            plugin_class=ServerAppExecPlugin,
-            stub_class=ServerAppIoStub,
-            appio_api_address=args.serverappio_api_address,
-            parent_pid=args.parent_pid,
-            warn_run_once=args.run_once,
-        )
-        return
 
     log(INFO, "Start `flwr-serverapp` process")
     log(
@@ -107,6 +95,7 @@ def flwr_serverapp() -> None:
         insecure=args.insecure,
         certificates=load_root_certificates(args.root_certificates, args.insecure),
         parent_pid=args.parent_pid,
+        runtime_dependency_install=args.runtime_dependency_install,
     )
 
     # Restore stdout/stderr
@@ -120,6 +109,7 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     insecure: bool,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
+    runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
     """Run Flower ServerApp process."""
     # Monitor the main process in case of SIGKILL
@@ -134,6 +124,7 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     heartbeat_sender = None
     grid = None
     context = None
+    runtime_env_dir: Path | None = None
     exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
@@ -163,6 +154,9 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         if grid:
             grid.close()
 
+        # Clean up run-scoped runtime environment, if any.
+        cleanup_app_runtime_environment(runtime_env_dir)
+
     # Register signal handlers for graceful shutdown
     register_signal_handlers(
         event_type=EventType.FLWR_SERVERAPP_RUN_LEAVE,
@@ -171,6 +165,7 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     )
 
     try:
+
         # Initialize the GrpcGrid
         grid = GrpcGrid(
             serverappio_service_address=serverappio_api_address,
@@ -178,6 +173,12 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             root_certificates=certificates,
             token=token,
         )
+
+        # Set up heartbeat sender
+        heartbeat_sender = HeartbeatSender(
+            make_app_heartbeat_fn_grpc(grid._stub, token)
+        )
+        heartbeat_sender.start()
 
         # Pull ServerAppInputs from LinkState
         try:
@@ -210,6 +211,29 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         fab_id, fab_version = get_fab_metadata(fab.content)
 
         app_path = str(get_project_dir(fab_id, fab_version, fab.hash_str))
+
+        if runtime_dependency_install:
+            log(DEBUG, "[flwr-serverapp] Installing app dependencies.")
+            runtime_env_dir = install_app_dependencies(
+                app_path,
+                launch_id=token,
+                run_id=run.run_id,
+                index_context={
+                    "component": "serverapp",
+                    "project_dir": app_path,
+                    "run_id": run.run_id,
+                    "launch_id": token,
+                    "fab_id": run.fab_id,
+                    "fab_version": run.fab_version,
+                    "fab_hash": fab.hash_str,
+                },
+            )
+        else:
+            log(
+                DEBUG,
+                "[flwr-serverapp] Runtime dependency installation is disabled.",
+            )
+
         config = get_project_config(app_path)
 
         # Obtain server app reference and the run config
@@ -232,12 +256,6 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             EventType.FLWR_SERVERAPP_RUN_ENTER,
             event_details={"run-id-hash": hash_run_id},
         )
-
-        # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(
-            make_app_heartbeat_fn_grpc(grid._stub, token)
-        )
-        heartbeat_sender.start()
 
         # Load and run the ServerApp with the Grid
         updated_context = run_(

@@ -75,7 +75,12 @@ def review(
     typer.secho("Downloading FAB... ", fg=typer.colors.BLUE)
     url = f"{PLATFORM_API_URL}/hub/fetch-fab"
     try:
-        presigned_url, _ = request_download_link(app_id, app_version, url, "fab_url")
+        presigned_url, _, note = request_download_link(
+            app_id, app_version, url, "fab_url"
+        )
+
+        if note:
+            typer.secho(f"Note: {note}", fg=typer.colors.YELLOW, err=True)
 
         fab_bytes = _download_fab(presigned_url)
 
