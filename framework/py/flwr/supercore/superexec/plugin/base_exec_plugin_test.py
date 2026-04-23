@@ -73,6 +73,8 @@ def test_launch_app_forwards_runtime_dependency_install_flag() -> None:
     """Ensure app launch forwards runtime install flag."""
     plugin = DummyExecPlugin(
         appio_api_address="127.0.0.1:9091",
+        insecure=True,
+        root_certificates_path=None,
         get_run=Mock(),
         runtime_dependency_install=True,
     )
@@ -105,6 +107,8 @@ def test_launch_app_skips_optional_runtime_flags_by_default() -> None:
     """Ensure app launch omits optional runtime install flags by default."""
     plugin = DummyExecPlugin(
         appio_api_address="127.0.0.1:9091",
+        insecure=True,
+        root_certificates_path=None,
         get_run=Mock(),
     )
 

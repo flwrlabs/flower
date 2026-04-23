@@ -26,7 +26,7 @@ from flwr.common.typing import Run
 class ExecPlugin(ABC):
     """Abstract base class for SuperExec plugins."""
 
-    def __init__(
+    def __init__(  # pylint: disable=R0913, R0917
         self,
         appio_api_address: str,
         insecure: bool,
