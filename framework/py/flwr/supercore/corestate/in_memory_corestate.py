@@ -29,6 +29,7 @@ from flwr.common.constant import (
 from flwr.common.typing import Fab
 
 from ..object_store import ObjectStore
+from ..typing import Task
 from .corestate import CoreState
 
 
@@ -53,6 +54,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.lock_token_store = Lock()
         self.nonce_store: dict[tuple[str, str], float] = {}
         self.lock_nonce_store = Lock()
+        self.task_store: dict[int, Task] = {}
+        self.lock_task_store = Lock()
 
     @property
     def object_store(self) -> ObjectStore:
