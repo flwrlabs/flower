@@ -8,6 +8,7 @@ import pickle
 import re
 import shlex
 import subprocess
+from textwrap import dedent
 from typing import Any
 
 import torch
@@ -15,6 +16,7 @@ from flwr.app import Context
 from omegaconf import DictConfig
 
 STATE_LAYER_PATHS = "layer_paths"
+DEFAULT_TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
 
 @dataclass
@@ -46,6 +48,37 @@ def _as_bool(value: Any, default: bool = False) -> bool:
         if text in {"0", "false", "no", "off"}:
             return False
     return default
+
+
+def _config_str(context: Context, key: str, default: str = "") -> str:
+    value = _config_value(context, key, default)
+    if value is None:
+        return default
+    return str(value)
+
+
+def _template_path(context: Context, key: str, fallback_name: str) -> str:
+    configured = _config_str(context, key, "").strip()
+    if configured:
+        return os.path.abspath(os.path.expanduser(os.path.expandvars(configured)))
+    return os.path.join(DEFAULT_TEMPLATE_DIR, fallback_name)
+
+
+def _render_template_text(template_text: str, values: dict[str, Any]) -> str:
+    """Render {{ var }} placeholders with stringified values."""
+
+    def replace(match: re.Match[str]) -> str:
+        template_key = match.group(1).strip()
+        return str(values.get(template_key, ""))
+
+    pattern = re.compile(r"{{\s*([a-zA-Z0-9_.-]+)\s*}}")
+    return pattern.sub(replace, template_text)
+
+
+def _render_template_file(template_path: str, values: dict[str, Any]) -> str:
+    with open(template_path, "r", encoding="utf-8") as file:
+        template_text = file.read()
+    return _render_template_text(template_text, values)
 
 
 def training_disabled(context: Context) -> bool:
@@ -314,12 +347,6 @@ def run_torchtitan_training(
         )
 
     env = os.environ.copy()
-    env["FLWR_TORCHTITAN_INPUT_STATE"] = input_state_path
-    env["FLWR_TORCHTITAN_OUTPUT_STATE"] = output_state_path
-    env["FLWR_TORCHTITAN_INPUT_DCP_DIR"] = input_dcp_dir
-    env["FLWR_TORCHTITAN_OUTPUT_DCP_DIR"] = output_dcp_dir
-    env["FLWR_RUN_ID"] = str(context.run_id)
-    env["FLWR_NODE_ID"] = str(context.node_id)
     scheduler_env = {
         "FLWR_TORCHTITAN_INPUT_STATE": input_state_path,
         "FLWR_TORCHTITAN_OUTPUT_STATE": output_state_path,
@@ -328,11 +355,108 @@ def run_torchtitan_training(
         "FLWR_RUN_ID": str(context.run_id),
         "FLWR_NODE_ID": str(context.node_id),
     }
+    env.update(scheduler_env)
 
     workdir = str(getattr(titan_cfg, "workdir", "")).strip() or None
     scheduler_backend = str(
         _config_value(context, "scheduler.backend", "local")
     ).strip().lower()
+    dry_run = _as_bool(
+        _config_value(context, "trainer.dry-run", _config_value(context, "trainer.dry_run", False)),
+        default=False,
+    )
+    round_id = int(_config_value(context, "current-round", 0))
+    client_name = _config_str(context, "client.name", str(context.node_id))
+    dataset_name = _config_str(context, "client.dataset-name", _config_str(context, "dataset.name", ""))
+    dataset_path = _config_str(context, "client.dataset-path", "")
+    hf_assets_path = _config_str(context, "client.hf-assets-path", "")
+    train_steps = int(_config_value(context, "client.train-steps", _config_value(context, "trainer.train-steps", 0)))
+    model_name = _config_str(context, "model.name", "")
+    model_flavor = _config_str(context, "trainer.torchtitan.model-flavor", "")
+    python_exec = _config_str(context, "trainer.python-exec", "python")
+    torchtitan_entrypoint = _config_str(context, "trainer.torchtitan.entrypoint", "")
+    client_workspace = _config_str(
+        context,
+        "client.workspace",
+        workdir or os.getcwd(),
+    )
+    dump_folder = _config_str(
+        context,
+        "trainer.dump-folder",
+        os.path.join(output_dir, "dump"),
+    )
+    config_filename = _config_str(
+        context,
+        "trainer.torchtitan.config-filename",
+        "torchtitan_generated.toml",
+    )
+    num_nodes = int(
+        _config_value(
+            context,
+            "trainer.num-nodes",
+            _config_value(context, "trainer.num_nodes", 1),
+        )
+    )
+    if not workdir:
+        workdir = client_workspace
+    os.makedirs(dump_folder, exist_ok=True)
+    scheduler_account = _config_str(context, "scheduler.account", "")
+    scheduler_partition = _config_str(context, "scheduler.partition", "")
+    scheduler_qos = _config_str(context, "scheduler.qos", "")
+    scheduler_gpus = _config_str(context, "scheduler.gpus", "")
+    scheduler_cpus_per_task = _config_str(context, "scheduler.cpus-per-task", "")
+    scheduler_mem = _config_str(context, "scheduler.mem", "")
+    scheduler_time = _config_str(context, "scheduler.time", "")
+    scheduler_extra_args = _config_str(context, "scheduler.extra-args", "")
+    env_setup = _config_str(context, "trainer.env-setup", "")
+
+    render_context: dict[str, Any] = {
+        "run_id": context.run_id,
+        "round_id": round_id,
+        "node_id": context.node_id,
+        "client_name": client_name,
+        "model_name": model_name,
+        "model_flavor": model_flavor,
+        "hf_assets_path": hf_assets_path,
+        "dataset_name": dataset_name,
+        "dataset_path": dataset_path,
+        "train_steps": train_steps,
+        "steps_per_round": train_steps,
+        "input_checkpoint_path": input_state_path,
+        "output_checkpoint_path": output_state_path,
+        "input_dcp_dir": input_dcp_dir,
+        "output_dcp_dir": output_dcp_dir,
+        "work_dir": output_dir,
+        "client_workspace": client_workspace,
+        "dump_folder": dump_folder,
+        "config_filename": config_filename,
+        "num_nodes": num_nodes,
+        "log_path": os.path.join(output_dir, "trainer.log"),
+        "scheduler_backend": scheduler_backend,
+        "scheduler_account": scheduler_account,
+        "scheduler_partition": scheduler_partition,
+        "scheduler_qos": scheduler_qos,
+        "scheduler_gpus": scheduler_gpus,
+        "scheduler_cpus_per_task": scheduler_cpus_per_task,
+        "scheduler_mem": scheduler_mem,
+        "scheduler_time": scheduler_time,
+        "scheduler_extra_args": scheduler_extra_args,
+        "env_setup": env_setup,
+        "python_exec": python_exec,
+        "torchtitan_entrypoint": torchtitan_entrypoint,
+        "torchtitan_command": command,
+        "torchtitan_config_path": os.path.join(output_dir, config_filename),
+    }
+
+    if _config_str(context, "trainer.torchtitan.config-template", "").strip():
+        config_template = _template_path(
+            context,
+            "trainer.torchtitan.config-template",
+            "torchtitan.toml.j2",
+        )
+        rendered_toml = _render_template_file(config_template, render_context)
+        with open(render_context["torchtitan_config_path"], "w", encoding="utf-8") as file:
+            file.write(rendered_toml)
 
     def run_local() -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -345,6 +469,26 @@ def run_torchtitan_training(
             check=False,
         )
 
+    if dry_run:
+        dry_run_report = os.path.join(output_dir, "dry_run_summary.txt")
+        with open(dry_run_report, "w", encoding="utf-8") as file:
+            file.write(
+                dedent(
+                    f"""\
+                    dry_run=true
+                    scheduler.backend={scheduler_backend}
+                    command={command}
+                    workdir={workdir or ''}
+                    script_path=
+                    run_id={context.run_id}
+                    node_id={context.node_id}
+                    client.name={client_name}
+                    dataset.name={dataset_name}
+                    dataset.path={dataset_path}
+                    """
+                )
+            )
+        return _normalize_state_dict_for_hf(state_dict)
     if scheduler_backend in {"", "none", "local"}:
         result = run_local()
     elif scheduler_backend == "slurm":
@@ -359,22 +503,38 @@ def run_torchtitan_training(
         )
 
         script_path = os.path.join(output_dir, "torchtitan_slurm.sh")
+        slurm_template_path = _template_path(
+            context,
+            "scheduler.slurm.script-template",
+            "slurm_train.sh.j2",
+        )
+        render_context["workdir"] = workdir or ""
+        render_context["script_path"] = script_path
+        script_text = _render_template_file(slurm_template_path, render_context)
         with open(script_path, "w", encoding="utf-8") as script_file:
-            script_file.write("#!/usr/bin/env bash\n")
-            script_file.write("set -euo pipefail\n")
-            if workdir:
-                script_file.write(f"cd {shlex.quote(workdir)}\n")
-            for key, value in scheduler_env.items():
-                script_file.write(
-                    f"export {key}={shlex.quote(str(value))}\n"
-                )
-            script_file.write(f"{command}\n")
+            script_file.write(script_text)
         os.chmod(script_path, 0o755)
 
         submit_parts = [slurm_submit]
         if slurm_wait:
             submit_parts.append("--wait")
         submit_parts.append("--parsable")
+        if scheduler_account:
+            submit_parts.extend(["--account", scheduler_account])
+        if scheduler_partition:
+            submit_parts.extend(["--partition", scheduler_partition])
+        if scheduler_qos:
+            submit_parts.extend(["--qos", scheduler_qos])
+        if scheduler_time:
+            submit_parts.extend(["--time", scheduler_time])
+        if scheduler_mem:
+            submit_parts.extend(["--mem", scheduler_mem])
+        if scheduler_gpus:
+            submit_parts.extend(["--gpus", scheduler_gpus])
+        if scheduler_cpus_per_task:
+            submit_parts.extend(["--cpus-per-task", scheduler_cpus_per_task])
+        if scheduler_extra_args:
+            submit_parts.extend(shlex.split(scheduler_extra_args))
         if slurm_extra_args:
             submit_parts.extend(shlex.split(slurm_extra_args))
         submit_parts.append(script_path)
@@ -394,22 +554,29 @@ def run_torchtitan_training(
         flux_extra_args = str(
             _config_value(context, "scheduler.flux.extra-args", "")
         ).strip()
-
-        wrapped_command = command
-        if workdir:
-            wrapped_command = f"cd {shlex.quote(workdir)} && {wrapped_command}"
-        export_prefix = " ".join(
-            f"{key}={shlex.quote(str(value))}"
-            for key, value in scheduler_env.items()
+        flux_script_path = os.path.join(output_dir, "torchtitan_flux.sh")
+        flux_template_path = _template_path(
+            context,
+            "scheduler.flux.script-template",
+            "flux_train.sh.j2",
         )
-        wrapped_command = f"{export_prefix} bash -lc {shlex.quote(wrapped_command)}"
+        render_context["workdir"] = workdir or ""
+        render_context["script_path"] = flux_script_path
+        flux_script_text = _render_template_file(flux_template_path, render_context)
+        with open(flux_script_path, "w", encoding="utf-8") as script_file:
+            script_file.write(flux_script_text)
+        os.chmod(flux_script_path, 0o755)
         flux_parts = shlex.split(flux_run)
+        if scheduler_extra_args:
+            flux_parts.extend(shlex.split(scheduler_extra_args))
         if flux_extra_args:
             flux_parts.extend(shlex.split(flux_extra_args))
-        flux_parts.extend(["bash", "-lc", wrapped_command])
+        flux_parts.append(flux_script_path)
 
         result = subprocess.run(
             flux_parts,
+            env=env,
+            cwd=workdir,
             capture_output=True,
             text=True,
             check=False,

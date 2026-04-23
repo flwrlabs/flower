@@ -135,6 +135,42 @@ flower-supernode --insecure --superlink <SUPERLINK_HOST:9092> \
   --node-config "scheduler.backend='flux' scheduler.flux.run-command='flux run' scheduler.flux.extra-args='-N1 -n1 -g1'"
 ```
 
+#### Template-based Script Generation
+
+The scheduler script and TorchTitan config can be generated from templates:
+
+- `/Users/pfoley/Code/flower/examples/flowertune-llm/flowertune_llm/templates/slurm_train.sh.j2`
+- `/Users/pfoley/Code/flower/examples/flowertune-llm/flowertune_llm/templates/flux_train.sh.j2`
+- `/Users/pfoley/Code/flower/examples/flowertune-llm/flowertune_llm/templates/torchtitan.toml.j2`
+
+Override template paths per SuperNode if needed:
+
+```bash
+flower-supernode --insecure --superlink <SUPERLINK_HOST:9092> \
+  --node-config "scheduler.backend='slurm' scheduler.slurm.script-template='/path/site/slurm_train.sh.j2' trainer.torchtitan.config-template='/path/site/torchtitan.toml.j2'"
+```
+
+Use `run-config` for shared settings, and `node-config` for machine-specific settings:
+
+- Shared (`run-config`): `num-server-rounds`, `model.name`, `trainer.backend`
+- Per-node (`node-config`): `client.dataset-path`, `client.hf-assets-path`, `scheduler.account`, `scheduler.partition`, `scheduler.qos`
+
+For script-template parameterization (matching job-template workflows), these keys are available:
+
+- `client.workspace` -> `client_workspace`
+- `trainer.dump-folder` -> `dump_folder`
+- `client.hf-assets-path` -> `hf_assets_path`
+- `client.train-steps` -> `steps_per_round`
+- `client.dataset-path` -> `dataset_path`
+- `trainer.torchtitan.config-filename` -> `config_filename`
+- `trainer.num-nodes` -> `num_nodes`
+
+Dry-run (render scripts/config but skip submission/training):
+
+```bash
+flwr run . remote-deployment --run-config "trainer.backend='torchtitan' trainer.dry-run=true"
+```
+
 To skip training entirely at runtime (useful for communication/debug profiling):
 
 ```bash

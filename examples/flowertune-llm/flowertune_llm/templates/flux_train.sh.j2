@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+{{ env_setup }}
+
+if [ -n "{{ workdir }}" ]; then
+  cd "{{ workdir }}"
+fi
+
+export FLWR_TORCHTITAN_INPUT_STATE="{{ input_checkpoint_path }}"
+export FLWR_TORCHTITAN_OUTPUT_STATE="{{ output_checkpoint_path }}"
+export FLWR_TORCHTITAN_INPUT_DCP_DIR="{{ input_dcp_dir }}"
+export FLWR_TORCHTITAN_OUTPUT_DCP_DIR="{{ output_dcp_dir }}"
+export FLWR_RUN_ID="{{ run_id }}"
+export FLWR_NODE_ID="{{ node_id }}"
+export FLWR_CLIENT_NAME="{{ client_name }}"
+export FLWR_CLIENT_WORKSPACE="{{ client_workspace }}"
+export FLWR_DATASET_NAME="{{ dataset_name }}"
+export FLWR_DATASET_PATH="{{ dataset_path }}"
+export FLWR_HF_ASSETS_PATH="{{ hf_assets_path }}"
+export FLWR_TRAIN_STEPS="{{ train_steps }}"
+export FLWR_STEPS_PER_ROUND="{{ steps_per_round }}"
+export FLWR_DUMP_FOLDER="{{ dump_folder }}"
+export FLWR_NUM_NODES="{{ num_nodes }}"
+export FLWR_TORCHTITAN_CONFIG_FILENAME="{{ config_filename }}"
+export FLWR_TORCHTITAN_CONFIG_PATH="{{ torchtitan_config_path }}"
+
+{{ torchtitan_command }}
