@@ -28,14 +28,14 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 class Task(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    EXEC_ID_FIELD_NUMBER: builtins.int
+    TASK_ID_FIELD_NUMBER: builtins.int
     TYPE_FIELD_NUMBER: builtins.int
     RUN_ID_FIELD_NUMBER: builtins.int
     STATUS_FIELD_NUMBER: builtins.int
     FAB_HASH_FIELD_NUMBER: builtins.int
     MODEL_REF_FIELD_NUMBER: builtins.int
     CONNECTOR_REF_FIELD_NUMBER: builtins.int
-    exec_id: builtins.int
+    task_id: builtins.int
     type: builtins.str
     run_id: builtins.int
     status: builtins.str
@@ -45,7 +45,7 @@ class Task(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        exec_id: builtins.int = ...,
+        task_id: builtins.int = ...,
         type: builtins.str = ...,
         run_id: builtins.int = ...,
         status: builtins.str = ...,
@@ -54,7 +54,7 @@ class Task(google.protobuf.message.Message):
         connector_ref: builtins.str | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "exec_id", b"exec_id", "fab_hash", b"fab_hash", "model_ref", b"model_ref", "run_id", b"run_id", "status", b"status", "type", b"type"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref", "run_id", b"run_id", "status", b"status", "task_id", b"task_id", "type", b"type"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_connector_ref", b"_connector_ref"]) -> typing.Literal["connector_ref"] | None: ...
     @typing.overload

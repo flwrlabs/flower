@@ -18,7 +18,7 @@ syntax = "proto3";
 package flwr.proto;
 
 message Task {
-  uint64 exec_id = 1;
+  uint64 task_id = 1;
   string type = 2;
   uint64 run_id = 3;
   string status = 4;
