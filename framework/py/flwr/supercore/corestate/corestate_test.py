@@ -54,6 +54,30 @@ class StateTest(unittest.TestCase):
         # Assert: token should no longer be valid
         self.assertFalse(state.verify_token(run_id, token))
 
+    def test_metadata_contains_task_table(self) -> None:
+        """CoreState metadata should include the task table and its columns."""
+        state = self.state_factory()
+
+        task_table = state.get_metadata().tables["task"]
+
+        self.assertEqual(
+            list(task_table.columns.keys()),
+            [
+                "task_id",
+                "type",
+                "run_id",
+                "status",
+                "fab_hash",
+                "model_ref",
+                "connector_ref",
+                "token",
+                "pending_at",
+                "starting_at",
+                "running_at",
+                "finished_at",
+            ],
+        )
+
     def test_create_token_already_exists(self) -> None:
         """Test creating a token that already exists."""
         # Prepare
