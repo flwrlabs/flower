@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower process-isolated app runtimes."""
+"""Flower Executors components."""
 
 
 from .run_agentapp import run_agentapp
