@@ -135,12 +135,10 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             self.token_to_task_id[token] = task_id
             return task_id
 
-    def get_task_info(  # pylint: disable=too-many-arguments,too-many-locals
+    def get_tasks(
         self,
         *,
         task_ids: Sequence[int] | None = None,
-        types: Sequence[str] | None = None,
-        run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
@@ -154,26 +152,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 if not task_ids:
                     return []
                 matched_task_ids &= set(task_ids)
-
-            if types is not None:
-                if not types:
-                    return []
-                type_set = set(types)
-                matched_task_ids &= {
-                    task_id
-                    for task_id in matched_task_ids
-                    if self.task_store[task_id].type in type_set
-                }
-
-            if run_ids is not None:
-                if not run_ids:
-                    return []
-                run_id_set = set(run_ids)
-                matched_task_ids &= {
-                    task_id
-                    for task_id in matched_task_ids
-                    if self.task_store[task_id].run_id in run_id_set
-                }
 
             if statuses is not None:
                 if not statuses:

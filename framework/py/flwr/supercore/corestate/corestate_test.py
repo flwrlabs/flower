@@ -46,7 +46,7 @@ class StateTest(unittest.TestCase):
             model_ref="model://test",
             connector_ref=None,
         )
-        tasks = state.get_task_info(task_ids=[task_id])
+        tasks = state.get_tasks(task_ids=[task_id])
 
         self.assertEqual(len(tasks), 1)
         task = tasks[0]
@@ -62,10 +62,10 @@ class StateTest(unittest.TestCase):
         self.assertEqual(task.running_at, "")
         self.assertEqual(task.finished_at, "")
 
-    def test_get_task_info_missing_returns_empty(self) -> None:
+    def test_get_tasks_missing_returns_empty(self) -> None:
         """Missing tasks should return an empty sequence."""
         state = self.state_factory()
-        self.assertEqual(state.get_task_info(task_ids=[123]), [])
+        self.assertEqual(state.get_tasks(task_ids=[123]), [])
 
     def test_get_task_returns_copy(self) -> None:
         """Retrieved task should be a defensive copy."""
@@ -78,12 +78,12 @@ class StateTest(unittest.TestCase):
             connector_ref=None,
         )
 
-        tasks = state.get_task_info(task_ids=[task_id])
+        tasks = state.get_tasks(task_ids=[task_id])
         self.assertEqual(len(tasks), 1)
         task = tasks[0]
         task.fab_hash = "mutated"
 
-        reloaded_tasks = state.get_task_info(task_ids=[task_id])
+        reloaded_tasks = state.get_tasks(task_ids=[task_id])
         self.assertEqual(len(reloaded_tasks), 1)
         reloaded = reloaded_tasks[0]
         self.assertEqual(reloaded.fab_hash, "fab-hash")

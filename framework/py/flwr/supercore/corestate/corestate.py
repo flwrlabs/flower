@@ -72,12 +72,10 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def get_task_info(  # pylint: disable=too-many-arguments
+    def get_tasks(
         self,
         *,
         task_ids: Sequence[int] | None = None,
-        types: Sequence[str] | None = None,
-        run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
@@ -93,10 +91,6 @@ class CoreState(ABC):
         ----------
         task_ids : Optional[Sequence[int]] (default: None)
             Sequence of task IDs to filter by.
-        types : Optional[Sequence[str]] (default: None)
-            Sequence of task types to filter by.
-        run_ids : Optional[Sequence[int]] (default: None)
-            Sequence of run IDs to filter by.
         statuses : Optional[Sequence[str]] (default: None)
             Sequence of task status values to filter by.
         order_by : Optional[Literal["pending_at"]] (default: None)

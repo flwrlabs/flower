@@ -167,12 +167,10 @@ class SqlCoreState(CoreState, SqlMixin):
         log(ERROR, "Unexpected task creation failure.")
         return 0
 
-    def get_task_info(  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches
+    def get_tasks(
         self,
         *,
         task_ids: Sequence[int] | None = None,
-        types: Sequence[str] | None = None,
-        run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
@@ -190,23 +188,6 @@ class SqlCoreState(CoreState, SqlMixin):
             conditions.append(f"task_id IN ({placeholders})")
             params.update(
                 {f"tid_{i}": task_id for i, task_id in enumerate(sint64_task_ids)}
-            )
-
-        if types is not None:
-            if not types:
-                return []
-            placeholders = ",".join([f":type_{i}" for i in range(len(types))])
-            conditions.append(f"type IN ({placeholders})")
-            params.update({f"type_{i}": task_type for i, task_type in enumerate(types)})
-
-        if run_ids is not None:
-            if not run_ids:
-                return []
-            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
-            placeholders = ",".join([f":rid_{i}" for i in range(len(sint64_run_ids))])
-            conditions.append(f"run_id IN ({placeholders})")
-            params.update(
-                {f"rid_{i}": run_id for i, run_id in enumerate(sint64_run_ids)}
             )
 
         if statuses is not None:
