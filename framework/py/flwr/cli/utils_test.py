@@ -284,7 +284,7 @@ def test_cli_output_handler_raises_click_exception_for_json_error() -> None:
     """cli_output_handler uses the parsed message for ClickException text."""
     with pytest.raises(click.ClickException, match="request failed") as exc_info:
         with cli_output_handler():
-            raise Exception('{"message": "request failed", "code": 400}')
+            raise click.ClickException('{"message": "request failed", "code": 400}')
 
     assert exc_info.value.message == "request failed"
 
