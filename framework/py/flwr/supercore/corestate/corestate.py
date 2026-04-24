@@ -73,8 +73,7 @@ class CoreState(ABC):
 
         Notes
         -----
-        Newly created tasks must start in
-        `TaskStatus(status="pending", sub_status="", details="")`.
+        Newly created tasks are in the pending status.
         This method only persists task data. It does not validate whether the
         provided fields are required for the given task type.
         """
