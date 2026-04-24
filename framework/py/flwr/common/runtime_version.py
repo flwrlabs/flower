@@ -31,6 +31,7 @@ from flwr.supercore.version import package_name, package_version
 
 RuntimeCompatibilityStatus = Literal[
     "missing",
+    "disabled",
     "invalid",
     "compatible",
     "incompatible",
@@ -169,7 +170,7 @@ def evaluate_runtime_version_compatibility(
             reason=metadata_error,
             local_metadata=local_metadata,
             peer_metadata=peer,
-            local_version=local_version,
+            local_version=None,
             peer_version=None,
         )
 
@@ -186,9 +187,10 @@ def evaluate_runtime_version_compatibility(
     local_version = parse_flower_version(local_metadata.package_version)
     if local_version is None:
         return CompatibilityResult(
-            status="invalid",
+            status="disabled",
             reason=(
-                "Local Flower version metadata is invalid: "
+                "Local Flower version metadata cannot be parsed, version checks "
+                "are disabled: "
                 f"{local_metadata.package_version!r}."
             ),
             local_metadata=local_metadata,
