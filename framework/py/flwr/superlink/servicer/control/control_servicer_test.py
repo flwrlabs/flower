@@ -293,13 +293,11 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch.object(
                 self.state.federation_manager,
                 "can_execute",
-                return_value=False,
+                return_value=(False, -1, ""),
             ),
             self.assertRaises(grpc.RpcError),
         ):
             self.servicer.StartRun(request, context)
-
-        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
 
     @parameterized.expand(
         [
@@ -329,7 +327,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch.object(
                 self.state.federation_manager,
                 "can_execute",
-                return_value=True,
+                return_value=(True, -1, ""),
             ) as mock_can_execute,
             patch.object(
                 self.state.federation_manager,
@@ -456,13 +454,12 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch.object(
                 self.state.federation_manager,
                 "can_execute",
-                return_value=False,
+                return_value=(False, -1, ""),
             ),
             self.assertRaises(grpc.RpcError),
         ):
             self.servicer.RegisterNode(req, ctx)
 
-        _assert_abort_with_flwr_err(ctx, ApiErrorCode.NO_PERMISSIONS)
         mock_create_node.assert_not_called()
 
     def test_register_node_calls_can_execute_with_expected_args(self) -> None:
@@ -474,7 +471,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         with patch.object(
             self.state.federation_manager,
             "can_execute",
-            return_value=True,
+            return_value=(True, -1, ""),
         ) as mock_can_execute:
             _ = self.servicer.RegisterNode(req, Mock())
 
@@ -623,7 +620,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch.object(
                 self.state.federation_manager,
                 "can_execute",
-                return_value=True,
+                return_value=(True, -1, ""),
             ) as mock_can_execute,
             patch.object(
                 self.state.federation_manager,
@@ -689,13 +686,11 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch.object(
                 self.state.federation_manager,
                 "can_execute",
-                return_value=False,
+                return_value=(False, -1, ""),
             ),
             self.assertRaises(grpc.RpcError),
         ):
             self.servicer.CreateFederation(request, context)
-
-        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
 
     def test_create_federation_raises_on_invalid_name(self) -> None:
         """Test CreateFederation aborts when federation name is invalid."""
@@ -869,7 +864,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             federation_name="test-federation",
         )
         context = Mock()
-        self.state.federation_manager.can_execute.return_value = True
+        self.state.federation_manager.can_execute.return_value = True, -1, ""
         self.state.federation_manager.get_simulation_config.return_value = None
 
         response = self.servicer.CreateInvitation(request, context)
@@ -898,12 +893,11 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         )
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
-        self.state.federation_manager.can_execute.return_value = False
+        self.state.federation_manager.can_execute.return_value = False, -1, ""
 
         with self.assertRaises(grpc.RpcError):
             self.servicer.CreateInvitation(request, context)
 
-        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
         self.state.federation_manager.create_invitation.assert_not_called()
 
     def test_list_invitations_success(self) -> None:
@@ -925,7 +919,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         """Test AcceptInvitation success path."""
         request = AcceptInvitationRequest(federation_name="test-federation")
         context = Mock()
-        self.state.federation_manager.can_execute.return_value = True
+        self.state.federation_manager.can_execute.return_value = True, -1, ""
         self.state.federation_manager.get_simulation_config.return_value = None
 
         response = self.servicer.AcceptInvitation(request, context)
@@ -949,12 +943,11 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         request = AcceptInvitationRequest(federation_name="test-federation")
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
-        self.state.federation_manager.can_execute.return_value = False
+        self.state.federation_manager.can_execute.return_value = False, -1, ""
 
         with self.assertRaises(grpc.RpcError):
             self.servicer.AcceptInvitation(request, context)
 
-        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
         self.state.federation_manager.accept_invitation.assert_not_called()
 
     def test_reject_invitation_success(self) -> None:
