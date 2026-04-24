@@ -31,7 +31,7 @@ from flwr.common.constant import (
     Status,
 )
 from flwr.common.typing import Fab
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -110,12 +110,13 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
         with self.lock_task_store:
             task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
+            task_status = TaskStatus(status=Status.PENDING, sub_status="", details="")
 
             task = Task(
                 task_id=task_id,
                 type=task_type,
                 run_id=run_id,
-                status=Status.PENDING,
+                status=task_status,
                 pending_at=now().isoformat(),
                 starting_at="",
                 running_at="",
@@ -132,7 +133,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             self.token_to_task_id[token] = task_id
             return task_id
 
-    def get_tasks(
+    def get_tasks(  # pylint: disable=too-many-arguments
         self,
         *,
         task_ids: Sequence[int] | None = None,
@@ -157,7 +158,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 matched_task_ids &= {
                     task_id
                     for task_id in matched_task_ids
-                    if self.task_store[task_id].status in status_set
+                    if self.task_store[task_id].status.status in status_set
                 }
 
             tasks = [self.task_store[task_id] for task_id in matched_task_ids]

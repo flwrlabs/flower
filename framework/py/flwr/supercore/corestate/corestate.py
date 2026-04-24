@@ -72,12 +72,14 @@ class CoreState(ABC):
 
         Notes
         -----
+        Newly created tasks must start in
+        `TaskStatus(status="pending", sub_status="", details="")`.
         This method only persists task data. It does not validate whether the
         provided fields are required for the given task type.
         """
 
     @abstractmethod
-    def get_tasks(
+    def get_tasks(  # pylint: disable=too-many-arguments
         self,
         *,
         task_ids: Sequence[int] | None = None,

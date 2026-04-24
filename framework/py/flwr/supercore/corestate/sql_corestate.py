@@ -34,7 +34,7 @@ from flwr.common.constant import (
     Status,
 )
 from flwr.common.typing import Fab
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
@@ -111,6 +111,7 @@ class SqlCoreState(CoreState, SqlMixin):
         uint64_task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
         sint64_task_id = uint64_to_int64(uint64_task_id)
         token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
+        task_status = TaskStatus(status=Status.PENDING, sub_status="", details="")
 
         insert_query = """
             INSERT INTO task (
@@ -151,7 +152,7 @@ class SqlCoreState(CoreState, SqlMixin):
                     "task_id": sint64_task_id,
                     "type": task_type,
                     "run_id": uint64_to_int64(run_id),
-                    "status": Status.PENDING,
+                    "status": task_status.status,
                     "fab_hash": fab_hash,
                     "model_ref": model_ref,
                     "connector_ref": connector_ref,
@@ -167,7 +168,7 @@ class SqlCoreState(CoreState, SqlMixin):
         log(ERROR, "Unexpected task creation failure.")
         return 0
 
-    def get_tasks(
+    def get_tasks(  # pylint: disable=too-many-arguments,too-many-locals
         self,
         *,
         task_ids: Sequence[int] | None = None,
@@ -193,9 +194,12 @@ class SqlCoreState(CoreState, SqlMixin):
         if statuses is not None:
             if not statuses:
                 return []
-            placeholders = ",".join([f":status_{i}" for i in range(len(statuses))])
+            status_values = list({status.status for status in statuses})
+            placeholders = ",".join([f":status_{i}" for i in range(len(status_values))])
             conditions.append(f"status IN ({placeholders})")
-            params.update({f"status_{i}": status for i, status in enumerate(statuses)})
+            params.update(
+                {f"status_{i}": status for i, status in enumerate(status_values)}
+            )
 
         query = """
             SELECT task_id, type, run_id, status, fab_hash, model_ref, connector_ref,
@@ -214,11 +218,16 @@ class SqlCoreState(CoreState, SqlMixin):
 
         result: list[Task] = []
         for row in rows:
+            task_status = TaskStatus(
+                status=row["status"],
+                sub_status="",
+                details="",
+            )
             task = Task(
                 task_id=int64_to_uint64(row["task_id"]),
                 type=row["type"],
                 run_id=int64_to_uint64(row["run_id"]),
-                status=row["status"],
+                status=task_status,
                 pending_at=row["pending_at"] or "",
                 starting_at=row["starting_at"] or "",
                 running_at=row["running_at"] or "",

@@ -21,6 +21,7 @@ from unittest.mock import patch
 
 from flwr.common import now
 from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL, Status
+from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
 
 from . import CoreState
 
@@ -53,7 +54,10 @@ class StateTest(unittest.TestCase):
         self.assertEqual(task.task_id, task_id)
         self.assertEqual(task.type, "flwr-model")
         self.assertEqual(task.run_id, 42)
-        self.assertEqual(task.status, Status.PENDING)
+        self.assertEqual(
+            task.status,
+            TaskStatus(status=Status.PENDING, sub_status="", details=""),
+        )
         self.assertEqual(task.model_ref, "model://test")
         self.assertFalse(task.HasField("fab_hash"))
         self.assertFalse(task.HasField("connector_ref"))
