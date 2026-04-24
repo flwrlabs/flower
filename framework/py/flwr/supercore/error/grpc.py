@@ -15,6 +15,7 @@
 """GRPC-specific translation utilities for Flower API errors."""
 
 
+import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 from logging import ERROR
@@ -24,7 +25,7 @@ from grpc import StatusCode
 
 from flwr.common.logger import log
 
-from .base import FlowerError
+from .base import EntitlementError, FlowerError
 from .catalog import API_ERROR_MAP
 
 INTERNAL_SERVER_ERROR_MESSAGE = "Internal server error."
@@ -49,6 +50,15 @@ def rpc_error_translator(
         msg = f"[{rpc_name}][ApiError:{err.code}] {err.message}"
         log(ERROR, msg)
         context.abort(grpc_status, public_message)
+        raise grpc.RpcError() from None  # Unreachable, but satisfies type checker
+    except EntitlementError as err:
+        json_msg: dict[str, str | int] = {
+            "rpc-name": rpc_name,
+            "code": err.code,
+            "message": err.message,
+        }
+        log(ERROR, json_msg)
+        context.abort(StatusCode.INTERNAL, json.dumps(json_msg))
         raise grpc.RpcError() from None  # Unreachable, but satisfies type checker
     except Exception as err:
         # Let pass through if `context.abort()` is called

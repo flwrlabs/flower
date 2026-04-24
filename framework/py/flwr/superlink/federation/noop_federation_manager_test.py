@@ -250,7 +250,7 @@ def test_can_execute(action: ActionType) -> None:
     """Test can_execute method returns True for NOOP_FEDERATION."""
     manager = NoOpFederationManager()
 
-    allowed = manager.can_execute(NOOP_FLWR_AID, action, ActionContext())
+    allowed, _, _ = manager.can_execute(NOOP_FLWR_AID, action, ActionContext())
     assert allowed is True
 
 

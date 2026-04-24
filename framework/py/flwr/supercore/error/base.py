@@ -43,3 +43,12 @@ class ApiErrorCode(IntEnum):
     FORBIDDEN_ACTION = 10
     SUPERNODE_ALREADY_IN_FEDERATION = 11
     FEDERATION_NOT_SPECIFIED = 12
+
+
+class EntitlementError(Exception):
+    """Base exception that carries an internal error code and debug message."""
+
+    def __init__(self, code: int, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message

@@ -15,7 +15,12 @@
 """Shared exception and error translation utilities."""
 
 
-from .base import ApiErrorCode, FlowerError
+from .base import ApiErrorCode, EntitlementError, FlowerError
 from .grpc import rpc_error_translator
 
-__all__ = ["ApiErrorCode", "FlowerError", "rpc_error_translator"]
+__all__ = [
+    "ApiErrorCode",
+    "EntitlementError",
+    "FlowerError",
+    "rpc_error_translator",
+]

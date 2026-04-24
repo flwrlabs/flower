@@ -336,7 +336,7 @@ class FederationManager(ABC):
     @abstractmethod
     def can_execute(
         self, flwr_aid: str, action: ActionType, context: ActionContext
-    ) -> bool:
+    ) -> tuple[bool, int, str]:
         """Check if an account can execute an action under a given context.
 
         Parameters
@@ -352,4 +352,10 @@ class FederationManager(ABC):
         -------
         bool
             ``True`` if the action is allowed, otherwise ``False``.
+
+        int
+            Code coresponding to the entitlement check result.
+
+        str
+            Message describing the entitlement check result.
         """
