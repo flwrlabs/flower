@@ -57,8 +57,8 @@ def add_args_flwr_app_common(parser: argparse.ArgumentParser) -> None:
         "--root-certificates",
         metavar="ROOT_CERT",
         type=str,
-        help="Path to the PEM-encoded root certificate file used to establish "
-        "a secure TLS connection.",
+        help="Path to a PEM-encoded root CA certificate (or CA bundle) used to verify "
+        "the server's TLS certificate. This is not a client certificate for mTLS.",
     )
     parser.add_argument(
         "--parent-pid",
