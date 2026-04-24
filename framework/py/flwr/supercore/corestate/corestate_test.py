@@ -73,12 +73,12 @@ class StateTest(unittest.TestCase):
         state = self.state_factory()
         self.assertEqual(state.get_tasks(task_ids=[123]), [])
 
-    def test_get_tasks_scalar_status_matches(self) -> None:
-        """A scalar status string should behave like a single-item status filter."""
+    def test_get_tasks_single_status_matches(self) -> None:
+        """A single-item status sequence should match pending tasks."""
         state = self.state_factory()
         _ = state.create_task(task_type="flwr-model", run_id=42)
 
-        tasks = state.get_tasks(statuses=Status.PENDING)
+        tasks = state.get_tasks(statuses=[Status.PENDING])
 
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].status.status, Status.PENDING)

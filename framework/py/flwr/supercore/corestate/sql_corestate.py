@@ -156,9 +156,6 @@ class SqlCoreState(CoreState, SqlMixin):
         if limit is not None and limit < 0:
             raise AssertionError("`limit` must be >= 0")
 
-        if isinstance(statuses, str):
-            statuses = [statuses]
-
         conditions = []
         params: dict[str, Any] = {}
 
