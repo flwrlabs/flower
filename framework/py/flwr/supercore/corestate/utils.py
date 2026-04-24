@@ -19,7 +19,7 @@ from os import urandom
 
 
 def generate_rand_int_from_bytes(
-    num_bytes: int, exclude: list[int] | None = None
+    num_bytes: int, exclude: set[int] | None = None
 ) -> int:
     """Generate a random unsigned integer from `num_bytes` bytes.
 
