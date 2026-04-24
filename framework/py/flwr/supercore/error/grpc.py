@@ -38,6 +38,15 @@ def rpc_error_translator(
     """Translate FlowerError into a sanitized gRPC error."""
     try:
         yield
+    except EntitlementError as err:
+        json_msg: dict[str, str | int] = {
+            "rpc-name": rpc_name,
+            "code": err.code,
+            "message": err.message,
+        }
+        log(ERROR, json_msg)
+        context.abort(StatusCode.INTERNAL, json.dumps(json_msg))
+        raise grpc.RpcError() from None  # Unreachable, but satisfies type checker
     except FlowerError as err:
         try:
             error_spec = API_ERROR_MAP[err.code]
@@ -50,15 +59,6 @@ def rpc_error_translator(
         msg = f"[{rpc_name}][ApiError:{err.code}] {err.message}"
         log(ERROR, msg)
         context.abort(grpc_status, public_message)
-        raise grpc.RpcError() from None  # Unreachable, but satisfies type checker
-    except EntitlementError as err:
-        json_msg: dict[str, str | int] = {
-            "rpc-name": rpc_name,
-            "code": err.code,
-            "message": err.message,
-        }
-        log(ERROR, json_msg)
-        context.abort(StatusCode.INTERNAL, json.dumps(json_msg))
         raise grpc.RpcError() from None  # Unreachable, but satisfies type checker
     except Exception as err:
         # Let pass through if `context.abort()` is called
