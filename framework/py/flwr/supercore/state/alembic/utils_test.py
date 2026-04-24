@@ -154,8 +154,12 @@ class TestAlembicRun(unittest.TestCase):
                 table.create(engine)
 
             # Execute & Assert
-            with patch("flwr.supercore.state.alembic.utils.flwr_exit") as mock_exit:
-                run_migrations(engine)
+            with patch(
+                "flwr.supercore.state.alembic.utils.flwr_exit",
+                side_effect=SystemExit(1),
+            ) as mock_exit:
+                with self.assertRaises(SystemExit):
+                    run_migrations(engine)
 
                 # Verify flwr_exit was called with correct arguments
                 mock_exit.assert_called_once()
@@ -187,8 +191,12 @@ class TestAlembicRun(unittest.TestCase):
                     baseline_metadata.tables[table_name].create(engine)
 
             # Execute & Assert
-            with patch("flwr.supercore.state.alembic.utils.flwr_exit") as mock_exit:
-                run_migrations(engine)
+            with patch(
+                "flwr.supercore.state.alembic.utils.flwr_exit",
+                side_effect=SystemExit(1),
+            ) as mock_exit:
+                with self.assertRaises(SystemExit):
+                    run_migrations(engine)
 
                 # Verify flwr_exit was called
                 mock_exit.assert_called_once()
