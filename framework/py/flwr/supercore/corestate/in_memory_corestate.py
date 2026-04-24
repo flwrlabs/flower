@@ -121,13 +121,10 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 starting_at="",
                 running_at="",
                 finished_at="",
+                fab_hash = fab_hash,
+                model_ref = model_ref,
+                connector_ref = connector_ref,
             )
-            if fab_hash is not None:
-                task.fab_hash = fab_hash
-            if model_ref is not None:
-                task.model_ref = model_ref
-            if connector_ref is not None:
-                task.connector_ref = connector_ref
 
             self.task_store[task_id] = task
             self.token_to_task_id[token] = task_id
