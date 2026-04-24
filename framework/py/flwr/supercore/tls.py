@@ -29,7 +29,7 @@ def validate_and_resolve_root_certificates(
         if root_cert_path is not None:
             flwr_exit(
                 ExitCode.COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE,
-                "Conflicting options: The '--insecure' flag disables HTTPS, but "
+                "Conflicting options: The '--insecure' flag disables TLS, but "
                 "'--root-certificates' was also specified.",
             )
         return None
