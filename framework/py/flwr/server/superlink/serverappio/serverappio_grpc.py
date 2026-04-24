@@ -27,9 +27,9 @@ from flwr.proto.serverappio_pb2_grpc import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.interceptors import (
+    create_serverappio_runtime_version_server_interceptor,
     create_serverappio_superexec_auth_server_interceptor,
     create_serverappio_token_auth_server_interceptor,
-    create_serverappio_runtime_version_server_interceptor,
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 
