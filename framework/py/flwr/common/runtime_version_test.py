@@ -119,6 +119,24 @@ def test_read_runtime_version_metadata_accepts_metadata_item_iterables() -> None
     )
 
 
+def test_read_runtime_version_metadata_rejects_duplicate_values() -> None:
+    """Runtime version metadata keys should appear at most once."""
+    metadata, error = read_runtime_version_metadata(
+        [
+            (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
+            (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.0"),
+            (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.1"),
+            (FLWR_COMPONENT_NAME_METADATA_KEY, "cli"),
+        ]
+    )
+
+    assert metadata is None
+    assert (
+        error
+        == "Flower runtime metadata contains duplicate values: flwr-package-version."
+    )
+
+
 def test_evaluate_runtime_version_compatibility_accepts_same_major_minor() -> None:
     """Patch differences are compatible."""
     result = evaluate_runtime_version_compatibility(
@@ -184,15 +202,19 @@ def test_version_checks_are_disabled_for_unknown_local_version() -> None:
     )
 
 
-def test_evaluate_runtime_version_compatibility_rejects_invalid_peer_version() -> None:
-    """Unparseable peer versions should be classified as invalid metadata."""
+def test_version_checks_are_disabled_for_unknown_peer_version() -> None:
+    """Unparseable peer versions should not hard-fail rollout/dev callers."""
     result = evaluate_runtime_version_compatibility(
         RuntimeVersionMetadata("flwr", "1.29.0", "superlink"),
         RuntimeVersionMetadata("flwr", "main", "supernode"),
     )
 
-    assert result.status == "invalid"
-    assert result.reason == "Peer Flower version metadata is invalid: 'main'."
+    assert result.status == "disabled"
+    assert (
+        result.reason
+        == "Peer Flower version metadata cannot be parsed, version checks "
+        "are disabled: 'main'."
+    )
 
 
 def test_format_invalid_metadata_message() -> None:

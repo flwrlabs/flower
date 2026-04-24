@@ -119,10 +119,8 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=1), Mock()))
         self.assertEqual(response, "ok")
 
-    def test_invalid_metadata_is_rejected(self) -> None:
-        """Malformed runtime metadata should be rejected."""
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
+    def test_unparseable_peer_version_is_tolerated(self) -> None:
+        """Unparseable peer versions should disable checks for rollout/dev."""
         intercepted = self.interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
@@ -135,14 +133,8 @@ class TestRuntimeVersionServerInterceptor(TestCase):
             ),
         )
 
-        with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(GetNodesRequest(run_id=1), context)
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            "Invalid Flower version metadata for "
-            "flwr-simulation <-> SuperLink ServerAppIo API. "
-            "Peer Flower version metadata is invalid: 'main'.",
-        )
+        response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=1), Mock()))
+        self.assertEqual(response, "ok")
 
     def test_incompatible_metadata_is_rejected(self) -> None:
         """Different major.minor versions should be rejected."""

@@ -115,15 +115,29 @@ def read_runtime_version_metadata(
     metadata: Mapping[str, str] | Iterable[tuple[str, str]] | None,
 ) -> tuple[RuntimeVersionMetadata | None, str | None]:
     """Read Flower runtime metadata from a mapping or metadata item iterable."""
-    metadata_map = _coerce_metadata(metadata)
     relevant_keys = (
         FLWR_PACKAGE_NAME_METADATA_KEY,
         FLWR_PACKAGE_VERSION_METADATA_KEY,
         FLWR_COMPONENT_NAME_METADATA_KEY,
     )
-    present_keys = [key for key in relevant_keys if key in metadata_map]
+    metadata_values = _coerce_metadata_values(metadata)
+    present_keys = [key for key in relevant_keys if key in metadata_values]
     if not present_keys:
         return None, None
+
+    duplicate_keys = [
+        key for key in relevant_keys if len(metadata_values.get(key, [])) > 1
+    ]
+    if duplicate_keys:
+        duplicate_keys_str = ", ".join(sorted(duplicate_keys))
+        return (
+            None,
+            f"Flower runtime metadata contains duplicate values: {duplicate_keys_str}.",
+        )
+
+    metadata_map = {
+        key: values[0] for key, values in metadata_values.items() if len(values) == 1
+    }
 
     missing_keys = [key for key in relevant_keys if key not in metadata_map]
     if missing_keys:
@@ -200,8 +214,11 @@ def evaluate_runtime_version_compatibility(
     if peer_version is None:
         peer_version_repr = repr(peer.package_version)
         return CompatibilityResult(
-            status="invalid",
-            reason=f"Peer Flower version metadata is invalid: {peer_version_repr}.",
+            status="disabled",
+            reason=(
+                "Peer Flower version metadata cannot be parsed, version checks "
+                f"are disabled: {peer_version_repr}."
+            ),
             local_metadata=local_metadata,
             peer_metadata=peer,
             local_version=local_version,
@@ -254,11 +271,16 @@ def format_invalid_metadata_message(connection_name: str, detail: str) -> str:
     return f"Invalid Flower version metadata for {connection_name}. {detail}"
 
 
-def _coerce_metadata(
+def _coerce_metadata_values(
     metadata: Mapping[str, str] | Iterable[tuple[str, str]] | None,
-) -> dict[str, str]:
+) -> dict[str, list[str]]:
     if metadata is None:
         return {}
     if isinstance(metadata, Mapping):
-        return {str(key): str(value) for key, value in metadata.items()}
-    return {str(key): str(value) for key, value in metadata}
+        return {str(key): [str(value)] for key, value in metadata.items()}
+
+    values: dict[str, list[str]] = {}
+    for key, value in metadata:
+        str_key = str(key)
+        values.setdefault(str_key, []).append(str(value))
+    return values
