@@ -44,7 +44,7 @@ def upgrade() -> None:
         sa.Column("model_ref", sa.String(), nullable=True),
         sa.Column("connector_ref", sa.String(), nullable=True),
         sa.Column("token", sa.String(), nullable=True),
-        sa.Column("pending_at", sa.String(), nullable=True),
+        sa.Column("pending_at", sa.String(), nullable=False),
         sa.Column("starting_at", sa.String(), nullable=True),
         sa.Column("running_at", sa.String(), nullable=True),
         sa.Column("finished_at", sa.String(), nullable=True),
