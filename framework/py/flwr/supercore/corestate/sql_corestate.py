@@ -41,6 +41,7 @@ from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
+from .utils import generate_rand_int_from_bytes
 
 
 class SqlCoreState(CoreState, SqlMixin):
@@ -98,7 +99,7 @@ class SqlCoreState(CoreState, SqlMixin):
             verifications=json.loads(row["verifications"]),
         )
 
-    def create_task(
+    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         task_type: str,
         run_id: int,
@@ -107,8 +108,6 @@ class SqlCoreState(CoreState, SqlMixin):
         connector_ref: str | None,
     ) -> int:
         """Create a task and return its ID."""
-        from flwr.server.superlink.linkstate.utils import generate_rand_int_from_bytes
-
         uint64_task_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
         sint64_task_id = uint64_to_int64(uint64_task_id)
         token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
@@ -168,7 +167,7 @@ class SqlCoreState(CoreState, SqlMixin):
         log(ERROR, "Unexpected task creation failure.")
         return 0
 
-    def get_task_info(
+    def get_task_info(  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches
         self,
         *,
         task_ids: Sequence[int] | None = None,

@@ -42,7 +42,7 @@ class CoreState(ABC):
         """Return the FAB for the given hash, if present."""
 
     @abstractmethod
-    def create_task(
+    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         task_type: str,
         run_id: int,
@@ -72,7 +72,7 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def get_task_info(
+    def get_task_info(  # pylint: disable=too-many-arguments
         self,
         *,
         task_ids: Sequence[int] | None = None,

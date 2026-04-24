@@ -35,6 +35,7 @@ from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
+from .utils import generate_rand_int_from_bytes
 
 
 @dataclass
@@ -97,7 +98,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 verifications=dict(fab.verifications),
             )
 
-    def create_task(
+    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         task_type: str,
         run_id: int,
@@ -106,8 +107,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         connector_ref: str | None,
     ) -> int:
         """Create a task and return its ID."""
-        from flwr.server.superlink.linkstate.utils import generate_rand_int_from_bytes
-
         token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
         with self.lock_task_store:
             task_id = generate_rand_int_from_bytes(
@@ -136,7 +135,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             self.token_to_task_id[token] = task_id
             return task_id
 
-    def get_task_info(
+    def get_task_info(  # pylint: disable=too-many-arguments,too-many-locals
         self,
         *,
         task_ids: Sequence[int] | None = None,
