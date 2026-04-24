@@ -49,7 +49,7 @@ class CoreState(ABC):
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
-    ) -> int:
+    ) -> int | None:
         """Create a new task.
 
         Parameters
@@ -67,8 +67,9 @@ class CoreState(ABC):
 
         Returns
         -------
-        int
-            The task ID of the newly created task.
+        Optional[int]
+            The task ID of the newly created task, or `None` if task creation
+            fails.
 
         Notes
         -----

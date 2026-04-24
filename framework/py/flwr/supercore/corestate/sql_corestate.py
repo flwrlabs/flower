@@ -19,13 +19,12 @@ import hashlib
 import json
 import secrets
 from collections.abc import Sequence
-from logging import ERROR
 from typing import Any, Literal, cast
 
 from sqlalchemy import MetaData, text
 from sqlalchemy.exc import IntegrityError
 
-from flwr.common import log, now
+from flwr.common import now
 from flwr.common.constant import (
     FLWR_APP_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -106,7 +105,7 @@ class SqlCoreState(CoreState, SqlMixin):
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
-    ) -> int:
+    ) -> int | None:
         """Create a task and return its ID."""
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
         sint64_task_id = uint64_to_int64(task_id)
@@ -139,10 +138,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 self.query(insert_query, params)
                 return task_id
             except IntegrityError:
-                pass
-
-        log(ERROR, "Unexpected task creation failure.")
-        return 0
+                return None
 
     def get_tasks(  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches
         self,
