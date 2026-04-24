@@ -16,8 +16,11 @@
 
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
+from typing import Literal
 
 from flwr.common.typing import Fab
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 
@@ -37,6 +40,78 @@ class CoreState(ABC):
     @abstractmethod
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return the FAB for the given hash, if present."""
+
+    @abstractmethod
+    def create_task(
+        self,
+        task_type: str,
+        run_id: int,
+        fab_hash: str | None,
+        model_ref: str | None,
+        connector_ref: str | None,
+    ) -> int:
+        """Create a new task.
+
+        Parameters
+        ----------
+        task_type : str
+            The task type to create.
+        run_id : int
+            The run ID this task belongs to.
+        fab_hash : Optional[str]
+            FAB hash associated with the task, if applicable.
+        model_ref : Optional[str]
+            Model reference associated with the task, if applicable.
+        connector_ref : Optional[str]
+            Connector reference associated with the task, if applicable.
+
+        Returns
+        -------
+        int
+            The task ID of the newly created task.
+        """
+
+    @abstractmethod
+    def get_task_info(
+        self,
+        *,
+        task_ids: Sequence[int] | None = None,
+        types: Sequence[str] | None = None,
+        run_ids: Sequence[int] | None = None,
+        statuses: Sequence[str] | None = None,
+        order_by: Literal["pending_at"] | None = None,
+        ascending: bool = True,
+        limit: int | None = None,
+    ) -> Sequence[Task]:
+        """Retrieve information about tasks based on the specified filters.
+
+        - If a filter is set to None, it is ignored.
+        - If multiple filters are provided, they are combined using AND logic.
+        - Within each filter, provided values are combined using OR logic.
+
+        Parameters
+        ----------
+        task_ids : Optional[Sequence[int]] (default: None)
+            Sequence of task IDs to filter by.
+        types : Optional[Sequence[str]] (default: None)
+            Sequence of task types to filter by.
+        run_ids : Optional[Sequence[int]] (default: None)
+            Sequence of run IDs to filter by.
+        statuses : Optional[Sequence[str]] (default: None)
+            Sequence of task status values to filter by.
+        order_by : Optional[Literal["pending_at"]] (default: None)
+            Field used to order the result.
+        ascending : bool (default: True)
+            Whether sorting should be in ascending order.
+        limit : Optional[int] (default: None)
+            Maximum number of tasks to return. If `None`, no limit is applied.
+
+        Returns
+        -------
+        Sequence[Task]
+            A sequence of Task objects representing tasks matching the specified
+            filters.
+        """
 
     @abstractmethod
     def create_token(self, run_id: int) -> str | None:

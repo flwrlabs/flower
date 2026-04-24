@@ -17,14 +17,18 @@
 
 import hashlib
 import secrets
+from collections.abc import Sequence
 from dataclasses import dataclass
 from threading import Lock
+from typing import Literal
 
 from flwr.common import now
 from flwr.common.constant import (
     FLWR_APP_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
+    RUN_ID_NUM_BYTES,
+    Status,
 )
 from flwr.common.typing import Fab
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
@@ -92,6 +96,114 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 content=fab.content,
                 verifications=dict(fab.verifications),
             )
+
+    def create_task(
+        self,
+        task_type: str,
+        run_id: int,
+        fab_hash: str | None,
+        model_ref: str | None,
+        connector_ref: str | None,
+    ) -> int:
+        """Create a task and return its ID."""
+        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
+        with self.lock_task_store:
+            while True:
+                task_id = int.from_bytes(
+                    secrets.token_bytes(RUN_ID_NUM_BYTES), "big", signed=False
+                )
+                if task_id in self.task_store:
+                    continue
+
+                task = Task(
+                    task_id=task_id,
+                    type=task_type,
+                    run_id=run_id,
+                    status=Status.PENDING,
+                    pending_at=now().isoformat(),
+                    starting_at="",
+                    running_at="",
+                    finished_at="",
+                )
+                if fab_hash is not None:
+                    task.fab_hash = fab_hash
+                if model_ref is not None:
+                    task.model_ref = model_ref
+                if connector_ref is not None:
+                    task.connector_ref = connector_ref
+
+                self.task_store[task_id] = task
+                self.token_to_task_id[token] = task_id
+                return task_id
+
+    def get_task_info(
+        self,
+        *,
+        task_ids: Sequence[int] | None = None,
+        types: Sequence[str] | None = None,
+        run_ids: Sequence[int] | None = None,
+        statuses: Sequence[str] | None = None,
+        order_by: Literal["pending_at"] | None = None,
+        ascending: bool = True,
+        limit: int | None = None,
+    ) -> Sequence[Task]:
+        """Retrieve information about tasks based on the specified filters."""
+        with self.lock_task_store:
+            matched_task_ids = set(self.task_store.keys())
+
+            if task_ids is not None:
+                if not task_ids:
+                    return []
+                matched_task_ids &= set(task_ids)
+
+            if types is not None:
+                if not types:
+                    return []
+                type_set = set(types)
+                matched_task_ids &= {
+                    task_id
+                    for task_id in matched_task_ids
+                    if self.task_store[task_id].type in type_set
+                }
+
+            if run_ids is not None:
+                if not run_ids:
+                    return []
+                run_id_set = set(run_ids)
+                matched_task_ids &= {
+                    task_id
+                    for task_id in matched_task_ids
+                    if self.task_store[task_id].run_id in run_id_set
+                }
+
+            if statuses is not None:
+                if not statuses:
+                    return []
+                status_set = set(statuses)
+                matched_task_ids &= {
+                    task_id
+                    for task_id in matched_task_ids
+                    if self.task_store[task_id].status in status_set
+                }
+
+            tasks = [self.task_store[task_id] for task_id in matched_task_ids]
+
+            if order_by is not None:
+                tasks = sorted(
+                    tasks,
+                    key=lambda task: task.pending_at,
+                    reverse=not ascending,
+                )
+
+            if limit is not None:
+                tasks = tasks[:limit]
+
+            result: list[Task] = []
+            for task in tasks:
+                task_copy = Task()
+                task_copy.CopyFrom(task)
+                result.append(task_copy)
+            return result
 
     def create_token(self, run_id: int) -> str | None:
         """Create a token for the given run ID."""

@@ -17,10 +17,11 @@
 
 import unittest
 from datetime import timedelta
+from time import sleep
 from unittest.mock import patch
 
 from flwr.common import now
-from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL
+from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL, Status
 
 from . import CoreState
 
@@ -34,6 +35,94 @@ class StateTest(unittest.TestCase):
     def state_factory(self) -> CoreState:
         """Provide state implementation to test."""
         raise NotImplementedError()
+
+    def test_create_and_get_task(self) -> None:
+        """Test creating and retrieving a task."""
+        state = self.state_factory()
+
+        task_id = state.create_task(
+            task_type="flwr-model",
+            run_id=42,
+            fab_hash=None,
+            model_ref="model://test",
+            connector_ref=None,
+        )
+        tasks = state.get_task_info(task_ids=[task_id])
+
+        self.assertEqual(len(tasks), 1)
+        task = tasks[0]
+        self.assertEqual(task.task_id, task_id)
+        self.assertEqual(task.type, "flwr-model")
+        self.assertEqual(task.run_id, 42)
+        self.assertEqual(task.status, Status.PENDING)
+        self.assertEqual(task.model_ref, "model://test")
+        self.assertFalse(task.HasField("fab_hash"))
+        self.assertFalse(task.HasField("connector_ref"))
+        self.assertTrue(task.pending_at)
+        self.assertEqual(task.starting_at, "")
+        self.assertEqual(task.running_at, "")
+        self.assertEqual(task.finished_at, "")
+
+    def test_get_task_info_missing_returns_empty(self) -> None:
+        """Missing tasks should return an empty sequence."""
+        state = self.state_factory()
+        self.assertEqual(state.get_task_info(task_ids=[123]), [])
+
+    def test_get_task_returns_copy(self) -> None:
+        """Retrieved task should be a defensive copy."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type="flwr-serverapp",
+            run_id=42,
+            fab_hash="fab-hash",
+            model_ref=None,
+            connector_ref=None,
+        )
+
+        tasks = state.get_task_info(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        task = tasks[0]
+        task.fab_hash = "mutated"
+
+        reloaded_tasks = state.get_task_info(task_ids=[task_id])
+        self.assertEqual(len(reloaded_tasks), 1)
+        reloaded = reloaded_tasks[0]
+        self.assertEqual(reloaded.fab_hash, "fab-hash")
+
+    def test_get_task_info_filters_and_order(self) -> None:
+        """Task queries should support filtering and ordering."""
+        state = self.state_factory()
+        first_task_id = state.create_task(
+            task_type="flwr-model",
+            run_id=1,
+            fab_hash=None,
+            model_ref="model://one",
+            connector_ref=None,
+        )
+        sleep(0.001)
+        second_task_id = state.create_task(
+            task_type="flwr-connector",
+            run_id=2,
+            fab_hash=None,
+            model_ref=None,
+            connector_ref="connector://two",
+        )
+
+        filtered = state.get_task_info(
+            types=["flwr-model"],
+            run_ids=[1],
+            statuses=[Status.PENDING],
+        )
+        self.assertEqual([task.task_id for task in filtered], [first_task_id])
+
+        ordered = state.get_task_info(
+            task_ids=[first_task_id, second_task_id],
+            order_by="pending_at",
+            ascending=False,
+            limit=1,
+        )
+        self.assertEqual(len(ordered), 1)
+        self.assertEqual(ordered[0].task_id, second_task_id)
 
     def test_create_verify_and_delete_token(self) -> None:
         """Test creating, verifying, and deleting tokens."""

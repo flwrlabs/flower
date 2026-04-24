@@ -18,7 +18,8 @@
 import hashlib
 import json
 import secrets
-from typing import cast
+from collections.abc import Sequence
+from typing import Any, Literal, cast
 
 from sqlalchemy import MetaData, text
 from sqlalchemy.exc import IntegrityError
@@ -28,8 +29,11 @@ from flwr.common.constant import (
     FLWR_APP_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
+    RUN_ID_NUM_BYTES,
+    Status,
 )
 from flwr.common.typing import Fab
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
@@ -92,6 +96,156 @@ class SqlCoreState(CoreState, SqlMixin):
             content=row["content"],
             verifications=json.loads(row["verifications"]),
         )
+
+    def create_task(
+        self,
+        task_type: str,
+        run_id: int,
+        fab_hash: str | None,
+        model_ref: str | None,
+        connector_ref: str | None,
+    ) -> int:
+        """Create a task and return its ID."""
+        insert_query = """
+            INSERT INTO task (
+                task_id,
+                type,
+                run_id,
+                status,
+                fab_hash,
+                model_ref,
+                connector_ref,
+                token,
+                pending_at,
+                starting_at,
+                running_at,
+                finished_at
+            )
+            VALUES (
+                :task_id,
+                :type,
+                :run_id,
+                :status,
+                :fab_hash,
+                :model_ref,
+                :connector_ref,
+                :token,
+                :pending_at,
+                :starting_at,
+                :running_at,
+                :finished_at
+            );
+        """
+
+        while True:
+            token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
+            uint64_task_id = int.from_bytes(
+                secrets.token_bytes(RUN_ID_NUM_BYTES), "big", signed=False
+            )
+            params = {
+                "task_id": uint64_to_int64(uint64_task_id),
+                "type": task_type,
+                "run_id": uint64_to_int64(run_id),
+                "status": Status.PENDING,
+                "fab_hash": fab_hash,
+                "model_ref": model_ref,
+                "connector_ref": connector_ref,
+                "token": token,
+                "pending_at": now().isoformat(),
+                "starting_at": "",
+                "running_at": "",
+                "finished_at": "",
+            }
+            try:
+                self.query(insert_query, params)
+                return uint64_task_id
+            except IntegrityError:
+                continue
+
+    def get_task_info(
+        self,
+        *,
+        task_ids: Sequence[int] | None = None,
+        types: Sequence[str] | None = None,
+        run_ids: Sequence[int] | None = None,
+        statuses: Sequence[str] | None = None,
+        order_by: Literal["pending_at"] | None = None,
+        ascending: bool = True,
+        limit: int | None = None,
+    ) -> Sequence[Task]:
+        """Retrieve information about tasks based on the specified filters."""
+        conditions = []
+        params: dict[str, Any] = {}
+
+        if task_ids is not None:
+            if not task_ids:
+                return []
+            sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
+            placeholders = ",".join([f":tid_{i}" for i in range(len(sint64_task_ids))])
+            conditions.append(f"task_id IN ({placeholders})")
+            params.update(
+                {f"tid_{i}": task_id for i, task_id in enumerate(sint64_task_ids)}
+            )
+
+        if types is not None:
+            if not types:
+                return []
+            placeholders = ",".join([f":type_{i}" for i in range(len(types))])
+            conditions.append(f"type IN ({placeholders})")
+            params.update({f"type_{i}": task_type for i, task_type in enumerate(types)})
+
+        if run_ids is not None:
+            if not run_ids:
+                return []
+            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
+            placeholders = ",".join([f":rid_{i}" for i in range(len(sint64_run_ids))])
+            conditions.append(f"run_id IN ({placeholders})")
+            params.update(
+                {f"rid_{i}": run_id for i, run_id in enumerate(sint64_run_ids)}
+            )
+
+        if statuses is not None:
+            if not statuses:
+                return []
+            placeholders = ",".join([f":status_{i}" for i in range(len(statuses))])
+            conditions.append(f"status IN ({placeholders})")
+            params.update({f"status_{i}": status for i, status in enumerate(statuses)})
+
+        query = """
+            SELECT task_id, type, run_id, status, fab_hash, model_ref, connector_ref,
+                   pending_at, starting_at, running_at, finished_at
+            FROM task
+        """
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        if order_by is not None:
+            query += f" ORDER BY {order_by} {'ASC' if ascending else 'DESC'}"
+        if limit is not None:
+            query += " LIMIT :limit"
+            params["limit"] = limit
+
+        rows = self.query(query, params)
+
+        result: list[Task] = []
+        for row in rows:
+            task = Task(
+                task_id=int64_to_uint64(row["task_id"]),
+                type=row["type"],
+                run_id=int64_to_uint64(row["run_id"]),
+                status=row["status"],
+                pending_at=row["pending_at"] or "",
+                starting_at=row["starting_at"] or "",
+                running_at=row["running_at"] or "",
+                finished_at=row["finished_at"] or "",
+            )
+            if row["fab_hash"] is not None:
+                task.fab_hash = row["fab_hash"]
+            if row["model_ref"] is not None:
+                task.model_ref = row["model_ref"]
+            if row["connector_ref"] is not None:
+                task.connector_ref = row["connector_ref"]
+            result.append(task)
+        return result
 
     def get_metadata(self) -> MetaData:
         """Return SQLAlchemy MetaData needed for CoreState tables."""
