@@ -102,9 +102,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self,
         task_type: str,
         run_id: int,
-        fab_hash: str | None,
-        model_ref: str | None,
-        connector_ref: str | None,
+        fab_hash: str | None = None,
+        model_ref: str | None = None,
+        connector_ref: str | None = None,
     ) -> int:
         """Create a task and return its ID."""
         token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)

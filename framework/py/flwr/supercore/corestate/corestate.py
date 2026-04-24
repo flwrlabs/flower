@@ -46,29 +46,34 @@ class CoreState(ABC):
         self,
         task_type: str,
         run_id: int,
-        fab_hash: str | None,
-        model_ref: str | None,
-        connector_ref: str | None,
+        fab_hash: str | None = None,
+        model_ref: str | None = None,
+        connector_ref: str | None = None,
     ) -> int:
         """Create a new task.
 
         Parameters
         ----------
         task_type : str
-            The task type to create.
+            The executor type of the task to create.
         run_id : int
             The run ID this task belongs to.
-        fab_hash : Optional[str]
+        fab_hash : Optional[str] (default: None)
             FAB hash associated with the task, if applicable.
-        model_ref : Optional[str]
+        model_ref : Optional[str] (default: None)
             Model reference associated with the task, if applicable.
-        connector_ref : Optional[str]
+        connector_ref : Optional[str] (default: None)
             Connector reference associated with the task, if applicable.
 
         Returns
         -------
         int
             The task ID of the newly created task.
+
+        Notes
+        -----
+        This method only persists task data. It does not validate whether the
+        provided fields are required for the given task type.
         """
 
     @abstractmethod

@@ -103,9 +103,9 @@ class SqlCoreState(CoreState, SqlMixin):
         self,
         task_type: str,
         run_id: int,
-        fab_hash: str | None,
-        model_ref: str | None,
-        connector_ref: str | None,
+        fab_hash: str | None = None,
+        model_ref: str | None = None,
+        connector_ref: str | None = None,
     ) -> int:
         """Create a task and return its ID."""
         uint64_task_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
