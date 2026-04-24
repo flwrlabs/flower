@@ -23,6 +23,7 @@ from logging import ERROR
 from typing import Any, Literal, cast
 
 from sqlalchemy import MetaData, text
+from sqlalchemy.exc import IntegrityError
 
 from flwr.common import log, now
 from flwr.common.constant import (
@@ -106,9 +107,7 @@ class SqlCoreState(CoreState, SqlMixin):
         connector_ref: str | None,
     ) -> int:
         """Create a task and return its ID."""
-        from flwr.server.superlink.linkstate.utils import (
-            generate_rand_int_from_bytes,
-        )
+        from flwr.server.superlink.linkstate.utils import generate_rand_int_from_bytes
 
         uint64_task_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
         sint64_task_id = uint64_to_int64(uint64_task_id)

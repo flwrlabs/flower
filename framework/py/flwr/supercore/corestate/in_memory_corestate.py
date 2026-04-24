@@ -106,9 +106,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         connector_ref: str | None,
     ) -> int:
         """Create a task and return its ID."""
-        from flwr.server.superlink.linkstate.utils import (
-            generate_rand_int_from_bytes,
-        )
+        from flwr.server.superlink.linkstate.utils import generate_rand_int_from_bytes
 
         token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
         with self.lock_task_store:

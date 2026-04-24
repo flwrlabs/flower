@@ -17,7 +17,6 @@
 
 import unittest
 from datetime import timedelta
-from time import sleep
 from unittest.mock import patch
 
 from flwr.common import now
