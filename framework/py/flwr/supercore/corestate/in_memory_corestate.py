@@ -138,6 +138,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         if limit is not None and limit < 0:
             raise AssertionError("`limit` must be >= 0")
 
+        if isinstance(statuses, str):
+            raise ValueError("`statuses` must be a sequence of strings")
+
         with self.lock_task_store:
             matched_task_ids = set(self.task_store.keys())
 
