@@ -126,9 +126,8 @@ erDiagram
     INTEGER run_id
     VARCHAR running_at "nullable"
     VARCHAR starting_at "nullable"
-    VARCHAR status
     INTEGER task_id UK
-    VARCHAR token
+    VARCHAR token "nullable"
     VARCHAR type
   }
 
