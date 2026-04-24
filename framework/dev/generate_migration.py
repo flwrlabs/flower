@@ -34,6 +34,18 @@ from pathlib import Path
 DEFAULT_HEAD = "flwr@head"
 
 
+def _remove_existing_temp_db(db_path: Path) -> None:
+    """Remove a stale temporary database before running Alembic."""
+    try:
+        db_path.unlink()
+    except FileNotFoundError:
+        return
+    except OSError as e:
+        raise SystemExit(
+            f"Failed to remove existing temporary database '{db_path}': {e}"
+        ) from e
+
+
 def main() -> None:
     """Parse arguments and generate migration revision."""
     parser = argparse.ArgumentParser(
@@ -53,7 +65,7 @@ def main() -> None:
     # Clean up any leftover state.db from a previous failed run
     db_path = Path("state.db")
     if db_path.exists():
-        db_path.unlink()
+        _remove_existing_temp_db(db_path)
 
     try:
         # Upgrade all branches to their latest revisions
