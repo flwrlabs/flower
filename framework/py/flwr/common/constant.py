@@ -121,6 +121,11 @@ SUPERLINK_NODE_ID = 1
 PARTITION_ID_KEY = "partition-id"
 NUM_PARTITIONS_KEY = "num-partitions"
 
+# Constants for Flower runtime version metadata
+FLWR_PACKAGE_NAME_METADATA_KEY = "flwr-package-name"
+FLWR_PACKAGE_VERSION_METADATA_KEY = "flwr-package-version"
+FLWR_COMPONENT_NAME_METADATA_KEY = "flwr-component-name"
+
 # Constants for keys in `metadata` of `MessageContainer` in `grpc-adapter`
 GRPC_ADAPTER_METADATA_FLOWER_PACKAGE_NAME_KEY = "flower-package-name"
 GRPC_ADAPTER_METADATA_FLOWER_PACKAGE_VERSION_KEY = "flower-package-version"
