@@ -28,13 +28,21 @@ from flwr.proto import federation_config_pb2 as flwr_dot_proto_dot_federation__c
 from flwr.proto import run_pb2 as flwr_dot_proto_dot_run__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x66lwr/proto/appio.proto\x12\nflwr.proto\x1a\x18\x66lwr/proto/message.proto\x1a\x14\x66lwr/proto/fab.proto\x1a\"flwr/proto/federation_config.proto\x1a\x14\x66lwr/proto/run.proto\"\x19\n\x17ListAppsToLaunchRequest\"+\n\x18ListAppsToLaunchResponse\x12\x0f\n\x07run_ids\x18\x01 \x03(\x04\"%\n\x13RequestTokenRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\"%\n\x14RequestTokenResponse\x12\r\n\x05token\x18\x01 \x01(\t\"\x99\x01\n\x16PushAppMessagesRequest\x12\r\n\x05token\x18\x01 \x01(\t\x12*\n\rmessages_list\x18\x02 \x03(\x0b\x32\x13.flwr.proto.Message\x12\x0e\n\x06run_id\x18\x03 \x01(\x04\x12\x34\n\x14message_object_trees\x18\x04 \x03(\x0b\x32\x16.flwr.proto.ObjectTree\"G\n\x17PushAppMessagesResponse\x12\x13\n\x0bmessage_ids\x18\x01 \x03(\t\x12\x17\n\x0fobjects_to_push\x18\x02 \x03(\t\"L\n\x16PullAppMessagesRequest\x12\r\n\x05token\x18\x01 \x01(\t\x12\x13\n\x0bmessage_ids\x18\x02 \x03(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\x04\"{\n\x17PullAppMessagesResponse\x12*\n\rmessages_list\x18\x01 \x03(\x0b\x32\x13.flwr.proto.Message\x12\x34\n\x14message_object_trees\x18\x02 \x03(\x0b\x32\x16.flwr.proto.ObjectTree\"%\n\x14PullAppInputsRequest\x12\r\n\x05token\x18\x01 \x01(\t\"\xb2\x01\n\x15PullAppInputsResponse\x12$\n\x07\x63ontext\x18\x01 \x01(\x0b\x32\x13.flwr.proto.Context\x12\x1c\n\x03run\x18\x02 \x01(\x0b\x32\x0f.flwr.proto.Run\x12\x1c\n\x03\x66\x61\x62\x18\x03 \x01(\x0b\x32\x0f.flwr.proto.Fab\x12\x37\n\x11\x66\x65\x64\x65ration_config\x18\x04 \x01(\x0b\x32\x1c.flwr.proto.SimulationConfig\"\\\n\x15PushAppOutputsRequest\x12\r\n\x05token\x18\x01 \x01(\t\x12\x0e\n\x06run_id\x18\x02 \x01(\x04\x12$\n\x07\x63ontext\x18\x03 \x01(\x0b\x32\x13.flwr.proto.Context\"\x18\n\x16PushAppOutputsResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x66lwr/proto/appio.proto\x12\nflwr.proto\x1a\x18\x66lwr/proto/message.proto\x1a\x14\x66lwr/proto/fab.proto\x1a\"flwr/proto/federation_config.proto\x1a\x14\x66lwr/proto/run.proto\"\x19\n\x17ListAppsToLaunchRequest\"+\n\x18ListAppsToLaunchResponse\x12\x0f\n\x07run_ids\x18\x01 \x03(\x04\"%\n\x13RequestTokenRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\"%\n\x14RequestTokenResponse\x12\r\n\x05token\x18\x01 \x01(\t\"\x9d\x01\n\x16PushAppMessagesRequest\x12\x11\n\x05token\x18\x01 \x01(\tB\x02\x18\x01\x12*\n\rmessages_list\x18\x02 \x03(\x0b\x32\x13.flwr.proto.Message\x12\x0e\n\x06run_id\x18\x03 \x01(\x04\x12\x34\n\x14message_object_trees\x18\x04 \x03(\x0b\x32\x16.flwr.proto.ObjectTree\"G\n\x17PushAppMessagesResponse\x12\x13\n\x0bmessage_ids\x18\x01 \x03(\t\x12\x17\n\x0fobjects_to_push\x18\x02 \x03(\t\"P\n\x16PullAppMessagesRequest\x12\x11\n\x05token\x18\x01 \x01(\tB\x02\x18\x01\x12\x13\n\x0bmessage_ids\x18\x02 \x03(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\x04\"{\n\x17PullAppMessagesResponse\x12*\n\rmessages_list\x18\x01 \x03(\x0b\x32\x13.flwr.proto.Message\x12\x34\n\x14message_object_trees\x18\x02 \x03(\x0b\x32\x16.flwr.proto.ObjectTree\")\n\x14PullAppInputsRequest\x12\x11\n\x05token\x18\x01 \x01(\tB\x02\x18\x01\"\xb2\x01\n\x15PullAppInputsResponse\x12$\n\x07\x63ontext\x18\x01 \x01(\x0b\x32\x13.flwr.proto.Context\x12\x1c\n\x03run\x18\x02 \x01(\x0b\x32\x0f.flwr.proto.Run\x12\x1c\n\x03\x66\x61\x62\x18\x03 \x01(\x0b\x32\x0f.flwr.proto.Fab\x12\x37\n\x11\x66\x65\x64\x65ration_config\x18\x04 \x01(\x0b\x32\x1c.flwr.proto.SimulationConfig\"`\n\x15PushAppOutputsRequest\x12\x11\n\x05token\x18\x01 \x01(\tB\x02\x18\x01\x12\x0e\n\x06run_id\x18\x02 \x01(\x04\x12$\n\x07\x63ontext\x18\x03 \x01(\x0b\x32\x13.flwr.proto.Context\"\x18\n\x16PushAppOutputsResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'flwr.proto.appio_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
+  _globals['_PUSHAPPMESSAGESREQUEST'].fields_by_name['token']._loaded_options = None
+  _globals['_PUSHAPPMESSAGESREQUEST'].fields_by_name['token']._serialized_options = b'\030\001'
+  _globals['_PULLAPPMESSAGESREQUEST'].fields_by_name['token']._loaded_options = None
+  _globals['_PULLAPPMESSAGESREQUEST'].fields_by_name['token']._serialized_options = b'\030\001'
+  _globals['_PULLAPPINPUTSREQUEST'].fields_by_name['token']._loaded_options = None
+  _globals['_PULLAPPINPUTSREQUEST'].fields_by_name['token']._serialized_options = b'\030\001'
+  _globals['_PUSHAPPOUTPUTSREQUEST'].fields_by_name['token']._loaded_options = None
+  _globals['_PUSHAPPOUTPUTSREQUEST'].fields_by_name['token']._serialized_options = b'\030\001'
   _globals['_LISTAPPSTOLAUNCHREQUEST']._serialized_start=144
   _globals['_LISTAPPSTOLAUNCHREQUEST']._serialized_end=169
   _globals['_LISTAPPSTOLAUNCHRESPONSE']._serialized_start=171
@@ -44,19 +52,19 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_REQUESTTOKENRESPONSE']._serialized_start=255
   _globals['_REQUESTTOKENRESPONSE']._serialized_end=292
   _globals['_PUSHAPPMESSAGESREQUEST']._serialized_start=295
-  _globals['_PUSHAPPMESSAGESREQUEST']._serialized_end=448
-  _globals['_PUSHAPPMESSAGESRESPONSE']._serialized_start=450
-  _globals['_PUSHAPPMESSAGESRESPONSE']._serialized_end=521
-  _globals['_PULLAPPMESSAGESREQUEST']._serialized_start=523
-  _globals['_PULLAPPMESSAGESREQUEST']._serialized_end=599
-  _globals['_PULLAPPMESSAGESRESPONSE']._serialized_start=601
-  _globals['_PULLAPPMESSAGESRESPONSE']._serialized_end=724
-  _globals['_PULLAPPINPUTSREQUEST']._serialized_start=726
-  _globals['_PULLAPPINPUTSREQUEST']._serialized_end=763
-  _globals['_PULLAPPINPUTSRESPONSE']._serialized_start=766
-  _globals['_PULLAPPINPUTSRESPONSE']._serialized_end=944
-  _globals['_PUSHAPPOUTPUTSREQUEST']._serialized_start=946
-  _globals['_PUSHAPPOUTPUTSREQUEST']._serialized_end=1038
-  _globals['_PUSHAPPOUTPUTSRESPONSE']._serialized_start=1040
-  _globals['_PUSHAPPOUTPUTSRESPONSE']._serialized_end=1064
+  _globals['_PUSHAPPMESSAGESREQUEST']._serialized_end=452
+  _globals['_PUSHAPPMESSAGESRESPONSE']._serialized_start=454
+  _globals['_PUSHAPPMESSAGESRESPONSE']._serialized_end=525
+  _globals['_PULLAPPMESSAGESREQUEST']._serialized_start=527
+  _globals['_PULLAPPMESSAGESREQUEST']._serialized_end=607
+  _globals['_PULLAPPMESSAGESRESPONSE']._serialized_start=609
+  _globals['_PULLAPPMESSAGESRESPONSE']._serialized_end=732
+  _globals['_PULLAPPINPUTSREQUEST']._serialized_start=734
+  _globals['_PULLAPPINPUTSREQUEST']._serialized_end=775
+  _globals['_PULLAPPINPUTSRESPONSE']._serialized_start=778
+  _globals['_PULLAPPINPUTSRESPONSE']._serialized_end=956
+  _globals['_PUSHAPPOUTPUTSREQUEST']._serialized_start=958
+  _globals['_PUSHAPPOUTPUTSREQUEST']._serialized_end=1054
+  _globals['_PUSHAPPOUTPUTSRESPONSE']._serialized_start=1056
+  _globals['_PUSHAPPOUTPUTSRESPONSE']._serialized_end=1080
 # @@protoc_insertion_point(module_scope)
