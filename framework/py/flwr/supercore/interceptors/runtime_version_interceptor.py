@@ -50,9 +50,7 @@ class RuntimeVersionClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type
         """Add or replace the runtime version metadata headers."""
         metadata = list(client_call_details.metadata or [])
         metadata = [
-            (key, value)
-            for key, value in metadata
-            if key not in self._metadata
+            (key, value) for key, value in metadata if key not in self._metadata
         ]
         metadata.extend(self._metadata.items())
         details = client_call_details._replace(metadata=metadata)
