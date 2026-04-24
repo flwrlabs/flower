@@ -16,6 +16,7 @@
 
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     Column,
     ForeignKey,
@@ -77,7 +78,7 @@ def create_objectstore_metadata() -> MetaData:
     Table(
         "run_objects",
         metadata,
-        Column("run_id", Integer, nullable=False),
+        Column("run_id", BigInteger, nullable=False),
         Column(
             "object_id",
             String,
