@@ -107,7 +107,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         connector_ref: str | None = None,
     ) -> int:
         """Create a task and return its ID."""
-        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
+        token = ""
         with self.lock_task_store:
             task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
             task_status = TaskStatus(status=Status.PENDING, sub_status="", details="")
@@ -121,13 +121,14 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 starting_at="",
                 running_at="",
                 finished_at="",
-                fab_hash = fab_hash,
-                model_ref = model_ref,
-                connector_ref = connector_ref,
+                fab_hash=fab_hash,
+                model_ref=model_ref,
+                connector_ref=connector_ref,
             )
 
             self.task_store[task_id] = task
-            self.token_to_task_id[token] = task_id
+            if token:
+                self.token_to_task_id[token] = task_id
             return task_id
 
     def get_tasks(  # pylint: disable=too-many-arguments

@@ -110,7 +110,7 @@ class SqlCoreState(CoreState, SqlMixin):
         """Create a task and return its ID."""
         uint64_task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
         sint64_task_id = uint64_to_int64(uint64_task_id)
-        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
+        token = ""
         task_status = TaskStatus(status=Status.PENDING, sub_status="", details="")
 
         insert_query = """
