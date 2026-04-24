@@ -27,7 +27,7 @@ from flwr.common.constant import (
     FLWR_APP_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
-    RUN_ID_NUM_BYTES,
+    TASK_ID_NUM_BYTES,
     Status,
 )
 from flwr.common.typing import Fab
@@ -109,10 +109,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         """Create a task and return its ID."""
         token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
         with self.lock_task_store:
-            task_id = generate_rand_int_from_bytes(
-                RUN_ID_NUM_BYTES,
-                exclude=list(self.task_store),
-            )
+            task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
 
             task = Task(
                 task_id=task_id,

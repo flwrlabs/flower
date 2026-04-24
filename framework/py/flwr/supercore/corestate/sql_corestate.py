@@ -30,7 +30,7 @@ from flwr.common.constant import (
     FLWR_APP_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
-    RUN_ID_NUM_BYTES,
+    TASK_ID_NUM_BYTES,
     Status,
 )
 from flwr.common.typing import Fab
@@ -108,7 +108,7 @@ class SqlCoreState(CoreState, SqlMixin):
         connector_ref: str | None = None,
     ) -> int:
         """Create a task and return its ID."""
-        uint64_task_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
+        uint64_task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
         sint64_task_id = uint64_to_int64(uint64_task_id)
         token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
 
