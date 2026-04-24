@@ -38,10 +38,7 @@ RuntimeCompatibilityStatus = Literal[
 ]
 
 _VERSION_PATTERN = re.compile(
-    r"^(?P<major>0|[1-9]\d*)"
-    r"\.(?P<minor>0|[1-9]\d*)"
-    r"\.(?P<patch>0|[1-9]\d*)"
-    r"(?P<suffix>(?:[.\-+][0-9A-Za-z][0-9A-Za-z.\-+]*)?)$"
+    r"^(?P<major>0|[1-9]\d*)" r"\.(?P<minor>0|[1-9]\d*)" r"\.(?P<patch>0|[1-9]\d*)"
 )
 
 
@@ -105,7 +102,7 @@ def runtime_version_metadata_to_dict(
 
 def parse_flower_version(version: str) -> ParsedFlowerVersion | None:
     """Parse a Flower version into its leading `major.minor.patch` tuple."""
-    if not (match := _VERSION_PATTERN.fullmatch(version.strip())):
+    if not (match := _VERSION_PATTERN.match(version.strip())):
         return None
     return ParsedFlowerVersion(
         major=int(match.group("major")),

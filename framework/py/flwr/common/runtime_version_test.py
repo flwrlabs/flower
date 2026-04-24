@@ -43,6 +43,9 @@ from .runtime_version import (
         ("1.29.7", ParsedFlowerVersion(1, 29, 7)),
         ("1.29.0.dev12", ParsedFlowerVersion(1, 29, 0)),
         ("1.29.0-nightly.20260423", ParsedFlowerVersion(1, 29, 0)),
+        ("1.29.0a0", ParsedFlowerVersion(1, 29, 0)),
+        ("1.29.0b1", ParsedFlowerVersion(1, 29, 0)),
+        ("1.29.0rc1", ParsedFlowerVersion(1, 29, 0)),
     ],
 )
 def test_parse_flower_version_accepts_valid_prefixes(
