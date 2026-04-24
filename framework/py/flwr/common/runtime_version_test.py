@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -137,7 +137,9 @@ def test_evaluate_runtime_version_compatibility_rejects_different_minor() -> Non
     assert result.status == "incompatible"
     assert result.peer_metadata == peer
     assert (
-        format_incompatible_version_message("SuperNode <-> SuperLink Fleet API", local, peer)
+        format_incompatible_version_message(
+            "SuperNode <-> SuperLink Fleet API", local, peer
+        )
         == "Incompatible Flower version for SuperNode <-> SuperLink Fleet API.\n"
         "Local superlink version 1.29.2 only accepts peers from the same "
         "major.minor release, but received supernode version 1.30.0."

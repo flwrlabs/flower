@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -150,7 +150,9 @@ def read_runtime_version_metadata(
 
 def evaluate_runtime_version_compatibility(
     local_metadata: RuntimeVersionMetadata,
-    peer_metadata: RuntimeVersionMetadata | Mapping[str, str] | Iterable[tuple[str, str]] | None,
+    peer_metadata: (
+        RuntimeVersionMetadata | Mapping[str, str] | Iterable[tuple[str, str]] | None
+    ),
 ) -> CompatibilityResult:
     """Evaluate whether a peer is runtime-compatible with the local component."""
     local_version = parse_flower_version(local_metadata.package_version)
@@ -200,8 +202,7 @@ def evaluate_runtime_version_compatibility(
         return CompatibilityResult(
             status="invalid",
             reason=(
-                "Peer Flower version metadata is invalid: "
-                f"{peer.package_version!r}."
+                "Peer Flower version metadata is invalid: " f"{peer.package_version!r}."
             ),
             local_metadata=local_metadata,
             peer_metadata=peer,
