@@ -103,6 +103,8 @@ def start_client_internal(
     max_wait_time: float | None = None,
     isolation: str = ISOLATION_MODE_SUBPROCESS,
     clientappio_api_address: str = CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
+    clientappio_certificates: tuple[bytes, bytes, bytes] | None = None,
+    clientappio_root_certificates_path: str | None = None,
     health_server_address: str | None = None,
     trusted_entities: dict[str, str] | None = None,
     superexec_auth_secret: bytes | None = None,
@@ -153,6 +155,12 @@ def start_client_internal(
     clientappio_api_address : str
         (default: `CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS`)
         The SuperNode gRPC server address.
+    clientappio_certificates : Optional[Tuple[bytes, bytes, bytes]] (default: None)
+        Tuple containing CA certificate, server certificate, and private key used to
+        start a secure ClientAppIo gRPC server.
+    clientappio_root_certificates_path : Optional[str] (default: None)
+        Path to the CA certificate file passed to subprocess SuperExec instances so
+        they can verify the ClientAppIo server certificate.
     health_server_address : Optional[str] (default: None)
         The address of the health server. If `None` is provided, the health server will
         NOT be started.
@@ -200,7 +208,7 @@ def start_client_internal(
         address=clientappio_api_address,
         state_factory=state_factory,
         objectstore_factory=object_store_factory,
-        certificates=None,
+        certificates=clientappio_certificates,
         superexec_auth_secret=superexec_auth_secret,
     )
     grpc_servers.append(clientappio_server)
@@ -223,7 +231,11 @@ def start_client_internal(
 
     # Launch the SuperExec if the isolation mode is `subprocess`
     if isolation == ISOLATION_MODE_SUBPROCESS:
-        command = ["flower-superexec", "--insecure"]
+        command = ["flower-superexec"]
+        if clientappio_certificates is None:
+            command.append("--insecure")
+        elif clientappio_root_certificates_path is not None:
+            command += ["--root-certificates", clientappio_root_certificates_path]
         command += [
             "--appio-api-address",
             resolve_bind_address(clientappio_api_address),

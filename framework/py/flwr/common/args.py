@@ -112,6 +112,13 @@ def try_obtain_root_certificates(
     return root_certificates
 
 
+def _read_file(path: str, option_name: str) -> bytes:
+    expanded_path = Path(path).expanduser()
+    if not expanded_path.is_file():
+        sys.exit(f"Path argument `{option_name}` does not point to a file.")
+    return expanded_path.read_bytes()
+
+
 def try_obtain_server_certificates(
     args: argparse.Namespace,
 ) -> tuple[bytes, bytes, bytes] | None:
@@ -126,29 +133,41 @@ def try_obtain_server_certificates(
         return None
     # Check if certificates are provided
     if args.ssl_certfile and args.ssl_keyfile and args.ssl_ca_certfile:
-        if not isfile(args.ssl_ca_certfile):
-            sys.exit("Path argument `--ssl-ca-certfile` does not point to a file.")
-        if not isfile(args.ssl_certfile):
-            sys.exit("Path argument `--ssl-certfile` does not point to a file.")
-        if not isfile(args.ssl_keyfile):
-            sys.exit("Path argument `--ssl-keyfile` does not point to a file.")
-        certificates = (
-            Path(args.ssl_ca_certfile).expanduser().read_bytes(),  # CA certificate
-            Path(args.ssl_certfile).expanduser().read_bytes(),  # server certificate
-            Path(args.ssl_keyfile).expanduser().read_bytes(),  # server private key
+        return (
+            _read_file(args.ssl_ca_certfile, "--ssl-ca-certfile"),
+            _read_file(args.ssl_certfile, "--ssl-certfile"),
+            _read_file(args.ssl_keyfile, "--ssl-keyfile"),
         )
-        return certificates
     if args.ssl_certfile or args.ssl_keyfile or args.ssl_ca_certfile:
         sys.exit(
             "You need to provide valid file paths to `--ssl-certfile`, "
-            "`--ssl-keyfile`, and `—-ssl-ca-certfile` to create a secure "
-            "connection in Fleet API server (gRPC-rere)."
+            "`--ssl-keyfile`, and `--ssl-ca-certfile` to create a secure "
+            "connection."
         )
     log(
         ERROR,
         "Certificates are required unless running in insecure mode. "
         "Please provide certificate paths to `--ssl-certfile`, "
-        "`--ssl-keyfile`, and `—-ssl-ca-certfile` or run the server "
+        "`--ssl-keyfile`, and `--ssl-ca-certfile` or run the server "
         "in insecure mode using '--insecure' if you understand the risks.",
     )
     sys.exit(1)
+
+
+def try_obtain_optional_server_certificates(
+    args: argparse.Namespace,
+) -> tuple[bytes, bytes, bytes] | None:
+    """Return server certificates when provided, otherwise None."""
+    if args.ssl_certfile and args.ssl_keyfile and args.ssl_ca_certfile:
+        return (
+            _read_file(args.ssl_ca_certfile, "--ssl-ca-certfile"),
+            _read_file(args.ssl_certfile, "--ssl-certfile"),
+            _read_file(args.ssl_keyfile, "--ssl-keyfile"),
+        )
+    if args.ssl_certfile or args.ssl_keyfile or args.ssl_ca_certfile:
+        sys.exit(
+            "You need to provide valid file paths to `--ssl-certfile`, "
+            "`--ssl-keyfile`, and `--ssl-ca-certfile` to create a secure "
+            "connection."
+        )
+    return None

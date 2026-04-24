@@ -28,6 +28,7 @@ from cryptography.hazmat.primitives.serialization.ssh import load_ssh_public_key
 from flwr.common import EventType, event
 from flwr.common.args import (
     add_args_runtime_dependency_install,
+    try_obtain_optional_server_certificates,
     try_obtain_root_certificates,
 )
 from flwr.common.config import parse_config_args
@@ -66,6 +67,7 @@ def flower_supernode() -> None:
     if trusted_entities:
         _validate_public_keys_ed25519(trusted_entities)
     root_certificates = try_obtain_root_certificates(args, args.superlink)
+    clientappio_certificates = try_obtain_optional_server_certificates(args)
     authentication_keys = _try_setup_client_authentication(args)
     superexec_auth_secret = None
     if args.superexec_auth_secret_file is not None:
@@ -110,6 +112,10 @@ def flower_supernode() -> None:
         ),
         isolation=args.isolation,
         clientappio_api_address=args.clientappio_api_address,
+        clientappio_certificates=clientappio_certificates,
+        clientappio_root_certificates_path=(
+            args.ssl_ca_certfile if clientappio_certificates is not None else None
+        ),
         health_server_address=args.health_server_address,
         trusted_entities=trusted_entities,
         superexec_auth_secret=superexec_auth_secret,
@@ -147,6 +153,25 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
         default=CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
         help="ClientAppIo API (gRPC) server address (IPv4, IPv6, or a domain name). "
         f"By default, it is set to {CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS}.",
+    )
+    parser.add_argument(
+        "--ssl-certfile",
+        help="ClientAppIo API server TLS certificate file (as a path str) "
+        "to create a secure connection.",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
+        "--ssl-keyfile",
+        help="ClientAppIo API server TLS private key file (as a path str) "
+        "to create a secure connection.",
+        type=str,
+    )
+    parser.add_argument(
+        "--ssl-ca-certfile",
+        help="ClientAppIo API server CA certificate file (as a path str) "
+        "to create a secure connection.",
+        type=str,
     )
     parser.add_argument(
         "--trusted-entities",

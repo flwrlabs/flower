@@ -359,7 +359,7 @@ def run_superlink() -> None:
         address=serverappio_address,
         state_factory=state_factory,
         objectstore_factory=objectstore_factory,
-        certificates=None,  # ServerAppIo API doesn't support SSL yet
+        certificates=certificates,
         superexec_auth_secret=superexec_auth_secret,
     )
     grpc_servers.append(serverappio_server)
@@ -446,7 +446,11 @@ def run_superlink() -> None:
         # bound_address contains the actual address when the port is set to :0
         # which means let the OS choose a free port.
         appio_address = resolve_bind_address(serverappio_server.bound_address)
-        command = ["flower-superexec", "--insecure"]
+        command = ["flower-superexec"]
+        if certificates is None:
+            command.append("--insecure")
+        else:
+            command += ["--root-certificates", args.ssl_ca_certfile]
         command += ["--appio-api-address", appio_address]
         command += ["--plugin-type", ExecPluginType.SERVER_APP]
         command += ["--parent-pid", str(os.getpid())]
@@ -711,20 +715,20 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--ssl-certfile",
-        help="Fleet API server SSL certificate file (as a path str) "
+        help="SuperLink API server TLS certificate file (as a path str) "
         "to create a secure connection.",
         type=str,
         default=None,
     )
     parser.add_argument(
         "--ssl-keyfile",
-        help="Fleet API server SSL private key file (as a path str) "
+        help="SuperLink API server TLS private key file (as a path str) "
         "to create a secure connection.",
         type=str,
     )
     parser.add_argument(
         "--ssl-ca-certfile",
-        help="Fleet API server SSL CA certificate file (as a path str) "
+        help="SuperLink API server CA certificate file (as a path str) "
         "to create a secure connection.",
         type=str,
     )
