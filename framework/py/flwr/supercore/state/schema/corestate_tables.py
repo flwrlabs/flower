@@ -16,10 +16,10 @@
 
 
 from sqlalchemy import (
+    BigInteger,
     Column,
     Float,
     Index,
-    Integer,
     LargeBinary,
     MetaData,
     String,
@@ -37,7 +37,7 @@ def create_corestate_metadata() -> MetaData:
     Table(
         "token_store",
         metadata,
-        Column("run_id", Integer, primary_key=True, nullable=True),
+        Column("run_id", BigInteger, primary_key=True, nullable=True),
         Column("token", String, unique=True, nullable=False),
         Column("active_until", Float),
     )
@@ -68,9 +68,9 @@ def create_corestate_metadata() -> MetaData:
     Table(
         "task",
         metadata,
-        Column("task_id", Integer, nullable=False, unique=True),
+        Column("task_id", BigInteger, nullable=False, unique=True),
         Column("type", String, nullable=False),
-        Column("run_id", Integer, nullable=False),
+        Column("run_id", BigInteger, nullable=False),
         Column("fab_hash", String, nullable=True),
         Column("model_ref", String, nullable=True),
         Column("connector_ref", String, nullable=True),
