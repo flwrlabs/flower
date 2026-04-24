@@ -75,7 +75,7 @@ def create_corestate_metadata() -> MetaData:
         Column("model_ref", String, nullable=True),
         Column("connector_ref", String, nullable=True),
         Column("token", String, nullable=True),
-        Column("pending_at", String),
+        Column("pending_at", String, nullable=False),
         Column("starting_at", String, nullable=True),
         Column("running_at", String, nullable=True),
         Column("finished_at", String, nullable=True),
