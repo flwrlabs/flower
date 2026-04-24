@@ -17,6 +17,7 @@
 
 import unittest
 from datetime import timedelta
+from typing import Any, cast
 from unittest.mock import patch
 
 from flwr.common import now
@@ -88,6 +89,13 @@ class StateTest(unittest.TestCase):
 
         with self.assertRaises(AssertionError):
             _ = state.get_tasks(limit=-1)
+
+    def test_get_tasks_invalid_order_by_raises(self) -> None:
+        """Unsupported order_by values should be rejected consistently."""
+        state = self.state_factory()
+
+        with self.assertRaises(AssertionError):
+            _ = state.get_tasks(order_by=cast(Any, "foo"))
 
     def test_get_task_returns_copy(self) -> None:
         """Retrieved task should be a defensive copy."""

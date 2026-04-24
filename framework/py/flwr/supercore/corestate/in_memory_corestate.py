@@ -135,6 +135,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         limit: int | None = None,
     ) -> Sequence[Task]:
         """Retrieve information about tasks based on the specified filters."""
+        if order_by not in (None, "pending_at"):
+            raise AssertionError("`order_by` must be 'pending_at' or None")
+
         if limit is not None and limit < 0:
             raise AssertionError("`limit` must be >= 0")
 
