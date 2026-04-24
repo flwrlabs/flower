@@ -214,10 +214,10 @@ class SqlCoreState(CoreState, SqlMixin):
                 task_id=int64_to_uint64(row["task_id"]),
                 type=row["type"],
                 run_id=int64_to_uint64(row["run_id"]),
-                pending_at=row["pending_at"] or "",
-                starting_at=row["starting_at"] or "",
-                running_at=row["running_at"] or "",
-                finished_at=row["finished_at"] or "",
+                pending_at=row["pending_at"],
+                starting_at=row["starting_at"],
+                running_at=row["running_at"],
+                finished_at=row["finished_at"],
             )
             task.status.CopyFrom(
                 TaskStatus(
