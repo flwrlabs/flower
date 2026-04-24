@@ -22,12 +22,12 @@ import pytest
 
 from flwr.common.exit import ExitCode
 
-from .tls import load_root_certificates
+from .tls import validate_and_resolve_root_certificates
 
 
 def test_load_root_certificates_returns_none_when_insecure() -> None:
     """The helper should return `None` for insecure connections."""
-    assert load_root_certificates(None, insecure=True) is None
+    assert validate_and_resolve_root_certificates(None, insecure=True) is None
 
 
 def test_load_root_certificates_reads_file(tmp_path: Path) -> None:
@@ -35,7 +35,10 @@ def test_load_root_certificates_reads_file(tmp_path: Path) -> None:
     cert_path = tmp_path / "root.pem"
     cert_path.write_bytes(b"root-cert")
 
-    assert load_root_certificates(str(cert_path), insecure=False) == b"root-cert"
+    assert (
+        validate_and_resolve_root_certificates(str(cert_path), insecure=False)
+        == b"root-cert"
+    )
 
 
 def test_load_root_certificates_rejects_conflicting_flags() -> None:
@@ -43,7 +46,7 @@ def test_load_root_certificates_rejects_conflicting_flags() -> None:
     with patch("flwr.supercore.tls.flwr_exit") as mock_exit:
         mock_exit.side_effect = RuntimeError
         with pytest.raises(RuntimeError):
-            load_root_certificates("/tmp/root.pem", insecure=True)
+            validate_and_resolve_root_certificates("/tmp/root.pem", insecure=True)
 
     mock_exit.assert_called_once()
     input_code = mock_exit.call_args.args[0]
@@ -55,7 +58,9 @@ def test_load_root_certificates_rejects_invalid_path() -> None:
     with patch("flwr.supercore.tls.flwr_exit") as mock_exit:
         mock_exit.side_effect = RuntimeError
         with pytest.raises(RuntimeError):
-            load_root_certificates("/tmp/missing-root.pem", insecure=False)
+            validate_and_resolve_root_certificates(
+                "/tmp/missing-root.pem", insecure=False
+            )
 
     mock_exit.assert_called_once()
     input_code = mock_exit.call_args.args[0]
@@ -64,4 +69,4 @@ def test_load_root_certificates_rejects_invalid_path() -> None:
 
 def test_load_root_certificates_returns_none_when_no_path() -> None:
     """The helper should return `None` when no path is provided."""
-    assert load_root_certificates(None, insecure=False) is None
+    assert validate_and_resolve_root_certificates(None, insecure=False) is None

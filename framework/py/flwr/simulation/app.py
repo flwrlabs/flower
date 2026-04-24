@@ -70,7 +70,7 @@ from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
-from flwr.supercore.tls import load_root_certificates
+from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 
 def _run_simulation_settings(
@@ -114,7 +114,9 @@ def flwr_simulation() -> None:
     log_queue: Queue[str | None] = Queue()
     mirror_output_to_queue(log_queue)
 
-    certificates = load_root_certificates(args.root_certificates, args.insecure)
+    certificates = validate_and_resolve_root_certificates(
+        args.root_certificates, args.insecure
+    )
 
     log(INFO, "Starting Flower Simulation")
     log(

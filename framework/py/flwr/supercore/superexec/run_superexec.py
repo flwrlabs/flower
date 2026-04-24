@@ -39,7 +39,7 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
     CLIENTAPPIO_SUPEREXEC_METHODS,
     SERVERAPPIO_SUPEREXEC_METHODS,
 )
-from flwr.supercore.tls import load_root_certificates
+from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 from .plugin import ExecPlugin
 from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
@@ -113,7 +113,9 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
     channel = create_channel(
         server_address=appio_api_address,
         insecure=insecure,
-        root_certificates=load_root_certificates(root_certificates_path, insecure),
+        root_certificates=validate_and_resolve_root_certificates(
+            root_certificates_path, insecure
+        ),
         interceptors=interceptors,
     )
     channel.subscribe(on_channel_state_change)

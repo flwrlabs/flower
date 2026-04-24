@@ -20,7 +20,7 @@ from pathlib import Path
 from flwr.common.exit import ExitCode, flwr_exit
 
 
-def load_root_certificates(
+def validate_and_resolve_root_certificates(
     root_cert_path: str | None,
     insecure: bool,
 ) -> bytes | None:

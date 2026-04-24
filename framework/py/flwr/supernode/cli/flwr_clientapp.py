@@ -21,7 +21,7 @@ from logging import DEBUG, INFO
 from flwr.common.args import add_args_flwr_app_common
 from flwr.common.constant import CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS
 from flwr.common.logger import log
-from flwr.supercore.tls import load_root_certificates
+from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.supercore.utils import mask_string
 from flwr.supernode.runtime.run_clientapp import run_clientapp
 
@@ -42,7 +42,9 @@ def flwr_clientapp() -> None:
         clientappio_api_address=args.clientappio_api_address,
         token=args.token,
         insecure=args.insecure,
-        certificates=load_root_certificates(args.root_certificates, args.insecure),
+        certificates=validate_and_resolve_root_certificates(
+            args.root_certificates, args.insecure
+        ),
         parent_pid=args.parent_pid,
         runtime_dependency_install=args.runtime_dependency_install,
     )

@@ -70,7 +70,7 @@ from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
-from flwr.supercore.tls import load_root_certificates
+from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 
 def flwr_serverapp() -> None:
@@ -93,7 +93,9 @@ def flwr_serverapp() -> None:
         log_queue=log_queue,
         token=args.token,
         insecure=args.insecure,
-        certificates=load_root_certificates(args.root_certificates, args.insecure),
+        certificates=validate_and_resolve_root_certificates(
+            args.root_certificates, args.insecure
+        ),
         parent_pid=args.parent_pid,
         runtime_dependency_install=args.runtime_dependency_install,
     )
