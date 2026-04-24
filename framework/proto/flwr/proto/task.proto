@@ -31,7 +31,6 @@ message Task {
   optional string connector_ref = 11;
 }
 
-
 message TaskStatus {
   // "starting", "running", "finished"
   string status = 1;
