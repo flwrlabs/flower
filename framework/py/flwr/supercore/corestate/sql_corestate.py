@@ -19,12 +19,12 @@ import hashlib
 import json
 import secrets
 from collections.abc import Sequence
+from logging import ERROR
 from typing import Any, Literal, cast
 
 from sqlalchemy import MetaData, text
-from sqlalchemy.exc import IntegrityError
 
-from flwr.common import now
+from flwr.common import log, now
 from flwr.common.constant import (
     FLWR_APP_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -110,6 +110,10 @@ class SqlCoreState(CoreState, SqlMixin):
             generate_rand_int_from_bytes,
         )
 
+        uint64_task_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
+        sint64_task_id = uint64_to_int64(uint64_task_id)
+        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
+
         insert_query = """
             INSERT INTO task (
                 task_id,
@@ -141,28 +145,29 @@ class SqlCoreState(CoreState, SqlMixin):
             );
         """
 
-        while True:
-            token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
-            uint64_task_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
-            params = {
-                "task_id": uint64_to_int64(uint64_task_id),
-                "type": task_type,
-                "run_id": uint64_to_int64(run_id),
-                "status": Status.PENDING,
-                "fab_hash": fab_hash,
-                "model_ref": model_ref,
-                "connector_ref": connector_ref,
-                "token": token,
-                "pending_at": now().isoformat(),
-                "starting_at": "",
-                "running_at": "",
-                "finished_at": "",
-            }
-            try:
+        with self.session():
+            query = "SELECT COUNT(*) as cnt FROM task WHERE task_id = :task_id"
+            rows = self.query(query, {"task_id": sint64_task_id})
+            if rows[0]["cnt"] == 0:
+                params = {
+                    "task_id": sint64_task_id,
+                    "type": task_type,
+                    "run_id": uint64_to_int64(run_id),
+                    "status": Status.PENDING,
+                    "fab_hash": fab_hash,
+                    "model_ref": model_ref,
+                    "connector_ref": connector_ref,
+                    "token": token,
+                    "pending_at": now().isoformat(),
+                    "starting_at": "",
+                    "running_at": "",
+                    "finished_at": "",
+                }
                 self.query(insert_query, params)
                 return uint64_task_id
-            except IntegrityError:
-                continue
+
+        log(ERROR, "Unexpected task creation failure.")
+        return 0
 
     def get_task_info(
         self,
