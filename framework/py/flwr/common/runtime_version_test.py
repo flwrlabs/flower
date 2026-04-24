@@ -102,7 +102,7 @@ def test_read_runtime_version_metadata_rejects_partial_metadata() -> None:
 
 
 def test_read_runtime_version_metadata_accepts_metadata_item_iterables() -> None:
-    """gRPC metadata-style iterables should be supported directly."""
+    """GRPC metadata-style iterables should be supported directly."""
     metadata, error = read_runtime_version_metadata(
         [
             (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
@@ -160,9 +160,7 @@ def test_evaluate_runtime_version_compatibility_tolerates_missing_metadata() -> 
     assert result.reason is None
 
 
-def test_evaluate_runtime_version_compatibility_tolerates_missing_metadata_with_unknown_local() -> (
-    None
-):
+def test_evaluate_runtime_version_compatibility_tolerates_missing_metadata_with_unknown_local() -> None:
     """Missing metadata should remain the rollout case in source environments."""
     result = evaluate_runtime_version_compatibility(
         RuntimeVersionMetadata("unknown", "unknown", "superlink"),
@@ -173,9 +171,7 @@ def test_evaluate_runtime_version_compatibility_tolerates_missing_metadata_with_
     assert result.reason is None
 
 
-def test_evaluate_runtime_version_compatibility_disables_checks_for_unknown_local() -> (
-    None
-):
+def test_evaluate_runtime_version_compatibility_disables_checks_for_unknown_local() -> None:
     """Unparseable local versions should not break the receiving API."""
     result = evaluate_runtime_version_compatibility(
         RuntimeVersionMetadata("unknown", "unknown", "superlink"),
