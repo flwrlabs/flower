@@ -218,20 +218,15 @@ class SqlCoreState(CoreState, SqlMixin):
                 starting_at=row["starting_at"],
                 running_at=row["running_at"],
                 finished_at=row["finished_at"],
-            )
-            task.status.CopyFrom(
-                TaskStatus(
+                status=TaskStatus(
                     status=determine_task_status(row),
                     sub_status="",
                     details="",
-                )
+                ),
+                fab_hash=row["fab_hash"],
+                model_ref=row["model_ref"],
+                connector_ref=row["connector_ref"],
             )
-            if row["fab_hash"] is not None:
-                task.fab_hash = row["fab_hash"]
-            if row["model_ref"] is not None:
-                task.model_ref = row["model_ref"]
-            if row["connector_ref"] is not None:
-                task.connector_ref = row["connector_ref"]
             result.append(task)
         return result
 
