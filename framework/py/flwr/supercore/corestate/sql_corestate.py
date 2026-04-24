@@ -106,6 +106,10 @@ class SqlCoreState(CoreState, SqlMixin):
         connector_ref: str | None,
     ) -> int:
         """Create a task and return its ID."""
+        from flwr.server.superlink.linkstate.utils import (
+            generate_rand_int_from_bytes,
+        )
+
         insert_query = """
             INSERT INTO task (
                 task_id,
@@ -139,9 +143,7 @@ class SqlCoreState(CoreState, SqlMixin):
 
         while True:
             token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
-            uint64_task_id = int.from_bytes(
-                secrets.token_bytes(RUN_ID_NUM_BYTES), "big", signed=False
-            )
+            uint64_task_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
             params = {
                 "task_id": uint64_to_int64(uint64_task_id),
                 "type": task_type,

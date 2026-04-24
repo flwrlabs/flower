@@ -106,35 +106,37 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         connector_ref: str | None,
     ) -> int:
         """Create a task and return its ID."""
+        from flwr.server.superlink.linkstate.utils import (
+            generate_rand_int_from_bytes,
+        )
+
         token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
         with self.lock_task_store:
-            while True:
-                task_id = int.from_bytes(
-                    secrets.token_bytes(RUN_ID_NUM_BYTES), "big", signed=False
-                )
-                if task_id in self.task_store:
-                    continue
+            task_id = generate_rand_int_from_bytes(
+                RUN_ID_NUM_BYTES,
+                exclude=list(self.task_store),
+            )
 
-                task = Task(
-                    task_id=task_id,
-                    type=task_type,
-                    run_id=run_id,
-                    status=Status.PENDING,
-                    pending_at=now().isoformat(),
-                    starting_at="",
-                    running_at="",
-                    finished_at="",
-                )
-                if fab_hash is not None:
-                    task.fab_hash = fab_hash
-                if model_ref is not None:
-                    task.model_ref = model_ref
-                if connector_ref is not None:
-                    task.connector_ref = connector_ref
+            task = Task(
+                task_id=task_id,
+                type=task_type,
+                run_id=run_id,
+                status=Status.PENDING,
+                pending_at=now().isoformat(),
+                starting_at="",
+                running_at="",
+                finished_at="",
+            )
+            if fab_hash is not None:
+                task.fab_hash = fab_hash
+            if model_ref is not None:
+                task.model_ref = model_ref
+            if connector_ref is not None:
+                task.connector_ref = connector_ref
 
-                self.task_store[task_id] = task
-                self.token_to_task_id[token] = task_id
-                return task_id
+            self.task_store[task_id] = task
+            self.token_to_task_id[token] = task_id
+            return task_id
 
     def get_task_info(
         self,
