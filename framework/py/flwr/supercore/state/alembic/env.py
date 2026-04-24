@@ -22,6 +22,13 @@ from sqlalchemy import engine_from_config, pool
 
 from flwr.supercore.state.alembic.utils import get_combined_metadata
 
+# Import EE module if available so its metadata provider is registered before
+# autogenerate runs.  The EE module only exists in the private repo.
+try:
+    import flwr.ee.state.alembic  # noqa: F401  # pylint: disable=unused-import
+except ImportError:
+    pass
+
 # Alembic Config object
 config = context.config  # pylint: disable=no-member
 
@@ -32,6 +39,10 @@ if config.config_file_name is not None:
 
 # Target metadata for autogenerate
 target_metadata = get_combined_metadata()
+
+# render_as_batch=True makes autogenerate emit batch_alter_table() blocks, which
+# use table recreation on SQLite (where ALTER COLUMN is unsupported) and native
+# ALTER statements on PostgreSQL.
 
 
 def run_migrations_offline() -> None:
@@ -47,6 +58,7 @@ def run_migrations_offline() -> None:
     context.configure(  # pylint: disable=no-member
         url=url,
         target_metadata=target_metadata,
+        render_as_batch=True,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -83,14 +95,20 @@ def run_migrations_online() -> None:
 
         with connectable.connect() as connection:
             # pylint: disable-next=no-member
-            context.configure(connection=connection, target_metadata=target_metadata)
+            context.configure(
+                connection=connection,
+                target_metadata=target_metadata,
+                render_as_batch=True,
+            )
 
             with context.begin_transaction():  # pylint: disable=no-member
                 context.run_migrations()  # pylint: disable=no-member
     else:
         # Use the provided connection directly (for in-memory databases)
         context.configure(  # pylint: disable=no-member
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            render_as_batch=True,
         )
 
         with context.begin_transaction():  # pylint: disable=no-member
