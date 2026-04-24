@@ -157,6 +157,17 @@ def test_evaluate_runtime_version_compatibility_tolerates_missing_metadata() -> 
     assert result.reason is None
 
 
+def test_evaluate_runtime_version_compatibility_tolerates_missing_metadata_with_unknown_local_version() -> None:
+    """Missing metadata should remain the rollout case in source environments."""
+    result = evaluate_runtime_version_compatibility(
+        RuntimeVersionMetadata("unknown", "unknown", "superlink"),
+        None,
+    )
+
+    assert result.status == "missing"
+    assert result.reason is None
+
+
 def test_evaluate_runtime_version_compatibility_rejects_invalid_peer_version() -> None:
     """Unparseable peer versions should be classified as invalid metadata."""
     result = evaluate_runtime_version_compatibility(

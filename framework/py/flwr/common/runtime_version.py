@@ -155,20 +155,6 @@ def evaluate_runtime_version_compatibility(
     ),
 ) -> CompatibilityResult:
     """Evaluate whether a peer is runtime-compatible with the local component."""
-    local_version = parse_flower_version(local_metadata.package_version)
-    if local_version is None:
-        return CompatibilityResult(
-            status="invalid",
-            reason=(
-                "Local Flower version metadata is invalid: "
-                f"{local_metadata.package_version!r}."
-            ),
-            local_metadata=local_metadata,
-            peer_metadata=None,
-            local_version=None,
-            peer_version=None,
-        )
-
     peer: RuntimeVersionMetadata | None
     metadata_error: str | None
     if isinstance(peer_metadata, RuntimeVersionMetadata):
@@ -193,7 +179,21 @@ def evaluate_runtime_version_compatibility(
             reason=None,
             local_metadata=local_metadata,
             peer_metadata=None,
-            local_version=local_version,
+            local_version=None,
+            peer_version=None,
+        )
+
+    local_version = parse_flower_version(local_metadata.package_version)
+    if local_version is None:
+        return CompatibilityResult(
+            status="invalid",
+            reason=(
+                "Local Flower version metadata is invalid: "
+                f"{local_metadata.package_version!r}."
+            ),
+            local_metadata=local_metadata,
+            peer_metadata=peer,
+            local_version=None,
             peer_version=None,
         )
 
