@@ -14,9 +14,9 @@
 # ==============================================================================
 """Add task table to core state.
 
-Revision ID: de162abae4db
+Revision ID: 02aad1cc2a99
 Revises: b277e6f3656c
-Create Date: 2026-04-24 13:21:16.146395
+Create Date: 2026-04-24 13:31:18.645691
 """
 from collections.abc import Sequence
 
@@ -26,7 +26,7 @@ from alembic import op
 # pylint: disable=no-member
 
 # revision identifiers, used by Alembic.
-revision: str = "de162abae4db"
+revision: str = "02aad1cc2a99"
 down_revision: str | Sequence[str] | None = "b277e6f3656c"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None

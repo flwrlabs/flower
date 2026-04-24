@@ -122,7 +122,7 @@ erDiagram
     VARCHAR fab_hash "nullable"
     VARCHAR finished_at "nullable"
     VARCHAR model_ref "nullable"
-    VARCHAR pending_at "nullable"
+    VARCHAR pending_at
     INTEGER run_id
     VARCHAR running_at "nullable"
     VARCHAR starting_at "nullable"
