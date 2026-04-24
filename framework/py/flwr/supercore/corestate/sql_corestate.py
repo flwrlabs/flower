@@ -110,15 +110,12 @@ class SqlCoreState(CoreState, SqlMixin):
         """Create a task and return its ID."""
         uint64_task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
         sint64_task_id = uint64_to_int64(uint64_task_id)
-        token = ""
-        task_status = TaskStatus(status=Status.PENDING, sub_status="", details="")
 
         insert_query = """
             INSERT INTO task (
                 task_id,
                 type,
                 run_id,
-                status,
                 fab_hash,
                 model_ref,
                 connector_ref,
@@ -132,7 +129,6 @@ class SqlCoreState(CoreState, SqlMixin):
                 :task_id,
                 :type,
                 :run_id,
-                :status,
                 :fab_hash,
                 :model_ref,
                 :connector_ref,
@@ -152,15 +148,14 @@ class SqlCoreState(CoreState, SqlMixin):
                     "task_id": sint64_task_id,
                     "type": task_type,
                     "run_id": uint64_to_int64(run_id),
-                    "status": task_status.status,
                     "fab_hash": fab_hash,
                     "model_ref": model_ref,
                     "connector_ref": connector_ref,
-                    "token": token,
+                    "token": None,
                     "pending_at": now().isoformat(),
-                    "starting_at": "",
-                    "running_at": "",
-                    "finished_at": "",
+                    "starting_at": None,
+                    "running_at": None,
+                    "finished_at": None,
                 }
                 self.query(insert_query, params)
                 return uint64_task_id
@@ -168,7 +163,7 @@ class SqlCoreState(CoreState, SqlMixin):
         log(ERROR, "Unexpected task creation failure.")
         return 0
 
-    def get_tasks(  # pylint: disable=too-many-arguments,too-many-locals
+    def get_tasks(  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches
         self,
         *,
         task_ids: Sequence[int] | None = None,
@@ -194,15 +189,26 @@ class SqlCoreState(CoreState, SqlMixin):
         if statuses is not None:
             if not statuses:
                 return []
-            status_values = list(set(statuses))
-            placeholders = ",".join([f":status_{i}" for i in range(len(status_values))])
-            conditions.append(f"status IN ({placeholders})")
-            params.update(
-                {f"status_{i}": status for i, status in enumerate(status_values)}
-            )
+            status_conditions = []
+            if "pending" in statuses:
+                status_conditions.append("starting_at IS NULL AND finished_at IS NULL")
+            if "starting" in statuses:
+                status_conditions.append(
+                    "starting_at IS NOT NULL AND running_at IS NULL "
+                    "AND finished_at IS NULL"
+                )
+            if "running" in statuses:
+                status_conditions.append(
+                    "running_at IS NOT NULL AND finished_at IS NULL"
+                )
+            if "finished" in statuses:
+                status_conditions.append("finished_at IS NOT NULL")
+            if not status_conditions:
+                return []
+            conditions.append(f"({' OR '.join(status_conditions)})")
 
         query = """
-            SELECT task_id, type, run_id, status, fab_hash, model_ref, connector_ref,
+            SELECT task_id, type, run_id, fab_hash, model_ref, connector_ref,
                    pending_at, starting_at, running_at, finished_at
             FROM task
         """
@@ -218,20 +224,21 @@ class SqlCoreState(CoreState, SqlMixin):
 
         result: list[Task] = []
         for row in rows:
-            task_status = TaskStatus(
-                status=row["status"],
-                sub_status="",
-                details="",
-            )
             task = Task(
                 task_id=int64_to_uint64(row["task_id"]),
                 type=row["type"],
                 run_id=int64_to_uint64(row["run_id"]),
-                status=task_status,
                 pending_at=row["pending_at"] or "",
                 starting_at=row["starting_at"] or "",
                 running_at=row["running_at"] or "",
                 finished_at=row["finished_at"] or "",
+            )
+            task.status.CopyFrom(
+                TaskStatus(
+                    status=determine_task_status(row),
+                    sub_status="",
+                    details="",
+                )
             )
             if row["fab_hash"] is not None:
                 task.fab_hash = row["fab_hash"]
@@ -370,3 +377,17 @@ class SqlCoreState(CoreState, SqlMixin):
         # IntegrityError can only arise from (namespace, nonce) uniqueness.
         except IntegrityError:
             return False
+
+
+def determine_task_status(row: dict[str, Any]) -> str:
+    """Determine the status of the task based on timestamp fields."""
+    if row["pending_at"]:
+        if row["finished_at"]:
+            return Status.FINISHED
+        if row["starting_at"]:
+            if row["running_at"]:
+                return Status.RUNNING
+            return Status.STARTING
+        return Status.PENDING
+    task_id = int64_to_uint64(row["task_id"])
+    raise ValueError(f"The task {task_id} does not have a valid status.")

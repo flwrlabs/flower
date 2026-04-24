@@ -61,7 +61,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.lock_nonce_store = Lock()
         self.task_store: dict[int, Task] = {}
         self.lock_task_store = Lock()
-        self.token_to_task_id: dict[str, int] = {}
 
     @property
     def object_store(self) -> ObjectStore:
@@ -107,16 +106,13 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         connector_ref: str | None = None,
     ) -> int:
         """Create a task and return its ID."""
-        token = ""
         with self.lock_task_store:
             task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
-            task_status = TaskStatus(status=Status.PENDING, sub_status="", details="")
 
             task = Task(
                 task_id=task_id,
                 type=task_type,
                 run_id=run_id,
-                status=task_status,
                 pending_at=now().isoformat(),
                 starting_at="",
                 running_at="",
@@ -127,8 +123,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             )
 
             self.task_store[task_id] = task
-            if token:
-                self.token_to_task_id[token] = task_id
             return task_id
 
     def get_tasks(  # pylint: disable=too-many-arguments
@@ -156,7 +150,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 matched_task_ids &= {
                     task_id
                     for task_id in matched_task_ids
-                    if self.task_store[task_id].status.status in status_set
+                    if determine_task_status(self.task_store[task_id]).status
+                    in status_set
                 }
 
             tasks = [self.task_store[task_id] for task_id in matched_task_ids]
@@ -175,6 +170,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             for task in tasks:
                 task_copy = Task()
                 task_copy.CopyFrom(task)
+                task_copy.status.CopyFrom(determine_task_status(task))
                 result.append(task_copy)
             return result
 
@@ -280,3 +276,16 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         for key, expires_at in list(self.nonce_store.items()):
             if expires_at < current:
                 del self.nonce_store[key]
+
+
+def determine_task_status(task: Task) -> TaskStatus:
+    """Determine the status of a task based on timestamp fields."""
+    if task.pending_at:
+        if task.finished_at:
+            return TaskStatus(status=Status.FINISHED, sub_status="", details="")
+        if task.starting_at:
+            if task.running_at:
+                return TaskStatus(status=Status.RUNNING, sub_status="", details="")
+            return TaskStatus(status=Status.STARTING, sub_status="", details="")
+        return TaskStatus(status=Status.PENDING, sub_status="", details="")
+    raise ValueError(f"The task {task.task_id} does not have a valid status.")
