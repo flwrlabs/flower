@@ -85,7 +85,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             self._local_metadata,
             handler_call_details.invocation_metadata,
         )
-        if compatibility.status == "missing":
+        if compatibility.status in {"missing", "compatible"}:
             return method_handler
 
         unary_handler = cast(
