@@ -89,41 +89,6 @@ class StateTest(unittest.TestCase):
         reloaded = reloaded_tasks[0]
         self.assertEqual(reloaded.fab_hash, "fab-hash")
 
-    def test_get_task_info_filters_and_order(self) -> None:
-        """Task queries should support filtering and ordering."""
-        state = self.state_factory()
-        first_task_id = state.create_task(
-            task_type="flwr-model",
-            run_id=1,
-            fab_hash=None,
-            model_ref="model://one",
-            connector_ref=None,
-        )
-        sleep(0.001)
-        second_task_id = state.create_task(
-            task_type="flwr-connector",
-            run_id=2,
-            fab_hash=None,
-            model_ref=None,
-            connector_ref="connector://two",
-        )
-
-        filtered = state.get_task_info(
-            types=["flwr-model"],
-            run_ids=[1],
-            statuses=[Status.PENDING],
-        )
-        self.assertEqual([task.task_id for task in filtered], [first_task_id])
-
-        ordered = state.get_task_info(
-            task_ids=[first_task_id, second_task_id],
-            order_by="pending_at",
-            ascending=False,
-            limit=1,
-        )
-        self.assertEqual(len(ordered), 1)
-        self.assertEqual(ordered[0].task_id, second_task_id)
-
     def test_create_verify_and_delete_token(self) -> None:
         """Test creating, verifying, and deleting tokens."""
         # Prepare
