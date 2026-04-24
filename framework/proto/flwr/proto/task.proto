@@ -21,7 +21,7 @@ message Task {
   uint64 task_id = 1;
   string type = 2;
   uint64 run_id = 3;
-  string status = 4;
+  TaskStatus status = 4;
   string pending_at = 5;
   string starting_at = 6;
   string running_at = 7;
@@ -29,4 +29,13 @@ message Task {
   optional string fab_hash = 9;
   optional string model_ref = 10;
   optional string connector_ref = 11;
+}
+
+message TaskStatus {
+  // "starting", "running", "finished"
+  string status = 1;
+  // "completed", "failed", "stopped" or "" (non-finished)
+  string sub_status = 2;
+  // failure details
+  string details = 3;
 }

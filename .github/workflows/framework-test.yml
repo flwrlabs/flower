@@ -72,6 +72,9 @@ jobs:
       - name: Check if protos need recompilation
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: ./framework/dev/check-protos.sh
+      - name: Check if migrations are up to date
+        if: ${{ needs.changes.outputs.framework == 'true' && matrix.python == '3.10' }}
+        run: ./framework/dev/check-migrations.sh
       - name: Lint + Test (isort/black/docformatter/mypy/pylint/flake8/pytest)
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: ./framework/dev/test.sh
