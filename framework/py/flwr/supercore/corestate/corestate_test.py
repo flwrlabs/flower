@@ -47,6 +47,7 @@ class StateTest(unittest.TestCase):
             model_ref="model://test",
             connector_ref=None,
         )
+        assert task_id is not None
         tasks = state.get_tasks(task_ids=[task_id])
 
         self.assertEqual(len(tasks), 1)
@@ -71,6 +72,23 @@ class StateTest(unittest.TestCase):
         state = self.state_factory()
         self.assertEqual(state.get_tasks(task_ids=[123]), [])
 
+    def test_get_tasks_scalar_status_matches(self) -> None:
+        """A scalar status string should behave like a single-item status filter."""
+        state = self.state_factory()
+        _ = state.create_task(task_type="flwr-model", run_id=42)
+
+        tasks = state.get_tasks(statuses=Status.PENDING)
+
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].status.status, Status.PENDING)
+
+    def test_get_tasks_negative_limit_raises(self) -> None:
+        """Negative limits should be rejected consistently."""
+        state = self.state_factory()
+
+        with self.assertRaises(AssertionError):
+            _ = state.get_tasks(limit=-1)
+
     def test_get_task_returns_copy(self) -> None:
         """Retrieved task should be a defensive copy."""
         state = self.state_factory()
@@ -81,6 +99,7 @@ class StateTest(unittest.TestCase):
             model_ref=None,
             connector_ref=None,
         )
+        assert task_id is not None
 
         tasks = state.get_tasks(task_ids=[task_id])
         self.assertEqual(len(tasks), 1)

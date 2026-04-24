@@ -150,6 +150,12 @@ class SqlCoreState(CoreState, SqlMixin):
         limit: int | None = None,
     ) -> Sequence[Task]:
         """Retrieve information about tasks based on the specified filters."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+
+        if isinstance(statuses, str):
+            statuses = [statuses]
+
         conditions = []
         params: dict[str, Any] = {}
 

@@ -135,6 +135,12 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         limit: int | None = None,
     ) -> Sequence[Task]:
         """Retrieve information about tasks based on the specified filters."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+
+        if isinstance(statuses, str):
+            statuses = [statuses]
+
         with self.lock_task_store:
             matched_task_ids = set(self.task_store.keys())
 
