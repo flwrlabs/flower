@@ -108,57 +108,38 @@ class SqlCoreState(CoreState, SqlMixin):
         connector_ref: str | None = None,
     ) -> int:
         """Create a task and return its ID."""
-        uint64_task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
-        sint64_task_id = uint64_to_int64(uint64_task_id)
+        task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
+        sint64_task_id = uint64_to_int64(task_id)
 
         insert_query = """
-            INSERT INTO task (
-                task_id,
-                type,
-                run_id,
-                fab_hash,
-                model_ref,
-                connector_ref,
-                token,
-                pending_at,
-                starting_at,
-                running_at,
-                finished_at
-            )
-            VALUES (
-                :task_id,
-                :type,
-                :run_id,
-                :fab_hash,
-                :model_ref,
-                :connector_ref,
-                :token,
-                :pending_at,
-                :starting_at,
-                :running_at,
-                :finished_at
-            );
+            INSERT INTO task
+            (task_id, type, run_id, fab_hash, model_ref, connector_ref, token,
+             pending_at, starting_at, running_at, finished_at)
+            VALUES
+            (:task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
+             :pending_at, :starting_at, :running_at, :finished_at);
         """
 
+        params = {
+            "task_id": sint64_task_id,
+            "type": task_type,
+            "run_id": uint64_to_int64(run_id),
+            "fab_hash": fab_hash,
+            "model_ref": model_ref,
+            "connector_ref": connector_ref,
+            "token": None,
+            "pending_at": now().isoformat(),
+            "starting_at": None,
+            "running_at": None,
+            "finished_at": None,
+        }
+
         with self.session():
-            query = "SELECT COUNT(*) as cnt FROM task WHERE task_id = :task_id"
-            rows = self.query(query, {"task_id": sint64_task_id})
-            if rows[0]["cnt"] == 0:
-                params = {
-                    "task_id": sint64_task_id,
-                    "type": task_type,
-                    "run_id": uint64_to_int64(run_id),
-                    "fab_hash": fab_hash,
-                    "model_ref": model_ref,
-                    "connector_ref": connector_ref,
-                    "token": None,
-                    "pending_at": now().isoformat(),
-                    "starting_at": None,
-                    "running_at": None,
-                    "finished_at": None,
-                }
+            try:
                 self.query(insert_query, params)
-                return uint64_task_id
+                return task_id
+            except IntegrityError:
+                pass
 
         log(ERROR, "Unexpected task creation failure.")
         return 0
