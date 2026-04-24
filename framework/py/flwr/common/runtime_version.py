@@ -38,7 +38,7 @@ RuntimeCompatibilityStatus = Literal[
 ]
 
 _VERSION_PATTERN = re.compile(
-    r"^(?P<major>0|[1-9]\d*)" r"\.(?P<minor>0|[1-9]\d*)" r"\.(?P<patch>0|[1-9]\d*)"
+    r"^(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)"
 )
 
 
@@ -198,11 +198,10 @@ def evaluate_runtime_version_compatibility(
 
     peer_version = parse_flower_version(peer.package_version)
     if peer_version is None:
+        peer_version_repr = repr(peer.package_version)
         return CompatibilityResult(
             status="invalid",
-            reason=(
-                "Peer Flower version metadata is invalid: " f"{peer.package_version!r}."
-            ),
+            reason=f"Peer Flower version metadata is invalid: {peer_version_repr}.",
             local_metadata=local_metadata,
             peer_metadata=peer,
             local_version=local_version,

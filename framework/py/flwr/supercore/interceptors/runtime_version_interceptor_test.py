@@ -99,6 +99,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
     """Unit tests for RuntimeVersionServerInterceptor."""
 
     def setUp(self) -> None:
+        """Create a baseline interceptor for each test."""
         self.interceptor = RuntimeVersionServerInterceptor(
             connection_name="flwr-simulation <-> SuperLink ServerAppIo API",
             local_metadata=build_runtime_version_metadata(
