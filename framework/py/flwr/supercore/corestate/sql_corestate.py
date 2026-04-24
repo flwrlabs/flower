@@ -194,7 +194,7 @@ class SqlCoreState(CoreState, SqlMixin):
         if statuses is not None:
             if not statuses:
                 return []
-            status_values = list({status.status for status in statuses})
+            status_values = list(set(statuses))
             placeholders = ",".join([f":status_{i}" for i in range(len(status_values))])
             conditions.append(f"status IN ({placeholders})")
             params.update(
