@@ -32,29 +32,42 @@ class Task(google.protobuf.message.Message):
     TYPE_FIELD_NUMBER: builtins.int
     RUN_ID_FIELD_NUMBER: builtins.int
     STATUS_FIELD_NUMBER: builtins.int
+    PENDING_AT_FIELD_NUMBER: builtins.int
+    STARTING_AT_FIELD_NUMBER: builtins.int
+    RUNNING_AT_FIELD_NUMBER: builtins.int
+    FINISHED_AT_FIELD_NUMBER: builtins.int
     FAB_HASH_FIELD_NUMBER: builtins.int
     MODEL_REF_FIELD_NUMBER: builtins.int
     CONNECTOR_REF_FIELD_NUMBER: builtins.int
     task_id: builtins.int
     type: builtins.str
     run_id: builtins.int
-    status: builtins.str
+    pending_at: builtins.str
+    starting_at: builtins.str
+    running_at: builtins.str
+    finished_at: builtins.str
     fab_hash: builtins.str
     model_ref: builtins.str
     connector_ref: builtins.str
+    @property
+    def status(self) -> global___TaskStatus: ...
     def __init__(
         self,
         *,
         task_id: builtins.int = ...,
         type: builtins.str = ...,
         run_id: builtins.int = ...,
-        status: builtins.str = ...,
+        status: global___TaskStatus | None = ...,
+        pending_at: builtins.str = ...,
+        starting_at: builtins.str = ...,
+        running_at: builtins.str = ...,
+        finished_at: builtins.str = ...,
         fab_hash: builtins.str | None = ...,
         model_ref: builtins.str | None = ...,
         connector_ref: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref", "run_id", b"run_id", "status", b"status", "task_id", b"task_id", "type", b"type"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref", "status", b"status"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "finished_at", b"finished_at", "model_ref", b"model_ref", "pending_at", b"pending_at", "run_id", b"run_id", "running_at", b"running_at", "starting_at", b"starting_at", "status", b"status", "task_id", b"task_id", "type", b"type"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_connector_ref", b"_connector_ref"]) -> typing.Literal["connector_ref"] | None: ...
     @typing.overload
@@ -63,3 +76,27 @@ class Task(google.protobuf.message.Message):
     def WhichOneof(self, oneof_group: typing.Literal["_model_ref", b"_model_ref"]) -> typing.Literal["model_ref"] | None: ...
 
 global___Task = Task
+
+@typing.final
+class TaskStatus(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    STATUS_FIELD_NUMBER: builtins.int
+    SUB_STATUS_FIELD_NUMBER: builtins.int
+    DETAILS_FIELD_NUMBER: builtins.int
+    status: builtins.str
+    """"starting", "running", "finished" """
+    sub_status: builtins.str
+    """"completed", "failed", "stopped" or "" (non-finished)"""
+    details: builtins.str
+    """failure details"""
+    def __init__(
+        self,
+        *,
+        status: builtins.str = ...,
+        sub_status: builtins.str = ...,
+        details: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["details", b"details", "status", b"status", "sub_status", b"sub_status"]) -> None: ...
+
+global___TaskStatus = TaskStatus
