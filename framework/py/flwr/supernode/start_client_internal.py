@@ -77,6 +77,7 @@ from flwr.supercore.primitives.asymmetric_ed25519 import (
     decode_base64url,
     verify_signature,
 )
+from flwr.supercore.tls import get_superexec_appio_tls_args
 from flwr.supercore.version import package_version
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
 from flwr.supernode.servicer.clientappio import ClientAppIoServicer
@@ -232,10 +233,9 @@ def start_client_internal(
     # Launch the SuperExec if the isolation mode is `subprocess`
     if isolation == ISOLATION_MODE_SUBPROCESS:
         command = ["flower-superexec"]
-        if clientappio_certificates is None:
-            command.append("--insecure")
-        elif clientappio_root_certificates_path is not None:
-            command += ["--root-certificates", clientappio_root_certificates_path]
+        command += get_superexec_appio_tls_args(
+            clientappio_certificates, clientappio_root_certificates_path
+        )
         command += [
             "--appio-api-address",
             resolve_bind_address(clientappio_api_address),

@@ -69,6 +69,7 @@ from flwr.supercore.auth import (
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.tls import get_superexec_appio_tls_args
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.version import package_version
 from flwr.superlink.artifact_provider import ArtifactProvider
@@ -447,10 +448,7 @@ def run_superlink() -> None:
         # which means let the OS choose a free port.
         appio_address = resolve_bind_address(serverappio_server.bound_address)
         command = ["flower-superexec"]
-        if certificates is None:
-            command.append("--insecure")
-        else:
-            command += ["--root-certificates", args.ssl_ca_certfile]
+        command += get_superexec_appio_tls_args(certificates, args.ssl_ca_certfile)
         command += ["--appio-api-address", appio_address]
         command += ["--plugin-type", ExecPluginType.SERVER_APP]
         command += ["--parent-pid", str(os.getpid())]

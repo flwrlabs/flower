@@ -19,6 +19,20 @@ from pathlib import Path
 
 from flwr.common.exit import ExitCode, flwr_exit
 
+ServerCertificates = tuple[bytes, bytes, bytes]
+
+
+def get_superexec_appio_tls_args(
+    certificates: ServerCertificates | None,
+    root_certificates_path: str | None,
+) -> list[str]:
+    """Return SuperExec TLS flags for connecting to an AppIO server."""
+    if certificates is None:
+        return ["--insecure"]
+    if root_certificates_path is None:
+        return []
+    return ["--root-certificates", root_certificates_path]
+
 
 def validate_and_resolve_root_certificates(
     root_cert_path: str | None,

@@ -22,7 +22,7 @@ import pytest
 
 from flwr.common.exit import ExitCode
 
-from .tls import validate_and_resolve_root_certificates
+from .tls import get_superexec_appio_tls_args, validate_and_resolve_root_certificates
 
 
 def test_load_root_certificates_returns_none_when_insecure() -> None:
@@ -70,3 +70,20 @@ def test_load_root_certificates_rejects_invalid_path() -> None:
 def test_load_root_certificates_returns_none_when_no_path() -> None:
     """The helper should return `None` when no path is provided."""
     assert validate_and_resolve_root_certificates(None, insecure=False) is None
+
+
+def test_get_superexec_appio_tls_args_returns_insecure_without_certificates() -> None:
+    """SuperExec should use plaintext when the AppIO server has no TLS certs."""
+    assert get_superexec_appio_tls_args(None, None) == ["--insecure"]
+
+
+def test_get_superexec_appio_tls_args_returns_root_certificates() -> None:
+    """SuperExec should verify AppIO TLS with the configured CA path."""
+    assert get_superexec_appio_tls_args(
+        (b"ca", b"cert", b"key"), "/tmp/ca.pem"
+    ) == ["--root-certificates", "/tmp/ca.pem"]
+
+
+def test_get_superexec_appio_tls_args_omits_flags_for_system_trust() -> None:
+    """SuperExec should use system trust roots when no CA path is provided."""
+    assert get_superexec_appio_tls_args((b"ca", b"cert", b"key"), None) == []
