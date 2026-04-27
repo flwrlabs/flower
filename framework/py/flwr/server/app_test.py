@@ -23,10 +23,7 @@ import pytest
 from flwr.supercore.version import package_version
 
 from . import app as app_module
-from .app import (
-    _obtain_superlink_certificates,
-    _parse_args_run_superlink,
-)
+from .app import _obtain_superlink_certificates, _parse_args_run_superlink
 
 
 def test_parse_superlink_log_rotation_args_defaults() -> None:

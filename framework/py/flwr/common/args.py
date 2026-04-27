@@ -169,18 +169,21 @@ def try_obtain_optional_appio_server_certificates(
         and args.appio_ssl_keyfile
         and args.appio_ssl_ca_certfile
     ):
-        if not isfile(args.appio_ssl_ca_certfile):
+        appio_ssl_ca_certfile = Path(args.appio_ssl_ca_certfile).expanduser()
+        appio_ssl_certfile = Path(args.appio_ssl_certfile).expanduser()
+        appio_ssl_keyfile = Path(args.appio_ssl_keyfile).expanduser()
+        if not appio_ssl_ca_certfile.is_file():
             sys.exit(
                 "Path argument `--appio-ssl-ca-certfile` does not point to a file."
             )
-        if not isfile(args.appio_ssl_certfile):
+        if not appio_ssl_certfile.is_file():
             sys.exit("Path argument `--appio-ssl-certfile` does not point to a file.")
-        if not isfile(args.appio_ssl_keyfile):
+        if not appio_ssl_keyfile.is_file():
             sys.exit("Path argument `--appio-ssl-keyfile` does not point to a file.")
         return (
-            Path(args.appio_ssl_ca_certfile).expanduser().read_bytes(),
-            Path(args.appio_ssl_certfile).expanduser().read_bytes(),
-            Path(args.appio_ssl_keyfile).expanduser().read_bytes(),
+            appio_ssl_ca_certfile.read_bytes(),
+            appio_ssl_certfile.read_bytes(),
+            appio_ssl_keyfile.read_bytes(),
         )
     if args.appio_ssl_certfile or args.appio_ssl_keyfile or args.appio_ssl_ca_certfile:
         sys.exit(

@@ -836,7 +836,9 @@ def _add_args_serverappio_api(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--appio-ssl-certfile",
         help="ServerAppIo API server TLS certificate file (as a path str) "
-        "to create a secure connection.",
+        "to create a secure connection. The certificate must be valid for the "
+        "AppIO API address used by SuperExec, typically including loopback SANs "
+        "such as 127.0.0.1 and ::1 for auto-launched local SuperExec.",
         type=str,
         default=None,
     )
