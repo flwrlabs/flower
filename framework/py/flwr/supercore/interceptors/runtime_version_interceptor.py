@@ -23,13 +23,12 @@ from typing import Any, cast
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.common.runtime_version import (
+from flwr.supercore.runtime_version_compatibility import (
+    CompatibilityResult,
     RuntimeVersionMetadata,
     build_runtime_version_metadata,
-    evaluate_runtime_version_compatibility,
     format_incompatible_version_message,
     format_invalid_metadata_message,
-    runtime_version_metadata_to_dict,
 )
 
 
@@ -37,9 +36,7 @@ class RuntimeVersionClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type
     """Attach Flower runtime version metadata to outbound unary RPCs."""
 
     def __init__(self, component_name: str) -> None:
-        self._metadata = runtime_version_metadata_to_dict(
-            build_runtime_version_metadata(component_name)
-        )
+        self._metadata = build_runtime_version_metadata(component_name)
 
     def intercept_unary_unary(
         self,
@@ -48,12 +45,11 @@ class RuntimeVersionClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type
         request: GrpcMessage,
     ) -> grpc.Call:
         """Add or replace the runtime version metadata headers."""
-        metadata = list(client_call_details.metadata or [])
-        metadata = [
-            (key, value) for key, value in metadata if key not in self._metadata
-        ]
-        metadata.extend(self._metadata.items())
-        details = client_call_details._replace(metadata=metadata)
+        details = client_call_details._replace(
+            metadata=self._metadata.append_to_grpc_metadata(
+                client_call_details.metadata
+            )
+        )
         return continuation(details, request)
 
 
@@ -79,10 +75,20 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         if method_handler is None or method_handler.unary_unary is None:
             return method_handler
 
-        compatibility = evaluate_runtime_version_compatibility(
-            self._local_metadata,
-            handler_call_details.invocation_metadata,
+        peer_metadata, metadata_error = RuntimeVersionMetadata.from_grpc_metadata(
+            handler_call_details.invocation_metadata
         )
+        if metadata_error is not None:
+            compatibility = CompatibilityResult(
+                status="invalid",
+                reason=metadata_error,
+                local_metadata=self._local_metadata,
+                peer_metadata=peer_metadata,
+                local_version=None,
+                peer_version=None,
+            )
+        else:
+            compatibility = self._local_metadata.check_compatibility_with(peer_metadata)
         if compatibility.status in {"missing", "disabled", "compatible"}:
             return method_handler
 

@@ -17,13 +17,12 @@
 
 import pytest
 
-from flwr.common.constant import (
+from flwr.supercore.constant import (
     FLWR_COMPONENT_NAME_METADATA_KEY,
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
-
-from .runtime_version import (
+from .runtime_version_compatibility import (
     ParsedFlowerVersion,
     RuntimeVersionMetadata,
     build_runtime_version_metadata,
@@ -76,6 +75,29 @@ def test_runtime_version_metadata_round_trip() -> None:
     }
 
 
+def test_runtime_version_metadata_appends_to_grpc_metadata() -> None:
+    """Runtime metadata should replace stale values and preserve unrelated ones."""
+    metadata = build_runtime_version_metadata(
+        "simulation",
+        package_name_value="flwr",
+        package_version_value="1.29.0",
+    )
+
+    grpc_metadata = metadata.append_to_grpc_metadata(
+        (
+            (FLWR_PACKAGE_NAME_METADATA_KEY, "old"),
+            ("x-test", "value"),
+        )
+    )
+
+    assert grpc_metadata == (
+        ("x-test", "value"),
+        (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
+        (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.0"),
+        (FLWR_COMPONENT_NAME_METADATA_KEY, "simulation"),
+    )
+
+
 def test_build_runtime_version_metadata_rejects_empty_component_name() -> None:
     """Component names must not be empty."""
     with pytest.raises(ValueError, match="component_name"):
@@ -109,6 +131,24 @@ def test_read_runtime_version_metadata_accepts_metadata_item_iterables() -> None
             (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.0"),
             (FLWR_COMPONENT_NAME_METADATA_KEY, "cli"),
         ]
+    )
+
+    assert error is None
+    assert metadata == RuntimeVersionMetadata(
+        package_name="flwr",
+        package_version="1.29.0",
+        component_name="cli",
+    )
+
+
+def test_runtime_version_metadata_from_grpc_metadata_accepts_bytes_values() -> None:
+    """Runtime metadata parsing should accept gRPC byte values."""
+    metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
+        (
+            (FLWR_PACKAGE_NAME_METADATA_KEY, b"flwr"),
+            (FLWR_PACKAGE_VERSION_METADATA_KEY, b"1.29.0"),
+            (FLWR_COMPONENT_NAME_METADATA_KEY, b"cli"),
+        )
     )
 
     assert error is None
