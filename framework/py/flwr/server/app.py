@@ -223,18 +223,7 @@ def run_superlink() -> None:
         health_server_address, _, _ = _format_address(args.health_server_address)
 
     # Obtain certificates
-    certificates = try_obtain_server_certificates(args)
-    appio_certificates = (
-        None if args.insecure else try_obtain_optional_appio_server_certificates(args)
-    )
-    if not args.insecure and appio_certificates is None:
-        sys.exit(
-            "Certificates are required for the ServerAppIo API unless running in "
-            "insecure mode. Please provide certificate paths to "
-            "`--appio-ssl-certfile`, `--appio-ssl-keyfile`, and "
-            "`--appio-ssl-ca-certfile` or run the server in insecure mode using "
-            "'--insecure' if you understand the risks."
-        )
+    certificates, appio_certificates = _obtain_superlink_certificates(args)
 
     # Load SuperExec auth secret
     superexec_auth_secret: bytes | None = None
@@ -459,15 +448,13 @@ def run_superlink() -> None:
         # bound_address contains the actual address when the port is set to :0
         # which means let the OS choose a free port.
         appio_address = resolve_bind_address(serverappio_server.bound_address)
-        command = ["flower-superexec"]
-        command += get_superexec_appio_tls_args(
-            appio_certificates, args.appio_ssl_ca_certfile
+        command = _get_superexec_command(
+            appio_address=appio_address,
+            appio_certificates=appio_certificates,
+            appio_root_certificates_path=args.appio_ssl_ca_certfile,
+            parent_pid=os.getpid(),
+            runtime_dependency_install=args.runtime_dependency_install,
         )
-        command += ["--appio-api-address", appio_address]
-        command += ["--plugin-type", ExecPluginType.SERVER_APP]
-        command += ["--parent-pid", str(os.getpid())]
-        if args.runtime_dependency_install:
-            command += ["--allow-runtime-dependency-installation"]
         # pylint: disable-next=consider-using-with
         subprocess.Popen(command)
 
@@ -501,6 +488,45 @@ def _format_address(address: str) -> tuple[str, str, int]:
         )
     host, port, is_v6 = parsed_address
     return (f"[{host}]:{port}" if is_v6 else f"{host}:{port}", host, port)
+
+
+def _obtain_superlink_certificates(
+    args: argparse.Namespace,
+) -> tuple[tuple[bytes, bytes, bytes] | None, tuple[bytes, bytes, bytes] | None]:
+    """Return Fleet/Control and ServerAppIo certificate tuples."""
+    certificates = try_obtain_server_certificates(args)
+    appio_certificates = (
+        None if args.insecure else try_obtain_optional_appio_server_certificates(args)
+    )
+    if not args.insecure and appio_certificates is None:
+        sys.exit(
+            "Certificates are required for the ServerAppIo API unless running in "
+            "insecure mode. Please provide certificate paths to "
+            "`--appio-ssl-certfile`, `--appio-ssl-keyfile`, and "
+            "`--appio-ssl-ca-certfile` or run the server in insecure mode using "
+            "'--insecure' if you understand the risks."
+        )
+    return certificates, appio_certificates
+
+
+def _get_superexec_command(
+    appio_address: str,
+    appio_certificates: tuple[bytes, bytes, bytes] | None,
+    appio_root_certificates_path: str | None,
+    parent_pid: int,
+    runtime_dependency_install: bool,
+) -> list[str]:
+    """Return the auto-launched SuperExec command for ServerApp subprocesses."""
+    command = ["flower-superexec"]
+    command += get_superexec_appio_tls_args(
+        appio_certificates, appio_root_certificates_path
+    )
+    command += ["--appio-api-address", appio_address]
+    command += ["--plugin-type", ExecPluginType.SERVER_APP]
+    command += ["--parent-pid", str(parent_pid)]
+    if runtime_dependency_install:
+        command += ["--allow-runtime-dependency-installation"]
+    return command
 
 
 def _load_control_auth_plugins(
