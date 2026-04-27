@@ -17,6 +17,7 @@
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+import json
 from logging import ERROR
 
 import grpc
@@ -48,7 +49,7 @@ def rpc_error_translator(
 
         msg = f"[{rpc_name}][ApiError:{err.code}] {err.message}"
         log(ERROR, msg)
-        context.abort(grpc_status, public_message)
+        context.abort(grpc_status, err.to_json(public_message))
         raise grpc.RpcError() from None  # Unreachable, but satisfies type checker
     except Exception as err:
         # Let pass through if `context.abort()` is called

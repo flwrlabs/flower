@@ -31,6 +31,7 @@ from flwr.supercore.constant import (
     NOOP_FEDERATION_DESCRIPTION,
     ActionType,
 )
+import json
 from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.typing import ActionContext
 
@@ -45,6 +46,24 @@ class UnsupportedError(FlowerError):
             message=message,
             code=ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT,
         )
+
+
+class EntitlementError(FlowerError):
+    """Exception raised when an account is not entitled to perform an action."""
+
+    def __init__(self, details: str , entitlement_code: int):
+        super().__init__(
+            message=details,
+            public_details=details,
+            code=...,
+        )
+        self.entitlement_code = entitlement_code
+
+    def to_json(self) -> str:
+        """Convert the error into a JSON string."""
+        base_dict = json.loads(super().to_json())
+        base_dict["entitlement_code"] = self.entitlement_code
+        return json.dumps(base_dict)
 
 
 class NoOpFederationManager(FederationManager):
