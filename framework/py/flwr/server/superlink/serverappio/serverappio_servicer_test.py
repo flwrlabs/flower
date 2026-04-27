@@ -88,7 +88,12 @@ from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
 from flwr.server.superlink.serverappio.serverappio_servicer import _raise_if
 from flwr.server.superlink.utils import _STATUS_TO_MSG
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_DB_NAME,
+    NOOP_FEDERATION,
+    RunType,
+    TaskType,
+)
 from flwr.supercore.date import now
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -463,7 +468,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         """Test `CreateTask` stores a pending task."""
         run_id = self._create_dummy_run()
         request = CreateTaskRequest(
-            type="flwr-serverapp",
+            type=TaskType.SERVER_APP.value,
             run_id=run_id,
             fab_hash="hash123",
         )
@@ -476,7 +481,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         self.assertEqual(len(tasks), 1)
         task = tasks[0]
         self.assertEqual(task.task_id, response.task_id)
-        self.assertEqual(task.type, "flwr-serverapp")
+        self.assertEqual(task.type, TaskType.SERVER_APP.value)
         self.assertEqual(task.run_id, run_id)
         self.assertEqual(
             task.status,
@@ -503,18 +508,24 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
     @parameterized.expand(
         [
             (
-                "flwr-serverapp",
-                "Task type 'flwr-serverapp' requires fab_hash.",
+                TaskType.SERVER_APP.value,
+                f"Task type '{TaskType.SERVER_APP.value}' requires fab_hash.",
             ),
             (
-                "flwr-clientapp",
-                "Task type 'flwr-clientapp' requires fab_hash.",
+                TaskType.CLIENT_APP.value,
+                f"Task type '{TaskType.CLIENT_APP.value}' requires fab_hash.",
             ),
-            ("flwr-agent", "Task type 'flwr-agent' requires fab_hash."),
-            ("flwr-model", "Task type 'flwr-model' requires model_ref."),
             (
-                "flwr-connector",
-                "Task type 'flwr-connector' requires connector_ref.",
+                TaskType.AGENT.value,
+                f"Task type '{TaskType.AGENT.value}' requires fab_hash.",
+            ),
+            (
+                TaskType.MODEL.value,
+                f"Task type '{TaskType.MODEL.value}' requires model_ref.",
+            ),
+            (
+                TaskType.CONNECTOR.value,
+                f"Task type '{TaskType.CONNECTOR.value}' requires connector_ref.",
             ),
         ]
     )  # type: ignore
@@ -537,7 +548,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         with self.assertRaises(grpc.RpcError) as err:
             self._create_task.with_call(
                 request=CreateTaskRequest(
-                    type="flwr-model",
+                    type=TaskType.MODEL.value,
                     run_id=42,
                     model_ref="model://test",
                 )

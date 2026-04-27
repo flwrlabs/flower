@@ -81,6 +81,12 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.superlink.utils import abort_if
 from flwr.server.utils.validator import validate_message
+from flwr.supercore.constant import (
+    TASK_TYPES_REQUIRING_CONNECTOR_REF,
+    TASK_TYPES_REQUIRING_FAB_HASH,
+    TASK_TYPES_REQUIRING_MODEL_REF,
+    TaskType,
+)
 from flwr.supercore.inflatable.inflatable_object import (
     UnexpectedObjectContentError,
     get_all_nested_objects,
@@ -581,34 +587,19 @@ def _raise_if(validation_error: bool, request_name: str, detail: str) -> None:
         raise ValueError(f"Malformed {request_name}: {detail}")
 
 
-TASK_TYPES = {
-    "flwr-serverapp",
-    "flwr-clientapp",
-    "flwr-simulation",
-    "flwr-agent",
-    "flwr-model",
-    "flwr-connector",
-}
-TASK_TYPES_REQUIRING_FAB_HASH = {
-    "flwr-serverapp",
-    "flwr-clientapp",
-    "flwr-agent",
-}
-TASK_TYPES_REQUIRING_MODEL_REF = {"flwr-model"}
-TASK_TYPES_REQUIRING_CONNECTOR_REF = {"flwr-connector"}
-
-
 def _validate_create_task_request(
     request: CreateTaskRequest, context: grpc.ServicerContext
 ) -> None:
     """Validate the task creation request."""
-    if request.type not in TASK_TYPES:
+    try:
+        task_type = TaskType(request.type)
+    except ValueError:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Invalid task type: {request.type}",
         )
 
-    if request.type in TASK_TYPES_REQUIRING_FAB_HASH and (
+    if task_type in TASK_TYPES_REQUIRING_FAB_HASH and (
         not request.HasField("fab_hash") or not request.fab_hash
     ):
         context.abort(
@@ -616,7 +607,7 @@ def _validate_create_task_request(
             f"Task type '{request.type}' requires fab_hash.",
         )
 
-    if request.type in TASK_TYPES_REQUIRING_MODEL_REF and (
+    if task_type in TASK_TYPES_REQUIRING_MODEL_REF and (
         not request.HasField("model_ref") or not request.model_ref
     ):
         context.abort(
@@ -624,7 +615,7 @@ def _validate_create_task_request(
             f"Task type '{request.type}' requires model_ref.",
         )
 
-    if request.type in TASK_TYPES_REQUIRING_CONNECTOR_REF and (
+    if task_type in TASK_TYPES_REQUIRING_CONNECTOR_REF and (
         not request.HasField("connector_ref") or not request.connector_ref
     ):
         context.abort(
