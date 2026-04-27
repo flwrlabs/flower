@@ -75,6 +75,8 @@ from flwr.proto.run_pb2 import (  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
+    PullPendingTasksRequest,
+    PullPendingTasksResponse,
 )
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.superlink.utils import abort_if
@@ -90,6 +92,8 @@ from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
 
 class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
     """ServerAppIo API servicer."""
+
+    _LAUNCHABLE_TASK_TYPES = frozenset({"flwr-serverapp", "flwr-simulation"})
 
     def __init__(
         self,
@@ -117,6 +121,26 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
 
         # Return run IDs
         return ListAppsToLaunchResponse(run_ids=pending_run_ids)
+
+    def PullPendingTasks(
+        self,
+        request: PullPendingTasksRequest,
+        context: grpc.ServicerContext,
+    ) -> PullPendingTasksResponse:
+        """Get pending ServerApp tasks to launch."""
+        log(DEBUG, "ServerAppIoServicer.PullPendingTasks")
+
+        del request, context
+
+        state = self.state_factory.state()
+        pending_tasks = state.get_tasks(
+            statuses=[Status.PENDING],
+            order_by="pending_at",
+        )
+        launchable_tasks = [
+            task for task in pending_tasks if task.type in self._LAUNCHABLE_TASK_TYPES
+        ]
+        return PullPendingTasksResponse(tasks=launchable_tasks)
 
     def RequestToken(
         self, request: RequestTokenRequest, context: grpc.ServicerContext

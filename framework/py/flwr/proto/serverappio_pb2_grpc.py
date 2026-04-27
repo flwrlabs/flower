@@ -44,6 +44,11 @@ class ServerAppIoStub(object):
                 request_serializer=flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchResponse.FromString,
                 _registered_method=True)
+        self.PullPendingTasks = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/PullPendingTasks',
+                request_serializer=flwr_dot_proto_dot_serverappio__pb2.PullPendingTasksRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_serverappio__pb2.PullPendingTasksResponse.FromString,
+                _registered_method=True)
         self.RequestToken = channel.unary_unary(
                 '/flwr.proto.ServerAppIo/RequestToken',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.RequestTokenRequest.SerializeToString,
@@ -125,6 +130,13 @@ class ServerAppIoServicer(object):
         ///////////////////////////////////////////////////////////////////////////
 
         List runs to launch
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def PullPendingTasks(self, request, context):
+        """Pull pending tasks to launch
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -248,6 +260,11 @@ def add_ServerAppIoServicer_to_server(servicer, server):
                     request_deserializer=flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchResponse.SerializeToString,
             ),
+            'PullPendingTasks': grpc.unary_unary_rpc_method_handler(
+                    servicer.PullPendingTasks,
+                    request_deserializer=flwr_dot_proto_dot_serverappio__pb2.PullPendingTasksRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_serverappio__pb2.PullPendingTasksResponse.SerializeToString,
+            ),
             'RequestToken': grpc.unary_unary_rpc_method_handler(
                     servicer.RequestToken,
                     request_deserializer=flwr_dot_proto_dot_appio__pb2.RequestTokenRequest.FromString,
@@ -346,6 +363,33 @@ class ServerAppIo(object):
             '/flwr.proto.ServerAppIo/ListAppsToLaunch',
             flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PullPendingTasks(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ServerAppIo/PullPendingTasks',
+            flwr_dot_proto_dot_serverappio__pb2.PullPendingTasksRequest.SerializeToString,
+            flwr_dot_proto_dot_serverappio__pb2.PullPendingTasksResponse.FromString,
             options,
             channel_credentials,
             insecure,

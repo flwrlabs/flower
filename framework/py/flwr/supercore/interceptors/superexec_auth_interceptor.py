@@ -46,6 +46,7 @@ from .appio_token_interceptor import AUTHENTICATION_FAILED_MESSAGE
 SERVERAPPIO_SUPEREXEC_METHODS: frozenset[str] = frozenset(
     {
         "/flwr.proto.ServerAppIo/ListAppsToLaunch",
+        "/flwr.proto.ServerAppIo/PullPendingTasks",
         "/flwr.proto.ServerAppIo/RequestToken",
         "/flwr.proto.ServerAppIo/GetRun",
     }

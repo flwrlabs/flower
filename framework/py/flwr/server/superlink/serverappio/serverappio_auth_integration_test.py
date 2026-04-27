@@ -29,6 +29,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
+    PullPendingTasksRequest,
+    PullPendingTasksResponse,
 )
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
@@ -90,6 +92,11 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
             request_serializer=ListAppsToLaunchRequest.SerializeToString,
             response_deserializer=ListAppsToLaunchResponse.FromString,
         )
+        self._pull_pending_tasks_no_auth = base_channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PullPendingTasks",
+            request_serializer=PullPendingTasksRequest.SerializeToString,
+            response_deserializer=PullPendingTasksResponse.FromString,
+        )
         auth_channel = grpc.intercept_channel(
             base_channel,
             AppIoTokenClientInterceptor(token=auth_token),
@@ -107,6 +114,11 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
             "/flwr.proto.ServerAppIo/ListAppsToLaunch",
             request_serializer=ListAppsToLaunchRequest.SerializeToString,
             response_deserializer=ListAppsToLaunchResponse.FromString,
+        )
+        self._pull_pending_tasks = auth_channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PullPendingTasks",
+            request_serializer=PullPendingTasksRequest.SerializeToString,
+            response_deserializer=PullPendingTasksResponse.FromString,
         )
 
     def tearDown(self) -> None:
@@ -164,4 +176,19 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
             request=ListAppsToLaunchRequest()
         )
         assert isinstance(response, ListAppsToLaunchResponse)
+        assert call.code() == grpc.StatusCode.OK
+
+    def test_pull_pending_tasks_denied_without_superexec_metadata(self) -> None:
+        """SuperExec RPC should deny unsigned PullPendingTasks requests."""
+        with self.assertRaises(grpc.RpcError) as err:
+            self._pull_pending_tasks_no_auth.with_call(request=PullPendingTasksRequest())
+        assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
+        assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE
+
+    def test_pull_pending_tasks_allows_with_superexec_metadata(self) -> None:
+        """SuperExec RPC should allow signed PullPendingTasks requests."""
+        response, call = self._pull_pending_tasks.with_call(
+            request=PullPendingTasksRequest()
+        )
+        assert isinstance(response, PullPendingTasksResponse)
         assert call.code() == grpc.StatusCode.OK
