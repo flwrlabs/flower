@@ -44,7 +44,9 @@ from flwr.common.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
 
 from .utils import (
+    _extract_error_message,
     build_pathspec,
+    cli_output_handler,
     collect_files,
     depth_of,
     filter_paths_for_publish,
@@ -262,6 +264,29 @@ def test_custom_grpc_err_handler() -> None:
             raise grpc_error
 
     mock_handler.assert_called_once_with(grpc_error)
+
+
+def test_extract_error_message_uses_json_message_field() -> None:
+    """JSON-encoded errors use only their message field."""
+    err = Exception('{"message": "request failed", "code": 400}')
+
+    assert _extract_error_message(err) == "request failed"
+
+
+def test_extract_error_message_falls_back_to_plain_string() -> None:
+    """Non-JSON errors fall back to their normal string form."""
+    err = Exception("plain failure")
+
+    assert _extract_error_message(err) == "plain failure"
+
+
+def test_cli_output_handler_raises_click_exception_for_json_error() -> None:
+    """cli_output_handler uses the parsed message for ClickException text."""
+    with pytest.raises(click.ClickException, match="request failed") as exc_info:
+        with cli_output_handler():
+            raise click.ClickException('{"message": "request failed", "code": 400}')
+
+    assert exc_info.value.message == "request failed"
 
 
 @pytest.mark.parametrize(

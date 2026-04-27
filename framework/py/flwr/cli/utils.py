@@ -84,6 +84,18 @@ def print_json_to_stdout(data: str | Any) -> None:
         Console(file=sys.__stdout__).print_json(data=data)
 
 
+def _extract_error_message(err: Exception) -> str:
+    """Return the message field from JSON-encoded errors when available."""
+    err_message = str(err)
+    try:
+        parsed = json.loads(err_message)
+        if isinstance(parsed, dict) and "message" in parsed:
+            return str(parsed["message"])
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return err_message
+
+
 @contextmanager  # docsig: ignore=SIG503
 def cli_output_handler(
     output_format: str = CliOutputFormat.DEFAULT,
@@ -106,13 +118,14 @@ def cli_output_handler(
     try:
         yield is_json
     except Exception as err:  # pylint: disable=broad-except
+        err_message = _extract_error_message(err)
         if is_json:
             restore_output()
-            print_json_error(captured_output.getvalue(), err)
+            print_json_error(captured_output.getvalue(), Exception(err_message))
         else:
             if isinstance(err, typer.Exit):
                 raise  # Allow typer.Exit to escape normally
-            raise click.ClickException(str(err)) from None
+            raise click.ClickException(err_message) from None
     finally:
         if is_json:
             restore_output()
