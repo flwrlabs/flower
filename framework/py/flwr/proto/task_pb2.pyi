@@ -100,3 +100,37 @@ class TaskStatus(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["details", b"details", "status", b"status", "sub_status", b"sub_status"]) -> None: ...
 
 global___TaskStatus = TaskStatus
+
+@typing.final
+class ClaimTaskRequest(google.protobuf.message.Message):
+    """ClaimTask messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASK_TYPE_FIELD_NUMBER: builtins.int
+    task_type: builtins.str
+    def __init__(
+        self,
+        *,
+        task_type: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["task_type", b"task_type"]) -> None: ...
+
+global___ClaimTaskRequest = ClaimTaskRequest
+
+@typing.final
+class ClaimTaskResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASK_FIELD_NUMBER: builtins.int
+    @property
+    def task(self) -> global___Task: ...
+    def __init__(
+        self,
+        *,
+        task: global___Task | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["task", b"task"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["task", b"task"]) -> None: ...
+
+global___ClaimTaskResponse = ClaimTaskResponse

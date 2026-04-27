@@ -93,3 +93,35 @@ class SendAppHeartbeatResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["success", b"success"]) -> None: ...
 
 global___SendAppHeartbeatResponse = SendAppHeartbeatResponse
+
+@typing.final
+class SendTaskHeartbeatRequest(google.protobuf.message.Message):
+    """Task Heartbeat messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASK_ID_FIELD_NUMBER: builtins.int
+    task_id: builtins.int
+    def __init__(
+        self,
+        *,
+        task_id: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["task_id", b"task_id"]) -> None: ...
+
+global___SendTaskHeartbeatRequest = SendTaskHeartbeatRequest
+
+@typing.final
+class SendTaskHeartbeatResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SUCCESS_FIELD_NUMBER: builtins.int
+    success: builtins.bool
+    def __init__(
+        self,
+        *,
+        success: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["success", b"success"]) -> None: ...
+
+global___SendTaskHeartbeatResponse = SendTaskHeartbeatResponse

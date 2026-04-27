@@ -16,6 +16,7 @@
 
 
 from logging import DEBUG, ERROR, INFO, WARNING
+from typing import NoReturn
 
 import grpc
 
@@ -50,6 +51,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
     SendAppHeartbeatRequest,
     SendAppHeartbeatResponse,
+    SendTaskHeartbeatRequest,
+    SendTaskHeartbeatResponse,
 )
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
@@ -75,6 +78,10 @@ from flwr.proto.run_pb2 import (  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
+)
+from flwr.proto.task_pb2 import (  # pylint: disable=E0611
+    ClaimTaskRequest,
+    ClaimTaskResponse,
 )
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.superlink.utils import abort_if
@@ -317,6 +324,14 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
 
         return GetRunResponse(run=run_to_proto(runs[0]))
 
+    def ClaimTask(
+        self, request: ClaimTaskRequest, context: grpc.ServicerContext
+    ) -> ClaimTaskResponse:
+        """Claim one task for an authenticated app executor."""
+        log(DEBUG, "ServerAppIoServicer.ClaimTask")
+        _ = request
+        _abort_unimplemented_rpc(context, "ClaimTask")
+
     def PullAppInputs(
         self, request: PullAppInputsRequest, context: grpc.ServicerContext
     ) -> PullAppInputsResponse:
@@ -436,6 +451,14 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         success = state.acknowledge_app_heartbeat(request.token)
         return SendAppHeartbeatResponse(success=success)
 
+    def SendTaskHeartbeat(
+        self, request: SendTaskHeartbeatRequest, context: grpc.ServicerContext
+    ) -> SendTaskHeartbeatResponse:
+        """Handle a heartbeat for a claimed task."""
+        log(DEBUG, "ServerAppIoServicer.SendTaskHeartbeat")
+        _ = request
+        _abort_unimplemented_rpc(context, "SendTaskHeartbeat")
+
     def PushObject(
         self, request: PushObjectRequest, context: grpc.ServicerContext
     ) -> PushObjectResponse:
@@ -547,3 +570,14 @@ def _raise_if(validation_error: bool, request_name: str, detail: str) -> None:
     """Raise a `ValueError` with a detailed message if a validation error occurs."""
     if validation_error:
         raise ValueError(f"Malformed {request_name}: {detail}")
+
+
+def _abort_unimplemented_rpc(
+    context: grpc.ServicerContext, method_name: str
+) -> NoReturn:
+    """Abort an RPC with an explicit UNIMPLEMENTED status."""
+    context.abort(
+        grpc.StatusCode.UNIMPLEMENTED,
+        f"{method_name} is not implemented yet.",
+    )
+    raise RuntimeError("Unreachable code")

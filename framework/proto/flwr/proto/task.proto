@@ -39,3 +39,7 @@ message TaskStatus {
   // failure details
   string details = 3;
 }
+
+// ClaimTask messages
+message ClaimTaskRequest { string task_type = 1; }
+message ClaimTaskResponse { Task task = 1; }

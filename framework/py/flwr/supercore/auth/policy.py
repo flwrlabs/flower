@@ -43,6 +43,7 @@ SERVERAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ServerAppIo/RequestToken": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ServerAppIo/GetRun": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ServerAppIo/SendAppHeartbeat": MethodTokenPolicy.token_required(),
+    "/flwr.proto.ServerAppIo/SendTaskHeartbeat": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PullAppInputs": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PushAppOutputs": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PushObject": MethodTokenPolicy.token_required(),

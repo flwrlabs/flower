@@ -23,6 +23,7 @@ import "flwr/proto/node.proto";
 import "flwr/proto/message.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/appio.proto";
+import "flwr/proto/task.proto";
 
 service ServerAppIo {
 
@@ -47,6 +48,13 @@ service ServerAppIo {
   // App heartbeat
   rpc SendAppHeartbeat(SendAppHeartbeatRequest)
       returns (SendAppHeartbeatResponse) {}
+
+  // Claim task
+  rpc ClaimTask(ClaimTaskRequest) returns (ClaimTaskResponse) {}
+
+  // Task heartbeat
+  rpc SendTaskHeartbeat(SendTaskHeartbeatRequest)
+      returns (SendTaskHeartbeatResponse) {}
 
   // Pull app inputs
   rpc PullAppInputs(PullAppInputsRequest) returns (PullAppInputsResponse) {}
