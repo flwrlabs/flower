@@ -83,9 +83,11 @@ class RuntimeVersionMetadata:
             FLWR_PACKAGE_VERSION_METADATA_KEY,
             FLWR_COMPONENT_NAME_METADATA_KEY,
         )
-        metadata_values = _coerce_grpc_metadata_values(
+        metadata_values, decode_error = _coerce_grpc_metadata_values(
             grpc_metadata, relevant_keys=relevant_keys
         )
+        if decode_error is not None:
+            return None, decode_error
         present_keys = [key for key in relevant_keys if key in metadata_values]
         if not present_keys:
             return None, None
@@ -329,9 +331,9 @@ def _coerce_grpc_metadata_values(
     metadata: Sequence[tuple[str, str | bytes]] | None,
     *,
     relevant_keys: Sequence[str] | None = None,
-) -> dict[str, list[str]]:
+) -> tuple[dict[str, list[str]], str | None]:
     if metadata is None:
-        return {}
+        return {}, None
 
     relevant_keys_set = set(relevant_keys) if relevant_keys is not None else None
     values: dict[str, list[str]] = {}
@@ -339,13 +341,19 @@ def _coerce_grpc_metadata_values(
         str_key = str(key)
         if relevant_keys_set is not None and str_key not in relevant_keys_set:
             continue
-        str_value = (
-            value.decode("utf-8", errors="strict")
-            if isinstance(value, bytes)
-            else value
-        )
+        try:
+            str_value = (
+                value.decode("utf-8", errors="strict")
+                if isinstance(value, bytes)
+                else value
+            )
+        except UnicodeDecodeError:
+            return (
+                {},
+                "Flower runtime metadata contains non-UTF-8 values: " f"{str_key}.",
+            )
         values.setdefault(str_key, []).append(str_value)
-    return values
+    return values, None
 
 
 def _normalize_flower_version(version: str) -> str:

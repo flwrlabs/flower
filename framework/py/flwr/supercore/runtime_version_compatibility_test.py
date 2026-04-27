@@ -158,6 +158,23 @@ def test_runtime_version_metadata_from_grpc_metadata_accepts_bytes_values() -> N
     )
 
 
+def test_runtime_version_metadata_rejects_non_utf8_runtime_values() -> None:
+    """Relevant runtime metadata keys should reject non-UTF-8 byte values."""
+    metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
+        (
+            (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
+            (FLWR_PACKAGE_VERSION_METADATA_KEY, b"\xff\xfe"),
+            (FLWR_COMPONENT_NAME_METADATA_KEY, "cli"),
+        )
+    )
+
+    assert metadata is None
+    assert (
+        error == "Flower runtime metadata contains non-UTF-8 values: "
+        "flwr-package-version."
+    )
+
+
 def test_runtime_version_metadata_ignores_unrelated_binary_headers() -> None:
     """Unrelated binary metadata should not affect runtime metadata parsing."""
     metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
