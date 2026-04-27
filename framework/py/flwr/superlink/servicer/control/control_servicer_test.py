@@ -35,7 +35,6 @@ from flwr.common.constant import (
     NOOP_ACCOUNT_NAME,
     PUBLIC_KEY_ALREADY_IN_USE_MESSAGE,
     PUBLIC_KEY_NOT_VALID,
-    RUN_ID_NOT_FOUND_MESSAGE,
     Status,
     SubStatus,
 )
@@ -51,7 +50,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationRequest,
     CreateInvitationRequest,
     CreateInvitationResponse,
-    CreateTaskRequest,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -78,7 +76,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
-from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
@@ -177,125 +174,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(run_info.fab_version, fab_version)
         self.assertEqual(run_info.run_type, RunType.SERVER_APP)
         self.assertFalse(response.HasField("note"))
-
-    def test_create_task(self) -> None:
-        """Test CreateTask stores a pending task."""
-        run_id = self._create_dummy_run(self.aid)
-        request = CreateTaskRequest(
-            type="flwr-serverapp",
-            run_id=run_id,
-            fab_hash="hash123",
-        )
-
-        response = self.servicer.CreateTask(request, Mock())
-        tasks = self.state.get_tasks(task_ids=[response.task_id])
-
-        self.assertEqual(len(tasks), 1)
-        task = tasks[0]
-        self.assertEqual(task.task_id, response.task_id)
-        self.assertEqual(task.type, "flwr-serverapp")
-        self.assertEqual(task.run_id, run_id)
-        self.assertEqual(
-            task.status,
-            TaskStatus(status=Status.PENDING, sub_status="", details=""),
-        )
-        self.assertEqual(task.fab_hash, "hash123")
-        self.assertTrue(task.pending_at)
-        self.assertEqual(task.starting_at, "")
-        self.assertEqual(task.running_at, "")
-        self.assertEqual(task.finished_at, "")
-
-    def test_create_task_rejects_unknown_type(self) -> None:
-        """CreateTask should reject unknown task types."""
-        run_id = self._create_dummy_run(self.aid)
-        request = CreateTaskRequest(type="unknown-task", run_id=run_id)
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
-
-        with self.assertRaises(grpc.RpcError):
-            self.servicer.CreateTask(request, context)
-
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            "Invalid task type: unknown-task",
-        )
-
-    @parameterized.expand(
-        [
-            (
-                "flwr-serverapp",
-                "fab_hash",
-                "Task type 'flwr-serverapp' requires fab_hash.",
-            ),
-            (
-                "flwr-clientapp",
-                "fab_hash",
-                "Task type 'flwr-clientapp' requires fab_hash.",
-            ),
-            ("flwr-agent", "fab_hash", "Task type 'flwr-agent' requires fab_hash."),
-            ("flwr-model", "model_ref", "Task type 'flwr-model' requires model_ref."),
-            (
-                "flwr-connector",
-                "connector_ref",
-                "Task type 'flwr-connector' requires connector_ref.",
-            ),
-        ]
-    )  # type: ignore
-    def test_create_task_rejects_missing_required_fields(
-        self, task_type: str, _field: str, error_msg: str
-    ) -> None:
-        """CreateTask should reject missing per-type required fields."""
-        run_id = self._create_dummy_run(self.aid)
-        request = CreateTaskRequest(type=task_type, run_id=run_id)
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
-
-        with self.assertRaises(grpc.RpcError):
-            self.servicer.CreateTask(request, context)
-
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            error_msg,
-        )
-
-    def test_create_task_rejects_missing_run(self) -> None:
-        """CreateTask should reject unknown run IDs."""
-        request = CreateTaskRequest(
-            type="flwr-model",
-            run_id=42,
-            model_ref="model://test",
-        )
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
-
-        with self.assertRaises(grpc.RpcError):
-            self.servicer.CreateTask(request, context)
-
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.NOT_FOUND,
-            RUN_ID_NOT_FOUND_MESSAGE,
-        )
-
-    def test_create_task_denied_when_not_federation_member(self) -> None:
-        """CreateTask should enforce federation membership for the run."""
-        run_id = self._create_dummy_run(self.aid)
-        request = CreateTaskRequest(
-            type="flwr-model",
-            run_id=run_id,
-            model_ref="model://test",
-        )
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
-
-        with (
-            patch.object(
-                self.state.federation_manager,
-                "has_member",
-                return_value=False,
-            ),
-            self.assertRaises(grpc.RpcError),
-        ):
-            self.servicer.CreateTask(request, context)
 
     def test_start_run_returns_note_for_remote_app(self) -> None:
         """Test StartRun includes the Hub compatibility note for remote apps."""

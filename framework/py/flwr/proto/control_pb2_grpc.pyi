@@ -39,12 +39,6 @@ class ControlStub:
     ]
     """Start run upon request"""
 
-    CreateTask: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.control_pb2.CreateTaskRequest,
-        flwr.proto.control_pb2.CreateTaskResponse,
-    ]
-    """Create task upon request"""
-
     StopRun: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.StopRunRequest,
         flwr.proto.control_pb2.StopRunResponse,
@@ -194,12 +188,6 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.StartRunResponse,
     ]
     """Start run upon request"""
-
-    CreateTask: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.control_pb2.CreateTaskRequest,
-        flwr.proto.control_pb2.CreateTaskResponse,
-    ]
-    """Create task upon request"""
 
     StopRun: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.StopRunRequest,
@@ -352,14 +340,6 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.StartRunResponse, collections.abc.Awaitable[flwr.proto.control_pb2.StartRunResponse]]:
         """Start run upon request"""
-
-    @abc.abstractmethod
-    def CreateTask(
-        self,
-        request: flwr.proto.control_pb2.CreateTaskRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.control_pb2.CreateTaskResponse, collections.abc.Awaitable[flwr.proto.control_pb2.CreateTaskResponse]]:
-        """Create task upon request"""
 
     @abc.abstractmethod
     def StopRun(

@@ -20,7 +20,7 @@ from logging import DEBUG, ERROR, INFO, WARNING
 import grpc
 
 from flwr.common import Message
-from flwr.common.constant import SUPERLINK_NODE_ID, Status
+from flwr.common.constant import RUN_ID_NOT_FOUND_MESSAGE, SUPERLINK_NODE_ID, Status
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -73,6 +73,8 @@ from flwr.proto.run_pb2 import (  # pylint: disable=E0611
     UpdateRunStatusResponse,
 )
 from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
+    CreateTaskRequest,
+    CreateTaskResponse,
     GetNodesRequest,
     GetNodesResponse,
 )
@@ -173,6 +175,36 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         all_ids: set[int] = state.get_nodes(request.run_id)
         nodes: list[Node] = [Node(node_id=node_id) for node_id in all_ids]
         return GetNodesResponse(nodes=nodes)
+
+    def CreateTask(
+        self, request: CreateTaskRequest, context: grpc.ServicerContext
+    ) -> CreateTaskResponse:
+        """Create a task."""
+        log(DEBUG, "ServerAppIoServicer.CreateTask")
+
+        state = self.state_factory.state()
+        runs = state.get_run_info(run_ids=[request.run_id])
+
+        if not runs:
+            context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
+            raise RuntimeError("This line should never be reached.")
+
+        _validate_create_task_request(request, context)
+
+        task_id = state.create_task(
+            task_type=request.type,
+            run_id=request.run_id,
+            fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
+            model_ref=request.model_ref if request.HasField("model_ref") else None,
+            connector_ref=(
+                request.connector_ref if request.HasField("connector_ref") else None
+            ),
+        )
+        if task_id is None:
+            context.abort(grpc.StatusCode.INTERNAL, "Failed to create task")
+            raise RuntimeError("This line should never be reached.")
+
+        return CreateTaskResponse(task_id=task_id)
 
     def PushMessages(
         self, request: PushAppMessagesRequest, context: grpc.ServicerContext
@@ -547,3 +579,55 @@ def _raise_if(validation_error: bool, request_name: str, detail: str) -> None:
     """Raise a `ValueError` with a detailed message if a validation error occurs."""
     if validation_error:
         raise ValueError(f"Malformed {request_name}: {detail}")
+
+
+TASK_TYPES = {
+    "flwr-serverapp",
+    "flwr-clientapp",
+    "flwr-simulation",
+    "flwr-agent",
+    "flwr-model",
+    "flwr-connector",
+}
+TASK_TYPES_REQUIRING_FAB_HASH = {
+    "flwr-serverapp",
+    "flwr-clientapp",
+    "flwr-agent",
+}
+TASK_TYPES_REQUIRING_MODEL_REF = {"flwr-model"}
+TASK_TYPES_REQUIRING_CONNECTOR_REF = {"flwr-connector"}
+
+
+def _validate_create_task_request(
+    request: CreateTaskRequest, context: grpc.ServicerContext
+) -> None:
+    """Validate the task creation request."""
+    if request.type not in TASK_TYPES:
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Invalid task type: {request.type}",
+        )
+
+    if request.type in TASK_TYPES_REQUIRING_FAB_HASH and (
+        not request.HasField("fab_hash") or not request.fab_hash
+    ):
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Task type '{request.type}' requires fab_hash.",
+        )
+
+    if request.type in TASK_TYPES_REQUIRING_MODEL_REF and (
+        not request.HasField("model_ref") or not request.model_ref
+    ):
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Task type '{request.type}' requires model_ref.",
+        )
+
+    if request.type in TASK_TYPES_REQUIRING_CONNECTOR_REF and (
+        not request.HasField("connector_ref") or not request.connector_ref
+    ):
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Task type '{request.type}' requires connector_ref.",
+        )

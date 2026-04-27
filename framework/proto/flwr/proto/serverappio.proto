@@ -91,8 +91,21 @@ service ServerAppIo {
 
   // Return a set of nodes
   rpc GetNodes(GetNodesRequest) returns (GetNodesResponse) {}
+
+  // Create a task
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {}
 }
 
 // GetNodes messages
 message GetNodesRequest { uint64 run_id = 1; }
 message GetNodesResponse { repeated Node nodes = 1; }
+
+// CreateTask messages
+message CreateTaskRequest {
+  string type = 1;
+  uint64 run_id = 2;
+  optional string fab_hash = 3;
+  optional string model_ref = 4;
+  optional string connector_ref = 5;
+}
+message CreateTaskResponse { optional uint64 task_id = 1; }

@@ -30,6 +30,7 @@ from parameterized import parameterized
 
 from flwr.common import ConfigRecord, Context, Error, Message, RecordDict
 from flwr.common.constant import (
+    RUN_ID_NOT_FOUND_MESSAGE,
     SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
     SUPERLINK_NODE_ID,
     Status,
@@ -75,9 +76,12 @@ from flwr.proto.run_pb2 import (  # pylint: disable=E0611
     UpdateRunStatusResponse,
 )
 from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
+    CreateTaskRequest,
+    CreateTaskResponse,
     GetNodesRequest,
     GetNodesResponse,
 )
+from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
@@ -354,6 +358,11 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=GetNodesRequest.SerializeToString,
             response_deserializer=GetNodesResponse.FromString,
         )
+        self._create_task = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/CreateTask",
+            request_serializer=CreateTaskRequest.SerializeToString,
+            response_deserializer=CreateTaskResponse.FromString,
+        )
         self._push_messages = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/PushMessages",
             request_serializer=PushAppMessagesRequest.SerializeToString,
@@ -449,6 +458,93 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Assert
         assert isinstance(response, GetNodesResponse)
         assert grpc.StatusCode.OK == call.code()
+
+    def test_create_task_stores_pending_task(self) -> None:
+        """Test `CreateTask` stores a pending task."""
+        run_id = self._create_dummy_run()
+        request = CreateTaskRequest(
+            type="flwr-serverapp",
+            run_id=run_id,
+            fab_hash="hash123",
+        )
+
+        response, call = self._create_task.with_call(request=request)
+
+        assert isinstance(response, CreateTaskResponse)
+        assert grpc.StatusCode.OK == call.code()
+        tasks = self.state.get_tasks(task_ids=[response.task_id])
+        self.assertEqual(len(tasks), 1)
+        task = tasks[0]
+        self.assertEqual(task.task_id, response.task_id)
+        self.assertEqual(task.type, "flwr-serverapp")
+        self.assertEqual(task.run_id, run_id)
+        self.assertEqual(
+            task.status,
+            TaskStatus(status=Status.PENDING, sub_status="", details=""),
+        )
+        self.assertEqual(task.fab_hash, "hash123")
+        self.assertTrue(task.pending_at)
+        self.assertEqual(task.starting_at, "")
+        self.assertEqual(task.running_at, "")
+        self.assertEqual(task.finished_at, "")
+
+    def test_create_task_rejects_unknown_type(self) -> None:
+        """Test `CreateTask` rejects unknown task types."""
+        run_id = self._create_dummy_run()
+
+        with self.assertRaises(grpc.RpcError) as err:
+            self._create_task.with_call(
+                request=CreateTaskRequest(type="unknown-task", run_id=run_id)
+            )
+
+        assert err.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
+        assert err.exception.details() == "Invalid task type: unknown-task"
+
+    @parameterized.expand(
+        [
+            (
+                "flwr-serverapp",
+                "Task type 'flwr-serverapp' requires fab_hash.",
+            ),
+            (
+                "flwr-clientapp",
+                "Task type 'flwr-clientapp' requires fab_hash.",
+            ),
+            ("flwr-agent", "Task type 'flwr-agent' requires fab_hash."),
+            ("flwr-model", "Task type 'flwr-model' requires model_ref."),
+            (
+                "flwr-connector",
+                "Task type 'flwr-connector' requires connector_ref.",
+            ),
+        ]
+    )  # type: ignore
+    def test_create_task_rejects_missing_required_fields(
+        self, task_type: str, error_msg: str
+    ) -> None:
+        """Test `CreateTask` rejects missing per-type required fields."""
+        run_id = self._create_dummy_run()
+
+        with self.assertRaises(grpc.RpcError) as err:
+            self._create_task.with_call(
+                request=CreateTaskRequest(type=task_type, run_id=run_id)
+            )
+
+        assert err.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
+        assert err.exception.details() == error_msg
+
+    def test_create_task_rejects_missing_run(self) -> None:
+        """Test `CreateTask` rejects unknown run IDs."""
+        with self.assertRaises(grpc.RpcError) as err:
+            self._create_task.with_call(
+                request=CreateTaskRequest(
+                    type="flwr-model",
+                    run_id=42,
+                    model_ref="model://test",
+                )
+            )
+
+        assert err.exception.code() == grpc.StatusCode.NOT_FOUND
+        assert err.exception.details() == RUN_ID_NOT_FOUND_MESSAGE
 
     def _assert_get_nodes_not_allowed(self, run_id: int) -> None:
         """Assert `GetNodes` not allowed."""

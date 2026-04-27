@@ -69,8 +69,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
-    CreateTaskRequest,
-    CreateTaskResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
     GetLoginDetailsRequest,
@@ -134,22 +132,6 @@ from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
 from .control_account_auth_interceptor import get_current_account_info
-
-TASK_TYPES = {
-    "flwr-serverapp",
-    "flwr-clientapp",
-    "flwr-simulation",
-    "flwr-agent",
-    "flwr-model",
-    "flwr-connector",
-}
-TASK_TYPES_REQUIRING_FAB_HASH = {
-    "flwr-serverapp",
-    "flwr-clientapp",
-    "flwr-agent",
-}
-TASK_TYPES_REQUIRING_MODEL_REF = {"flwr-model"}
-TASK_TYPES_REQUIRING_CONNECTOR_REF = {"flwr-connector"}
 
 
 # pylint: disable=too-many-public-methods
@@ -298,44 +280,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         log(INFO, "Created %s run %s", run_type, str(run_id))
         return StartRunResponse(run_id=run_id, note=note)
-
-    def CreateTask(
-        self, request: CreateTaskRequest, context: grpc.ServicerContext
-    ) -> CreateTaskResponse:
-        """Create task ID."""
-        log(INFO, rpc_name := self.CreateTask.__qualname__)
-
-        state = self.linkstate_factory.state()
-        runs = state.get_run_info(run_ids=[request.run_id])
-
-        if not runs:
-            context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
-            raise grpc.RpcError()  # This line is unreachable
-        run = runs[0]
-
-        with rpc_error_translator(context, rpc_name):
-            flwr_aid = _get_flwr_aid(context)
-            _validate_federation_membership_in_request(
-                state, flwr_aid, run.federation, context
-            )
-
-        _validate_create_task_request(request, context)
-
-        task_id = state.create_task(
-            task_type=request.type,
-            run_id=request.run_id,
-            fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
-            model_ref=request.model_ref if request.HasField("model_ref") else None,
-            connector_ref=(
-                request.connector_ref if request.HasField("connector_ref") else None
-            ),
-        )
-        if task_id is None:
-            context.abort(grpc.StatusCode.INTERNAL, "Failed to create task")
-            raise grpc.RpcError()  # This line is unreachable
-
-        log(INFO, "Created task %s of type %s", str(task_id), request.type)
-        return CreateTaskResponse(task_id=task_id)
 
     def StreamLogs(  # pylint: disable=C0103
         self, request: StreamLogsRequest, context: grpc.ServicerContext
@@ -1057,41 +1001,6 @@ class FederationNotSpecified(FlowerError):
     def __init__(self) -> None:
         super().__init__(
             ApiErrorCode.FEDERATION_NOT_SPECIFIED, "No federation specified in request."
-        )
-
-
-def _validate_create_task_request(
-    request: CreateTaskRequest, context: grpc.ServicerContext
-) -> None:
-    """Validate the task creation request."""
-    if request.type not in TASK_TYPES:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Invalid task type: {request.type}",
-        )
-
-    if request.type in TASK_TYPES_REQUIRING_FAB_HASH and (
-        not request.HasField("fab_hash") or not request.fab_hash
-    ):
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Task type '{request.type}' requires fab_hash.",
-        )
-
-    if request.type in TASK_TYPES_REQUIRING_MODEL_REF and (
-        not request.HasField("model_ref") or not request.model_ref
-    ):
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Task type '{request.type}' requires model_ref.",
-        )
-
-    if request.type in TASK_TYPES_REQUIRING_CONNECTOR_REF and (
-        not request.HasField("connector_ref") or not request.connector_ref
-    ):
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Task type '{request.type}' requires connector_ref.",
         )
 
 

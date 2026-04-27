@@ -218,11 +218,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 starting_at=row["starting_at"],
                 running_at=row["running_at"],
                 finished_at=row["finished_at"],
-                status=TaskStatus(
-                    status=determine_task_status(row),
-                    sub_status="",
-                    details="",
-                ),
+                status=determine_task_status(row),
                 fab_hash=row["fab_hash"],
                 model_ref=row["model_ref"],
                 connector_ref=row["connector_ref"],
@@ -360,15 +356,15 @@ class SqlCoreState(CoreState, SqlMixin):
             return False
 
 
-def determine_task_status(row: dict[str, Any]) -> str:
+def determine_task_status(row: dict[str, Any]) -> TaskStatus:
     """Determine the status of the task based on timestamp fields."""
     if row["pending_at"]:
         if row["finished_at"]:
-            return Status.FINISHED
+            return TaskStatus(status=Status.FINISHED, sub_status="", details="")
         if row["starting_at"]:
             if row["running_at"]:
-                return Status.RUNNING
-            return Status.STARTING
-        return Status.PENDING
+                return TaskStatus(status=Status.RUNNING, sub_status="", details="")
+            return TaskStatus(status=Status.STARTING, sub_status="", details="")
+        return TaskStatus(status=Status.PENDING, sub_status="", details="")
     task_id = int64_to_uint64(row["task_id"])
     raise ValueError(f"The task {task_id} does not have a valid status.")
