@@ -84,4 +84,8 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         public_message="No federation specified. You must specify a federation to "
         "perform this action.",
     ),
+    ApiErrorCode.ENTITLEMENT_ERROR: ApiErrorSpec(
+        status_code=StatusCode.PERMISSION_DENIED,
+        public_message="",  # to be set based on entitlement endpoint response
+    ),
 }

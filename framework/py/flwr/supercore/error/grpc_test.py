@@ -15,6 +15,7 @@
 """Tests for gRPC error translation utilities."""
 
 
+import json
 from unittest.mock import Mock
 
 import grpc
@@ -39,7 +40,14 @@ def test_rpc_error_translator_mapped_flower_error() -> None:
             )
 
     spec = API_ERROR_MAP[ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT]
-    context.abort.assert_called_once_with(spec.status_code, spec.public_message)
+    context.abort.assert_called_once()
+    grpc_status, payload = context.abort.call_args.args
+    assert grpc_status == spec.status_code
+    assert json.loads(payload) == {
+        "code": ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT,
+        "message": spec.public_message,
+        "entitlement": False,
+    }
 
 
 def test_rpc_error_translator_grpc_error() -> None:
@@ -65,11 +73,36 @@ def test_rpc_error_translator_unmapped_flower_error() -> None:
     with pytest.raises(grpc.RpcError):
         with rpc_error_translator(context, "MockApi.MockRpc"):
             raise FlowerError(999, "internal diagnostic message")
+    context.abort.assert_called_once()
+    grpc_status, payload = context.abort.call_args.args
+    assert grpc_status == grpc.StatusCode.INTERNAL
+    assert json.loads(payload) == {
+        "code": 999,
+        "message": INTERNAL_SERVER_ERROR_MESSAGE,
+        "entitlement": False,
+    }
 
-    context.abort.assert_called_once_with(
-        grpc.StatusCode.INTERNAL,
-        INTERNAL_SERVER_ERROR_MESSAGE,
-    )
+
+def test_rpc_error_translator_entitlement_error_preserves_error_message() -> None:
+    """Keep the original error message for entitlement errors."""
+    context = Mock(spec=grpc.ServicerContext)
+    context.abort.side_effect = grpc.RpcError()
+    context.code.return_value = None
+
+    error_message = "Entitlement check failed: plan does not allow this action."
+
+    with pytest.raises(grpc.RpcError):
+        with rpc_error_translator(context, "MockApi.MockRpc"):
+            raise FlowerError(ApiErrorCode.ENTITLEMENT_ERROR, error_message)
+
+    context.abort.assert_called_once()
+    grpc_status, payload = context.abort.call_args.args
+    assert grpc_status == grpc.StatusCode.PERMISSION_DENIED
+    assert json.loads(payload) == {
+        "code": ApiErrorCode.ENTITLEMENT_ERROR,
+        "message": error_message,
+        "entitlement": True,
+    }
 
 
 def test_rpc_error_translator_unexpected_error() -> None:

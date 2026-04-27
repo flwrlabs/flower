@@ -14,7 +14,7 @@
 # ==============================================================================
 """Base error types for API-facing error translation."""
 
-
+import json
 from enum import IntEnum
 
 
@@ -25,6 +25,29 @@ class FlowerError(Exception):
         super().__init__(message)
         self.code = code
         self.message = message
+
+    def to_json(self, public_message: str) -> str:
+        """Convert error to JSON-serializable dict.
+
+        Parameters
+        ----------
+        public_message : str
+            Override for the public message. If "", the message from the
+            error spec will be used. This is the desired behaviour for
+            ENTITLEMENT_ERROR, where the public message is determined
+            dynamically based on the entitlement endpoint response.
+
+        Returns
+        -------
+        str
+            JSON string with `code`, `message`, `entitlement` fields.
+        """
+        json_msg: dict[str, str | int | bool] = {
+            "code": self.code,
+            "message": public_message if public_message else self.message,
+            "entitlement": self.code == ApiErrorCode.ENTITLEMENT_ERROR,
+        }
+        return json.dumps(json_msg)
 
 
 class ApiErrorCode(IntEnum):
@@ -43,3 +66,4 @@ class ApiErrorCode(IntEnum):
     FORBIDDEN_ACTION = 10
     SUPERNODE_ALREADY_IN_FEDERATION = 11
     FEDERATION_NOT_SPECIFIED = 12
+    ENTITLEMENT_ERROR = 13
