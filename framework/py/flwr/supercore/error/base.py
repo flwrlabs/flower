@@ -21,36 +21,44 @@ from enum import IntEnum
 class FlowerError(Exception):
     """Base exception that carries an internal error code and debug message."""
 
-    def __init__(self, code: int, message: str) -> None:
+    def __init__(
+        self,
+        code: int,
+        message: str,
+        public_details: str | None = None,
+    ) -> None:
         super().__init__(message)
         self.code = code
-        self.message = message
+        self.message = message  # Sensitive message
+        self.public_details = public_details
 
     def to_json(self, public_message: str) -> str:
-        """Convert error to JSON-serializable dict.
+        """Convert the error to a JSON string."""
+        return json.dumps(
+            {
+                "code": self.code,
+                "public_message": public_message,
+                "public_details": self.public_details,
+            }
+        )
 
-        Parameters
-        ----------
-        public_message : str
-            Override for the public message. The override is ignored
-            for ENTITLEMENT_ERROR. This is the desired behaviour for
-            ENTITLEMENT_ERROR, where the public message is determined
-            dynamically based on the entitlement endpoint response.
 
-        Returns
-        -------
-        str
-            JSON string with `code` and `message` fields.
-        """
-        json_msg: dict[str, str | int] = {
-            "code": self.code,
-            "message": (
-                self.message
-                if self.code == ApiErrorCode.ENTITLEMENT_ERROR
-                else public_message
-            ),
-        }
-        return json.dumps(json_msg)
+class EntitlementError(FlowerError):
+    """Exception raised when an account is not entitled to perform an action."""
+
+    def __init__(self, details: str, entitlement_code: int):
+        super().__init__(
+            message=details,
+            public_details=details,
+            code=ApiErrorCode.ENTITLEMENT_ERROR,
+        )
+        self.entitlement_code = entitlement_code
+
+    def to_json(self, public_message: str) -> str:
+        """Convert the error into a JSON string."""
+        base_dict = json.loads(super().to_json(public_message))
+        base_dict["entitlement_code"] = self.entitlement_code
+        return json.dumps(base_dict)
 
 
 class ApiErrorCode(IntEnum):

@@ -86,6 +86,6 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
     ),
     ApiErrorCode.ENTITLEMENT_ERROR: ApiErrorSpec(
         status_code=StatusCode.PERMISSION_DENIED,
-        public_message="",  # to be set based on entitlement endpoint response
+        public_message="Entitlement error.",
     ),
 }

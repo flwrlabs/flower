@@ -1343,4 +1343,13 @@ def test_format_verification_compact() -> None:
 def _assert_abort_with_flwr_err(ctx: MagicMock, code: int) -> None:
     """Assert that ctx.abort was called with a translated FlowerError."""
     spec = API_ERROR_MAP[code]
-    ctx.abort.assert_called_once_with(spec.status_code, spec.public_message)
+    ctx.abort.assert_called_once_with(
+        spec.status_code,
+        json.dumps(
+            {
+                "code": code,
+                "public_message": spec.public_message,
+                "public_details": None,
+            }
+        ),
+    )

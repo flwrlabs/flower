@@ -21,7 +21,7 @@ from unittest.mock import Mock
 import grpc
 import pytest
 
-from .base import ApiErrorCode, FlowerError
+from .base import ApiErrorCode, EntitlementError, FlowerError
 from .catalog import API_ERROR_MAP
 from .grpc import INTERNAL_SERVER_ERROR_MESSAGE, rpc_error_translator
 
@@ -45,7 +45,8 @@ def test_rpc_error_translator_mapped_flower_error() -> None:
     assert grpc_status == spec.status_code
     assert json.loads(payload) == {
         "code": ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT,
-        "message": spec.public_message,
+        "public_message": spec.public_message,
+        "public_details": None,
     }
 
 
@@ -77,28 +78,32 @@ def test_rpc_error_translator_unmapped_flower_error() -> None:
     assert grpc_status == grpc.StatusCode.INTERNAL
     assert json.loads(payload) == {
         "code": 999,
-        "message": INTERNAL_SERVER_ERROR_MESSAGE,
+        "public_message": INTERNAL_SERVER_ERROR_MESSAGE,
+        "public_details": None,
     }
 
 
 def test_rpc_error_translator_entitlement_error_preserves_error_message() -> None:
-    """Keep the original error message for entitlement errors."""
+    """Keep entitlement details in the translated payload."""
     context = Mock(spec=grpc.ServicerContext)
     context.abort.side_effect = grpc.RpcError()
     context.code.return_value = None
 
     error_message = "Entitlement check failed: plan does not allow this action."
+    entitlement_code = 101
 
     with pytest.raises(grpc.RpcError):
         with rpc_error_translator(context, "MockApi.MockRpc"):
-            raise FlowerError(ApiErrorCode.ENTITLEMENT_ERROR, error_message)
+            raise EntitlementError(error_message, entitlement_code)
 
     context.abort.assert_called_once()
     grpc_status, payload = context.abort.call_args.args
     assert grpc_status == grpc.StatusCode.PERMISSION_DENIED
     assert json.loads(payload) == {
         "code": ApiErrorCode.ENTITLEMENT_ERROR,
-        "message": error_message,
+        "public_message": API_ERROR_MAP[ApiErrorCode.ENTITLEMENT_ERROR].public_message,
+        "public_details": error_message,
+        "entitlement_code": entitlement_code,
     }
 
 

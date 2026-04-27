@@ -267,10 +267,13 @@ def test_custom_grpc_err_handler() -> None:
 
 
 def test_extract_error_message_uses_json_message_field() -> None:
-    """JSON-encoded errors use only their message field."""
-    err = Exception('{"message": "request failed", "code": 400}')
+    """Structured Flower errors combine public message and details."""
+    err = Exception(
+        '{"public_message": "request failed", '
+        '"public_details": "missing entitlement", "code": 400}'
+    )
 
-    assert _extract_error_message(err) == "request failed"
+    assert _extract_error_message(err) == "request failed Details: missing entitlement"
 
 
 def test_extract_error_message_falls_back_to_plain_string() -> None:

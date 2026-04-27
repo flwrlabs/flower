@@ -89,8 +89,11 @@ def _extract_error_message(err: Exception) -> str:
     err_message = str(err)
     try:
         parsed = json.loads(err_message)
-        if isinstance(parsed, dict) and "message" in parsed:
-            return str(parsed["message"])
+        if isinstance(parsed, dict) and "public_message" in parsed:
+            msg = str(parsed["public_message"])
+            if details := parsed.get("public_details"):
+                msg += f" Details: {details}"
+            return msg
     except (json.JSONDecodeError, TypeError):
         pass
     return err_message
