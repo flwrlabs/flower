@@ -24,6 +24,7 @@ from sqlalchemy import (
     MetaData,
     String,
     Table,
+    text,
 )
 
 
@@ -79,6 +80,8 @@ def create_corestate_metadata() -> MetaData:
         Column("starting_at", String, nullable=True),
         Column("running_at", String, nullable=True),
         Column("finished_at", String, nullable=True),
+        Column("sub_status", String, nullable=False, server_default=text("''")),
+        Column("details", String, nullable=False, server_default=text("''")),
     )
 
     return metadata
