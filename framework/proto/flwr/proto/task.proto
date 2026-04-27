@@ -41,5 +41,5 @@ message TaskStatus {
 }
 
 // ClaimTask messages
-message ClaimTaskRequest { string task_type = 1; }
-message ClaimTaskResponse { Task task = 1; }
+message ClaimTaskRequest { uint64 task_id = 1; }
+message ClaimTaskResponse { string token = 1; }

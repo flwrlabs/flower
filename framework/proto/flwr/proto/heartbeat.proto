@@ -31,5 +31,5 @@ message SendAppHeartbeatRequest { string token = 1 [ deprecated = true ]; }
 message SendAppHeartbeatResponse { bool success = 1; }
 
 // Task Heartbeat messages
-message SendTaskHeartbeatRequest { uint64 task_id = 1; }
+message SendTaskHeartbeatRequest {}
 message SendTaskHeartbeatResponse { bool success = 1; }

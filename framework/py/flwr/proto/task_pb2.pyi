@@ -107,14 +107,14 @@ class ClaimTaskRequest(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    TASK_TYPE_FIELD_NUMBER: builtins.int
-    task_type: builtins.str
+    TASK_ID_FIELD_NUMBER: builtins.int
+    task_id: builtins.int
     def __init__(
         self,
         *,
-        task_type: builtins.str = ...,
+        task_id: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["task_type", b"task_type"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["task_id", b"task_id"]) -> None: ...
 
 global___ClaimTaskRequest = ClaimTaskRequest
 
@@ -122,15 +122,13 @@ global___ClaimTaskRequest = ClaimTaskRequest
 class ClaimTaskResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    TASK_FIELD_NUMBER: builtins.int
-    @property
-    def task(self) -> global___Task: ...
+    TOKEN_FIELD_NUMBER: builtins.int
+    token: builtins.str
     def __init__(
         self,
         *,
-        task: global___Task | None = ...,
+        token: builtins.str = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["task", b"task"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["task", b"task"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["token", b"token"]) -> None: ...
 
 global___ClaimTaskResponse = ClaimTaskResponse
