@@ -33,7 +33,7 @@ from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
     RuntimeVersionServerInterceptor,
 )
-from flwr.supercore.runtime_version_compatibility import build_runtime_version_metadata
+from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
 
 _ClientCallDetails = namedtuple(
     "_ClientCallDetails",
@@ -102,7 +102,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         """Create a baseline interceptor for each test."""
         self.interceptor = RuntimeVersionServerInterceptor(
             connection_name="flwr-simulation <-> SuperLink ServerAppIo API",
-            local_metadata=build_runtime_version_metadata(
+            local_metadata=RuntimeVersionMetadata.from_local_component(
                 "superlink",
                 package_name_value="flwr",
                 package_version_value="1.29.0",

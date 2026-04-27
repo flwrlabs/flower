@@ -26,7 +26,6 @@ from google.protobuf.message import Message as GrpcMessage
 from flwr.supercore.runtime_version_compatibility import (
     CompatibilityResult,
     RuntimeVersionMetadata,
-    build_runtime_version_metadata,
     format_incompatible_version_message,
     format_invalid_metadata_message,
 )
@@ -36,7 +35,7 @@ class RuntimeVersionClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type
     """Attach Flower runtime version metadata to outbound unary RPCs."""
 
     def __init__(self, component_name: str) -> None:
-        self._metadata = build_runtime_version_metadata(component_name)
+        self._metadata = RuntimeVersionMetadata.from_local_component(component_name)
 
     def intercept_unary_unary(
         self,
@@ -145,5 +144,5 @@ def create_serverappio_runtime_version_server_interceptor(
     """Create the default runtime version interceptor for ServerAppIo."""
     return RuntimeVersionServerInterceptor(
         connection_name=connection_name,
-        local_metadata=build_runtime_version_metadata("superlink"),
+        local_metadata=RuntimeVersionMetadata.from_local_component("superlink"),
     )

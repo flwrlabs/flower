@@ -242,20 +242,6 @@ class CompatibilityResult:
     peer_version: ParsedFlowerVersion | None
 
 
-def build_runtime_version_metadata(
-    component_name: str,
-    *,
-    package_name_value: str = flwr_package_name,
-    package_version_value: str = flwr_package_version,
-) -> RuntimeVersionMetadata:
-    """Build metadata for the local Flower runtime component."""
-    return RuntimeVersionMetadata.from_local_component(
-        component_name,
-        package_name_value=package_name_value,
-        package_version_value=package_version_value,
-    )
-
-
 def parse_flower_version(version: str) -> ParsedFlowerVersion | None:
     """Parse a Flower version into its leading `major.minor.patch` tuple."""
     normalized_version = _normalize_flower_version(version)

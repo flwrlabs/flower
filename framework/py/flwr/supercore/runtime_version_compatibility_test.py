@@ -26,7 +26,6 @@ from flwr.supercore.constant import (
 from .runtime_version_compatibility import (
     ParsedFlowerVersion,
     RuntimeVersionMetadata,
-    build_runtime_version_metadata,
     evaluate_runtime_version_compatibility,
     format_incompatible_version_message,
     format_invalid_metadata_message,
@@ -62,7 +61,7 @@ def test_parse_flower_version_rejects_invalid_values(version: str) -> None:
 
 def test_runtime_version_metadata_round_trip() -> None:
     """Metadata should serialize using the shared key names."""
-    metadata = build_runtime_version_metadata(
+    metadata = RuntimeVersionMetadata.from_local_component(
         "supernode",
         package_name_value="flwr",
         package_version_value="1.29.0",
@@ -77,7 +76,7 @@ def test_runtime_version_metadata_round_trip() -> None:
 
 def test_runtime_version_metadata_appends_to_grpc_metadata() -> None:
     """Runtime metadata should replace stale values and preserve unrelated ones."""
-    metadata = build_runtime_version_metadata(
+    metadata = RuntimeVersionMetadata.from_local_component(
         "simulation",
         package_name_value="flwr",
         package_version_value="1.29.0",
@@ -101,7 +100,7 @@ def test_runtime_version_metadata_appends_to_grpc_metadata() -> None:
 def test_build_runtime_version_metadata_rejects_empty_component_name() -> None:
     """Component names must not be empty."""
     with pytest.raises(ValueError, match="component_name"):
-        build_runtime_version_metadata("")
+        RuntimeVersionMetadata.from_local_component("")
 
 
 def test_read_runtime_version_metadata_returns_missing_for_absent_keys() -> None:
