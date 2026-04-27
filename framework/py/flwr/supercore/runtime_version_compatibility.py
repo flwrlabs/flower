@@ -82,7 +82,9 @@ class RuntimeVersionMetadata:
             FLWR_PACKAGE_VERSION_METADATA_KEY,
             FLWR_COMPONENT_NAME_METADATA_KEY,
         )
-        metadata_values = _coerce_grpc_metadata_values(grpc_metadata)
+        metadata_values = _coerce_grpc_metadata_values(
+            grpc_metadata, relevant_keys=relevant_keys
+        )
         present_keys = [key for key in relevant_keys if key in metadata_values]
         if not present_keys:
             return None, None
@@ -345,13 +347,18 @@ def _coerce_grpc_metadata(
 
 def _coerce_grpc_metadata_values(
     metadata: Sequence[tuple[str, str | bytes]] | None,
+    *,
+    relevant_keys: Sequence[str] | None = None,
 ) -> dict[str, list[str]]:
     if metadata is None:
         return {}
 
+    relevant_keys_set = set(relevant_keys) if relevant_keys is not None else None
     values: dict[str, list[str]] = {}
     for key, value in metadata:
         str_key = str(key)
+        if relevant_keys_set is not None and str_key not in relevant_keys_set:
+            continue
         str_value = (
             value.decode("utf-8", errors="strict")
             if isinstance(value, bytes)

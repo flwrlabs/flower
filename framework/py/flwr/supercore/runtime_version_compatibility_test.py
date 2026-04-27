@@ -160,6 +160,19 @@ def test_runtime_version_metadata_from_grpc_metadata_accepts_bytes_values() -> N
     )
 
 
+def test_runtime_version_metadata_ignores_unrelated_binary_headers() -> None:
+    """Unrelated binary metadata should not affect runtime metadata parsing."""
+    metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
+        (
+            ("grpc-trace-bin", b"\xff\x00\xfe"),
+            ("other-header", "value"),
+        )
+    )
+
+    assert metadata is None
+    assert error is None
+
+
 def test_read_runtime_version_metadata_rejects_duplicate_values() -> None:
     """Runtime version metadata keys should appear at most once."""
     metadata, error = read_runtime_version_metadata(
