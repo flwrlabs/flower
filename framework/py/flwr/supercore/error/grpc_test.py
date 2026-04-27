@@ -46,7 +46,6 @@ def test_rpc_error_translator_mapped_flower_error() -> None:
     assert json.loads(payload) == {
         "code": ApiErrorCode.NO_FEDERATION_MANAGEMENT_SUPPORT,
         "message": spec.public_message,
-        "entitlement": False,
     }
 
 
@@ -79,7 +78,6 @@ def test_rpc_error_translator_unmapped_flower_error() -> None:
     assert json.loads(payload) == {
         "code": 999,
         "message": INTERNAL_SERVER_ERROR_MESSAGE,
-        "entitlement": False,
     }
 
 
@@ -101,7 +99,6 @@ def test_rpc_error_translator_entitlement_error_preserves_error_message() -> Non
     assert json.loads(payload) == {
         "code": ApiErrorCode.ENTITLEMENT_ERROR,
         "message": error_message,
-        "entitlement": True,
     }
 
 

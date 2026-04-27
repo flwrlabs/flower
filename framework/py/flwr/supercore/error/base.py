@@ -32,20 +32,23 @@ class FlowerError(Exception):
         Parameters
         ----------
         public_message : str
-            Override for the public message. If "", the message from the
-            error spec will be used. This is the desired behaviour for
+            Override for the public message. The override is ignored
+            for ENTITLEMENT_ERROR. This is the desired behaviour for
             ENTITLEMENT_ERROR, where the public message is determined
             dynamically based on the entitlement endpoint response.
 
         Returns
         -------
         str
-            JSON string with `code`, `message`, `entitlement` fields.
+            JSON string with `code` and `message` fields.
         """
-        json_msg: dict[str, str | int | bool] = {
+        json_msg: dict[str, str | int] = {
             "code": self.code,
-            "message": public_message if public_message else self.message,
-            "entitlement": self.code == ApiErrorCode.ENTITLEMENT_ERROR,
+            "message": (
+                self.message
+                if self.code == ApiErrorCode.ENTITLEMENT_ERROR
+                else public_message
+            ),
         }
         return json.dumps(json_msg)
 
