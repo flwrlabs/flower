@@ -139,7 +139,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore
 
 
 def create_serverappio_runtime_version_server_interceptor(
-    connection_name: str = "flwr-simulation <-> SuperLink ServerAppIo API",
+    connection_name: str = "Caller <-> SuperLink ServerAppIo API",
 ) -> RuntimeVersionServerInterceptor:
     """Create the default runtime version interceptor for ServerAppIo."""
     return RuntimeVersionServerInterceptor(

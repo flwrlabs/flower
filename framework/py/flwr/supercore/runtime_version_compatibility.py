@@ -350,7 +350,7 @@ def _coerce_grpc_metadata_values(
         except UnicodeDecodeError:
             return (
                 {},
-                "Flower runtime metadata contains non-UTF-8 values: " f"{str_key}.",
+                f"Flower runtime metadata contains non-UTF-8 values: {str_key}.",
             )
         values.setdefault(str_key, []).append(str_value)
     return values, None
