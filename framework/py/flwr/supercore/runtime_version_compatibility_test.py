@@ -33,19 +33,19 @@ from .runtime_version_compatibility import (
 )
 
 
-def test_runtime_version_metadata_round_trip() -> None:
-    """Metadata should serialize using the shared key names."""
+def test_runtime_version_metadata_appends_new_metadata() -> None:
+    """Runtime metadata should append the shared key names."""
     metadata = RuntimeVersionMetadata.from_local_component(
         "supernode",
         package_name_value="flwr",
         package_version_value="1.29.0",
     )
 
-    assert metadata.to_dict() == {
-        FLWR_PACKAGE_NAME_METADATA_KEY: "flwr",
-        FLWR_PACKAGE_VERSION_METADATA_KEY: "1.29.0",
-        FLWR_COMPONENT_NAME_METADATA_KEY: "supernode",
-    }
+    assert metadata.append_to_grpc_metadata(None) == (
+        (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
+        (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.0"),
+        (FLWR_COMPONENT_NAME_METADATA_KEY, "supernode"),
+    )
 
 
 def test_runtime_version_metadata_appends_to_grpc_metadata() -> None:

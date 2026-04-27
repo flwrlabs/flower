@@ -127,25 +127,22 @@ class RuntimeVersionMetadata:
             None,
         )
 
-    def to_dict(self) -> dict[str, str]:
-        """Serialize runtime version metadata to a string dictionary."""
-        return {
-            FLWR_PACKAGE_NAME_METADATA_KEY: self.package_name,
-            FLWR_PACKAGE_VERSION_METADATA_KEY: self.package_version,
-            FLWR_COMPONENT_NAME_METADATA_KEY: self.component_name,
-        }
-
     def append_to_grpc_metadata(
         self,
         grpc_metadata: Sequence[tuple[str, str | bytes]] | None,
     ) -> tuple[tuple[str, str | bytes], ...]:
         """Return gRPC metadata with runtime version values added or replaced."""
         metadata = tuple(grpc_metadata or ())
-        runtime_keys = self.to_dict()
+        runtime_metadata = (
+            (FLWR_PACKAGE_NAME_METADATA_KEY, self.package_name),
+            (FLWR_PACKAGE_VERSION_METADATA_KEY, self.package_version),
+            (FLWR_COMPONENT_NAME_METADATA_KEY, self.component_name),
+        )
+        runtime_keys = {key for key, _ in runtime_metadata}
         filtered_metadata = tuple(
             (key, value) for key, value in metadata if key not in runtime_keys
         )
-        return filtered_metadata + tuple(runtime_keys.items())
+        return filtered_metadata + runtime_metadata
 
     def check_compatibility_with(
         self,
