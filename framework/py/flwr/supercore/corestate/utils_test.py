@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,15 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower command line interface for shared infrastructure components."""
+"""CoreState utils tests."""
 
 
-from .flower_superexec import flower_superexec
-from .flwr_agentapp import flwr_agentapp
-from .flwr_model import flwr_model
+import unittest
 
-__all__ = [
-    "flower_superexec",
-    "flwr_agentapp",
-    "flwr_model",
-]
+from .utils import generate_rand_int_from_bytes
+
+
+class UtilsTest(unittest.TestCase):
+    """Test CoreState utils code."""
+
+    def test_generate_rand_int_from_bytes_unsigned_int(self) -> None:
+        """Test that the generated integer is unsigned (non-negative)."""
+        for num_bytes in range(1, 9):
+            with self.subTest(num_bytes=num_bytes):
+                rand_int = generate_rand_int_from_bytes(num_bytes)
+                self.assertGreaterEqual(rand_int, 0)

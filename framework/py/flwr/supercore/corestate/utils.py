@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,15 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower command line interface for shared infrastructure components."""
+"""Utility functions for CoreState."""
 
 
-from .flower_superexec import flower_superexec
-from .flwr_agentapp import flwr_agentapp
-from .flwr_model import flwr_model
+from os import urandom
 
-__all__ = [
-    "flower_superexec",
-    "flwr_agentapp",
-    "flwr_model",
-]
+
+def generate_rand_int_from_bytes(
+    num_bytes: int, exclude: set[int] | None = None
+) -> int:
+    """Generate a random unsigned integer from `num_bytes` bytes.
+
+    If `exclude` is set, this function guarantees such number is not returned.
+    """
+    num = int.from_bytes(urandom(num_bytes), "little", signed=False)
+
+    if exclude:
+        while num in exclude:
+            num = int.from_bytes(urandom(num_bytes), "little", signed=False)
+    return num
