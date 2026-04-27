@@ -29,10 +29,8 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
-from flwr.supercore.version import (
-    package_name as flwr_package_name,
-    package_version as flwr_package_version,
-)
+from flwr.supercore.version import package_name as flwr_package_name
+from flwr.supercore.version import package_version as flwr_package_version
 
 RuntimeCompatibilityStatus = Literal[
     "missing",
