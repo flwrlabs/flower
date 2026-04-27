@@ -16,15 +16,28 @@
 
 
 from enum import IntEnum
+import json
 
 
 class FlowerError(Exception):
     """Base exception that carries an internal error code and debug message."""
 
-    def __init__(self, code: int, message: str) -> None:
+    def __init__(
+        self, code: int, message: str, public_details: str | None = None,
+    ) -> None:
         super().__init__(message)
         self.code = code
-        self.message = message
+        self.message = message  # Sensitive message
+        self.public_details = public_details
+
+    def to_json(self, public_message: str) -> str:
+        """Convert the error to a JSON string."""
+        return json.dumps({
+            "code": self.code,
+            "public_message": public_message,
+            "public_details": self.public_details,
+        }
+        )
 
 
 class ApiErrorCode(IntEnum):
