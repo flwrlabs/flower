@@ -114,8 +114,8 @@ def test_read_runtime_version_metadata_accepts_metadata_item_iterables() -> None
     )
 
 
-def test_runtime_version_metadata_from_grpc_metadata_accepts_bytes_values() -> None:
-    """Runtime metadata parsing should accept gRPC byte values."""
+def test_runtime_version_metadata_rejects_bytes_values() -> None:
+    """Runtime metadata keys should reject non-string gRPC values."""
     metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
         (
             (FLWR_PACKAGE_NAME_METADATA_KEY, b"flwr"),
@@ -124,16 +124,15 @@ def test_runtime_version_metadata_from_grpc_metadata_accepts_bytes_values() -> N
         )
     )
 
-    assert error is None
-    assert metadata == RuntimeVersionMetadata(
-        package_name="flwr",
-        package_version="1.29.0",
-        component_name="cli",
+    assert metadata is None
+    assert (
+        error
+        == "Flower runtime metadata contains non-string values: flwr-package-name."
     )
 
 
-def test_runtime_version_metadata_rejects_non_utf8_runtime_values() -> None:
-    """Relevant runtime metadata keys should reject non-UTF-8 byte values."""
+def test_runtime_version_metadata_rejects_non_string_runtime_values() -> None:
+    """Relevant runtime metadata keys should reject non-string values."""
     metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
         (
             (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
@@ -144,7 +143,7 @@ def test_runtime_version_metadata_rejects_non_utf8_runtime_values() -> None:
 
     assert metadata is None
     assert (
-        error == "Flower runtime metadata contains non-UTF-8 values: "
+        error == "Flower runtime metadata contains non-string values: "
         "flwr-package-version."
     )
 

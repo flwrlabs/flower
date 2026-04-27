@@ -310,16 +310,11 @@ def _coerce_grpc_metadata_values(
         str_key = str(key)
         if relevant_keys_set is not None and str_key not in relevant_keys_set:
             continue
-        try:
-            str_value = (
-                value.decode("utf-8", errors="strict")
-                if isinstance(value, bytes)
-                else value
-            )
-        except UnicodeDecodeError:
+        if not isinstance(value, str):
             return (
                 {},
-                f"Flower runtime metadata contains non-UTF-8 values: {str_key}.",
+                f"Flower runtime metadata contains non-string values: {str_key}.",
             )
+        str_value = value
         values.setdefault(str_key, []).append(str_value)
     return values, None
