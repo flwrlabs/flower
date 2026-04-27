@@ -32,6 +32,7 @@ from flwr.supercore.utils import get_metadata_str
 
 APP_TOKEN_HEADER = "flwr-app-token"
 AUTHENTICATION_FAILED_MESSAGE = "Authentication failed."
+RUN_BINDING_FAILED_MESSAGE = "Token is not valid for requested run."
 
 
 class _TokenState(Protocol):
@@ -49,12 +50,25 @@ def _abort_auth_denied(context: grpc.ServicerContext) -> NoReturn:
     raise RuntimeError("Should not reach this point")
 
 
+def _abort_run_denied(context: grpc.ServicerContext) -> NoReturn:
+    context.abort(grpc.StatusCode.PERMISSION_DENIED, RUN_BINDING_FAILED_MESSAGE)
+    raise RuntimeError("Should not reach this point")
+
+
 def _unauthenticated_terminator() -> grpc.RpcMethodHandler:
     def _terminate(_request: GrpcMessage, context: grpc.ServicerContext) -> GrpcMessage:
         context.abort(grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE)
         raise RuntimeError("Should not reach this point")
 
     return grpc.unary_unary_rpc_method_handler(_terminate)
+
+
+def _get_request_run_id(request: GrpcMessage) -> int | None:
+    descriptor = getattr(request, "DESCRIPTOR", None)
+    if descriptor is None or "run_id" not in descriptor.fields_by_name:
+        return None
+    request_any = cast(Any, request)
+    return cast(int, request_any.run_id)
 
 
 class AppIoTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ignore
@@ -128,9 +142,15 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
 
             state = self._state_provider()
             run_id = state.get_run_id_by_token(token)
+
             # Validate both token->run lookup and run->token mapping.
             if run_id is None or not state.verify_token(run_id, token):
                 _abort_auth_denied(context)
+
+            # Validate request.run_id matches the run_id associated with the token
+            request_run_id: int | None = _get_request_run_id(request)
+            if request_run_id is not None and request_run_id != run_id:
+                _abort_run_denied(context)
 
             return unary_handler(request, context)
 

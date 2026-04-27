@@ -212,7 +212,7 @@ def pull_appinputs(
 
         # Pull and inflate the message
         pull_msg_res: PullAppMessagesResponse = stub.PullMessage(
-            PullAppMessagesRequest(token=token)
+            PullAppMessagesRequest(token=token, run_id=run.run_id)
         )
         run_id = context.run_id
         node = Node(node_id=context.node_id)
@@ -258,6 +258,7 @@ def push_appoutputs(
                 PushAppMessagesRequest(
                     token=token,
                     messages_list=[proto_message],
+                    run_id=context.run_id,
                     message_object_trees=[object_tree],
                 )
             )
@@ -281,7 +282,11 @@ def push_appoutputs(
 
         # Push Context
         res: PushAppOutputsResponse = stub.PushAppOutputs(
-            PushAppOutputsRequest(token=token, context=proto_context)
+            PushAppOutputsRequest(
+                token=token,
+                run_id=context.run_id,
+                context=proto_context,
+            )
         )
         return res
     except grpc.RpcError as e:
