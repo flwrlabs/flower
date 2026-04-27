@@ -1075,6 +1075,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         """Test `PullPendingTasks`."""
         serverapp_run_id = self._create_dummy_run(running=False)
         model_run_id = self._create_dummy_run(running=False)
+        connector_run_id = self._create_dummy_run(running=False)
         simulation_run_id = self._create_dummy_run(running=False)
 
         serverapp_task_id = self.state.create_task(
@@ -1085,6 +1086,10 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             task_type="flwr-model",
             run_id=model_run_id,
         )
+        connector_task_id = self.state.create_task(
+            task_type="flwr-connector",
+            run_id=connector_run_id,
+        )
         simulation_task_id = self.state.create_task(
             task_type="flwr-simulation",
             run_id=simulation_run_id,
@@ -1092,6 +1097,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 
         assert serverapp_task_id is not None
         assert model_task_id is not None
+        assert connector_task_id is not None
         assert simulation_task_id is not None
 
         response, call = self._pull_pending_tasks.with_call(

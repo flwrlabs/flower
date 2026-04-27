@@ -127,7 +127,7 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         request: PullPendingTasksRequest,
         context: grpc.ServicerContext,
     ) -> PullPendingTasksResponse:
-        """Get pending ServerApp tasks to launch."""
+        """Get pending top-level tasks to launch."""
         log(DEBUG, "ServerAppIoServicer.PullPendingTasks")
 
         del request, context
