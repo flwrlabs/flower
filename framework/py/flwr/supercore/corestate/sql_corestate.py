@@ -18,7 +18,8 @@
 import hashlib
 import json
 import secrets
-from typing import cast
+from collections.abc import Sequence
+from typing import Any, Literal, cast
 
 from sqlalchemy import MetaData, text
 from sqlalchemy.exc import IntegrityError
@@ -28,14 +29,18 @@ from flwr.common.constant import (
     FLWR_APP_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
+    TASK_ID_NUM_BYTES,
+    Status,
 )
 from flwr.common.typing import Fab
+from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
+from .utils import generate_rand_int_from_bytes
 
 
 class SqlCoreState(CoreState, SqlMixin):
@@ -92,6 +97,134 @@ class SqlCoreState(CoreState, SqlMixin):
             content=row["content"],
             verifications=json.loads(row["verifications"]),
         )
+
+    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        task_type: str,
+        run_id: int,
+        fab_hash: str | None = None,
+        model_ref: str | None = None,
+        connector_ref: str | None = None,
+    ) -> int | None:
+        """Create a task and return its ID."""
+        task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
+        sint64_task_id = uint64_to_int64(task_id)
+
+        insert_query = """
+            INSERT INTO task
+            (task_id, type, run_id, fab_hash, model_ref, connector_ref, token,
+             pending_at, starting_at, running_at, finished_at)
+            VALUES
+            (:task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
+             :pending_at, :starting_at, :running_at, :finished_at);
+        """
+
+        params = {
+            "task_id": sint64_task_id,
+            "type": task_type,
+            "run_id": uint64_to_int64(run_id),
+            "fab_hash": fab_hash,
+            "model_ref": model_ref,
+            "connector_ref": connector_ref,
+            "token": None,
+            "pending_at": now().isoformat(),
+            "starting_at": None,
+            "running_at": None,
+            "finished_at": None,
+        }
+
+        with self.session():
+            try:
+                self.query(insert_query, params)
+                return task_id
+            except IntegrityError:
+                return None
+
+    def get_tasks(  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches
+        self,
+        *,
+        task_ids: Sequence[int] | None = None,
+        statuses: Sequence[str] | None = None,
+        order_by: Literal["pending_at"] | None = None,
+        ascending: bool = True,
+        limit: int | None = None,
+    ) -> Sequence[Task]:
+        """Retrieve information about tasks based on the specified filters."""
+        if order_by not in (None, "pending_at"):
+            raise AssertionError("`order_by` must be 'pending_at' or None")
+
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+
+        if isinstance(statuses, str):
+            raise ValueError("`statuses` must be a sequence of strings")
+
+        conditions = []
+        params: dict[str, Any] = {}
+
+        if task_ids is not None:
+            if not task_ids:
+                return []
+            sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
+            placeholders = ",".join([f":tid_{i}" for i in range(len(sint64_task_ids))])
+            conditions.append(f"task_id IN ({placeholders})")
+            params.update(
+                {f"tid_{i}": task_id for i, task_id in enumerate(sint64_task_ids)}
+            )
+
+        if statuses is not None:
+            if not statuses:
+                return []
+            status_conditions = []
+            if "pending" in statuses:
+                status_conditions.append("starting_at IS NULL AND finished_at IS NULL")
+            if "starting" in statuses:
+                status_conditions.append(
+                    "starting_at IS NOT NULL AND running_at IS NULL "
+                    "AND finished_at IS NULL"
+                )
+            if "running" in statuses:
+                status_conditions.append(
+                    "running_at IS NOT NULL AND finished_at IS NULL"
+                )
+            if "finished" in statuses:
+                status_conditions.append("finished_at IS NOT NULL")
+            if not status_conditions:
+                return []
+            conditions.append(f"({' OR '.join(status_conditions)})")
+
+        query = """
+            SELECT task_id, type, run_id, fab_hash, model_ref, connector_ref,
+                   pending_at, starting_at, running_at, finished_at
+            FROM task
+        """
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        if order_by is not None:
+            query += f" ORDER BY {order_by} {'ASC' if ascending else 'DESC'}"
+        if limit is not None:
+            query += " LIMIT :limit"
+            params["limit"] = limit
+
+        rows = self.query(query, params)
+
+        result: list[Task] = []
+        for row in rows:
+            task = Task(
+                task_id=int64_to_uint64(row["task_id"]),
+                type=row["type"],
+                run_id=int64_to_uint64(row["run_id"]),
+                pending_at=row["pending_at"],
+                starting_at=row["starting_at"],
+                running_at=row["running_at"],
+                finished_at=row["finished_at"],
+                status=determine_task_status(row),
+                fab_hash=row["fab_hash"],
+                model_ref=row["model_ref"],
+                connector_ref=row["connector_ref"],
+            )
+            result.append(task)
+        return result
 
     def get_metadata(self) -> MetaData:
         """Return SQLAlchemy MetaData needed for CoreState tables."""
@@ -221,3 +354,17 @@ class SqlCoreState(CoreState, SqlMixin):
         # IntegrityError can only arise from (namespace, nonce) uniqueness.
         except IntegrityError:
             return False
+
+
+def determine_task_status(row: dict[str, Any]) -> TaskStatus:
+    """Determine the status of the task based on timestamp fields."""
+    if row["pending_at"]:
+        if row["finished_at"]:
+            return TaskStatus(status=Status.FINISHED, sub_status="", details="")
+        if row["starting_at"]:
+            if row["running_at"]:
+                return TaskStatus(status=Status.RUNNING, sub_status="", details="")
+            return TaskStatus(status=Status.STARTING, sub_status="", details="")
+        return TaskStatus(status=Status.PENDING, sub_status="", details="")
+    task_id = int64_to_uint64(row["task_id"])
+    raise ValueError(f"The task {task_id} does not have a valid status.")

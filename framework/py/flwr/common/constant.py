@@ -67,6 +67,7 @@ RUN_FAILURE_DETAILS_NO_HEARTBEAT = "No heartbeat received from the run."
 # IDs
 RUN_ID_NUM_BYTES = 8
 NODE_ID_NUM_BYTES = 8
+TASK_ID_NUM_BYTES = 8
 
 # Constants for FAB
 APP_DIR = "apps"

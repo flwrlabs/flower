@@ -543,7 +543,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """Create, store in the link state, and return `node_id`."""
         # Sample a random uint64 as node_id
         uint64_node_id = generate_rand_int_from_bytes(
-            NODE_ID_NUM_BYTES, exclude=[SUPERLINK_NODE_ID, 0]
+            NODE_ID_NUM_BYTES, exclude={SUPERLINK_NODE_ID, 0}
         )
 
         # Convert the uint64 value to sint64 for SQLite
