@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
@@ -39,11 +38,6 @@ RuntimeCompatibilityStatus = Literal[
     "compatible",
     "incompatible",
 ]
-
-_NIGHTLY_VERSION_PATTERN = re.compile(
-    r"^(?P<release>(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))"
-    r"-nightly(?:[.\-+].*)?$"
-)
 
 
 @dataclass(frozen=True)
@@ -168,8 +162,9 @@ class RuntimeVersionMetadata:
                 peer_version=None,
             )
 
-        local_version = parse_flower_version(self.package_version)
-        if local_version is None:
+        try:
+            local_version = Version(self.package_version)
+        except InvalidVersion:
             return CompatibilityResult(
                 status="disabled",
                 reason=(
@@ -182,8 +177,9 @@ class RuntimeVersionMetadata:
                 peer_version=None,
             )
 
-        peer_version = parse_flower_version(peer_metadata.package_version)
-        if peer_version is None:
+        try:
+            peer_version = Version(peer_metadata.package_version)
+        except InvalidVersion:
             peer_version_repr = repr(peer_metadata.package_version)
             return CompatibilityResult(
                 status="disabled",
@@ -223,15 +219,6 @@ class RuntimeVersionMetadata:
         )
 
 
-@dataclass(frozen=True, order=True)
-class ParsedFlowerVersion:
-    """A parsed `major.minor.patch` Flower version."""
-
-    major: int
-    minor: int
-    patch: int
-
-
 @dataclass(frozen=True)
 class CompatibilityResult:
     """Compatibility decision for a runtime peer."""
@@ -240,26 +227,8 @@ class CompatibilityResult:
     reason: str | None
     local_metadata: RuntimeVersionMetadata
     peer_metadata: RuntimeVersionMetadata | None
-    local_version: ParsedFlowerVersion | None
-    peer_version: ParsedFlowerVersion | None
-
-
-def parse_flower_version(version: str) -> ParsedFlowerVersion | None:
-    """Parse a Flower version into its leading `major.minor.patch` tuple."""
-    normalized_version = _normalize_flower_version(version)
-    try:
-        parsed_version = Version(normalized_version)
-    except InvalidVersion:
-        return None
-
-    if len(parsed_version.release) < 3:
-        return None
-
-    return ParsedFlowerVersion(
-        major=parsed_version.major,
-        minor=parsed_version.minor,
-        patch=parsed_version.micro,
-    )
+    local_version: Version | None
+    peer_version: Version | None
 
 
 def read_runtime_version_metadata(
@@ -354,10 +323,3 @@ def _coerce_grpc_metadata_values(
             )
         values.setdefault(str_key, []).append(str_value)
     return values, None
-
-
-def _normalize_flower_version(version: str) -> str:
-    normalized_version = version.strip()
-    if match := _NIGHTLY_VERSION_PATTERN.match(normalized_version):
-        return match.group("release")
-    return normalized_version

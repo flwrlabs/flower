@@ -16,6 +16,7 @@
 
 
 import pytest
+from packaging.version import Version
 
 from flwr.supercore.constant import (
     FLWR_COMPONENT_NAME_METADATA_KEY,
@@ -24,39 +25,12 @@ from flwr.supercore.constant import (
 )
 
 from .runtime_version_compatibility import (
-    ParsedFlowerVersion,
     RuntimeVersionMetadata,
     evaluate_runtime_version_compatibility,
     format_incompatible_version_message,
     format_invalid_metadata_message,
-    parse_flower_version,
     read_runtime_version_metadata,
 )
-
-
-@pytest.mark.parametrize(
-    ("version", "expected"),
-    [
-        ("1.29.0", ParsedFlowerVersion(1, 29, 0)),
-        ("1.29.7", ParsedFlowerVersion(1, 29, 7)),
-        ("1.29.0.dev12", ParsedFlowerVersion(1, 29, 0)),
-        ("1.29.0-nightly.20260423", ParsedFlowerVersion(1, 29, 0)),
-        ("1.29.0a0", ParsedFlowerVersion(1, 29, 0)),
-        ("1.29.0b1", ParsedFlowerVersion(1, 29, 0)),
-        ("1.29.0rc1", ParsedFlowerVersion(1, 29, 0)),
-    ],
-)
-def test_parse_flower_version_accepts_valid_prefixes(
-    version: str, expected: ParsedFlowerVersion
-) -> None:
-    """Leading `major.minor.patch` should be parsed consistently."""
-    assert parse_flower_version(version) == expected
-
-
-@pytest.mark.parametrize("version", ["1.29", "main", "dev", "unknown", "1.29.x"])
-def test_parse_flower_version_rejects_invalid_values(version: str) -> None:
-    """Versions without a parseable leading release tuple should fail."""
-    assert parse_flower_version(version) is None
 
 
 def test_runtime_version_metadata_round_trip() -> None:
@@ -214,7 +188,19 @@ def test_evaluate_runtime_version_compatibility_accepts_same_major_minor() -> No
     )
 
     assert result.status == "compatible"
-    assert result.peer_version == ParsedFlowerVersion(1, 29, 7)
+    assert result.peer_version == Version("1.29.7")
+
+
+def test_evaluate_runtime_version_compatibility_accepts_dev_versions() -> None:
+    """PEP 440 nightly/dev versions should be compatible by release tuple."""
+    result = evaluate_runtime_version_compatibility(
+        RuntimeVersionMetadata("flwr", "1.30.0.dev20260425", "superlink"),
+        RuntimeVersionMetadata("flwr", "1.30.0rc1", "supernode"),
+    )
+
+    assert result.status == "compatible"
+    assert result.local_version == Version("1.30.0.dev20260425")
+    assert result.peer_version == Version("1.30.0rc1")
 
 
 def test_evaluate_runtime_version_compatibility_rejects_different_minor() -> None:
