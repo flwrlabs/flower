@@ -32,7 +32,6 @@ from .runtime_version_compatibility import (
     format_invalid_metadata_message,
     parse_flower_version,
     read_runtime_version_metadata,
-    runtime_version_metadata_to_dict,
 )
 
 
@@ -69,7 +68,7 @@ def test_runtime_version_metadata_round_trip() -> None:
         package_version_value="1.29.0",
     )
 
-    assert runtime_version_metadata_to_dict(metadata) == {
+    assert metadata.to_dict() == {
         FLWR_PACKAGE_NAME_METADATA_KEY: "flwr",
         FLWR_PACKAGE_VERSION_METADATA_KEY: "1.29.0",
         FLWR_COMPONENT_NAME_METADATA_KEY: "supernode",

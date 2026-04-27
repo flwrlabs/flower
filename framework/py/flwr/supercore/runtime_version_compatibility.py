@@ -256,13 +256,6 @@ def build_runtime_version_metadata(
     )
 
 
-def runtime_version_metadata_to_dict(
-    metadata: RuntimeVersionMetadata,
-) -> dict[str, str]:
-    """Serialize runtime version metadata to a string dictionary."""
-    return metadata.to_dict()
-
-
 def parse_flower_version(version: str) -> ParsedFlowerVersion | None:
     """Parse a Flower version into its leading `major.minor.patch` tuple."""
     normalized_version = _normalize_flower_version(version)
