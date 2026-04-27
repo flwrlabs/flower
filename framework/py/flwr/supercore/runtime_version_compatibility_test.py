@@ -22,6 +22,7 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
+
 from .runtime_version_compatibility import (
     ParsedFlowerVersion,
     RuntimeVersionMetadata,

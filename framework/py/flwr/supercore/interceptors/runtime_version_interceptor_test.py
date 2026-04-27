@@ -23,19 +23,17 @@ from unittest.mock import Mock
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
+from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
 from flwr.supercore.constant import (
     FLWR_COMPONENT_NAME_METADATA_KEY,
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
-from flwr.supercore.runtime_version_compatibility import (
-    build_runtime_version_metadata,
-)
-from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
 from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
     RuntimeVersionServerInterceptor,
 )
+from flwr.supercore.runtime_version_compatibility import build_runtime_version_metadata
 
 _ClientCallDetails = namedtuple(
     "_ClientCallDetails",
