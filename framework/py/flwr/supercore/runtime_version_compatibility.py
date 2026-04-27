@@ -29,7 +29,10 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
-from flwr.supercore.version import package_name, package_version
+from flwr.supercore.version import (
+    package_name as flwr_package_name,
+    package_version as flwr_package_version,
+)
 
 RuntimeCompatibilityStatus = Literal[
     "missing",
@@ -58,8 +61,8 @@ class RuntimeVersionMetadata:
         cls,
         component_name: str,
         *,
-        package_name_value: str = package_name,
-        package_version_value: str = package_version,
+        package_name_value: str = flwr_package_name,
+        package_version_value: str = flwr_package_version,
     ) -> RuntimeVersionMetadata:
         """Build metadata for the local Flower runtime component."""
         component_name = component_name.strip()
@@ -244,8 +247,8 @@ class CompatibilityResult:
 def build_runtime_version_metadata(
     component_name: str,
     *,
-    package_name_value: str = package_name,
-    package_version_value: str = package_version,
+    package_name_value: str = flwr_package_name,
+    package_version_value: str = flwr_package_version,
 ) -> RuntimeVersionMetadata:
     """Build metadata for the local Flower runtime component."""
     return RuntimeVersionMetadata.from_local_component(
