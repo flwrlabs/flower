@@ -174,7 +174,12 @@ def build_alembic_config(engine: Engine) -> Config:
     """Create Alembic config with script location, DB URL, and version locations."""
     config = Config()
     config.set_main_option("script_location", str(ALEMBIC_DIR))
-    config.set_main_option("sqlalchemy.url", str(engine.url))
+    # render_as_string(hide_password=False) preserves the real password;
+    # str(engine.url) masks it as '***' which breaks Alembic's connection.
+    # The .replace("%", "%%") escapes percent-encoded characters (e.g. %3D)
+    # so ConfigParser doesn't treat them as interpolation placeholders.
+    url = engine.url.render_as_string(hide_password=False).replace("%", "%%")
+    config.set_main_option("sqlalchemy.url", url)
 
     # Combine base version location with any registered external locations
     base_versions = ALEMBIC_DIR / "versions"
