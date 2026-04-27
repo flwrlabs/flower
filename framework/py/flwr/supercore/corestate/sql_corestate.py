@@ -356,7 +356,7 @@ class SqlCoreState(CoreState, SqlMixin):
             return False
 
 
-def determine_task_status(row: dict[str, Any]) -> str:
+def determine_task_status(row: dict[str, Any]) -> TaskStatus:
     """Determine the status of the task based on timestamp fields."""
     if row["pending_at"]:
         if row["finished_at"]:
