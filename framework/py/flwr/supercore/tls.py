@@ -26,7 +26,18 @@ def get_superexec_appio_tls_args(
     certificates: ServerCertificates | None,
     root_certificates_path: str | None,
 ) -> list[str]:
-    """Return SuperExec TLS flags for connecting to an AppIO server."""
+    """Return SuperExec TLS flags for connecting to an AppIO server.
+
+    The `certificates` tuple is the AppIO server's TLS key material. Its presence
+    tells the auto-launched SuperExec that the AppIO server is listening with TLS
+    enabled; its absence means the AppIO server is plaintext and SuperExec must be
+    launched with `--insecure`.
+
+    When AppIO TLS is enabled and `root_certificates_path` is provided, pass that
+    path to SuperExec as `--root-certificates` so the SuperExec client channel can
+    verify the AppIO server certificate. When the path is omitted, SuperExec uses
+    TLS without explicit trust roots, which lets gRPC use its default trust store.
+    """
     if certificates is None:
         return ["--insecure"]
     if root_certificates_path is None:
