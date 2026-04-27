@@ -33,6 +33,7 @@ import yaml
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH, EventType, event
 from flwr.common.args import (
     add_args_runtime_dependency_install,
+    try_obtain_optional_appio_server_certificates,
     try_obtain_server_certificates,
 )
 from flwr.common.constant import (
@@ -223,6 +224,17 @@ def run_superlink() -> None:
 
     # Obtain certificates
     certificates = try_obtain_server_certificates(args)
+    appio_certificates = (
+        None if args.insecure else try_obtain_optional_appio_server_certificates(args)
+    )
+    if not args.insecure and appio_certificates is None:
+        sys.exit(
+            "Certificates are required for the ServerAppIo API unless running in "
+            "insecure mode. Please provide certificate paths to "
+            "`--appio-ssl-certfile`, `--appio-ssl-keyfile`, and "
+            "`--appio-ssl-ca-certfile` or run the server in insecure mode using "
+            "'--insecure' if you understand the risks."
+        )
 
     # Load SuperExec auth secret
     superexec_auth_secret: bytes | None = None
@@ -360,7 +372,7 @@ def run_superlink() -> None:
         address=serverappio_address,
         state_factory=state_factory,
         objectstore_factory=objectstore_factory,
-        certificates=certificates,
+        certificates=appio_certificates,
         superexec_auth_secret=superexec_auth_secret,
     )
     grpc_servers.append(serverappio_server)
@@ -448,7 +460,9 @@ def run_superlink() -> None:
         # which means let the OS choose a free port.
         appio_address = resolve_bind_address(serverappio_server.bound_address)
         command = ["flower-superexec"]
-        command += get_superexec_appio_tls_args(certificates, args.ssl_ca_certfile)
+        command += get_superexec_appio_tls_args(
+            appio_certificates, args.appio_ssl_ca_certfile
+        )
         command += ["--appio-api-address", appio_address]
         command += ["--plugin-type", ExecPluginType.SERVER_APP]
         command += ["--parent-pid", str(os.getpid())]
@@ -792,6 +806,26 @@ def _add_args_serverappio_api(parser: argparse.ArgumentParser) -> None:
         help="ServerAppIo API (gRPC) server address (IPv4, IPv6, or a domain name). "
         "`--simulationio-api-address` is accepted as a deprecated alias. "
         f"By default, it is set to {SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS}.",
+    )
+    parser.add_argument(
+        "--appio-ssl-certfile",
+        help="ServerAppIo API server TLS certificate file (as a path str) "
+        "to create a secure connection.",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
+        "--appio-ssl-keyfile",
+        help="ServerAppIo API server TLS private key file (as a path str) "
+        "to create a secure connection.",
+        type=str,
+    )
+    parser.add_argument(
+        "--appio-ssl-ca-certfile",
+        help="Path to the PEM-encoded CA certificate file used by SuperExec to verify "
+        "the ServerAppIo API server certificate. This is not a client certificate "
+        "for mTLS.",
+        type=str,
     )
 
 

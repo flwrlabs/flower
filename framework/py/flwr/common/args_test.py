@@ -23,7 +23,7 @@ import pytest
 from flwr.common.args import (
     add_args_flwr_app_common,
     add_args_runtime_dependency_install,
-    try_obtain_optional_server_certificates,
+    try_obtain_optional_appio_server_certificates,
 )
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 
@@ -88,21 +88,21 @@ def test_flwr_app_common_args_reject_run_once() -> None:
         parser.parse_args(["--token", "test-token", "--run-once"])
 
 
-def test_try_obtain_optional_server_certificates_returns_none() -> None:
-    """Optional server certificates should be omitted by default."""
+def test_try_obtain_optional_appio_server_certificates_returns_none() -> None:
+    """Optional AppIO server certificates should be omitted by default."""
     args = argparse.Namespace(
-        ssl_ca_certfile=None,
-        ssl_certfile=None,
-        ssl_keyfile=None,
+        appio_ssl_ca_certfile=None,
+        appio_ssl_certfile=None,
+        appio_ssl_keyfile=None,
     )
 
-    assert try_obtain_optional_server_certificates(args) is None
+    assert try_obtain_optional_appio_server_certificates(args) is None
 
 
-def test_try_obtain_optional_server_certificates_reads_files(
+def test_try_obtain_optional_appio_server_certificates_reads_files(
     tmp_path: Path,
 ) -> None:
-    """Optional server certificates should be read when all paths are provided."""
+    """Optional AppIO server certificates should be read when all paths are provided."""
     cert_dir = tmp_path
     ca_cert = cert_dir / "ca.pem"
     server_cert = cert_dir / "server.pem"
@@ -111,23 +111,39 @@ def test_try_obtain_optional_server_certificates_reads_files(
     server_cert.write_bytes(b"cert")
     server_key.write_bytes(b"key")
     args = argparse.Namespace(
-        ssl_ca_certfile=str(ca_cert),
-        ssl_certfile=str(server_cert),
-        ssl_keyfile=str(server_key),
+        appio_ssl_ca_certfile=str(ca_cert),
+        appio_ssl_certfile=str(server_cert),
+        appio_ssl_keyfile=str(server_key),
     )
 
-    certificates = try_obtain_optional_server_certificates(args)
+    certificates = try_obtain_optional_appio_server_certificates(args)
 
     assert certificates == (b"ca", b"cert", b"key")
 
 
-def test_try_obtain_optional_server_certificates_rejects_partial_config() -> None:
-    """Optional server certificates should reject partial TLS config."""
+def test_try_obtain_optional_appio_server_certificates_rejects_partial_config() -> None:
+    """Optional AppIO server certificates should reject partial TLS config."""
     args = argparse.Namespace(
-        ssl_ca_certfile="/tmp/ca.pem",
-        ssl_certfile=None,
-        ssl_keyfile=None,
+        appio_ssl_ca_certfile="/tmp/ca.pem",
+        appio_ssl_certfile=None,
+        appio_ssl_keyfile=None,
     )
 
-    with pytest.raises(SystemExit):
-        try_obtain_optional_server_certificates(args)
+    with pytest.raises(SystemExit) as exc_info:
+        try_obtain_optional_appio_server_certificates(args)
+
+    assert "--appio-ssl-certfile" in str(exc_info.value)
+
+
+def test_try_obtain_optional_appio_server_certificates_rejects_invalid_path() -> None:
+    """Optional AppIO server certificates should reject invalid paths."""
+    args = argparse.Namespace(
+        appio_ssl_ca_certfile="/tmp/missing-ca.pem",
+        appio_ssl_certfile="/tmp/missing-cert.pem",
+        appio_ssl_keyfile="/tmp/missing-key.pem",
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        try_obtain_optional_appio_server_certificates(args)
+
+    assert "--appio-ssl-ca-certfile" in str(exc_info.value)

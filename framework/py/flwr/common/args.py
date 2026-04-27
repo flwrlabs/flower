@@ -154,33 +154,38 @@ def try_obtain_server_certificates(
     sys.exit(1)
 
 
-def try_obtain_optional_server_certificates(
+def try_obtain_optional_appio_server_certificates(
     args: argparse.Namespace,
 ) -> tuple[bytes, bytes, bytes] | None:
-    """Return server certificates when provided, otherwise None. SuperNodes use this
-    helper for ClientAppIo TLS key material.
+    """Return AppIO server certificates when provided, otherwise None.
 
     Unlike `try_obtain_server_certificates`, missing certificate arguments are valid
     and return `None`. This helper also intentionally does not inspect `args.insecure`
     because callers such as `flower-supernode` use `--insecure` for an outbound
     client connection, not for the local AppIO server this certificate tuple secures.
     """
-    if args.ssl_certfile and args.ssl_keyfile and args.ssl_ca_certfile:
-        if not isfile(args.ssl_ca_certfile):
-            sys.exit("Path argument `--ssl-ca-certfile` does not point to a file.")
-        if not isfile(args.ssl_certfile):
-            sys.exit("Path argument `--ssl-certfile` does not point to a file.")
-        if not isfile(args.ssl_keyfile):
-            sys.exit("Path argument `--ssl-keyfile` does not point to a file.")
+    if (
+        args.appio_ssl_certfile
+        and args.appio_ssl_keyfile
+        and args.appio_ssl_ca_certfile
+    ):
+        if not isfile(args.appio_ssl_ca_certfile):
+            sys.exit(
+                "Path argument `--appio-ssl-ca-certfile` does not point to a file."
+            )
+        if not isfile(args.appio_ssl_certfile):
+            sys.exit("Path argument `--appio-ssl-certfile` does not point to a file.")
+        if not isfile(args.appio_ssl_keyfile):
+            sys.exit("Path argument `--appio-ssl-keyfile` does not point to a file.")
         return (
-            Path(args.ssl_ca_certfile).expanduser().read_bytes(),
-            Path(args.ssl_certfile).expanduser().read_bytes(),
-            Path(args.ssl_keyfile).expanduser().read_bytes(),
+            Path(args.appio_ssl_ca_certfile).expanduser().read_bytes(),
+            Path(args.appio_ssl_certfile).expanduser().read_bytes(),
+            Path(args.appio_ssl_keyfile).expanduser().read_bytes(),
         )
-    if args.ssl_certfile or args.ssl_keyfile or args.ssl_ca_certfile:
+    if args.appio_ssl_certfile or args.appio_ssl_keyfile or args.appio_ssl_ca_certfile:
         sys.exit(
-            "You need to provide valid file paths to `--ssl-certfile`, "
-            "`--ssl-keyfile`, and `--ssl-ca-certfile` to create a secure "
-            "connection."
+            "You need to provide valid file paths to `--appio-ssl-certfile`, "
+            "`--appio-ssl-keyfile`, and `--appio-ssl-ca-certfile` to create a "
+            "secure AppIO connection."
         )
     return None
