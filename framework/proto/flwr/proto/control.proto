@@ -28,6 +28,9 @@ service Control {
   // Start run upon request
   rpc StartRun(StartRunRequest) returns (StartRunResponse) {}
 
+  // Create task upon request
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {}
+
   // Stop run upon request
   rpc StopRun(StopRunRequest) returns (StopRunResponse) {}
 
@@ -127,6 +130,14 @@ message StartRunResponse {
   optional uint64 run_id = 1;
   optional string note = 2;
 }
+message CreateTaskRequest {
+  string type = 1;
+  uint64 run_id = 2;
+  optional string fab_hash = 3;
+  optional string model_ref = 4;
+  optional string connector_ref = 5;
+}
+message CreateTaskResponse { optional uint64 task_id = 1; }
 message StreamLogsRequest {
   uint64 run_id = 1;
   double after_timestamp = 2;

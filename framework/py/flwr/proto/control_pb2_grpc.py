@@ -39,6 +39,11 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.StartRunRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.StartRunResponse.FromString,
                 _registered_method=True)
+        self.CreateTask = channel.unary_unary(
+                '/flwr.proto.Control/CreateTask',
+                request_serializer=flwr_dot_proto_dot_control__pb2.CreateTaskRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.CreateTaskResponse.FromString,
+                _registered_method=True)
         self.StopRun = channel.unary_unary(
                 '/flwr.proto.Control/StopRun',
                 request_serializer=flwr_dot_proto_dot_control__pb2.StopRunRequest.SerializeToString,
@@ -161,6 +166,13 @@ class ControlServicer(object):
 
     def StartRun(self, request, context):
         """Start run upon request
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateTask(self, request, context):
+        """Create task upon request
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -339,6 +351,11 @@ def add_ControlServicer_to_server(servicer, server):
                     request_deserializer=flwr_dot_proto_dot_control__pb2.StartRunRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.StartRunResponse.SerializeToString,
             ),
+            'CreateTask': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateTask,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.CreateTaskRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.CreateTaskResponse.SerializeToString,
+            ),
             'StopRun': grpc.unary_unary_rpc_method_handler(
                     servicer.StopRun,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.StopRunRequest.FromString,
@@ -482,6 +499,33 @@ class Control(object):
             '/flwr.proto.Control/StartRun',
             flwr_dot_proto_dot_control__pb2.StartRunRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.StartRunResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateTask(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/CreateTask',
+            flwr_dot_proto_dot_control__pb2.CreateTaskRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.CreateTaskResponse.FromString,
             options,
             channel_credentials,
             insecure,
