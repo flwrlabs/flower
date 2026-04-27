@@ -157,7 +157,14 @@ def try_obtain_server_certificates(
 def try_obtain_optional_server_certificates(
     args: argparse.Namespace,
 ) -> tuple[bytes, bytes, bytes] | None:
-    """Return server certificates when provided, otherwise None."""
+    """Return server certificates when provided, otherwise None. SuperNodes use this
+    helper for ClientAppIo TLS key material.
+
+    Unlike `try_obtain_server_certificates`, missing certificate arguments are valid
+    and return `None`. This helper also intentionally does not inspect `args.insecure`
+    because callers such as `flower-supernode` use `--insecure` for an outbound
+    client connection, not for the local AppIO server this certificate tuple secures.
+    """
     if args.ssl_certfile and args.ssl_keyfile and args.ssl_ca_certfile:
         if not isfile(args.ssl_ca_certfile):
             sys.exit("Path argument `--ssl-ca-certfile` does not point to a file.")

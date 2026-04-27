@@ -79,11 +79,12 @@ def test_get_superexec_appio_tls_args_returns_insecure_without_certificates() ->
 
 def test_get_superexec_appio_tls_args_returns_root_certificates() -> None:
     """SuperExec should verify AppIO TLS with the configured CA path."""
-    assert get_superexec_appio_tls_args(
-        (b"ca", b"cert", b"key"), "/tmp/ca.pem"
-    ) == ["--root-certificates", "/tmp/ca.pem"]
+    assert get_superexec_appio_tls_args((b"ca", b"cert", b"key"), "/tmp/ca.pem") == [
+        "--root-certificates",
+        "/tmp/ca.pem",
+    ]
 
 
 def test_get_superexec_appio_tls_args_omits_flags_for_system_trust() -> None:
     """SuperExec should use system trust roots when no CA path is provided."""
-    assert get_superexec_appio_tls_args((b"ca", b"cert", b"key"), None) == []
+    assert not get_superexec_appio_tls_args((b"ca", b"cert", b"key"), None)

@@ -317,10 +317,14 @@ class _StopAfterSuperExecLaunch(Exception):
     """Stop start_client_internal after command construction."""
 
 
-def _run_until_connection_start(**kwargs: object) -> tuple[Mock, Mock]:
+def _run_until_connection_start(
+    clientappio_certificates: tuple[bytes, bytes, bytes] | None = None,
+    clientappio_root_certificates_path: str | None = None,
+) -> tuple[Mock, Mock]:
     with (
-        patch("flwr.supernode.start_client_internal.run_clientappio_api_grpc")
-        as run_clientappio,
+        patch(
+            "flwr.supernode.start_client_internal.run_clientappio_api_grpc"
+        ) as run_clientappio,
         patch("flwr.supernode.start_client_internal.register_signal_handlers"),
         patch("flwr.supernode.start_client_internal.subprocess.Popen") as popen,
         patch(
@@ -336,7 +340,8 @@ def _run_until_connection_start(**kwargs: object) -> tuple[Mock, Mock]:
                 root_certificates=None,
                 insecure=True,
                 transport=TRANSPORT_TYPE_GRPC_RERE,
-                **kwargs,
+                clientappio_certificates=clientappio_certificates,
+                clientappio_root_certificates_path=clientappio_root_certificates_path,
             )
 
     return run_clientappio, popen
@@ -352,7 +357,9 @@ def test_start_client_internal_launches_insecure_superexec_by_default() -> None:
     assert "--root-certificates" not in command
 
 
-def test_start_client_internal_launches_secure_superexec_with_root_certificates() -> None:
+def test_start_client_internal_launches_secure_superexec_with_root_certificates() -> (
+    None
+):
     """Subprocess SuperExec should trust the secure ClientAppIo server CA."""
     certificates = (b"ca", b"cert", b"key")
 
