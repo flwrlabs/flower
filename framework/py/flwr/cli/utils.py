@@ -422,9 +422,8 @@ def flwr_cli_grpc_exc_handler(  # pylint: disable=too-many-branches
     except grpc.RpcError as e:
         if custom_handler is not None:
             custom_handler(e)
-        details = _extract_error_message(
-            Exception(e.details())
-        )  # pylint: disable=E1101
+        # pylint: disable-next=E1101
+        details = _extract_error_message(Exception(e.details()))
         if e.code() == grpc.StatusCode.UNAUTHENTICATED:
             raise click.ClickException(
                 "Authentication failed. Please run `flwr login`"
