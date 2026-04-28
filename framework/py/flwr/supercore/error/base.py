@@ -14,12 +14,23 @@
 # ==============================================================================
 """Base error types for API-facing error translation."""
 
+
 import json
 from enum import IntEnum
 
 
 class FlowerError(Exception):
-    """Base exception for API errors exposed through client-safe responses."""
+    """Base exception for API errors exposed through client-safe responses.
+
+    Parameters
+    ----------
+    code : int
+        Internal numeric error code used to look up the API error contract.
+    message : str
+        Sensitive diagnostic message intended for server-side logs.
+    public_details : str | None
+        Optional client-safe details to include in the serialized error payload.
+    """
 
     def __init__(
         self,
@@ -27,17 +38,6 @@ class FlowerError(Exception):
         message: str,
         public_details: str | None = None,
     ) -> None:
-        """Initialize a Flower API error.
-
-        Parameters
-        ----------
-        code : int
-            Internal numeric error code used to look up the API error contract.
-        message : str
-            Sensitive diagnostic message intended for server-side logs.
-        public_details : str | None
-            Optional client-safe details to include in the serialized error payload.
-        """
         super().__init__(message)
         self.code = code
         self.message = message  # Sensitive message
@@ -65,47 +65,6 @@ class FlowerError(Exception):
                 "public_details": self.public_details,
             }
         )
-
-
-class EntitlementError(FlowerError):
-    """API error for actions blocked by entitlement checks."""
-
-    def __init__(self, details: str, entitlement_code: int):
-        """Initialize an entitlement-specific API error.
-
-        Parameters
-        ----------
-        details : str
-            Client-visible explanation of why the entitlement check failed.
-        entitlement_code : int
-            Service-defined entitlement code included in the serialized payload
-            for programmatic handling.
-        """
-        super().__init__(
-            message=details,
-            public_details=details,
-            code=ApiErrorCode.ENTITLEMENT_ERROR,
-        )
-        self.entitlement_code = entitlement_code
-
-    def to_json(self, public_message: str) -> str:
-        """Serialize the entitlement error payload as JSON.
-
-        Parameters
-        ----------
-        public_message : str
-            Sanitized message that should be exposed to the client together with
-            the entitlement-specific details.
-
-        Returns
-        -------
-        str
-            A JSON string containing the base client-visible error fields plus
-            the entitlement code used for programmatic handling on the client.
-        """
-        base_dict = json.loads(super().to_json(public_message))
-        base_dict["entitlement_code"] = self.entitlement_code
-        return json.dumps(base_dict)
 
 
 class ApiErrorCode(IntEnum):
