@@ -27,6 +27,7 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from .utils import (
     get_metadata_bytes,
     get_metadata_str,
+    get_metadata_str_checked,
     humanize_bytes,
     humanize_duration,
     int64_to_uint64,
@@ -70,6 +71,29 @@ def test_get_metadata_str(
 ) -> None:
     """Return exactly one non-empty string value of the expected type."""
     assert get_metadata_str(metadata, key) == expected
+
+
+@pytest.mark.parametrize(
+    ("metadata", "key", "expected_value", "expected_error"),
+    [
+        ([("x-token", "value")], "x-token", "value", None),
+        ([("x-token", "")], "x-token", None, "empty"),
+        ([("x-token", "value"), ("x-token", "other")], "x-token", None, "duplicate"),
+        ([("x-token", b"value")], "x-token", None, "wrong_type"),
+        ([("other", "value")], "x-token", None, "missing"),
+    ],
+)
+def test_get_metadata_str_checked(
+    metadata: list[tuple[str, str | bytes]],
+    key: str,
+    expected_value: str | None,
+    expected_error: str | None,
+) -> None:
+    """Preserve metadata validation outcomes for callers that need them."""
+    result = get_metadata_str_checked(metadata, key)
+
+    assert result.value == expected_value
+    assert result.error == expected_error
 
 
 @pytest.mark.parametrize(

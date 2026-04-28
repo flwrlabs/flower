@@ -28,6 +28,7 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
+from flwr.supercore.utils import get_metadata_str_checked
 from flwr.supercore.version import package_name as flwr_package_name
 from flwr.supercore.version import package_version as flwr_package_version
 
@@ -77,17 +78,17 @@ class RuntimeVersionMetadata:
             FLWR_PACKAGE_VERSION_METADATA_KEY,
             FLWR_COMPONENT_NAME_METADATA_KEY,
         )
-        metadata_values, metadata_error = _collect_runtime_metadata_values(
-            grpc_metadata, relevant_keys=relevant_keys
-        )
-        if metadata_error is not None:
-            return None, metadata_error
-        present_keys = [key for key in relevant_keys if key in metadata_values]
+        values_by_key = {
+            key: get_metadata_str_checked(grpc_metadata, key) for key in relevant_keys
+        }
+        present_keys = [
+            key for key, result in values_by_key.items() if result.error != "missing"
+        ]
         if not present_keys:
             return None, None
 
         duplicate_keys = [
-            key for key in relevant_keys if len(metadata_values.get(key, [])) > 1
+            key for key, result in values_by_key.items() if result.error == "duplicate"
         ]
         if duplicate_keys:
             duplicate_keys_str = ", ".join(sorted(duplicate_keys))
@@ -97,7 +98,9 @@ class RuntimeVersionMetadata:
                 f"{duplicate_keys_str}.",
             )
 
-        missing_keys = [key for key in relevant_keys if key not in metadata_values]
+        missing_keys = [
+            key for key, result in values_by_key.items() if result.error == "missing"
+        ]
         if missing_keys:
             missing_keys_str = ", ".join(sorted(missing_keys))
             return (
@@ -105,18 +108,32 @@ class RuntimeVersionMetadata:
                 f"Missing required Flower runtime metadata: {missing_keys_str}.",
             )
 
-        values = {
-            # each relevant key appears exactly once
-            key: metadata_values[key][0].strip()
-            for key in relevant_keys
-        }
-        empty_keys = [key for key, value in values.items() if value == ""]
+        wrong_type_keys = [
+            key for key, result in values_by_key.items() if result.error == "wrong_type"
+        ]
+        if wrong_type_keys:
+            wrong_type_keys_str = ", ".join(sorted(wrong_type_keys))
+            return (
+                None,
+                "Flower runtime metadata contains non-string values: "
+                f"{wrong_type_keys_str}.",
+            )
+
+        empty_keys = [
+            key for key, result in values_by_key.items() if result.error == "empty"
+        ]
         if empty_keys:
             empty_keys_str = ", ".join(sorted(empty_keys))
             return (
                 None,
                 f"Flower runtime metadata contains empty values: {empty_keys_str}.",
             )
+
+        values: dict[str, str] = {}
+        for key in relevant_keys:
+            value = values_by_key[key].value
+            assert value is not None
+            values[key] = value.strip()
 
         return (
             cls(
@@ -246,31 +263,3 @@ def format_incompatible_version_message(
 def format_invalid_metadata_message(connection_name: str, detail: str) -> str:
     """Format a standard invalid-metadata error message."""
     return f"Invalid Flower version metadata for {connection_name}. {detail}"
-
-
-def _collect_runtime_metadata_values(
-    metadata: Sequence[tuple[str, str | bytes]] | None,
-    *,
-    relevant_keys: Sequence[str] | None = None,
-) -> tuple[dict[str, list[str]], str | None]:
-    """Collect relevant runtime metadata values from a gRPC metadata sequence.
-
-    NOTE: Only the requested runtime-version keys are inspected. Unrelated gRPC
-    metadata is ignored so this parser does not accidentally widen the runtime
-    version contract.
-    """
-    if metadata is None:
-        return {}, None
-
-    relevant_keys_lookup = set(relevant_keys) if relevant_keys is not None else None
-    values: dict[str, list[str]] = {}
-    for key, value in metadata:
-        if relevant_keys_lookup is not None and key not in relevant_keys_lookup:
-            continue
-        if not isinstance(value, str):
-            return (
-                {},
-                f"Flower runtime metadata contains non-string values: {key}.",
-            )
-        values.setdefault(key, []).append(value)
-    return values, None

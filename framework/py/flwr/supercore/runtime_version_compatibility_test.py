@@ -126,8 +126,8 @@ def test_runtime_version_metadata_rejects_bytes_values() -> None:
 
     assert metadata is None
     assert (
-        error
-        == "Flower runtime metadata contains non-string values: flwr-package-name."
+        error == "Flower runtime metadata contains non-string values: "
+        "flwr-component-name, flwr-package-name, flwr-package-version."
     )
 
 
