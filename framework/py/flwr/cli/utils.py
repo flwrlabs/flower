@@ -92,7 +92,7 @@ def _extract_error_message(err: Exception) -> str:
         if isinstance(parsed, dict) and "public_message" in parsed:
             msg = str(parsed["public_message"])
             if details := parsed.get("public_details"):
-                msg += f" Details: {details}"
+                msg += f"\n{details}"
             return msg
     except (json.JSONDecodeError, TypeError):
         pass
