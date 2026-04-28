@@ -78,6 +78,8 @@ def test_get_metadata_str(
     [
         ([("x-token", "value")], "x-token", "value", None),
         ([("x-token", "")], "x-token", None, "empty"),
+        ([("x-token", "   ")], "x-token", None, "empty"),
+        ([("x-token", "  value  ")], "x-token", "value", None),
         ([("x-token", "value"), ("x-token", "other")], "x-token", None, "duplicate"),
         ([("x-token", b"value")], "x-token", None, "wrong_type"),
         ([("other", "value")], "x-token", None, "missing"),

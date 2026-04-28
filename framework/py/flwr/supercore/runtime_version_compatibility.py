@@ -28,7 +28,7 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
-from flwr.supercore.utils import get_metadata_str_checked
+from flwr.supercore.utils import MetadataStrResult, get_metadata_str_checked
 from flwr.supercore.version import package_name as flwr_package_name
 from flwr.supercore.version import package_version as flwr_package_version
 
@@ -39,6 +39,8 @@ RuntimeCompatibilityStatus = Literal[
     "compatible",
     "incompatible",
 ]
+_SUPPORTED_FLOWER_PACKAGE_NAMES = frozenset({"flwr", "flwr-nightly"})
+RuntimeMetadataLookup = dict[str, MetadataStrResult]
 
 
 @dataclass(frozen=True)
@@ -81,68 +83,7 @@ class RuntimeVersionMetadata:
         values_by_key = {
             key: get_metadata_str_checked(grpc_metadata, key) for key in relevant_keys
         }
-        present_keys = [
-            key for key, result in values_by_key.items() if result.error != "missing"
-        ]
-        if not present_keys:
-            return None, None
-
-        duplicate_keys = [
-            key for key, result in values_by_key.items() if result.error == "duplicate"
-        ]
-        if duplicate_keys:
-            duplicate_keys_str = ", ".join(sorted(duplicate_keys))
-            return (
-                None,
-                "Flower runtime metadata contains duplicate values: "
-                f"{duplicate_keys_str}.",
-            )
-
-        missing_keys = [
-            key for key, result in values_by_key.items() if result.error == "missing"
-        ]
-        if missing_keys:
-            missing_keys_str = ", ".join(sorted(missing_keys))
-            return (
-                None,
-                f"Missing required Flower runtime metadata: {missing_keys_str}.",
-            )
-
-        wrong_type_keys = [
-            key for key, result in values_by_key.items() if result.error == "wrong_type"
-        ]
-        if wrong_type_keys:
-            wrong_type_keys_str = ", ".join(sorted(wrong_type_keys))
-            return (
-                None,
-                "Flower runtime metadata contains non-string values: "
-                f"{wrong_type_keys_str}.",
-            )
-
-        empty_keys = [
-            key for key, result in values_by_key.items() if result.error == "empty"
-        ]
-        if empty_keys:
-            empty_keys_str = ", ".join(sorted(empty_keys))
-            return (
-                None,
-                f"Flower runtime metadata contains empty values: {empty_keys_str}.",
-            )
-
-        values: dict[str, str] = {}
-        for key in relevant_keys:
-            value = values_by_key[key].value
-            assert value is not None
-            values[key] = value.strip()
-
-        return (
-            cls(
-                package_name=values[FLWR_PACKAGE_NAME_METADATA_KEY],
-                package_version=values[FLWR_PACKAGE_VERSION_METADATA_KEY],
-                component_name=values[FLWR_COMPONENT_NAME_METADATA_KEY],
-            ),
-            None,
-        )
+        return _build_runtime_metadata_from_lookup(values_by_key, relevant_keys)
 
     def append_to_grpc_metadata(
         self,
@@ -176,31 +117,30 @@ class RuntimeVersionMetadata:
                 peer_version=None,
             )
 
-        try:
-            local_version = Version(self.package_version)
-        except InvalidVersion:
+        package_name_result = _check_package_name_compatibility(self, peer_metadata)
+        if package_name_result is not None:
+            return package_name_result
+
+        local_version, local_error = _parse_runtime_version(
+            self.package_version, subject="Local"
+        )
+        if local_error is not None:
             return CompatibilityResult(
                 status="disabled",
-                reason=(
-                    "Local Flower version metadata cannot be parsed, version checks "
-                    f"are disabled: {self.package_version!r}."
-                ),
+                reason=local_error,
                 local_metadata=self,
                 peer_metadata=peer_metadata,
                 local_version=None,
                 peer_version=None,
             )
 
-        try:
-            peer_version = Version(peer_metadata.package_version)
-        except InvalidVersion:
-            peer_version_repr = repr(peer_metadata.package_version)
+        peer_version, peer_error = _parse_runtime_version(
+            peer_metadata.package_version, subject="Peer"
+        )
+        if peer_error is not None:
             return CompatibilityResult(
                 status="disabled",
-                reason=(
-                    "Peer Flower version metadata cannot be parsed, version checks "
-                    f"are disabled: {peer_version_repr}."
-                ),
+                reason=peer_error,
                 local_metadata=self,
                 peer_metadata=peer_metadata,
                 local_version=local_version,
@@ -263,3 +203,93 @@ def format_incompatible_version_message(
 def format_invalid_metadata_message(connection_name: str, detail: str) -> str:
     """Format a standard invalid-metadata error message."""
     return f"Invalid Flower version metadata for {connection_name}. {detail}"
+
+
+def _build_runtime_metadata_from_lookup(
+    values_by_key: RuntimeMetadataLookup,
+    relevant_keys: Sequence[str],
+) -> tuple[RuntimeVersionMetadata | None, str | None]:
+    """Build runtime metadata from checked lookup results."""
+    present_keys = [
+        key for key, result in values_by_key.items() if result.error != "missing"
+    ]
+    if not present_keys:
+        return None, None
+
+    for error_kind, message_prefix in (
+        ("duplicate", "Flower runtime metadata contains duplicate values: "),
+        ("missing", "Missing required Flower runtime metadata: "),
+        ("wrong_type", "Flower runtime metadata contains non-string values: "),
+        ("empty", "Flower runtime metadata contains empty values: "),
+    ):
+        matching_keys = [
+            key for key, result in values_by_key.items() if result.error == error_kind
+        ]
+        if matching_keys:
+            matching_keys_str = ", ".join(sorted(matching_keys))
+            return None, f"{message_prefix}{matching_keys_str}."
+
+    values: dict[str, str] = {}
+    for key in relevant_keys:
+        value = values_by_key[key].value
+        assert value is not None
+        values[key] = value
+
+    return (
+        RuntimeVersionMetadata(
+            package_name=values[FLWR_PACKAGE_NAME_METADATA_KEY],
+            package_version=values[FLWR_PACKAGE_VERSION_METADATA_KEY],
+            component_name=values[FLWR_COMPONENT_NAME_METADATA_KEY],
+        ),
+        None,
+    )
+
+
+def _check_package_name_compatibility(
+    local_metadata: RuntimeVersionMetadata,
+    peer_metadata: RuntimeVersionMetadata,
+) -> CompatibilityResult | None:
+    """Return a disabled result when either package name is not first-party."""
+    local_package_name = local_metadata.package_name.strip()
+    if local_package_name not in _SUPPORTED_FLOWER_PACKAGE_NAMES:
+        return CompatibilityResult(
+            status="disabled",
+            reason=(
+                "Local Flower package name is not recognized, version checks "
+                f"are disabled: {local_metadata.package_name!r}."
+            ),
+            local_metadata=local_metadata,
+            peer_metadata=peer_metadata,
+            local_version=None,
+            peer_version=None,
+        )
+
+    peer_package_name = peer_metadata.package_name.strip()
+    if peer_package_name not in _SUPPORTED_FLOWER_PACKAGE_NAMES:
+        return CompatibilityResult(
+            status="disabled",
+            reason=(
+                "Peer Flower package name is not recognized, version checks "
+                f"are disabled: {peer_metadata.package_name!r}."
+            ),
+            local_metadata=local_metadata,
+            peer_metadata=peer_metadata,
+            local_version=None,
+            peer_version=None,
+        )
+
+    return None
+
+
+def _parse_runtime_version(
+    package_version: str, *, subject: str
+) -> tuple[Version | None, str | None]:
+    """Parse a runtime version string or return the disabled-policy reason."""
+    try:
+        return Version(package_version), None
+    except InvalidVersion:
+        return (
+            None,
+            f"{subject} Flower version metadata cannot be parsed, version checks "
+            f"are disabled: {package_version!r}.",
+        )

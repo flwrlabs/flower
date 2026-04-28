@@ -403,10 +403,11 @@ def get_metadata_str_checked(
     value = values[0]
     if not isinstance(value, str):
         return MetadataStrResult(value=None, error="wrong_type")
-    if value == "":
+    stripped_value = value.strip()
+    if stripped_value == "":
         return MetadataStrResult(value=None, error="empty")
 
-    return MetadataStrResult(value=value, error=None)
+    return MetadataStrResult(value=stripped_value, error=None)
 
 
 def get_metadata_bytes(

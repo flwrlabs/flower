@@ -204,6 +204,17 @@ def test_runtime_version_metadata_accepts_dev_versions() -> None:
     assert result.peer_version == Version("1.30.0rc1")
 
 
+def test_runtime_version_metadata_accepts_flwr_nightly_package_name() -> None:
+    """First-party package names should remain compatible with each other."""
+    local = RuntimeVersionMetadata("flwr", "1.30.0", "superlink")
+
+    result = local.check_compatibility_with(
+        RuntimeVersionMetadata("flwr-nightly", "1.30.1.dev20260425", "supernode")
+    )
+
+    assert result.status == "compatible"
+
+
 def test_runtime_version_metadata_rejects_different_minor() -> None:
     """Different minor versions should be incompatible."""
     peer = RuntimeVersionMetadata("flwr", "1.30.0", "supernode")
@@ -270,6 +281,21 @@ def test_version_checks_are_disabled_for_unknown_peer_version() -> None:
         result.reason
         == "Peer Flower version metadata cannot be parsed, version checks "
         "are disabled: 'main'."
+    )
+
+
+def test_version_checks_are_disabled_for_unknown_peer_package_name() -> None:
+    """Unrecognized peer package names should not be treated as compatible."""
+    local = RuntimeVersionMetadata("flwr", "1.29.0", "superlink")
+
+    result = local.check_compatibility_with(
+        RuntimeVersionMetadata("forked-flower", "1.29.1", "supernode")
+    )
+
+    assert result.status == "disabled"
+    assert (
+        result.reason == "Peer Flower package name is not recognized, version checks "
+        "are disabled: 'forked-flower'."
     )
 
 
