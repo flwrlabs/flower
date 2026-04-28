@@ -19,8 +19,17 @@ import json
 from enum import IntEnum
 
 
-class FlowerError(Exception):
-    """Base exception for API errors exposed through client-safe responses."""
+    """Base exception for API errors exposed through client-safe responses.
+
+    Parameters
+    ----------
+    code : int
+        Internal numeric error code used to look up the API error contract.
+    message : str
+        Sensitive diagnostic message intended for server-side logs.
+    public_details : str | None
+        Optional client-safe details to include in the serialized error payload.
+    """
 
     def __init__(
         self,
@@ -28,17 +37,6 @@ class FlowerError(Exception):
         message: str,
         public_details: str | None = None,
     ) -> None:
-        """Initialize a Flower API error.
-
-        Parameters
-        ----------
-        code : int
-            Internal numeric error code used to look up the API error contract.
-        message : str
-            Sensitive diagnostic message intended for server-side logs.
-        public_details : str | None
-            Optional client-safe details to include in the serialized error payload.
-        """
         super().__init__(message)
         self.code = code
         self.message = message  # Sensitive message
