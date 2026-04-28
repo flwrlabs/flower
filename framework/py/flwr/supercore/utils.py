@@ -21,7 +21,6 @@ import os
 import re
 import sys
 from collections.abc import Sequence
-from dataclasses import dataclass
 from logging import WARN
 from pathlib import Path
 from typing import Any, Literal, TypeVar
@@ -38,14 +37,6 @@ from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN, MAX_NAME_LENGTH
 T = TypeVar("T", str, bytes)
 PR_SET_DUMPABLE = 4  # from /usr/include/linux/prctl.h
 MetadataLookupError = Literal["missing", "duplicate", "wrong_type", "empty"]
-
-
-@dataclass(frozen=True)
-class MetadataStrResult:
-    """Validation result for a string-valued gRPC metadata lookup."""
-
-    value: str | None
-    error: MetadataLookupError | None
 
 
 def mask_string(value: str, head: int = 4, tail: int = 4) -> str:
@@ -385,29 +376,29 @@ def get_metadata_str(
 def get_metadata_str_checked(
     metadata: Sequence[tuple[str, str | bytes]] | None,
     key: str,
-) -> MetadataStrResult:
+) -> tuple[str | None, MetadataLookupError | None]:
     """Return a checked string metadata lookup result for `key`.
 
     This distinguishes the cases that `get_metadata_str` intentionally collapses
     into `None`: missing value, duplicate values, wrong type, and empty value.
     """
     if metadata is None:
-        return MetadataStrResult(value=None, error="missing")
+        return None, "missing"
 
     values = [value for metadata_key, value in metadata if metadata_key == key]
     if not values:
-        return MetadataStrResult(value=None, error="missing")
+        return None, "missing"
     if len(values) != 1:
-        return MetadataStrResult(value=None, error="duplicate")
+        return None, "duplicate"
 
     value = values[0]
     if not isinstance(value, str):
-        return MetadataStrResult(value=None, error="wrong_type")
+        return None, "wrong_type"
     stripped_value = value.strip()
     if stripped_value == "":
-        return MetadataStrResult(value=None, error="empty")
+        return None, "empty"
 
-    return MetadataStrResult(value=stripped_value, error=None)
+    return stripped_value, None
 
 
 def get_metadata_bytes(

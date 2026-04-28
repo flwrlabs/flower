@@ -92,10 +92,10 @@ def test_get_metadata_str_checked(
     expected_error: str | None,
 ) -> None:
     """Preserve metadata validation outcomes for callers that need them."""
-    result = get_metadata_str_checked(metadata, key)
+    value, error = get_metadata_str_checked(metadata, key)
 
-    assert result.value == expected_value
-    assert result.error == expected_error
+    assert value == expected_value
+    assert error == expected_error
 
 
 @pytest.mark.parametrize(

@@ -28,7 +28,7 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
-from flwr.supercore.utils import MetadataStrResult, get_metadata_str_checked
+from flwr.supercore.utils import MetadataLookupError, get_metadata_str_checked
 from flwr.supercore.version import package_name as flwr_package_name
 from flwr.supercore.version import package_version as flwr_package_version
 
@@ -40,7 +40,7 @@ RuntimeCompatibilityStatus = Literal[
     "incompatible",
 ]
 _SUPPORTED_FLOWER_PACKAGE_NAMES = frozenset({"flwr", "flwr-nightly"})
-RuntimeMetadataLookup = dict[str, MetadataStrResult]
+RuntimeMetadataLookup = dict[str, tuple[str | None, MetadataLookupError | None]]
 
 
 @dataclass(frozen=True)
@@ -214,7 +214,7 @@ def _build_runtime_metadata_from_lookup(
 ) -> tuple[RuntimeVersionMetadata | None, str | None]:
     """Build runtime metadata from checked lookup results."""
     present_keys = [
-        key for key, result in values_by_key.items() if result.error != "missing"
+        key for key, (_, error) in values_by_key.items() if error != "missing"
     ]
     if not present_keys:
         return None, None
@@ -226,7 +226,7 @@ def _build_runtime_metadata_from_lookup(
         ("empty", "Flower runtime metadata contains empty values: "),
     ):
         matching_keys = [
-            key for key, result in values_by_key.items() if result.error == error_kind
+            key for key, (_, error) in values_by_key.items() if error == error_kind
         ]
         if matching_keys:
             matching_keys_str = ", ".join(sorted(matching_keys))
@@ -234,7 +234,7 @@ def _build_runtime_metadata_from_lookup(
 
     values: dict[str, str] = {}
     for key in relevant_keys:
-        value = values_by_key[key].value
+        value, _ = values_by_key[key]
         assert value is not None
         values[key] = value
 
