@@ -21,7 +21,12 @@ from typing import Any, cast
 from unittest.mock import patch
 
 from flwr.common import now
-from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL, Status
+from flwr.common.constant import (
+    HEARTBEAT_DEFAULT_INTERVAL,
+    HEARTBEAT_PATIENCE,
+    Status,
+    SubStatus,
+)
 from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
 
 from . import CoreState
@@ -118,6 +123,112 @@ class StateTest(unittest.TestCase):
         self.assertEqual(len(reloaded_tasks), 1)
         reloaded = reloaded_tasks[0]
         self.assertEqual(reloaded.fab_hash, "fab-hash")
+
+    def test_claim_task_transitions_pending_to_starting(self) -> None:
+        """Claiming a task should create a token and move it to starting."""
+        state = self.state_factory()
+        task_id = state.create_task(task_type="flwr-model", run_id=42)
+        assert task_id is not None
+
+        token = state.claim_task(task_id)
+
+        self.assertIsNotNone(token)
+        assert token is not None
+        self.assertEqual(state.get_task_id_by_token(token), task_id)
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].status.status, Status.STARTING)
+        self.assertTrue(tasks[0].starting_at)
+        self.assertEqual(tasks[0].running_at, "")
+        self.assertEqual(tasks[0].finished_at, "")
+
+    def test_claim_task_rejects_missing_claimed_and_non_pending(self) -> None:
+        """Only existing pending unclaimed tasks should be claimable."""
+        state = self.state_factory()
+        self.assertIsNone(state.claim_task(61016))
+
+        claimed_task_id = state.create_task(task_type="flwr-model", run_id=42)
+        finished_task_id = state.create_task(task_type="flwr-model", run_id=42)
+        assert claimed_task_id is not None and finished_task_id is not None
+
+        self.assertIsNotNone(state.claim_task(claimed_task_id))
+        self.assertIsNone(state.claim_task(claimed_task_id))
+        self.assertTrue(
+            state.finish_task(finished_task_id, SubStatus.COMPLETED, "done")
+        )
+        self.assertIsNone(state.claim_task(finished_task_id))
+
+    def test_activate_task_transitions_starting_to_running(self) -> None:
+        """Only starting tasks should transition to running."""
+        state = self.state_factory()
+        task_id = state.create_task(task_type="flwr-model", run_id=42)
+        assert task_id is not None
+
+        self.assertFalse(state.activate_task(61016))
+        self.assertFalse(state.activate_task(task_id))
+        self.assertIsNotNone(state.claim_task(task_id))
+        self.assertTrue(state.activate_task(task_id))
+        self.assertFalse(state.activate_task(task_id))
+
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].status.status, Status.RUNNING)
+        self.assertTrue(tasks[0].running_at)
+        self.assertEqual(tasks[0].finished_at, "")
+
+    def test_finish_task_transitions_unfinished_task_to_finished(self) -> None:
+        """Finishing a task should store the terminal status details."""
+        state = self.state_factory()
+        task_id = state.create_task(task_type="flwr-model", run_id=42)
+        assert task_id is not None
+
+        self.assertFalse(state.finish_task(61016, SubStatus.FAILED, "missing"))
+        self.assertTrue(state.finish_task(task_id, SubStatus.FAILED, "boom"))
+        self.assertFalse(state.finish_task(task_id, SubStatus.COMPLETED, "again"))
+        self.assertIsNone(state.claim_task(task_id))
+
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        task = tasks[0]
+        self.assertEqual(
+            task.status,
+            TaskStatus(
+                status=Status.FINISHED,
+                sub_status=SubStatus.FAILED,
+                details="boom",
+            ),
+        )
+        self.assertTrue(task.finished_at)
+
+    def test_task_heartbeat_extends_token_expiration(self) -> None:
+        """Task heartbeat should keep a claimed task token valid."""
+        state = self.state_factory()
+        created_at = now()
+        task_id = state.create_task(task_type="flwr-model", run_id=42)
+        assert task_id is not None
+        token = state.claim_task(task_id)
+        assert token is not None
+
+        self.assertFalse(state.acknowledge_task_heartbeat(61016))
+        self.assertTrue(state.acknowledge_task_heartbeat(task_id))
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = created_at + timedelta(
+                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
+            )
+            self.assertEqual(state.get_task_id_by_token(token), task_id)
+
+            mock_dt.now.return_value = created_at + timedelta(
+                seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
+            )
+            self.assertIsNone(state.get_task_id_by_token(token))
+            self.assertFalse(state.acknowledge_task_heartbeat(task_id))
+
+    def test_get_task_id_by_token_returns_none_for_unknown_token(self) -> None:
+        """Unknown task tokens should not resolve to a task."""
+        state = self.state_factory()
+
+        self.assertIsNone(state.get_task_id_by_token("missing-token"))
 
     def test_create_verify_and_delete_token(self) -> None:
         """Test creating, verifying, and deleting tokens."""

@@ -60,6 +60,10 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.nonce_store: dict[tuple[str, str], float] = {}
         self.lock_nonce_store = Lock()
         self.task_store: dict[int, Task] = {}
+        # Store task ID to token mapping
+        self.task_token_store: dict[int, TokenRecord] = {}
+        # Store token to task ID mapping
+        self.task_token_to_task_id: dict[str, int] = {}
         self.lock_task_store = Lock()
 
     @property
@@ -179,6 +183,100 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 task_copy.status.CopyFrom(determine_task_status(task))
                 result.append(task_copy)
             return result
+
+    def claim_task(self, task_id: int) -> str | None:
+        """Atomically claim a pending task."""
+        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
+        with self.lock_task_store:
+            # Expire abandoned claims before deciding whether this task can be claimed.
+            self._cleanup_expired_task_tokens_locked()
+            task = self.task_store.get(task_id)
+            if task is None or task_id in self.task_token_store:
+                return None
+            if determine_task_status(task).status != Status.PENDING:
+                return None
+
+            # Claiming moves the task into STARTING and records the heartbeat state.
+            claimed_at = now()
+            task.starting_at = claimed_at.isoformat()
+            task.status.CopyFrom(
+                TaskStatus(status=Status.STARTING, sub_status="", details="")
+            )
+            self.task_token_store[task_id] = TokenRecord(
+                token=token,
+                active_until=claimed_at.timestamp() + HEARTBEAT_DEFAULT_INTERVAL,
+            )
+            self.task_token_to_task_id[token] = task_id
+            return token
+
+    def activate_task(self, task_id: int) -> bool:
+        """Move a task from starting to running."""
+        with self.lock_task_store:
+            # Transition task from STARTING -> RUNNING.
+            task = self.task_store.get(task_id)
+            if task is None or determine_task_status(task).status != Status.STARTING:
+                return False
+
+            task.running_at = now().isoformat()
+            task.status.CopyFrom(
+                TaskStatus(status=Status.RUNNING, sub_status="", details="")
+            )
+            return True
+
+    def finish_task(self, task_id: int, substatus: str, detail: str) -> bool:
+        """Move an unfinished task to finished."""
+        with self.lock_task_store:
+            # Transition task from RUNNING -> FINISHED.
+            task = self.task_store.get(task_id)
+            if task is None or determine_task_status(task).status == Status.FINISHED:
+                return False
+
+            task.finished_at = now().isoformat()
+            task.status.CopyFrom(
+                TaskStatus(
+                    status=Status.FINISHED,
+                    sub_status=substatus,
+                    details=detail,
+                )
+            )
+            # Finished tasks no longer need claim/heartbeat bookkeeping.
+            if (record := self.task_token_store.pop(task_id, None)) is not None:
+                self.task_token_to_task_id.pop(record.token, None)
+            return True
+
+    def acknowledge_task_heartbeat(self, task_id: int) -> bool:
+        """Extend heartbeat state for the claimed task."""
+        with self.lock_task_store:
+            # Heartbeats are accepted only for active, unexpired task claims.
+            self._cleanup_expired_task_tokens_locked()
+            task = self.task_store.get(task_id)
+            record = self.task_token_store.get(task_id)
+            if (
+                task is None
+                or record is None
+                or determine_task_status(task).status == Status.FINISHED
+            ):
+                return False
+
+            record.active_until = (
+                now().timestamp() + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+            )
+            return True
+
+    def get_task_id_by_token(self, token: str) -> int | None:
+        """Return the task ID associated with the task token, if valid."""
+        with self.lock_task_store:
+            # Resolve tokens after cleanup so callers never receive expired claims.
+            self._cleanup_expired_task_tokens_locked()
+            return self.task_token_to_task_id.get(token)
+
+    def _cleanup_expired_task_tokens_locked(self) -> None:
+        """Remove expired task tokens while holding `lock_task_store`."""
+        current = now().timestamp()
+        for task_id, record in list(self.task_token_store.items()):
+            if record.active_until < current:
+                del self.task_token_store[task_id]
+                self.task_token_to_task_id.pop(record.token, None)
 
     def create_token(self, run_id: int) -> str | None:
         """Create a token for the given run ID."""
