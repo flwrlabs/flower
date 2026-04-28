@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "flwr"
-version = "1.29.0"
+version = "1.30.0"
 description = "Flower: A Friendly Federated AI Framework"
 license = "Apache-2.0"
 authors = [{ name = "The Flower Authors", email = "hello@flower.ai" }]
@@ -82,6 +82,8 @@ flower-supernode = "flwr.supernode.cli:flower_supernode"
 flower-superexec = "flwr.supercore.cli:flower_superexec"
 flwr-serverapp = "flwr.server.serverapp:flwr_serverapp"
 flwr-clientapp = "flwr.supernode.cli:flwr_clientapp"
+flwr-agentapp = "flwr.supercore.cli:flwr_agentapp"
+flwr-model = "flwr.supercore.cli:flwr_model"
 
 [project.urls]
 homepage = "https://flower.ai"

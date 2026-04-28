@@ -17,7 +17,12 @@
 
 import argparse
 
-from flwr.common.args import add_args_runtime_dependency_install
+import pytest
+
+from flwr.common.args import (
+    add_args_flwr_app_common,
+    add_args_runtime_dependency_install,
+)
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 
 
@@ -39,3 +44,43 @@ def test_runtime_dependency_install_args_flags() -> None:
     args = parser.parse_args(["--allow-runtime-dependency-installation"])
 
     assert args.runtime_dependency_install is True
+
+
+def test_flwr_app_common_args_require_token() -> None:
+    """App process CLIs should require a token."""
+    parser = argparse.ArgumentParser()
+    add_args_flwr_app_common(parser)
+
+    with pytest.raises(SystemExit):
+        parser.parse_args([])
+
+
+def test_flwr_app_common_args_parse_token() -> None:
+    """App process CLIs should parse token and common flags."""
+    parser = argparse.ArgumentParser()
+    add_args_flwr_app_common(parser)
+
+    args = parser.parse_args(
+        [
+            "--token",
+            "test-token",
+            "--insecure",
+            "--parent-pid",
+            "1234",
+            "--allow-runtime-dependency-installation",
+        ]
+    )
+
+    assert args.token == "test-token"
+    assert args.insecure is True
+    assert args.parent_pid == 1234
+    assert args.runtime_dependency_install is True
+
+
+def test_flwr_app_common_args_reject_run_once() -> None:
+    """The removed deprecated flag should no longer parse."""
+    parser = argparse.ArgumentParser()
+    add_args_flwr_app_common(parser)
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--token", "test-token", "--run-once"])

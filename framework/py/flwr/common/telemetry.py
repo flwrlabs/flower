@@ -156,6 +156,14 @@ class EventType(str, Enum):
     FLWR_CLIENTAPP_RUN_ENTER = auto()
     FLWR_CLIENTAPP_RUN_LEAVE = auto()
 
+    # CLI: flwr-agentapp
+    FLWR_AGENTAPP_RUN_ENTER = auto()
+    FLWR_AGENTAPP_RUN_LEAVE = auto()
+
+    # CLI: flwr-model
+    FLWR_MODEL_RUN_ENTER = auto()
+    FLWR_MODEL_RUN_LEAVE = auto()
+
     # --- Simulation Engine ------------------------------------------------------------
 
     # Python API: `run_simulation`

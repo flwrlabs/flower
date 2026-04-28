@@ -290,6 +290,10 @@ You can view it at:
 
     https://flower.ai/apps/<account_name>/<app_name>/
 
+.. tip::
+   If you want trusted reviewers to verify your app after publication, see
+   :doc:`how-to-sign-hub-apps`.
+
 
 Publish a New Version of Your App
 ---------------------------------

@@ -1,0 +1,41 @@
+// Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+// ==============================================================================
+
+syntax = "proto3";
+
+package flwr.proto;
+
+message Task {
+  uint64 task_id = 1;
+  string type = 2;
+  uint64 run_id = 3;
+  TaskStatus status = 4;
+  string pending_at = 5;
+  string starting_at = 6;
+  string running_at = 7;
+  string finished_at = 8;
+  optional string fab_hash = 9;
+  optional string model_ref = 10;
+  optional string connector_ref = 11;
+}
+
+message TaskStatus {
+  // "starting", "running", "finished"
+  string status = 1;
+  // "completed", "failed", "stopped" or "" (non-finished)
+  string sub_status = 2;
+  // failure details
+  string details = 3;
+}
