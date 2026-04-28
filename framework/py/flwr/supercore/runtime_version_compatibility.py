@@ -177,17 +177,18 @@ def get_runtime_version_rejection(
     assert local_version is not None
     assert peer_version is not None
 
+    rejection = None
     if (
-        local_version.major == peer_version.major
-        and local_version.minor == peer_version.minor
+        local_version.major != peer_version.major
+        or local_version.minor != peer_version.minor
     ):
-        return None
+        rejection = format_incompatible_version_message(
+            connection_name,
+            local_metadata,
+            peer_metadata,
+        )
 
-    return format_incompatible_version_message(
-        connection_name,
-        local_metadata,
-        peer_metadata,
-    )
+    return rejection
 
 
 def _get_package_name_error(
