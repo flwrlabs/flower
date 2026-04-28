@@ -83,7 +83,38 @@ class RuntimeVersionMetadata:
         values_by_key = {
             key: get_metadata_str_checked(grpc_metadata, key) for key in relevant_keys
         }
-        return _build_runtime_metadata_from_lookup(values_by_key, relevant_keys)
+
+        if all(error == "missing" for _, error in values_by_key.values()):
+            return None, None
+
+        for error_kind, message_prefix in (
+            ("missing", "Missing required Flower runtime metadata: "),
+            ("duplicate", "Flower runtime metadata contains duplicate values: "),
+            ("wrong_type", "Flower runtime metadata contains non-string values: "),
+            ("empty", "Flower runtime metadata contains empty values: "),
+        ):
+            matching_keys = [
+                key for key, (_, error) in values_by_key.items() if error == error_kind
+            ]
+            if matching_keys:
+                matching_keys_str = ", ".join(sorted(matching_keys))
+                return None, f"{message_prefix}{matching_keys_str}."
+
+        package_name = values_by_key[FLWR_PACKAGE_NAME_METADATA_KEY][0]
+        package_version = values_by_key[FLWR_PACKAGE_VERSION_METADATA_KEY][0]
+        component_name = values_by_key[FLWR_COMPONENT_NAME_METADATA_KEY][0]
+        assert package_name is not None
+        assert package_version is not None
+        assert component_name is not None
+
+        return (
+            cls(
+                package_name=package_name,
+                package_version=package_version,
+                component_name=component_name,
+            ),
+            None,
+        )
 
     def append_to_grpc_metadata(
         self,
@@ -206,46 +237,6 @@ def format_incompatible_version_message(
 def format_invalid_metadata_message(connection_name: str, detail: str) -> str:
     """Format a standard invalid-metadata error message."""
     return f"Invalid Flower version metadata for {connection_name}. {detail}"
-
-
-def _build_runtime_metadata_from_lookup(
-    values_by_key: RuntimeMetadataLookup,
-    relevant_keys: Sequence[str],
-) -> tuple[RuntimeVersionMetadata | None, str | None]:
-    """Build runtime metadata from checked lookup results."""
-    present_keys = [
-        key for key, (_, error) in values_by_key.items() if error != "missing"
-    ]
-    if not present_keys:
-        return None, None
-
-    for error_kind, message_prefix in (
-        ("duplicate", "Flower runtime metadata contains duplicate values: "),
-        ("missing", "Missing required Flower runtime metadata: "),
-        ("wrong_type", "Flower runtime metadata contains non-string values: "),
-        ("empty", "Flower runtime metadata contains empty values: "),
-    ):
-        matching_keys = [
-            key for key, (_, error) in values_by_key.items() if error == error_kind
-        ]
-        if matching_keys:
-            matching_keys_str = ", ".join(sorted(matching_keys))
-            return None, f"{message_prefix}{matching_keys_str}."
-
-    values: dict[str, str] = {}
-    for key in relevant_keys:
-        value, _ = values_by_key[key]
-        assert value is not None
-        values[key] = value
-
-    return (
-        RuntimeVersionMetadata(
-            package_name=values[FLWR_PACKAGE_NAME_METADATA_KEY],
-            package_version=values[FLWR_PACKAGE_VERSION_METADATA_KEY],
-            component_name=values[FLWR_COMPONENT_NAME_METADATA_KEY],
-        ),
-        None,
-    )
 
 
 def _check_package_name_compatibility(
