@@ -40,7 +40,9 @@ from flwr.common import (
     now,
 )
 from flwr.common import recorddict_compat as compat
-from flwr.common import typing
+from flwr.common import (
+    typing,
+)
 from flwr.common.constant import MessageTypeLegacy
 from flwr.common.message import make_message
 

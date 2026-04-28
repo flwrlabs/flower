@@ -25,8 +25,8 @@ from google.protobuf.message import Message as GrpcMessage
 
 from flwr.supercore.runtime_version_compatibility import (
     RuntimeVersionMetadata,
-    get_runtime_version_rejection,
     format_invalid_metadata_message,
+    get_runtime_version_rejection,
 )
 
 
