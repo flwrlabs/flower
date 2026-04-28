@@ -44,7 +44,7 @@ from flwr.common.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
 
 from .utils import (
-    _extract_error_message,
+    _format_grpc_error,
     build_pathspec,
     cli_output_handler,
     collect_files,
@@ -58,6 +58,17 @@ from .utils import (
     validate_credentials_content,
     validate_federation_name,
 )
+
+
+class _GrpcErrorWithDetails(grpc.RpcError):
+    """Test helper for grpc.RpcError values carrying a details string."""
+
+    def __init__(self, details: str) -> None:
+        self._details = details
+
+    def details(self) -> str:
+        """Return the stored gRPC details string."""
+        return self._details
 
 
 class TestGetSHA256Hash(unittest.TestCase):
@@ -266,21 +277,21 @@ def test_custom_grpc_err_handler() -> None:
     mock_handler.assert_called_once_with(grpc_error)
 
 
-def test_extract_error_message_uses_json_message_field() -> None:
+def test_ormat_grpc_error_uses_json_message_field() -> None:
     """Structured Flower errors combine public message and details."""
-    err = Exception(
+    err = _GrpcErrorWithDetails(
         '{"public_message": "request failed", '
         '"public_details": "missing entitlement", "code": 400}'
     )
 
-    assert _extract_error_message(err) == "request failed Details: missing entitlement"
+    assert _format_grpc_error(err) == "request failed\nmissing entitlement"
 
 
-def test_extract_error_message_falls_back_to_plain_string() -> None:
+def test_ormat_grpc_error_falls_back_to_plain_string() -> None:
     """Non-JSON errors fall back to their normal string form."""
-    err = Exception("plain failure")
+    err = _GrpcErrorWithDetails("plain failure")
 
-    assert _extract_error_message(err) == "plain failure"
+    assert _format_grpc_error(err) == "plain failure"
 
 
 def test_cli_output_handler_raises_click_exception_for_json_error() -> None:
