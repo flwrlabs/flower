@@ -282,7 +282,7 @@ def test_custom_grpc_err_handler() -> None:
     mock_handler.assert_called_once_with(grpc_error)
 
 
-def test_ormat_grpc_error_uses_json_message_field() -> None:
+def test_format_grpc_error_uses_json_message_field() -> None:
     """Structured Flower errors combine public message and details."""
     err = _grpc_error_with_details(
         '{"public_message": "request failed", '
@@ -292,7 +292,7 @@ def test_ormat_grpc_error_uses_json_message_field() -> None:
     assert _format_grpc_error(err) == "request failed\nmissing entitlement"
 
 
-def test_ormat_grpc_error_falls_back_to_plain_string() -> None:
+def test_format_grpc_error_falls_back_to_plain_string() -> None:
     """Non-JSON errors fall back to their normal string form."""
     err = _grpc_error_with_details("plain failure")
 
