@@ -247,13 +247,10 @@ def test_has_node() -> None:
     ]
 )  # type: ignore
 def test_can_execute(action: ActionType) -> None:
-    """Test can_execute returns an allowed entitlement response."""
+    """Test can_execute completes for allowed actions."""
     manager = NoOpFederationManager()
 
-    response = manager.can_execute(NOOP_FLWR_AID, action, ActionContext())
-    assert response.allowed is True
-    assert response.code == 0
-    assert response.message == "Action allowed."
+    manager.can_execute(NOOP_FLWR_AID, action, ActionContext())
 
 
 def test_get_federations() -> None:

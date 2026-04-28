@@ -84,14 +84,13 @@ from flwr.supercore.constant import (
     RunTime,
     RunType,
 )
-from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.error import ApiErrorCode, EntitlementError, FlowerError
 from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
     CreateInvitationContext,
-    EntitlementResponse,
     RegisterSupernodeContext,
     StartRunContext,
 )
@@ -294,10 +293,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch.object(
                 self.state.federation_manager,
                 "can_execute",
-                return_value=EntitlementResponse(
-                    allowed=False,
-                    code=101,
-                    message="Start run not permitted.",
+                side_effect=EntitlementError(
+                    details="Start run not permitted.",
+                    entitlement_code=101,
                 ),
             ),
             self.assertRaises(grpc.RpcError),
@@ -339,11 +337,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch.object(
                 self.state.federation_manager,
                 "can_execute",
-                return_value=EntitlementResponse(
-                    allowed=True,
-                    code=0,
-                    message="Action allowed.",
-                ),
+                return_value=None,
             ) as mock_can_execute,
             patch.object(
                 self.state.federation_manager,
@@ -470,10 +464,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch.object(
                 self.state.federation_manager,
                 "can_execute",
-                return_value=EntitlementResponse(
-                    allowed=False,
-                    code=102,
-                    message="Register node not permitted.",
+                side_effect=EntitlementError(
+                    details="Register node not permitted.",
+                    entitlement_code=102,
                 ),
             ),
             self.assertRaises(grpc.RpcError),
@@ -497,11 +490,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         with patch.object(
             self.state.federation_manager,
             "can_execute",
-            return_value=EntitlementResponse(
-                allowed=True,
-                code=0,
-                message="Action allowed.",
-            ),
+            return_value=None,
         ) as mock_can_execute:
             _ = self.servicer.RegisterNode(req, Mock())
 
@@ -650,11 +639,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch.object(
                 self.state.federation_manager,
                 "can_execute",
-                return_value=EntitlementResponse(
-                    allowed=True,
-                    code=0,
-                    message="Action allowed.",
-                ),
+                return_value=None,
             ) as mock_can_execute,
             patch.object(
                 self.state.federation_manager,
@@ -720,10 +705,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch.object(
                 self.state.federation_manager,
                 "can_execute",
-                return_value=EntitlementResponse(
-                    allowed=False,
-                    code=103,
-                    message="Create federation not permitted.",
+                side_effect=EntitlementError(
+                    details="Create federation not permitted.",
+                    entitlement_code=103,
                 ),
             ),
             self.assertRaises(grpc.RpcError),
@@ -909,11 +893,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             federation_name="test-federation",
         )
         context = Mock()
-        self.state.federation_manager.can_execute.return_value = EntitlementResponse(
-            allowed=True,
-            code=0,
-            message="Action allowed.",
-        )
+        self.state.federation_manager.can_execute.return_value = None
         self.state.federation_manager.get_simulation_config.return_value = None
 
         response = self.servicer.CreateInvitation(request, context)
@@ -942,10 +922,9 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         )
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
-        self.state.federation_manager.can_execute.return_value = EntitlementResponse(
-            allowed=False,
-            code=104,
-            message="Create invitation not permitted.",
+        self.state.federation_manager.can_execute.side_effect = EntitlementError(
+            details="Create invitation not permitted.",
+            entitlement_code=104,
         )
 
         with self.assertRaises(grpc.RpcError):
@@ -978,11 +957,7 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         """Test AcceptInvitation success path."""
         request = AcceptInvitationRequest(federation_name="test-federation")
         context = Mock()
-        self.state.federation_manager.can_execute.return_value = EntitlementResponse(
-            allowed=True,
-            code=0,
-            message="Action allowed.",
-        )
+        self.state.federation_manager.can_execute.return_value = None
         self.state.federation_manager.get_simulation_config.return_value = None
 
         response = self.servicer.AcceptInvitation(request, context)
@@ -1006,10 +981,9 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         request = AcceptInvitationRequest(federation_name="test-federation")
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
-        self.state.federation_manager.can_execute.return_value = EntitlementResponse(
-            allowed=False,
-            code=105,
-            message="Accept invitation not permitted.",
+        self.state.federation_manager.can_execute.side_effect = EntitlementError(
+            details="Accept invitation not permitted.",
+            entitlement_code=105,
         )
 
         with self.assertRaises(grpc.RpcError):

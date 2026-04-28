@@ -117,12 +117,7 @@ from flwr.supercore.constant import (
     RunTime,
     RunType,
 )
-from flwr.supercore.error import (
-    ApiErrorCode,
-    EntitlementError,
-    FlowerError,
-    rpc_error_translator,
-)
+from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
 from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
 from flwr.supercore.typing import (
@@ -216,16 +211,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 resolved_federation_config.CopyFrom(sim_cfg)
                 resolved_federation_config.MergeFrom(request.override_federation_config)
 
-            entitlement_response = state.federation_manager.can_execute(
+            state.federation_manager.can_execute(
                 flwr_aid,
                 ActionType.START_RUN,
                 StartRunContext(federation_name=federation, runtime=runtime),
             )
-            if not entitlement_response.allowed:
-                raise EntitlementError(
-                    details=entitlement_response.message,
-                    entitlement_code=entitlement_response.code,
-                )
 
         try:
             # Validate user config overrides matches keys in run config in FAB
@@ -541,16 +531,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         flwr_aid = _get_flwr_aid(context)
         with rpc_error_translator(context, self.RegisterNode.__qualname__):
-            entitlement_response = state.federation_manager.can_execute(
+            state.federation_manager.can_execute(
                 flwr_aid,
                 ActionType.REGISTER_SUPERNODE,
                 RegisterSupernodeContext(),
             )
-            if not entitlement_response.allowed:
-                raise EntitlementError(
-                    details=entitlement_response.message,
-                    entitlement_code=entitlement_response.code,
-                )
 
         # Account name exists if `flwr_aid` exists
         account_name = cast(str, get_current_account_info().account_name)
@@ -694,7 +679,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
             runtime = RunTime.SIMULATION if request.simulation else RunTime.DEPLOYMENT
             flwr_aid = cast(str, account.flwr_aid)
-            entitlement_response = state.federation_manager.can_execute(
+            state.federation_manager.can_execute(
                 flwr_aid,
                 ActionType.CREATE_FEDERATION,
                 CreateFederationContext(
@@ -703,11 +688,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     visibility="private",
                 ),
             )
-            if not entitlement_response.allowed:
-                raise EntitlementError(
-                    details=entitlement_response.message,
-                    entitlement_code=entitlement_response.code,
-                )
 
             # Create federation
             federation = state.federation_manager.create_federation(
@@ -852,7 +832,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 else RunTime.DEPLOYMENT
             )
 
-            entitlement_response = state.federation_manager.can_execute(
+            state.federation_manager.can_execute(
                 flwr_aid=flwr_aid,
                 action=ActionType.CREATE_INVITATION,
                 context=CreateInvitationContext(
@@ -861,11 +841,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     runtime=runtime,
                 ),
             )
-            if not entitlement_response.allowed:
-                raise EntitlementError(
-                    details=entitlement_response.message,
-                    entitlement_code=entitlement_response.code,
-                )
 
             state.federation_manager.create_invitation(
                 flwr_aid=flwr_aid,
@@ -909,7 +884,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 else RunTime.DEPLOYMENT
             )
 
-            entitlement_response = state.federation_manager.can_execute(
+            state.federation_manager.can_execute(
                 flwr_aid=flwr_aid,
                 action=ActionType.ACCEPT_INVITATION,
                 context=AcceptInvitationContext(
@@ -917,11 +892,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     runtime=runtime,
                 ),
             )
-            if not entitlement_response.allowed:
-                raise EntitlementError(
-                    details=entitlement_response.message,
-                    entitlement_code=entitlement_response.code,
-                )
 
             state.federation_manager.accept_invitation(
                 flwr_aid=_get_flwr_aid(context),

@@ -22,7 +22,7 @@ from flwr.common.typing import Federation
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Invitation  # pylint: disable=E0611
 from flwr.supercore.constant import ActionType
-from flwr.supercore.typing import ActionContext, EntitlementResponse
+from flwr.supercore.typing import ActionContext
 
 if TYPE_CHECKING:
     from flwr.server.superlink.linkstate.linkstate import LinkState
@@ -336,7 +336,7 @@ class FederationManager(ABC):
     @abstractmethod
     def can_execute(
         self, flwr_aid: str, action: ActionType, context: ActionContext
-    ) -> EntitlementResponse:
+    ) -> None:
         """Check if an account can execute an action under a given context.
 
         Parameters
@@ -348,9 +348,8 @@ class FederationManager(ABC):
         context : ActionContext
             Action-specific context required for authorization.
 
-        Returns
-        -------
-        EntitlementResponse
-            An `EntitlementResponse` object indicating whether the action is allowed,
-            along with a code and message providing more details.
+        Raises
+        ------
+        EntitlementError
+            If the action is not allowed under the given entitlement context.
         """

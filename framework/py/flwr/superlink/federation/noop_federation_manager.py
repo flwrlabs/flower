@@ -32,7 +32,7 @@ from flwr.supercore.constant import (
     ActionType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
-from flwr.supercore.typing import ActionContext, EntitlementResponse
+from flwr.supercore.typing import ActionContext
 
 from .federation_manager import FederationManager
 
@@ -227,7 +227,7 @@ class NoOpFederationManager(FederationManager):
 
     def can_execute(
         self, flwr_aid: str, action: ActionType, context: ActionContext
-    ) -> EntitlementResponse:
+    ) -> None:
         """Check if an account can execute an action under a given context."""
         _ = (flwr_aid, action, context)
-        return EntitlementResponse(allowed=True, code=0, message="Action allowed.")
+        return None
