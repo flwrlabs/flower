@@ -26,10 +26,8 @@ from flwr.supercore.constant import (
 
 from .runtime_version_compatibility import (
     RuntimeVersionMetadata,
-    evaluate_runtime_version_compatibility,
     format_incompatible_version_message,
     format_invalid_metadata_message,
-    read_runtime_version_metadata,
 )
 
 
@@ -79,7 +77,9 @@ def test_build_runtime_version_metadata_rejects_empty_component_name() -> None:
 
 def test_read_runtime_version_metadata_returns_missing_for_absent_keys() -> None:
     """Absent Flower metadata should be treated as the rollout missing case."""
-    metadata, error = read_runtime_version_metadata({"other-header": "value"})
+    metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
+        (("other-header", "value"),)
+    )
 
     assert metadata is None
     assert error is None
@@ -87,8 +87,8 @@ def test_read_runtime_version_metadata_returns_missing_for_absent_keys() -> None
 
 def test_read_runtime_version_metadata_rejects_partial_metadata() -> None:
     """Partial Flower metadata should be rejected as invalid."""
-    metadata, error = read_runtime_version_metadata(
-        {FLWR_PACKAGE_NAME_METADATA_KEY: "flwr"}
+    metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
+        ((FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),)
     )
 
     assert metadata is None
@@ -98,12 +98,12 @@ def test_read_runtime_version_metadata_rejects_partial_metadata() -> None:
 
 def test_read_runtime_version_metadata_accepts_metadata_item_iterables() -> None:
     """GRPC metadata-style iterables should be supported directly."""
-    metadata, error = read_runtime_version_metadata(
-        [
+    metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
+        (
             (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
             (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.0"),
             (FLWR_COMPONENT_NAME_METADATA_KEY, "cli"),
-        ]
+        )
     )
 
     assert error is None
@@ -163,13 +163,13 @@ def test_runtime_version_metadata_ignores_unrelated_binary_headers() -> None:
 
 def test_read_runtime_version_metadata_rejects_duplicate_values() -> None:
     """Runtime version metadata keys should appear at most once."""
-    metadata, error = read_runtime_version_metadata(
-        [
+    metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
+        (
             (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
             (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.0"),
             (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.1"),
             (FLWR_COMPONENT_NAME_METADATA_KEY, "cli"),
-        ]
+        )
     )
 
     assert metadata is None
@@ -179,22 +179,24 @@ def test_read_runtime_version_metadata_rejects_duplicate_values() -> None:
     )
 
 
-def test_evaluate_runtime_version_compatibility_accepts_same_major_minor() -> None:
+def test_runtime_version_metadata_accepts_same_major_minor() -> None:
     """Patch differences are compatible."""
-    result = evaluate_runtime_version_compatibility(
-        RuntimeVersionMetadata("flwr", "1.29.0", "superlink"),
-        RuntimeVersionMetadata("flwr", "1.29.7", "supernode"),
+    local = RuntimeVersionMetadata("flwr", "1.29.0", "superlink")
+
+    result = local.check_compatibility_with(
+        RuntimeVersionMetadata("flwr", "1.29.7", "supernode")
     )
 
     assert result.status == "compatible"
     assert result.peer_version == Version("1.29.7")
 
 
-def test_evaluate_runtime_version_compatibility_accepts_dev_versions() -> None:
+def test_runtime_version_metadata_accepts_dev_versions() -> None:
     """PEP 440 nightly/dev versions should be compatible by release tuple."""
-    result = evaluate_runtime_version_compatibility(
-        RuntimeVersionMetadata("flwr", "1.30.0.dev20260425", "superlink"),
-        RuntimeVersionMetadata("flwr", "1.30.0rc1", "supernode"),
+    local = RuntimeVersionMetadata("flwr", "1.30.0.dev20260425", "superlink")
+
+    result = local.check_compatibility_with(
+        RuntimeVersionMetadata("flwr", "1.30.0rc1", "supernode")
     )
 
     assert result.status == "compatible"
@@ -202,12 +204,12 @@ def test_evaluate_runtime_version_compatibility_accepts_dev_versions() -> None:
     assert result.peer_version == Version("1.30.0rc1")
 
 
-def test_evaluate_runtime_version_compatibility_rejects_different_minor() -> None:
+def test_runtime_version_metadata_rejects_different_minor() -> None:
     """Different minor versions should be incompatible."""
     peer = RuntimeVersionMetadata("flwr", "1.30.0", "supernode")
     local = RuntimeVersionMetadata("flwr", "1.29.2", "superlink")
 
-    result = evaluate_runtime_version_compatibility(local, peer)
+    result = local.check_compatibility_with(peer)
 
     assert result.status == "incompatible"
     assert result.peer_metadata == peer
@@ -221,12 +223,11 @@ def test_evaluate_runtime_version_compatibility_rejects_different_minor() -> Non
     )
 
 
-def test_evaluate_runtime_version_compatibility_tolerates_missing_metadata() -> None:
+def test_runtime_version_metadata_tolerates_missing_metadata() -> None:
     """Missing metadata should be surfaced distinctly for rollout handling."""
-    result = evaluate_runtime_version_compatibility(
-        RuntimeVersionMetadata("flwr", "1.29.0", "superlink"),
-        None,
-    )
+    local = RuntimeVersionMetadata("flwr", "1.29.0", "superlink")
+
+    result = local.check_compatibility_with(None)
 
     assert result.status == "missing"
     assert result.reason is None
@@ -234,10 +235,9 @@ def test_evaluate_runtime_version_compatibility_tolerates_missing_metadata() -> 
 
 def test_missing_metadata_is_tolerated_with_unknown_local_version() -> None:
     """Missing metadata should remain the rollout case in source environments."""
-    result = evaluate_runtime_version_compatibility(
-        RuntimeVersionMetadata("unknown", "unknown", "superlink"),
-        None,
-    )
+    local = RuntimeVersionMetadata("unknown", "unknown", "superlink")
+
+    result = local.check_compatibility_with(None)
 
     assert result.status == "missing"
     assert result.reason is None
@@ -245,9 +245,10 @@ def test_missing_metadata_is_tolerated_with_unknown_local_version() -> None:
 
 def test_version_checks_are_disabled_for_unknown_local_version() -> None:
     """Unparseable local versions should not break the receiving API."""
-    result = evaluate_runtime_version_compatibility(
-        RuntimeVersionMetadata("unknown", "unknown", "superlink"),
-        RuntimeVersionMetadata("flwr", "1.29.0", "simulation"),
+    local = RuntimeVersionMetadata("unknown", "unknown", "superlink")
+
+    result = local.check_compatibility_with(
+        RuntimeVersionMetadata("flwr", "1.29.0", "simulation")
     )
 
     assert result.status == "disabled"
@@ -258,9 +259,10 @@ def test_version_checks_are_disabled_for_unknown_local_version() -> None:
 
 def test_version_checks_are_disabled_for_unknown_peer_version() -> None:
     """Unparseable peer versions should not hard-fail rollout/dev callers."""
-    result = evaluate_runtime_version_compatibility(
-        RuntimeVersionMetadata("flwr", "1.29.0", "superlink"),
-        RuntimeVersionMetadata("flwr", "main", "supernode"),
+    local = RuntimeVersionMetadata("flwr", "1.29.0", "superlink")
+
+    result = local.check_compatibility_with(
+        RuntimeVersionMetadata("flwr", "main", "supernode")
     )
 
     assert result.status == "disabled"

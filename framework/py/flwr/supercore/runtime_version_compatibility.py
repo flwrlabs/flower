@@ -228,41 +228,6 @@ class CompatibilityResult:
     peer_version: Version | None
 
 
-def read_runtime_version_metadata(
-    metadata: Mapping[str, str] | Iterable[tuple[str, str]] | None,
-) -> tuple[RuntimeVersionMetadata | None, str | None]:
-    """Read Flower runtime metadata from a mapping or metadata item iterable."""
-    return RuntimeVersionMetadata.from_grpc_metadata(_coerce_grpc_metadata(metadata))
-
-
-def evaluate_runtime_version_compatibility(
-    local_metadata: RuntimeVersionMetadata,
-    peer_metadata: (
-        RuntimeVersionMetadata | Mapping[str, str] | Iterable[tuple[str, str]] | None
-    ),
-) -> CompatibilityResult:
-    """Evaluate whether a peer is runtime-compatible with the local component."""
-    peer: RuntimeVersionMetadata | None
-    metadata_error: str | None
-    if isinstance(peer_metadata, RuntimeVersionMetadata):
-        peer = peer_metadata
-        metadata_error = None
-    else:
-        peer, metadata_error = read_runtime_version_metadata(peer_metadata)
-
-    if metadata_error is not None:
-        return CompatibilityResult(
-            status="invalid",
-            reason=metadata_error,
-            local_metadata=local_metadata,
-            peer_metadata=peer,
-            local_version=None,
-            peer_version=None,
-        )
-
-    return local_metadata.check_compatibility_with(peer)
-
-
 def format_incompatible_version_message(
     connection_name: str,
     local_metadata: RuntimeVersionMetadata,
