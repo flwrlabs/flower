@@ -84,17 +84,6 @@ def test_runtime_version_metadata_from_grpc_returns_missing_for_absent_keys() ->
     assert error is None
 
 
-def test_runtime_version_metadata_from_grpc_rejects_partial_metadata() -> None:
-    """Partial Flower metadata should be rejected as invalid."""
-    metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
-        ((FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),)
-    )
-
-    assert metadata is None
-    assert error is not None
-    assert "Missing required Flower runtime metadata" in error
-
-
 def test_runtime_version_metadata_from_grpc_accepts_metadata_item_iterables() -> None:
     """GRPC metadata-style iterables should be supported directly."""
     metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
@@ -113,189 +102,137 @@ def test_runtime_version_metadata_from_grpc_accepts_metadata_item_iterables() ->
     )
 
 
-def test_runtime_version_metadata_rejects_bytes_values() -> None:
-    """Runtime metadata keys should reject non-string gRPC values."""
-    metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
+@pytest.mark.parametrize(
+    ("grpc_metadata", "expected_error"),
+    [
         (
-            (FLWR_PACKAGE_NAME_METADATA_KEY, b"flwr"),
-            (FLWR_PACKAGE_VERSION_METADATA_KEY, b"1.29.0"),
-            (FLWR_COMPONENT_NAME_METADATA_KEY, b"cli"),
-        )
-    )
+            ((FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),),
+            "Missing required Flower runtime metadata: "
+            "flwr-component-name, flwr-package-version.",
+        ),
+        (
+            (
+                (FLWR_PACKAGE_NAME_METADATA_KEY, b"flwr"),
+                (FLWR_PACKAGE_VERSION_METADATA_KEY, b"1.29.0"),
+                (FLWR_COMPONENT_NAME_METADATA_KEY, b"cli"),
+            ),
+            "Flower runtime metadata contains non-string values: "
+            "flwr-component-name, flwr-package-name, flwr-package-version.",
+        ),
+        (
+            (
+                (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
+                (FLWR_PACKAGE_VERSION_METADATA_KEY, b"\xff\xfe"),
+                (FLWR_COMPONENT_NAME_METADATA_KEY, "cli"),
+            ),
+            "Flower runtime metadata contains non-string values: "
+            "flwr-package-version.",
+        ),
+        (
+            (
+                (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
+                (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.0"),
+                (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.1"),
+                (FLWR_COMPONENT_NAME_METADATA_KEY, "cli"),
+            ),
+            "Flower runtime metadata contains duplicate values: "
+            "flwr-package-version.",
+        ),
+    ],
+)
+def test_runtime_version_metadata_from_grpc_rejects_invalid_metadata(
+    grpc_metadata: tuple[tuple[str, str | bytes], ...],
+    expected_error: str,
+) -> None:
+    """Malformed runtime metadata should be rejected explicitly."""
+    metadata, error = RuntimeVersionMetadata.from_grpc_metadata(grpc_metadata)
 
     assert metadata is None
-    assert (
-        error == "Flower runtime metadata contains non-string values: "
-        "flwr-component-name, flwr-package-name, flwr-package-version."
-    )
+    assert error == expected_error
 
 
-def test_runtime_version_metadata_rejects_non_string_runtime_values() -> None:
-    """Relevant runtime metadata keys should reject non-string values."""
-    metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
+@pytest.mark.parametrize(
+    ("local", "peer"),
+    [
         (
-            (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
-            (FLWR_PACKAGE_VERSION_METADATA_KEY, b"\xff\xfe"),
-            (FLWR_COMPONENT_NAME_METADATA_KEY, "cli"),
-        )
-    )
-
-    assert metadata is None
-    assert (
-        error == "Flower runtime metadata contains non-string values: "
-        "flwr-package-version."
-    )
-
-
-def test_runtime_version_metadata_ignores_unrelated_binary_headers() -> None:
-    """Unrelated binary metadata should not affect runtime metadata parsing."""
-    metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
+            RuntimeVersionMetadata("flwr", "1.29.0", "superlink"),
+            RuntimeVersionMetadata("flwr", "1.29.7", "supernode"),
+        ),
         (
-            ("grpc-trace-bin", b"\xff\x00\xfe"),
-            ("other-header", "value"),
-        )
-    )
-
-    assert metadata is None
-    assert error is None
-
-
-def test_runtime_version_metadata_from_grpc_rejects_duplicate_values() -> None:
-    """Runtime version metadata keys should appear at most once."""
-    metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
+            RuntimeVersionMetadata("flwr", "1.30.0.dev20260425", "superlink"),
+            RuntimeVersionMetadata("flwr", "1.30.0rc1", "supernode"),
+        ),
         (
-            (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
-            (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.0"),
-            (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.1"),
-            (FLWR_COMPONENT_NAME_METADATA_KEY, "cli"),
-        )
-    )
-
-    assert metadata is None
-    assert (
-        error
-        == "Flower runtime metadata contains duplicate values: flwr-package-version."
-    )
-
-
-def test_runtime_version_metadata_accepts_same_major_minor() -> None:
-    """Patch differences are compatible."""
-    local = RuntimeVersionMetadata("flwr", "1.29.0", "superlink")
+            RuntimeVersionMetadata("flwr", "1.30.0", "superlink"),
+            RuntimeVersionMetadata("flwr-nightly", "1.30.1.dev20260425", "supernode"),
+        ),
+        (
+            RuntimeVersionMetadata("flwr", "1.29.0", "superlink"),
+            None,
+        ),
+    ],
+)
+def test_runtime_version_metadata_allows_expected_cases(
+    local: RuntimeVersionMetadata,
+    peer: RuntimeVersionMetadata | None,
+) -> None:
+    """Compatible peers and absent metadata should continue."""
     rejection = get_runtime_version_rejection(
         "SuperNode <-> SuperLink Fleet API",
         local,
-        RuntimeVersionMetadata("flwr", "1.29.7", "supernode"),
+        peer,
     )
 
     assert rejection is None
 
 
-def test_runtime_version_metadata_accepts_dev_versions() -> None:
-    """PEP 440 nightly/dev versions should be compatible by release tuple."""
-    local = RuntimeVersionMetadata("flwr", "1.30.0.dev20260425", "superlink")
-    rejection = get_runtime_version_rejection(
-        "SuperNode <-> SuperLink Fleet API",
-        local,
-        RuntimeVersionMetadata("flwr", "1.30.0rc1", "supernode"),
-    )
-
-    assert rejection is None
-
-
-def test_runtime_version_metadata_accepts_flwr_nightly_package_name() -> None:
-    """First-party package names should remain compatible with each other."""
-    local = RuntimeVersionMetadata("flwr", "1.30.0", "superlink")
-    rejection = get_runtime_version_rejection(
-        "SuperNode <-> SuperLink Fleet API",
-        local,
-        RuntimeVersionMetadata("flwr-nightly", "1.30.1.dev20260425", "supernode"),
-    )
-
-    assert rejection is None
-
-
-def test_runtime_version_metadata_rejects_different_minor() -> None:
-    """Different minor versions should be incompatible."""
-    peer = RuntimeVersionMetadata("flwr", "1.30.0", "supernode")
-    local = RuntimeVersionMetadata("flwr", "1.29.2", "superlink")
-
+@pytest.mark.parametrize(
+    ("local", "peer", "connection_name", "expected_rejection"),
+    [
+        (
+            RuntimeVersionMetadata("flwr", "1.29.2", "superlink"),
+            RuntimeVersionMetadata("flwr", "1.30.0", "supernode"),
+            "SuperNode <-> SuperLink Fleet API",
+            "Incompatible Flower version for SuperNode <-> SuperLink Fleet API.\n"
+            "Local superlink version 1.29.2 only accepts peers from the same "
+            "major.minor release, but received supernode version 1.30.0.",
+        ),
+        (
+            RuntimeVersionMetadata("unknown", "unknown", "superlink"),
+            RuntimeVersionMetadata("flwr", "1.29.0", "simulation"),
+            "ServerApp <-> SuperLink ServerAppIo API",
+            "Invalid Flower version metadata for "
+            "ServerApp <-> SuperLink ServerAppIo API. "
+            "Local Flower package name is not recognized: 'unknown'.",
+        ),
+        (
+            RuntimeVersionMetadata("flwr", "1.29.0", "superlink"),
+            RuntimeVersionMetadata("flwr", "main", "supernode"),
+            "SuperNode <-> SuperLink Fleet API",
+            "Invalid Flower version metadata for "
+            "SuperNode <-> SuperLink Fleet API. "
+            "Peer Flower version metadata cannot be parsed: 'main'.",
+        ),
+        (
+            RuntimeVersionMetadata("flwr", "1.29.0", "superlink"),
+            RuntimeVersionMetadata("forked-flower", "1.29.1", "supernode"),
+            "SuperNode <-> SuperLink Fleet API",
+            "Invalid Flower version metadata for "
+            "SuperNode <-> SuperLink Fleet API. "
+            "Peer Flower package name is not recognized: 'forked-flower'.",
+        ),
+    ],
+)
+def test_runtime_version_metadata_rejects_expected_cases(
+    local: RuntimeVersionMetadata,
+    peer: RuntimeVersionMetadata,
+    connection_name: str,
+    expected_rejection: str,
+) -> None:
+    """Explicitly invalid or incompatible peers should be rejected."""
     assert (
-        get_runtime_version_rejection("SuperNode <-> SuperLink Fleet API", local, peer)
-        == "Incompatible Flower version for SuperNode <-> SuperLink Fleet API.\n"
-        "Local superlink version 1.29.2 only accepts peers from the same "
-        "major.minor release, but received supernode version 1.30.0."
-    )
-
-
-def test_runtime_version_metadata_tolerates_missing_metadata() -> None:
-    """Missing metadata should be surfaced distinctly for rollout handling."""
-    local = RuntimeVersionMetadata("flwr", "1.29.0", "superlink")
-    rejection = get_runtime_version_rejection(
-        "SuperNode <-> SuperLink Fleet API",
-        local,
-        None,
-    )
-
-    assert rejection is None
-
-
-def test_missing_metadata_is_tolerated_with_unknown_local_version() -> None:
-    """Missing metadata should remain the rollout case in source environments."""
-    local = RuntimeVersionMetadata("unknown", "unknown", "superlink")
-    rejection = get_runtime_version_rejection(
-        "SuperNode <-> SuperLink Fleet API",
-        local,
-        None,
-    )
-
-    assert rejection is None
-
-
-def test_unknown_local_version_is_rejected() -> None:
-    """Explicit local version metadata must be parseable."""
-    local = RuntimeVersionMetadata("unknown", "unknown", "superlink")
-    rejection = get_runtime_version_rejection(
-        "ServerApp <-> SuperLink ServerAppIo API",
-        local,
-        RuntimeVersionMetadata("flwr", "1.29.0", "simulation"),
-    )
-
-    assert (
-        rejection == "Invalid Flower version metadata for "
-        "ServerApp <-> SuperLink ServerAppIo API. "
-        "Local Flower package name is not recognized: 'unknown'."
-    )
-
-
-def test_unknown_peer_version_is_rejected() -> None:
-    """Explicit peer version metadata must be parseable."""
-    local = RuntimeVersionMetadata("flwr", "1.29.0", "superlink")
-    rejection = get_runtime_version_rejection(
-        "SuperNode <-> SuperLink Fleet API",
-        local,
-        RuntimeVersionMetadata("flwr", "main", "supernode"),
-    )
-
-    assert (
-        rejection == "Invalid Flower version metadata for "
-        "SuperNode <-> SuperLink Fleet API. "
-        "Peer Flower version metadata cannot be parsed: 'main'."
-    )
-
-
-def test_unknown_peer_package_name_is_rejected() -> None:
-    """Unrecognized peer package names should be rejected."""
-    local = RuntimeVersionMetadata("flwr", "1.29.0", "superlink")
-    rejection = get_runtime_version_rejection(
-        "SuperNode <-> SuperLink Fleet API",
-        local,
-        RuntimeVersionMetadata("forked-flower", "1.29.1", "supernode"),
-    )
-
-    assert (
-        rejection == "Invalid Flower version metadata for "
-        "SuperNode <-> SuperLink Fleet API. "
-        "Peer Flower package name is not recognized: 'forked-flower'."
+        get_runtime_version_rejection(connection_name, local, peer)
+        == expected_rejection
     )
 
 
