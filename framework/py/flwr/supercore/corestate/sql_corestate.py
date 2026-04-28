@@ -49,9 +49,6 @@ class SqlCoreState(CoreState, SqlMixin):
     def __init__(self, database_path: str, object_store: ObjectStore) -> None:
         super().__init__(database_path)
         self._object_store = object_store
-        # Temporary in-process task token expiry state. The token itself is
-        # persisted in task.token; this can move into task.active_until later.
-        self.task_token_store: dict[str, float] = {}
 
     @property
     def object_store(self) -> ObjectStore:
@@ -116,10 +113,11 @@ class SqlCoreState(CoreState, SqlMixin):
         insert_query = """
             INSERT INTO task
             (task_id, type, run_id, fab_hash, model_ref, connector_ref, token,
-             pending_at, starting_at, running_at, finished_at, sub_status, details)
+             active_until, pending_at, starting_at, running_at, finished_at,
+             sub_status, details)
             VALUES
             (:task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
-             :pending_at, :starting_at, :running_at, :finished_at,
+             :active_until, :pending_at, :starting_at, :running_at, :finished_at,
              :sub_status, :details);
         """
 
@@ -131,6 +129,7 @@ class SqlCoreState(CoreState, SqlMixin):
             "model_ref": model_ref,
             "connector_ref": connector_ref,
             "token": None,
+            "active_until": None,
             "pending_at": now().isoformat(),
             "starting_at": None,
             "running_at": None,
@@ -251,7 +250,9 @@ class SqlCoreState(CoreState, SqlMixin):
                 rows = self.query(
                     """
                     UPDATE task
-                    SET token = :token, starting_at = :starting_at
+                    SET token = :token,
+                        active_until = :active_until,
+                        starting_at = :starting_at
                     WHERE task_id = :task_id
                     AND pending_at IS NOT NULL
                     AND starting_at IS NULL
@@ -263,15 +264,15 @@ class SqlCoreState(CoreState, SqlMixin):
                     {
                         "task_id": sint64_task_id,
                         "token": token,
+                        "active_until": (
+                            claimed_at.timestamp() + HEARTBEAT_DEFAULT_INTERVAL
+                        ),
                         "starting_at": claimed_at.isoformat(),
                     },
                 )
                 if not rows:
                     return None
 
-                self.task_token_store[token] = (
-                    claimed_at.timestamp() + HEARTBEAT_DEFAULT_INTERVAL
-                )
                 return token
         except IntegrityError:
             return None
@@ -297,18 +298,6 @@ class SqlCoreState(CoreState, SqlMixin):
         """Move an unfinished task to finished."""
         sint64_task_id = uint64_to_int64(task_id)
         with self.session():
-            # Load the token first so finishing can also clear heartbeat state.
-            rows = self.query(
-                """
-                SELECT token FROM task
-                WHERE task_id = :task_id AND finished_at IS NULL
-                """,
-                {"task_id": sint64_task_id},
-            )
-            if not rows:
-                return False
-
-            token = rows[0]["token"]
             # Any unfinished task can finish, but the terminal state is immutable.
             updated = self.query(
                 """
@@ -316,6 +305,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 SET finished_at = :finished_at,
                     sub_status = :sub_status,
                     details = :details,
+                    active_until = NULL,
                     token = NULL
                 WHERE task_id = :task_id AND finished_at IS NULL
                 RETURNING task_id
@@ -330,10 +320,6 @@ class SqlCoreState(CoreState, SqlMixin):
             if not updated:
                 return False
 
-            # Finished tasks no longer need claim/heartbeat bookkeeping.
-            if token is not None:
-                self.task_token_store.pop(token, None)
-
             return True
 
     def acknowledge_task_heartbeat(self, task_id: int) -> bool:
@@ -343,62 +329,57 @@ class SqlCoreState(CoreState, SqlMixin):
         current = now().timestamp()
         rows = self.query(
             """
-            SELECT token FROM task
-            WHERE task_id = :task_id AND finished_at IS NULL
+            UPDATE task
+            SET active_until = :active_until
+            WHERE task_id = :task_id
+            AND token IS NOT NULL
+            AND active_until >= :current
+            AND finished_at IS NULL
+            RETURNING task_id
             """,
-            {"task_id": uint64_to_int64(task_id)},
+            {
+                "task_id": uint64_to_int64(task_id),
+                "current": current,
+                "active_until": (
+                    current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+                ),
+            },
         )
-        if not rows or rows[0]["token"] is None:
-            return False
-
-        token = rows[0]["token"]
-        if token not in self.task_token_store:
-            return False
-
-        self.task_token_store[token] = (
-            current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-        )
-        return True
+        return len(rows) > 0
 
     def get_task_id_by_token(self, token: str) -> int | None:
         """Return the task ID associated with the task token, if valid."""
         # Resolve tokens after cleanup so callers never receive expired claims.
         self._cleanup_expired_task_tokens()
-        if token not in self.task_token_store:
-            return None
 
         rows = self.query(
             """
             SELECT task_id FROM task
-            WHERE token = :token AND finished_at IS NULL
+            WHERE token = :token
+            AND active_until >= :current
+            AND finished_at IS NULL
             LIMIT 1
             """,
-            {"token": token},
+            {"token": token, "current": now().timestamp()},
         )
         if not rows:
-            self.task_token_store.pop(token, None)
             return None
         return int64_to_uint64(rows[0]["task_id"])
 
     def _cleanup_expired_task_tokens(self) -> None:
         """Remove expired task heartbeat records."""
         current = now().timestamp()
-        expired_tokens = [
-            token
-            for token, active_until in self.task_token_store.items()
-            if active_until < current
-        ]
-        if not expired_tokens:
-            return
-
-        for token in expired_tokens:
-            del self.task_token_store[token]
-
         with self.session():
-            # Expired tokens are detached from any task rows still pointing at them.
+            # Expired task tokens are detached from any unfinished task rows.
             self.query(
-                "UPDATE task SET token = NULL WHERE token = :token",
-                [{"token": token} for token in expired_tokens],
+                """
+                UPDATE task
+                SET token = NULL, active_until = NULL
+                WHERE token IS NOT NULL
+                AND active_until < :current
+                AND finished_at IS NULL
+                """,
+                {"current": current},
             )
 
     def create_token(self, run_id: int) -> str | None:
