@@ -32,7 +32,7 @@ message Task {
 }
 
 message TaskStatus {
-  // "starting", "running", "finished"
+  // "pending", "starting", "running", or "finished"
   string status = 1;
   // "completed", "failed", "stopped" or "" (non-finished)
   string sub_status = 2;

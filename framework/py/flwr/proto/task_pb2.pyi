@@ -85,7 +85,7 @@ class TaskStatus(google.protobuf.message.Message):
     SUB_STATUS_FIELD_NUMBER: builtins.int
     DETAILS_FIELD_NUMBER: builtins.int
     status: builtins.str
-    """"starting", "running", "finished" """
+    """"pending", "starting", "running", or "finished" """
     sub_status: builtins.str
     """"completed", "failed", "stopped" or "" (non-finished)"""
     details: builtins.str
@@ -127,8 +127,10 @@ class ClaimTaskResponse(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        token: builtins.str = ...,
+        token: builtins.str | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["token", b"token"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_token", b"_token", "token", b"token"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_token", b"_token", "token", b"token"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_token", b"_token"]) -> typing.Literal["token"] | None: ...
 
 global___ClaimTaskResponse = ClaimTaskResponse
