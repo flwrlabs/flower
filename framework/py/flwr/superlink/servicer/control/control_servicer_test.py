@@ -1422,7 +1422,7 @@ def _assert_abort_with_flwr_err(
     if entitlement_code is not None:
         payload["entitlement_code"] = entitlement_code
 
-    ctx.abort.assert_called_once_with(
-        spec.status_code,
-        json.dumps(payload),
-    )
+    ctx.abort.assert_called_once()
+    status_code, raw_payload = ctx.abort.call_args.args
+    assert status_code == spec.status_code
+    assert json.loads(raw_payload) == payload
