@@ -230,4 +230,3 @@ class NoOpFederationManager(FederationManager):
     ) -> None:
         """Check if an account can execute an action under a given context."""
         _ = (flwr_aid, action, context)
-        return None
