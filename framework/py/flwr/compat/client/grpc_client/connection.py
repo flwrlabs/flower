@@ -36,9 +36,7 @@ from flwr.common import (
     now,
 )
 from flwr.common import recorddict_compat as compat
-from flwr.common import (
-    serde,
-)
+from flwr.common import serde
 from flwr.common.constant import MessageTypeLegacy
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
