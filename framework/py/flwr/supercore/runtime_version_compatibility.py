@@ -17,7 +17,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
@@ -77,11 +77,11 @@ class RuntimeVersionMetadata:
             FLWR_PACKAGE_VERSION_METADATA_KEY,
             FLWR_COMPONENT_NAME_METADATA_KEY,
         )
-        metadata_values, decode_error = _coerce_grpc_metadata_values(
+        metadata_values, metadata_error = _collect_runtime_metadata_values(
             grpc_metadata, relevant_keys=relevant_keys
         )
-        if decode_error is not None:
-            return None, decode_error
+        if metadata_error is not None:
+            return None, metadata_error
         present_keys = [key for key in relevant_keys if key in metadata_values]
         if not present_keys:
             return None, None
@@ -248,35 +248,29 @@ def format_invalid_metadata_message(connection_name: str, detail: str) -> str:
     return f"Invalid Flower version metadata for {connection_name}. {detail}"
 
 
-def _coerce_grpc_metadata(
-    metadata: Mapping[str, str] | Iterable[tuple[str, str]] | None,
-) -> tuple[tuple[str, str | bytes], ...] | None:
-    if metadata is None:
-        return None
-    if isinstance(metadata, Mapping):
-        return tuple((str(key), str(value)) for key, value in metadata.items())
-    return tuple((str(key), str(value)) for key, value in metadata)
-
-
-def _coerce_grpc_metadata_values(
+def _collect_runtime_metadata_values(
     metadata: Sequence[tuple[str, str | bytes]] | None,
     *,
     relevant_keys: Sequence[str] | None = None,
 ) -> tuple[dict[str, list[str]], str | None]:
+    """Collect relevant runtime metadata values from a gRPC metadata sequence.
+
+    NOTE: Only the requested runtime-version keys are inspected. Unrelated gRPC
+    metadata is ignored so this parser does not accidentally widen the runtime
+    version contract.
+    """
     if metadata is None:
         return {}, None
 
-    relevant_keys_set = set(relevant_keys) if relevant_keys is not None else None
+    relevant_keys_lookup = set(relevant_keys) if relevant_keys is not None else None
     values: dict[str, list[str]] = {}
     for key, value in metadata:
-        str_key = str(key)
-        if relevant_keys_set is not None and str_key not in relevant_keys_set:
+        if relevant_keys_lookup is not None and key not in relevant_keys_lookup:
             continue
         if not isinstance(value, str):
             return (
                 {},
-                f"Flower runtime metadata contains non-string values: {str_key}.",
+                f"Flower runtime metadata contains non-string values: {key}.",
             )
-        str_value = value
-        values.setdefault(str_key, []).append(str_value)
+        values.setdefault(key, []).append(value)
     return values, None
