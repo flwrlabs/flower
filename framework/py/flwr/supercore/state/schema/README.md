@@ -94,7 +94,7 @@ erDiagram
     BIGINT bytes_recv "nullable"
     BIGINT bytes_sent "nullable"
     FLOAT clientapp_runtime "nullable"
-    VARCHAR details "nullable"
+    VARCHAR details
     VARCHAR fab_hash "nullable"
     VARCHAR fab_id "nullable"
     VARCHAR fab_version "nullable"
@@ -109,7 +109,7 @@ erDiagram
     VARCHAR run_type
     VARCHAR running_at "nullable"
     VARCHAR starting_at "nullable"
-    VARCHAR sub_status "nullable"
+    VARCHAR sub_status
     VARCHAR usage_reported_at
   }
 
