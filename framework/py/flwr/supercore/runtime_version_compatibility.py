@@ -27,12 +27,16 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
-from flwr.supercore.utils import MetadataLookupError, get_metadata_str_checked
+from flwr.supercore.utils import get_metadata_str_checked
 from flwr.supercore.version import package_name as flwr_package_name
 from flwr.supercore.version import package_version as flwr_package_version
 
 _SUPPORTED_FLOWER_PACKAGE_NAMES = frozenset({"flwr", "flwr-nightly"})
-RuntimeMetadataLookup = dict[str, tuple[str | None, MetadataLookupError | None]]
+_RUNTIME_METADATA_KEYS = (
+    FLWR_PACKAGE_NAME_METADATA_KEY,
+    FLWR_PACKAGE_VERSION_METADATA_KEY,
+    FLWR_COMPONENT_NAME_METADATA_KEY,
+)
 
 
 @dataclass(frozen=True)
@@ -67,13 +71,9 @@ class RuntimeVersionMetadata:
         grpc_metadata: Sequence[tuple[str, str | bytes]] | None,
     ) -> tuple[RuntimeVersionMetadata | None, str | None]:
         """Parse runtime version metadata from a gRPC metadata sequence."""
-        relevant_keys = (
-            FLWR_PACKAGE_NAME_METADATA_KEY,
-            FLWR_PACKAGE_VERSION_METADATA_KEY,
-            FLWR_COMPONENT_NAME_METADATA_KEY,
-        )
         values_by_key = {
-            key: get_metadata_str_checked(grpc_metadata, key) for key in relevant_keys
+            key: get_metadata_str_checked(grpc_metadata, key)
+            for key in _RUNTIME_METADATA_KEYS
         }
 
         if all(error == "missing" for _, error in values_by_key.values()):
