@@ -201,9 +201,7 @@ def test_runtime_version_metadata_allows_expected_cases(
             RuntimeVersionMetadata("unknown", "unknown", "superlink"),
             RuntimeVersionMetadata("flwr", "1.29.0", "simulation"),
             "ServerApp <-> SuperLink ServerAppIo API",
-            "Invalid Flower version metadata for "
-            "ServerApp <-> SuperLink ServerAppIo API. "
-            "Local Flower package name is not recognized: 'unknown'.",
+            None,
         ),
         (
             RuntimeVersionMetadata("flwr", "1.29.0", "superlink"),
@@ -227,7 +225,7 @@ def test_runtime_version_metadata_rejects_expected_cases(
     local: RuntimeVersionMetadata,
     peer: RuntimeVersionMetadata,
     connection_name: str,
-    expected_rejection: str,
+    expected_rejection: str | None,
 ) -> None:
     """Explicitly invalid or incompatible peers should be rejected."""
     assert (

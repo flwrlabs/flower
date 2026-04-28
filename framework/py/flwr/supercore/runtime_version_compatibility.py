@@ -155,6 +155,9 @@ def get_runtime_version_rejection(
     if peer_metadata is None:
         return None
 
+    if local_metadata.package_name.strip() not in _SUPPORTED_FLOWER_PACKAGE_NAMES:
+        return None
+
     package_name_error = _get_package_name_error(local_metadata, peer_metadata)
     if package_name_error is not None:
         return format_invalid_metadata_message(connection_name, package_name_error)
@@ -191,13 +194,15 @@ def _get_package_name_error(
     local_metadata: RuntimeVersionMetadata,
     peer_metadata: RuntimeVersionMetadata,
 ) -> str | None:
-    """Return an error when either package name is not first-party."""
+    """Return an error when the peer package name is not first-party.
+
+    The local runtime can legitimately report `unknown` in source/non-installed
+    environments, so that case must not turn the receiver into a hard-failing
+    gate for every incoming RPC.
+    """
     local_package_name = local_metadata.package_name.strip()
     if local_package_name not in _SUPPORTED_FLOWER_PACKAGE_NAMES:
-        return (
-            "Local Flower package name is not recognized: "
-            f"{local_metadata.package_name!r}."
-        )
+        return None
 
     peer_package_name = peer_metadata.package_name.strip()
     if peer_package_name not in _SUPPORTED_FLOWER_PACKAGE_NAMES:
