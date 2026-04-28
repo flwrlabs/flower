@@ -61,7 +61,7 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
     interceptors = [
         create_serverappio_token_auth_server_interceptor(
             state_provider=state_factory.state
-        ),
+        )
     ]
     if superexec_auth_secret is not None:
         interceptors.append(
