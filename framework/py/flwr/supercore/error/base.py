@@ -14,6 +14,7 @@
 # ==============================================================================
 """Base error types for API-facing error translation."""
 
+
 import json
 from enum import IntEnum
 
