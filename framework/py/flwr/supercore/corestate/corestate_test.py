@@ -130,6 +130,7 @@ class StateTest(unittest.TestCase):
         task_id = state.create_task(task_type="flwr-model", run_id=42)
         assert task_id is not None
 
+        # Claim should persist token ownership and move the task to STARTING.
         token = state.claim_task(task_id)
 
         self.assertIsNotNone(token)
@@ -145,14 +146,19 @@ class StateTest(unittest.TestCase):
     def test_claim_task_rejects_missing_claimed_and_non_pending(self) -> None:
         """Only existing pending unclaimed tasks should be claimable."""
         state = self.state_factory()
+
+        # Missing tasks cannot be claimed.
         self.assertIsNone(state.claim_task(61016))
 
         claimed_task_id = state.create_task(task_type="flwr-model", run_id=42)
         finished_task_id = state.create_task(task_type="flwr-model", run_id=42)
         assert claimed_task_id is not None and finished_task_id is not None
 
+        # Claiming is single-owner and cannot be repeated.
         self.assertIsNotNone(state.claim_task(claimed_task_id))
         self.assertIsNone(state.claim_task(claimed_task_id))
+
+        # Finished tasks are not claimable.
         self.assertTrue(
             state.finish_task(finished_task_id, SubStatus.COMPLETED, "done")
         )
@@ -164,10 +170,15 @@ class StateTest(unittest.TestCase):
         task_id = state.create_task(task_type="flwr-model", run_id=42)
         assert task_id is not None
 
+        # Task does not exist, so it cannot be activated.
         self.assertFalse(state.activate_task(61016))
+        # Task exists but is pending, so it must be claimed before activation.
         self.assertFalse(state.activate_task(task_id))
+        # Claiming the task returns a token.
         self.assertIsNotNone(state.claim_task(task_id))
+        # The task is in starting status, so it can be activated.
         self.assertTrue(state.activate_task(task_id))
+        # The task is already in running status, so it cannot be activated again.
         self.assertFalse(state.activate_task(task_id))
 
         tasks = state.get_tasks(task_ids=[task_id])
@@ -182,9 +193,13 @@ class StateTest(unittest.TestCase):
         task_id = state.create_task(task_type="flwr-model", run_id=42)
         assert task_id is not None
 
+        # Task does not exist.
         self.assertFalse(state.finish_task(61016, SubStatus.FAILED, "missing"))
+        # Task is pending, so it can be finished.
         self.assertTrue(state.finish_task(task_id, SubStatus.FAILED, "boom"))
+        # Task is already finished, so it cannot be finished again.
         self.assertFalse(state.finish_task(task_id, SubStatus.COMPLETED, "again"))
+        # Finished tasks cannot be claimed.
         self.assertIsNone(state.claim_task(task_id))
 
         tasks = state.get_tasks(task_ids=[task_id])
@@ -209,15 +224,19 @@ class StateTest(unittest.TestCase):
         token = state.claim_task(task_id)
         assert token is not None
 
+        # Heartbeat extends only existing claimed task leases.
         self.assertFalse(state.acknowledge_task_heartbeat(61016))
         self.assertTrue(state.acknowledge_task_heartbeat(task_id))
 
         with patch("datetime.datetime") as mock_dt:
+            # The heartbeat extension should keep the token valid past its
+            # initial claim deadline.
             mock_dt.now.return_value = created_at + timedelta(
                 seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
             )
             self.assertEqual(state.get_task_id_by_token(token), task_id)
 
+            # Once the extended deadline passes, the token no longer resolves.
             mock_dt.now.return_value = created_at + timedelta(
                 seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
             )
