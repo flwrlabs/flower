@@ -19,7 +19,7 @@ from enum import IntEnum
 
 
 class FlowerError(Exception):
-    """Base exception that carries an internal error code and debug message."""
+    """Base exception for API errors exposed through client-safe responses."""
 
     def __init__(
         self,
@@ -27,13 +27,37 @@ class FlowerError(Exception):
         message: str,
         public_details: str | None = None,
     ) -> None:
+        """Initialize a Flower API error.
+
+        Parameters
+        ----------
+        code : int
+            Internal numeric error code used to look up the API error contract.
+        message : str
+            Sensitive diagnostic message intended for server-side logs.
+        public_details : str | None
+            Optional client-safe details to include in the serialized error payload.
+        """
         super().__init__(message)
         self.code = code
         self.message = message  # Sensitive message
         self.public_details = public_details
 
     def to_json(self, public_message: str) -> str:
-        """Convert the error to a JSON string."""
+        """Serialize the client-visible error payload as JSON.
+
+        Parameters
+        ----------
+        public_message : str
+            Sanitized message that should be exposed to the client instead of the
+            internal diagnostic message.
+
+        Returns
+        -------
+        str
+            A JSON string containing the error code, the client-visible message,
+            and any client-safe details attached to the error.
+        """
         return json.dumps(
             {
                 "code": self.code,
@@ -44,9 +68,19 @@ class FlowerError(Exception):
 
 
 class EntitlementError(FlowerError):
-    """Exception raised when an account is not entitled to perform an action."""
+    """API error for actions blocked by entitlement checks."""
 
     def __init__(self, details: str, entitlement_code: int):
+        """Initialize an entitlement-specific API error.
+
+        Parameters
+        ----------
+        details : str
+            Client-visible explanation of why the entitlement check failed.
+        entitlement_code : int
+            Service-defined entitlement code included in the serialized payload
+            for programmatic handling.
+        """
         super().__init__(
             message=details,
             public_details=details,
@@ -55,7 +89,20 @@ class EntitlementError(FlowerError):
         self.entitlement_code = entitlement_code
 
     def to_json(self, public_message: str) -> str:
-        """Convert the error into a JSON string."""
+        """Serialize the entitlement error payload as JSON.
+
+        Parameters
+        ----------
+        public_message : str
+            Sanitized message that should be exposed to the client together with
+            the entitlement-specific details.
+
+        Returns
+        -------
+        str
+            A JSON string containing the base client-visible error fields plus
+            the entitlement code used for programmatic handling on the client.
+        """
         base_dict = json.loads(super().to_json(public_message))
         base_dict["entitlement_code"] = self.entitlement_code
         return json.dumps(base_dict)

@@ -84,11 +84,11 @@ def print_json_to_stdout(data: str | Any) -> None:
         Console(file=sys.__stdout__).print_json(data=data)
 
 
-def _extract_error_message(err: grpc.RpcError) -> str:
+def _format_grpc_error(err: grpc.RpcError) -> str:
     """Return a user-facing message from a gRPC error.
 
-    This function parses FlowerError JSON in `err.details()` when present,
-    otherwise falls back to the raw gRPC details string.
+    This function parses FlowerError JSON in `err.details()` when present, otherwise
+    falls back to the raw gRPC details string.
     """
     err_message = err.details()  # pylint: disable=E1101
     try:
@@ -127,7 +127,7 @@ def cli_output_handler(
     except Exception as err:  # pylint: disable=broad-except
         if is_json:
             restore_output()
-            print_json_error(captured_output.getvalue(), Exception(str(err)))
+            print_json_error(captured_output.getvalue(), err)
         else:
             if isinstance(err, typer.Exit):
                 raise  # Allow typer.Exit to escape normally
@@ -427,7 +427,7 @@ def flwr_cli_grpc_exc_handler(  # pylint: disable=too-many-branches
         if custom_handler is not None:
             custom_handler(e)
         # pylint: disable-next=E1101
-        details = _extract_error_message(Exception(e.details()))
+        details = _format_grpc_error(e)
         if e.code() == grpc.StatusCode.UNAUTHENTICATED:
             raise click.ClickException(
                 "Authentication failed. Please run `flwr login`"
