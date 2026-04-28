@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Shared exception and error translation utilities."""
+"""CoreState utils tests."""
 
 
-from .base import ApiErrorCode, FlowerError
-from .exceptions import EntitlementError
-from .grpc import rpc_error_translator
+import unittest
 
-__all__ = ["ApiErrorCode", "EntitlementError", "FlowerError", "rpc_error_translator"]
+from .utils import generate_rand_int_from_bytes
+
+
+class UtilsTest(unittest.TestCase):
+    """Test CoreState utils code."""
+
+    def test_generate_rand_int_from_bytes_unsigned_int(self) -> None:
+        """Test that the generated integer is unsigned (non-negative)."""
+        for num_bytes in range(1, 9):
+            with self.subTest(num_bytes=num_bytes):
+                rand_int = generate_rand_int_from_bytes(num_bytes)
+                self.assertGreaterEqual(rand_int, 0)

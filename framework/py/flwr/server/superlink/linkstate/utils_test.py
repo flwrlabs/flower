@@ -29,7 +29,6 @@ from flwr.server.superlink.linkstate.utils import dict_to_message, message_to_di
 from .utils import (
     convert_sint64_values_in_dict_to_uint64,
     convert_uint64_values_in_dict_to_sint64,
-    generate_rand_int_from_bytes,
 )
 
 
@@ -91,13 +90,6 @@ class UtilsTest(unittest.TestCase):
         """Test sint64 to uint64 conversion in a dictionary."""
         convert_sint64_values_in_dict_to_uint64(input_dict, keys)
         self.assertEqual(input_dict, expected_dict)
-
-    def test_generate_rand_int_from_bytes_unsigned_int(self) -> None:
-        """Test that the generated integer is unsigned (non-negative)."""
-        for num_bytes in range(1, 9):
-            with self.subTest(num_bytes=num_bytes):
-                rand_int = generate_rand_int_from_bytes(num_bytes)
-                self.assertGreaterEqual(rand_int, 0)
 
     @parameterized.expand([(False,), (True,)])  # type: ignore
     def test_message_to_dict_and_back(self, has_error: bool) -> None:

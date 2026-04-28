@@ -17,20 +17,25 @@
 
 import hashlib
 import secrets
+from collections.abc import Sequence
 from dataclasses import dataclass
 from threading import Lock
+from typing import Literal
 
 from flwr.common import now
 from flwr.common.constant import (
     FLWR_APP_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
+    TASK_ID_NUM_BYTES,
+    Status,
 )
 from flwr.common.typing import Fab
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
+from .utils import generate_rand_int_from_bytes
 
 
 @dataclass
@@ -56,7 +61,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.lock_nonce_store = Lock()
         self.task_store: dict[int, Task] = {}
         self.lock_task_store = Lock()
-        self.token_to_task_id: dict[str, int] = {}
 
     @property
     def object_store(self) -> ObjectStore:
@@ -92,6 +96,89 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 content=fab.content,
                 verifications=dict(fab.verifications),
             )
+
+    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        task_type: str,
+        run_id: int,
+        fab_hash: str | None = None,
+        model_ref: str | None = None,
+        connector_ref: str | None = None,
+    ) -> int | None:
+        """Create a task and return its ID."""
+        with self.lock_task_store:
+            task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
+
+            task = Task(
+                task_id=task_id,
+                type=task_type,
+                run_id=run_id,
+                pending_at=now().isoformat(),
+                fab_hash=fab_hash,
+                model_ref=model_ref,
+                connector_ref=connector_ref,
+            )
+
+            self.task_store[task_id] = task
+            return task_id
+
+    def get_tasks(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        task_ids: Sequence[int] | None = None,
+        statuses: Sequence[str] | None = None,
+        order_by: Literal["pending_at"] | None = None,
+        ascending: bool = True,
+        limit: int | None = None,
+    ) -> Sequence[Task]:
+        """Retrieve information about tasks based on the specified filters."""
+        if order_by not in (None, "pending_at"):
+            raise AssertionError("`order_by` must be 'pending_at' or None")
+
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+
+        if isinstance(statuses, str):
+            raise ValueError("`statuses` must be a sequence of strings")
+
+        with self.lock_task_store:
+            matched_task_ids = set(self.task_store.keys())
+
+            if task_ids is not None:
+                if not task_ids:
+                    return []
+                matched_task_ids &= set(task_ids)
+
+            if statuses is not None:
+                if not statuses:
+                    return []
+                status_set = set(statuses)
+                matched_task_ids &= {
+                    task_id
+                    for task_id in matched_task_ids
+                    if determine_task_status(self.task_store[task_id]).status
+                    in status_set
+                }
+
+            tasks = [self.task_store[task_id] for task_id in matched_task_ids]
+
+            if order_by is not None:
+                tasks = sorted(
+                    tasks,
+                    key=lambda task: task.pending_at,
+                    reverse=not ascending,
+                )
+
+            if limit is not None:
+                tasks = tasks[:limit]
+
+            result: list[Task] = []
+            for task in tasks:
+                task_copy = Task()
+                task_copy.CopyFrom(task)
+                task_copy.status.CopyFrom(determine_task_status(task))
+                result.append(task_copy)
+            return result
 
     def create_token(self, run_id: int) -> str | None:
         """Create a token for the given run ID."""
@@ -195,3 +282,16 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         for key, expires_at in list(self.nonce_store.items()):
             if expires_at < current:
                 del self.nonce_store[key]
+
+
+def determine_task_status(task: Task) -> TaskStatus:
+    """Determine the status of a task based on timestamp fields."""
+    if task.pending_at:
+        if task.finished_at:
+            return TaskStatus(status=Status.FINISHED, sub_status="", details="")
+        if task.starting_at:
+            if task.running_at:
+                return TaskStatus(status=Status.RUNNING, sub_status="", details="")
+            return TaskStatus(status=Status.STARTING, sub_status="", details="")
+        return TaskStatus(status=Status.PENDING, sub_status="", details="")
+    raise ValueError(f"The task {task.task_id} does not have a valid status.")

@@ -88,7 +88,7 @@ def _create_node_id_to_partition_mapping(
     for i in range(num_clients):
         while True:
             node_id = generate_rand_int_from_bytes(
-                NODE_ID_NUM_BYTES, exclude=[SUPERLINK_NODE_ID, 0]
+                NODE_ID_NUM_BYTES, exclude={SUPERLINK_NODE_ID, 0}
             )
             if node_id not in nodes_mapping:
                 break
