@@ -163,10 +163,10 @@ def test_obtain_superlink_certificates_keeps_appio_separate(
     assert appio_certificates_result == appio_certificates
 
 
-def test_obtain_superlink_certificates_requires_appio_certificates_when_secure(
+def test_obtain_superlink_certificates_allows_plaintext_appio_when_secure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Secure SuperLink should fail if ServerAppIo TLS material is omitted."""
+    """SuperLink should allow plaintext ServerAppIo with secure Fleet/Control APIs."""
     fleet_certificates = (b"fleet-ca", b"fleet-cert", b"fleet-key")
     monkeypatch.setattr(
         app_module, "try_obtain_server_certificates", lambda _args: fleet_certificates
@@ -176,7 +176,7 @@ def test_obtain_superlink_certificates_requires_appio_certificates_when_secure(
     )
     args = argparse.Namespace(insecure=False)
 
-    with pytest.raises(SystemExit) as exc_info:
-        _obtain_superlink_certificates(args)
+    certificates, appio_certificates = _obtain_superlink_certificates(args)
 
-    assert "--appio-ssl-certfile" in str(exc_info.value)
+    assert certificates == fleet_certificates
+    assert appio_certificates is None

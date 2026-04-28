@@ -498,14 +498,6 @@ def _obtain_superlink_certificates(
     appio_certificates = (
         None if args.insecure else try_obtain_optional_appio_server_certificates(args)
     )
-    if not args.insecure and appio_certificates is None:
-        sys.exit(
-            "Certificates are required for the ServerAppIo API unless running in "
-            "insecure mode. Please provide certificate paths to "
-            "`--appio-ssl-certfile`, `--appio-ssl-keyfile`, and "
-            "`--appio-ssl-ca-certfile` or run the server in insecure mode using "
-            "'--insecure' if you understand the risks."
-        )
     return certificates, appio_certificates
 
 
