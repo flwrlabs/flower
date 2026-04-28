@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Shared exception and error translation utilities."""
+"""Utility functions for CoreState."""
 
 
-from .base import ApiErrorCode, FlowerError
-from .exceptions import EntitlementError
-from .grpc import rpc_error_translator
+from os import urandom
 
-__all__ = ["ApiErrorCode", "EntitlementError", "FlowerError", "rpc_error_translator"]
+
+def generate_rand_int_from_bytes(
+    num_bytes: int, exclude: set[int] | None = None
+) -> int:
+    """Generate a random unsigned integer from `num_bytes` bytes.
+
+    If `exclude` is set, this function guarantees such number is not returned.
+    """
+    num = int.from_bytes(urandom(num_bytes), "little", signed=False)
+
+    if exclude:
+        while num in exclude:
+            num = int.from_bytes(urandom(num_bytes), "little", signed=False)
+    return num

@@ -17,10 +17,12 @@
 
 import unittest
 from datetime import timedelta
+from typing import Any, cast
 from unittest.mock import patch
 
 from flwr.common import now
-from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL
+from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL, Status
+from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
 
 from . import CoreState
 
@@ -34,6 +36,88 @@ class StateTest(unittest.TestCase):
     def state_factory(self) -> CoreState:
         """Provide state implementation to test."""
         raise NotImplementedError()
+
+    def test_create_and_get_task(self) -> None:
+        """Test creating and retrieving a task."""
+        state = self.state_factory()
+
+        task_id = state.create_task(
+            task_type="flwr-model",
+            run_id=42,
+            fab_hash=None,
+            model_ref="model://test",
+            connector_ref=None,
+        )
+        assert task_id is not None
+        tasks = state.get_tasks(task_ids=[task_id])
+
+        self.assertEqual(len(tasks), 1)
+        task = tasks[0]
+        self.assertEqual(task.task_id, task_id)
+        self.assertEqual(task.type, "flwr-model")
+        self.assertEqual(task.run_id, 42)
+        self.assertEqual(
+            task.status,
+            TaskStatus(status=Status.PENDING, sub_status="", details=""),
+        )
+        self.assertEqual(task.model_ref, "model://test")
+        self.assertFalse(task.HasField("fab_hash"))
+        self.assertFalse(task.HasField("connector_ref"))
+        self.assertTrue(task.pending_at)
+        self.assertEqual(task.starting_at, "")
+        self.assertEqual(task.running_at, "")
+        self.assertEqual(task.finished_at, "")
+
+    def test_get_tasks_missing_returns_empty(self) -> None:
+        """Missing tasks should return an empty sequence."""
+        state = self.state_factory()
+        self.assertEqual(state.get_tasks(task_ids=[123]), [])
+
+    def test_get_tasks_single_status_matches(self) -> None:
+        """A single-item status sequence should match pending tasks."""
+        state = self.state_factory()
+        _ = state.create_task(task_type="flwr-model", run_id=42)
+
+        tasks = state.get_tasks(statuses=[Status.PENDING])
+
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].status.status, Status.PENDING)
+
+    def test_get_tasks_negative_limit_raises(self) -> None:
+        """Negative limits should be rejected consistently."""
+        state = self.state_factory()
+
+        with self.assertRaises(AssertionError):
+            _ = state.get_tasks(limit=-1)
+
+    def test_get_tasks_invalid_order_by_raises(self) -> None:
+        """Unsupported order_by values should be rejected consistently."""
+        state = self.state_factory()
+
+        with self.assertRaises(AssertionError):
+            _ = state.get_tasks(order_by=cast(Any, "foo"))
+
+    def test_get_task_returns_copy(self) -> None:
+        """Retrieved task should be a defensive copy."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type="flwr-serverapp",
+            run_id=42,
+            fab_hash="fab-hash",
+            model_ref=None,
+            connector_ref=None,
+        )
+        assert task_id is not None
+
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        task = tasks[0]
+        task.fab_hash = "mutated"
+
+        reloaded_tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(reloaded_tasks), 1)
+        reloaded = reloaded_tasks[0]
+        self.assertEqual(reloaded.fab_hash, "fab-hash")
 
     def test_create_verify_and_delete_token(self) -> None:
         """Test creating, verifying, and deleting tokens."""
