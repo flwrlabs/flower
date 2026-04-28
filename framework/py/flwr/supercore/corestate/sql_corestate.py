@@ -42,8 +42,6 @@ from ..object_store import ObjectStore
 from .corestate import CoreState
 from .utils import generate_rand_int_from_bytes
 
-_TASK_TOKEN_NAMESPACE = "corestate:task-token"
-
 
 class SqlCoreState(CoreState, SqlMixin):
     """SQLAlchemy-based CoreState implementation."""
@@ -51,6 +49,9 @@ class SqlCoreState(CoreState, SqlMixin):
     def __init__(self, database_path: str, object_store: ObjectStore) -> None:
         super().__init__(database_path)
         self._object_store = object_store
+        # Temporary in-process task token expiry state. The token itself is
+        # persisted in task.token; this can move into task.active_until later.
+        self.task_token_store: dict[str, float] = {}
 
     @property
     def object_store(self) -> ObjectStore:
@@ -268,19 +269,8 @@ class SqlCoreState(CoreState, SqlMixin):
                 if not rows:
                     return None
 
-                # The task table stores the token; nonce_store stores its expiry.
-                self.query(
-                    """
-                    INSERT INTO nonce_store (namespace, nonce, expires_at)
-                    VALUES (:namespace, :nonce, :expires_at)
-                    """,
-                    {
-                        "namespace": _TASK_TOKEN_NAMESPACE,
-                        "nonce": token,
-                        "expires_at": (
-                            claimed_at.timestamp() + HEARTBEAT_DEFAULT_INTERVAL
-                        ),
-                    },
+                self.task_token_store[token] = (
+                    claimed_at.timestamp() + HEARTBEAT_DEFAULT_INTERVAL
                 )
                 return token
         except IntegrityError:
@@ -342,13 +332,7 @@ class SqlCoreState(CoreState, SqlMixin):
 
             # Finished tasks no longer need claim/heartbeat bookkeeping.
             if token is not None:
-                self.query(
-                    """
-                    DELETE FROM nonce_store
-                    WHERE namespace = :namespace AND nonce = :token
-                    """,
-                    {"namespace": _TASK_TOKEN_NAMESPACE, "token": token},
-                )
+                self.task_token_store.pop(token, None)
 
             return True
 
@@ -359,79 +343,62 @@ class SqlCoreState(CoreState, SqlMixin):
         current = now().timestamp()
         rows = self.query(
             """
-            UPDATE nonce_store
-            SET expires_at = :active_until
-            WHERE namespace = :namespace
-            AND expires_at >= :current
-            AND nonce = (
-                SELECT token FROM task
-                WHERE task_id = :task_id AND finished_at IS NULL
-            )
-            RETURNING nonce
+            SELECT token FROM task
+            WHERE task_id = :task_id AND finished_at IS NULL
             """,
-            {
-                "task_id": uint64_to_int64(task_id),
-                "namespace": _TASK_TOKEN_NAMESPACE,
-                "current": current,
-                "active_until": (
-                    current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-                ),
-            },
+            {"task_id": uint64_to_int64(task_id)},
         )
-        return len(rows) > 0
+        if not rows or rows[0]["token"] is None:
+            return False
+
+        token = rows[0]["token"]
+        if token not in self.task_token_store:
+            return False
+
+        self.task_token_store[token] = (
+            current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+        )
+        return True
 
     def get_task_id_by_token(self, token: str) -> int | None:
         """Return the task ID associated with the task token, if valid."""
         # Resolve tokens after cleanup so callers never receive expired claims.
         self._cleanup_expired_task_tokens()
+        if token not in self.task_token_store:
+            return None
+
         rows = self.query(
             """
             SELECT task_id FROM task
-            WHERE token = :token
-            AND EXISTS (
-                SELECT 1 FROM nonce_store
-                WHERE namespace = :namespace
-                AND nonce = :token
-                AND expires_at >= :current
-            )
+            WHERE token = :token AND finished_at IS NULL
             LIMIT 1
             """,
-            {
-                "namespace": _TASK_TOKEN_NAMESPACE,
-                "token": token,
-                "current": now().timestamp(),
-            },
+            {"token": token},
         )
         if not rows:
+            self.task_token_store.pop(token, None)
             return None
         return int64_to_uint64(rows[0]["task_id"])
 
     def _cleanup_expired_task_tokens(self) -> None:
         """Remove expired task heartbeat records."""
         current = now().timestamp()
-        with self.session():
-            # Expired task token records are removed from nonce_store and detached
-            # from any task rows still pointing at them.
-            rows = self.query(
-                """
-                SELECT nonce FROM nonce_store
-                WHERE namespace = :namespace AND expires_at < :current
-                """,
-                {"namespace": _TASK_TOKEN_NAMESPACE, "current": current},
-            )
-            if not rows:
-                return
+        expired_tokens = [
+            token
+            for token, active_until in self.task_token_store.items()
+            if active_until < current
+        ]
+        if not expired_tokens:
+            return
 
-            self.query(
-                """
-                DELETE FROM nonce_store
-                WHERE namespace = :namespace AND expires_at < :current
-                """,
-                {"namespace": _TASK_TOKEN_NAMESPACE, "current": current},
-            )
+        for token in expired_tokens:
+            del self.task_token_store[token]
+
+        with self.session():
+            # Expired tokens are detached from any task rows still pointing at them.
             self.query(
                 "UPDATE task SET token = NULL WHERE token = :token",
-                [{"token": row["nonce"]} for row in rows],
+                [{"token": token} for token in expired_tokens],
             )
 
     def create_token(self, run_id: int) -> str | None:
