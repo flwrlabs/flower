@@ -21,9 +21,9 @@ import os
 import re
 import sys
 from collections.abc import Sequence
+from dataclasses import dataclass
 from logging import WARN
 from pathlib import Path
-from dataclasses import dataclass
 from typing import Any, Literal, TypeVar
 
 import requests
