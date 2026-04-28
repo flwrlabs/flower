@@ -19,7 +19,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal
 
 from packaging.version import InvalidVersion, Version
 
@@ -32,13 +31,6 @@ from flwr.supercore.utils import MetadataLookupError, get_metadata_str_checked
 from flwr.supercore.version import package_name as flwr_package_name
 from flwr.supercore.version import package_version as flwr_package_version
 
-RuntimeCompatibilityStatus = Literal[
-    "missing",
-    "disabled",
-    "invalid",
-    "compatible",
-    "incompatible",
-]
 _SUPPORTED_FLOWER_PACKAGE_NAMES = frozenset({"flwr", "flwr-nightly"})
 RuntimeMetadataLookup = dict[str, tuple[str | None, MetadataLookupError | None]]
 
@@ -133,91 +125,6 @@ class RuntimeVersionMetadata:
         )
         return filtered_metadata + runtime_metadata
 
-    def check_compatibility_with(
-        self,
-        peer_metadata: RuntimeVersionMetadata | None,
-    ) -> CompatibilityResult:
-        """Evaluate whether a peer is runtime-compatible with the local component."""
-        if peer_metadata is None:
-            return CompatibilityResult(
-                status="missing",
-                reason=None,
-                local_metadata=self,
-                peer_metadata=None,
-                local_version=None,
-                peer_version=None,
-            )
-
-        package_name_result = _check_package_name_compatibility(self, peer_metadata)
-        if package_name_result is not None:
-            return package_name_result
-
-        local_version, local_error = _parse_runtime_version(
-            self.package_version, subject="Local"
-        )
-        if local_error is not None:
-            return CompatibilityResult(
-                status="disabled",
-                reason=local_error,
-                local_metadata=self,
-                peer_metadata=peer_metadata,
-                local_version=None,
-                peer_version=None,
-            )
-
-        peer_version, peer_error = _parse_runtime_version(
-            peer_metadata.package_version, subject="Peer"
-        )
-        if peer_error is not None:
-            return CompatibilityResult(
-                status="disabled",
-                reason=peer_error,
-                local_metadata=self,
-                peer_metadata=peer_metadata,
-                local_version=local_version,
-                peer_version=None,
-            )
-
-        assert local_version is not None
-        assert peer_version is not None
-
-        if (
-            local_version.major == peer_version.major
-            and local_version.minor == peer_version.minor
-        ):
-            return CompatibilityResult(
-                status="compatible",
-                reason=None,
-                local_metadata=self,
-                peer_metadata=peer_metadata,
-                local_version=local_version,
-                peer_version=peer_version,
-            )
-
-        return CompatibilityResult(
-            status="incompatible",
-            reason=(
-                "Peer Flower version is outside the accepted major.minor release: "
-                f"{peer_metadata.package_version!r}."
-            ),
-            local_metadata=self,
-            peer_metadata=peer_metadata,
-            local_version=local_version,
-            peer_version=peer_version,
-        )
-
-
-@dataclass(frozen=True)
-class CompatibilityResult:
-    """Compatibility decision for a runtime peer."""
-
-    status: RuntimeCompatibilityStatus
-    reason: str | None
-    local_metadata: RuntimeVersionMetadata
-    peer_metadata: RuntimeVersionMetadata | None
-    local_version: Version | None
-    peer_version: Version | None
-
 
 def format_incompatible_version_message(
     connection_name: str,
@@ -239,37 +146,64 @@ def format_invalid_metadata_message(connection_name: str, detail: str) -> str:
     return f"Invalid Flower version metadata for {connection_name}. {detail}"
 
 
-def _check_package_name_compatibility(
+def get_runtime_version_rejection(
+    connection_name: str,
+    local_metadata: RuntimeVersionMetadata,
+    peer_metadata: RuntimeVersionMetadata | None,
+) -> str | None:
+    """Return a rejection message, or `None` when the peer should continue."""
+    if peer_metadata is None:
+        return None
+
+    package_name_error = _get_package_name_error(local_metadata, peer_metadata)
+    if package_name_error is not None:
+        return format_invalid_metadata_message(connection_name, package_name_error)
+
+    local_version, local_error = _parse_runtime_version(
+        local_metadata.package_version, subject="Local"
+    )
+    if local_error is not None:
+        return format_invalid_metadata_message(connection_name, local_error)
+
+    peer_version, peer_error = _parse_runtime_version(
+        peer_metadata.package_version, subject="Peer"
+    )
+    if peer_error is not None:
+        return format_invalid_metadata_message(connection_name, peer_error)
+
+    assert local_version is not None
+    assert peer_version is not None
+
+    if (
+        local_version.major == peer_version.major
+        and local_version.minor == peer_version.minor
+    ):
+        return None
+
+    return format_incompatible_version_message(
+        connection_name,
+        local_metadata,
+        peer_metadata,
+    )
+
+
+def _get_package_name_error(
     local_metadata: RuntimeVersionMetadata,
     peer_metadata: RuntimeVersionMetadata,
-) -> CompatibilityResult | None:
-    """Return a disabled result when either package name is not first-party."""
+) -> str | None:
+    """Return an error when either package name is not first-party."""
     local_package_name = local_metadata.package_name.strip()
     if local_package_name not in _SUPPORTED_FLOWER_PACKAGE_NAMES:
-        return CompatibilityResult(
-            status="disabled",
-            reason=(
-                "Local Flower package name is not recognized, version checks "
-                f"are disabled: {local_metadata.package_name!r}."
-            ),
-            local_metadata=local_metadata,
-            peer_metadata=peer_metadata,
-            local_version=None,
-            peer_version=None,
+        return (
+            "Local Flower package name is not recognized: "
+            f"{local_metadata.package_name!r}."
         )
 
     peer_package_name = peer_metadata.package_name.strip()
     if peer_package_name not in _SUPPORTED_FLOWER_PACKAGE_NAMES:
-        return CompatibilityResult(
-            status="disabled",
-            reason=(
-                "Peer Flower package name is not recognized, version checks "
-                f"are disabled: {peer_metadata.package_name!r}."
-            ),
-            local_metadata=local_metadata,
-            peer_metadata=peer_metadata,
-            local_version=None,
-            peer_version=None,
+        return (
+            "Peer Flower package name is not recognized: "
+            f"{peer_metadata.package_name!r}."
         )
 
     return None
@@ -278,12 +212,11 @@ def _check_package_name_compatibility(
 def _parse_runtime_version(
     package_version: str, *, subject: str
 ) -> tuple[Version | None, str | None]:
-    """Parse a runtime version string or return the disabled-policy reason."""
+    """Parse a runtime version string or return the invalid-metadata reason."""
     try:
         return Version(package_version), None
     except InvalidVersion:
         return (
             None,
-            f"{subject} Flower version metadata cannot be parsed, version checks "
-            f"are disabled: {package_version!r}.",
+            f"{subject} Flower version metadata cannot be parsed: {package_version!r}.",
         )

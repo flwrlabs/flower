@@ -16,7 +16,6 @@
 
 
 import pytest
-from packaging.version import Version
 
 from flwr.supercore.constant import (
     FLWR_COMPONENT_NAME_METADATA_KEY,
@@ -26,8 +25,8 @@ from flwr.supercore.constant import (
 
 from .runtime_version_compatibility import (
     RuntimeVersionMetadata,
-    format_incompatible_version_message,
     format_invalid_metadata_message,
+    get_runtime_version_rejection,
 )
 
 
@@ -182,37 +181,37 @@ def test_runtime_version_metadata_from_grpc_rejects_duplicate_values() -> None:
 def test_runtime_version_metadata_accepts_same_major_minor() -> None:
     """Patch differences are compatible."""
     local = RuntimeVersionMetadata("flwr", "1.29.0", "superlink")
-
-    result = local.check_compatibility_with(
-        RuntimeVersionMetadata("flwr", "1.29.7", "supernode")
+    rejection = get_runtime_version_rejection(
+        "SuperNode <-> SuperLink Fleet API",
+        local,
+        RuntimeVersionMetadata("flwr", "1.29.7", "supernode"),
     )
 
-    assert result.status == "compatible"
-    assert result.peer_version == Version("1.29.7")
+    assert rejection is None
 
 
 def test_runtime_version_metadata_accepts_dev_versions() -> None:
     """PEP 440 nightly/dev versions should be compatible by release tuple."""
     local = RuntimeVersionMetadata("flwr", "1.30.0.dev20260425", "superlink")
-
-    result = local.check_compatibility_with(
-        RuntimeVersionMetadata("flwr", "1.30.0rc1", "supernode")
+    rejection = get_runtime_version_rejection(
+        "SuperNode <-> SuperLink Fleet API",
+        local,
+        RuntimeVersionMetadata("flwr", "1.30.0rc1", "supernode"),
     )
 
-    assert result.status == "compatible"
-    assert result.local_version == Version("1.30.0.dev20260425")
-    assert result.peer_version == Version("1.30.0rc1")
+    assert rejection is None
 
 
 def test_runtime_version_metadata_accepts_flwr_nightly_package_name() -> None:
     """First-party package names should remain compatible with each other."""
     local = RuntimeVersionMetadata("flwr", "1.30.0", "superlink")
-
-    result = local.check_compatibility_with(
-        RuntimeVersionMetadata("flwr-nightly", "1.30.1.dev20260425", "supernode")
+    rejection = get_runtime_version_rejection(
+        "SuperNode <-> SuperLink Fleet API",
+        local,
+        RuntimeVersionMetadata("flwr-nightly", "1.30.1.dev20260425", "supernode"),
     )
 
-    assert result.status == "compatible"
+    assert rejection is None
 
 
 def test_runtime_version_metadata_rejects_different_minor() -> None:
@@ -220,14 +219,8 @@ def test_runtime_version_metadata_rejects_different_minor() -> None:
     peer = RuntimeVersionMetadata("flwr", "1.30.0", "supernode")
     local = RuntimeVersionMetadata("flwr", "1.29.2", "superlink")
 
-    result = local.check_compatibility_with(peer)
-
-    assert result.status == "incompatible"
-    assert result.peer_metadata == peer
     assert (
-        format_incompatible_version_message(
-            "SuperNode <-> SuperLink Fleet API", local, peer
-        )
+        get_runtime_version_rejection("SuperNode <-> SuperLink Fleet API", local, peer)
         == "Incompatible Flower version for SuperNode <-> SuperLink Fleet API.\n"
         "Local superlink version 1.29.2 only accepts peers from the same "
         "major.minor release, but received supernode version 1.30.0."
@@ -237,65 +230,72 @@ def test_runtime_version_metadata_rejects_different_minor() -> None:
 def test_runtime_version_metadata_tolerates_missing_metadata() -> None:
     """Missing metadata should be surfaced distinctly for rollout handling."""
     local = RuntimeVersionMetadata("flwr", "1.29.0", "superlink")
+    rejection = get_runtime_version_rejection(
+        "SuperNode <-> SuperLink Fleet API",
+        local,
+        None,
+    )
 
-    result = local.check_compatibility_with(None)
-
-    assert result.status == "missing"
-    assert result.reason is None
+    assert rejection is None
 
 
 def test_missing_metadata_is_tolerated_with_unknown_local_version() -> None:
     """Missing metadata should remain the rollout case in source environments."""
     local = RuntimeVersionMetadata("unknown", "unknown", "superlink")
+    rejection = get_runtime_version_rejection(
+        "SuperNode <-> SuperLink Fleet API",
+        local,
+        None,
+    )
 
-    result = local.check_compatibility_with(None)
-
-    assert result.status == "missing"
-    assert result.reason is None
+    assert rejection is None
 
 
-def test_version_checks_are_disabled_for_unknown_local_version() -> None:
-    """Unparseable local versions should not break the receiving API."""
+def test_unknown_local_version_is_rejected() -> None:
+    """Explicit local version metadata must be parseable."""
     local = RuntimeVersionMetadata("unknown", "unknown", "superlink")
-
-    result = local.check_compatibility_with(
-        RuntimeVersionMetadata("flwr", "1.29.0", "simulation")
+    rejection = get_runtime_version_rejection(
+        "ServerApp <-> SuperLink ServerAppIo API",
+        local,
+        RuntimeVersionMetadata("flwr", "1.29.0", "simulation"),
     )
 
-    assert result.status == "disabled"
-    assert result.peer_metadata == RuntimeVersionMetadata(
-        "flwr", "1.29.0", "simulation"
-    )
-
-
-def test_version_checks_are_disabled_for_unknown_peer_version() -> None:
-    """Unparseable peer versions should not hard-fail rollout/dev callers."""
-    local = RuntimeVersionMetadata("flwr", "1.29.0", "superlink")
-
-    result = local.check_compatibility_with(
-        RuntimeVersionMetadata("flwr", "main", "supernode")
-    )
-
-    assert result.status == "disabled"
     assert (
-        result.reason
-        == "Peer Flower version metadata cannot be parsed, version checks "
-        "are disabled: 'main'."
+        rejection == "Invalid Flower version metadata for "
+        "ServerApp <-> SuperLink ServerAppIo API. "
+        "Local Flower package name is not recognized: 'unknown'."
     )
 
 
-def test_version_checks_are_disabled_for_unknown_peer_package_name() -> None:
-    """Unrecognized peer package names should not be treated as compatible."""
+def test_unknown_peer_version_is_rejected() -> None:
+    """Explicit peer version metadata must be parseable."""
     local = RuntimeVersionMetadata("flwr", "1.29.0", "superlink")
-
-    result = local.check_compatibility_with(
-        RuntimeVersionMetadata("forked-flower", "1.29.1", "supernode")
+    rejection = get_runtime_version_rejection(
+        "SuperNode <-> SuperLink Fleet API",
+        local,
+        RuntimeVersionMetadata("flwr", "main", "supernode"),
     )
 
-    assert result.status == "disabled"
     assert (
-        result.reason == "Peer Flower package name is not recognized, version checks "
-        "are disabled: 'forked-flower'."
+        rejection == "Invalid Flower version metadata for "
+        "SuperNode <-> SuperLink Fleet API. "
+        "Peer Flower version metadata cannot be parsed: 'main'."
+    )
+
+
+def test_unknown_peer_package_name_is_rejected() -> None:
+    """Unrecognized peer package names should be rejected."""
+    local = RuntimeVersionMetadata("flwr", "1.29.0", "superlink")
+    rejection = get_runtime_version_rejection(
+        "SuperNode <-> SuperLink Fleet API",
+        local,
+        RuntimeVersionMetadata("forked-flower", "1.29.1", "supernode"),
+    )
+
+    assert (
+        rejection == "Invalid Flower version metadata for "
+        "SuperNode <-> SuperLink Fleet API. "
+        "Peer Flower package name is not recognized: 'forked-flower'."
     )
 
 

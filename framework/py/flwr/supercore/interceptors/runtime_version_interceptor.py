@@ -18,15 +18,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any
 
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
 from flwr.supercore.runtime_version_compatibility import (
-    CompatibilityResult,
     RuntimeVersionMetadata,
-    format_incompatible_version_message,
+    get_runtime_version_rejection,
     format_invalid_metadata_message,
 )
 
@@ -77,59 +76,29 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         peer_metadata, metadata_error = RuntimeVersionMetadata.from_grpc_metadata(
             handler_call_details.invocation_metadata
         )
-        if metadata_error is not None:
-            compatibility = CompatibilityResult(
-                status="invalid",
-                reason=metadata_error,
-                local_metadata=self._local_metadata,
-                peer_metadata=peer_metadata,
-                local_version=None,
-                peer_version=None,
+        if metadata_error is None:
+            rejection = get_runtime_version_rejection(
+                self._connection_name,
+                self._local_metadata,
+                peer_metadata,
             )
         else:
-            compatibility = self._local_metadata.check_compatibility_with(peer_metadata)
-        if compatibility.status in {"missing", "disabled", "compatible"}:
+            rejection = format_invalid_metadata_message(
+                self._connection_name,
+                metadata_error,
+            )
+        if rejection is None:
             return method_handler
 
-        unary_handler = cast(
-            Callable[[GrpcMessage, grpc.ServicerContext], GrpcMessage],
-            method_handler.unary_unary,
-        )
-
         def _version_checked_handler(
-            request: GrpcMessage,
+            _request: GrpcMessage,
             context: grpc.ServicerContext,
         ) -> GrpcMessage:
-            if compatibility.status == "invalid":
-                context.abort(
-                    grpc.StatusCode.FAILED_PRECONDITION,
-                    format_invalid_metadata_message(
-                        self._connection_name,
-                        compatibility.reason or "Unknown metadata error.",
-                    ),
-                )
-                raise RuntimeError("Should not reach this point")
-            if compatibility.status == "incompatible":
-                peer_metadata = compatibility.peer_metadata
-                if peer_metadata is None:
-                    context.abort(
-                        grpc.StatusCode.FAILED_PRECONDITION,
-                        format_invalid_metadata_message(
-                            self._connection_name,
-                            "Peer metadata is unavailable for incompatibility check.",
-                        ),
-                    )
-                    raise RuntimeError("Should not reach this point")
-                context.abort(
-                    grpc.StatusCode.FAILED_PRECONDITION,
-                    format_incompatible_version_message(
-                        self._connection_name,
-                        self._local_metadata,
-                        peer_metadata,
-                    ),
-                )
-                raise RuntimeError("Should not reach this point")
-            return unary_handler(request, context)
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                rejection,
+            )
+            raise RuntimeError("Should not reach this point")
 
         return grpc.unary_unary_rpc_method_handler(
             _version_checked_handler,
