@@ -147,6 +147,9 @@ class RuntimeVersionMetadata:
                 peer_version=None,
             )
 
+        assert local_version is not None
+        assert peer_version is not None
+
         if (
             local_version.major == peer_version.major
             and local_version.minor == peer_version.minor

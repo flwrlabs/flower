@@ -75,7 +75,7 @@ def test_build_runtime_version_metadata_rejects_empty_component_name() -> None:
         RuntimeVersionMetadata.from_local_component("")
 
 
-def test_read_runtime_version_metadata_returns_missing_for_absent_keys() -> None:
+def test_runtime_version_metadata_from_grpc_returns_missing_for_absent_keys() -> None:
     """Absent Flower metadata should be treated as the rollout missing case."""
     metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
         (("other-header", "value"),)
@@ -85,7 +85,7 @@ def test_read_runtime_version_metadata_returns_missing_for_absent_keys() -> None
     assert error is None
 
 
-def test_read_runtime_version_metadata_rejects_partial_metadata() -> None:
+def test_runtime_version_metadata_from_grpc_rejects_partial_metadata() -> None:
     """Partial Flower metadata should be rejected as invalid."""
     metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
         ((FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),)
@@ -96,7 +96,7 @@ def test_read_runtime_version_metadata_rejects_partial_metadata() -> None:
     assert "Missing required Flower runtime metadata" in error
 
 
-def test_read_runtime_version_metadata_accepts_metadata_item_iterables() -> None:
+def test_runtime_version_metadata_from_grpc_accepts_metadata_item_iterables() -> None:
     """GRPC metadata-style iterables should be supported directly."""
     metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
         (
@@ -161,7 +161,7 @@ def test_runtime_version_metadata_ignores_unrelated_binary_headers() -> None:
     assert error is None
 
 
-def test_read_runtime_version_metadata_rejects_duplicate_values() -> None:
+def test_runtime_version_metadata_from_grpc_rejects_duplicate_values() -> None:
     """Runtime version metadata keys should appear at most once."""
     metadata, error = RuntimeVersionMetadata.from_grpc_metadata(
         (
