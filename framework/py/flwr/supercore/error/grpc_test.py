@@ -21,8 +21,9 @@ from unittest.mock import Mock
 import grpc
 import pytest
 
-from .base import ApiErrorCode, EntitlementError, FlowerError
+from .base import ApiErrorCode, FlowerError
 from .catalog import API_ERROR_MAP
+from .exceptions import EntitlementError
 from .grpc import INTERNAL_SERVER_ERROR_MESSAGE, rpc_error_translator
 
 
