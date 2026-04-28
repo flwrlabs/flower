@@ -43,13 +43,6 @@ from .corestate import CoreState
 from .utils import generate_rand_int_from_bytes
 
 _TASK_TOKEN_NAMESPACE = "corestate:task-token"
-_TASK_STATUS_NAMESPACE_PREFIX = "corestate:task-status:"
-_TASK_STATUS_EXPIRES_AT = 253402300799.0
-
-
-def _task_status_namespace(sint64_task_id: int) -> str:
-    """Return the nonce namespace used to store finished task status details."""
-    return f"{_TASK_STATUS_NAMESPACE_PREFIX}{sint64_task_id}"
 
 
 class SqlCoreState(CoreState, SqlMixin):
@@ -330,11 +323,19 @@ class SqlCoreState(CoreState, SqlMixin):
             updated = self.query(
                 """
                 UPDATE task
-                SET finished_at = :finished_at, token = NULL
+                SET finished_at = :finished_at,
+                    sub_status = :sub_status,
+                    details = :details,
+                    token = NULL
                 WHERE task_id = :task_id AND finished_at IS NULL
                 RETURNING task_id
                 """,
-                {"task_id": sint64_task_id, "finished_at": now().isoformat()},
+                {
+                    "task_id": sint64_task_id,
+                    "finished_at": now().isoformat(),
+                    "sub_status": substatus,
+                    "details": detail,
+                },
             )
             if not updated:
                 return False
@@ -349,23 +350,6 @@ class SqlCoreState(CoreState, SqlMixin):
                     {"namespace": _TASK_TOKEN_NAMESPACE, "token": token},
                 )
 
-            status_namespace = _task_status_namespace(sint64_task_id)
-            # Store terminal task details without changing the task table schema.
-            self.query(
-                "DELETE FROM nonce_store WHERE namespace = :namespace",
-                {"namespace": status_namespace},
-            )
-            self.query(
-                """
-                INSERT INTO nonce_store (namespace, nonce, expires_at)
-                VALUES (:namespace, :nonce, :expires_at)
-                """,
-                {
-                    "namespace": status_namespace,
-                    "nonce": json.dumps({"sub_status": substatus, "details": detail}),
-                    "expires_at": _TASK_STATUS_EXPIRES_AT,
-                },
-            )
             return True
 
     def acknowledge_task_heartbeat(self, task_id: int) -> bool:
@@ -449,23 +433,6 @@ class SqlCoreState(CoreState, SqlMixin):
                 "UPDATE task SET token = NULL WHERE token = :token",
                 [{"token": row["nonce"]} for row in rows],
             )
-
-    def _get_finished_task_status(self, sint64_task_id: int) -> tuple[str, str]:
-        """Return stored status details for a finished task."""
-        # Terminal task details are stored under a per-task namespace.
-        rows = self.query(
-            "SELECT nonce FROM nonce_store WHERE namespace = :namespace LIMIT 1",
-            {"namespace": _task_status_namespace(sint64_task_id)},
-        )
-        if not rows:
-            return "", ""
-
-        try:
-            status = json.loads(rows[0]["nonce"])
-        except (TypeError, json.JSONDecodeError):
-            return "", ""
-
-        return str(status.get("sub_status", "")), str(status.get("details", ""))
 
     def create_token(self, run_id: int) -> str | None:
         """Create a token for the given run ID."""

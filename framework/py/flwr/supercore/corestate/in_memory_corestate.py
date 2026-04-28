@@ -227,7 +227,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
     def finish_task(self, task_id: int, substatus: str, detail: str) -> bool:
         """Move an unfinished task to finished."""
         with self.lock_task_store:
-            # Transition task from RUNNING -> FINISHED.
+            # Transition task to FINISHED
             task = self.task_store.get(task_id)
             if task is None or determine_task_status(task).status == Status.FINISHED:
                 return False
