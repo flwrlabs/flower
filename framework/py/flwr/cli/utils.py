@@ -84,9 +84,13 @@ def print_json_to_stdout(data: str | Any) -> None:
         Console(file=sys.__stdout__).print_json(data=data)
 
 
-def _extract_error_message(err: Exception) -> str:
-    """Return the message field from JSON-encoded errors when available."""
-    err_message = str(err)
+def _extract_error_message(err: grpc.RpcError) -> str:
+    """Return a user-facing message from a gRPC error.
+
+    This function parses FlowerError JSON in `err.details()` when present,
+    otherwise falls back to the raw gRPC details string.
+    """
+    err_message = err.details()  # pylint: disable=E1101
     try:
         parsed = json.loads(err_message)
         if isinstance(parsed, dict) and "public_message" in parsed:
