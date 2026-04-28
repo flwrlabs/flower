@@ -76,17 +76,15 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         peer_metadata, metadata_error = RuntimeVersionMetadata.from_grpc_metadata(
             handler_call_details.invocation_metadata
         )
-        if metadata_error is None:
-            rejection = get_runtime_version_rejection(
+        rejection = (
+            format_invalid_metadata_message(self._connection_name, metadata_error)
+            if metadata_error is not None
+            else get_runtime_version_rejection(
                 self._connection_name,
                 self._local_metadata,
                 peer_metadata,
             )
-        else:
-            rejection = format_invalid_metadata_message(
-                self._connection_name,
-                metadata_error,
-            )
+        )
         if rejection is None:
             return method_handler
 
