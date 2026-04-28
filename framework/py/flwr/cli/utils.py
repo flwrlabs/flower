@@ -90,7 +90,7 @@ def _format_grpc_error(err: grpc.RpcError) -> str:
     This function parses FlowerError JSON in `err.details()` when present, otherwise
     falls back to the raw gRPC details string.
     """
-    err_message = err.details()  # pylint: disable=E1101
+    err_message = cast(str, err.details())  # pylint: disable=E1101
     try:
         parsed = json.loads(err_message)
         if isinstance(parsed, dict) and "public_message" in parsed:

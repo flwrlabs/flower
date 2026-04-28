@@ -60,8 +60,8 @@ from .utils import (
 )
 
 
-class _GrpcErrorWithDetails(grpc.RpcError):
-    """Test helper for grpc.RpcError values carrying a details string."""
+class _GrpcErrorWithDetails:
+    """Test helper object carrying a gRPC-like details string."""
 
     def __init__(self, details: str) -> None:
         self._details = details
@@ -69,6 +69,11 @@ class _GrpcErrorWithDetails(grpc.RpcError):
     def details(self) -> str:
         """Return the stored gRPC details string."""
         return self._details
+
+
+def _grpc_error_with_details(details: str) -> grpc.RpcError:
+    """Return a grpc.RpcError-compatible test helper with a details method."""
+    return cast(grpc.RpcError, _GrpcErrorWithDetails(details))
 
 
 class TestGetSHA256Hash(unittest.TestCase):
@@ -279,7 +284,7 @@ def test_custom_grpc_err_handler() -> None:
 
 def test_ormat_grpc_error_uses_json_message_field() -> None:
     """Structured Flower errors combine public message and details."""
-    err = _GrpcErrorWithDetails(
+    err = _grpc_error_with_details(
         '{"public_message": "request failed", '
         '"public_details": "missing entitlement", "code": 400}'
     )
@@ -289,7 +294,7 @@ def test_ormat_grpc_error_uses_json_message_field() -> None:
 
 def test_ormat_grpc_error_falls_back_to_plain_string() -> None:
     """Non-JSON errors fall back to their normal string form."""
-    err = _GrpcErrorWithDetails("plain failure")
+    err = _grpc_error_with_details("plain failure")
 
     assert _format_grpc_error(err) == "plain failure"
 
