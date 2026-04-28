@@ -91,6 +91,7 @@ from flwr.supercore.typing import (
     AcceptInvitationContext,
     CreateFederationContext,
     CreateInvitationContext,
+    EntitlementResponse,
     RegisterSupernodeContext,
     StartRunContext,
 )
@@ -293,13 +294,22 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch.object(
                 self.state.federation_manager,
                 "can_execute",
-                return_value=False,
+                return_value=EntitlementResponse(
+                    allowed=False,
+                    code=101,
+                    message="Start run not permitted.",
+                ),
             ),
             self.assertRaises(grpc.RpcError),
         ):
             self.servicer.StartRun(request, context)
 
-        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
+        _assert_abort_with_flwr_err(
+            context,
+            ApiErrorCode.ENTITLEMENT_ERROR,
+            public_details="Start run not permitted.",
+            entitlement_code=101,
+        )
 
     @parameterized.expand(
         [
@@ -329,7 +339,11 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch.object(
                 self.state.federation_manager,
                 "can_execute",
-                return_value=True,
+                return_value=EntitlementResponse(
+                    allowed=True,
+                    code=0,
+                    message="Action allowed.",
+                ),
             ) as mock_can_execute,
             patch.object(
                 self.state.federation_manager,
@@ -456,13 +470,22 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch.object(
                 self.state.federation_manager,
                 "can_execute",
-                return_value=False,
+                return_value=EntitlementResponse(
+                    allowed=False,
+                    code=102,
+                    message="Register node not permitted.",
+                ),
             ),
             self.assertRaises(grpc.RpcError),
         ):
             self.servicer.RegisterNode(req, ctx)
 
-        _assert_abort_with_flwr_err(ctx, ApiErrorCode.NO_PERMISSIONS)
+        _assert_abort_with_flwr_err(
+            ctx,
+            ApiErrorCode.ENTITLEMENT_ERROR,
+            public_details="Register node not permitted.",
+            entitlement_code=102,
+        )
         mock_create_node.assert_not_called()
 
     def test_register_node_calls_can_execute_with_expected_args(self) -> None:
@@ -474,7 +497,11 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         with patch.object(
             self.state.federation_manager,
             "can_execute",
-            return_value=True,
+            return_value=EntitlementResponse(
+                allowed=True,
+                code=0,
+                message="Action allowed.",
+            ),
         ) as mock_can_execute:
             _ = self.servicer.RegisterNode(req, Mock())
 
@@ -623,7 +650,11 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch.object(
                 self.state.federation_manager,
                 "can_execute",
-                return_value=True,
+                return_value=EntitlementResponse(
+                    allowed=True,
+                    code=0,
+                    message="Action allowed.",
+                ),
             ) as mock_can_execute,
             patch.object(
                 self.state.federation_manager,
@@ -689,13 +720,22 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch.object(
                 self.state.federation_manager,
                 "can_execute",
-                return_value=False,
+                return_value=EntitlementResponse(
+                    allowed=False,
+                    code=103,
+                    message="Create federation not permitted.",
+                ),
             ),
             self.assertRaises(grpc.RpcError),
         ):
             self.servicer.CreateFederation(request, context)
 
-        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
+        _assert_abort_with_flwr_err(
+            context,
+            ApiErrorCode.ENTITLEMENT_ERROR,
+            public_details="Create federation not permitted.",
+            entitlement_code=103,
+        )
 
     def test_create_federation_raises_on_invalid_name(self) -> None:
         """Test CreateFederation aborts when federation name is invalid."""
@@ -869,7 +909,11 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
             federation_name="test-federation",
         )
         context = Mock()
-        self.state.federation_manager.can_execute.return_value = True
+        self.state.federation_manager.can_execute.return_value = EntitlementResponse(
+            allowed=True,
+            code=0,
+            message="Action allowed.",
+        )
         self.state.federation_manager.get_simulation_config.return_value = None
 
         response = self.servicer.CreateInvitation(request, context)
@@ -898,12 +942,21 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         )
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
-        self.state.federation_manager.can_execute.return_value = False
+        self.state.federation_manager.can_execute.return_value = EntitlementResponse(
+            allowed=False,
+            code=104,
+            message="Create invitation not permitted.",
+        )
 
         with self.assertRaises(grpc.RpcError):
             self.servicer.CreateInvitation(request, context)
 
-        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
+        _assert_abort_with_flwr_err(
+            context,
+            ApiErrorCode.ENTITLEMENT_ERROR,
+            public_details="Create invitation not permitted.",
+            entitlement_code=104,
+        )
         self.state.federation_manager.create_invitation.assert_not_called()
 
     def test_list_invitations_success(self) -> None:
@@ -925,7 +978,11 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         """Test AcceptInvitation success path."""
         request = AcceptInvitationRequest(federation_name="test-federation")
         context = Mock()
-        self.state.federation_manager.can_execute.return_value = True
+        self.state.federation_manager.can_execute.return_value = EntitlementResponse(
+            allowed=True,
+            code=0,
+            message="Action allowed.",
+        )
         self.state.federation_manager.get_simulation_config.return_value = None
 
         response = self.servicer.AcceptInvitation(request, context)
@@ -949,12 +1006,21 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         request = AcceptInvitationRequest(federation_name="test-federation")
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
-        self.state.federation_manager.can_execute.return_value = False
+        self.state.federation_manager.can_execute.return_value = EntitlementResponse(
+            allowed=False,
+            code=105,
+            message="Accept invitation not permitted.",
+        )
 
         with self.assertRaises(grpc.RpcError):
             self.servicer.AcceptInvitation(request, context)
 
-        _assert_abort_with_flwr_err(context, ApiErrorCode.NO_PERMISSIONS)
+        _assert_abort_with_flwr_err(
+            context,
+            ApiErrorCode.ENTITLEMENT_ERROR,
+            public_details="Accept invitation not permitted.",
+            entitlement_code=105,
+        )
         self.state.federation_manager.accept_invitation.assert_not_called()
 
     def test_reject_invitation_success(self) -> None:
@@ -1340,16 +1406,23 @@ def test_format_verification_compact() -> None:
     assert v2 == {"sig": "def", "algo": "ed25519"}
 
 
-def _assert_abort_with_flwr_err(ctx: MagicMock, code: int) -> None:
+def _assert_abort_with_flwr_err(
+    ctx: MagicMock,
+    code: int,
+    public_details: str | None = None,
+    entitlement_code: int | None = None,
+) -> None:
     """Assert that ctx.abort was called with a translated FlowerError."""
     spec = API_ERROR_MAP[code]
+    payload: dict[str, int | str | None] = {
+        "code": code,
+        "public_message": spec.public_message,
+        "public_details": public_details,
+    }
+    if entitlement_code is not None:
+        payload["entitlement_code"] = entitlement_code
+
     ctx.abort.assert_called_once_with(
         spec.status_code,
-        json.dumps(
-            {
-                "code": code,
-                "public_message": spec.public_message,
-                "public_details": None,
-            }
-        ),
+        json.dumps(payload),
     )

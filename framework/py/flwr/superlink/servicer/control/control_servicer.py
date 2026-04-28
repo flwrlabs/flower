@@ -117,7 +117,12 @@ from flwr.supercore.constant import (
     RunTime,
     RunType,
 )
-from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
+from flwr.supercore.error import (
+    ApiErrorCode,
+    EntitlementError,
+    FlowerError,
+    rpc_error_translator,
+)
 from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
 from flwr.supercore.typing import (
@@ -211,15 +216,15 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 resolved_federation_config.CopyFrom(sim_cfg)
                 resolved_federation_config.MergeFrom(request.override_federation_config)
 
-            if not state.federation_manager.can_execute(
+            entitlement_response = state.federation_manager.can_execute(
                 flwr_aid,
                 ActionType.START_RUN,
                 StartRunContext(federation_name=federation, runtime=runtime),
-            ):
-                raise FlowerError(
-                    ApiErrorCode.NO_PERMISSIONS,
-                    f"'{ActionType.START_RUN}' action cannot be executed on federation "
-                    f"'{federation}'.",
+            )
+            if not entitlement_response.allowed:
+                raise EntitlementError(
+                    details=entitlement_response.message,
+                    entitlement_code=entitlement_response.code,
                 )
 
         try:
@@ -536,14 +541,15 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         flwr_aid = _get_flwr_aid(context)
         with rpc_error_translator(context, self.RegisterNode.__qualname__):
-            if not state.federation_manager.can_execute(
+            entitlement_response = state.federation_manager.can_execute(
                 flwr_aid,
                 ActionType.REGISTER_SUPERNODE,
                 RegisterSupernodeContext(),
-            ):
-                raise FlowerError(
-                    ApiErrorCode.NO_PERMISSIONS,
-                    f"'{ActionType.REGISTER_SUPERNODE}' action cannot be executed.",
+            )
+            if not entitlement_response.allowed:
+                raise EntitlementError(
+                    details=entitlement_response.message,
+                    entitlement_code=entitlement_response.code,
                 )
 
         # Account name exists if `flwr_aid` exists
@@ -688,7 +694,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
             runtime = RunTime.SIMULATION if request.simulation else RunTime.DEPLOYMENT
             flwr_aid = cast(str, account.flwr_aid)
-            if not state.federation_manager.can_execute(
+            entitlement_response = state.federation_manager.can_execute(
                 flwr_aid,
                 ActionType.CREATE_FEDERATION,
                 CreateFederationContext(
@@ -696,11 +702,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     runtime=runtime,
                     visibility="private",
                 ),
-            ):
-                raise FlowerError(
-                    ApiErrorCode.NO_PERMISSIONS,
-                    f"'{ActionType.CREATE_FEDERATION}' action cannot be executed with "
-                    f"a '{runtime}' runtime.",
+            )
+            if not entitlement_response.allowed:
+                raise EntitlementError(
+                    details=entitlement_response.message,
+                    entitlement_code=entitlement_response.code,
                 )
 
             # Create federation
@@ -846,7 +852,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 else RunTime.DEPLOYMENT
             )
 
-            if not state.federation_manager.can_execute(
+            entitlement_response = state.federation_manager.can_execute(
                 flwr_aid=flwr_aid,
                 action=ActionType.CREATE_INVITATION,
                 context=CreateInvitationContext(
@@ -854,11 +860,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     invitee_account_name=invitee_account_name,
                     runtime=runtime,
                 ),
-            ):
-                raise FlowerError(
-                    ApiErrorCode.NO_PERMISSIONS,
-                    f"'{ActionType.CREATE_INVITATION}' action cannot be executed on "
-                    f"federation '{federation}' for account '{invitee_account_name}'.",
+            )
+            if not entitlement_response.allowed:
+                raise EntitlementError(
+                    details=entitlement_response.message,
+                    entitlement_code=entitlement_response.code,
                 )
 
             state.federation_manager.create_invitation(
@@ -903,18 +909,18 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 else RunTime.DEPLOYMENT
             )
 
-            if not state.federation_manager.can_execute(
+            entitlement_response = state.federation_manager.can_execute(
                 flwr_aid=flwr_aid,
                 action=ActionType.ACCEPT_INVITATION,
                 context=AcceptInvitationContext(
                     federation_name=federation,
                     runtime=runtime,
                 ),
-            ):
-                raise FlowerError(
-                    ApiErrorCode.NO_PERMISSIONS,
-                    f"'{ActionType.ACCEPT_INVITATION}' action cannot be executed on "
-                    f"federation '{federation}'.",
+            )
+            if not entitlement_response.allowed:
+                raise EntitlementError(
+                    details=entitlement_response.message,
+                    entitlement_code=entitlement_response.code,
                 )
 
             state.federation_manager.accept_invitation(

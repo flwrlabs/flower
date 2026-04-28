@@ -98,3 +98,22 @@ class AcceptInvitationContext(ActionContext):
 
     federation_name: str
     runtime: RunTime
+
+
+@dataclass(frozen=True)
+class EntitlementResponse:
+    """Dataclass for entitlement responses.
+
+    Attributes
+    ----------
+    allowed : bool
+        Whether the action is allowed or not.
+    code : int
+        An integer code representing the reason for denial if not allowed.
+    message : str
+        A human-readable message providing more details about the denial reason.
+    """
+
+    allowed: bool
+    code: int
+    message: str
