@@ -23,7 +23,6 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-
 # pylint: disable=no-member
 
 # revision identifiers, used by Alembic.

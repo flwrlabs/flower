@@ -660,9 +660,7 @@ def run_from_proto(run_proto: ProtoRun) -> typing.Run:
         flwr_aid=run_proto.flwr_aid,
         federation=run_proto.federation,
         primary_task_id=(
-            run_proto.primary_task_id
-            if run_proto.HasField("primary_task_id")
-            else None
+            run_proto.primary_task_id if run_proto.HasField("primary_task_id") else None
         ),
         bytes_sent=run_proto.bytes_sent,
         bytes_recv=run_proto.bytes_recv,
