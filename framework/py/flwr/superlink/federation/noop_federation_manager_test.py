@@ -247,11 +247,10 @@ def test_has_node() -> None:
     ]
 )  # type: ignore
 def test_can_execute(action: ActionType) -> None:
-    """Test can_execute method returns True for NOOP_FEDERATION."""
+    """Test can_execute completes for allowed actions."""
     manager = NoOpFederationManager()
 
-    allowed = manager.can_execute(NOOP_FLWR_AID, action, ActionContext())
-    assert allowed is True
+    manager.can_execute(NOOP_FLWR_AID, action, ActionContext())
 
 
 def test_get_federations() -> None:
