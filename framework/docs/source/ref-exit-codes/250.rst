@@ -1,0 +1,17 @@
+#####################################
+ [250] CLIENTAPP_COMMUNICATION_ERROR
+#####################################
+
+*************
+ Description
+*************
+
+The ClientApp could not communicate with the ClientAppIo API.
+
+****************
+ How to Resolve
+****************
+
+Check that the SuperNode ClientAppIo API is reachable and that the ClientApp process
+uses the correct address, token, and TLS options. If TLS is enabled, verify that the
+configured root certificates can verify the ClientAppIo server certificate.
