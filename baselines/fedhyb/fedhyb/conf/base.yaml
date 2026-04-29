@@ -1,0 +1,27 @@
+# this is the config file that will be loaded as default to main.py
+
+path_to_dataset: 'dataset'
+val_ratio: 0.1 #percentage of the validation daateset 
+
+
+# dataset preprocessing parameters
+batch_size: 16 # batch size to use by clients during training
+total_classes: 15 # number of classes in our dataset (we use  CICIDS2018) -- this tells the model how to setup its output fully-connected layer
+num_drop: 5 # number of maximum classes to drop from the training data for each client. The number as well as the classes to be dropped is generated randomly.
+
+
+num_cpus: 1
+num_gpus: 0
+
+
+
+
+# feederated training parameters
+num_clients: 10 # number of total clients available (this is also the number of partitions we need to create)
+num_clients_per_round_fit: 10 # number of clients to involve in each fit round (fit  round = clients receive the model from the server and do local training)
+num_clients_per_round_eval: 10 # number of clients to involve in each evaluate round (evaluate round = client only evaluate the model sent by the server on their local dataset without training it)
+lr: 0.01 # learning rate to use by the clients
+local_epochs: 3 # number of training epochs each clients does in a fit() round
+num_rounds: 30 # number of FL rounds in the experiment
+
+print_round: 30 # print round represents the round when we want to display the classification report for clients, by default is the last round
