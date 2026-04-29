@@ -85,7 +85,7 @@ class TaskStatus(google.protobuf.message.Message):
     SUB_STATUS_FIELD_NUMBER: builtins.int
     DETAILS_FIELD_NUMBER: builtins.int
     status: builtins.str
-    """"starting", "running", "finished" """
+    """"pending", "starting", "running", or "finished" """
     sub_status: builtins.str
     """"completed", "failed", "stopped" or "" (non-finished)"""
     details: builtins.str
@@ -100,3 +100,37 @@ class TaskStatus(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["details", b"details", "status", b"status", "sub_status", b"sub_status"]) -> None: ...
 
 global___TaskStatus = TaskStatus
+
+@typing.final
+class ClaimTaskRequest(google.protobuf.message.Message):
+    """ClaimTask messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASK_ID_FIELD_NUMBER: builtins.int
+    task_id: builtins.int
+    def __init__(
+        self,
+        *,
+        task_id: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["task_id", b"task_id"]) -> None: ...
+
+global___ClaimTaskRequest = ClaimTaskRequest
+
+@typing.final
+class ClaimTaskResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TOKEN_FIELD_NUMBER: builtins.int
+    token: builtins.str
+    def __init__(
+        self,
+        *,
+        token: builtins.str | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_token", b"_token", "token", b"token"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_token", b"_token", "token", b"token"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_token", b"_token"]) -> typing.Literal["token"] | None: ...
+
+global___ClaimTaskResponse = ClaimTaskResponse

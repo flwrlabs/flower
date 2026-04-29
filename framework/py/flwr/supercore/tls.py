@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""TLS helpers for gRPC connections."""
+"""TLS helpers for SuperExec/AppIO-style gRPC connections."""
 
 
-import argparse
 from pathlib import Path
 
 from flwr.common.exit import ExitCode, flwr_exit

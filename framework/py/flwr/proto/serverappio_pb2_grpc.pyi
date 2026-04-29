@@ -25,6 +25,7 @@ import flwr.proto.log_pb2
 import flwr.proto.message_pb2
 import flwr.proto.run_pb2
 import flwr.proto.serverappio_pb2
+import flwr.proto.task_pb2
 import grpc
 import grpc.aio
 import typing
@@ -71,6 +72,18 @@ class ServerAppIoStub:
         flwr.proto.heartbeat_pb2.SendAppHeartbeatResponse,
     ]
     """App heartbeat"""
+
+    ClaimTask: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.task_pb2.ClaimTaskRequest,
+        flwr.proto.task_pb2.ClaimTaskResponse,
+    ]
+    """Claim task"""
+
+    SendTaskHeartbeat: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.heartbeat_pb2.SendTaskHeartbeatRequest,
+        flwr.proto.heartbeat_pb2.SendTaskHeartbeatResponse,
+    ]
+    """Task heartbeat"""
 
     PullAppInputs: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullAppInputsRequest,
@@ -182,6 +195,18 @@ class ServerAppIoAsyncStub:
         flwr.proto.heartbeat_pb2.SendAppHeartbeatResponse,
     ]
     """App heartbeat"""
+
+    ClaimTask: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.task_pb2.ClaimTaskRequest,
+        flwr.proto.task_pb2.ClaimTaskResponse,
+    ]
+    """Claim task"""
+
+    SendTaskHeartbeat: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.heartbeat_pb2.SendTaskHeartbeatRequest,
+        flwr.proto.heartbeat_pb2.SendTaskHeartbeatResponse,
+    ]
+    """Task heartbeat"""
 
     PullAppInputs: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullAppInputsRequest,
@@ -301,6 +326,22 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.heartbeat_pb2.SendAppHeartbeatResponse, collections.abc.Awaitable[flwr.proto.heartbeat_pb2.SendAppHeartbeatResponse]]:
         """App heartbeat"""
+
+    @abc.abstractmethod
+    def ClaimTask(
+        self,
+        request: flwr.proto.task_pb2.ClaimTaskRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.task_pb2.ClaimTaskResponse, collections.abc.Awaitable[flwr.proto.task_pb2.ClaimTaskResponse]]:
+        """Claim task"""
+
+    @abc.abstractmethod
+    def SendTaskHeartbeat(
+        self,
+        request: flwr.proto.heartbeat_pb2.SendTaskHeartbeatRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.heartbeat_pb2.SendTaskHeartbeatResponse, collections.abc.Awaitable[flwr.proto.heartbeat_pb2.SendTaskHeartbeatResponse]]:
+        """Task heartbeat"""
 
     @abc.abstractmethod
     def PullAppInputs(
