@@ -493,6 +493,23 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         self.assertEqual(task.running_at, "")
         self.assertEqual(task.finished_at, "")
 
+    def test_create_task_aborts_if_state_create_task_fails(self) -> None:
+        """Test `CreateTask` aborts if state.create_task returns None."""
+        run_id = self._create_dummy_run()
+
+        with patch.object(self.state, "create_task", return_value=None):
+            with self.assertRaises(grpc.RpcError) as err:
+                self._create_task.with_call(
+                    request=CreateTaskRequest(
+                        type=TaskType.SERVER_APP.value,
+                        run_id=run_id,
+                        fab_hash="hash123",
+                    )
+                )
+
+        assert err.exception.code() == grpc.StatusCode.INTERNAL
+        assert err.exception.details() == "Failed to create task"
+
     def test_create_task_rejects_unknown_type(self) -> None:
         """Test `CreateTask` rejects unknown task types."""
         run_id = self._create_dummy_run()
