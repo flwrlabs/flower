@@ -1,0 +1,9 @@
+pandas==2.2.3
+scikit-learn==1.6.1
+matplotlib==3.10.0
+numpy==2.2.2
+joblib==1.4.2
+seaborn==0.13.2
+plotly==6.0.0
+einops==0.8.0
+omegaconf==2.3.0
