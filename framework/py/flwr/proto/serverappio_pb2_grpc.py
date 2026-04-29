@@ -9,6 +9,7 @@ from flwr.proto import log_pb2 as flwr_dot_proto_dot_log__pb2
 from flwr.proto import message_pb2 as flwr_dot_proto_dot_message__pb2
 from flwr.proto import run_pb2 as flwr_dot_proto_dot_run__pb2
 from flwr.proto import serverappio_pb2 as flwr_dot_proto_dot_serverappio__pb2
+from flwr.proto import task_pb2 as flwr_dot_proto_dot_task__pb2
 
 GRPC_GENERATED_VERSION = '1.70.0'
 GRPC_VERSION = grpc.__version__
@@ -58,6 +59,16 @@ class ServerAppIoStub(object):
                 '/flwr.proto.ServerAppIo/SendAppHeartbeat',
                 request_serializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatResponse.FromString,
+                _registered_method=True)
+        self.ClaimTask = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/ClaimTask',
+                request_serializer=flwr_dot_proto_dot_task__pb2.ClaimTaskRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_task__pb2.ClaimTaskResponse.FromString,
+                _registered_method=True)
+        self.SendTaskHeartbeat = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/SendTaskHeartbeat',
+                request_serializer=flwr_dot_proto_dot_heartbeat__pb2.SendTaskHeartbeatRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_heartbeat__pb2.SendTaskHeartbeatResponse.FromString,
                 _registered_method=True)
         self.PullAppInputs = channel.unary_unary(
                 '/flwr.proto.ServerAppIo/PullAppInputs',
@@ -150,6 +161,20 @@ class ServerAppIoServicer(object):
 
     def SendAppHeartbeat(self, request, context):
         """App heartbeat
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ClaimTask(self, request, context):
+        """Claim task
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SendTaskHeartbeat(self, request, context):
+        """Task heartbeat
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -262,6 +287,16 @@ def add_ServerAppIoServicer_to_server(servicer, server):
                     servicer.SendAppHeartbeat,
                     request_deserializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatResponse.SerializeToString,
+            ),
+            'ClaimTask': grpc.unary_unary_rpc_method_handler(
+                    servicer.ClaimTask,
+                    request_deserializer=flwr_dot_proto_dot_task__pb2.ClaimTaskRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_task__pb2.ClaimTaskResponse.SerializeToString,
+            ),
+            'SendTaskHeartbeat': grpc.unary_unary_rpc_method_handler(
+                    servicer.SendTaskHeartbeat,
+                    request_deserializer=flwr_dot_proto_dot_heartbeat__pb2.SendTaskHeartbeatRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_heartbeat__pb2.SendTaskHeartbeatResponse.SerializeToString,
             ),
             'PullAppInputs': grpc.unary_unary_rpc_method_handler(
                     servicer.PullAppInputs,
@@ -427,6 +462,60 @@ class ServerAppIo(object):
             '/flwr.proto.ServerAppIo/SendAppHeartbeat',
             flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatRequest.SerializeToString,
             flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ClaimTask(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ServerAppIo/ClaimTask',
+            flwr_dot_proto_dot_task__pb2.ClaimTaskRequest.SerializeToString,
+            flwr_dot_proto_dot_task__pb2.ClaimTaskResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SendTaskHeartbeat(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ServerAppIo/SendTaskHeartbeat',
+            flwr_dot_proto_dot_heartbeat__pb2.SendTaskHeartbeatRequest.SerializeToString,
+            flwr_dot_proto_dot_heartbeat__pb2.SendTaskHeartbeatResponse.FromString,
             options,
             channel_credentials,
             insecure,
