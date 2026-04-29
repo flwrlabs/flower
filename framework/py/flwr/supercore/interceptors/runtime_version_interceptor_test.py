@@ -119,10 +119,8 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=1), Mock()))
         self.assertEqual(response, "ok")
 
-    def test_unparseable_peer_version_is_rejected(self) -> None:
-        """Explicit unparseable peer versions should be rejected."""
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
+    def test_unparseable_peer_version_is_tolerated(self) -> None:
+        """Explicit unparseable peer versions should still pass through."""
         intercepted = self.interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
@@ -135,19 +133,11 @@ class TestRuntimeVersionServerInterceptor(TestCase):
             ),
         )
 
-        with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(GetNodesRequest(run_id=1), context)
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            "Invalid Flower version metadata for "
-            "flwr-simulation <-> SuperLink ServerAppIo API. "
-            "Peer Flower version metadata cannot be parsed: 'main'.",
-        )
+        response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=1), Mock()))
+        self.assertEqual(response, "ok")
 
-    def test_incompatible_metadata_is_rejected(self) -> None:
-        """Different major.minor versions should be rejected."""
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
+    def test_incompatible_metadata_is_tolerated(self) -> None:
+        """Different major.minor versions should still pass through."""
         intercepted = self.interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
@@ -160,15 +150,8 @@ class TestRuntimeVersionServerInterceptor(TestCase):
             ),
         )
 
-        with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(GetNodesRequest(run_id=1), context)
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            "Incompatible Flower version for "
-            "flwr-simulation <-> SuperLink ServerAppIo API.\n"
-            "Local superlink version 1.29.0 only accepts peers from the same "
-            "major.minor release, but received simulation version 1.30.1.",
-        )
+        response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=1), Mock()))
+        self.assertEqual(response, "ok")
 
     def test_compatible_metadata_is_accepted(self) -> None:
         """Same major.minor versions should pass."""
