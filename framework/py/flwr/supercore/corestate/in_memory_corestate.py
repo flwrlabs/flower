@@ -162,8 +162,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 matched_task_ids &= {
                     task_id
                     for task_id in matched_task_ids
-                    if determine_task_status(self.task_store[task_id]).status
-                    in status_set
+                    if self.task_store[task_id].status.status in status_set
                 }
 
             tasks = [self.task_store[task_id] for task_id in matched_task_ids]
@@ -182,7 +181,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             for task in tasks:
                 task_copy = Task()
                 task_copy.CopyFrom(task)
-                task_copy.status.CopyFrom(determine_task_status(task))
+                task_copy.status.CopyFrom(task.status)
                 result.append(task_copy)
             return result
 
@@ -217,7 +216,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
 
             # Transition task from STARTING -> RUNNING.
             task = self.task_store.get(task_id)
-            if task is None or determine_task_status(task).status != Status.STARTING:
+            if task is None or task.status.status != Status.STARTING:
                 return False
 
             task.running_at = now().isoformat()
@@ -234,7 +233,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
 
             # Transition task to FINISHED
             task = self.task_store.get(task_id)
-            if task is None or determine_task_status(task).status == Status.FINISHED:
+            if task is None or task.status.status == Status.FINISHED:
                 return False
 
             task.finished_at = now().isoformat()
@@ -254,11 +253,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             self._cleanup_expired_task_tokens_locked()
             task = self.task_store.get(task_id)
             record = self.task_token_store.get(task_id)
-            if (
-                task is None
-                or record is None
-                or determine_task_status(task).status == Status.FINISHED
-            ):
+            if task is None or record is None or task.status.status == Status.FINISHED:
                 return False
 
             record.active_until = (
@@ -402,20 +397,3 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         for key, expires_at in list(self.nonce_store.items()):
             if expires_at < current:
                 del self.nonce_store[key]
-
-
-def determine_task_status(task: Task) -> TaskStatus:
-    """Determine the status of a task based on timestamp fields."""
-    if task.pending_at:
-        if task.finished_at:
-            return TaskStatus(
-                status=Status.FINISHED,
-                sub_status=task.status.sub_status,
-                details=task.status.details,
-            )
-        if task.starting_at:
-            if task.running_at:
-                return TaskStatus(status=Status.RUNNING, sub_status="", details="")
-            return TaskStatus(status=Status.STARTING, sub_status="", details="")
-        return TaskStatus(status=Status.PENDING, sub_status="", details="")
-    raise ValueError(f"The task {task.task_id} does not have a valid status.")
