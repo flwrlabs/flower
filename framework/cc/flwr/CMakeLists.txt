@@ -1,4 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
+# Allow CMake 4.x to configure dependencies built with older cmake_minimum_required
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 project(flwr VERSION 1.0
   DESCRIPTION "Flower Library that packages gRPC and other dependencies"
   LANGUAGES CXX)
@@ -71,10 +73,13 @@ endmacro()
 # Using the above macro for all proto files
 GENERATE_AND_COPY(transport)
 GENERATE_AND_COPY(node)
-GENERATE_AND_COPY(task)
-GENERATE_AND_COPY(fleet)
 GENERATE_AND_COPY(error)
-GENERATE_AND_COPY(recordset)
+GENERATE_AND_COPY(recorddict)
+GENERATE_AND_COPY(message)
+GENERATE_AND_COPY(heartbeat)
+GENERATE_AND_COPY(run)
+GENERATE_AND_COPY(fab)
+GENERATE_AND_COPY(fleet)
 
 add_library(flwr_grpc_proto STATIC ${ALL_PROTO_FILES})
 
@@ -97,7 +102,8 @@ add_library(flwr ${FLWR_SRCS})
 
 target_include_directories(flwr PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${grpc_SOURCE_DIR}/third_party/boringssl-with-bazel/src/include>
 )
 
-# Link gRPC and other dependencies
-target_link_libraries(flwr PRIVATE flwr_grpc_proto)
+# Link gRPC and other dependencies (ssl/crypto from BoringSSL for node auth)
+target_link_libraries(flwr PRIVATE flwr_grpc_proto ssl crypto)
