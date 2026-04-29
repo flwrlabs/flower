@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for SuperExec base plugin launch behavior."""
 
-
 import subprocess
 from unittest.mock import Mock, patch
 
@@ -39,11 +38,16 @@ def test_clientapp_launch_inherits_default_stdio() -> None:
         get_run=_get_run,
     )
 
-    with patch("subprocess.Popen") as popen:
+    with (
+        patch("flwr.supercore.superexec.plugin.base_exec_plugin.os.name", "posix"),
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.launch_with_lifeline"
+        ) as launch,
+    ):
         plugin.launch_app(token="token", run_id=7)
 
-    assert "stdout" not in popen.call_args.kwargs
-    assert "stderr" not in popen.call_args.kwargs
+    assert "stdout" not in launch.call_args.kwargs["popen_kwargs"]
+    assert "stderr" not in launch.call_args.kwargs["popen_kwargs"]
 
 
 def test_serverapp_launch_isolates_stdio() -> None:
@@ -55,11 +59,16 @@ def test_serverapp_launch_isolates_stdio() -> None:
         get_run=_get_run,
     )
 
-    with patch("subprocess.Popen") as popen:
+    with (
+        patch("flwr.supercore.superexec.plugin.base_exec_plugin.os.name", "posix"),
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.launch_with_lifeline"
+        ) as launch,
+    ):
         plugin.launch_app(token="token", run_id=5)
 
-    assert popen.call_args.kwargs["stdout"] is subprocess.DEVNULL
-    assert popen.call_args.kwargs["stderr"] is subprocess.DEVNULL
+    assert launch.call_args.kwargs["popen_kwargs"]["stdout"] is subprocess.DEVNULL
+    assert launch.call_args.kwargs["popen_kwargs"]["stderr"] is subprocess.DEVNULL
 
 
 class DummyExecPlugin(BaseExecPlugin):
@@ -80,27 +89,23 @@ def test_launch_app_forwards_runtime_dependency_install_flag() -> None:
     )
 
     with (
+        patch("flwr.supercore.superexec.plugin.base_exec_plugin.os.name", "posix"),
         patch(
-            "flwr.supercore.superexec.plugin.base_exec_plugin.os.getpid",
-            return_value=1234,
-        ),
-        patch(
-            "flwr.supercore.superexec.plugin.base_exec_plugin.subprocess.Popen"
-        ) as popen,
+            "flwr.supercore.superexec.plugin.base_exec_plugin.launch_with_lifeline"
+        ) as launch,
     ):
         plugin.launch_app(token="token-123", run_id=7)
 
-    assert popen.call_args.args[0] == [
+    assert launch.call_args.args[0] == [
         "dummy-app",
         "--insecure",
         "--appio-api-address",
         "127.0.0.1:9091",
         "--token",
         "token-123",
-        "--parent-pid",
-        "1234",
         "--allow-runtime-dependency-installation",
     ]
+    assert launch.call_args.kwargs["wait"] is False
 
 
 def test_launch_app_skips_optional_runtime_flags_by_default() -> None:
@@ -112,12 +117,15 @@ def test_launch_app_skips_optional_runtime_flags_by_default() -> None:
         get_run=Mock(),
     )
 
-    with patch(
-        "flwr.supercore.superexec.plugin.base_exec_plugin.subprocess.Popen"
-    ) as popen:
+    with (
+        patch("flwr.supercore.superexec.plugin.base_exec_plugin.os.name", "posix"),
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.launch_with_lifeline"
+        ) as launch,
+    ):
         plugin.launch_app(token="token-123", run_id=7)
 
-    assert "--allow-runtime-dependency-installation" not in popen.call_args.args[0]
+    assert "--allow-runtime-dependency-installation" not in launch.call_args.args[0]
 
 
 def test_clientapp_launch_forwards_root_certificate() -> None:
@@ -129,10 +137,15 @@ def test_clientapp_launch_forwards_root_certificate() -> None:
         get_run=_get_run,
     )
 
-    with patch("subprocess.Popen") as mock_popen:
+    with (
+        patch("flwr.supercore.superexec.plugin.base_exec_plugin.os.name", "posix"),
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.launch_with_lifeline"
+        ) as launch,
+    ):
         plugin.launch_app(token="token", run_id=7)
 
-    assert mock_popen.call_args.args[0][:3] == [
+    assert launch.call_args.args[0][:3] == [
         "flwr-clientapp",
         "--root-certificates",
         "/tmp/root.pem",
@@ -148,8 +161,13 @@ def test_clientapp_launch_omits_tls_flags_when_using_system_certificates() -> No
         get_run=_get_run,
     )
 
-    with patch("subprocess.Popen") as mock_popen:
+    with (
+        patch("flwr.supercore.superexec.plugin.base_exec_plugin.os.name", "posix"),
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.launch_with_lifeline"
+        ) as launch,
+    ):
         plugin.launch_app(token="token", run_id=7)
 
-    assert "--insecure" not in mock_popen.call_args.args[0]
-    assert "--root-certificates" not in mock_popen.call_args.args[0]
+    assert "--insecure" not in launch.call_args.args[0]
+    assert "--root-certificates" not in launch.call_args.args[0]

@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for SuperExec base ephemeral plugin behavior."""
 
-
 from unittest.mock import patch
 
 from flwr.common.exit import ExitCode
@@ -55,24 +54,25 @@ def test_select_run_id_returns_first_candidate() -> None:
 
 
 def test_launch_app_runs_expected_command_and_exits() -> None:
-    """Launch should invoke the app with token and parent PID, then exit."""
+    """Launch should invoke the app with token, then exit."""
     plugin = _get_ephemeral_plugin()
 
     with (
         patch(
-            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.os.getpid",
-            return_value=1234,
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.os.name",
+            "posix",
         ),
         patch(
-            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.run"
-        ) as run,
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin."
+            "launch_with_lifeline"
+        ) as launch,
         patch(
             "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"
         ) as flwr_exit,
     ):
         plugin.launch_app(token="token-123", run_id=5)
 
-    run.assert_called_once_with(
+    launch.assert_called_once_with(
         [
             "flwr-serverapp",
             "--insecure",
@@ -80,10 +80,9 @@ def test_launch_app_runs_expected_command_and_exits() -> None:
             "127.0.0.1:9091",
             "--token",
             "token-123",
-            "--parent-pid",
-            "1234",
         ],
-        check=False,
+        wait=True,
+        popen_kwargs={},
     )
     flwr_exit.assert_called_once_with(
         ExitCode.SUCCESS,
@@ -101,12 +100,17 @@ def test_launch_app_calls_cleanup_before_launch() -> None:
     # Execute
     with (
         patch(
-            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.run",
-            side_effect=lambda *_, **__: call_log.append("subprocess"),
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.os.name",
+            "posix",
+        ),
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin."
+            "launch_with_lifeline",
+            side_effect=lambda *_, **__: call_log.append("launch"),
         ),
         patch("flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"),
     ):
         plugin.launch_app(token="token-abc", run_id=1)
 
     # Assert
-    assert call_log == ["cleanup", "subprocess"]
+    assert call_log == ["cleanup", "launch"]
