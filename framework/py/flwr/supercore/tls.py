@@ -15,6 +15,7 @@
 """TLS helpers for SuperExec/AppIO-style gRPC connections."""
 
 
+import argparse
 from pathlib import Path
 
 from flwr.common.exit import ExitCode, flwr_exit
