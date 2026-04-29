@@ -29,7 +29,6 @@ from flwr.supercore.superexec.app_lifeline import (
     launch_with_lifeline,
 )
 
-
 pytestmark = pytest.mark.skipif(
     os.name != "posix",
     reason="Lifeline FD launch depends on POSIX FD inheritance.",

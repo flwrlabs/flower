@@ -63,7 +63,7 @@ class BaseEphemeralExecPlugin(ExecPlugin):
             # cleared before any future sandbox wrapper observes launch state.
             launch_with_lifeline(cmds, wait=True, popen_kwargs={})
             flwr_exit(ExitCode.SUCCESS, "App process finished, exiting SuperExec.")
-            return
-        # Launch the app process and wait for it to finish
-        subprocess.run(cmds, check=False)
-        flwr_exit(ExitCode.SUCCESS, "App process finished, exiting SuperExec.")
+        else:
+            # Launch the app process and wait for it to finish.
+            subprocess.run(cmds, check=False)
+            flwr_exit(ExitCode.SUCCESS, "App process finished, exiting SuperExec.")

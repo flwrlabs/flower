@@ -15,8 +15,8 @@
 """Tests for ServerApp process CLI parsing and wiring."""
 
 import importlib
-from types import SimpleNamespace
 from queue import Queue
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
@@ -108,7 +108,7 @@ def test_flwr_serverapp_forwards_cli_args() -> None:
 
     mirror_output_to_queue = Mock()
     restore_output = Mock()
-    run_serverapp = Mock()
+    run_serverapp_mock = Mock()
 
     with (
         patch.object(serverapp_module, "_parse_args_run_flwr_serverapp", _Parser),
@@ -118,14 +118,14 @@ def test_flwr_serverapp_forwards_cli_args() -> None:
             mirror_output_to_queue,
         ),
         patch.object(serverapp_module, "restore_output", restore_output),
-        patch.object(serverapp_module, "run_serverapp", run_serverapp),
+        patch.object(serverapp_module, "run_serverapp", run_serverapp_mock),
     ):
         serverapp_module.flwr_serverapp()
 
     mirror_output_to_queue.assert_called_once()
     restore_output.assert_called_once_with()
-    run_serverapp.assert_called_once()
-    kwargs = run_serverapp.call_args.kwargs
+    run_serverapp_mock.assert_called_once()
+    kwargs = run_serverapp_mock.call_args.kwargs
     assert kwargs["serverappio_api_address"] == "127.0.0.1:9091"
     assert kwargs["token"] == "test-token"
     assert kwargs["certificates"] is None

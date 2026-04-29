@@ -23,7 +23,6 @@ import pytest
 
 from .app_utils import start_lifeline_fd_monitor
 
-
 pytestmark = pytest.mark.skipif(
     os.name != "posix",
     reason="Lifeline FD monitoring depends on POSIX FD behavior.",
@@ -101,4 +100,4 @@ def _close_fd(fd: int) -> None:
     try:
         os.close(fd)
     except OSError:
-        return
+        pass

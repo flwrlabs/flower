@@ -88,13 +88,13 @@ def _run_simulation_settings(
     backend_config: BackendConfig = {"client_resources": {}, "init_args": {}}
 
     if sim_cfg.HasField("client_resources_num_cpus"):
-        backend_config["client_resources"]["num_cpus"] = (
-            sim_cfg.client_resources_num_cpus
-        )
+        backend_config["client_resources"][
+            "num_cpus"
+        ] = sim_cfg.client_resources_num_cpus
     if sim_cfg.HasField("client_resources_num_gpus"):
-        backend_config["client_resources"]["num_gpus"] = (
-            sim_cfg.client_resources_num_gpus
-        )
+        backend_config["client_resources"][
+            "num_gpus"
+        ] = sim_cfg.client_resources_num_gpus
     if sim_cfg.HasField("init_args_num_cpus"):
         backend_config["init_args"]["num_cpus"] = sim_cfg.init_args_num_cpus
     if sim_cfg.HasField("init_args_num_gpus"):
