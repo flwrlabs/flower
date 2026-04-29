@@ -60,6 +60,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         render_as_batch=True,
         literal_binds=True,
+        compare_server_default=True,
         dialect_opts={"paramstyle": "named"},
     )
 
@@ -99,6 +100,7 @@ def run_migrations_online() -> None:
                 connection=connection,
                 target_metadata=target_metadata,
                 render_as_batch=True,
+                compare_server_default=True,
             )
 
             with context.begin_transaction():  # pylint: disable=no-member
@@ -109,6 +111,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             render_as_batch=True,
+            compare_server_default=True,
         )
 
         with context.begin_transaction():  # pylint: disable=no-member
