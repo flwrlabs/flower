@@ -248,6 +248,34 @@ class StateTest(unittest.TestCase):
             self.assertIsNone(state.get_task_id_by_token(token))
             self.assertFalse(state.acknowledge_task_heartbeat(task_id))
 
+    def test_expired_task_token_transitions_task_to_finished_failed(self) -> None:
+        """Expired task claims should transition tasks to FINISHED:FAILED."""
+        state = self.state_factory()
+        created_at = now()
+        task_id = state.create_task(task_type="flwr-model", run_id=42)
+        assert task_id is not None
+
+        token = state.claim_task(task_id)
+        assert token is not None
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = created_at + timedelta(
+                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
+            )
+            self.assertIsNone(state.get_task_id_by_token(token))
+
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(
+            tasks[0].status,
+            TaskStatus(
+                status=Status.FINISHED,
+                sub_status=SubStatus.FAILED,
+                details="No heartbeat received from the task",
+            ),
+        )
+        self.assertTrue(tasks[0].finished_at)
+
     def test_get_task_id_by_token_returns_none_for_unknown_token(self) -> None:
         """Unknown task tokens should not resolve to a task."""
         state = self.state_factory()

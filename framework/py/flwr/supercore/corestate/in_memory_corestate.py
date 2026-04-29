@@ -29,6 +29,7 @@ from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     TASK_ID_NUM_BYTES,
     Status,
+    SubStatus,
 )
 from flwr.common.typing import Fab
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
@@ -189,8 +190,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         """Atomically claim a pending task."""
         token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
         with self.lock_task_store:
-            # Expire abandoned claims before deciding whether this task can be claimed.
-            self._cleanup_expired_task_tokens_locked()
             task = self.task_store.get(task_id)
             if task is None or task_id in self.task_token_store:
                 return None
@@ -246,9 +245,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                     details=detail,
                 )
             )
-            # Finished tasks no longer need claim/heartbeat bookkeeping.
-            if (record := self.task_token_store.pop(task_id, None)) is not None:
-                self.task_token_to_task_id.pop(record.token, None)
             return True
 
     def acknowledge_task_heartbeat(self, task_id: int) -> bool:
@@ -278,10 +274,29 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             return self.task_token_to_task_id.get(token)
 
     def _cleanup_expired_task_tokens_locked(self) -> None:
-        """Remove expired task tokens while holding `lock_task_store`."""
-        current = now().timestamp()
+        """Remove expired task tokens.
+
+        Callers must acquire `lock_task_store` before calling this method.
+        Expired tasks are marked as finished with a failed status, and their
+        tokens are removed.
+        """
+        expired_at = now()
+        current = expired_at.timestamp()
         for task_id, record in list(self.task_token_store.items()):
             if record.active_until < current:
+                # The task is considered expired. Mark it as finished with a failed
+                # status if it's not already finished, and remove the token.
+                if (
+                    task := self.task_store.get(task_id)
+                ) is not None and task.status.status != Status.FINISHED:
+                    task.finished_at = expired_at.isoformat()
+                    task.status.CopyFrom(
+                        TaskStatus(
+                            status=Status.FINISHED,
+                            sub_status=SubStatus.FAILED,
+                            details="No heartbeat received from the task",
+                        )
+                    )
                 del self.task_token_store[task_id]
                 self.task_token_to_task_id.pop(record.token, None)
 

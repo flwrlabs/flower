@@ -31,6 +31,7 @@ from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     TASK_ID_NUM_BYTES,
     Status,
+    SubStatus,
 )
 from flwr.common.typing import Fab
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
@@ -367,19 +368,33 @@ class SqlCoreState(CoreState, SqlMixin):
         return int64_to_uint64(rows[0]["task_id"])
 
     def _cleanup_expired_task_tokens(self) -> None:
-        """Remove expired task heartbeat records."""
-        current = now().timestamp()
+        """Remove expired task heartbeat records.
+
+        Expired tasks are marked as finished with a failed status, and their tokens are
+        removed.
+        """
+        expired_at = now()
+        current = expired_at.timestamp()
         with self.session():
-            # Expired task tokens are detached from any unfinished task rows.
+            # Expired task claims are terminal failures and lose their token.
             self.query(
                 """
                 UPDATE task
-                SET token = NULL, active_until = NULL
+                SET token = NULL,
+                    active_until = NULL,
+                    finished_at = :finished_at,
+                    sub_status = :sub_status,
+                    details = :details
                 WHERE token IS NOT NULL
                 AND active_until < :current
                 AND finished_at IS NULL
                 """,
-                {"current": current},
+                {
+                    "current": current,
+                    "finished_at": expired_at.isoformat(),
+                    "sub_status": SubStatus.FAILED,
+                    "details": "No heartbeat received from the task",
+                },
             )
 
     def create_token(self, run_id: int) -> str | None:
