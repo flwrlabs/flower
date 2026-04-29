@@ -28,7 +28,6 @@ from cryptography.hazmat.primitives.serialization.ssh import load_ssh_public_key
 from flwr.common import EventType, event
 from flwr.common.args import (
     add_args_runtime_dependency_install,
-    try_obtain_optional_appio_server_certificates,
     try_obtain_root_certificates,
 )
 from flwr.common.config import parse_config_args
@@ -48,6 +47,7 @@ from flwr.supercore.auth import (
     load_superexec_auth_secret,
 )
 from flwr.supercore.grpc_health import add_args_health
+from flwr.supercore.tls import try_obtain_optional_appio_server_certificates
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.version import package_version
 from flwr.supernode.start_client_internal import start_client_internal
@@ -157,9 +157,8 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
     parser.add_argument(
         "--appio-ssl-certfile",
         help="ClientAppIo API server TLS certificate file (as a path str) "
-        "to create a secure connection. The certificate must be valid for the "
-        "AppIO API address used by SuperExec, typically including loopback SANs "
-        "such as 127.0.0.1 and ::1 for auto-launched local SuperExec.",
+        "to create a secure connection. The certificate must include SANs for "
+        "the AppIO API address used by SuperExec.",
         type=str,
         default=None,
     )

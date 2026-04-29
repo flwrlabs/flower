@@ -17,6 +17,7 @@
 
 import argparse
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -180,3 +181,27 @@ def test_obtain_superlink_certificates_allows_plaintext_appio_when_secure(
 
     assert certificates == fleet_certificates
     assert appio_certificates is None
+
+
+def test_obtain_superlink_certificates_skips_cert_loading_when_insecure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SuperLink should not load any TLS certificates when insecure."""
+    obtain_server_certificates_mock = Mock()
+    obtain_appio_certificates_mock = Mock()
+    monkeypatch.setattr(
+        app_module, "try_obtain_server_certificates", obtain_server_certificates_mock
+    )
+    monkeypatch.setattr(
+        app_module,
+        "try_obtain_optional_appio_server_certificates",
+        obtain_appio_certificates_mock,
+    )
+    args = argparse.Namespace(insecure=True)
+
+    certificates, appio_certificates = _obtain_superlink_certificates(args)
+
+    assert certificates is None
+    assert appio_certificates is None
+    obtain_server_certificates_mock.assert_not_called()
+    obtain_appio_certificates_mock.assert_not_called()

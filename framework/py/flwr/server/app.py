@@ -33,7 +33,6 @@ import yaml
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH, EventType, event
 from flwr.common.args import (
     add_args_runtime_dependency_install,
-    try_obtain_optional_appio_server_certificates,
     try_obtain_server_certificates,
 )
 from flwr.common.constant import (
@@ -70,7 +69,10 @@ from flwr.supercore.auth import (
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
 from flwr.supercore.object_store import ObjectStoreFactory
-from flwr.supercore.tls import get_superexec_appio_tls_args
+from flwr.supercore.tls import (
+    get_client_tls_args,
+    try_obtain_optional_appio_server_certificates,
+)
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.version import package_version
 from flwr.superlink.artifact_provider import ArtifactProvider
@@ -494,10 +496,16 @@ def _obtain_superlink_certificates(
     args: argparse.Namespace,
 ) -> tuple[tuple[bytes, bytes, bytes] | None, tuple[bytes, bytes, bytes] | None]:
     """Return Fleet/Control and ServerAppIo certificate tuples."""
+    if args.insecure:
+        log(
+            WARN,
+            "Option `--insecure` was set. Starting insecure HTTP server with "
+            "unencrypted communication (TLS disabled). Proceed only if you understand "
+            "the risks.",
+        )
+        return None, None
     certificates = try_obtain_server_certificates(args)
-    appio_certificates = (
-        None if args.insecure else try_obtain_optional_appio_server_certificates(args)
-    )
+    appio_certificates = try_obtain_optional_appio_server_certificates(args)
     return certificates, appio_certificates
 
 
@@ -510,8 +518,9 @@ def _get_superexec_command(
 ) -> list[str]:
     """Return the auto-launched SuperExec command for ServerApp subprocesses."""
     command = ["flower-superexec"]
-    command += get_superexec_appio_tls_args(
-        appio_certificates, appio_root_certificates_path
+    command += get_client_tls_args(
+        insecure=appio_certificates is None,
+        root_certificates_path=appio_root_certificates_path,
     )
     command += ["--appio-api-address", appio_address]
     command += ["--plugin-type", ExecPluginType.SERVER_APP]
@@ -745,21 +754,21 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--ssl-certfile",
-        help="SuperLink API server TLS certificate file (as a path str) "
-        "to create a secure connection.",
+        help="Server TLS certificate file for Fleet API and Control API "
+        "(as a path str) to create a secure connection.",
         type=str,
         default=None,
     )
     parser.add_argument(
         "--ssl-keyfile",
-        help="SuperLink API server TLS private key file (as a path str) "
-        "to create a secure connection.",
+        help="Server TLS private key file for Fleet API and Control API "
+        "(as a path str) to create a secure connection.",
         type=str,
     )
     parser.add_argument(
         "--ssl-ca-certfile",
-        help="SuperLink API server CA certificate file (as a path str) "
-        "to create a secure connection.",
+        help="Server TLS CA certificate file for Fleet API and Control API "
+        "(as a path str) to create a secure connection.",
         type=str,
     )
     parser.add_argument(
@@ -828,9 +837,8 @@ def _add_args_serverappio_api(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--appio-ssl-certfile",
         help="ServerAppIo API server TLS certificate file (as a path str) "
-        "to create a secure connection. The certificate must be valid for the "
-        "AppIO API address used by SuperExec, typically including loopback SANs "
-        "such as 127.0.0.1 and ::1 for auto-launched local SuperExec.",
+        "to create a secure connection. The certificate must include SANs for "
+        "the AppIO API address used by SuperExec.",
         type=str,
         default=None,
     )
