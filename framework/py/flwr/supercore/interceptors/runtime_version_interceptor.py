@@ -23,11 +23,7 @@ from typing import Any
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.supercore.runtime_version_compatibility import (
-    RuntimeVersionMetadata,
-    format_invalid_metadata_message,
-    get_runtime_version_rejection,
-)
+from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
 
 
 class RuntimeVersionClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ignore
@@ -73,36 +69,29 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         if method_handler is None or method_handler.unary_unary is None:
             return method_handler
 
+        # Parse and validate peer metadata
         peer_metadata, metadata_error = RuntimeVersionMetadata.from_grpc_metadata(
             handler_call_details.invocation_metadata
         )
-        rejection = (
-            format_invalid_metadata_message(self._connection_name, metadata_error)
-            if metadata_error is not None
-            else get_runtime_version_rejection(
-                self._connection_name,
-                self._local_metadata,
-                peer_metadata,
-            )
-        )
-        if rejection is None:
-            return method_handler
+        if metadata_error is not None:
+            return _failed_precondition_terminator(metadata_error)
 
-        def _version_checked_handler(
-            _request: GrpcMessage,
-            context: grpc.ServicerContext,
-        ) -> GrpcMessage:
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION,
-                rejection,
+        # Check compatibility and return any rejection message
+        if rejection := self._local_metadata.check_compatibility(peer_metadata):
+            return _failed_precondition_terminator(
+                "Runtime version compatibility check failed for "
+                f"{self._connection_name}. {rejection}",
             )
-            raise RuntimeError("Should not reach this point")
 
-        return grpc.unary_unary_rpc_method_handler(
-            _version_checked_handler,
-            request_deserializer=method_handler.request_deserializer,
-            response_serializer=method_handler.response_serializer,
-        )
+        return method_handler
+
+
+def _failed_precondition_terminator(details: str) -> grpc.RpcMethodHandler:
+    def _terminate(_request, context):  # type: ignore
+        context.abort(grpc.StatusCode.FAILED_PRECONDITION, details)
+        raise RuntimeError("Should not reach this point")
+
+    return grpc.unary_unary_rpc_method_handler(_terminate)
 
 
 def create_serverappio_runtime_version_server_interceptor(

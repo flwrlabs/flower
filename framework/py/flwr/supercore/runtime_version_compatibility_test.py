@@ -23,11 +23,7 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
 
-from .runtime_version_compatibility import (
-    RuntimeVersionMetadata,
-    format_invalid_metadata_message,
-    get_runtime_version_rejection,
-)
+from .runtime_version_compatibility import RuntimeVersionMetadata
 
 
 def test_runtime_version_metadata_appends_new_metadata() -> None:
@@ -107,8 +103,8 @@ def test_runtime_version_metadata_from_grpc_accepts_metadata_item_iterables() ->
     [
         (
             ((FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),),
-            "Missing required Flower runtime metadata: "
-            "flwr-component-name, flwr-package-version.",
+            "Invalid Flower runtime metadata: "
+            "Metadata key 'flwr-package-version' is missing.",
         ),
         (
             (
@@ -116,8 +112,8 @@ def test_runtime_version_metadata_from_grpc_accepts_metadata_item_iterables() ->
                 (FLWR_PACKAGE_VERSION_METADATA_KEY, b"1.29.0"),
                 (FLWR_COMPONENT_NAME_METADATA_KEY, b"cli"),
             ),
-            "Flower runtime metadata contains non-string values: "
-            "flwr-component-name, flwr-package-name, flwr-package-version.",
+            "Invalid Flower runtime metadata: "
+            "Metadata key 'flwr-package-name' has a value of the wrong type.",
         ),
         (
             (
@@ -125,8 +121,8 @@ def test_runtime_version_metadata_from_grpc_accepts_metadata_item_iterables() ->
                 (FLWR_PACKAGE_VERSION_METADATA_KEY, b"\xff\xfe"),
                 (FLWR_COMPONENT_NAME_METADATA_KEY, "cli"),
             ),
-            "Flower runtime metadata contains non-string values: "
-            "flwr-package-version.",
+            "Invalid Flower runtime metadata: "
+            "Metadata key 'flwr-package-version' has a value of the wrong type.",
         ),
         (
             (
@@ -135,8 +131,8 @@ def test_runtime_version_metadata_from_grpc_accepts_metadata_item_iterables() ->
                 (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.1"),
                 (FLWR_COMPONENT_NAME_METADATA_KEY, "cli"),
             ),
-            "Flower runtime metadata contains duplicate values: "
-            "flwr-package-version.",
+            "Invalid Flower runtime metadata: "
+            "Metadata key 'flwr-package-version' has duplicate values.",
         ),
     ],
 )
@@ -177,46 +173,31 @@ def test_runtime_version_metadata_allows_expected_cases(
     peer: RuntimeVersionMetadata | None,
 ) -> None:
     """Compatible peers and absent metadata should continue."""
-    rejection = get_runtime_version_rejection(
-        "SuperNode <-> SuperLink Fleet API",
-        local,
-        peer,
-    )
-
-    assert rejection is None
+    assert local.check_compatibility(peer) is None
 
 
 @pytest.mark.parametrize(
-    ("local", "peer", "connection_name", "expected_rejection"),
+    ("local", "peer", "expected_rejection"),
     [
         (
             RuntimeVersionMetadata("flwr", "1.29.2", "superlink"),
             RuntimeVersionMetadata("flwr", "1.30.0", "supernode"),
-            "SuperNode <-> SuperLink Fleet API",
-            "Incompatible Flower version for SuperNode <-> SuperLink Fleet API.\n"
             "Local superlink version 1.29.2 only accepts peers from the same "
             "major.minor release, but received supernode version 1.30.0.",
         ),
         (
             RuntimeVersionMetadata("unknown", "unknown", "superlink"),
             RuntimeVersionMetadata("flwr", "1.29.0", "simulation"),
-            "ServerApp <-> SuperLink ServerAppIo API",
             None,
         ),
         (
             RuntimeVersionMetadata("flwr", "1.29.0", "superlink"),
             RuntimeVersionMetadata("flwr", "main", "supernode"),
-            "SuperNode <-> SuperLink Fleet API",
-            "Invalid Flower version metadata for "
-            "SuperNode <-> SuperLink Fleet API. "
             "Peer Flower version metadata cannot be parsed: 'main'.",
         ),
         (
             RuntimeVersionMetadata("flwr", "1.29.0", "superlink"),
             RuntimeVersionMetadata("forked-flower", "1.29.1", "supernode"),
-            "SuperNode <-> SuperLink Fleet API",
-            "Invalid Flower version metadata for "
-            "SuperNode <-> SuperLink Fleet API. "
             "Peer Flower package name is not recognized: 'forked-flower'.",
         ),
     ],
@@ -224,23 +205,7 @@ def test_runtime_version_metadata_allows_expected_cases(
 def test_runtime_version_metadata_rejects_expected_cases(
     local: RuntimeVersionMetadata,
     peer: RuntimeVersionMetadata,
-    connection_name: str,
     expected_rejection: str | None,
 ) -> None:
     """Explicitly invalid or incompatible peers should be rejected."""
-    assert (
-        get_runtime_version_rejection(connection_name, local, peer)
-        == expected_rejection
-    )
-
-
-def test_format_invalid_metadata_message() -> None:
-    """Invalid metadata messages should include the connection name."""
-    assert (
-        format_invalid_metadata_message(
-            "CLI <-> SuperLink Control API",
-            "Missing required Flower runtime metadata: flwr-component-name.",
-        )
-        == "Invalid Flower version metadata for CLI <-> SuperLink Control API. "
-        "Missing required Flower runtime metadata: flwr-component-name."
-    )
+    assert local.check_compatibility(peer) == expected_rejection
