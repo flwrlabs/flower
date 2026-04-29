@@ -43,7 +43,7 @@ class StateTest(unittest.TestCase):
         state = self.state_factory()
 
         task_id = state.create_task(
-            task_type=TaskType.MODEL.value,
+            task_type=TaskType.MODEL,
             run_id=42,
             fab_hash=None,
             model_ref="model://test",

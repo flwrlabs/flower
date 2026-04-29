@@ -191,7 +191,7 @@ class TaskType(str, Enum):
     SERVER_APP = "flwr-serverapp"
     CLIENT_APP = "flwr-clientapp"
     SIMULATION = "flwr-simulation"
-    AGENT = "flwr-agent"
+    AGENT_APP = "flwr-agentapp"
     MODEL = "flwr-model"
     CONNECTOR = "flwr-connector"
 
