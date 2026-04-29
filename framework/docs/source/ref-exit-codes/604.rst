@@ -1,0 +1,17 @@
+###########################
+ [604] COMMON_PATH_INVALID
+###########################
+
+*************
+ Description
+*************
+
+The provided path is invalid or does not point to the expected file.
+
+****************
+ How to Resolve
+****************
+
+Verify that the path exists, points to the expected file type, and is readable by the
+current process. Check the error message for the specific option or file path that
+caused the failure.
