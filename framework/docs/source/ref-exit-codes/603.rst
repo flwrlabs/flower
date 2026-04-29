@@ -1,0 +1,18 @@
+#################################################
+ [603] COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE
+#################################################
+
+*************
+ Description
+*************
+
+The ``--root-certificates`` option was provided together with ``--insecure``. These
+options are mutually exclusive because ``--insecure`` disables TLS.
+
+****************
+ How to Resolve
+****************
+
+Choose one of the following:
+    - Remove ``--insecure`` to use TLS with ``--root-certificates``
+    - Remove ``--root-certificates`` to run without TLS

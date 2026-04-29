@@ -46,6 +46,7 @@ class SimulationIoConnection:
     def __init__(  # pylint: disable=too-many-arguments
         self,
         serverappio_api_address: str = SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
+        insecure: bool = False,
         root_certificates: bytes | None = None,
         *,
         token: str,
@@ -53,6 +54,7 @@ class SimulationIoConnection:
         if token == "":
             raise ValueError("`token` must be a non-empty string")
         self._addr = serverappio_api_address
+        self._insecure = insecure
         self._cert = root_certificates
         self._token = token
         self._grpc_stub: ServerAppIoStub | None = None
@@ -78,7 +80,7 @@ class SimulationIoConnection:
             return
         self._channel = create_channel(
             server_address=self._addr,
-            insecure=(self._cert is None),
+            insecure=self._insecure,
             root_certificates=self._cert,
             interceptors=[AppIoTokenClientInterceptor(token=self._token)],
         )

@@ -32,10 +32,14 @@ message Task {
 }
 
 message TaskStatus {
-  // "starting", "running", "finished"
+  // "pending", "starting", "running", or "finished"
   string status = 1;
   // "completed", "failed", "stopped" or "" (non-finished)
   string sub_status = 2;
   // failure details
   string details = 3;
 }
+
+// ClaimTask messages
+message ClaimTaskRequest { uint64 task_id = 1; }
+message ClaimTaskResponse { optional string token = 1; }

@@ -68,6 +68,7 @@ def test_flwr_clientapp_forwards_cli_args() -> None:
         insecure=True,
         clientappio_api_address="127.0.0.1:9094",
         token="test-token",
+        root_certificates=None,
         parent_pid=321,
         runtime_dependency_install=True,
     )
