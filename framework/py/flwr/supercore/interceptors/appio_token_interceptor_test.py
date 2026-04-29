@@ -365,7 +365,7 @@ class TestMethodPolicyMaps(TestCase):
 
     def test_only_expected_no_auth_methods_exist(self) -> None:
         """Only bootstrap methods should be marked no-auth in the policy table."""
-        expected_suffixes = {"ListAppsToLaunch", "RequestToken", "GetRun"}
+        expected_suffixes = {"ListAppsToLaunch", "RequestToken", "ClaimTask", "GetRun"}
         no_auth_methods = {
             method.rsplit("/", maxsplit=1)[-1]
             for method, policy in SERVERAPPIO_METHOD_AUTH_POLICY.items()
