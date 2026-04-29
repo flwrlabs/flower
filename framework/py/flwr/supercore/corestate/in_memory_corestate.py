@@ -236,6 +236,11 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             if task is None or task.status.status == Status.FINISHED:
                 return False
 
+            if sub_status == SubStatus.COMPLETED:
+                # Only allow transition to COMPLETED if currently RUNNING
+                if task.status.status != Status.RUNNING:
+                    return False
+
             task.finished_at = now().isoformat()
             task.status.CopyFrom(
                 TaskStatus(

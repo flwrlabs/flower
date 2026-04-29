@@ -299,16 +299,21 @@ class SqlCoreState(CoreState, SqlMixin):
         """Move an unfinished task to finished."""
         sint64_task_id = uint64_to_int64(task_id)
         with self.session():
-            # Any unfinished task can finish, but the terminal state is immutable.
+            # FINISHED:COMPLETED is only valid from RUNNING.
+            completion_constraint = ""
+            if substatus == SubStatus.COMPLETED:
+                completion_constraint = " AND running_at IS NOT NULL"
+
             updated = self.query(
-                """
+                f"""
                 UPDATE task
                 SET finished_at = :finished_at,
                     sub_status = :sub_status,
                     details = :details,
                     active_until = NULL,
                     token = NULL
-                WHERE task_id = :task_id AND finished_at IS NULL
+                WHERE task_id = :task_id
+                AND finished_at IS NULL{completion_constraint}
                 RETURNING task_id
                 """,
                 {

@@ -161,9 +161,7 @@ class StateTest(unittest.TestCase):
         self.assertIsNone(state.claim_task(claimed_task_id))
 
         # Finished tasks are not claimable.
-        self.assertTrue(
-            state.finish_task(finished_task_id, SubStatus.COMPLETED, "done")
-        )
+        self.assertTrue(state.finish_task(finished_task_id, SubStatus.FAILED, "done"))
         self.assertIsNone(state.claim_task(finished_task_id))
 
     def test_activate_task_transitions_starting_to_running(self) -> None:
@@ -189,9 +187,15 @@ class StateTest(unittest.TestCase):
         self.assertTrue(tasks[0].running_at)
         self.assertEqual(tasks[0].finished_at, "")
 
-    @parameterized.expand([(SubStatus.FAILED,), (SubStatus.STOPPED,)])  # type: ignore
+    @parameterized.expand(  # type: ignore
+        [
+            (SubStatus.FAILED, False),
+            (SubStatus.STOPPED, False),
+            (SubStatus.COMPLETED, True),
+        ]
+    )
     def test_finish_task_transitions_unfinished_task_to_finished(
-        self, sub_status: str
+        self, sub_status: str, requires_running: bool
     ) -> None:
         """Finishing a task should store the terminal status details."""
         state = self.state_factory()
@@ -200,7 +204,14 @@ class StateTest(unittest.TestCase):
 
         # Task does not exist.
         self.assertFalse(state.finish_task(61016, SubStatus.FAILED, "missing"))
-        # Task is pending, so it can be finished.
+
+        if requires_running:
+            # FINISHED:COMPLETED is only valid once the task is RUNNING.
+            self.assertFalse(state.finish_task(task_id, sub_status, "boom"))
+            self.assertIsNotNone(state.claim_task(task_id))
+            self.assertTrue(state.activate_task(task_id))
+
+        # Valid unfinished task transition should succeed.
         self.assertTrue(state.finish_task(task_id, sub_status, "boom"))
         # Task is already finished, so it cannot be finished again.
         self.assertFalse(state.finish_task(task_id, SubStatus.FAILED, "again"))
