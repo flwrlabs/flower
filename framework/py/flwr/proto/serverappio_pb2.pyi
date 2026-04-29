@@ -20,6 +20,7 @@ limitations under the License.
 import builtins
 import collections.abc
 import flwr.proto.node_pb2
+import flwr.proto.task_pb2
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
@@ -59,3 +60,31 @@ class GetNodesResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["nodes", b"nodes"]) -> None: ...
 
 global___GetNodesResponse = GetNodesResponse
+
+@typing.final
+class PullPendingTasksRequest(google.protobuf.message.Message):
+    """PullPendingTasks messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___PullPendingTasksRequest = PullPendingTasksRequest
+
+@typing.final
+class PullPendingTasksResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASKS_FIELD_NUMBER: builtins.int
+    @property
+    def tasks(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.task_pb2.Task]: ...
+    def __init__(
+        self,
+        *,
+        tasks: collections.abc.Iterable[flwr.proto.task_pb2.Task] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["tasks", b"tasks"]) -> None: ...
+
+global___PullPendingTasksResponse = PullPendingTasksResponse

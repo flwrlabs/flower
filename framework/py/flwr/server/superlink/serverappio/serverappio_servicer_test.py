@@ -77,6 +77,8 @@ from flwr.proto.run_pb2 import (  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
+    PullPendingTasksRequest,
+    PullPendingTasksResponse,
 )
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
@@ -398,6 +400,11 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             "/flwr.proto.ServerAppIo/ListAppsToLaunch",
             request_serializer=ListAppsToLaunchRequest.SerializeToString,
             response_deserializer=ListAppsToLaunchResponse.FromString,
+        )
+        self._pull_pending_tasks = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PullPendingTasks",
+            request_serializer=PullPendingTasksRequest.SerializeToString,
+            response_deserializer=PullPendingTasksResponse.FromString,
         )
         self._request_token = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/RequestToken",
@@ -1063,6 +1070,50 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 
         # Assert: Run ID 2 is returned
         assert response.run_ids == [run_id2]
+
+    def test_pull_pending_tasks(self) -> None:
+        """Test `PullPendingTasks`."""
+        serverapp_run_id = self._create_dummy_run(running=False)
+        model_run_id = self._create_dummy_run(running=False)
+        connector_run_id = self._create_dummy_run(running=False)
+        simulation_run_id = self._create_dummy_run(running=False)
+
+        serverapp_task_id = self.state.create_task(
+            task_type="flwr-serverapp",
+            run_id=serverapp_run_id,
+        )
+        model_task_id = self.state.create_task(
+            task_type="flwr-model",
+            run_id=model_run_id,
+        )
+        connector_task_id = self.state.create_task(
+            task_type="flwr-connector",
+            run_id=connector_run_id,
+        )
+        simulation_task_id = self.state.create_task(
+            task_type="flwr-simulation",
+            run_id=simulation_run_id,
+        )
+
+        assert serverapp_task_id is not None
+        assert model_task_id is not None
+        assert connector_task_id is not None
+        assert simulation_task_id is not None
+
+        response, call = self._pull_pending_tasks.with_call(
+            request=PullPendingTasksRequest()
+        )
+
+        assert isinstance(response, PullPendingTasksResponse)
+        assert grpc.StatusCode.OK == call.code()
+
+        returned_task_ids = {task.task_id for task in response.tasks}
+        returned_types = {task.type for task in response.tasks}
+        returned_run_ids = {task.run_id for task in response.tasks}
+
+        assert returned_task_ids == {serverapp_task_id, simulation_task_id}
+        assert returned_types == {"flwr-serverapp", "flwr-simulation"}
+        assert returned_run_ids == {serverapp_run_id, simulation_run_id}
 
     def test_request_token(self) -> None:
         """Test `RequestToken`."""

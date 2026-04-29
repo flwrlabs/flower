@@ -49,6 +49,12 @@ class ServerAppIoStub:
     List runs to launch
     """
 
+    PullPendingTasks: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.serverappio_pb2.PullPendingTasksRequest,
+        flwr.proto.serverappio_pb2.PullPendingTasksResponse,
+    ]
+    """Pull pending tasks to launch"""
+
     RequestToken: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.RequestTokenRequest,
         flwr.proto.appio_pb2.RequestTokenResponse,
@@ -159,6 +165,12 @@ class ServerAppIoAsyncStub:
 
     List runs to launch
     """
+
+    PullPendingTasks: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.serverappio_pb2.PullPendingTasksRequest,
+        flwr.proto.serverappio_pb2.PullPendingTasksResponse,
+    ]
+    """Pull pending tasks to launch"""
 
     RequestToken: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.RequestTokenRequest,
@@ -272,6 +284,14 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
 
         List runs to launch
         """
+
+    @abc.abstractmethod
+    def PullPendingTasks(
+        self,
+        request: flwr.proto.serverappio_pb2.PullPendingTasksRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.serverappio_pb2.PullPendingTasksResponse, collections.abc.Awaitable[flwr.proto.serverappio_pb2.PullPendingTasksResponse]]:
+        """Pull pending tasks to launch"""
 
     @abc.abstractmethod
     def RequestToken(

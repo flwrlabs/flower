@@ -40,6 +40,7 @@ class MethodTokenPolicy:
 # In a follow-up PR, create explicit method maps using a shared builder.
 SERVERAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ServerAppIo/ListAppsToLaunch": MethodTokenPolicy.no_auth(),
+    "/flwr.proto.ServerAppIo/PullPendingTasks": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ServerAppIo/RequestToken": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ServerAppIo/GetRun": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ServerAppIo/SendAppHeartbeat": MethodTokenPolicy.token_required(),

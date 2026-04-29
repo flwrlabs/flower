@@ -23,6 +23,7 @@ import "flwr/proto/node.proto";
 import "flwr/proto/message.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/appio.proto";
+import "flwr/proto/task.proto";
 
 service ServerAppIo {
 
@@ -33,6 +34,10 @@ service ServerAppIo {
   // List runs to launch
   rpc ListAppsToLaunch(ListAppsToLaunchRequest)
       returns (ListAppsToLaunchResponse) {}
+
+  // Pull pending tasks to launch
+  rpc PullPendingTasks(PullPendingTasksRequest)
+      returns (PullPendingTasksResponse) {}
 
   // Request token for a run
   rpc RequestToken(RequestTokenRequest) returns (RequestTokenResponse) {}
@@ -96,3 +101,7 @@ service ServerAppIo {
 // GetNodes messages
 message GetNodesRequest { uint64 run_id = 1; }
 message GetNodesResponse { repeated Node nodes = 1; }
+
+// PullPendingTasks messages
+message PullPendingTasksRequest {}
+message PullPendingTasksResponse { repeated Task tasks = 1; }
