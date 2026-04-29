@@ -18,8 +18,8 @@ authors = [
 dependencies = [
     "flwr[simulation]>=1.28.0",
     "transformers>=4.30.0,<5.0",
-    "lerobot[pusht] @ git+https://github.com/huggingface/lerobot.git@96c7052777aca85d4e55dfba8f81586103ba8f61",
-    "flwr-datasets>=0.5.0",
+    "lerobot[pusht]==0.4.3",
+    "flwr-datasets >=0.6.0",
     "torch>=2.5.0",
     "evaluate>=0.4.0,<1.0",
     "scikit-learn>=1.3.1, <2.0",
@@ -37,9 +37,10 @@ clientapp = "lerobot_example.client_app:app"
 
 [tool.flwr.app.config]
 num-server-rounds = 50 # for good results, total number of training rounds should be over 100,000: num-server-rounds*local_epochs > 50,000
-model-name = "lerobot/pusht"
+dataset-name = "lerobot/pusht"
 fraction-fit = 0.4
 fraction-evaluate = 0.4
+eval-every = 5
 local-epochs = 200
 server-device = "cpu"
 use-wandb = true

@@ -3,71 +3,79 @@
 from datetime import datetime
 from pathlib import Path
 
-from flwr.common import Context, Metrics, ndarrays_to_parameters
-from flwr.server import ServerApp, ServerAppComponents, ServerConfig
-from flwr.server.strategy import FedAvg
+import torch
+from flwr.app import ArrayRecord, ConfigRecord, Context, MetricRecord
+from flwr.serverapp import Grid, ServerApp
+from flwr.serverapp.strategy import FedAvg
+from lerobot.datasets.lerobot_dataset import CODEBASE_VERSION
+from lerobot.datasets.utils import get_safe_version
 
-from lerobot_example.task import get_dataset, get_model, get_params, set_params
-
-
-def get_evaluate_fn_callback(save_path: Path):
-
-    def evaluate_fn(server_round: int, parameters, config):
-
-        # Save model if round % 5 = 0 (exactly as frequently as model is evaluated)
-        if server_round % 5 == 0:
-            # Instantiate model
-            dataset = get_dataset()
-            model = get_model(dataset_stats=dataset.stats)
-            # Apply current global model weights
-            set_params(model, parameters)
-            # Save checkpoint
-            model.save_pretrained(
-                str(save_path / "global_model" / f"round_{server_round}")
-            )
-
-    return evaluate_fn
+from lerobot_example.task import get_dataset_metadata, get_policy_components
 
 
-def get_evaluate_config_callback(save_path: Path):
-    """Return a function to configure an evaluate round."""
+class EvalEveryFedAvg(FedAvg):
+    """FedAvg strategy that only runs evaluation every N rounds."""
 
-    def evaluate_config_fn(server_round: int) -> Metrics:
-        eval_save_path = save_path / "evaluate" / f"round_{server_round}"
-        return {"save_path": str(eval_save_path), "skip": server_round % 5 != 0}
+    def __init__(self, eval_every: int, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.eval_every = max(1, int(eval_every))
 
-    return evaluate_config_fn
+    def configure_evaluate(self, server_round, arrays, config, grid):
+        if server_round % self.eval_every != 0:
+            return []
+        return super().configure_evaluate(server_round, arrays, config, grid)
 
 
-def server_fn(context: Context) -> ServerAppComponents:
-    """Construct components for ServerApp."""
-    # Construct ServerConfig
-    num_rounds = context.run_config["num-server-rounds"]
-    config = ServerConfig(num_rounds=num_rounds)
+# Create ServerApp
+app = ServerApp()
 
-    # Create output directory given current timestamp
+
+@app.main()
+def main(grid: Grid, context: Context) -> None:
+    """Main entry point for the ServerApp."""
+    num_rounds = int(context.run_config["num-server-rounds"])
+    fraction_fit = float(context.run_config["fraction-fit"])
+    fraction_evaluate = float(context.run_config["fraction-evaluate"])
+    eval_every = int(context.run_config["eval-every"])
+    repo_id = context.run_config["dataset-name"]
+    server_device = torch.device(context.run_config["server-device"])
+
     current_time = datetime.now()
     folder_name = current_time.strftime("%Y-%m-%d_%H-%M-%S")
     save_path = Path(f"outputs/{folder_name}")
-    save_path.mkdir(parents=True)
+    save_path.mkdir(parents=True, exist_ok=True)
+    eval_root = save_path / "evaluate"
+    eval_root.mkdir(parents=True, exist_ok=True)
 
-    # Set global model initialization
-    dataset = get_dataset()
-    ndarrays = get_params(get_model(dataset_stats=dataset.stats))
-    global_model_init = ndarrays_to_parameters(ndarrays)
+    revision = get_safe_version(repo_id, CODEBASE_VERSION)
+    meta = get_dataset_metadata(repo_id, revision)
+    policy, preprocessor, postprocessor, _cfg = get_policy_components(
+        meta, server_device
+    )
+    arrays = ArrayRecord(policy.state_dict())
 
-    # Define strategy
-    fraction_fit = context.run_config["fraction-fit"]
-    fraction_evaluate = context.run_config["fraction-evaluate"]
-    strategy = FedAvg(
-        fraction_fit=fraction_fit,
+    def evaluate_fn(server_round: int, arrays: ArrayRecord) -> MetricRecord | None:
+        if server_round == 0 or server_round % eval_every != 0:
+            return None
+        round_dir = save_path / "global_model" / f"round_{server_round}"
+        round_dir.mkdir(parents=True, exist_ok=True)
+        policy.load_state_dict(arrays.to_torch_state_dict())
+        policy.save_pretrained(round_dir)
+        preprocessor.save_pretrained(round_dir)
+        postprocessor.save_pretrained(round_dir)
+        return None
+
+    strategy = EvalEveryFedAvg(
+        eval_every=eval_every,
+        fraction_train=fraction_fit,
         fraction_evaluate=fraction_evaluate,
-        initial_parameters=global_model_init,
-        on_evaluate_config_fn=get_evaluate_config_callback(save_path),
-        evaluate_fn=get_evaluate_fn_callback(save_path),
     )
 
-    return ServerAppComponents(config=config, strategy=strategy)
-
-
-app = ServerApp(server_fn=server_fn)
+    strategy.start(
+        grid=grid,
+        initial_arrays=arrays,
+        num_rounds=num_rounds,
+        train_config=ConfigRecord(),
+        evaluate_config=ConfigRecord({"eval-root": str(eval_root)}),
+        evaluate_fn=evaluate_fn,
+    )
