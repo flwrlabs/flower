@@ -14,7 +14,6 @@
 # ==============================================================================
 """Common Flower arguments."""
 
-
 import argparse
 import sys
 from logging import DEBUG, ERROR, INFO, WARN
@@ -67,6 +66,12 @@ def add_args_flwr_app_common(parser: argparse.ArgumentParser) -> None:
         help="The PID of the parent process. When set, the process will terminate "
         "when the parent process exits.",
     )
+    parser.add_argument(
+        "--lifeline-fd",
+        type=int,
+        default=None,
+        help="File descriptor used to cooperatively monitor parent liveness.",
+    )
     add_args_runtime_dependency_install(parser)
 
 
@@ -102,8 +107,7 @@ def try_obtain_root_certificates(
             root_certificates = Path(root_cert_path).expanduser().read_bytes()
         log(
             DEBUG,
-            "Starting secure HTTPS channel to %s "
-            "with the following certificates: %s.",
+            "Starting secure HTTPS channel to %s with the following certificates: %s.",
             grpc_server_address,
             root_cert_path,
         )

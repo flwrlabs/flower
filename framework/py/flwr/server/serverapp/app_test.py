@@ -14,16 +14,16 @@
 # ==============================================================================
 """Tests for ServerApp process CLI parsing and wiring."""
 
-
 import importlib
 from types import SimpleNamespace
+from queue import Queue
 from unittest.mock import Mock, patch
 
 import pytest
 
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
 
-from .app import _parse_args_run_flwr_serverapp
+from .app import _parse_args_run_flwr_serverapp, run_serverapp
 
 serverapp_module = importlib.import_module("flwr.server.serverapp.app")
 
@@ -51,6 +51,8 @@ def test_parse_flwr_serverapp_parses_tokenized_invocation() -> None:
             "--insecure",
             "--parent-pid",
             "1234",
+            "--lifeline-fd",
+            "42",
             "--allow-runtime-dependency-installation",
         ]
     )
@@ -59,6 +61,7 @@ def test_parse_flwr_serverapp_parses_tokenized_invocation() -> None:
     assert args.token == "test-token"
     assert args.insecure is True
     assert args.parent_pid == 1234
+    assert args.lifeline_fd == 42
     assert args.runtime_dependency_install is True
 
 
@@ -94,6 +97,7 @@ def test_flwr_serverapp_forwards_cli_args() -> None:
         token="test-token",
         root_certificates=None,
         parent_pid=321,
+        lifeline_fd=43,
         runtime_dependency_install=True,
     )
 
@@ -126,4 +130,24 @@ def test_flwr_serverapp_forwards_cli_args() -> None:
     assert kwargs["token"] == "test-token"
     assert kwargs["certificates"] is None
     assert kwargs["parent_pid"] == 321
+    assert kwargs["lifeline_fd"] == 43
     assert kwargs["runtime_dependency_install"] is True
+
+
+def test_run_serverapp_starts_lifeline_fd_monitor() -> None:
+    """The ServerApp runtime should monitor the lifeline FD when provided."""
+    with (
+        patch.object(serverapp_module, "start_lifeline_fd_monitor") as monitor,
+        patch.object(serverapp_module, "register_signal_handlers"),
+        patch.object(serverapp_module, "GrpcGrid", side_effect=RuntimeError),
+        patch.object(serverapp_module, "flwr_exit"),
+    ):
+        run_serverapp(
+            serverappio_api_address="127.0.0.1:9091",
+            log_queue=Queue(),
+            token="test-token",
+            insecure=True,
+            lifeline_fd=42,
+        )
+
+    monitor.assert_called_once_with(42)

@@ -14,7 +14,6 @@
 # ==============================================================================
 """`flwr-agentapp` command."""
 
-
 import argparse
 from logging import DEBUG, INFO
 from queue import Queue
@@ -43,8 +42,7 @@ def flwr_agentapp() -> None:
     log(INFO, "Start `flwr-agentapp` process")
     log(
         DEBUG,
-        "`flwr-agentapp` will attempt to connect to SuperLink's "
-        "ServerAppIo API at %s",
+        "`flwr-agentapp` will attempt to connect to SuperLink's ServerAppIo API at %s",
         args.serverappio_api_address,
     )
     run_agentapp(
@@ -53,6 +51,7 @@ def flwr_agentapp() -> None:
         token=args.token,
         certificates=None,
         parent_pid=args.parent_pid,
+        lifeline_fd=args.lifeline_fd,
         runtime_dependency_install=args.runtime_dependency_install,
     )
 

@@ -14,7 +14,6 @@
 # ==============================================================================
 """Flower ServerApp process."""
 
-
 import argparse
 from logging import DEBUG, ERROR, INFO
 from pathlib import Path
@@ -64,7 +63,10 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.run_pb2 import UpdateRunStatusRequest  # pylint: disable=E0611
 from flwr.server.grid.grpc_grid import GrpcGrid
 from flwr.server.run_serverapp import run as run_
-from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.app_utils import (
+    start_lifeline_fd_monitor,
+    start_parent_process_monitor,
+)
 from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
 from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
@@ -84,8 +86,7 @@ def flwr_serverapp() -> None:
     log(INFO, "Start `flwr-serverapp` process")
     log(
         DEBUG,
-        "`flwr-serverapp` will attempt to connect to SuperLink's "
-        "ServerAppIo API at %s",
+        "`flwr-serverapp` will attempt to connect to SuperLink's ServerAppIo API at %s",
         args.serverappio_api_address,
     )
     run_serverapp(
@@ -97,6 +98,7 @@ def flwr_serverapp() -> None:
             args.root_certificates, args.insecure
         ),
         parent_pid=args.parent_pid,
+        lifeline_fd=args.lifeline_fd,
         runtime_dependency_install=args.runtime_dependency_install,
     )
 
@@ -111,12 +113,15 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     insecure: bool,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
+    lifeline_fd: int | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
     """Run Flower ServerApp process."""
-    # Monitor the main process in case of SIGKILL
+    # Monitor SuperExec liveness if a parent PID or lifeline FD is provided.
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
+    if lifeline_fd is not None:
+        start_lifeline_fd_monitor(lifeline_fd)
 
     # Initialize variables for exit handler
     log_uploader = None
@@ -167,7 +172,6 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     )
 
     try:
-
         # Initialize the GrpcGrid
         grid = GrpcGrid(
             serverappio_service_address=serverappio_api_address,

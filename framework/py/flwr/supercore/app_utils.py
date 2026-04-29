@@ -14,7 +14,6 @@
 # ==============================================================================
 """Utility functions for app processes."""
 
-
 import os
 import signal
 import threading
@@ -55,5 +54,30 @@ def start_parent_process_monitor(
             if not _pid_exists(parent_pid):
                 signal.raise_signal(signal.SIGINT)
                 break
+
+    threading.Thread(target=monitor, daemon=True).start()
+
+
+def start_lifeline_fd_monitor(lifeline_fd: int) -> None:
+    """Monitor a lifeline FD and exit when the writer closes it."""
+    if os.name != "posix":
+        raise RuntimeError("lifeline FD monitoring requires POSIX FD semantics")
+    try:
+        os.set_inheritable(lifeline_fd, False)
+    except OSError:
+        return
+
+    def monitor() -> None:
+        try:
+            while os.read(lifeline_fd, 1):
+                continue
+        except OSError:
+            pass
+        finally:
+            try:
+                os.close(lifeline_fd)
+            except OSError:
+                pass
+        signal.raise_signal(signal.SIGINT)
 
     threading.Thread(target=monitor, daemon=True).start()

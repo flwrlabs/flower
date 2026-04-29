@@ -114,3 +114,38 @@ def test_launch_app_calls_cleanup_before_launch() -> None:
 
     # Assert
     assert call_log == ["cleanup", "launch"]
+
+
+def test_launch_app_non_posix_fallback_passes_parent_pid() -> None:
+    """Non-POSIX launch should keep the existing parent PID behavior."""
+    plugin = _get_ephemeral_plugin()
+
+    with (
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.os.name",
+            "nt",
+        ),
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.os.getpid",
+            return_value=1234,
+        ),
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.run"
+        ) as run,
+        patch("flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"),
+    ):
+        plugin.launch_app(token="token-123", run_id=5)
+
+    run.assert_called_once_with(
+        [
+            "flwr-serverapp",
+            "--insecure",
+            "--serverappio-api-address",
+            "127.0.0.1:9091",
+            "--token",
+            "token-123",
+            "--parent-pid",
+            "1234",
+        ],
+        check=False,
+    )

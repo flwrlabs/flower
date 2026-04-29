@@ -14,7 +14,6 @@
 # ==============================================================================
 """Flower Simulation process."""
 
-
 import argparse
 from dataclasses import replace
 from logging import DEBUG, ERROR, INFO
@@ -63,7 +62,10 @@ from flwr.proto.run_pb2 import UpdateRunStatusRequest  # pylint: disable=E0611
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
 from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
-from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.app_utils import (
+    start_lifeline_fd_monitor,
+    start_parent_process_monitor,
+)
 from flwr.supercore.constant import NOOP_FEDERATION
 from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
 from flwr.supercore.superexec.dependency_installer import (
@@ -86,13 +88,13 @@ def _run_simulation_settings(
     backend_config: BackendConfig = {"client_resources": {}, "init_args": {}}
 
     if sim_cfg.HasField("client_resources_num_cpus"):
-        backend_config["client_resources"][
-            "num_cpus"
-        ] = sim_cfg.client_resources_num_cpus
+        backend_config["client_resources"]["num_cpus"] = (
+            sim_cfg.client_resources_num_cpus
+        )
     if sim_cfg.HasField("client_resources_num_gpus"):
-        backend_config["client_resources"][
-            "num_gpus"
-        ] = sim_cfg.client_resources_num_gpus
+        backend_config["client_resources"]["num_gpus"] = (
+            sim_cfg.client_resources_num_gpus
+        )
     if sim_cfg.HasField("init_args_num_cpus"):
         backend_config["init_args"]["num_cpus"] = sim_cfg.init_args_num_cpus
     if sim_cfg.HasField("init_args_num_gpus"):
@@ -131,6 +133,7 @@ def flwr_simulation() -> None:
         insecure=args.insecure,
         certificates=certificates,
         parent_pid=args.parent_pid,
+        lifeline_fd=args.lifeline_fd,
         runtime_dependency_install=args.runtime_dependency_install,
     )
 
@@ -145,12 +148,15 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     insecure: bool,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
+    lifeline_fd: int | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
     """Run Flower Simulation process."""
-    # Start monitoring the parent process if a PID is provided
+    # Monitor SuperExec liveness if a parent PID or lifeline FD is provided.
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
+    if lifeline_fd is not None:
+        start_lifeline_fd_monitor(lifeline_fd)
 
     conn = SimulationIoConnection(
         serverappio_api_address=serverappio_api_address,

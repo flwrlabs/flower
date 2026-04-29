@@ -171,3 +171,36 @@ def test_clientapp_launch_omits_tls_flags_when_using_system_certificates() -> No
 
     assert "--insecure" not in launch.call_args.args[0]
     assert "--root-certificates" not in launch.call_args.args[0]
+
+
+def test_launch_app_non_posix_fallback_passes_parent_pid() -> None:
+    """Non-POSIX launch should keep the existing parent PID behavior."""
+    plugin = DummyExecPlugin(
+        appio_api_address="127.0.0.1:9091",
+        insecure=True,
+        root_certificates_path=None,
+        get_run=Mock(),
+    )
+
+    with (
+        patch("flwr.supercore.superexec.plugin.base_exec_plugin.os.name", "nt"),
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.os.getpid",
+            return_value=1234,
+        ),
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.subprocess.Popen"
+        ) as popen,
+    ):
+        plugin.launch_app(token="token-123", run_id=7)
+
+    assert popen.call_args.args[0] == [
+        "dummy-app",
+        "--insecure",
+        "--appio-api-address",
+        "127.0.0.1:9091",
+        "--token",
+        "token-123",
+        "--parent-pid",
+        "1234",
+    ]

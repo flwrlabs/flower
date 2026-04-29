@@ -14,7 +14,6 @@
 # ==============================================================================
 """Flower ClientApp process."""
 
-
 from logging import DEBUG, ERROR, INFO
 
 import grpc
@@ -51,7 +50,10 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
-from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.app_utils import (
+    start_lifeline_fd_monitor,
+    start_parent_process_monitor,
+)
 from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -81,12 +83,15 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
     insecure: bool,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
+    lifeline_fd: int | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
     """Run Flower ClientApp process."""
-    # Monitor the main process in case of SIGKILL
+    # Monitor SuperExec liveness if a parent PID or lifeline FD is provided.
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
+    if lifeline_fd is not None:
+        start_lifeline_fd_monitor(lifeline_fd)
 
     event(EventType.FLWR_CLIENTAPP_RUN_ENTER)
 
@@ -123,7 +128,6 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
         message, context, run, fab = pull_appinputs(stub=stub, token=token)
 
         try:
-
             # Install FAB
             log(DEBUG, "[flwr-clientapp] Start FAB installation.")
             install_from_fab(fab.content, skip_prompt=True)
@@ -248,7 +252,6 @@ def push_appoutputs(
     proto_context = context_to_proto(context)
 
     try:
-
         with no_object_id_recompute():
             # Get object tree and all objects to push
             object_tree = get_object_tree(message)

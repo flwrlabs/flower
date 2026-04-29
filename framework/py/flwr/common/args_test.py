@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for runtime dependency installation CLI arguments."""
 
-
 import argparse
 from pathlib import Path
 
@@ -69,6 +68,8 @@ def test_flwr_app_common_args_parse_token() -> None:
             "--insecure",
             "--parent-pid",
             "1234",
+            "--lifeline-fd",
+            "42",
             "--allow-runtime-dependency-installation",
         ]
     )
@@ -76,6 +77,7 @@ def test_flwr_app_common_args_parse_token() -> None:
     assert args.token == "test-token"
     assert args.insecure is True
     assert args.parent_pid == 1234
+    assert args.lifeline_fd == 42
     assert args.runtime_dependency_install is True
 
 

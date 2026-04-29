@@ -19,7 +19,7 @@ import subprocess
 from collections.abc import Callable, Sequence
 
 from flwr.common.exit import ExitCode, flwr_exit
-from flwr.supercore.superexec.app_supervisor import launch_with_lifeline
+from flwr.supercore.superexec.app_lifeline import launch_with_lifeline
 
 from .exec_plugin import ExecPlugin
 
@@ -59,7 +59,7 @@ class BaseEphemeralExecPlugin(ExecPlugin):
         if self.cleanup_before_launch is not None:
             self.cleanup_before_launch()
         if os.name == "posix":
-            # Cleanup must happen before supervision starts so auth secret material is
+            # Cleanup must happen before the app launch so auth secret material is
             # cleared before any future sandbox wrapper observes launch state.
             launch_with_lifeline(cmds, wait=True, popen_kwargs={})
             flwr_exit(ExitCode.SUCCESS, "App process finished, exiting SuperExec.")

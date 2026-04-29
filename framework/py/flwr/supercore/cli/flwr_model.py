@@ -14,7 +14,6 @@
 # ==============================================================================
 """`flwr-model` command."""
 
-
 import argparse
 from logging import DEBUG, INFO
 from queue import Queue
@@ -52,6 +51,7 @@ def flwr_model() -> None:
         token=args.token,
         certificates=None,
         parent_pid=args.parent_pid,
+        lifeline_fd=args.lifeline_fd,
         runtime_dependency_install=args.runtime_dependency_install,
     )
 
