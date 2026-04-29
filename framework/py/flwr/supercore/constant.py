@@ -196,7 +196,6 @@ class TaskType(str, Enum):
     CONNECTOR = "flwr-connector"
 
 
-TASK_TYPES: frozenset[TaskType] = frozenset(TaskType)
 TASK_TYPES_REQUIRING_FAB_HASH: frozenset[TaskType] = frozenset(
     {
         TaskType.SERVER_APP,
