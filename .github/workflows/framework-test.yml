@@ -64,6 +64,9 @@ jobs:
         uses: ./.github/actions/bootstrap
         with:
           python-version: ${{ matrix.python }}
+      - name: Prepare framework
+        if: ${{ needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true' }}
+        run: ./framework/dev/prepare-framework.sh
       - name: Install dependencies
         if: ${{ needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true' }}
         run: |
