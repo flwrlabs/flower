@@ -35,11 +35,14 @@ class ExitCode:
     SUPERLINK_INVALID_ARGS = 104
     SUPERLINK_DATABASE_SCHEMA_MISMATCH = 105
 
-    # ServerApp-specific exit codes (200-299)
+    # ServerApp-specific exit codes (200-249)
     SERVERAPP_STRATEGY_PRECONDITION_UNMET = 200
     SERVERAPP_EXCEPTION = 201
     SERVERAPP_STRATEGY_AGGREGATION_ERROR = 202
     SERVERAPP_RUN_START_REJECTED = 203
+
+    # ClientApp-specific exit codes (250-299)
+    CLIENTAPP_COMMUNICATION_ERROR = 250
 
     # SuperNode-specific exit codes (300-399)
     SUPERNODE_REST_ADDRESS_INVALID = 300
@@ -102,7 +105,7 @@ EXIT_CODE_HELP = {
         "SuperLink. Please refer to the documentation for guidance on how to resolve "
         "this issue."
     ),
-    # ServerApp-specific exit codes (200-299)
+    # ServerApp-specific exit codes (200-249)
     ExitCode.SERVERAPP_STRATEGY_PRECONDITION_UNMET: (
         "The strategy received replies that cannot be aggregated. Please ensure all "
         "replies returned by ClientApps have one `ArrayRecord` (none when replies are "
@@ -121,6 +124,10 @@ EXIT_CODE_HELP = {
         "The SuperLink rejected the request to start the run. This may occur if the "
         "run has been stopped, the run ID or FAB is invalid, or the run failed to "
         "start within the allowed time."
+    ),
+    # ClientApp-specific exit codes (250-299)
+    ExitCode.CLIENTAPP_COMMUNICATION_ERROR: (
+        "The ClientApp could not communicate with the ClientAppIo API."
     ),
     # SuperNode-specific exit codes (300-399)
     ExitCode.SUPERNODE_REST_ADDRESS_INVALID: (
