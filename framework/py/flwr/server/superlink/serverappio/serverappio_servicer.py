@@ -16,6 +16,7 @@
 
 
 from logging import DEBUG, ERROR, INFO, WARNING
+from typing import NoReturn
 
 import grpc
 
@@ -50,6 +51,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
     SendAppHeartbeatRequest,
     SendAppHeartbeatResponse,
+    SendTaskHeartbeatRequest,
+    SendTaskHeartbeatResponse,
 )
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
@@ -77,6 +80,10 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     CreateTaskResponse,
     GetNodesRequest,
     GetNodesResponse,
+)
+from flwr.proto.task_pb2 import (  # pylint: disable=E0611
+    ClaimTaskRequest,
+    ClaimTaskResponse,
 )
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.superlink.utils import abort_if
@@ -355,6 +362,14 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
 
         return GetRunResponse(run=run_to_proto(runs[0]))
 
+    def ClaimTask(
+        self, request: ClaimTaskRequest, context: grpc.ServicerContext
+    ) -> ClaimTaskResponse:
+        """Claim one task for an authenticated app executor."""
+        log(DEBUG, "ServerAppIoServicer.ClaimTask")
+        _ = request
+        _abort_unimplemented_rpc(context, "ClaimTask")
+
     def PullAppInputs(
         self, request: PullAppInputsRequest, context: grpc.ServicerContext
     ) -> PullAppInputsResponse:
@@ -473,6 +488,14 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         # Acknowledge the heartbeat
         success = state.acknowledge_app_heartbeat(request.token)
         return SendAppHeartbeatResponse(success=success)
+
+    def SendTaskHeartbeat(
+        self, request: SendTaskHeartbeatRequest, context: grpc.ServicerContext
+    ) -> SendTaskHeartbeatResponse:
+        """Handle a heartbeat for a claimed task."""
+        log(DEBUG, "ServerAppIoServicer.SendTaskHeartbeat")
+        _ = request
+        _abort_unimplemented_rpc(context, "SendTaskHeartbeat")
 
     def PushObject(
         self, request: PushObjectRequest, context: grpc.ServicerContext
@@ -599,26 +622,31 @@ def _validate_create_task_request(
             f"Invalid task type: {request.type}",
         )
 
-    if task_type in TASK_TYPES_REQUIRING_FAB_HASH and (
-        not request.HasField("fab_hash") or not request.fab_hash
-    ):
+    if task_type in TASK_TYPES_REQUIRING_FAB_HASH and not request.fab_hash:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires fab_hash.",
         )
 
-    if task_type in TASK_TYPES_REQUIRING_MODEL_REF and (
-        not request.HasField("model_ref") or not request.model_ref
-    ):
+    if task_type in TASK_TYPES_REQUIRING_MODEL_REF and not request.model_ref:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires model_ref.",
         )
 
-    if task_type in TASK_TYPES_REQUIRING_CONNECTOR_REF and (
-        not request.HasField("connector_ref") or not request.connector_ref
-    ):
+    if task_type in TASK_TYPES_REQUIRING_CONNECTOR_REF and not request.connector_ref:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires connector_ref.",
         )
+
+
+def _abort_unimplemented_rpc(
+    context: grpc.ServicerContext, method_name: str
+) -> NoReturn:
+    """Abort an RPC with an explicit UNIMPLEMENTED status."""
+    context.abort(
+        grpc.StatusCode.UNIMPLEMENTED,
+        f"{method_name} is not implemented yet.",
+    )
+    raise RuntimeError("Unreachable code")

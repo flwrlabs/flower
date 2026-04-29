@@ -54,6 +54,13 @@ def add_args_flwr_app_common(parser: argparse.ArgumentParser) -> None:
         "Use this flag only if you understand the risks.",
     )
     parser.add_argument(
+        "--root-certificates",
+        metavar="ROOT_CERT",
+        type=str,
+        help="Path to a PEM-encoded root CA certificate (or CA bundle) used to verify "
+        "the server's TLS certificate. This is not a client certificate for mTLS.",
+    )
+    parser.add_argument(
         "--parent-pid",
         type=int,
         default=None,

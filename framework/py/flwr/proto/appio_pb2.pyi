@@ -212,6 +212,8 @@ class PullAppInputsResponse(google.protobuf.message.Message):
     RUN_FIELD_NUMBER: builtins.int
     FAB_FIELD_NUMBER: builtins.int
     FEDERATION_CONFIG_FIELD_NUMBER: builtins.int
+    TASK_ID_FIELD_NUMBER: builtins.int
+    task_id: builtins.int
     @property
     def context(self) -> flwr.proto.message_pb2.Context: ...
     @property
@@ -227,9 +229,10 @@ class PullAppInputsResponse(google.protobuf.message.Message):
         run: flwr.proto.run_pb2.Run | None = ...,
         fab: flwr.proto.fab_pb2.Fab | None = ...,
         federation_config: flwr.proto.federation_config_pb2.SimulationConfig | None = ...,
+        task_id: builtins.int = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run", "task_id", b"task_id"]) -> None: ...
 
 global___PullAppInputsResponse = PullAppInputsResponse
 
@@ -242,8 +245,12 @@ class PushAppOutputsRequest(google.protobuf.message.Message):
     TOKEN_FIELD_NUMBER: builtins.int
     RUN_ID_FIELD_NUMBER: builtins.int
     CONTEXT_FIELD_NUMBER: builtins.int
+    SUB_STATUS_FIELD_NUMBER: builtins.int
+    DETAILS_FIELD_NUMBER: builtins.int
     token: builtins.str
     run_id: builtins.int
+    sub_status: builtins.str
+    details: builtins.str
     @property
     def context(self) -> flwr.proto.message_pb2.Context: ...
     def __init__(
@@ -252,9 +259,11 @@ class PushAppOutputsRequest(google.protobuf.message.Message):
         token: builtins.str = ...,
         run_id: builtins.int = ...,
         context: flwr.proto.message_pb2.Context | None = ...,
+        sub_status: builtins.str = ...,
+        details: builtins.str = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["context", b"context"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["context", b"context", "run_id", b"run_id", "token", b"token"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["context", b"context", "details", b"details", "run_id", b"run_id", "sub_status", b"sub_status", "token", b"token"]) -> None: ...
 
 global___PushAppOutputsRequest = PushAppOutputsRequest
 

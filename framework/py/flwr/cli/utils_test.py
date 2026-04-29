@@ -44,7 +44,9 @@ from flwr.common.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
 
 from .utils import (
+    _format_grpc_error,
     build_pathspec,
+    cli_output_handler,
     collect_files,
     depth_of,
     filter_paths_for_publish,
@@ -56,6 +58,22 @@ from .utils import (
     validate_credentials_content,
     validate_federation_name,
 )
+
+
+class _GrpcErrorWithDetails:
+    """Test helper object carrying a gRPC-like details string."""
+
+    def __init__(self, details: str) -> None:
+        self._details = details
+
+    def details(self) -> str:
+        """Return the stored gRPC details string."""
+        return self._details
+
+
+def _grpc_error_with_details(details: str) -> grpc.RpcError:
+    """Return a grpc.RpcError-compatible test helper with a details method."""
+    return cast(grpc.RpcError, _GrpcErrorWithDetails(details))
 
 
 class TestGetSHA256Hash(unittest.TestCase):
@@ -262,6 +280,32 @@ def test_custom_grpc_err_handler() -> None:
             raise grpc_error
 
     mock_handler.assert_called_once_with(grpc_error)
+
+
+def test_format_grpc_error_uses_json_message_field() -> None:
+    """Structured Flower errors combine public message and details."""
+    err = _grpc_error_with_details(
+        '{"public_message": "request failed", '
+        '"public_details": "missing entitlement", "code": 400}'
+    )
+
+    assert _format_grpc_error(err) == "request failed\nmissing entitlement"
+
+
+def test_format_grpc_error_falls_back_to_plain_string() -> None:
+    """Non-JSON errors fall back to their normal string form."""
+    err = _grpc_error_with_details("plain failure")
+
+    assert _format_grpc_error(err) == "plain failure"
+
+
+def test_cli_output_handler_raises_click_exception_for_json_error() -> None:
+    """cli_output_handler preserves the original ClickException text."""
+    with pytest.raises(click.ClickException, match="request failed") as exc_info:
+        with cli_output_handler():
+            raise click.ClickException('{"message": "request failed", "code": 400}')
+
+    assert exc_info.value.message == '{"message": "request failed", "code": 400}'
 
 
 @pytest.mark.parametrize(
