@@ -164,10 +164,9 @@ class RuntimeVersionMetadata:
             or local_version.minor != peer_version.minor
         ):
             return (
-                f"Local {self.component_name} version "
-                f"{self.package_version} only accepts peers from the same "
-                f"major.minor release, but received {peer.component_name} "
-                f"version {peer.package_version}."
+                f"{self.component_name} version {self.package_version} only accepts "
+                "peers from the same major.minor release, but received "
+                f"{peer.component_name} version {peer.package_version}."
             )
 
         # Versions are compatible

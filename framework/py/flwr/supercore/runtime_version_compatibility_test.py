@@ -180,24 +180,24 @@ def test_runtime_version_metadata_allows_expected_cases(
     ("local", "peer", "expected_rejection"),
     [
         (
-            RuntimeVersionMetadata("flwr", "1.29.2", "superlink"),
-            RuntimeVersionMetadata("flwr", "1.30.0", "supernode"),
-            "Local superlink version 1.29.2 only accepts peers from the same "
-            "major.minor release, but received supernode version 1.30.0.",
+            RuntimeVersionMetadata("flwr", "1.29.2", "SuperLink"),
+            RuntimeVersionMetadata("flwr", "1.30.0", "SuperNode"),
+            "SuperLink version 1.29.2 only accepts peers from the same "
+            "major.minor release, but received SuperNode version 1.30.0.",
         ),
         (
-            RuntimeVersionMetadata("unknown", "unknown", "superlink"),
-            RuntimeVersionMetadata("flwr", "1.29.0", "simulation"),
+            RuntimeVersionMetadata("unknown", "unknown", "SuperLink"),
+            RuntimeVersionMetadata("flwr", "1.29.0", "flwr-simulation"),
             None,
         ),
         (
-            RuntimeVersionMetadata("flwr", "1.29.0", "superlink"),
-            RuntimeVersionMetadata("flwr", "main", "supernode"),
+            RuntimeVersionMetadata("flwr", "1.29.0", "SuperLink"),
+            RuntimeVersionMetadata("flwr", "main", "SuperNode"),
             "Peer Flower version metadata cannot be parsed: 'main'.",
         ),
         (
-            RuntimeVersionMetadata("flwr", "1.29.0", "superlink"),
-            RuntimeVersionMetadata("forked-flower", "1.29.1", "supernode"),
+            RuntimeVersionMetadata("flwr", "1.29.0", "SuperLink"),
+            RuntimeVersionMetadata("forked-flower", "1.29.1", "SuperNode"),
             "Peer Flower package name is not recognized: 'forked-flower'.",
         ),
     ],
