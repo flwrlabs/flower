@@ -20,7 +20,7 @@ import json
 import os
 import re
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from logging import WARN
 from pathlib import Path
 from typing import Any, Literal, TypeVar
@@ -363,6 +363,18 @@ def _get_metadata_typed(
     if value in ("", b""):
         return None
     return value
+
+
+def find_metadata_keys(
+    metadata: Sequence[tuple[str, str | bytes]] | None,
+    keys: Iterable[str],
+) -> set[str]:
+    """Return the subset of `keys` present in the gRPC metadata sequence."""
+    if metadata is None:
+        return set()
+
+    key_set = set(keys)
+    return {metadata_key for metadata_key, _ in metadata if metadata_key in key_set}
 
 
 def get_metadata_str(

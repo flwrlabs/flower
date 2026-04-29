@@ -25,6 +25,7 @@ from parameterized import parameterized
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 from .utils import (
+    find_metadata_keys,
     get_metadata_bytes,
     get_metadata_str,
     get_metadata_str_checked,
@@ -38,6 +39,18 @@ from .utils import (
     simulation_config_to_json,
     uint64_to_int64,
 )
+
+
+def test_find_metadata_keys() -> None:
+    """Return the subset of requested keys present in metadata."""
+    assert find_metadata_keys(
+        [
+            ("x-token", "value"),
+            ("x-trace-id", "abc"),
+            ("x-token", "other"),
+        ],
+        ("x-token", "missing"),
+    ) == {"x-token"}
 
 
 def test_mask_string() -> None:
