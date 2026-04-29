@@ -22,7 +22,10 @@ from flwr.common import EventType
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import stop_log_uploader
-from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.app_utils import (
+    start_lifeline_fd_monitor,
+    start_parent_process_monitor,
+)
 from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
 )
@@ -34,15 +37,18 @@ def run_model(  # pylint: disable=R0913, R0917
     token: str,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
+    lifeline_fd: int | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
     """Run Flower ModelApp process.
 
     This runtime is intentionally a stub until ModelApp execution support is added.
     """
-    # Monitor the main process in case of SIGKILL
+    # Monitor SuperExec liveness if a parent PID or lifeline FD is provided.
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
+    if lifeline_fd is not None:
+        start_lifeline_fd_monitor(lifeline_fd)
 
     log_uploader = None
     runtime_env_dir: Path | None = None
@@ -64,6 +70,7 @@ def run_model(  # pylint: disable=R0913, R0917
         token,
         certificates,
         parent_pid,
+        lifeline_fd,
         runtime_dependency_install,
     )
     flwr_exit(

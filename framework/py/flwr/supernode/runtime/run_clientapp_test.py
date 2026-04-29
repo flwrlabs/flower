@@ -41,3 +41,24 @@ class TestRunClientApp(unittest.TestCase):
         assert interceptors is not None
         self.assertEqual(len(interceptors), 1)
         self.assertIsInstance(interceptors[0], AppIoTokenClientInterceptor)
+
+    def test_run_clientapp_starts_lifeline_fd_monitor(self) -> None:
+        """`run_clientapp` should monitor the lifeline FD when provided."""
+        with (
+            patch(
+                "flwr.supernode.runtime.run_clientapp.start_lifeline_fd_monitor"
+            ) as monitor,
+            patch(
+                "flwr.supernode.runtime.run_clientapp.create_channel",
+                side_effect=RuntimeError,
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            run_clientapp(
+                "127.0.0.1:9094",
+                insecure=True,
+                token="test-token",
+                lifeline_fd=42,
+            )
+
+        monitor.assert_called_once_with(42)

@@ -20,6 +20,8 @@ import subprocess
 from collections.abc import Sequence
 from typing import Any
 
+from flwr.supercore.superexec.app_lifeline import launch_with_lifeline
+
 from .exec_plugin import ExecPlugin
 
 
@@ -48,9 +50,19 @@ class BaseExecPlugin(ExecPlugin):
             cmds += ["--root-certificates", self.root_certificates_path]
         cmds += [self.appio_api_address_arg, self.appio_api_address]
         cmds += ["--token", token]
-        cmds += ["--parent-pid", str(os.getpid())]
+        if os.name != "posix":
+            cmds += ["--parent-pid", str(os.getpid())]
         if self.runtime_dependency_install:
             cmds += ["--allow-runtime-dependency-installation"]
+        if os.name == "posix":
+            # On POSIX, apps cooperatively monitor a lifeline FD instead of a host
+            # SuperExec PID that may not be visible inside PID namespaces.
+            launch_with_lifeline(
+                cmds,
+                wait=False,
+                popen_kwargs=self.get_popen_kwargs(),
+            )
+            return
         # Launch the client app without waiting for it to complete.
         # Since we don't need to manage the process, we intentionally avoid using
         # a `with` statement. Suppress the pylint warning for it in this case.

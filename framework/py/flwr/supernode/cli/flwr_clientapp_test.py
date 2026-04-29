@@ -51,6 +51,8 @@ def test_parse_flwr_clientapp_parses_tokenized_invocation() -> None:
             "--insecure",
             "--parent-pid",
             "1234",
+            "--lifeline-fd",
+            "42",
             "--allow-runtime-dependency-installation",
         ]
     )
@@ -59,6 +61,7 @@ def test_parse_flwr_clientapp_parses_tokenized_invocation() -> None:
     assert args.token == "test-token"
     assert args.insecure is True
     assert args.parent_pid == 1234
+    assert args.lifeline_fd == 42
     assert args.runtime_dependency_install is True
 
 
@@ -70,6 +73,7 @@ def test_flwr_clientapp_forwards_cli_args() -> None:
         token="test-token",
         root_certificates=None,
         parent_pid=321,
+        lifeline_fd=43,
         runtime_dependency_install=True,
     )
 
@@ -92,4 +96,5 @@ def test_flwr_clientapp_forwards_cli_args() -> None:
     assert kwargs["token"] == "test-token"
     assert kwargs["certificates"] is None
     assert kwargs["parent_pid"] == 321
+    assert kwargs["lifeline_fd"] == 43
     assert kwargs["runtime_dependency_install"] is True

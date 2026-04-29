@@ -11,7 +11,7 @@
 ---
 erDiagram
   context {
-    BIGINT run_id FK "nullable"
+    INTEGER run_id FK "nullable"
     BLOB context "nullable"
   }
 
@@ -22,39 +22,39 @@ erDiagram
   }
 
   logs {
-    BIGINT run_id FK "nullable"
+    INTEGER run_id FK "nullable"
     VARCHAR log "nullable"
-    BIGINT node_id "nullable"
+    INTEGER node_id "nullable"
     FLOAT timestamp "nullable"
   }
 
   message_ins {
-    BIGINT run_id FK "nullable"
+    INTEGER run_id FK "nullable"
     BLOB content "nullable"
     FLOAT created_at "nullable"
     VARCHAR delivered_at "nullable"
-    BIGINT dst_node_id "nullable"
+    INTEGER dst_node_id "nullable"
     BLOB error "nullable"
     VARCHAR group_id "nullable"
     VARCHAR message_id UK "nullable"
     VARCHAR message_type "nullable"
     VARCHAR reply_to_message_id "nullable"
-    BIGINT src_node_id "nullable"
+    INTEGER src_node_id "nullable"
     FLOAT ttl "nullable"
   }
 
   message_res {
-    BIGINT run_id FK "nullable"
+    INTEGER run_id FK "nullable"
     BLOB content "nullable"
     FLOAT created_at "nullable"
     VARCHAR delivered_at "nullable"
-    BIGINT dst_node_id "nullable"
+    INTEGER dst_node_id "nullable"
     BLOB error "nullable"
     VARCHAR group_id "nullable"
     VARCHAR message_id UK "nullable"
     VARCHAR message_type "nullable"
     VARCHAR reply_to_message_id "nullable"
-    BIGINT src_node_id "nullable"
+    INTEGER src_node_id "nullable"
     FLOAT ttl "nullable"
   }
 
@@ -62,7 +62,7 @@ erDiagram
     FLOAT heartbeat_interval "nullable"
     VARCHAR last_activated_at "nullable"
     VARCHAR last_deactivated_at "nullable"
-    BIGINT node_id UK "nullable"
+    INTEGER node_id UK "nullable"
     TIMESTAMP online_until "nullable"
     VARCHAR owner_aid "nullable"
     VARCHAR owner_name "nullable"
@@ -91,8 +91,8 @@ erDiagram
   }
 
   run {
-    BIGINT bytes_recv "nullable"
-    BIGINT bytes_sent "nullable"
+    INTEGER bytes_recv "nullable"
+    INTEGER bytes_sent "nullable"
     FLOAT clientapp_runtime "nullable"
     VARCHAR details "nullable"
     VARCHAR fab_hash "nullable"
@@ -104,7 +104,7 @@ erDiagram
     VARCHAR flwr_aid "nullable"
     VARCHAR override_config "nullable"
     VARCHAR pending_at "nullable"
-    BIGINT run_id UK "nullable"
+    INTEGER run_id UK "nullable"
     VARCHAR run_type
     VARCHAR running_at "nullable"
     VARCHAR starting_at "nullable"
@@ -114,25 +114,11 @@ erDiagram
 
   run_objects {
     VARCHAR object_id PK,FK
-    BIGINT run_id PK
-  }
-
-  task {
-    VARCHAR connector_ref "nullable"
-    VARCHAR fab_hash "nullable"
-    VARCHAR finished_at "nullable"
-    VARCHAR model_ref "nullable"
-    VARCHAR pending_at
-    BIGINT run_id
-    VARCHAR running_at "nullable"
-    VARCHAR starting_at "nullable"
-    BIGINT task_id UK
-    VARCHAR token "nullable"
-    VARCHAR type
+    INTEGER run_id PK
   }
 
   token_store {
-    BIGINT run_id PK "nullable"
+    INTEGER run_id PK "nullable"
     FLOAT active_until "nullable"
     VARCHAR token UK
   }

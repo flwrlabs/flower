@@ -39,11 +39,16 @@ def test_clientapp_launch_inherits_default_stdio() -> None:
         get_run=_get_run,
     )
 
-    with patch("subprocess.Popen") as popen:
+    with (
+        patch("flwr.supercore.superexec.plugin.base_exec_plugin.os.name", "posix"),
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.launch_with_lifeline"
+        ) as launch,
+    ):
         plugin.launch_app(token="token", run_id=7)
 
-    assert "stdout" not in popen.call_args.kwargs
-    assert "stderr" not in popen.call_args.kwargs
+    assert "stdout" not in launch.call_args.kwargs["popen_kwargs"]
+    assert "stderr" not in launch.call_args.kwargs["popen_kwargs"]
 
 
 def test_serverapp_launch_isolates_stdio() -> None:
@@ -55,11 +60,16 @@ def test_serverapp_launch_isolates_stdio() -> None:
         get_run=_get_run,
     )
 
-    with patch("subprocess.Popen") as popen:
+    with (
+        patch("flwr.supercore.superexec.plugin.base_exec_plugin.os.name", "posix"),
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.launch_with_lifeline"
+        ) as launch,
+    ):
         plugin.launch_app(token="token", run_id=5)
 
-    assert popen.call_args.kwargs["stdout"] is subprocess.DEVNULL
-    assert popen.call_args.kwargs["stderr"] is subprocess.DEVNULL
+    assert launch.call_args.kwargs["popen_kwargs"]["stdout"] is subprocess.DEVNULL
+    assert launch.call_args.kwargs["popen_kwargs"]["stderr"] is subprocess.DEVNULL
 
 
 class DummyExecPlugin(BaseExecPlugin):
@@ -80,6 +90,101 @@ def test_launch_app_forwards_runtime_dependency_install_flag() -> None:
     )
 
     with (
+        patch("flwr.supercore.superexec.plugin.base_exec_plugin.os.name", "posix"),
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.launch_with_lifeline"
+        ) as launch,
+    ):
+        plugin.launch_app(token="token-123", run_id=7)
+
+    assert launch.call_args.args[0] == [
+        "dummy-app",
+        "--insecure",
+        "--appio-api-address",
+        "127.0.0.1:9091",
+        "--token",
+        "token-123",
+        "--allow-runtime-dependency-installation",
+    ]
+    assert launch.call_args.kwargs["wait"] is False
+
+
+def test_launch_app_skips_optional_runtime_flags_by_default() -> None:
+    """Ensure app launch omits optional runtime install flags by default."""
+    plugin = DummyExecPlugin(
+        appio_api_address="127.0.0.1:9091",
+        insecure=True,
+        root_certificates_path=None,
+        get_run=Mock(),
+    )
+
+    with (
+        patch("flwr.supercore.superexec.plugin.base_exec_plugin.os.name", "posix"),
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.launch_with_lifeline"
+        ) as launch,
+    ):
+        plugin.launch_app(token="token-123", run_id=7)
+
+    assert "--allow-runtime-dependency-installation" not in launch.call_args.args[0]
+
+
+def test_clientapp_launch_forwards_root_certificate() -> None:
+    """ClientApp launch should forward the configured root certificate path."""
+    plugin = ClientAppExecPlugin(
+        appio_api_address="127.0.0.1:9094",
+        insecure=False,
+        root_certificates_path="/tmp/root.pem",
+        get_run=_get_run,
+    )
+
+    with (
+        patch("flwr.supercore.superexec.plugin.base_exec_plugin.os.name", "posix"),
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.launch_with_lifeline"
+        ) as launch,
+    ):
+        plugin.launch_app(token="token", run_id=7)
+
+    assert launch.call_args.args[0][:3] == [
+        "flwr-clientapp",
+        "--root-certificates",
+        "/tmp/root.pem",
+    ]
+
+
+def test_clientapp_launch_omits_tls_flags_when_using_system_certificates() -> None:
+    """ClientApp launch should omit TLS flags when relying on system certificates."""
+    plugin = ClientAppExecPlugin(
+        appio_api_address="127.0.0.1:9094",
+        insecure=False,
+        root_certificates_path=None,
+        get_run=_get_run,
+    )
+
+    with (
+        patch("flwr.supercore.superexec.plugin.base_exec_plugin.os.name", "posix"),
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.launch_with_lifeline"
+        ) as launch,
+    ):
+        plugin.launch_app(token="token", run_id=7)
+
+    assert "--insecure" not in launch.call_args.args[0]
+    assert "--root-certificates" not in launch.call_args.args[0]
+
+
+def test_launch_app_non_posix_fallback_passes_parent_pid() -> None:
+    """Non-POSIX launch should keep the existing parent PID behavior."""
+    plugin = DummyExecPlugin(
+        appio_api_address="127.0.0.1:9091",
+        insecure=True,
+        root_certificates_path=None,
+        get_run=Mock(),
+    )
+
+    with (
+        patch("flwr.supercore.superexec.plugin.base_exec_plugin.os.name", "nt"),
         patch(
             "flwr.supercore.superexec.plugin.base_exec_plugin.os.getpid",
             return_value=1234,
@@ -99,57 +204,4 @@ def test_launch_app_forwards_runtime_dependency_install_flag() -> None:
         "token-123",
         "--parent-pid",
         "1234",
-        "--allow-runtime-dependency-installation",
     ]
-
-
-def test_launch_app_skips_optional_runtime_flags_by_default() -> None:
-    """Ensure app launch omits optional runtime install flags by default."""
-    plugin = DummyExecPlugin(
-        appio_api_address="127.0.0.1:9091",
-        insecure=True,
-        root_certificates_path=None,
-        get_run=Mock(),
-    )
-
-    with patch(
-        "flwr.supercore.superexec.plugin.base_exec_plugin.subprocess.Popen"
-    ) as popen:
-        plugin.launch_app(token="token-123", run_id=7)
-
-    assert "--allow-runtime-dependency-installation" not in popen.call_args.args[0]
-
-
-def test_clientapp_launch_forwards_root_certificate() -> None:
-    """ClientApp launch should forward the configured root certificate path."""
-    plugin = ClientAppExecPlugin(
-        appio_api_address="127.0.0.1:9094",
-        insecure=False,
-        root_certificates_path="/tmp/root.pem",
-        get_run=_get_run,
-    )
-
-    with patch("subprocess.Popen") as mock_popen:
-        plugin.launch_app(token="token", run_id=7)
-
-    assert mock_popen.call_args.args[0][:3] == [
-        "flwr-clientapp",
-        "--root-certificates",
-        "/tmp/root.pem",
-    ]
-
-
-def test_clientapp_launch_omits_tls_flags_when_using_system_certificates() -> None:
-    """ClientApp launch should omit TLS flags when relying on system certificates."""
-    plugin = ClientAppExecPlugin(
-        appio_api_address="127.0.0.1:9094",
-        insecure=False,
-        root_certificates_path=None,
-        get_run=_get_run,
-    )
-
-    with patch("subprocess.Popen") as mock_popen:
-        plugin.launch_app(token="token", run_id=7)
-
-    assert "--insecure" not in mock_popen.call_args.args[0]
-    assert "--root-certificates" not in mock_popen.call_args.args[0]

@@ -46,6 +46,7 @@ def flwr_clientapp() -> None:
             args.root_certificates, args.insecure
         ),
         parent_pid=args.parent_pid,
+        lifeline_fd=args.lifeline_fd,
         runtime_dependency_install=args.runtime_dependency_install,
     )
 

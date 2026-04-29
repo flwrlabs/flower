@@ -16,6 +16,7 @@
 
 
 import importlib
+from queue import Queue
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -23,7 +24,7 @@ import pytest
 
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
 
-from .app import _parse_args_run_flwr_serverapp
+from .app import _parse_args_run_flwr_serverapp, run_serverapp
 
 serverapp_module = importlib.import_module("flwr.server.serverapp.app")
 
@@ -51,6 +52,8 @@ def test_parse_flwr_serverapp_parses_tokenized_invocation() -> None:
             "--insecure",
             "--parent-pid",
             "1234",
+            "--lifeline-fd",
+            "42",
             "--allow-runtime-dependency-installation",
         ]
     )
@@ -59,6 +62,7 @@ def test_parse_flwr_serverapp_parses_tokenized_invocation() -> None:
     assert args.token == "test-token"
     assert args.insecure is True
     assert args.parent_pid == 1234
+    assert args.lifeline_fd == 42
     assert args.runtime_dependency_install is True
 
 
@@ -94,6 +98,7 @@ def test_flwr_serverapp_forwards_cli_args() -> None:
         token="test-token",
         root_certificates=None,
         parent_pid=321,
+        lifeline_fd=43,
         runtime_dependency_install=True,
     )
 
@@ -104,7 +109,7 @@ def test_flwr_serverapp_forwards_cli_args() -> None:
 
     mirror_output_to_queue = Mock()
     restore_output = Mock()
-    run_serverapp = Mock()
+    run_serverapp_mock = Mock()
 
     with (
         patch.object(serverapp_module, "_parse_args_run_flwr_serverapp", _Parser),
@@ -114,16 +119,36 @@ def test_flwr_serverapp_forwards_cli_args() -> None:
             mirror_output_to_queue,
         ),
         patch.object(serverapp_module, "restore_output", restore_output),
-        patch.object(serverapp_module, "run_serverapp", run_serverapp),
+        patch.object(serverapp_module, "run_serverapp", run_serverapp_mock),
     ):
         serverapp_module.flwr_serverapp()
 
     mirror_output_to_queue.assert_called_once()
     restore_output.assert_called_once_with()
-    run_serverapp.assert_called_once()
-    kwargs = run_serverapp.call_args.kwargs
+    run_serverapp_mock.assert_called_once()
+    kwargs = run_serverapp_mock.call_args.kwargs
     assert kwargs["serverappio_api_address"] == "127.0.0.1:9091"
     assert kwargs["token"] == "test-token"
     assert kwargs["certificates"] is None
     assert kwargs["parent_pid"] == 321
+    assert kwargs["lifeline_fd"] == 43
     assert kwargs["runtime_dependency_install"] is True
+
+
+def test_run_serverapp_starts_lifeline_fd_monitor() -> None:
+    """The ServerApp runtime should monitor the lifeline FD when provided."""
+    with (
+        patch.object(serverapp_module, "start_lifeline_fd_monitor") as monitor,
+        patch.object(serverapp_module, "register_signal_handlers"),
+        patch.object(serverapp_module, "GrpcGrid", side_effect=RuntimeError),
+        patch.object(serverapp_module, "flwr_exit"),
+    ):
+        run_serverapp(
+            serverappio_api_address="127.0.0.1:9091",
+            log_queue=Queue(),
+            token="test-token",
+            insecure=True,
+            lifeline_fd=42,
+        )
+
+    monitor.assert_called_once_with(42)

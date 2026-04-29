@@ -64,6 +64,25 @@ class TestRunSimulationProcess(unittest.TestCase):
         )
         mock_flwr_exit.assert_called_once()
 
+    @patch("flwr.simulation.app.SimulationIoConnection", side_effect=RuntimeError)
+    @patch("flwr.simulation.app.start_lifeline_fd_monitor")
+    def test_run_simulation_process_starts_lifeline_fd_monitor(
+        self,
+        mock_lifeline_monitor: Mock,
+        _mock_connection_cls: Mock,
+    ) -> None:
+        """`run_simulation_process` should monitor the lifeline FD when provided."""
+        with self.assertRaises(RuntimeError):
+            run_simulation_process(
+                serverappio_api_address="127.0.0.1:9091",
+                log_queue=Queue(),
+                insecure=True,
+                token="test-token",
+                lifeline_fd=42,
+            )
+
+        mock_lifeline_monitor.assert_called_once_with(42)
+
 
 def test_parse_flwr_simulation_requires_token() -> None:
     """The simulation process CLI should require a token."""
@@ -88,6 +107,8 @@ def test_parse_flwr_simulation_parses_tokenized_invocation() -> None:
             "--insecure",
             "--parent-pid",
             "1234",
+            "--lifeline-fd",
+            "42",
             "--allow-runtime-dependency-installation",
         ]
     )
@@ -96,6 +117,7 @@ def test_parse_flwr_simulation_parses_tokenized_invocation() -> None:
     assert args.token == "test-token"
     assert args.insecure is True
     assert args.parent_pid == 1234
+    assert args.lifeline_fd == 42
     assert args.runtime_dependency_install is True
 
 
@@ -136,6 +158,7 @@ def test_flwr_simulation_forwards_cli_args(
         token="test-token",
         root_certificates=None,
         parent_pid=321,
+        lifeline_fd=43,
         runtime_dependency_install=True,
     )
     calls: list[str] = []
@@ -173,4 +196,5 @@ def test_flwr_simulation_forwards_cli_args(
     assert captured["token"] == "test-token"
     assert captured["certificates"] is None
     assert captured["parent_pid"] == 321
+    assert captured["lifeline_fd"] == 43
     assert captured["runtime_dependency_install"] is True
