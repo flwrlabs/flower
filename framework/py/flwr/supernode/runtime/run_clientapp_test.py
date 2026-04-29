@@ -33,7 +33,7 @@ class TestRunClientApp(unittest.TestCase):
             side_effect=RuntimeError,
         ) as mock_create_channel:
             with self.assertRaises(RuntimeError):
-                run_clientapp("127.0.0.1:9094", token="test-token")
+                run_clientapp("127.0.0.1:9094", insecure=True, token="test-token")
 
         kwargs = mock_create_channel.call_args.kwargs
         interceptors = kwargs["interceptors"]

@@ -48,7 +48,7 @@ class RuntimeVersionClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type
 
 
 class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore
-    """Validate Flower runtime version metadata on inbound unary RPCs."""
+    """Observe Flower runtime version metadata on inbound unary RPCs."""
 
     def __init__(
         self,
@@ -64,7 +64,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         continuation: Callable[[Any], Any],
         handler_call_details: grpc.HandlerCallDetails,
     ) -> grpc.RpcMethodHandler:
-        """Reject explicit invalid or incompatible peer metadata before handling."""
+        """Parse peer runtime metadata, then continue normal RPC handling."""
         method_handler = continuation(handler_call_details)
         if method_handler is None or method_handler.unary_unary is None:
             return method_handler

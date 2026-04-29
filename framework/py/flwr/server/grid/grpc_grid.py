@@ -121,6 +121,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
     def __init__(  # pylint: disable=too-many-arguments
         self,
         serverappio_service_address: str = SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
+        insecure: bool = False,
         root_certificates: bytes | None = None,
         *,
         token: str,
@@ -128,6 +129,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
         if token == "":
             raise ValueError("`token` must be a non-empty string")
         self._addr = serverappio_service_address
+        self._insecure = insecure
         self._cert = root_certificates
         self._token = token
         self._run: Run | None = None
@@ -152,7 +154,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
             return
         self._channel = create_channel(
             server_address=self._addr,
-            insecure=(self._cert is None),
+            insecure=self._insecure,
             root_certificates=self._cert,
             interceptors=[AppIoTokenClientInterceptor(token=self._token)],
         )
