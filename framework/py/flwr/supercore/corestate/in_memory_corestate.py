@@ -181,7 +181,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             for task in tasks:
                 task_copy = Task()
                 task_copy.CopyFrom(task)
-                task_copy.status.CopyFrom(task.status)
                 result.append(task_copy)
             return result
 
