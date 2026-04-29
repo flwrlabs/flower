@@ -18,7 +18,7 @@
 from collections import namedtuple
 from typing import cast
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import grpc
 from google.protobuf.message import Message as GrpcMessage
@@ -93,6 +93,34 @@ class TestRuntimeVersionClientInterceptor(TestCase):
         self.assertIn(FLWR_PACKAGE_NAME_METADATA_KEY, metadata)
         self.assertIn(FLWR_PACKAGE_VERSION_METADATA_KEY, metadata)
         self.assertEqual(metadata[FLWR_COMPONENT_NAME_METADATA_KEY], "simulation")
+
+    @patch("flwr.supercore.interceptors.runtime_version_interceptor.log")
+    def test_attach_runtime_version_headers_warns_for_preexisting_runtime_keys(
+        self, mock_log: Mock
+    ) -> None:
+        """Warn when runtime-version keys are already present in outbound metadata."""
+        interceptor = RuntimeVersionClientInterceptor(component_name="simulation")
+        details = _ClientCallDetails(
+            method="/flwr.proto.ServerAppIo/GetNodes",
+            timeout=None,
+            metadata=((FLWR_PACKAGE_NAME_METADATA_KEY, "old"), ("x-test", "value")),
+            credentials=None,
+            wait_for_ready=None,
+            compression=None,
+        )
+
+        interceptor.intercept_unary_unary(
+            continuation=lambda _details, _request: "ok",
+            client_call_details=details,
+            request=GetNodesRequest(run_id=1),
+        )
+
+        mock_log.assert_called_once_with(
+            30,
+            "Outbound gRPC metadata already contains runtime version keys; "
+            "replacing existing values for: %s",
+            FLWR_PACKAGE_NAME_METADATA_KEY,
+        )
 
 
 class TestRuntimeVersionServerInterceptor(TestCase):
