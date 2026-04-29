@@ -20,6 +20,8 @@ from datetime import timedelta
 from typing import Any, cast
 from unittest.mock import patch
 
+from parameterized import parameterized
+
 from flwr.common import now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -187,7 +189,10 @@ class StateTest(unittest.TestCase):
         self.assertTrue(tasks[0].running_at)
         self.assertEqual(tasks[0].finished_at, "")
 
-    def test_finish_task_transitions_unfinished_task_to_finished(self) -> None:
+    @parameterized.expand([(SubStatus.FAILED,), (SubStatus.STOPPED,)])  # type: ignore
+    def test_finish_task_transitions_unfinished_task_to_finished(
+        self, sub_status: str
+    ) -> None:
         """Finishing a task should store the terminal status details."""
         state = self.state_factory()
         task_id = state.create_task(task_type="flwr-model", run_id=42)
@@ -196,9 +201,9 @@ class StateTest(unittest.TestCase):
         # Task does not exist.
         self.assertFalse(state.finish_task(61016, SubStatus.FAILED, "missing"))
         # Task is pending, so it can be finished.
-        self.assertTrue(state.finish_task(task_id, SubStatus.FAILED, "boom"))
+        self.assertTrue(state.finish_task(task_id, sub_status, "boom"))
         # Task is already finished, so it cannot be finished again.
-        self.assertFalse(state.finish_task(task_id, SubStatus.COMPLETED, "again"))
+        self.assertFalse(state.finish_task(task_id, SubStatus.FAILED, "again"))
         # Finished tasks cannot be claimed.
         self.assertIsNone(state.claim_task(task_id))
 
@@ -209,7 +214,7 @@ class StateTest(unittest.TestCase):
             task.status,
             TaskStatus(
                 status=Status.FINISHED,
-                sub_status=SubStatus.FAILED,
+                sub_status=sub_status,
                 details="boom",
             ),
         )
