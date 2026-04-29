@@ -516,8 +516,8 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
                 f"Task type '{TaskType.CLIENT_APP.value}' requires fab_hash.",
             ),
             (
-                TaskType.AGENT.value,
-                f"Task type '{TaskType.AGENT.value}' requires fab_hash.",
+                TaskType.AGENT_APP.value,
+                f"Task type '{TaskType.AGENT_APP.value}' requires fab_hash.",
             ),
             (
                 TaskType.MODEL.value,

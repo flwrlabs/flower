@@ -201,7 +201,7 @@ TASK_TYPES_REQUIRING_FAB_HASH: frozenset[TaskType] = frozenset(
     {
         TaskType.SERVER_APP,
         TaskType.CLIENT_APP,
-        TaskType.AGENT,
+        TaskType.AGENT_APP,
     }
 )
 TASK_TYPES_REQUIRING_MODEL_REF: frozenset[TaskType] = frozenset({TaskType.MODEL})
