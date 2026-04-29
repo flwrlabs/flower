@@ -194,7 +194,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             task = self.task_store.get(task_id)
             if task is None or task_id in self.task_token_store:
                 return None
-            if determine_task_status(task).status != Status.PENDING:
+            if task.status.status != Status.PENDING:
                 return None
 
             # Claiming moves the task into STARTING and records the heartbeat state.
@@ -213,6 +213,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
     def activate_task(self, task_id: int) -> bool:
         """Move a task from starting to running."""
         with self.lock_task_store:
+            # Expire non-responsive tasks before transitioning task status.
+            self._cleanup_expired_task_tokens_locked()
+
             # Transition task from STARTING -> RUNNING.
             task = self.task_store.get(task_id)
             if task is None or determine_task_status(task).status != Status.STARTING:
@@ -227,6 +230,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
     def finish_task(self, task_id: int, sub_status: str, detail: str) -> bool:
         """Move an unfinished task to finished."""
         with self.lock_task_store:
+            # Expire non-responsive tasks before transitioning task status.
+            self._cleanup_expired_task_tokens_locked()
+
             # Transition task to FINISHED
             task = self.task_store.get(task_id)
             if task is None or determine_task_status(task).status == Status.FINISHED:
@@ -248,7 +254,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
     def acknowledge_task_heartbeat(self, task_id: int) -> bool:
         """Extend heartbeat state for the claimed task."""
         with self.lock_task_store:
-            # Heartbeats are accepted only for active, unexpired task claims.
+            # Heartbeats are accepted only for starting and running tasks
             self._cleanup_expired_task_tokens_locked()
             task = self.task_store.get(task_id)
             record = self.task_token_store.get(task_id)
