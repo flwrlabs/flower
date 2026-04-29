@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for ServerApp process CLI parsing and wiring."""
 
+
 import importlib
 from queue import Queue
 from types import SimpleNamespace

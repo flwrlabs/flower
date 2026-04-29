@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for SuperExec base ephemeral plugin behavior."""
 
+
 from unittest.mock import patch
 
 from flwr.common.exit import ExitCode

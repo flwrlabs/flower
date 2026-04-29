@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for ClientApp runtime wiring."""
 
+
 import unittest
 from unittest.mock import patch
 

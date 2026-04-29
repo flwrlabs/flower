@@ -14,6 +14,7 @@
 # ==============================================================================
 """`flwr-clientapp` command."""
 
+
 import argparse
 from logging import DEBUG, INFO
 

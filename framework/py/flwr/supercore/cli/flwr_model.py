@@ -14,6 +14,7 @@
 # ==============================================================================
 """`flwr-model` command."""
 
+
 import argparse
 from logging import DEBUG, INFO
 from queue import Queue

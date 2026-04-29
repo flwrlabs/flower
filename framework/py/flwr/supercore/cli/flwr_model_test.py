@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for ModelApp process CLI parsing and wiring."""
 
+
 import importlib
 from types import SimpleNamespace
 from unittest.mock import Mock, patch

@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for SuperExec base plugin launch behavior."""
 
+
 import subprocess
 from unittest.mock import Mock, patch
 
