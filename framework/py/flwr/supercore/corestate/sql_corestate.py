@@ -360,16 +360,11 @@ class SqlCoreState(CoreState, SqlMixin):
 
     def get_task_id_by_token(self, token: str) -> int | None:
         """Return the task ID associated with the task token, if valid."""
-        # Resolve tokens after cleanup so callers never receive expired claims.
-        self._cleanup_expired_task_tokens()
 
         rows = self.query(
             """
             SELECT task_id FROM task
-            WHERE token = :token
-            AND active_until >= :current
-            AND finished_at IS NULL
-            LIMIT 1
+            WHERE token = :token AND active_until >= :current AND finished_at IS NULL
             """,
             {"token": token, "current": now().timestamp()},
         )
@@ -394,9 +389,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 finished_at = :finished_at,
                 sub_status = :sub_status,
                 details = :details
-            WHERE token IS NOT NULL
-            AND active_until < :current
-            AND finished_at IS NULL
+            WHERE token IS NOT NULL AND active_until < :current
             """,
             {
                 "current": current,
