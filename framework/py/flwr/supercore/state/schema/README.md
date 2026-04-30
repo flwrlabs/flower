@@ -119,7 +119,7 @@ erDiagram
   }
 
   task {
-    FLOAT active_until "nullable"
+    BIGINT active_until "nullable"
     VARCHAR connector_ref "nullable"
     VARCHAR details
     VARCHAR fab_hash "nullable"

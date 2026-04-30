@@ -250,6 +250,7 @@ class SqlCoreState(CoreState, SqlMixin):
         """Atomically claim a pending task."""
         token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
         claimed_at = now()
+        active_until = int(claimed_at.timestamp()) + HEARTBEAT_DEFAULT_INTERVAL
         sint64_task_id = uint64_to_int64(task_id)
         try:
             # The conditional UPDATE is the atomic claim: exactly one caller can
@@ -267,9 +268,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 {
                     "task_id": sint64_task_id,
                     "token": token,
-                    "active_until": (
-                        claimed_at.timestamp() + HEARTBEAT_DEFAULT_INTERVAL
-                    ),
+                    "active_until": active_until,
                     "starting_at": claimed_at.isoformat(),
                 },
             )
@@ -337,7 +336,7 @@ class SqlCoreState(CoreState, SqlMixin):
         """Extend heartbeat state for the claimed task."""
         # Heartbeats are accepted only for active, unexpired task claims.
         with self.session():
-            current = now().timestamp()
+            current = int(now().timestamp())
             self._cleanup_expired_task_tokens()
             rows = self.query(
                 """
@@ -365,7 +364,7 @@ class SqlCoreState(CoreState, SqlMixin):
             SELECT task_id FROM task
             WHERE token = :token AND active_until >= :current AND finished_at IS NULL
             """,
-            {"token": token, "current": now().timestamp()},
+            {"token": token, "current": int(now().timestamp())},
         )
         if not rows:
             return None
@@ -378,7 +377,7 @@ class SqlCoreState(CoreState, SqlMixin):
         removed.
         """
         expired_at = now()
-        current = expired_at.timestamp()
+        current = int(expired_at.timestamp())
         # Expired task claims are terminal failures and lose their token.
         self.query(
             """
