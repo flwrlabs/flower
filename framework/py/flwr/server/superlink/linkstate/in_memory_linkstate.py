@@ -756,12 +756,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 return True
             return False
 
-    def _on_tokens_expired(self, expired_records: list[tuple[int, float]]) -> None:
+    def _on_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
         """Transition runs with expired tokens to failed status.
 
         Parameters
         ----------
-        expired_records : list[tuple[int, float]]
+        expired_records : list[tuple[int, int]]
             List of tuples containing (run_id, active_until timestamp)
             for expired tokens.
         """

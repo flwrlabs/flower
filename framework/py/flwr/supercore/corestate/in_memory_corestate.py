@@ -44,7 +44,7 @@ class TokenRecord:
     """Record containing token and heartbeat information."""
 
     token: str
-    active_until: float
+    active_until: int
 
 
 class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attributes
@@ -202,7 +202,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             )
             self.task_token_store[task_id] = TokenRecord(
                 token=token,
-                active_until=claimed_at.timestamp() + HEARTBEAT_DEFAULT_INTERVAL,
+                active_until=int(claimed_at.timestamp()) + HEARTBEAT_DEFAULT_INTERVAL,
             )
             self.task_token_to_task_id[token] = task_id
             return token
@@ -262,8 +262,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             if task is None or record is None or task.status.status == Status.FINISHED:
                 return False
 
+            now_int = int(now().timestamp())
             record.active_until = (
-                now().timestamp() + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+                now_int + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
             )
             return True
 
@@ -282,7 +283,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         tokens are removed.
         """
         expired_at = now()
-        current = expired_at.timestamp()
+        current = int(expired_at.timestamp())
         for task_id, record in list(self.task_token_store.items()):
             if record.active_until < current:
                 # The task is considered expired. Mark it as finished with a failed
@@ -307,8 +308,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             if run_id in self.token_store:
                 return None  # Token already created for this run ID
 
+            active_until = int(now().timestamp()) + HEARTBEAT_DEFAULT_INTERVAL
             self.token_store[run_id] = TokenRecord(
-                token=token, active_until=now().timestamp() + HEARTBEAT_DEFAULT_INTERVAL
+                token=token, active_until=active_until
             )
             self.token_to_run_id[token] = run_id
         return token
@@ -346,7 +348,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             # Get the run_id and update heartbeat info
             run_id = self.token_to_run_id[token]
             record = self.token_store[run_id]
-            current = now().timestamp()
+            current = int(now().timestamp())
             record.active_until = (
                 current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
             )
@@ -359,8 +361,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         Subclasses can override `_on_tokens_expired` to add custom cleanup logic.
         """
         with self.lock_token_store:
-            current = now().timestamp()
-            expired_records: list[tuple[int, float]] = []
+            current = int(now().timestamp())
+            expired_records: list[tuple[int, int]] = []
             for run_id, record in list(self.token_store.items()):
                 if record.active_until < current:
                     expired_records.append((run_id, record.active_until))
@@ -372,14 +374,14 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             if expired_records:
                 self._on_tokens_expired(expired_records)
 
-    def _on_tokens_expired(self, expired_records: list[tuple[int, float]]) -> None:
+    def _on_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
         """Handle cleanup of expired tokens.
 
         Override in subclasses to add custom cleanup logic.
 
         Parameters
         ----------
-        expired_records : list[tuple[int, float]]
+        expired_records : list[tuple[int, int]]
             List of tuples containing (run_id, active_until timestamp)
             for expired tokens.
         """
