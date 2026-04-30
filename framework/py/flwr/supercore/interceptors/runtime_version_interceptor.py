@@ -25,9 +25,7 @@ import grpc
 from google.protobuf.message import Message as GrpcMessage
 
 from flwr.common.logger import log
-from flwr.supercore.constant import (
-    VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
-)
+from flwr.supercore.constant import VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
 from flwr.supercore.utils import get_metadata_str
 
