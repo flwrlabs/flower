@@ -47,6 +47,7 @@ from flwr.supercore.auth import (
     load_superexec_auth_secret,
 )
 from flwr.supercore.grpc_health import add_args_health
+from flwr.supercore.tls import try_obtain_optional_appio_server_certificates
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.version import package_version
 from flwr.supernode.start_client_internal import start_client_internal
@@ -66,6 +67,7 @@ def flower_supernode() -> None:
     if trusted_entities:
         _validate_public_keys_ed25519(trusted_entities)
     root_certificates = try_obtain_root_certificates(args, args.superlink)
+    clientappio_certificates = try_obtain_optional_appio_server_certificates(args)
     authentication_keys = _try_setup_client_authentication(args)
     superexec_auth_secret = None
     if args.superexec_auth_secret_file is not None:
@@ -110,6 +112,10 @@ def flower_supernode() -> None:
         ),
         isolation=args.isolation,
         clientappio_api_address=args.clientappio_api_address,
+        clientappio_certificates=clientappio_certificates,
+        clientappio_root_certificates_path=(
+            args.appio_ssl_ca_certfile if clientappio_certificates is not None else None
+        ),
         health_server_address=args.health_server_address,
         trusted_entities=trusted_entities,
         superexec_auth_secret=superexec_auth_secret,
@@ -147,6 +153,27 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
         default=CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
         help="ClientAppIo API (gRPC) server address (IPv4, IPv6, or a domain name). "
         f"By default, it is set to {CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS}.",
+    )
+    parser.add_argument(
+        "--appio-ssl-certfile",
+        help="ClientAppIo API server TLS certificate file (as a path str) "
+        "to create a secure connection. The certificate must include SANs for "
+        "the AppIO API address used by SuperExec.",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
+        "--appio-ssl-keyfile",
+        help="ClientAppIo API server TLS private key file (as a path str) "
+        "to create a secure connection.",
+        type=str,
+    )
+    parser.add_argument(
+        "--appio-ssl-ca-certfile",
+        help="Path to the PEM-encoded CA certificate file used by SuperExec to verify "
+        "the ClientAppIo API server certificate. This is not a client certificate "
+        "for mTLS.",
+        type=str,
     )
     parser.add_argument(
         "--trusted-entities",
