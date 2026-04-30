@@ -189,7 +189,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
         )
 
     except grpc.RpcError as e:
-        log(ERROR, "GRPC error occurred: %s", str(e))
+        log(ERROR, "gRPC error occurred: %s", str(e))
         exit_code = ExitCode.CLIENTAPP_COMMUNICATION_ERROR
 
     flwr_exit(
