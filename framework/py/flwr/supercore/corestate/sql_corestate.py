@@ -299,6 +299,7 @@ class SqlCoreState(CoreState, SqlMixin):
         """Move an unfinished task to finished."""
         sint64_task_id = uint64_to_int64(task_id)
         with self.session():
+            self._cleanup_expired_task_tokens()
             # FINISHED:COMPLETED is only valid from RUNNING.
             completion_constraint = ""
             if substatus == SubStatus.COMPLETED:
