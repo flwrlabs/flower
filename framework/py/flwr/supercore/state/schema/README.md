@@ -104,6 +104,7 @@ erDiagram
     VARCHAR flwr_aid "nullable"
     VARCHAR override_config "nullable"
     VARCHAR pending_at "nullable"
+    BIGINT primary_task_id "nullable"
     BIGINT run_id UK "nullable"
     VARCHAR run_type
     VARCHAR running_at "nullable"
@@ -119,6 +120,7 @@ erDiagram
 
   task {
     VARCHAR connector_ref "nullable"
+    VARCHAR details
     VARCHAR fab_hash "nullable"
     VARCHAR finished_at "nullable"
     VARCHAR model_ref "nullable"
@@ -126,6 +128,7 @@ erDiagram
     BIGINT run_id
     VARCHAR running_at "nullable"
     VARCHAR starting_at "nullable"
+    VARCHAR sub_status
     BIGINT task_id UK
     VARCHAR token "nullable"
     VARCHAR type
