@@ -343,7 +343,6 @@ class SqlCoreState(CoreState, SqlMixin):
             UPDATE task
             SET active_until = :active_until
             WHERE task_id = :task_id
-            AND token IS NOT NULL
             AND active_until >= :current
             AND finished_at IS NULL
             RETURNING task_id
