@@ -77,7 +77,17 @@ class RuntimeVersionClientInterceptor(  # type: ignore
                 client_call_details.metadata
             )
         )
-        return continuation(details, request)
+        call = continuation(details, request)
+        yield from call
+
+        # Log the incompatibility message from the trailing metadata
+        if not self._compatibility_warning_logged:
+            incompat_message = get_metadata_str(
+                call.trailing_metadata(), VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY
+            )
+            if incompat_message:
+                self._compatibility_warning_logged = True
+                log(WARN, incompat_message)
 
 
 class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore
