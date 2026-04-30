@@ -30,7 +30,6 @@ from unittest.mock import patch
 import pytest
 
 from flwr.supercore.superexec.app_supervisor import (
-    AppLaunchResult,
     _run_supervised_app,
     _validate_launch_request,
     _validate_termination_grace_period,
@@ -56,16 +55,15 @@ def test_launch_with_lifeline_wait_returns_app_exit_code() -> None:
 
 
 @POSIX_ONLY
-def test_launch_with_lifeline_without_wait_returns_supervisor_pid() -> None:
-    """Non-waiting launch should return after starting the supervisor."""
+def test_launch_with_lifeline_without_wait_returns_none_after_launch() -> None:
+    """Non-waiting launch should return None after app launch is confirmed."""
     result = launch_with_lifeline(
         [sys.executable, "-c", "pass"],
         wait=False,
         termination_grace_period=0.1,
     )
 
-    assert isinstance(result, AppLaunchResult)
-    assert result.supervisor_pid > 0
+    assert result is None
 
 
 @POSIX_ONLY
