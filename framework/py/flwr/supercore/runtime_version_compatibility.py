@@ -27,7 +27,11 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
-from flwr.supercore.utils import MetadataLookupError, get_metadata_str_checked
+from flwr.supercore.utils import (
+    MetadataLookupError,
+    find_metadata_keys,
+    get_metadata_str_checked,
+)
 from flwr.supercore.version import package_name as flwr_package_name
 from flwr.supercore.version import package_version as flwr_package_version
 
@@ -108,18 +112,20 @@ class RuntimeVersionMetadata:
         self,
         grpc_metadata: Sequence[tuple[str, str | bytes]] | None,
     ) -> tuple[tuple[str, str | bytes], ...]:
-        """Return gRPC metadata with runtime version values added or replaced."""
+        """Return gRPC metadata with runtime version values added."""
         metadata = tuple(grpc_metadata or ())
+        existing_runtime_keys = find_metadata_keys(metadata, _RUNTIME_METADATA_KEYS)
+        if existing_runtime_keys:
+            raise RuntimeError(
+                "gRPC metadata already contains runtime version keys: "
+                f"{', '.join(sorted(existing_runtime_keys))}"
+            )
         runtime_metadata = (
             (FLWR_PACKAGE_NAME_METADATA_KEY, self.package_name),
             (FLWR_PACKAGE_VERSION_METADATA_KEY, self.package_version),
             (FLWR_COMPONENT_NAME_METADATA_KEY, self.component_name),
         )
-        runtime_keys = {key for key, _ in runtime_metadata}
-        filtered_metadata = tuple(
-            (key, value) for key, value in metadata if key not in runtime_keys
-        )
-        return filtered_metadata + runtime_metadata
+        return metadata + runtime_metadata
 
     def check_compatibility(self, peer: RuntimeVersionMetadata | None) -> str | None:
         """Return a rejection message, or ``None`` if the peer is accepted.

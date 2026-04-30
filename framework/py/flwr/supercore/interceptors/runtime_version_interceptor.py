@@ -26,19 +26,10 @@ from google.protobuf.message import Message as GrpcMessage
 
 from flwr.common.logger import log
 from flwr.supercore.constant import (
-    FLWR_COMPONENT_NAME_METADATA_KEY,
-    FLWR_PACKAGE_NAME_METADATA_KEY,
-    FLWR_PACKAGE_VERSION_METADATA_KEY,
     VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
 )
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
-from flwr.supercore.utils import find_metadata_keys, get_metadata_str
-
-_RUNTIME_METADATA_KEYS = (
-    FLWR_PACKAGE_NAME_METADATA_KEY,
-    FLWR_PACKAGE_VERSION_METADATA_KEY,
-    FLWR_COMPONENT_NAME_METADATA_KEY,
-)
+from flwr.supercore.utils import get_metadata_str
 
 
 class RuntimeVersionClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ignore
@@ -54,18 +45,7 @@ class RuntimeVersionClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type
         client_call_details: grpc.ClientCallDetails,
         request: GrpcMessage,
     ) -> grpc.Call:
-        """Add or replace the runtime version metadata headers."""
-        existing_runtime_keys = find_metadata_keys(
-            client_call_details.metadata,
-            _RUNTIME_METADATA_KEYS,
-        )
-        if existing_runtime_keys:
-            log(
-                WARN,
-                "Outbound gRPC metadata already contains runtime version keys; "
-                "replacing existing values for: %s",
-                ", ".join(sorted(existing_runtime_keys)),
-            )
+        """Add the runtime version metadata headers."""
         details = client_call_details._replace(
             metadata=self._metadata.append_to_grpc_metadata(
                 client_call_details.metadata

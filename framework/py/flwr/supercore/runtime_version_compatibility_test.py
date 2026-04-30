@@ -42,19 +42,14 @@ def test_runtime_version_metadata_appends_new_metadata() -> None:
 
 
 def test_runtime_version_metadata_appends_to_grpc_metadata() -> None:
-    """Runtime metadata should replace stale values and preserve unrelated ones."""
+    """Runtime metadata should preserve unrelated metadata when appending."""
     metadata = RuntimeVersionMetadata.from_local_component(
         "simulation",
         package_name_value="flwr",
         package_version_value="1.29.0",
     )
 
-    grpc_metadata = metadata.append_to_grpc_metadata(
-        (
-            (FLWR_PACKAGE_NAME_METADATA_KEY, "old"),
-            ("x-test", "value"),
-        )
-    )
+    grpc_metadata = metadata.append_to_grpc_metadata((("x-test", "value"),))
 
     assert grpc_metadata == (
         ("x-test", "value"),
@@ -62,6 +57,27 @@ def test_runtime_version_metadata_appends_to_grpc_metadata() -> None:
         (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.0"),
         (FLWR_COMPONENT_NAME_METADATA_KEY, "simulation"),
     )
+
+
+def test_runtime_version_metadata_append_rejects_preexisting_runtime_keys() -> None:
+    """Appending should fail fast when runtime-version keys already exist."""
+    metadata = RuntimeVersionMetadata.from_local_component(
+        "simulation",
+        package_name_value="flwr",
+        package_version_value="1.29.0",
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="gRPC metadata already contains runtime version keys: "
+        "flwr-package-name",
+    ):
+        metadata.append_to_grpc_metadata(
+            (
+                (FLWR_PACKAGE_NAME_METADATA_KEY, "old"),
+                ("x-test", "value"),
+            )
+        )
 
 
 def test_build_runtime_version_metadata_rejects_empty_component_name() -> None:
