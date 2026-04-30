@@ -27,11 +27,12 @@ except ImportError:
     class StrEnum(str, Enum):
         """Python 3.10-compatible fallback for enum.StrEnum.
 
-        Preserves StrEnum behavior by returning the member value from str().
-        Remove this fallback once Python 3.10 support is dropped.
+        Preserves StrEnum behavior by returning the member value from str(). Remove this
+        fallback once Python 3.10 support is dropped.
         """
 
         def __str__(self):
+            """Return the member value."""
             return self.value
 
 
