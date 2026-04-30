@@ -80,6 +80,7 @@ class RuntimeVersionClientInterceptor(  # type: ignore
         return continuation(details, request)
 
 
+
 class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore
     """Observe Flower runtime version metadata on inbound unary RPCs."""
 
