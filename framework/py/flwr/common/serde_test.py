@@ -486,6 +486,7 @@ def test_run_serialization_deserialization() -> None:
         status=typing.RunStatus(status="running", sub_status="", details="OK"),
         flwr_aid="user123",
         federation="mock-fed",
+        primary_task_id=42,
         bytes_sent=2048,
         bytes_recv=1024,
         clientapp_runtime=3.14,
