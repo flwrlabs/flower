@@ -115,6 +115,92 @@ class CoreState(ABC):
         """
 
     @abstractmethod
+    def claim_task(self, task_id: int) -> str | None:
+        """Atomically claim a pending task.
+
+        Claiming a task creates a task token, initializes heartbeat state, and
+        moves the task from pending to starting.
+
+        Parameters
+        ----------
+        task_id : int
+            The ID of the task to claim.
+
+        Returns
+        -------
+        Optional[str]
+            The generated task token if the claim succeeds, otherwise `None`.
+        """
+
+    @abstractmethod
+    def activate_task(self, task_id: int) -> bool:
+        """Move a task from starting to running.
+
+        Parameters
+        ----------
+        task_id : int
+            The ID of the task to activate.
+
+        Returns
+        -------
+        bool
+            True if the task existed and transitioned from starting to running,
+            otherwise False.
+        """
+
+    @abstractmethod
+    def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
+        """Move an unfinished task to finished.
+
+        Parameters
+        ----------
+        task_id : int
+            The ID of the task to finish.
+        sub_status : str
+            Terminal task sub-status, such as completed, failed, or stopped.
+            Only RUNNING status can be transitioned to FINISHED:COMPLETED
+        details : str
+            Additional terminal status details.
+
+        Returns
+        -------
+        bool
+            True if the task existed and was not already finished, otherwise
+            False.
+        """
+
+    @abstractmethod
+    def acknowledge_task_heartbeat(self, task_id: int) -> bool:
+        """Extend heartbeat state for the claimed task.
+
+        Parameters
+        ----------
+        task_id : int
+            The ID of the task whose heartbeat should be acknowledged.
+
+        Returns
+        -------
+        bool
+            True if the task heartbeat was acknowledged successfully, otherwise
+            False.
+        """
+
+    @abstractmethod
+    def get_task_id_by_token(self, token: str) -> int | None:
+        """Return the task ID associated with the task token, if valid.
+
+        Parameters
+        ----------
+        token : str
+            The task token to look up.
+
+        Returns
+        -------
+        Optional[int]
+            The task ID if the token is valid, otherwise None.
+        """
+
+    @abstractmethod
     def create_token(self, run_id: int) -> str | None:
         """Create a token for the given run ID.
 

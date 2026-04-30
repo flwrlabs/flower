@@ -15,9 +15,66 @@
 """TLS helpers for SuperExec/AppIO-style gRPC connections."""
 
 
+import argparse
 from pathlib import Path
 
 from flwr.common.exit import ExitCode, flwr_exit
+
+ServerCertificates = tuple[bytes, bytes, bytes]
+
+
+def get_client_tls_args(
+    insecure: bool,
+    root_certificates_path: str | None,
+) -> list[str]:
+    """Return TLS flags for a Flower client process."""
+    if insecure:
+        return ["--insecure"]
+    if root_certificates_path is None:
+        return []
+    return ["--root-certificates", root_certificates_path]
+
+
+def try_obtain_optional_appio_server_certificates(
+    args: argparse.Namespace,
+) -> ServerCertificates | None:
+    """Load AppIO server certificates from `appio_ssl_*` args when provided."""
+    if (
+        args.appio_ssl_certfile
+        and args.appio_ssl_keyfile
+        and args.appio_ssl_ca_certfile
+    ):
+        appio_ssl_ca_certfile = Path(args.appio_ssl_ca_certfile).expanduser()
+        appio_ssl_certfile = Path(args.appio_ssl_certfile).expanduser()
+        appio_ssl_keyfile = Path(args.appio_ssl_keyfile).expanduser()
+        if not appio_ssl_ca_certfile.is_file():
+            flwr_exit(
+                ExitCode.COMMON_PATH_INVALID,
+                "Path argument `--appio-ssl-ca-certfile` does not point to a file.",
+            )
+        if not appio_ssl_certfile.is_file():
+            flwr_exit(
+                ExitCode.COMMON_PATH_INVALID,
+                "Path argument `--appio-ssl-certfile` does not point to a file.",
+            )
+        if not appio_ssl_keyfile.is_file():
+            flwr_exit(
+                ExitCode.COMMON_PATH_INVALID,
+                "Path argument `--appio-ssl-keyfile` does not point to a file.",
+            )
+        return (
+            appio_ssl_ca_certfile.read_bytes(),
+            appio_ssl_certfile.read_bytes(),
+            appio_ssl_keyfile.read_bytes(),
+        )
+    if args.appio_ssl_certfile or args.appio_ssl_keyfile or args.appio_ssl_ca_certfile:
+        flwr_exit(
+            ExitCode.COMMON_TLS_SERVER_CERTIFICATES_INVALID,
+            "You need to provide valid file paths to `--appio-ssl-certfile`, "
+            "`--appio-ssl-keyfile`, and `--appio-ssl-ca-certfile` to create a "
+            "secure AppIO connection.",
+        )
+    return None
 
 
 def validate_and_resolve_root_certificates(

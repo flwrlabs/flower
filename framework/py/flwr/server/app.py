@@ -69,6 +69,10 @@ from flwr.supercore.auth import (
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.tls import (
+    get_client_tls_args,
+    try_obtain_optional_appio_server_certificates,
+)
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.version import package_version
 from flwr.superlink.artifact_provider import ArtifactProvider
@@ -221,7 +225,7 @@ def run_superlink() -> None:
         health_server_address, _, _ = _format_address(args.health_server_address)
 
     # Obtain certificates
-    certificates = try_obtain_server_certificates(args)
+    certificates, appio_certificates = _obtain_superlink_certificates(args)
 
     # Load SuperExec auth secret
     superexec_auth_secret: bytes | None = None
@@ -359,7 +363,7 @@ def run_superlink() -> None:
         address=serverappio_address,
         state_factory=state_factory,
         objectstore_factory=objectstore_factory,
-        certificates=None,  # ServerAppIo API doesn't support SSL yet
+        certificates=appio_certificates,
         superexec_auth_secret=superexec_auth_secret,
     )
     grpc_servers.append(serverappio_server)
@@ -446,12 +450,13 @@ def run_superlink() -> None:
         # bound_address contains the actual address when the port is set to :0
         # which means let the OS choose a free port.
         appio_address = resolve_bind_address(serverappio_server.bound_address)
-        command = ["flower-superexec", "--insecure"]
-        command += ["--appio-api-address", appio_address]
-        command += ["--plugin-type", ExecPluginType.SERVER_APP]
-        command += ["--parent-pid", str(os.getpid())]
-        if args.runtime_dependency_install:
-            command += ["--allow-runtime-dependency-installation"]
+        command = _get_superexec_command(
+            appio_address=appio_address,
+            appio_certificates=appio_certificates,
+            appio_root_certificates_path=args.appio_ssl_ca_certfile,
+            parent_pid=os.getpid(),
+            runtime_dependency_install=args.runtime_dependency_install,
+        )
         # pylint: disable-next=consider-using-with
         subprocess.Popen(command)
 
@@ -485,6 +490,44 @@ def _format_address(address: str) -> tuple[str, str, int]:
         )
     host, port, is_v6 = parsed_address
     return (f"[{host}]:{port}" if is_v6 else f"{host}:{port}", host, port)
+
+
+def _obtain_superlink_certificates(
+    args: argparse.Namespace,
+) -> tuple[tuple[bytes, bytes, bytes] | None, tuple[bytes, bytes, bytes] | None]:
+    """Return Fleet/Control and ServerAppIo certificate tuples."""
+    if args.insecure:
+        log(
+            WARN,
+            "Option `--insecure` was set. Starting insecure HTTP server with "
+            "unencrypted communication (TLS disabled). Proceed only if you understand "
+            "the risks.",
+        )
+        return None, None
+    certificates = try_obtain_server_certificates(args)
+    appio_certificates = try_obtain_optional_appio_server_certificates(args)
+    return certificates, appio_certificates
+
+
+def _get_superexec_command(
+    appio_address: str,
+    appio_certificates: tuple[bytes, bytes, bytes] | None,
+    appio_root_certificates_path: str | None,
+    parent_pid: int,
+    runtime_dependency_install: bool,
+) -> list[str]:
+    """Return the auto-launched SuperExec command for ServerApp subprocesses."""
+    command = ["flower-superexec"]
+    command += get_client_tls_args(
+        insecure=appio_certificates is None,
+        root_certificates_path=appio_root_certificates_path,
+    )
+    command += ["--appio-api-address", appio_address]
+    command += ["--plugin-type", ExecPluginType.SERVER_APP]
+    command += ["--parent-pid", str(parent_pid)]
+    if runtime_dependency_install:
+        command += ["--allow-runtime-dependency-installation"]
+    return command
 
 
 def _load_control_auth_plugins(
@@ -711,21 +754,21 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--ssl-certfile",
-        help="Fleet API server SSL certificate file (as a path str) "
-        "to create a secure connection.",
+        help="Server TLS certificate file for Fleet API and Control API "
+        "(as a path str) to create a secure connection.",
         type=str,
         default=None,
     )
     parser.add_argument(
         "--ssl-keyfile",
-        help="Fleet API server SSL private key file (as a path str) "
-        "to create a secure connection.",
+        help="Server TLS private key file for Fleet API and Control API "
+        "(as a path str) to create a secure connection.",
         type=str,
     )
     parser.add_argument(
         "--ssl-ca-certfile",
-        help="Fleet API server SSL CA certificate file (as a path str) "
-        "to create a secure connection.",
+        help="Server TLS CA certificate file for Fleet API and Control API "
+        "(as a path str) to create a secure connection.",
         type=str,
     )
     parser.add_argument(
@@ -790,6 +833,27 @@ def _add_args_serverappio_api(parser: argparse.ArgumentParser) -> None:
         help="ServerAppIo API (gRPC) server address (IPv4, IPv6, or a domain name). "
         "`--simulationio-api-address` is accepted as a deprecated alias. "
         f"By default, it is set to {SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS}.",
+    )
+    parser.add_argument(
+        "--appio-ssl-certfile",
+        help="ServerAppIo API server TLS certificate file (as a path str) "
+        "to create a secure connection. The certificate must include SANs for "
+        "the AppIO API address used by SuperExec.",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
+        "--appio-ssl-keyfile",
+        help="ServerAppIo API server TLS private key file (as a path str) "
+        "to create a secure connection.",
+        type=str,
+    )
+    parser.add_argument(
+        "--appio-ssl-ca-certfile",
+        help="Path to the PEM-encoded CA certificate file used by SuperExec to verify "
+        "the ServerAppIo API server certificate. This is not a client certificate "
+        "for mTLS.",
+        type=str,
     )
 
 

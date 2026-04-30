@@ -119,6 +119,7 @@ erDiagram
   }
 
   task {
+    BIGINT active_until "nullable"
     VARCHAR connector_ref "nullable"
     VARCHAR details
     VARCHAR fab_hash "nullable"
