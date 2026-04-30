@@ -55,7 +55,7 @@ class StateTest(unittest.TestCase):
         self.assertEqual(len(tasks), 1)
         task = tasks[0]
         self.assertEqual(task.task_id, task_id)
-        self.assertEqual(task.type, TaskType.MODEL.value)
+        self.assertEqual(task.type, TaskType.MODEL)
         self.assertEqual(task.run_id, 42)
         self.assertEqual(
             task.status,
@@ -77,7 +77,7 @@ class StateTest(unittest.TestCase):
     def test_get_tasks_single_status_matches(self) -> None:
         """A single-item status sequence should match pending tasks."""
         state = self.state_factory()
-        _ = state.create_task(task_type=TaskType.MODEL.value, run_id=42)
+        _ = state.create_task(task_type=TaskType.MODEL, run_id=42)
 
         tasks = state.get_tasks(statuses=[Status.PENDING])
 
@@ -102,7 +102,7 @@ class StateTest(unittest.TestCase):
         """Retrieved task should be a defensive copy."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type=TaskType.SERVER_APP.value,
+            task_type=TaskType.SERVER_APP,
             run_id=42,
             fab_hash="fab-hash",
             model_ref=None,

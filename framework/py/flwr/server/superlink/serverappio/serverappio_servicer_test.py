@@ -468,7 +468,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         """Test `CreateTask` stores a pending task."""
         run_id = self._create_dummy_run()
         request = CreateTaskRequest(
-            type=TaskType.SERVER_APP.value,
+            type=TaskType.SERVER_APP,
             run_id=run_id,
             fab_hash="hash123",
         )
@@ -481,7 +481,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         self.assertEqual(len(tasks), 1)
         task = tasks[0]
         self.assertEqual(task.task_id, response.task_id)
-        self.assertEqual(task.type, TaskType.SERVER_APP.value)
+        self.assertEqual(task.type, TaskType.SERVER_APP)
         self.assertEqual(task.run_id, run_id)
         self.assertEqual(
             task.status,
@@ -501,7 +501,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             with self.assertRaises(grpc.RpcError) as err:
                 self._create_task.with_call(
                     request=CreateTaskRequest(
-                        type=TaskType.SERVER_APP.value,
+                        type=TaskType.SERVER_APP,
                         run_id=run_id,
                         fab_hash="hash123",
                     )
@@ -525,24 +525,24 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
     @parameterized.expand(
         [
             (
-                TaskType.SERVER_APP.value,
-                f"Task type '{TaskType.SERVER_APP.value}' requires fab_hash.",
+                TaskType.SERVER_APP,
+                f"Task type '{TaskType.SERVER_APP}' requires fab_hash.",
             ),
             (
-                TaskType.CLIENT_APP.value,
-                f"Task type '{TaskType.CLIENT_APP.value}' requires fab_hash.",
+                TaskType.CLIENT_APP,
+                f"Task type '{TaskType.CLIENT_APP}' requires fab_hash.",
             ),
             (
-                TaskType.AGENT_APP.value,
-                f"Task type '{TaskType.AGENT_APP.value}' requires fab_hash.",
+                TaskType.AGENT_APP,
+                f"Task type '{TaskType.AGENT_APP}' requires fab_hash.",
             ),
             (
-                TaskType.MODEL.value,
-                f"Task type '{TaskType.MODEL.value}' requires model_ref.",
+                TaskType.MODEL,
+                f"Task type '{TaskType.MODEL}' requires model_ref.",
             ),
             (
-                TaskType.CONNECTOR.value,
-                f"Task type '{TaskType.CONNECTOR.value}' requires connector_ref.",
+                TaskType.CONNECTOR,
+                f"Task type '{TaskType.CONNECTOR}' requires connector_ref.",
             ),
         ]
     )  # type: ignore
@@ -565,7 +565,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         with self.assertRaises(grpc.RpcError) as err:
             self._create_task.with_call(
                 request=CreateTaskRequest(
-                    type=TaskType.MODEL.value,
+                    type=TaskType.MODEL,
                     run_id=42,
                     model_ref="model://test",
                 )
