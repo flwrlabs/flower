@@ -149,7 +149,7 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def finish_task(self, task_id: int, sub_status: str, detail: str) -> bool:
+    def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished.
 
         Parameters
