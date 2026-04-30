@@ -14,7 +14,6 @@
 # ==============================================================================
 """Runtime version metadata interceptors."""
 
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -30,9 +29,9 @@ from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
 from flwr.supercore.utils import get_metadata_str
 
 
-class RuntimeVersionClientInterceptor(  # type: ignore
-    grpc.UnaryUnaryClientInterceptor,
-    grpc.UnaryStreamClientInterceptor,
+class RuntimeVersionClientInterceptor(
+    grpc.UnaryUnaryClientInterceptor,  # type: ignore[misc]
+    grpc.UnaryStreamClientInterceptor,  # type: ignore[misc]
 ):
     """Attach Flower runtime version metadata to outbound unary RPCs."""
 
@@ -90,7 +89,7 @@ class RuntimeVersionClientInterceptor(  # type: ignore
                 log(WARN, incompat_message)
 
 
-class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore
+class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):
     """Observe Flower runtime version metadata on inbound unary RPCs."""
 
     def __init__(
