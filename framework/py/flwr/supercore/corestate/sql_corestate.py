@@ -336,30 +336,30 @@ class SqlCoreState(CoreState, SqlMixin):
     def acknowledge_task_heartbeat(self, task_id: int) -> bool:
         """Extend heartbeat state for the claimed task."""
         # Heartbeats are accepted only for active, unexpired task claims.
-        self._cleanup_expired_task_tokens()
-        current = now().timestamp()
-        rows = self.query(
-            """
-            UPDATE task
-            SET active_until = :active_until
-            WHERE task_id = :task_id
-            AND active_until >= :current
-            AND finished_at IS NULL
-            RETURNING task_id
-            """,
-            {
-                "task_id": uint64_to_int64(task_id),
-                "current": current,
-                "active_until": (
-                    current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-                ),
-            },
-        )
+        with self.session():
+            current = now().timestamp()
+            self._cleanup_expired_task_tokens()
+            rows = self.query(
+                """
+                UPDATE task
+                SET active_until = :active_until
+                WHERE task_id = :task_id
+                AND active_until >= :current
+                AND finished_at IS NULL
+                RETURNING task_id
+                """,
+                {
+                    "task_id": uint64_to_int64(task_id),
+                    "current": current,
+                    "active_until": (
+                        current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+                    ),
+                },
+            )
         return len(rows) > 0
 
     def get_task_id_by_token(self, token: str) -> int | None:
         """Return the task ID associated with the task token, if valid."""
-
         rows = self.query(
             """
             SELECT task_id FROM task

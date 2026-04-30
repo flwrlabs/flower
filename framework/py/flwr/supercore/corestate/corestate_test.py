@@ -278,6 +278,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
                 seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
             )
             self.assertIsNone(state.get_task_id_by_token(token))
+            self.assertFalse(state.acknowledge_task_heartbeat(task_id))
 
         tasks = state.get_tasks(task_ids=[task_id])
         self.assertEqual(len(tasks), 1)
