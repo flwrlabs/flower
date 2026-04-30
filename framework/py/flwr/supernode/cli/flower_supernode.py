@@ -121,6 +121,7 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
     """Parse flower-supernode command line arguments."""
     parser = argparse.ArgumentParser(
         description="Start a Flower SuperNode",
+        fromfile_prefix_chars="@",
     )
     parser.add_argument(
         "-V",
