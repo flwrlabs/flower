@@ -289,13 +289,10 @@ class SqlCoreState(CoreState, SqlMixin):
 
             # Activation is a strict STARTING -> RUNNING transition.
             rows = self.query(
-                """
+                f"""
                 UPDATE task
                 SET running_at = :running_at
-                WHERE task_id = :task_id
-                AND starting_at IS NOT NULL
-                AND running_at IS NULL
-                AND finished_at IS NULL
+                WHERE task_id = :task_id AND {STATUS_CONDITIONS[Status.STARTING]}
                 RETURNING task_id
                 """,
                 {"task_id": uint64_to_int64(task_id), "running_at": now().isoformat()},
@@ -310,9 +307,9 @@ class SqlCoreState(CoreState, SqlMixin):
             # FINISHED:COMPLETED is only valid from RUNNING.
             completion_constraint = ""
             if sub_status == SubStatus.COMPLETED:
-                completion_constraint = " AND running_at IS NOT NULL"
+                completion_constraint = "AND running_at IS NOT NULL"
 
-            updated = self.query(
+            rows = self.query(
                 f"""
                 UPDATE task
                 SET finished_at = :finished_at,
@@ -331,7 +328,7 @@ class SqlCoreState(CoreState, SqlMixin):
                     "details": details,
                 },
             )
-            if not updated:
+            if not rows:
                 return False
 
             return True
