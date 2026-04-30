@@ -26,7 +26,6 @@ import sys
 import threading
 import time
 from collections.abc import Sequence
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -44,20 +43,13 @@ _POLL_INTERVAL = 0.1
 _STDIO_POPEN_KWARGS = frozenset({"stdin", "stdout", "stderr"})
 
 
-@dataclass(frozen=True)
-class AppLaunchResult:
-    """Result for a non-waiting app launch."""
-
-    supervisor_pid: int
-
-
 def launch_with_lifeline(
     command: list[str],
     *,
     wait: bool,
     popen_kwargs: dict[str, Any] | None = None,
     termination_grace_period: float = 5.0,
-) -> AppLaunchResult | int:
+) -> int | None:
     """Launch an app command through a supervisor with a lifeline FD.
 
     When ``wait`` is ``False``, this returns after the supervisor starts and
@@ -125,7 +117,7 @@ def launch_with_lifeline(
 
         _start_supervisor_reaper(supervisor, lifeline_write_fd)
         lifeline_write_fd = -1
-        return AppLaunchResult(supervisor_pid=supervisor.pid)
+        return None
     except Exception:
         if supervisor is not None and supervisor.poll() is None:
             supervisor.terminate()
