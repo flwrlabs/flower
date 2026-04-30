@@ -285,9 +285,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             if record.active_until < current:
                 # The task is considered expired. Mark it as finished with a failed
                 # status if it's not already finished, and remove the token.
-                if (
-                    task := self.task_store.get(task_id)
-                ) is not None and task.status.status != Status.FINISHED:
+                task = self.task_store.get(task_id)
+                if task and task.status.status != Status.FINISHED:
                     task.finished_at = expired_at.isoformat()
                     task.status.CopyFrom(
                         TaskStatus(
