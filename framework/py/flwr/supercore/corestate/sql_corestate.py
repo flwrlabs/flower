@@ -42,6 +42,7 @@ from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 from ..object_store import ObjectStore
 from .corestate import CoreState
 from .utils import generate_rand_int_from_bytes
+
 # Define SQL conditions for task statuses to ensure consistency across queries
 STATUS_CONDITIONS = {
     Status.PENDING: "(starting_at IS NULL AND finished_at IS NULL)",
@@ -251,32 +252,31 @@ class SqlCoreState(CoreState, SqlMixin):
         claimed_at = now()
         sint64_task_id = uint64_to_int64(task_id)
         try:
-            with self.session():
-                # The conditional UPDATE is the atomic claim: exactly one caller can
-                # move a pending, unclaimed task to STARTING and attach a token.
-                rows = self.query(
-                    f"""
-                    UPDATE task
-                    SET token = :token,
-                        active_until = :active_until,
-                        starting_at = :starting_at
-                    WHERE task_id = :task_id AND token IS NULL
-                    AND {STATUS_CONDITIONS[Status.PENDING]}
-                    RETURNING task_id
-                    """,
-                    {
-                        "task_id": sint64_task_id,
-                        "token": token,
-                        "active_until": (
-                            claimed_at.timestamp() + HEARTBEAT_DEFAULT_INTERVAL
-                        ),
-                        "starting_at": claimed_at.isoformat(),
-                    },
-                )
-                if not rows:
-                    return None
+            # The conditional UPDATE is the atomic claim: exactly one caller can
+            # move a pending, unclaimed task to STARTING and attach a token.
+            rows = self.query(
+                f"""
+                UPDATE task
+                SET token = :token,
+                    active_until = :active_until,
+                    starting_at = :starting_at
+                WHERE task_id = :task_id AND token IS NULL
+                AND {STATUS_CONDITIONS[Status.PENDING]}
+                RETURNING task_id
+                """,
+                {
+                    "task_id": sint64_task_id,
+                    "token": token,
+                    "active_until": (
+                        claimed_at.timestamp() + HEARTBEAT_DEFAULT_INTERVAL
+                    ),
+                    "starting_at": claimed_at.isoformat(),
+                },
+            )
+            if not rows:
+                return None
 
-                return token
+            return token
         except IntegrityError:
             return None
 
