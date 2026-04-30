@@ -36,7 +36,28 @@ from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN, MAX_NAME_LENGTH
 
 T = TypeVar("T", str, bytes)
 PR_SET_DUMPABLE = 4  # from /usr/include/linux/prctl.h
-MetadataLookupError = Literal["missing", "duplicate", "wrong_type", "empty"]
+
+
+MetadataLookupErrorType = Literal["missing", "duplicate", "wrong_type", "empty"]
+
+
+class MetadataLookupError(Exception):
+    """Error type for metadata lookup failures."""
+
+    def __init__(self, key: str, error_type: MetadataLookupErrorType) -> None:
+        self.key = key
+        self.error_type = error_type
+        if error_type == "missing":
+            message = f"Metadata key '{key}' is missing."
+        elif error_type == "duplicate":
+            message = f"Metadata key '{key}' has duplicate values."
+        elif error_type == "wrong_type":
+            message = f"Metadata key '{key}' has a value of the wrong type."
+        elif error_type == "empty":
+            message = f"Metadata key '{key}' has an empty value."
+        else:
+            message = f"Metadata key '{key}' has an unknown error: {error_type}."
+        super().__init__(message)
 
 
 def mask_string(value: str, head: int = 4, tail: int = 4) -> str:
@@ -344,27 +365,6 @@ def is_valid_name(name: str) -> tuple[bool, str]:
     return True, ""
 
 
-def _get_metadata_typed(
-    metadata: Sequence[tuple[str, str | bytes]] | None,
-    key: str,
-    value_type: type[T],
-) -> T | None:
-    """Return exactly one non-empty string or bytes metadata value for `key`."""
-    if metadata is None:
-        return None
-    values: list[Any] = [
-        value for metadata_key, value in metadata if metadata_key == key
-    ]
-    if len(values) != 1:
-        return None
-    value = values[0]
-    if not isinstance(value, value_type):
-        return None
-    if value in ("", b""):
-        return None
-    return value
-
-
 def find_metadata_keys(
     metadata: Sequence[tuple[str, str | bytes]] | None,
     keys: Iterable[str],
@@ -377,48 +377,86 @@ def find_metadata_keys(
     return {metadata_key for metadata_key, _ in metadata if metadata_key in key_set}
 
 
-def get_metadata_str(
+def _get_metadata_typed_checked(
     metadata: Sequence[tuple[str, str | bytes]] | None,
     key: str,
-) -> str | None:
-    """Return exactly one non-empty string metadata value for `key`."""
-    return _get_metadata_typed(metadata, key, str)
+    value_type: type[T],
+) -> T:
+    """Return exactly one non-empty string or bytes metadata value for `key`.
+
+    Raises
+    ------
+    MetadataLookupError
+        If the metadata value for `key` is missing, duplicated, of the wrong type,
+        or empty.
+    """
+    values: list[Any] = [
+        value for metadata_key, value in metadata or [] if metadata_key == key
+    ]
+    if not values:
+        raise MetadataLookupError(key, "missing")
+    if len(values) > 1:
+        raise MetadataLookupError(key, "duplicate")
+    value = values[0]
+    if not isinstance(value, value_type):
+        raise MetadataLookupError(key, "wrong_type")
+    if value in ("", b""):
+        raise MetadataLookupError(key, "empty")
+    return value
 
 
 def get_metadata_str_checked(
     metadata: Sequence[tuple[str, str | bytes]] | None,
     key: str,
-) -> tuple[str | None, MetadataLookupError | None]:
-    """Return a checked string metadata lookup result for `key`.
+) -> str:
+    """Return exactly one non-empty string metadata value for `key`.
 
-    This distinguishes the cases that `get_metadata_str` intentionally collapses
-    into `None`: missing value, duplicate values, wrong type, and empty value.
+    Raises
+    ------
+    MetadataLookupError
+        If the metadata value for `key` is missing, duplicated, of the wrong type,
+        or empty.
     """
-    if metadata is None:
-        return None, "missing"
+    return _get_metadata_typed_checked(metadata, key, str)
 
-    values = [value for metadata_key, value in metadata if metadata_key == key]
-    if not values:
-        return None, "missing"
-    if len(values) != 1:
-        return None, "duplicate"
 
-    value = values[0]
-    if not isinstance(value, str):
-        return None, "wrong_type"
-    stripped_value = value.strip()
-    if stripped_value == "":
-        return None, "empty"
+def get_metadata_bytes_checked(
+    metadata: Sequence[tuple[str, str | bytes]] | None,
+    key: str,
+) -> bytes:
+    """Return exactly one non-empty bytes metadata value for `key`.
 
-    return stripped_value, None
+    Raises
+    ------
+    MetadataLookupError
+        If the metadata value for `key` is missing, duplicated, of the wrong type,
+        or empty.
+    """
+    return _get_metadata_typed_checked(metadata, key, bytes)
+
+
+def get_metadata_str(
+    metadata: Sequence[tuple[str, str | bytes]] | None,
+    key: str,
+) -> str | None:
+    """Return exactly one non-empty string metadata value for `key`, or None if not
+    found or invalid."""
+    try:
+        return get_metadata_str_checked(metadata, key)
+    except MetadataLookupError:
+        return None
 
 
 def get_metadata_bytes(
     metadata: Sequence[tuple[str, str | bytes]] | None,
     key: str,
 ) -> bytes | None:
-    """Return exactly one non-empty bytes metadata value for `key`."""
-    return _get_metadata_typed(metadata, key, bytes)
+    """Return exactly one non-empty bytes metadata value for `key`, or None if not found
+    or invalid."""
+    try:
+        return get_metadata_bytes_checked(metadata, key)
+    except MetadataLookupError:
+        return None
 
 
 def disable_process_dumping(strict: bool) -> None:

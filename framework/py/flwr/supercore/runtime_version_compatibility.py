@@ -27,7 +27,7 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
 )
-from flwr.supercore.utils import get_metadata_str_checked
+from flwr.supercore.utils import MetadataLookupError, get_metadata_str_checked
 from flwr.supercore.version import package_name as flwr_package_name
 from flwr.supercore.version import package_version as flwr_package_version
 
@@ -59,6 +59,17 @@ class RuntimeVersionMetadata:
         component_name = component_name.strip()
         if component_name == "":
             raise ValueError("`component_name` must be a non-empty string")
+
+        # Check version validity when the package name is recognized
+        if package_name_value != "unknown":
+            try:
+                Version(package_version_value)
+            except InvalidVersion:
+                raise ValueError(
+                    "`package_version_value` is not a valid version: "
+                    f"{package_version_value!r}"
+                ) from None
+
         return cls(
             package_name=package_name_value,
             package_version=package_version_value,
@@ -71,42 +82,27 @@ class RuntimeVersionMetadata:
         grpc_metadata: Sequence[tuple[str, str | bytes]] | None,
     ) -> tuple[RuntimeVersionMetadata | None, str | None]:
         """Parse runtime version metadata from a gRPC metadata sequence."""
-        values_by_key = {
-            key: get_metadata_str_checked(grpc_metadata, key)
-            for key in _RUNTIME_METADATA_KEYS
-        }
-
-        if all(error == "missing" for _, error in values_by_key.values()):
+        # TEMPORARY: allow continuation when all runtime metadata keys are missing
+        # to avoid hard-failing older clients without metadata
+        if _metadata_is_missing(grpc_metadata):
             return None, None
 
-        for error_kind, message_prefix in (
-            ("missing", "Missing required Flower runtime metadata: "),
-            ("duplicate", "Flower runtime metadata contains duplicate values: "),
-            ("wrong_type", "Flower runtime metadata contains non-string values: "),
-            ("empty", "Flower runtime metadata contains empty values: "),
-        ):
-            matching_keys = [
-                key for key, (_, error) in values_by_key.items() if error == error_kind
-            ]
-            if matching_keys:
-                matching_keys_str = ", ".join(sorted(matching_keys))
-                return None, f"{message_prefix}{matching_keys_str}."
+        try:
+            ret = RuntimeVersionMetadata(
+                package_name=get_metadata_str_checked(
+                    grpc_metadata, FLWR_PACKAGE_NAME_METADATA_KEY
+                ),
+                package_version=get_metadata_str_checked(
+                    grpc_metadata, FLWR_PACKAGE_VERSION_METADATA_KEY
+                ),
+                component_name=get_metadata_str_checked(
+                    grpc_metadata, FLWR_COMPONENT_NAME_METADATA_KEY
+                ),
+            )
+            return ret, None
 
-        package_name = values_by_key[FLWR_PACKAGE_NAME_METADATA_KEY][0]
-        package_version = values_by_key[FLWR_PACKAGE_VERSION_METADATA_KEY][0]
-        component_name = values_by_key[FLWR_COMPONENT_NAME_METADATA_KEY][0]
-        assert package_name is not None
-        assert package_version is not None
-        assert component_name is not None
-
-        return (
-            cls(
-                package_name=package_name,
-                package_version=package_version,
-                component_name=component_name,
-            ),
-            None,
-        )
+        except MetadataLookupError as e:
+            return None, f"Invalid Flower runtime metadata: {str(e)}"
 
     def append_to_grpc_metadata(
         self,
@@ -125,104 +121,70 @@ class RuntimeVersionMetadata:
         )
         return filtered_metadata + runtime_metadata
 
+    def check_compatibility(self, peer: RuntimeVersionMetadata | None) -> str | None:
+        """Return a rejection message, or ``None`` if the peer is accepted.
 
-def format_incompatible_version_message(
-    connection_name: str,
-    local_metadata: RuntimeVersionMetadata,
-    peer_metadata: RuntimeVersionMetadata,
-) -> str:
-    """Format the standard incompatible-version error message."""
-    return (
-        f"Incompatible Flower version for {connection_name}.\n"
-        f"Local {local_metadata.component_name} version "
-        f"{local_metadata.package_version} only accepts peers from the same "
-        f"major.minor release, but received {peer_metadata.component_name} "
-        f"version {peer_metadata.package_version}."
-    )
+        Rejects the peer if any of the following are true:
+        - The peer's Flower package name is not recognized.
+        - The peer's Flower version cannot be parsed as a valid version.
+        - The peer's major or minor version differs from the local version.
 
+        Accepts the peer (returns ``None``) if any of the following are true:
+        - The peer metadata is missing (temporary allowance for older clients).
+        - The local package name is not recognized.
+        - The peer's major and minor version match the local version.
+        """
+        # TEMPORARY: allow continuation when peer metadata is missing to avoid
+        # hard-failing older clients without metadata
+        if peer is None:
+            return None
 
-def format_invalid_metadata_message(connection_name: str, detail: str) -> str:
-    """Format a standard invalid-metadata error message."""
-    return f"Invalid Flower version metadata for {connection_name}. {detail}"
+        # Reject suspicious peer package name
+        peer_package_name = peer.package_name.strip()
+        if peer_package_name not in _SUPPORTED_FLOWER_PACKAGE_NAMES:
+            return f"Peer Flower package name is not recognized: {peer_package_name!r}."
 
+        # Allow continuation when the local package name is not recognized
+        if self.package_name.strip() not in _SUPPORTED_FLOWER_PACKAGE_NAMES:
+            return None
 
-def get_runtime_version_rejection(
-    connection_name: str,
-    local_metadata: RuntimeVersionMetadata,
-    peer_metadata: RuntimeVersionMetadata | None,
-) -> str | None:
-    """Return a rejection message, or `None` when the peer should continue."""
-    if peer_metadata is None:
+        # Parse versions
+        local_version = Version(self.package_version)
+        try:
+            peer_version = Version(peer.package_version)
+        except InvalidVersion:
+            return (
+                f"Peer Flower version metadata cannot be parsed: "
+                f"{peer.package_version!r}."
+            )
+
+        # Check major.minor compatibility
+        if (
+            local_version.major != peer_version.major
+            or local_version.minor != peer_version.minor
+        ):
+            return (
+                f"{self.component_name} version {self.package_version} only accepts "
+                "peers from the same major.minor release, but received "
+                f"{peer.component_name} version {peer.package_version}."
+            )
+
+        # Versions are compatible
         return None
 
-    if local_metadata.package_name.strip() not in _SUPPORTED_FLOWER_PACKAGE_NAMES:
-        return None
 
-    package_name_error = _get_package_name_error(local_metadata, peer_metadata)
-    if package_name_error is not None:
-        return format_invalid_metadata_message(connection_name, package_name_error)
+def _metadata_is_missing(
+    metadata: Sequence[tuple[str, str | bytes]] | None,
+) -> bool:
+    """Return `True` if all runtime metadata keys are missing from the gRPC metadata.
 
-    local_version, local_error = _parse_runtime_version(
-        local_metadata.package_version, subject="Local"
-    )
-    if local_error is not None:
-        return format_invalid_metadata_message(connection_name, local_error)
-
-    peer_version, peer_error = _parse_runtime_version(
-        peer_metadata.package_version, subject="Peer"
-    )
-    if peer_error is not None:
-        return format_invalid_metadata_message(connection_name, peer_error)
-
-    assert local_version is not None
-    assert peer_version is not None
-
-    rejection = None
-    if (
-        local_version.major != peer_version.major
-        or local_version.minor != peer_version.minor
-    ):
-        rejection = format_incompatible_version_message(
-            connection_name,
-            local_metadata,
-            peer_metadata,
-        )
-
-    return rejection
-
-
-def _get_package_name_error(
-    local_metadata: RuntimeVersionMetadata,
-    peer_metadata: RuntimeVersionMetadata,
-) -> str | None:
-    """Return an error when the peer package name is not first-party.
-
-    The local runtime can legitimately report `unknown` in source/non-installed
-    environments, so that case must not turn the receiver into a hard-failing
-    gate for every incoming RPC.
+    This is a TEMPORARY helper to allow older clients without runtime metadata to
+    continue working rather than being rejected for missing metadata. It is safe to
+    remove this once the minimum supported Flower version is new enough that all clients
+    are expected to include runtime metadata.
     """
-    local_package_name = local_metadata.package_name.strip()
-    if local_package_name not in _SUPPORTED_FLOWER_PACKAGE_NAMES:
-        return None
+    if metadata is None:
+        return True
 
-    peer_package_name = peer_metadata.package_name.strip()
-    if peer_package_name not in _SUPPORTED_FLOWER_PACKAGE_NAMES:
-        return (
-            "Peer Flower package name is not recognized: "
-            f"{peer_metadata.package_name!r}."
-        )
-
-    return None
-
-
-def _parse_runtime_version(
-    package_version: str, *, subject: str
-) -> tuple[Version | None, str | None]:
-    """Parse a runtime version string or return the invalid-metadata reason."""
-    try:
-        return Version(package_version), None
-    except InvalidVersion:
-        return (
-            None,
-            f"{subject} Flower version metadata cannot be parsed: {package_version!r}.",
-        )
+    metadata_keys = {key for key, _ in metadata}
+    return all(key not in metadata_keys for key in _RUNTIME_METADATA_KEYS)

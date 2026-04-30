@@ -29,9 +29,10 @@ from flwr.supercore.constant import (
     FLWR_COMPONENT_NAME_METADATA_KEY,
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
+    VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
 )
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
-from flwr.supercore.utils import find_metadata_keys
+from flwr.supercore.utils import find_metadata_keys, get_metadata_str
 
 _RUNTIME_METADATA_KEYS = (
     FLWR_PACKAGE_NAME_METADATA_KEY,
@@ -44,7 +45,10 @@ class RuntimeVersionClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type
     """Attach Flower runtime version metadata to outbound unary RPCs."""
 
     def __init__(self, component_name: str) -> None:
-        self._metadata = RuntimeVersionMetadata.from_local_component(component_name)
+        self._metadata = RuntimeVersionMetadata.from_local_component(
+            component_name, package_version_value="1.32.0"
+        )
+        self._compatibility_warning_logged = False
 
     def intercept_unary_unary(
         self,
@@ -69,7 +73,18 @@ class RuntimeVersionClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type
                 client_call_details.metadata
             )
         )
-        return continuation(details, request)
+        call: grpc.Call = continuation(details, request)
+
+        # Log the incompatibility message from the response metadata
+        if not self._compatibility_warning_logged:
+            incompat_message = get_metadata_str(
+                call.trailing_metadata(), VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY
+            )
+            if incompat_message:
+                self._compatibility_warning_logged = True
+                log(WARN, incompat_message)
+
+        return call
 
 
 class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore
@@ -90,14 +105,36 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         handler_call_details: grpc.HandlerCallDetails,
     ) -> grpc.RpcMethodHandler:
         """Parse peer runtime metadata, then continue normal RPC handling."""
-        method_handler = continuation(handler_call_details)
+        method_handler: grpc.RpcMethodHandler = continuation(handler_call_details)
         if method_handler is None or method_handler.unary_unary is None:
             return method_handler
 
-        RuntimeVersionMetadata.from_grpc_metadata(
+        # Parse and validate peer metadata
+        peer_metadata, incompat_details = RuntimeVersionMetadata.from_grpc_metadata(
             handler_call_details.invocation_metadata
         )
-        return method_handler
+
+        # Check compatibility and return any rejection message
+        if incompat_details is None:
+            incompat_details = self._local_metadata.check_compatibility(peer_metadata)
+
+        # Attach the incompatibility message to the trailing metadata if present
+        def wrapped(request: GrpcMessage, context: grpc.ServicerContext) -> GrpcMessage:
+            if incompat_details:
+                incompat_message = (
+                    "Runtime version compatibility check failed for "
+                    f"{self._connection_name}. {incompat_details}"
+                )
+                context.set_trailing_metadata(
+                    ((VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, incompat_message),)
+                )
+            return method_handler.unary_unary(request, context)  # type: ignore
+
+        return grpc.unary_unary_rpc_method_handler(
+            wrapped,
+            request_deserializer=method_handler.request_deserializer,
+            response_serializer=method_handler.response_serializer,
+        )
 
 
 def create_serverappio_runtime_version_server_interceptor(
@@ -106,5 +143,5 @@ def create_serverappio_runtime_version_server_interceptor(
     """Create the default runtime version interceptor for ServerAppIo."""
     return RuntimeVersionServerInterceptor(
         connection_name=connection_name,
-        local_metadata=RuntimeVersionMetadata.from_local_component("superlink"),
+        local_metadata=RuntimeVersionMetadata.from_local_component("SuperLink"),
     )

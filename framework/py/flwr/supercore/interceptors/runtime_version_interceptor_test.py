@@ -16,7 +16,6 @@
 
 
 from collections import namedtuple
-from typing import cast
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
@@ -61,6 +60,11 @@ def _make_unary_handler() -> grpc.RpcMethodHandler:
 class TestRuntimeVersionClientInterceptor(TestCase):
     """Unit tests for RuntimeVersionClientInterceptor."""
 
+    def _make_call(self) -> Mock:
+        call = Mock(spec=grpc.Call)
+        call.trailing_metadata.return_value = ()
+        return call
+
     def test_attach_runtime_version_headers(self) -> None:
         """The interceptor should add the shared version metadata keys."""
         interceptor = RuntimeVersionClientInterceptor(component_name="simulation")
@@ -73,13 +77,14 @@ class TestRuntimeVersionClientInterceptor(TestCase):
             compression=None,
         )
         captured: dict[str, list[tuple[str, str | bytes]]] = {}
+        call = self._make_call()
 
         def continuation(
             client_call_details: grpc.ClientCallDetails,
             _request: GrpcMessage,
-        ) -> str:
+        ) -> Mock:
             captured["metadata"] = list(client_call_details.metadata or [])
-            return "ok"
+            return call
 
         response = interceptor.intercept_unary_unary(
             continuation=continuation,
@@ -87,7 +92,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
             request=GetNodesRequest(run_id=1),
         )
 
-        self.assertEqual(response, "ok")
+        self.assertIs(response, call)
         metadata = dict(captured["metadata"])
         self.assertEqual(metadata["x-test"], "value")
         self.assertIn(FLWR_PACKAGE_NAME_METADATA_KEY, metadata)
@@ -108,9 +113,10 @@ class TestRuntimeVersionClientInterceptor(TestCase):
             wait_for_ready=None,
             compression=None,
         )
+        call = self._make_call()
 
         interceptor.intercept_unary_unary(
-            continuation=lambda _details, _request: "ok",
+            continuation=lambda _details, _request: call,
             client_call_details=details,
             request=GetNodesRequest(run_id=1),
         )
@@ -144,11 +150,13 @@ class TestRuntimeVersionServerInterceptor(TestCase):
             _HandlerCallDetails("/flwr.proto.ServerAppIo/GetNodes", ()),
         )
 
-        response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=1), Mock()))
+        context = Mock()
+        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
         self.assertEqual(response, "ok")
+        context.set_trailing_metadata.assert_not_called()
 
-    def test_unparseable_peer_version_is_tolerated(self) -> None:
-        """Explicit unparseable peer versions should still pass through."""
+    def test_unparseable_peer_version_is_warned(self) -> None:
+        """Explicit unparseable peer versions should be warned."""
         intercepted = self.interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
@@ -161,11 +169,13 @@ class TestRuntimeVersionServerInterceptor(TestCase):
             ),
         )
 
-        response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=1), Mock()))
+        context = Mock()
+        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
         self.assertEqual(response, "ok")
+        context.set_trailing_metadata.assert_called_once()
 
-    def test_incompatible_metadata_is_tolerated(self) -> None:
-        """Different major.minor versions should still pass through."""
+    def test_incompatible_metadata_is_warned(self) -> None:
+        """Different major.minor versions should still be warned."""
         intercepted = self.interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
@@ -178,8 +188,10 @@ class TestRuntimeVersionServerInterceptor(TestCase):
             ),
         )
 
-        response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=1), Mock()))
+        context = Mock()
+        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
         self.assertEqual(response, "ok")
+        context.set_trailing_metadata.assert_called_once()
 
     def test_compatible_metadata_is_accepted(self) -> None:
         """Same major.minor versions should pass."""
@@ -195,5 +207,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
             ),
         )
 
-        response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=1), Mock()))
+        context = Mock()
+        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
         self.assertEqual(response, "ok")
+        context.set_trailing_metadata.assert_not_called()

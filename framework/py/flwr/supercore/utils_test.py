@@ -25,6 +25,7 @@ from parameterized import parameterized
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 from .utils import (
+    MetadataLookupError,
     find_metadata_keys,
     get_metadata_bytes,
     get_metadata_str,
@@ -91,8 +92,6 @@ def test_get_metadata_str(
     [
         ([("x-token", "value")], "x-token", "value", None),
         ([("x-token", "")], "x-token", None, "empty"),
-        ([("x-token", "   ")], "x-token", None, "empty"),
-        ([("x-token", "  value  ")], "x-token", "value", None),
         ([("x-token", "value"), ("x-token", "other")], "x-token", None, "duplicate"),
         ([("x-token", b"value")], "x-token", None, "wrong_type"),
         ([("other", "value")], "x-token", None, "missing"),
@@ -105,10 +104,14 @@ def test_get_metadata_str_checked(
     expected_error: str | None,
 ) -> None:
     """Preserve metadata validation outcomes for callers that need them."""
-    value, error = get_metadata_str_checked(metadata, key)
+    value, error_type = None, None
+    try:
+        value = get_metadata_str_checked(metadata, key)
+    except MetadataLookupError as e:
+        error_type = e.error_type
 
     assert value == expected_value
-    assert error == expected_error
+    assert error_type == expected_error
 
 
 @pytest.mark.parametrize(
