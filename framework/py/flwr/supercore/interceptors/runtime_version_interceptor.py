@@ -89,7 +89,7 @@ class RuntimeVersionClientInterceptor(
                 log(WARN, incompat_message)
 
 
-class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):
+class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[misc]
     """Observe Flower runtime version metadata on inbound unary RPCs."""
 
     def __init__(
@@ -165,7 +165,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):
                             ),
                         )
                     )
-                yield from method_handler.unary_stream(request, context)  # type: ignore
+                yield from method_handler.unary_stream(request, context)
 
             return grpc.unary_stream_rpc_method_handler(
                 wrapped_stream,
