@@ -113,10 +113,11 @@ class SqlCoreState(CoreState, SqlMixin):
         insert_query = """
             INSERT INTO task
             (task_id, type, run_id, fab_hash, model_ref, connector_ref, token,
-             pending_at, starting_at, running_at, finished_at)
+             pending_at, starting_at, running_at, finished_at, sub_status, details)
             VALUES
             (:task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
-             :pending_at, :starting_at, :running_at, :finished_at);
+             :pending_at, :starting_at, :running_at, :finished_at,
+             :sub_status, :details);
         """
 
         params = {
@@ -131,6 +132,8 @@ class SqlCoreState(CoreState, SqlMixin):
             "starting_at": None,
             "running_at": None,
             "finished_at": None,
+            "sub_status": "",
+            "details": "",
         }
 
         with self.session():
@@ -195,7 +198,8 @@ class SqlCoreState(CoreState, SqlMixin):
 
         query = """
             SELECT task_id, type, run_id, fab_hash, model_ref, connector_ref,
-                   pending_at, starting_at, running_at, finished_at
+                   pending_at, starting_at, running_at, finished_at,
+                   sub_status, details
             FROM task
         """
         if conditions:
@@ -360,7 +364,11 @@ def determine_task_status(row: dict[str, Any]) -> TaskStatus:
     """Determine the status of the task based on timestamp fields."""
     if row["pending_at"]:
         if row["finished_at"]:
-            return TaskStatus(status=Status.FINISHED, sub_status="", details="")
+            return TaskStatus(
+                status=Status.FINISHED,
+                sub_status=row.get("sub_status", ""),
+                details=row.get("details", ""),
+            )
         if row["starting_at"]:
             if row["running_at"]:
                 return TaskStatus(status=Status.RUNNING, sub_status="", details="")

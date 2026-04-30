@@ -113,6 +113,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 task_id=task_id,
                 type=task_type,
                 run_id=run_id,
+                status=TaskStatus(status=Status.PENDING, sub_status="", details=""),
                 pending_at=now().isoformat(),
                 fab_hash=fab_hash,
                 model_ref=model_ref,
@@ -288,7 +289,11 @@ def determine_task_status(task: Task) -> TaskStatus:
     """Determine the status of a task based on timestamp fields."""
     if task.pending_at:
         if task.finished_at:
-            return TaskStatus(status=Status.FINISHED, sub_status="", details="")
+            return TaskStatus(
+                status=Status.FINISHED,
+                sub_status=task.status.sub_status,
+                details=task.status.details,
+            )
         if task.starting_at:
             if task.running_at:
                 return TaskStatus(status=Status.RUNNING, sub_status="", details="")

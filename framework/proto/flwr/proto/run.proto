@@ -38,6 +38,7 @@ message Run {
   uint64 bytes_recv = 14;
   double clientapp_runtime = 15;
   string run_type = 16;
+  optional uint64 primary_task_id = 17;
 }
 
 message RunStatus {
