@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Make run substatus and details not nullable.
+"""Make run sub_status and details not nullable.
 
 Revision ID: e566a1e755c5
 Revises: c7eb009ce75c
