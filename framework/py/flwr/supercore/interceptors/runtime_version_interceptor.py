@@ -123,6 +123,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore
 
         # Attach the incompatibility message to the trailing metadata if present
         if method_handler.unary_unary is not None:
+
             def wrapped(
                 request: GrpcMessage, context: grpc.ServicerContext
             ) -> GrpcMessage:
@@ -148,6 +149,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             )
 
         if method_handler.unary_stream is not None:
+
             def wrapped_stream(
                 request: GrpcMessage, context: grpc.ServicerContext
             ) -> Any:
