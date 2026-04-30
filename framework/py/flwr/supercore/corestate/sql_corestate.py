@@ -318,7 +318,7 @@ class SqlCoreState(CoreState, SqlMixin):
                     active_until = NULL,
                     token = NULL
                 WHERE task_id = :task_id
-                AND finished_at IS NULL{completion_constraint}
+                AND finished_at IS NULL {completion_constraint}
                 RETURNING task_id
                 """,
                 {
