@@ -18,7 +18,22 @@
 from __future__ import annotations
 
 import os
-from enum import Enum
+
+try:
+    from enum import StrEnum
+except ImportError:
+    from enum import Enum
+
+    class StrEnum(str, Enum):
+        """Python 3.10-compatible fallback for enum.StrEnum.
+
+        Preserves StrEnum behavior by returning the member value from str().
+        Remove this fallback once Python 3.10 support is dropped.
+        """
+
+        def __str__(self):
+            return self.value
+
 
 from flwr.common.constant import (
     FLWR_DIR,
@@ -161,7 +176,7 @@ class NodeStatus:
         raise TypeError(f"{cls.__name__} cannot be instantiated.")
 
 
-class InvitationStatus(str, Enum):
+class InvitationStatus(StrEnum):
     """Status of a federation invitation."""
 
     PENDING = "pending"
@@ -171,21 +186,21 @@ class InvitationStatus(str, Enum):
     EXPIRED = "expired"
 
 
-class RunType(str, Enum):
+class RunType(StrEnum):
     """Supported run types."""
 
     SERVER_APP = "serverapp"
     SIMULATION = "simulation"
 
 
-class RunTime(str, Enum):
+class RunTime(StrEnum):
     """Supported runtimes."""
 
     DEPLOYMENT = "deployment"
     SIMULATION = "simulation"
 
 
-class TaskType(str, Enum):
+class TaskType(StrEnum):
     """Supported task types."""
 
     SERVER_APP = "flwr-serverapp"
@@ -209,7 +224,7 @@ TASK_TYPES_REQUIRING_CONNECTOR_REF: frozenset[TaskType] = frozenset(
 )
 
 
-class ActionType(str, Enum):
+class ActionType(StrEnum):
     """Supported control action types."""
 
     REGISTER_SUPERNODE = "register_supernode"
