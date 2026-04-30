@@ -295,14 +295,14 @@ class SqlCoreState(CoreState, SqlMixin):
         )
         return len(rows) > 0
 
-    def finish_task(self, task_id: int, substatus: str, detail: str) -> bool:
+    def finish_task(self, task_id: int, sub_status: str, detail: str) -> bool:
         """Move an unfinished task to finished."""
         sint64_task_id = uint64_to_int64(task_id)
         with self.session():
             self._cleanup_expired_task_tokens()
             # FINISHED:COMPLETED is only valid from RUNNING.
             completion_constraint = ""
-            if substatus == SubStatus.COMPLETED:
+            if sub_status == SubStatus.COMPLETED:
                 completion_constraint = " AND running_at IS NOT NULL"
 
             updated = self.query(
@@ -320,7 +320,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 {
                     "task_id": sint64_task_id,
                     "finished_at": now().isoformat(),
-                    "sub_status": substatus,
+                    "sub_status": sub_status,
                     "details": detail,
                 },
             )

@@ -34,7 +34,7 @@ from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
 from . import CoreState
 
 
-class StateTest(unittest.TestCase):
+class StateTest(unittest.TestCase):  # pylint: disable=R0904
     """Test all CoreState implementations."""
 
     # This is to True in each child class
