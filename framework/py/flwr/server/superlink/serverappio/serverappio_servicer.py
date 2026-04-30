@@ -35,6 +35,8 @@ from flwr.common.serde import (
 from flwr.common.typing import RunStatus
 from flwr.proto import serverappio_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    CreateTaskRequest,
+    CreateTaskResponse,
     ListAppsToLaunchRequest,
     ListAppsToLaunchResponse,
     PullAppInputsRequest,
@@ -76,8 +78,6 @@ from flwr.proto.run_pb2 import (  # pylint: disable=E0611
     UpdateRunStatusResponse,
 )
 from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
-    CreateTaskRequest,
-    CreateTaskResponse,
     GetNodesRequest,
     GetNodesResponse,
 )
