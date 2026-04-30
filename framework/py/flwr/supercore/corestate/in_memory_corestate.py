@@ -246,6 +246,10 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                     status=Status.FINISHED, sub_status=sub_status, details=details
                 )
             )
+
+            # Revoke any existing task token now that the task is finished.
+            if (record := self.task_token_store.pop(task_id, None)) is not None:
+                self.task_token_to_task_id.pop(record.token, None)
             return True
 
     def acknowledge_task_heartbeat(self, task_id: int) -> bool:
