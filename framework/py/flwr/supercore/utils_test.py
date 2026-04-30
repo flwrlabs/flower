@@ -25,8 +25,11 @@ from parameterized import parameterized
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 from .utils import (
+    MetadataLookupError,
+    find_metadata_keys,
     get_metadata_bytes,
     get_metadata_str,
+    get_metadata_str_checked,
     humanize_bytes,
     humanize_duration,
     int64_to_uint64,
@@ -37,6 +40,18 @@ from .utils import (
     simulation_config_to_json,
     uint64_to_int64,
 )
+
+
+def test_find_metadata_keys() -> None:
+    """Return the subset of requested keys present in metadata."""
+    assert find_metadata_keys(
+        [
+            ("x-token", "value"),
+            ("x-trace-id", "abc"),
+            ("x-token", "other"),
+        ],
+        ("x-token", "missing"),
+    ) == {"x-token"}
 
 
 def test_mask_string() -> None:
@@ -70,6 +85,33 @@ def test_get_metadata_str(
 ) -> None:
     """Return exactly one non-empty string value of the expected type."""
     assert get_metadata_str(metadata, key) == expected
+
+
+@pytest.mark.parametrize(
+    ("metadata", "key", "expected_value", "expected_error"),
+    [
+        ([("x-token", "value")], "x-token", "value", None),
+        ([("x-token", "")], "x-token", None, "empty"),
+        ([("x-token", "value"), ("x-token", "other")], "x-token", None, "duplicate"),
+        ([("x-token", b"value")], "x-token", None, "wrong_type"),
+        ([("other", "value")], "x-token", None, "missing"),
+    ],
+)
+def test_get_metadata_str_checked(
+    metadata: list[tuple[str, str | bytes]],
+    key: str,
+    expected_value: str | None,
+    expected_error: str | None,
+) -> None:
+    """Preserve metadata validation outcomes for callers that need them."""
+    value, error_type = None, None
+    try:
+        value = get_metadata_str_checked(metadata, key)
+    except MetadataLookupError as e:
+        error_type = e.error_type
+
+    assert value == expected_value
+    assert error_type == expected_error
 
 
 @pytest.mark.parametrize(
