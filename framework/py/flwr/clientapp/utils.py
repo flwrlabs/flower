@@ -74,8 +74,6 @@ def get_load_client_app_fn(
                     f"and FAB version '{fab_version}'.",
                 ) from None
 
-            # log(WARN, "FAB ID is not provided; the default ClientApp will be loaded.")
-
             # Set app reference
             client_app_ref = config["tool"]["flwr"]["app"]["components"]["clientapp"]
         # If multi-app feature is enabled
