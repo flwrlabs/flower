@@ -237,6 +237,7 @@ class Run:  # pylint: disable=too-many-instance-attributes
     status: RunStatus
     flwr_aid: str
     federation: str
+    primary_task_id: int | None
     bytes_sent: int
     bytes_recv: int
     clientapp_runtime: float
@@ -258,6 +259,7 @@ class Run:  # pylint: disable=too-many-instance-attributes
             status=RunStatus(status="", sub_status="", details=""),
             flwr_aid="",
             federation="",
+            primary_task_id=None,
             bytes_sent=0,
             bytes_recv=0,
             clientapp_runtime=0.0,

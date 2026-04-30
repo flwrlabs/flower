@@ -27,7 +27,7 @@ from flwr.proto import recorddict_pb2 as flwr_dot_proto_dot_recorddict__pb2
 from flwr.proto import transport_pb2 as flwr_dot_proto_dot_transport__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14\x66lwr/proto/run.proto\x12\nflwr.proto\x1a\x15\x66lwr/proto/node.proto\x1a\x1b\x66lwr/proto/recorddict.proto\x1a\x1a\x66lwr/proto/transport.proto\"\xc9\x03\n\x03Run\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\x12\x0e\n\x06\x66\x61\x62_id\x18\x02 \x01(\t\x12\x13\n\x0b\x66\x61\x62_version\x18\x03 \x01(\t\x12<\n\x0foverride_config\x18\x04 \x03(\x0b\x32#.flwr.proto.Run.OverrideConfigEntry\x12\x10\n\x08\x66\x61\x62_hash\x18\x05 \x01(\t\x12\x12\n\npending_at\x18\x06 \x01(\t\x12\x13\n\x0bstarting_at\x18\x07 \x01(\t\x12\x12\n\nrunning_at\x18\x08 \x01(\t\x12\x13\n\x0b\x66inished_at\x18\t \x01(\t\x12%\n\x06status\x18\n \x01(\x0b\x32\x15.flwr.proto.RunStatus\x12\x10\n\x08\x66lwr_aid\x18\x0b \x01(\t\x12\x12\n\nfederation\x18\x0c \x01(\t\x12\x12\n\nbytes_sent\x18\r \x01(\x04\x12\x12\n\nbytes_recv\x18\x0e \x01(\x04\x12\x19\n\x11\x63lientapp_runtime\x18\x0f \x01(\x01\x12\x10\n\x08run_type\x18\x10 \x01(\t\x1aI\n\x13OverrideConfigEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12!\n\x05value\x18\x02 \x01(\x0b\x32\x12.flwr.proto.Scalar:\x02\x38\x01\"@\n\tRunStatus\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x12\n\nsub_status\x18\x02 \x01(\t\x12\x0f\n\x07\x64\x65tails\x18\x03 \x01(\t\"?\n\rGetRunRequest\x12\x1e\n\x04node\x18\x01 \x01(\x0b\x32\x10.flwr.proto.Node\x12\x0e\n\x06run_id\x18\x02 \x01(\x04\".\n\x0eGetRunResponse\x12\x1c\n\x03run\x18\x01 \x01(\x0b\x32\x0f.flwr.proto.Run\"S\n\x16UpdateRunStatusRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\x12)\n\nrun_status\x18\x02 \x01(\x0b\x32\x15.flwr.proto.RunStatus\"\x19\n\x17UpdateRunStatusResponse\"-\n\x1bGetFederationOptionsRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\"T\n\x1cGetFederationOptionsResponse\x12\x34\n\x12\x66\x65\x64\x65ration_options\x18\x01 \x01(\x0b\x32\x18.flwr.proto.ConfigRecordb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14\x66lwr/proto/run.proto\x12\nflwr.proto\x1a\x15\x66lwr/proto/node.proto\x1a\x1b\x66lwr/proto/recorddict.proto\x1a\x1a\x66lwr/proto/transport.proto\"\xfb\x03\n\x03Run\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\x12\x0e\n\x06\x66\x61\x62_id\x18\x02 \x01(\t\x12\x13\n\x0b\x66\x61\x62_version\x18\x03 \x01(\t\x12<\n\x0foverride_config\x18\x04 \x03(\x0b\x32#.flwr.proto.Run.OverrideConfigEntry\x12\x10\n\x08\x66\x61\x62_hash\x18\x05 \x01(\t\x12\x12\n\npending_at\x18\x06 \x01(\t\x12\x13\n\x0bstarting_at\x18\x07 \x01(\t\x12\x12\n\nrunning_at\x18\x08 \x01(\t\x12\x13\n\x0b\x66inished_at\x18\t \x01(\t\x12%\n\x06status\x18\n \x01(\x0b\x32\x15.flwr.proto.RunStatus\x12\x10\n\x08\x66lwr_aid\x18\x0b \x01(\t\x12\x12\n\nfederation\x18\x0c \x01(\t\x12\x12\n\nbytes_sent\x18\r \x01(\x04\x12\x12\n\nbytes_recv\x18\x0e \x01(\x04\x12\x19\n\x11\x63lientapp_runtime\x18\x0f \x01(\x01\x12\x10\n\x08run_type\x18\x10 \x01(\t\x12\x1c\n\x0fprimary_task_id\x18\x11 \x01(\x04H\x00\x88\x01\x01\x1aI\n\x13OverrideConfigEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12!\n\x05value\x18\x02 \x01(\x0b\x32\x12.flwr.proto.Scalar:\x02\x38\x01\x42\x12\n\x10_primary_task_id\"@\n\tRunStatus\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x12\n\nsub_status\x18\x02 \x01(\t\x12\x0f\n\x07\x64\x65tails\x18\x03 \x01(\t\"?\n\rGetRunRequest\x12\x1e\n\x04node\x18\x01 \x01(\x0b\x32\x10.flwr.proto.Node\x12\x0e\n\x06run_id\x18\x02 \x01(\x04\".\n\x0eGetRunResponse\x12\x1c\n\x03run\x18\x01 \x01(\x0b\x32\x0f.flwr.proto.Run\"S\n\x16UpdateRunStatusRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\x12)\n\nrun_status\x18\x02 \x01(\x0b\x32\x15.flwr.proto.RunStatus\"\x19\n\x17UpdateRunStatusResponse\"-\n\x1bGetFederationOptionsRequest\x12\x0e\n\x06run_id\x18\x01 \x01(\x04\"T\n\x1cGetFederationOptionsResponse\x12\x34\n\x12\x66\x65\x64\x65ration_options\x18\x01 \x01(\x0b\x32\x18.flwr.proto.ConfigRecordb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -37,21 +37,21 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_RUN_OVERRIDECONFIGENTRY']._loaded_options = None
   _globals['_RUN_OVERRIDECONFIGENTRY']._serialized_options = b'8\001'
   _globals['_RUN']._serialized_start=117
-  _globals['_RUN']._serialized_end=574
-  _globals['_RUN_OVERRIDECONFIGENTRY']._serialized_start=501
-  _globals['_RUN_OVERRIDECONFIGENTRY']._serialized_end=574
-  _globals['_RUNSTATUS']._serialized_start=576
-  _globals['_RUNSTATUS']._serialized_end=640
-  _globals['_GETRUNREQUEST']._serialized_start=642
-  _globals['_GETRUNREQUEST']._serialized_end=705
-  _globals['_GETRUNRESPONSE']._serialized_start=707
-  _globals['_GETRUNRESPONSE']._serialized_end=753
-  _globals['_UPDATERUNSTATUSREQUEST']._serialized_start=755
-  _globals['_UPDATERUNSTATUSREQUEST']._serialized_end=838
-  _globals['_UPDATERUNSTATUSRESPONSE']._serialized_start=840
-  _globals['_UPDATERUNSTATUSRESPONSE']._serialized_end=865
-  _globals['_GETFEDERATIONOPTIONSREQUEST']._serialized_start=867
-  _globals['_GETFEDERATIONOPTIONSREQUEST']._serialized_end=912
-  _globals['_GETFEDERATIONOPTIONSRESPONSE']._serialized_start=914
-  _globals['_GETFEDERATIONOPTIONSRESPONSE']._serialized_end=998
+  _globals['_RUN']._serialized_end=624
+  _globals['_RUN_OVERRIDECONFIGENTRY']._serialized_start=531
+  _globals['_RUN_OVERRIDECONFIGENTRY']._serialized_end=604
+  _globals['_RUNSTATUS']._serialized_start=626
+  _globals['_RUNSTATUS']._serialized_end=690
+  _globals['_GETRUNREQUEST']._serialized_start=692
+  _globals['_GETRUNREQUEST']._serialized_end=755
+  _globals['_GETRUNRESPONSE']._serialized_start=757
+  _globals['_GETRUNRESPONSE']._serialized_end=803
+  _globals['_UPDATERUNSTATUSREQUEST']._serialized_start=805
+  _globals['_UPDATERUNSTATUSREQUEST']._serialized_end=888
+  _globals['_UPDATERUNSTATUSRESPONSE']._serialized_start=890
+  _globals['_UPDATERUNSTATUSRESPONSE']._serialized_end=915
+  _globals['_GETFEDERATIONOPTIONSREQUEST']._serialized_start=917
+  _globals['_GETFEDERATIONOPTIONSREQUEST']._serialized_end=962
+  _globals['_GETFEDERATIONOPTIONSRESPONSE']._serialized_start=964
+  _globals['_GETFEDERATIONOPTIONSRESPONSE']._serialized_end=1048
 # @@protoc_insertion_point(module_scope)

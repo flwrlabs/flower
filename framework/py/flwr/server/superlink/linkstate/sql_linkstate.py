@@ -815,14 +815,15 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 query = """
                     INSERT INTO run
                     (run_id, fab_id, fab_version, fab_hash, override_config, federation,
-                    federation_config, run_type, pending_at, starting_at, running_at,
-                    finished_at, usage_reported_at, sub_status, details, flwr_aid,
-                    bytes_sent, bytes_recv, clientapp_runtime)
+                    primary_task_id, federation_config, run_type, pending_at,
+                    starting_at, running_at, finished_at, usage_reported_at,
+                    sub_status, details, flwr_aid, bytes_sent, bytes_recv,
+                    clientapp_runtime)
                     VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
-                    :federation, :federation_config, :run_type, :pending_at,
-                    :starting_at, :running_at, :finished_at, :usage_reported_at,
-                    :sub_status, :details, :flwr_aid, :bytes_sent, :bytes_recv,
-                    :clientapp_runtime)
+                    :federation, :primary_task_id, :federation_config, :run_type,
+                    :pending_at, :starting_at, :running_at, :finished_at,
+                    :usage_reported_at, :sub_status, :details, :flwr_aid,
+                    :bytes_sent, :bytes_recv, :clientapp_runtime)
                 """
                 override_config_json = json.dumps(override_config)
                 params = {
@@ -832,6 +833,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     "fab_hash": fab_hash or "",
                     "override_config": override_config_json,
                     "federation": federation,
+                    "primary_task_id": None,
                     "federation_config": fed_config_json,
                     "run_type": run_type,
                     "pending_at": now().isoformat(),
@@ -954,6 +956,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 ),
                 flwr_aid=row["flwr_aid"],
                 federation=row["federation"],
+                primary_task_id=(
+                    int64_to_uint64(row["primary_task_id"])
+                    if row["primary_task_id"] is not None
+                    else None
+                ),
                 bytes_sent=row["bytes_sent"],
                 bytes_recv=row["bytes_recv"],
                 clientapp_runtime=row["clientapp_runtime"],

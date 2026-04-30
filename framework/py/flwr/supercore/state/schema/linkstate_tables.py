@@ -82,6 +82,7 @@ def create_linkstate_metadata() -> MetaData:
         Column("sub_status", String),
         Column("details", String),
         Column("federation", String),
+        Column("primary_task_id", BigInteger, nullable=True),
         Column("federation_config", String),
         Column("run_type", String, nullable=False, server_default=RunType.SERVER_APP),
         Column("flwr_aid", String),
