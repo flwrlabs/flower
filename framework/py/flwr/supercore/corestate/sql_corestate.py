@@ -530,8 +530,8 @@ def determine_task_status(row: dict[str, Any]) -> TaskStatus:
         if row["finished_at"]:
             return TaskStatus(
                 status=Status.FINISHED,
-                sub_status=row.get("sub_status") or "",
-                details=row.get("details") or "",
+                sub_status=row.get("sub_status"),
+                details=row.get("details"),
             )
         if row["starting_at"]:
             if row["running_at"]:

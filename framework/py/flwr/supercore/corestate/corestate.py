@@ -159,7 +159,7 @@ class CoreState(ABC):
         sub_status : str
             Terminal task sub-status, such as completed, failed, or stopped.
             Only RUNNING status can be transitioned to FINISHED:COMPLETED
-        detail : str
+        details : str
             Additional terminal status detail.
 
         Returns
