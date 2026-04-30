@@ -277,6 +277,7 @@ class SqlCoreState(CoreState, SqlMixin):
 
             return token
         except IntegrityError:
+            # Rare failure: generated token already exists (duplicate)
             return None
 
     def activate_task(self, task_id: int) -> bool:
