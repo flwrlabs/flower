@@ -18,6 +18,8 @@
 from __future__ import annotations
 
 import os
+import sys
+from enum import Enum
 
 from flwr.common.constant import (
     FLWR_DIR,
@@ -27,12 +29,11 @@ from flwr.common.constant import (
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
-try:
+if sys.version_info >= (3, 11):
     from enum import StrEnum
-except ImportError:
-    from enum import Enum
+else:
 
-    class StrEnum(str, Enum):  # type: ignore[no-redef]
+    class StrEnum(str, Enum):
         """Python 3.10-compatible fallback for enum.StrEnum.
 
         Preserves StrEnum behavior by returning the member value from str(). Remove this
