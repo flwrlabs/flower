@@ -45,9 +45,7 @@ class RuntimeVersionClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type
     """Attach Flower runtime version metadata to outbound unary RPCs."""
 
     def __init__(self, component_name: str) -> None:
-        self._metadata = RuntimeVersionMetadata.from_local_component(
-            component_name, package_version_value="1.32.0"
-        )
+        self._metadata = RuntimeVersionMetadata.from_local_component(component_name)
         self._compatibility_warning_logged = False
 
     def intercept_unary_unary(
