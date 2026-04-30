@@ -43,6 +43,15 @@ from ..object_store import ObjectStore
 from .corestate import CoreState
 from .utils import generate_rand_int_from_bytes
 
+# Define SQL conditions for task statuses to ensure consistency across queries
+STATUS_CONDITIONS = {
+    Status.PENDING: "(starting_at IS NULL AND finished_at IS NULL)",
+    Status.STARTING: "(starting_at IS NOT NULL AND running_at IS NULL "
+    "AND finished_at IS NULL)",
+    Status.RUNNING: "(running_at IS NOT NULL AND finished_at IS NULL)",
+    Status.FINISHED: "(finished_at IS NOT NULL)",
+}
+
 
 class SqlCoreState(CoreState, SqlMixin):
     """SQLAlchemy-based CoreState implementation."""
@@ -241,41 +250,34 @@ class SqlCoreState(CoreState, SqlMixin):
         """Atomically claim a pending task."""
         token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
         claimed_at = now()
+        active_until = int(claimed_at.timestamp()) + HEARTBEAT_DEFAULT_INTERVAL
         sint64_task_id = uint64_to_int64(task_id)
         try:
-            with self.session():
-                # Expire abandoned claims before trying to claim this task.
-                self._cleanup_expired_task_tokens()
-                # The conditional UPDATE is the atomic claim: exactly one caller can
-                # move a pending, unclaimed task to STARTING and attach a token.
-                rows = self.query(
-                    """
-                    UPDATE task
-                    SET token = :token,
-                        active_until = :active_until,
-                        starting_at = :starting_at
-                    WHERE task_id = :task_id
-                    AND pending_at IS NOT NULL
-                    AND starting_at IS NULL
-                    AND running_at IS NULL
-                    AND finished_at IS NULL
-                    AND token IS NULL
-                    RETURNING task_id
-                    """,
-                    {
-                        "task_id": sint64_task_id,
-                        "token": token,
-                        "active_until": (
-                            claimed_at.timestamp() + HEARTBEAT_DEFAULT_INTERVAL
-                        ),
-                        "starting_at": claimed_at.isoformat(),
-                    },
-                )
-                if not rows:
-                    return None
+            # The conditional UPDATE is the atomic claim: exactly one caller can
+            # move a pending, unclaimed task to STARTING and attach a token.
+            rows = self.query(
+                f"""
+                UPDATE task
+                SET token = :token,
+                    active_until = :active_until,
+                    starting_at = :starting_at
+                WHERE task_id = :task_id AND token IS NULL
+                AND {STATUS_CONDITIONS[Status.PENDING]}
+                RETURNING task_id
+                """,
+                {
+                    "task_id": sint64_task_id,
+                    "token": token,
+                    "active_until": active_until,
+                    "starting_at": claimed_at.isoformat(),
+                },
+            )
+            if not rows:
+                return None
 
-                return token
+            return token
         except IntegrityError:
+            # Rare failure: generated token already exists (duplicate)
             return None
 
     def activate_task(self, task_id: int) -> bool:
@@ -287,20 +289,17 @@ class SqlCoreState(CoreState, SqlMixin):
 
             # Activation is a strict STARTING -> RUNNING transition.
             rows = self.query(
-                """
+                f"""
                 UPDATE task
                 SET running_at = :running_at
-                WHERE task_id = :task_id
-                AND starting_at IS NOT NULL
-                AND running_at IS NULL
-                AND finished_at IS NULL
+                WHERE task_id = :task_id AND {STATUS_CONDITIONS[Status.STARTING]}
                 RETURNING task_id
                 """,
                 {"task_id": uint64_to_int64(task_id), "running_at": now().isoformat()},
             )
         return len(rows) > 0
 
-    def finish_task(self, task_id: int, sub_status: str, detail: str) -> bool:
+    def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
         sint64_task_id = uint64_to_int64(task_id)
         with self.session():
@@ -308,9 +307,9 @@ class SqlCoreState(CoreState, SqlMixin):
             # FINISHED:COMPLETED is only valid from RUNNING.
             completion_constraint = ""
             if sub_status == SubStatus.COMPLETED:
-                completion_constraint = " AND running_at IS NOT NULL"
+                completion_constraint = "AND running_at IS NOT NULL"
 
-            updated = self.query(
+            rows = self.query(
                 f"""
                 UPDATE task
                 SET finished_at = :finished_at,
@@ -319,17 +318,17 @@ class SqlCoreState(CoreState, SqlMixin):
                     active_until = NULL,
                     token = NULL
                 WHERE task_id = :task_id
-                AND finished_at IS NULL{completion_constraint}
+                AND finished_at IS NULL {completion_constraint}
                 RETURNING task_id
                 """,
                 {
                     "task_id": sint64_task_id,
                     "finished_at": now().isoformat(),
                     "sub_status": sub_status,
-                    "details": detail,
+                    "details": details,
                 },
             )
-            if not updated:
+            if not rows:
                 return False
 
             return True
@@ -337,42 +336,36 @@ class SqlCoreState(CoreState, SqlMixin):
     def acknowledge_task_heartbeat(self, task_id: int) -> bool:
         """Extend heartbeat state for the claimed task."""
         # Heartbeats are accepted only for active, unexpired task claims.
-        self._cleanup_expired_task_tokens()
-        current = now().timestamp()
-        rows = self.query(
-            """
-            UPDATE task
-            SET active_until = :active_until
-            WHERE task_id = :task_id
-            AND token IS NOT NULL
-            AND active_until >= :current
-            AND finished_at IS NULL
-            RETURNING task_id
-            """,
-            {
-                "task_id": uint64_to_int64(task_id),
-                "current": current,
-                "active_until": (
-                    current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-                ),
-            },
-        )
+        with self.session():
+            current = int(now().timestamp())
+            self._cleanup_expired_task_tokens()
+            rows = self.query(
+                """
+                UPDATE task
+                SET active_until = :active_until
+                WHERE task_id = :task_id
+                AND active_until >= :current
+                AND finished_at IS NULL
+                RETURNING task_id
+                """,
+                {
+                    "task_id": uint64_to_int64(task_id),
+                    "current": current,
+                    "active_until": (
+                        current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+                    ),
+                },
+            )
         return len(rows) > 0
 
     def get_task_id_by_token(self, token: str) -> int | None:
         """Return the task ID associated with the task token, if valid."""
-        # Resolve tokens after cleanup so callers never receive expired claims.
-        self._cleanup_expired_task_tokens()
-
         rows = self.query(
             """
             SELECT task_id FROM task
-            WHERE token = :token
-            AND active_until >= :current
-            AND finished_at IS NULL
-            LIMIT 1
+            WHERE token = :token AND active_until >= :current AND finished_at IS NULL
             """,
-            {"token": token, "current": now().timestamp()},
+            {"token": token, "current": int(now().timestamp())},
         )
         if not rows:
             return None
@@ -385,7 +378,7 @@ class SqlCoreState(CoreState, SqlMixin):
         removed.
         """
         expired_at = now()
-        current = expired_at.timestamp()
+        current = int(expired_at.timestamp())
         # Expired task claims are terminal failures and lose their token.
         self.query(
             """
@@ -395,9 +388,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 finished_at = :finished_at,
                 sub_status = :sub_status,
                 details = :details
-            WHERE token IS NOT NULL
-            AND active_until < :current
-            AND finished_at IS NULL
+            WHERE token IS NOT NULL AND active_until < :current
             """,
             {
                 "current": current,
@@ -539,8 +530,8 @@ def determine_task_status(row: dict[str, Any]) -> TaskStatus:
         if row["finished_at"]:
             return TaskStatus(
                 status=Status.FINISHED,
-                sub_status=row.get("sub_status") or "",
-                details=row.get("details") or "",
+                sub_status=row["sub_status"],
+                details=row["details"],
             )
         if row["starting_at"]:
             if row["running_at"]:

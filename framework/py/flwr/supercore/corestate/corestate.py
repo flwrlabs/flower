@@ -149,7 +149,7 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def finish_task(self, task_id: int, sub_status: str, detail: str) -> bool:
+    def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished.
 
         Parameters
@@ -159,8 +159,8 @@ class CoreState(ABC):
         sub_status : str
             Terminal task sub-status, such as completed, failed, or stopped.
             Only RUNNING status can be transitioned to FINISHED:COMPLETED
-        detail : str
-            Additional terminal status detail.
+        details : str
+            Additional terminal status details.
 
         Returns
         -------
