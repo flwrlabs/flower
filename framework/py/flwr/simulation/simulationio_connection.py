@@ -86,7 +86,7 @@ class SimulationIoConnection:
             insecure=self._insecure,
             root_certificates=self._cert,
             interceptors=[
-                RuntimeVersionClientInterceptor(component_name="simulation"),
+                RuntimeVersionClientInterceptor(component_name="flwr-simulation"),
                 AppIoTokenClientInterceptor(token=self._token),
             ],
         )
