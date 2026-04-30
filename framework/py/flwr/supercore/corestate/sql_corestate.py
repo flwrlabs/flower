@@ -300,7 +300,7 @@ class SqlCoreState(CoreState, SqlMixin):
             )
         return len(rows) > 0
 
-    def finish_task(self, task_id: int, sub_status: str, detail: str) -> bool:
+    def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
         sint64_task_id = uint64_to_int64(task_id)
         with self.session():
@@ -326,7 +326,7 @@ class SqlCoreState(CoreState, SqlMixin):
                     "task_id": sint64_task_id,
                     "finished_at": now().isoformat(),
                     "sub_status": sub_status,
-                    "details": detail,
+                    "details": details,
                 },
             )
             if not updated:
