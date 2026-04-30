@@ -25,7 +25,10 @@ from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
 from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
-from flwr.supercore.interceptors import AppIoTokenClientInterceptor
+from flwr.supercore.interceptors import (
+    AppIoTokenClientInterceptor,
+    RuntimeVersionClientInterceptor,
+)
 
 
 class SimulationIoConnection:
@@ -85,7 +88,10 @@ class SimulationIoConnection:
             server_address=self._addr,
             insecure=self._insecure,
             root_certificates=self._cert,
-            interceptors=[AppIoTokenClientInterceptor(token=self._token)],
+            interceptors=[
+                RuntimeVersionClientInterceptor(component_name="flwr-simulation"),
+                AppIoTokenClientInterceptor(token=self._token),
+            ],
         )
         self._channel.subscribe(on_channel_state_change)
         self._grpc_stub = ServerAppIoStub(self._channel)
