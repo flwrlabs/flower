@@ -108,10 +108,13 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
     ----------
     serverappio_service_address : str (default: "[::]:9091")
         The address (URL, IPv6, IPv4) of the SuperLink ServerAppIo API service.
+    insecure : bool (default: False)
+        If True, use plaintext (TLS disabled). If False, use TLS.
     root_certificates : Optional[bytes] (default: None)
         The PEM-encoded root certificates as a byte string.
-        If provided, a secure connection using the certificates will be
-        established to an SSL-enabled Flower server.
+        Used only when `insecure` is False. If provided, these certificates are
+        used to verify the server certificate. If None, gRPC default root
+        certificates are used.
     token : str
         Executor token used for ServerAppIo authentication.
     """

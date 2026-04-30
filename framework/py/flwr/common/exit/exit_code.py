@@ -61,6 +61,7 @@ class ExitCode:
     COMMON_TLS_NOT_SUPPORTED = 602
     COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE = 603
     COMMON_PATH_INVALID = 604
+    COMMON_TLS_SERVER_CERTIFICATES_INVALID = 605
 
     # Simulation exit codes (700-799)
     SIMULATION_EXCEPTION = 700
@@ -171,6 +172,9 @@ To use the REST API, install `flwr` with the `rest` extra:
     ),
     ExitCode.COMMON_PATH_INVALID: (
         "The provided path is invalid or does not point to the expected file."
+    ),
+    ExitCode.COMMON_TLS_SERVER_CERTIFICATES_INVALID: (
+        "TLS server certificate configuration is incomplete or invalid."
     ),
     # Simulation exit codes (700-799)
     ExitCode.SIMULATION_EXCEPTION: (

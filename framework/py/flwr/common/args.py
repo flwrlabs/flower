@@ -116,14 +116,6 @@ def try_obtain_server_certificates(
     args: argparse.Namespace,
 ) -> tuple[bytes, bytes, bytes] | None:
     """Validate and return the CA cert, server cert, and server private key."""
-    if args.insecure:
-        log(
-            WARN,
-            "Option `--insecure` was set. Starting insecure HTTP server with "
-            "unencrypted communication (TLS disabled). Proceed only if you understand "
-            "the risks.",
-        )
-        return None
     # Check if certificates are provided
     if args.ssl_certfile and args.ssl_keyfile and args.ssl_ca_certfile:
         if not isfile(args.ssl_ca_certfile):
