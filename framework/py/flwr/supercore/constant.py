@@ -185,6 +185,30 @@ class RunTime(str, Enum):
     SIMULATION = "simulation"
 
 
+class TaskType(str, Enum):
+    """Supported task types."""
+
+    SERVER_APP = "flwr-serverapp"
+    CLIENT_APP = "flwr-clientapp"
+    SIMULATION = "flwr-simulation"
+    AGENT_APP = "flwr-agentapp"
+    MODEL = "flwr-model"
+    CONNECTOR = "flwr-connector"
+
+
+TASK_TYPES_REQUIRING_FAB_HASH: frozenset[TaskType] = frozenset(
+    {
+        TaskType.SERVER_APP,
+        TaskType.CLIENT_APP,
+        TaskType.AGENT_APP,
+    }
+)
+TASK_TYPES_REQUIRING_MODEL_REF: frozenset[TaskType] = frozenset({TaskType.MODEL})
+TASK_TYPES_REQUIRING_CONNECTOR_REF: frozenset[TaskType] = frozenset(
+    {TaskType.CONNECTOR}
+)
+
+
 class ActionType(str, Enum):
     """Supported control action types."""
 
