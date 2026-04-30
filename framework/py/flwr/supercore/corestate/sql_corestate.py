@@ -280,19 +280,24 @@ class SqlCoreState(CoreState, SqlMixin):
 
     def activate_task(self, task_id: int) -> bool:
         """Move a task from starting to running."""
-        # Activation is a strict STARTING -> RUNNING transition.
-        rows = self.query(
-            """
-            UPDATE task
-            SET running_at = :running_at
-            WHERE task_id = :task_id
-            AND starting_at IS NOT NULL
-            AND running_at IS NULL
-            AND finished_at IS NULL
-            RETURNING task_id
-            """,
-            {"task_id": uint64_to_int64(task_id), "running_at": now().isoformat()},
-        )
+        # Expire non-responsive tasks before transitioning task status.
+
+        with self.session():
+            self._cleanup_expired_task_tokens()
+
+            # Activation is a strict STARTING -> RUNNING transition.
+            rows = self.query(
+                """
+                UPDATE task
+                SET running_at = :running_at
+                WHERE task_id = :task_id
+                AND starting_at IS NOT NULL
+                AND running_at IS NULL
+                AND finished_at IS NULL
+                RETURNING task_id
+                """,
+                {"task_id": uint64_to_int64(task_id), "running_at": now().isoformat()},
+            )
         return len(rows) > 0
 
     def finish_task(self, task_id: int, sub_status: str, detail: str) -> bool:
@@ -381,27 +386,26 @@ class SqlCoreState(CoreState, SqlMixin):
         """
         expired_at = now()
         current = expired_at.timestamp()
-        with self.session():
-            # Expired task claims are terminal failures and lose their token.
-            self.query(
-                """
-                UPDATE task
-                SET token = NULL,
-                    active_until = NULL,
-                    finished_at = :finished_at,
-                    sub_status = :sub_status,
-                    details = :details
-                WHERE token IS NOT NULL
-                AND active_until < :current
-                AND finished_at IS NULL
-                """,
-                {
-                    "current": current,
-                    "finished_at": expired_at.isoformat(),
-                    "sub_status": SubStatus.FAILED,
-                    "details": "No heartbeat received from the task",
-                },
-            )
+        # Expired task claims are terminal failures and lose their token.
+        self.query(
+            """
+            UPDATE task
+            SET token = NULL,
+                active_until = NULL,
+                finished_at = :finished_at,
+                sub_status = :sub_status,
+                details = :details
+            WHERE token IS NOT NULL
+            AND active_until < :current
+            AND finished_at IS NULL
+            """,
+            {
+                "current": current,
+                "finished_at": expired_at.isoformat(),
+                "sub_status": SubStatus.FAILED,
+                "details": "No heartbeat received from the task",
+            },
+        )
 
     def create_token(self, run_id: int) -> str | None:
         """Create a token for the given run ID."""

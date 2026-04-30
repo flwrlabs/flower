@@ -234,26 +234,28 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_task_heartbeat_extends_token_expiration(self) -> None:
         """Task heartbeat should keep a claimed task token valid."""
         state = self.state_factory()
-        created_at = now()
-        task_id = state.create_task(task_type="flwr-model", run_id=42)
-        assert task_id is not None
-        token = state.claim_task(task_id)
-        assert token is not None
-
-        # Heartbeat extends only existing claimed task leases.
-        self.assertFalse(state.acknowledge_task_heartbeat(61016))
-        self.assertTrue(state.acknowledge_task_heartbeat(task_id))
+        fixed_now = now()
 
         with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(task_type="flwr-model", run_id=42)
+            assert task_id is not None
+            token = state.claim_task(task_id)
+            assert token is not None
+
+            # Heartbeat extends only existing claimed task leases.
+            self.assertFalse(state.acknowledge_task_heartbeat(61016))
+            self.assertTrue(state.acknowledge_task_heartbeat(task_id))
+
             # The heartbeat extension should keep the token valid past its
             # initial claim deadline.
-            mock_dt.now.return_value = created_at + timedelta(
+            mock_dt.now.return_value = fixed_now + timedelta(
                 seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
             )
             self.assertEqual(state.get_task_id_by_token(token), task_id)
 
             # Once the extended deadline passes, the token no longer resolves.
-            mock_dt.now.return_value = created_at + timedelta(
+            mock_dt.now.return_value = fixed_now + timedelta(
                 seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
             )
             self.assertIsNone(state.get_task_id_by_token(token))
@@ -262,15 +264,17 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_expired_task_token_transitions_task_to_finished_failed(self) -> None:
         """Expired task claims should transition tasks to FINISHED:FAILED."""
         state = self.state_factory()
-        created_at = now()
-        task_id = state.create_task(task_type="flwr-model", run_id=42)
-        assert task_id is not None
-
-        token = state.claim_task(task_id)
-        assert token is not None
+        fixed_now = now()
 
         with patch("datetime.datetime") as mock_dt:
-            mock_dt.now.return_value = created_at + timedelta(
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(task_type="flwr-model", run_id=42)
+            assert task_id is not None
+
+            token = state.claim_task(task_id)
+            assert token is not None
+
+            mock_dt.now.return_value = fixed_now + timedelta(
                 seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
             )
             self.assertIsNone(state.get_task_id_by_token(token))
