@@ -42,6 +42,14 @@ from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 from ..object_store import ObjectStore
 from .corestate import CoreState
 from .utils import generate_rand_int_from_bytes
+# Define SQL conditions for task statuses to ensure consistency across queries
+STATUS_CONDITIONS = {
+    Status.PENDING: "(starting_at IS NULL AND finished_at IS NULL)",
+    Status.STARTING: "(starting_at IS NOT NULL AND running_at IS NULL "
+    "AND finished_at IS NULL)",
+    Status.RUNNING: "(running_at IS NOT NULL AND finished_at IS NULL)",
+    Status.FINISHED: "(finished_at IS NOT NULL)",
+}
 
 
 class SqlCoreState(CoreState, SqlMixin):
@@ -244,22 +252,16 @@ class SqlCoreState(CoreState, SqlMixin):
         sint64_task_id = uint64_to_int64(task_id)
         try:
             with self.session():
-                # Expire abandoned claims before trying to claim this task.
-                self._cleanup_expired_task_tokens()
                 # The conditional UPDATE is the atomic claim: exactly one caller can
                 # move a pending, unclaimed task to STARTING and attach a token.
                 rows = self.query(
-                    """
+                    f"""
                     UPDATE task
                     SET token = :token,
                         active_until = :active_until,
                         starting_at = :starting_at
-                    WHERE task_id = :task_id
-                    AND pending_at IS NOT NULL
-                    AND starting_at IS NULL
-                    AND running_at IS NULL
-                    AND finished_at IS NULL
-                    AND token IS NULL
+                    WHERE task_id = :task_id AND token IS NULL
+                    AND {STATUS_CONDITIONS[Status.PENDING]}
                     RETURNING task_id
                     """,
                     {
