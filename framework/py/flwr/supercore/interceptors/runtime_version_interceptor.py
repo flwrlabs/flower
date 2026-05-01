@@ -129,7 +129,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
             incompat_details = self._local_metadata.check_compatibility(peer_metadata)
 
         # Prepare trailing metadata
-        trailing_metadata = ()
+        trailing_metadata: tuple[tuple[str, str], ...] = ()
         if incompat_details:
             incompat_message = (
                 "Runtime version compatibility check failed for "
