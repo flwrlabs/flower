@@ -94,10 +94,9 @@ from flwr.supercore.inflatable.inflatable_object import (
     no_object_id_recompute,
 )
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
-from flwr.supercore.servicers import AppIoServicer
 
 
-class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoServicer):
+class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
     """ServerAppIo API servicer."""
 
     def __init__(
@@ -107,10 +106,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
     ) -> None:
         self.state_factory = state_factory
         self.objectstore_factory = objectstore_factory
-
-    def state(self) -> LinkState:
-        """Return the LinkState instance."""
-        return self.state_factory.state()
 
     def ListAppsToLaunch(
         self,
@@ -590,3 +585,34 @@ def _raise_if(validation_error: bool, request_name: str, detail: str) -> None:
     """Raise a `ValueError` with a detailed message if a validation error occurs."""
     if validation_error:
         raise ValueError(f"Malformed {request_name}: {detail}")
+
+
+def _validate_create_task_request(
+    request: CreateTaskRequest, context: grpc.ServicerContext
+) -> None:
+    """Validate the task creation request."""
+    try:
+        task_type = TaskType(request.type)
+    except ValueError:
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Invalid task type: {request.type}",
+        )
+
+    if task_type in TASK_TYPES_REQUIRING_FAB_HASH and not request.fab_hash:
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Task type '{request.type}' requires fab_hash.",
+        )
+
+    if task_type in TASK_TYPES_REQUIRING_MODEL_REF and not request.model_ref:
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Task type '{request.type}' requires model_ref.",
+        )
+
+    if task_type in TASK_TYPES_REQUIRING_CONNECTOR_REF and not request.connector_ref:
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Task type '{request.type}' requires connector_ref.",
+        )
