@@ -224,7 +224,8 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         context.set_trailing_metadata.assert_called_once()
 
     def test_compatible_metadata_is_accepted(self) -> None:
-        """Compatible peer version should not set trailing metadata for unary handlers."""
+        """Compatible peer version should not set trailing metadata for unary
+        handlers."""
         intercepted = self._intercept(
             "/flwr.proto.ServerAppIo/GetNodes",
             _make_runtime_metadata("1.29.7"),
@@ -236,7 +237,8 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         context.set_trailing_metadata.assert_not_called()
 
     def test_unary_stream_incompatible_metadata_is_warned(self) -> None:
-        """Incompatible peer version should set trailing metadata for stream handlers."""
+        """Incompatible peer version should set trailing metadata for stream
+        handlers."""
         intercepted = self._intercept(
             "/flwr.proto.ServerAppIo/PullTaskIns",
             _make_runtime_metadata("1.30.1"),
@@ -249,7 +251,8 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         context.set_trailing_metadata.assert_called_once()
 
     def test_unary_stream_compatible_metadata_is_accepted(self) -> None:
-        """Compatible peer version should not set trailing metadata for stream handlers."""
+        """Compatible peer version should not set trailing metadata for stream
+        handlers."""
         intercepted = self._intercept(
             "/flwr.proto.ServerAppIo/PullTaskIns",
             _make_runtime_metadata("1.29.7"),
@@ -313,7 +316,8 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
         self.assertEqual(metadata[FLWR_COMPONENT_NAME_METADATA_KEY], "simulation")
 
     def test_log_incompatibility_from_trailing_metadata(self) -> None:
-        """The interceptor should log stream incompatibilities from trailing metadata."""
+        """The interceptor should log stream incompatibilities from trailing
+        metadata."""
         mock_call = _make_stream_call(
             trailing_metadata=(
                 (VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, "runtime mismatch"),
