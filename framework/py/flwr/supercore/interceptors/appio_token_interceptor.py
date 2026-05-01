@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from contextvars import ContextVar
 from typing import Any, NoReturn, Protocol, cast
 
 import grpc
@@ -28,10 +29,13 @@ from flwr.supercore.auth import (
     SERVERAPPIO_METHOD_AUTH_POLICY,
     MethodTokenPolicy,
 )
-from flwr.supercore.utils import get_metadata_str
+from flwr.supercore.utils import find_metadata_keys, get_metadata_str
 
 APP_TOKEN_HEADER = "flwr-app-token"
 AUTHENTICATION_FAILED_MESSAGE = "Authentication failed."
+
+
+_current_task_id = ContextVar("current_task_id", default=-1)
 
 
 class _TokenState(Protocol):
@@ -42,6 +46,9 @@ class _TokenState(Protocol):
 
     def verify_token(self, run_id: int, token: str) -> bool:
         """Return whether token is valid for run_id."""
+
+    def get_task_id_by_token(self, token: str) -> int | None:
+        """Return the task ID associated with the task token, if valid."""
 
 
 def _abort_auth_denied(context: grpc.ServicerContext) -> NoReturn:
@@ -70,9 +77,12 @@ class AppIoTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ig
         request: GrpcMessage,
     ) -> grpc.Call:
         """Add/replace the App token metadata on outbound unary requests."""
-        metadata = list(client_call_details.metadata or [])
-        metadata = [(key, value) for key, value in metadata if key != APP_TOKEN_HEADER]
-        metadata.append((APP_TOKEN_HEADER, self._token))
+        metadata = tuple(client_call_details.metadata or ())
+        if find_metadata_keys(metadata, (APP_TOKEN_HEADER,)):
+            raise RuntimeError(
+                f"{APP_TOKEN_HEADER} already present in outbound metadata."
+            )
+        metadata += ((APP_TOKEN_HEADER, self._token),)
         details = client_call_details._replace(metadata=metadata)
         return continuation(details, request)
 
@@ -127,18 +137,30 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 _abort_auth_denied(context)
 
             state = self._state_provider()
-            run_id = state.get_run_id_by_token(token)
-            # Validate both token->run lookup and run->token mapping.
-            if run_id is None or not state.verify_token(run_id, token):
-                _abort_auth_denied(context)
 
-            return unary_handler(request, context)
+            # Legacy: Validate both token->run lookup and run->token mapping.
+            run_id = state.get_run_id_by_token(token)
+            if run_id is not None and state.verify_token(run_id, token):
+                return unary_handler(request, context)
+
+            # Validate task token and set task context for downstream handlers
+            task_id = state.get_task_id_by_token(token)
+            if task_id is not None:
+                _current_task_id.set(task_id)
+                return unary_handler(request, context)
+
+            _abort_auth_denied(context)
 
         return grpc.unary_unary_rpc_method_handler(
             _authenticated_handler,
             request_deserializer=method_handler.request_deserializer,
             response_serializer=method_handler.response_serializer,
         )
+
+
+def get_authenticated_task_id() -> int:
+    """Get the authenticated task ID from the current context."""
+    return _current_task_id.get()
 
 
 def create_serverappio_token_auth_server_interceptor(
