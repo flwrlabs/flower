@@ -128,23 +128,22 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
         if incompat_details is None:
             incompat_details = self._local_metadata.check_compatibility(peer_metadata)
 
-        incompat_message = None
+        # Prepare trailing metadata
+        trailing_metadata = ()
         if incompat_details:
             incompat_message = (
                 "Runtime version compatibility check failed for "
                 f"{self._connection_name}. {incompat_details}"
             )
-        incompat_metadata = (
-            ((VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, incompat_message),)
-            if incompat_message
-            else None
-        )
+            trailing_metadata += (
+                (VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, incompat_message),
+            )
 
-        def maybe_set_incompat_trailing_metadata(
+        def maybe_set_trailing_metadata(
             context: grpc.ServicerContext,
         ) -> None:
-            if incompat_metadata:
-                context.set_trailing_metadata(incompat_metadata)
+            if trailing_metadata:
+                context.set_trailing_metadata(trailing_metadata)
 
         if method_handler.unary_unary is not None:
 
