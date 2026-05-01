@@ -15,6 +15,7 @@
 """Tests for runtime version metadata interceptors."""
 
 from collections import namedtuple
+from collections.abc import Iterator
 from unittest import TestCase
 from unittest.mock import Mock
 
@@ -59,7 +60,7 @@ def _make_unary_handler() -> grpc.RpcMethodHandler:
 def _make_unary_stream_handler() -> grpc.RpcMethodHandler:
     def _handler(
         _request: GrpcMessage, _context: grpc.ServicerContext
-    ) -> grpc.RpcMethodHandler:
+    ) -> Iterator[str]:
         yield "a"
         yield "b"
 
