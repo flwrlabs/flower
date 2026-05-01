@@ -134,14 +134,10 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
                     "Runtime version compatibility check failed for "
                     f"{self._connection_name}. {incompat_details}"
                 )
-                context.set_trailing_metadata(
-                    (
-                        (
-                            VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
-                            incompat_message,
-                        ),
-                    )
+                trailing_metadata = (
+                    (VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, incompat_message,),
                 )
+                context.set_trailing_metadata(trailing_metadata)
 
         if method_handler.unary_unary is not None:
 
