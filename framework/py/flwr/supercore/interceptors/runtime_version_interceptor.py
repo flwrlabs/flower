@@ -150,7 +150,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
             def wrapped(
                 request: GrpcMessage, context: grpc.ServicerContext
             ) -> GrpcMessage:
-                maybe_set_incompat_trailing_metadata(context)
+                maybe_set_trailing_metadata(context)
                 return method_handler.unary_unary(request, context)  # type: ignore
 
             return grpc.unary_unary_rpc_method_handler(
@@ -164,7 +164,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
             def wrapped_stream(
                 request: GrpcMessage, context: grpc.ServicerContext
             ) -> Any:
-                maybe_set_incompat_trailing_metadata(context)
+                maybe_set_trailing_metadata(context)
                 yield from method_handler.unary_stream(request, context)
 
             return grpc.unary_stream_rpc_method_handler(
