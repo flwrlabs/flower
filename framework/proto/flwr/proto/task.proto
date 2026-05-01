@@ -39,7 +39,3 @@ message TaskStatus {
   // failure details
   string details = 3;
 }
-
-// ClaimTask messages
-message ClaimTaskRequest { uint64 task_id = 1; }
-message ClaimTaskResponse { optional string token = 1; }
