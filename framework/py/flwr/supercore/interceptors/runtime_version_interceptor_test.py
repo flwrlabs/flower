@@ -16,6 +16,7 @@
 
 from collections import namedtuple
 from collections.abc import Iterator
+from typing import Any
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
@@ -49,6 +50,28 @@ class _HandlerCallDetails:
     ) -> None:
         self.method = method
         self.invocation_metadata = invocation_metadata
+
+
+def _make_call_details(
+    method: str,
+    metadata: tuple[tuple[str, str | bytes], ...] = (),
+) -> _ClientCallDetails:
+    return _ClientCallDetails(
+        method=method,
+        timeout=None,
+        metadata=metadata,
+        credentials=None,
+        wait_for_ready=None,
+        compression=None,
+    )
+
+
+def _make_runtime_metadata(version: str) -> tuple[tuple[str, str], ...]:
+    return (
+        (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
+        (FLWR_PACKAGE_VERSION_METADATA_KEY, version),
+        (FLWR_COMPONENT_NAME_METADATA_KEY, "simulation"),
+    )
 
 
 def _make_unary_handler() -> grpc.RpcMethodHandler:
@@ -115,13 +138,9 @@ class TestRuntimeVersionClientInterceptor(TestCase):
     ) -> None:
         """Fail fast when runtime-version keys are already present outbound."""
         interceptor = RuntimeVersionClientInterceptor(component_name="simulation")
-        details = _ClientCallDetails(
-            method="/flwr.proto.ServerAppIo/GetNodes",
-            timeout=None,
-            metadata=((FLWR_PACKAGE_NAME_METADATA_KEY, "old"), ("x-test", "value")),
-            credentials=None,
-            wait_for_ready=None,
-            compression=None,
+        details = _make_call_details(
+            "/flwr.proto.ServerAppIo/GetNodes",
+            ((FLWR_PACKAGE_NAME_METADATA_KEY, "old"), ("x-test", "value")),
         )
         with self.assertRaisesRegex(
             RuntimeError,
@@ -148,11 +167,24 @@ class TestRuntimeVersionServerInterceptor(TestCase):
             ),
         )
 
+    def _intercept(
+        self,
+        method: str,
+        metadata: tuple[tuple[str, str | bytes], ...],
+        *,
+        stream: bool = False,
+    ) -> grpc.RpcMethodHandler:
+        handler = _make_unary_stream_handler() if stream else _make_unary_handler()
+        return self.interceptor.intercept_service(
+            lambda _: handler,
+            _HandlerCallDetails(method, metadata),
+        )
+
     def test_missing_metadata_is_tolerated(self) -> None:
         """Missing runtime metadata should pass during rollout."""
-        intercepted = self.interceptor.intercept_service(
-            lambda _: _make_unary_handler(),
-            _HandlerCallDetails("/flwr.proto.ServerAppIo/GetNodes", ()),
+        intercepted = self._intercept(
+            "/flwr.proto.ServerAppIo/GetNodes",
+            (),
         )
 
         context = Mock()
@@ -162,16 +194,9 @@ class TestRuntimeVersionServerInterceptor(TestCase):
 
     def test_unparseable_peer_version_is_warned(self) -> None:
         """Explicit unparseable peer versions should be warned."""
-        intercepted = self.interceptor.intercept_service(
-            lambda _: _make_unary_handler(),
-            _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/GetNodes",
-                (
-                    (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
-                    (FLWR_PACKAGE_VERSION_METADATA_KEY, "main"),
-                    (FLWR_COMPONENT_NAME_METADATA_KEY, "simulation"),
-                ),
-            ),
+        intercepted = self._intercept(
+            "/flwr.proto.ServerAppIo/GetNodes",
+            _make_runtime_metadata("main"),
         )
 
         context = Mock()
@@ -181,16 +206,9 @@ class TestRuntimeVersionServerInterceptor(TestCase):
 
     def test_incompatible_metadata_is_warned(self) -> None:
         """Different major.minor versions should still be warned."""
-        intercepted = self.interceptor.intercept_service(
-            lambda _: _make_unary_handler(),
-            _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/GetNodes",
-                (
-                    (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
-                    (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.30.1"),
-                    (FLWR_COMPONENT_NAME_METADATA_KEY, "simulation"),
-                ),
-            ),
+        intercepted = self._intercept(
+            "/flwr.proto.ServerAppIo/GetNodes",
+            _make_runtime_metadata("1.30.1"),
         )
 
         context = Mock()
@@ -201,16 +219,9 @@ class TestRuntimeVersionServerInterceptor(TestCase):
     def test_compatible_metadata_is_accepted(self) -> None:
         """Compatible peer version should not set trailing metadata for unary
         handlers."""
-        intercepted = self.interceptor.intercept_service(
-            lambda _: _make_unary_handler(),
-            _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/GetNodes",
-                (
-                    (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
-                    (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.7"),
-                    (FLWR_COMPONENT_NAME_METADATA_KEY, "simulation"),
-                ),
-            ),
+        intercepted = self._intercept(
+            "/flwr.proto.ServerAppIo/GetNodes",
+            _make_runtime_metadata("1.29.7"),
         )
 
         context = Mock()
@@ -221,37 +232,24 @@ class TestRuntimeVersionServerInterceptor(TestCase):
     def test_unary_stream_incompatible_metadata_is_warned(self) -> None:
         """Incompatible peer version should set trailing metadata for stream
         handlers."""
-        intercepted = self.interceptor.intercept_service(
-            lambda _: _make_unary_stream_handler(),
-            _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/PullTaskIns",
-                (
-                    (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
-                    (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.30.1"),
-                    (FLWR_COMPONENT_NAME_METADATA_KEY, "simulation"),
-                ),
-            ),
+        intercepted = self._intercept(
+            "/flwr.proto.ServerAppIo/PullTaskIns",
+            _make_runtime_metadata("1.30.1"),
+            stream=True,
         )
 
         context = Mock()
         responses = list(intercepted.unary_stream(GetNodesRequest(run_id=1), context))
         self.assertEqual(responses, ["a", "b"])
-        context.send_initial_metadata.assert_called_once()
         context.set_trailing_metadata.assert_called_once()
 
     def test_unary_stream_compatible_metadata_is_accepted(self) -> None:
         """Compatible peer version should not set trailing metadata for stream
         handlers."""
-        intercepted = self.interceptor.intercept_service(
-            lambda _: _make_unary_stream_handler(),
-            _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/PullTaskIns",
-                (
-                    (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
-                    (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.7"),
-                    (FLWR_COMPONENT_NAME_METADATA_KEY, "simulation"),
-                ),
-            ),
+        intercepted = self._intercept(
+            "/flwr.proto.ServerAppIo/PullTaskIns",
+            _make_runtime_metadata("1.29.7"),
+            stream=True,
         )
 
         context = Mock()
@@ -263,16 +261,31 @@ class TestRuntimeVersionServerInterceptor(TestCase):
 class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
     """Unit tests for RuntimeVersionClientInterceptor.intercept_unary_stream."""
 
+    def _make_call(self) -> Mock:
+        call = Mock()
+        call.trailing_metadata.return_value = ()
+        call.__iter__ = Mock(return_value=iter(["msg1", "msg2"]))
+        return call
+
+    def _intercept(
+        self, call: Any, metadata: tuple[tuple[str, str | bytes], ...] = ()
+    ) -> Any:
+        interceptor = RuntimeVersionClientInterceptor(component_name="simulation")
+        return interceptor.intercept_unary_stream(
+            continuation=lambda _details, _request: call,
+            client_call_details=_make_call_details(
+                "/flwr.proto.Fleet/PullTaskIns",
+                metadata,
+            ),
+            request=GetNodesRequest(run_id=1),
+        )
+
     def test_attach_runtime_version_headers_unary_stream(self) -> None:
         """The interceptor should add version metadata headers for stream calls."""
         interceptor = RuntimeVersionClientInterceptor(component_name="simulation")
-        details = _ClientCallDetails(
-            method="/flwr.proto.Fleet/PullTaskIns",
-            timeout=None,
-            metadata=(("x-test", "value"),),
-            credentials=None,
-            wait_for_ready=None,
-            compression=None,
+        details = _make_call_details(
+            "/flwr.proto.Fleet/PullTaskIns",
+            (("x-test", "value"),),
         )
         captured: dict[str, list[tuple[str, str | bytes]]] = {}
 
@@ -302,77 +315,36 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
         self.assertIn(FLWR_PACKAGE_VERSION_METADATA_KEY, metadata)
         self.assertEqual(metadata[FLWR_COMPONENT_NAME_METADATA_KEY], "simulation")
 
-    def test_log_incompatibility_from_initial_metadata(self) -> None:
-        """The interceptor should log stream incompatibilities on first response."""
+    def test_log_incompatibility_from_trailing_metadata(self) -> None:
+        """The interceptor should log stream incompatibilities from trailing metadata."""
         interceptor = RuntimeVersionClientInterceptor(component_name="simulation")
-        details = _ClientCallDetails(
-            method="/flwr.proto.Fleet/PullTaskIns",
-            timeout=None,
-            metadata=(),
-            credentials=None,
-            wait_for_ready=None,
-            compression=None,
-        )
-        mock_call = Mock()
-        mock_call.initial_metadata.return_value = (
-            (
-                VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
-                "runtime mismatch",
-            ),
-        )
-        mock_call.trailing_metadata.return_value = ()
-        mock_call.__iter__ = Mock(return_value=iter(["msg1"]))
-
-        with patch(
-            "flwr.supercore.interceptors.runtime_version_interceptor.log"
-        ) as log_mock:
-            response_iterator = interceptor.intercept_unary_stream(
-                continuation=lambda _details, _request: mock_call,
-                client_call_details=details,
-                request=GetNodesRequest(run_id=1),
-            )
-
-            mock_call.initial_metadata.assert_not_called()
-            log_mock.assert_not_called()
-
-            responses = list(response_iterator)
-
-        self.assertEqual(responses, ["msg1"])
-        mock_call.initial_metadata.assert_called_once()
-        mock_call.add_done_callback.assert_called_once()
-        log_mock.assert_called_once()
-
-    def test_fallback_to_trailing_metadata_when_initial_metadata_is_empty(self) -> None:
-        """The interceptor should keep the trailing-metadata fallback for streams."""
-        interceptor = RuntimeVersionClientInterceptor(component_name="simulation")
-        details = _ClientCallDetails(
-            method="/flwr.proto.Fleet/PullTaskIns",
-            timeout=None,
-            metadata=(),
-            credentials=None,
-            wait_for_ready=None,
-            compression=None,
-        )
-        mock_call = Mock()
-        mock_call.initial_metadata.return_value = ()
+        mock_call = self._make_call()
         mock_call.trailing_metadata.return_value = (
-            (
-                VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
-                "runtime mismatch",
-            ),
+            (VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, "runtime mismatch"),
         )
-        mock_call.__iter__ = Mock(return_value=iter(["msg1"]))
 
         with patch(
             "flwr.supercore.interceptors.runtime_version_interceptor.log"
         ) as log_mock:
             interceptor.intercept_unary_stream(
                 continuation=lambda _details, _request: mock_call,
-                client_call_details=details,
+                client_call_details=_make_call_details("/flwr.proto.Fleet/PullTaskIns"),
                 request=GetNodesRequest(run_id=1),
             )
 
             done_callback = mock_call.add_done_callback.call_args.args[0]
             done_callback(mock_call)
 
+        mock_call.add_done_callback.assert_called_once()
         log_mock.assert_called_once()
+
+    def test_skip_done_callback_when_stream_call_does_not_support_it(self) -> None:
+        """The interceptor should tolerate stream calls without Future methods."""
+
+        class _StreamOnlyCall:
+            def __iter__(self) -> Iterator[str]:
+                return iter(["msg1"])
+
+        response = self._intercept(_StreamOnlyCall())
+
+        self.assertEqual(list(response), ["msg1"])

@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from logging import WARN
 from typing import Any
 
@@ -91,40 +91,11 @@ class RuntimeVersionClientInterceptor(
         def _log_incompat_warning(done: Any) -> None:
             self._maybe_log_incompat_warning(done.trailing_metadata())
 
-        call.add_done_callback(_log_incompat_warning)
-        return _UnaryStreamCallWrapper(call, self._maybe_log_incompat_warning)
+        add_done_callback = getattr(call, "add_done_callback", None)
+        if callable(add_done_callback):
+            add_done_callback(_log_incompat_warning)
 
-
-class _UnaryStreamCallWrapper:
-    """Proxy unary-stream calls while deferring header reads until consumption."""
-
-    def __init__(
-        self,
-        call: grpc.Call,
-        maybe_log_incompat_warning: Callable[[Any | None], None],
-    ) -> None:
-        self._call = call
-        self._maybe_log_incompat_warning = maybe_log_incompat_warning
-        self._iterator: Iterator[Any] | None = None
-        self._headers_checked = False
-
-    def __iter__(self) -> _UnaryStreamCallWrapper:
-        return self
-
-    def __next__(self) -> Any:
-        self._maybe_log_initial_metadata()
-        if self._iterator is None:
-            self._iterator = iter(self._call)
-        return next(self._iterator)
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._call, name)
-
-    def _maybe_log_initial_metadata(self) -> None:
-        if self._headers_checked:
-            return
-        self._headers_checked = True
-        self._maybe_log_incompat_warning(self._call.initial_metadata())
+        return call
 
 
 class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[misc]
@@ -176,12 +147,6 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
             if incompat_metadata:
                 context.set_trailing_metadata(incompat_metadata)
 
-        def maybe_send_incompat_initial_metadata(
-            context: grpc.ServicerContext,
-        ) -> None:
-            if incompat_metadata:
-                context.send_initial_metadata(incompat_metadata)
-
         if method_handler.unary_unary is not None:
 
             def wrapped(
@@ -201,7 +166,6 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
             def wrapped_stream(
                 request: GrpcMessage, context: grpc.ServicerContext
             ) -> Any:
-                maybe_send_incompat_initial_metadata(context)
                 maybe_set_incompat_trailing_metadata(context)
                 yield from method_handler.unary_stream(request, context)
 
