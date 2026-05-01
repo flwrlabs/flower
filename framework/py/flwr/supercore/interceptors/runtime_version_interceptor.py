@@ -14,6 +14,7 @@
 # ==============================================================================
 """Runtime version metadata interceptors."""
 
+
 from __future__ import annotations
 
 from collections.abc import Callable
