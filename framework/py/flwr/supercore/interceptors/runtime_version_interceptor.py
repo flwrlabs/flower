@@ -14,7 +14,6 @@
 # ==============================================================================
 """Runtime version metadata interceptors."""
 
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -42,7 +41,8 @@ class RuntimeVersionClientInterceptor(
         self._compatibility_warning_logged = False
 
     def _maybe_log_incompat_warning(
-        self, grpc_metadata: Any | None,
+        self,
+        grpc_metadata: Any | None,
     ) -> None:
         if self._compatibility_warning_logged:
             return
@@ -135,8 +135,10 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
                 f"{self._connection_name}. {incompat_details}"
             )
         incompat_metadata = (
-            (VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, incompat_message),
-        ) if incompat_message else None
+            ((VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, incompat_message),)
+            if incompat_message
+            else None
+        )
 
         def maybe_set_incompat_trailing_metadata(
             context: grpc.ServicerContext,
