@@ -197,6 +197,25 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_called_once()
 
+    def test_compatible_metadata_is_accepted(self) -> None:
+        """Compatible peer version should not set trailing metadata for unary handlers."""
+        intercepted = self.interceptor.intercept_service(
+            lambda _: _make_unary_handler(),
+            _HandlerCallDetails(
+                "/flwr.proto.ServerAppIo/GetNodes",
+                (
+                    (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
+                    (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.7"),
+                    (FLWR_COMPONENT_NAME_METADATA_KEY, "simulation"),
+                ),
+            ),
+        )
+
+        context = Mock()
+        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        self.assertEqual(response, "ok")
+        context.set_trailing_metadata.assert_not_called()
+
     def test_unary_stream_incompatible_metadata_is_warned(self) -> None:
         """Incompatible peer version should set trailing metadata for stream
         handlers."""

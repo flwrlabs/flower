@@ -33,7 +33,7 @@ class RuntimeVersionClientInterceptor(
     grpc.UnaryUnaryClientInterceptor,  # type: ignore[misc]
     grpc.UnaryStreamClientInterceptor,  # type: ignore[misc]
 ):
-    """Attach Flower runtime version metadata to outbound unary RPCs."""
+    """Attach Flower runtime version metadata to outbound unary-unary and unary-stream RPCs."""
 
     def __init__(self, component_name: str) -> None:
         self._metadata = RuntimeVersionMetadata.from_local_component(component_name)
@@ -69,24 +69,27 @@ class RuntimeVersionClientInterceptor(
         continuation: Callable[[Any, Any], Any],
         client_call_details: grpc.ClientCallDetails,
         request: GrpcMessage,
-    ) -> Any:
+    ) -> grpc.Call:
         """Add the runtime version metadata headers for unary-stream RPCs."""
         details = client_call_details._replace(
             metadata=self._metadata.append_to_grpc_metadata(
                 client_call_details.metadata
             )
         )
-        call = continuation(details, request)
-        yield from call
+        call: grpc.Call = continuation(details, request)
 
-        # Log the incompatibility message from the trailing metadata
-        if not self._compatibility_warning_logged:
-            incompat_message = get_metadata_str(
-                call.trailing_metadata(), VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY
-            )
-            if incompat_message:
-                self._compatibility_warning_logged = True
-                log(WARN, incompat_message)
+        def _log_incompat_warning(done: Any) -> None:
+            if not self._compatibility_warning_logged:
+                incompat_message = get_metadata_str(
+                    done.trailing_metadata(),
+                    VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
+                )
+                if incompat_message:
+                    self._compatibility_warning_logged = True
+                    log(WARN, incompat_message)
+
+        call.add_done_callback(_log_incompat_warning)
+        return call
 
 
 class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[misc]
