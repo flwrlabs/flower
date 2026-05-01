@@ -276,3 +276,56 @@ class PushAppOutputsResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___PushAppOutputsResponse = PushAppOutputsResponse
+
+@typing.final
+class CreateTaskRequest(google.protobuf.message.Message):
+    """CreateTask messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TYPE_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    FAB_HASH_FIELD_NUMBER: builtins.int
+    MODEL_REF_FIELD_NUMBER: builtins.int
+    CONNECTOR_REF_FIELD_NUMBER: builtins.int
+    type: builtins.str
+    run_id: builtins.int
+    fab_hash: builtins.str
+    model_ref: builtins.str
+    connector_ref: builtins.str
+    def __init__(
+        self,
+        *,
+        type: builtins.str = ...,
+        run_id: builtins.int = ...,
+        fab_hash: builtins.str | None = ...,
+        model_ref: builtins.str | None = ...,
+        connector_ref: builtins.str | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref", "run_id", b"run_id", "type", b"type"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_connector_ref", b"_connector_ref"]) -> typing.Literal["connector_ref"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_fab_hash", b"_fab_hash"]) -> typing.Literal["fab_hash"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_model_ref", b"_model_ref"]) -> typing.Literal["model_ref"] | None: ...
+
+global___CreateTaskRequest = CreateTaskRequest
+
+@typing.final
+class CreateTaskResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TASK_ID_FIELD_NUMBER: builtins.int
+    task_id: builtins.int
+    def __init__(
+        self,
+        *,
+        task_id: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_task_id", b"_task_id", "task_id", b"task_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_task_id", b"_task_id", "task_id", b"task_id"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_task_id", b"_task_id"]) -> typing.Literal["task_id"] | None: ...
+
+global___CreateTaskResponse = CreateTaskResponse

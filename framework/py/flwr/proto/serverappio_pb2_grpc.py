@@ -95,6 +95,11 @@ class ServerAppIoStub(object):
                 request_serializer=flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedResponse.FromString,
                 _registered_method=True)
+        self.CreateTask = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/CreateTask',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.FromString,
+                _registered_method=True)
         self.GetFederationOptions = channel.unary_unary(
                 '/flwr.proto.ServerAppIo/GetFederationOptions',
                 request_serializer=flwr_dot_proto_dot_run__pb2.GetFederationOptionsRequest.SerializeToString,
@@ -219,6 +224,13 @@ class ServerAppIoServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateTask(self, request, context):
+        """Create a task
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetFederationOptions(self, request, context):
         """///////////////////////////////////////////////////////////////////////////
         Specific endpoints for ServerAppIo
@@ -322,6 +334,11 @@ def add_ServerAppIoServicer_to_server(servicer, server):
                     servicer.ConfirmMessageReceived,
                     request_deserializer=flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedResponse.SerializeToString,
+            ),
+            'CreateTask': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateTask,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.SerializeToString,
             ),
             'GetFederationOptions': grpc.unary_unary_rpc_method_handler(
                     servicer.GetFederationOptions,
@@ -651,6 +668,33 @@ class ServerAppIo(object):
             '/flwr.proto.ServerAppIo/ConfirmMessageReceived',
             flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedRequest.SerializeToString,
             flwr_dot_proto_dot_message__pb2.ConfirmMessageReceivedResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateTask(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ServerAppIo/CreateTask',
+            flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.FromString,
             options,
             channel_credentials,
             insecure,

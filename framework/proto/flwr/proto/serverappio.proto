@@ -76,6 +76,9 @@ service ServerAppIo {
   rpc ConfirmMessageReceived(ConfirmMessageReceivedRequest)
       returns (ConfirmMessageReceivedResponse) {}
 
+  // Create a task
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {}
+
   /////////////////////////////////////////////////////////////////////////////
   // Specific endpoints for ServerAppIo
   /////////////////////////////////////////////////////////////////////////////
