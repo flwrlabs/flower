@@ -25,7 +25,10 @@ from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
 from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
-from flwr.supercore.interceptors import AppIoTokenClientInterceptor
+from flwr.supercore.interceptors import (
+    AppIoTokenClientInterceptor,
+    RuntimeVersionClientInterceptor,
+)
 
 
 class SimulationIoConnection:
@@ -35,10 +38,13 @@ class SimulationIoConnection:
     ----------
     serverappio_api_address : str (default: "127.0.0.1:9091")
         The address (URL, IPv6, IPv4) of the SuperLink ServerAppIo API service.
+    insecure : bool (default: False)
+        If True, use plaintext (TLS disabled). If False, use TLS.
     root_certificates : Optional[bytes] (default: None)
         The PEM-encoded root certificates as a byte string.
-        If provided, a secure connection using the certificates will be
-        established to an SSL-enabled Flower server.
+        Used only when `insecure` is False. If provided, these certificates are
+        used to verify the server certificate. If None, gRPC default root
+        certificates are used.
     token : str
         Executor token attached to all outgoing RPCs via metadata.
     """
@@ -82,7 +88,10 @@ class SimulationIoConnection:
             server_address=self._addr,
             insecure=self._insecure,
             root_certificates=self._cert,
-            interceptors=[AppIoTokenClientInterceptor(token=self._token)],
+            interceptors=[
+                RuntimeVersionClientInterceptor(component_name="flwr-simulation"),
+                AppIoTokenClientInterceptor(token=self._token),
+            ],
         )
         self._channel.subscribe(on_channel_state_change)
         self._grpc_stub = ServerAppIoStub(self._channel)

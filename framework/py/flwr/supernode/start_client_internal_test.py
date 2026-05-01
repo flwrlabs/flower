@@ -18,7 +18,10 @@
 import unittest
 from unittest.mock import Mock, patch
 
+import pytest
+
 from flwr.common import ConfigRecord, Context, Message, RecordDict
+from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE
 from flwr.common.message import remove_content_from_message
 from flwr.common.typing import Fab
 from flwr.supercore.inflatable.inflatable_object import (
@@ -26,7 +29,11 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
 )
 
-from .start_client_internal import FAB_VERIFICATION_ERROR, _pull_and_store_message
+from .start_client_internal import (
+    FAB_VERIFICATION_ERROR,
+    _pull_and_store_message,
+    start_client_internal,
+)
 
 
 class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
@@ -304,3 +311,75 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         stored_message = self.mock_state.store_message.call_args.args[0]
         assert stored_message.has_error()
         assert stored_message.error == FAB_VERIFICATION_ERROR
+
+
+class _StopAfterSuperExecLaunch(Exception):
+    """Stop start_client_internal after command construction."""
+
+
+def _run_until_connection_start(
+    clientappio_certificates: tuple[bytes, bytes, bytes] | None = None,
+    clientappio_root_certificates_path: str | None = None,
+) -> tuple[Mock, Mock]:
+    """Run startup only far enough to inspect ClientAppIo and SuperExec wiring."""
+    with (
+        patch(
+            "flwr.supernode.start_client_internal.run_clientappio_api_grpc"
+        ) as run_clientappio,
+        patch("flwr.supernode.start_client_internal.register_signal_handlers"),
+        patch("flwr.supernode.start_client_internal.subprocess.Popen") as popen,
+        patch(
+            "flwr.supernode.start_client_internal._init_connection",
+            side_effect=_StopAfterSuperExecLaunch,
+        ),
+    ):
+        run_clientappio.return_value.bound_address = "127.0.0.1:9094"
+        # `_init_connection` starts the long-running SuperNode/SuperLink connection.
+        # Raising there keeps this test focused on the setup performed before it.
+        with pytest.raises(_StopAfterSuperExecLaunch):
+            start_client_internal(
+                server_address="127.0.0.1:9092",
+                node_config={},
+                root_certificates=None,
+                insecure=True,
+                transport=TRANSPORT_TYPE_GRPC_RERE,
+                clientappio_certificates=clientappio_certificates,
+                clientappio_root_certificates_path=clientappio_root_certificates_path,
+            )
+
+    return run_clientappio, popen
+
+
+def test_start_client_internal_launches_insecure_superexec_by_default() -> None:
+    """Subprocess SuperExec should use insecure AppIO when ClientAppIo has no TLS."""
+    # This verifies the default subprocess-isolation path: when SuperNode starts
+    # ClientAppIo without server TLS, the spawned SuperExec must use plaintext too.
+    run_clientappio, popen = _run_until_connection_start()
+
+    # No ClientAppIo server certificates means the local AppIO server is plaintext,
+    # so the child SuperExec must connect with `--insecure`.
+    assert run_clientappio.call_args.kwargs["certificates"] is None
+    command = popen.call_args.args[0]
+    assert command[:2] == ["flower-superexec", "--insecure"]
+    assert "--root-certificates" not in command
+
+
+def test_start_client_internal_launches_secure_superexec_with_root_certificates() -> (
+    None
+):
+    """Subprocess SuperExec should trust the secure ClientAppIo server CA."""
+    # This verifies the TLS subprocess-isolation path: when SuperNode starts
+    # ClientAppIo with server TLS, the spawned SuperExec must receive trust roots.
+    certificates = (b"ca", b"cert", b"key")
+
+    run_clientappio, popen = _run_until_connection_start(
+        clientappio_certificates=certificates,
+        clientappio_root_certificates_path="/tmp/ca.pem",
+    )
+
+    # When ClientAppIo is started with TLS, SuperExec should verify that server
+    # certificate with the same CA file instead of falling back to plaintext.
+    assert run_clientappio.call_args.kwargs["certificates"] == certificates
+    command = popen.call_args.args[0]
+    assert "--insecure" not in command
+    assert command[:3] == ["flower-superexec", "--root-certificates", "/tmp/ca.pem"]
