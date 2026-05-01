@@ -20,6 +20,7 @@ import subprocess
 from collections.abc import Callable, Sequence
 
 from flwr.common.exit import ExitCode, flwr_exit
+from flwr.supercore.superexec.app_supervisor import launch_with_lifeline
 
 from .exec_plugin import ExecPlugin
 
@@ -44,6 +45,7 @@ class BaseEphemeralExecPlugin(ExecPlugin):
 
     def launch_app(self, token: str, run_id: int) -> None:
         """Launch the application associated with a given run ID and token."""
+        use_lifeline_supervisor = os.name == "posix"
         cmds = [self.command]
         if self.insecure:
             cmds += ["--insecure"]
@@ -51,12 +53,16 @@ class BaseEphemeralExecPlugin(ExecPlugin):
             cmds += ["--root-certificates", self.root_certificates_path]
         cmds += [self.appio_api_address_arg, self.appio_api_address]
         cmds += ["--token", token]
-        cmds += ["--parent-pid", str(os.getpid())]
+        if not use_lifeline_supervisor:
+            cmds += ["--parent-pid", str(os.getpid())]
         if self.runtime_dependency_install:
             cmds += ["--allow-runtime-dependency-installation"]
         # Perform any cleanup before launching the app
         if self.cleanup_before_launch is not None:
             self.cleanup_before_launch()
-        # Launch the app process and wait for it to finish
-        subprocess.run(cmds, check=False)
+        if use_lifeline_supervisor:
+            launch_with_lifeline(cmds, wait=True, popen_kwargs={})
+        else:
+            # Launch the app directly on non-POSIX and wait for it to finish.
+            subprocess.run(cmds, check=False)
         flwr_exit(ExitCode.SUCCESS, "App process finished, exiting SuperExec.")
