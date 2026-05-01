@@ -88,12 +88,10 @@ class RuntimeVersionClientInterceptor(
         )
         call: grpc.Call = continuation(details, request)
 
-        def _log_incompat_warning(done: Any) -> None:
-            self._maybe_log_incompat_warning(done.trailing_metadata())
+        def _log_incompat_warning() -> None:
+            self._maybe_log_incompat_warning(call.trailing_metadata())
 
-        add_done_callback = getattr(call, "add_done_callback", None)
-        if callable(add_done_callback):
-            add_done_callback(_log_incompat_warning)
+        call.add_callback(_log_incompat_warning)
 
         return call
 
