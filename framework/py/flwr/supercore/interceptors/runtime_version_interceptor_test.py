@@ -198,7 +198,8 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         context.set_trailing_metadata.assert_called_once()
 
     def test_unary_stream_incompatible_metadata_is_warned(self) -> None:
-        """Incompatible peer version should set trailing metadata for stream handlers."""
+        """Incompatible peer version should set trailing metadata for stream
+        handlers."""
         intercepted = self.interceptor.intercept_service(
             lambda _: _make_unary_stream_handler(),
             _HandlerCallDetails(
@@ -217,7 +218,8 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         context.set_trailing_metadata.assert_called_once()
 
     def test_unary_stream_compatible_metadata_is_accepted(self) -> None:
-        """Compatible peer version should not set trailing metadata for stream handlers."""
+        """Compatible peer version should not set trailing metadata for stream
+        handlers."""
         intercepted = self.interceptor.intercept_service(
             lambda _: _make_unary_stream_handler(),
             _HandlerCallDetails(
