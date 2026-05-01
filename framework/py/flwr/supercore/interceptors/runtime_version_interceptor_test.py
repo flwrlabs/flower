@@ -15,7 +15,8 @@
 """Tests for runtime version metadata interceptors."""
 
 from collections import namedtuple
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
+from typing import cast
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
@@ -275,16 +276,19 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
 
     def _intercept(
         self,
-        call: object,
+        call: Iterable[str],
         metadata: tuple[tuple[str, str | bytes], ...] = (),
-    ) -> object:
-        return self.interceptor.intercept_unary_stream(
-            continuation=lambda _details, _request: call,
-            client_call_details=_make_call_details(
-                "/flwr.proto.Fleet/PullTaskIns",
-                metadata,
+    ) -> Iterable[str]:
+        return cast(
+            Iterable[str],
+            self.interceptor.intercept_unary_stream(
+                continuation=lambda _details, _request: call,
+                client_call_details=_make_call_details(
+                    "/flwr.proto.Fleet/PullTaskIns",
+                    metadata,
+                ),
+                request=GetNodesRequest(run_id=1),
             ),
-            request=GetNodesRequest(run_id=1),
         )
 
     def test_attach_runtime_version_headers_unary_stream(self) -> None:
