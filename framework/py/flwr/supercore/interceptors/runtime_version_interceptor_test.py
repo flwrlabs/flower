@@ -198,7 +198,8 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         context.set_trailing_metadata.assert_called_once()
 
     def test_compatible_metadata_is_accepted(self) -> None:
-        """Compatible peer version should not set trailing metadata for unary handlers."""
+        """Compatible peer version should not set trailing metadata for unary
+        handlers."""
         intercepted = self.interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
