@@ -17,7 +17,7 @@
 from collections import namedtuple
 from collections.abc import Iterator
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import grpc
 from google.protobuf.message import Message as GrpcMessage
@@ -27,6 +27,7 @@ from flwr.supercore.constant import (
     FLWR_COMPONENT_NAME_METADATA_KEY,
     FLWR_PACKAGE_NAME_METADATA_KEY,
     FLWR_PACKAGE_VERSION_METADATA_KEY,
+    VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
 )
 from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
@@ -235,6 +236,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         context = Mock()
         responses = list(intercepted.unary_stream(GetNodesRequest(run_id=1), context))
         self.assertEqual(responses, ["a", "b"])
+        context.send_initial_metadata.assert_called_once()
         context.set_trailing_metadata.assert_called_once()
 
     def test_unary_stream_compatible_metadata_is_accepted(self) -> None:
@@ -298,3 +300,75 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
         self.assertIn(FLWR_PACKAGE_NAME_METADATA_KEY, metadata)
         self.assertIn(FLWR_PACKAGE_VERSION_METADATA_KEY, metadata)
         self.assertEqual(metadata[FLWR_COMPONENT_NAME_METADATA_KEY], "simulation")
+
+    def test_log_incompatibility_from_initial_metadata(self) -> None:
+        """The interceptor should log stream incompatibilities before completion."""
+        interceptor = RuntimeVersionClientInterceptor(component_name="simulation")
+        details = _ClientCallDetails(
+            method="/flwr.proto.Fleet/PullTaskIns",
+            timeout=None,
+            metadata=(),
+            credentials=None,
+            wait_for_ready=None,
+            compression=None,
+        )
+        mock_call = Mock()
+        mock_call.initial_metadata.return_value = (
+            (
+                VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
+                "runtime mismatch",
+            ),
+        )
+        mock_call.trailing_metadata.return_value = ()
+        mock_call.__iter__ = Mock(return_value=iter(["msg1"]))
+
+        with patch(
+            "flwr.supercore.interceptors.runtime_version_interceptor.log"
+        ) as log_mock:
+            responses = list(
+                interceptor.intercept_unary_stream(
+                    continuation=lambda _details, _request: mock_call,
+                    client_call_details=details,
+                    request=GetNodesRequest(run_id=1),
+                )
+            )
+
+        self.assertEqual(responses, ["msg1"])
+        mock_call.initial_metadata.assert_called_once()
+        mock_call.add_done_callback.assert_called_once()
+        log_mock.assert_called_once()
+
+    def test_fallback_to_trailing_metadata_when_initial_metadata_is_empty(self) -> None:
+        """The interceptor should keep the trailing-metadata fallback for streams."""
+        interceptor = RuntimeVersionClientInterceptor(component_name="simulation")
+        details = _ClientCallDetails(
+            method="/flwr.proto.Fleet/PullTaskIns",
+            timeout=None,
+            metadata=(),
+            credentials=None,
+            wait_for_ready=None,
+            compression=None,
+        )
+        mock_call = Mock()
+        mock_call.initial_metadata.return_value = ()
+        mock_call.trailing_metadata.return_value = (
+            (
+                VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
+                "runtime mismatch",
+            ),
+        )
+        mock_call.__iter__ = Mock(return_value=iter(["msg1"]))
+
+        with patch(
+            "flwr.supercore.interceptors.runtime_version_interceptor.log"
+        ) as log_mock:
+            interceptor.intercept_unary_stream(
+                continuation=lambda _details, _request: mock_call,
+                client_call_details=details,
+                request=GetNodesRequest(run_id=1),
+            )
+
+            done_callback = mock_call.add_done_callback.call_args.args[0]
+            done_callback(mock_call)
+
+        log_mock.assert_called_once()

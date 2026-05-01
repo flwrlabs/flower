@@ -41,6 +41,20 @@ class RuntimeVersionClientInterceptor(
         self._metadata = RuntimeVersionMetadata.from_local_component(component_name)
         self._compatibility_warning_logged = False
 
+    def _maybe_log_incompat_warning(
+        self, grpc_metadata: Any | None,
+    ) -> None:
+        if self._compatibility_warning_logged:
+            return
+
+        incompat_message = get_metadata_str(
+            grpc_metadata,
+            VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
+        )
+        if incompat_message:
+            self._compatibility_warning_logged = True
+            log(WARN, incompat_message)
+
     def intercept_unary_unary(
         self,
         continuation: Callable[[Any, Any], Any],
@@ -56,13 +70,7 @@ class RuntimeVersionClientInterceptor(
         call: grpc.Call = continuation(details, request)
 
         # Log the incompatibility message from the response metadata
-        if not self._compatibility_warning_logged:
-            incompat_message = get_metadata_str(
-                call.trailing_metadata(), VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY
-            )
-            if incompat_message:
-                self._compatibility_warning_logged = True
-                log(WARN, incompat_message)
+        self._maybe_log_incompat_warning(call.trailing_metadata())
 
         return call
 
@@ -80,15 +88,10 @@ class RuntimeVersionClientInterceptor(
         )
         call: grpc.Call = continuation(details, request)
 
+        self._maybe_log_incompat_warning(call.initial_metadata())
+
         def _log_incompat_warning(done: Any) -> None:
-            if not self._compatibility_warning_logged:
-                incompat_message = get_metadata_str(
-                    done.trailing_metadata(),
-                    VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
-                )
-                if incompat_message:
-                    self._compatibility_warning_logged = True
-                    log(WARN, incompat_message)
+            self._maybe_log_incompat_warning(done.trailing_metadata())
 
         call.add_done_callback(_log_incompat_warning)
         return call
@@ -125,19 +128,27 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
         if incompat_details is None:
             incompat_details = self._local_metadata.check_compatibility(peer_metadata)
 
-        # Attach the incompatibility message to the trailing metadata if present
+        incompat_message = None
+        if incompat_details:
+            incompat_message = (
+                "Runtime version compatibility check failed for "
+                f"{self._connection_name}. {incompat_details}"
+            )
+        incompat_metadata = (
+            (VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, incompat_message),
+        ) if incompat_message else None
+
         def maybe_set_incompat_trailing_metadata(
             context: grpc.ServicerContext,
         ) -> None:
-            if incompat_details:
-                incompat_message = (
-                    "Runtime version compatibility check failed for "
-                    f"{self._connection_name}. {incompat_details}"
-                )
-                trailing_metadata = (
-                    (VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, incompat_message,),
-                )
-                context.set_trailing_metadata(trailing_metadata)
+            if incompat_metadata:
+                context.set_trailing_metadata(incompat_metadata)
+
+        def maybe_send_incompat_initial_metadata(
+            context: grpc.ServicerContext,
+        ) -> None:
+            if incompat_metadata:
+                context.send_initial_metadata(incompat_metadata)
 
         if method_handler.unary_unary is not None:
 
@@ -158,6 +169,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
             def wrapped_stream(
                 request: GrpcMessage, context: grpc.ServicerContext
             ) -> Any:
+                maybe_send_incompat_initial_metadata(context)
                 maybe_set_incompat_trailing_metadata(context)
                 yield from method_handler.unary_stream(request, context)
 
