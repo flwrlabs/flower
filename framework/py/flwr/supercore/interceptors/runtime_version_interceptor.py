@@ -121,24 +121,29 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
             incompat_details = self._local_metadata.check_compatibility(peer_metadata)
 
         # Attach the incompatibility message to the trailing metadata if present
+        def maybe_set_incompat_trailing_metadata(
+            context: grpc.ServicerContext,
+        ) -> None:
+            if incompat_details:
+                incompat_message = (
+                    "Runtime version compatibility check failed for "
+                    f"{self._connection_name}. {incompat_details}"
+                )
+                context.set_trailing_metadata(
+                    (
+                        (
+                            VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
+                            incompat_message,
+                        ),
+                    )
+                )
+
         if method_handler.unary_unary is not None:
 
             def wrapped(
                 request: GrpcMessage, context: grpc.ServicerContext
             ) -> GrpcMessage:
-                if incompat_details:
-                    incompat_message = (
-                        "Runtime version compatibility check failed for "
-                        f"{self._connection_name}. {incompat_details}"
-                    )
-                    context.set_trailing_metadata(
-                        (
-                            (
-                                VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
-                                incompat_message,
-                            ),
-                        )
-                    )
+                maybe_set_incompat_trailing_metadata(context)
                 return method_handler.unary_unary(request, context)  # type: ignore
 
             return grpc.unary_unary_rpc_method_handler(
@@ -152,19 +157,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
             def wrapped_stream(
                 request: GrpcMessage, context: grpc.ServicerContext
             ) -> Any:
-                if incompat_details:
-                    incompat_message = (
-                        "Runtime version compatibility check failed for "
-                        f"{self._connection_name}. {incompat_details}"
-                    )
-                    context.set_trailing_metadata(
-                        (
-                            (
-                                VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
-                                incompat_message,
-                            ),
-                        )
-                    )
+                maybe_set_incompat_trailing_metadata(context)
                 yield from method_handler.unary_stream(request, context)
 
             return grpc.unary_stream_rpc_method_handler(

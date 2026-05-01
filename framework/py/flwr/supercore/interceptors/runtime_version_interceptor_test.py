@@ -57,6 +57,16 @@ def _make_unary_handler() -> grpc.RpcMethodHandler:
     return grpc.unary_unary_rpc_method_handler(_handler)
 
 
+def _make_unary_stream_handler() -> grpc.RpcMethodHandler:
+    def _handler(
+        _request: GrpcMessage, _context: grpc.ServicerContext
+    ) -> grpc.RpcMethodHandler:
+        yield "a"
+        yield "b"
+
+    return grpc.unary_stream_rpc_method_handler(_handler)
+
+
 class TestRuntimeVersionClientInterceptor(TestCase):
     """Unit tests for RuntimeVersionClientInterceptor."""
 
@@ -187,12 +197,31 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_called_once()
 
-    def test_compatible_metadata_is_accepted(self) -> None:
-        """Same major.minor versions should pass."""
+    def test_unary_stream_incompatible_metadata_is_warned(self) -> None:
+        """Incompatible peer version should set trailing metadata for stream handlers."""
         intercepted = self.interceptor.intercept_service(
-            lambda _: _make_unary_handler(),
+            lambda _: _make_unary_stream_handler(),
             _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/GetNodes",
+                "/flwr.proto.ServerAppIo/PullTaskIns",
+                (
+                    (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
+                    (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.30.1"),
+                    (FLWR_COMPONENT_NAME_METADATA_KEY, "simulation"),
+                ),
+            ),
+        )
+
+        context = Mock()
+        responses = list(intercepted.unary_stream(GetNodesRequest(run_id=1), context))
+        self.assertEqual(responses, ["a", "b"])
+        context.set_trailing_metadata.assert_called_once()
+
+    def test_unary_stream_compatible_metadata_is_accepted(self) -> None:
+        """Compatible peer version should not set trailing metadata for stream handlers."""
+        intercepted = self.interceptor.intercept_service(
+            lambda _: _make_unary_stream_handler(),
+            _HandlerCallDetails(
+                "/flwr.proto.ServerAppIo/PullTaskIns",
                 (
                     (FLWR_PACKAGE_NAME_METADATA_KEY, "flwr"),
                     (FLWR_PACKAGE_VERSION_METADATA_KEY, "1.29.7"),
@@ -202,6 +231,48 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
 
         context = Mock()
-        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
-        self.assertEqual(response, "ok")
+        responses = list(intercepted.unary_stream(GetNodesRequest(run_id=1), context))
+        self.assertEqual(responses, ["a", "b"])
         context.set_trailing_metadata.assert_not_called()
+
+
+class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
+    """Unit tests for RuntimeVersionClientInterceptor.intercept_unary_stream."""
+
+    def test_attach_runtime_version_headers_unary_stream(self) -> None:
+        """The interceptor should add version metadata headers for stream calls."""
+        interceptor = RuntimeVersionClientInterceptor(component_name="simulation")
+        details = _ClientCallDetails(
+            method="/flwr.proto.Fleet/PullTaskIns",
+            timeout=None,
+            metadata=(("x-test", "value"),),
+            credentials=None,
+            wait_for_ready=None,
+            compression=None,
+        )
+        captured: dict[str, list[tuple[str, str | bytes]]] = {}
+
+        def continuation(
+            client_call_details: grpc.ClientCallDetails,
+            _request: GrpcMessage,
+        ) -> Mock:
+            captured["metadata"] = list(client_call_details.metadata or [])
+            mock_call = Mock()
+            mock_call.trailing_metadata.return_value = ()
+            mock_call.__iter__ = Mock(return_value=iter(["msg1", "msg2"]))
+            return mock_call
+
+        responses = list(
+            interceptor.intercept_unary_stream(
+                continuation=continuation,
+                client_call_details=details,
+                request=GetNodesRequest(run_id=1),
+            )
+        )
+
+        self.assertEqual(responses, ["msg1", "msg2"])
+        metadata = dict(captured["metadata"])
+        self.assertEqual(metadata["x-test"], "value")
+        self.assertIn(FLWR_PACKAGE_NAME_METADATA_KEY, metadata)
+        self.assertIn(FLWR_PACKAGE_VERSION_METADATA_KEY, metadata)
+        self.assertEqual(metadata[FLWR_COMPONENT_NAME_METADATA_KEY], "simulation")
