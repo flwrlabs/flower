@@ -92,7 +92,8 @@ class RuntimeVersionClientInterceptor(
         def _log_incompat_warning() -> None:
             self._maybe_log_incompat_warning(call.trailing_metadata())
 
-        call.add_callback(_log_incompat_warning)
+        if not call.add_callback(_log_incompat_warning):
+            _log_incompat_warning()
 
         return call
 

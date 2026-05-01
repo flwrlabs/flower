@@ -339,19 +339,30 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
                 request=GetNodesRequest(run_id=1),
             )
 
-            done_callback = mock_call.add_done_callback.call_args.args[0]
-            done_callback(mock_call)
+            done_callback = mock_call.add_callback.call_args.args[0]
+            done_callback()
 
-        mock_call.add_done_callback.assert_called_once()
+        mock_call.add_callback.assert_called_once()
         log_mock.assert_called_once()
 
-    def test_skip_done_callback_when_stream_call_does_not_support_it(self) -> None:
-        """The interceptor should tolerate stream calls without Future methods."""
+    def test_log_incompatibility_when_callback_cannot_be_added(self) -> None:
+        """The interceptor should log immediately if the RPC already terminated."""
+        mock_call = _make_stream_call(
+            trailing_metadata=(
+                (VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, "runtime mismatch"),
+            ),
+        )
+        mock_call.add_callback.return_value = False
 
-        class _StreamOnlyCall:
-            def __iter__(self) -> Iterator[str]:
-                return iter(["msg1"])
+        with patch(
+            "flwr.supercore.interceptors.runtime_version_interceptor.log"
+        ) as log_mock:
+            response = self.interceptor.intercept_unary_stream(
+                continuation=lambda _details, _request: mock_call,
+                client_call_details=_make_call_details("/flwr.proto.Fleet/PullTaskIns"),
+                request=GetNodesRequest(run_id=1),
+            )
 
-        response = self._intercept(_StreamOnlyCall())
-
-        self.assertEqual(list(response), ["msg1"])
+        self.assertIs(response, mock_call)
+        mock_call.add_callback.assert_called_once()
+        log_mock.assert_called_once()
