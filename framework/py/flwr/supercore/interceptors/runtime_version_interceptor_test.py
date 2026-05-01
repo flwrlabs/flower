@@ -282,6 +282,7 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
         ) -> Mock:
             captured["metadata"] = list(client_call_details.metadata or [])
             mock_call = Mock()
+            mock_call.initial_metadata.return_value = ()
             mock_call.trailing_metadata.return_value = ()
             mock_call.__iter__ = Mock(return_value=iter(["msg1", "msg2"]))
             return mock_call
