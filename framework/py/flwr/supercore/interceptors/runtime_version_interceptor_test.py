@@ -105,6 +105,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
     """Unit tests for RuntimeVersionClientInterceptor."""
 
     def setUp(self) -> None:
+        """Create the default client interceptor under test."""
         self.interceptor = RuntimeVersionClientInterceptor(component_name="simulation")
 
     def _make_call(self) -> Mock:
@@ -269,6 +270,7 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
     """Unit tests for RuntimeVersionClientInterceptor.intercept_unary_stream."""
 
     def setUp(self) -> None:
+        """Create the default unary-stream client interceptor under test."""
         self.interceptor = RuntimeVersionClientInterceptor(component_name="simulation")
 
     def _intercept(
