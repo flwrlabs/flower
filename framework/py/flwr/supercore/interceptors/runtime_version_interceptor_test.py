@@ -303,7 +303,7 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
         self.assertEqual(metadata[FLWR_COMPONENT_NAME_METADATA_KEY], "simulation")
 
     def test_log_incompatibility_from_initial_metadata(self) -> None:
-        """The interceptor should log stream incompatibilities before completion."""
+        """The interceptor should log stream incompatibilities on first response."""
         interceptor = RuntimeVersionClientInterceptor(component_name="simulation")
         details = _ClientCallDetails(
             method="/flwr.proto.Fleet/PullTaskIns",
@@ -326,13 +326,16 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
         with patch(
             "flwr.supercore.interceptors.runtime_version_interceptor.log"
         ) as log_mock:
-            responses = list(
-                interceptor.intercept_unary_stream(
-                    continuation=lambda _details, _request: mock_call,
-                    client_call_details=details,
-                    request=GetNodesRequest(run_id=1),
-                )
+            response_iterator = interceptor.intercept_unary_stream(
+                continuation=lambda _details, _request: mock_call,
+                client_call_details=details,
+                request=GetNodesRequest(run_id=1),
             )
+
+            mock_call.initial_metadata.assert_not_called()
+            log_mock.assert_not_called()
+
+            responses = list(response_iterator)
 
         self.assertEqual(responses, ["msg1"])
         mock_call.initial_metadata.assert_called_once()

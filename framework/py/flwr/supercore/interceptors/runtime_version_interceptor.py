@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from logging import WARN
 from typing import Any
 
@@ -88,13 +88,43 @@ class RuntimeVersionClientInterceptor(
         )
         call: grpc.Call = continuation(details, request)
 
-        self._maybe_log_incompat_warning(call.initial_metadata())
-
         def _log_incompat_warning(done: Any) -> None:
             self._maybe_log_incompat_warning(done.trailing_metadata())
 
         call.add_done_callback(_log_incompat_warning)
-        return call
+        return _UnaryStreamCallWrapper(call, self._maybe_log_incompat_warning)
+
+
+class _UnaryStreamCallWrapper:
+    """Proxy unary-stream calls while deferring header reads until consumption."""
+
+    def __init__(
+        self,
+        call: grpc.Call,
+        maybe_log_incompat_warning: Callable[[Any | None], None],
+    ) -> None:
+        self._call = call
+        self._maybe_log_incompat_warning = maybe_log_incompat_warning
+        self._iterator: Iterator[Any] | None = None
+        self._headers_checked = False
+
+    def __iter__(self) -> _UnaryStreamCallWrapper:
+        return self
+
+    def __next__(self) -> Any:
+        self._maybe_log_initial_metadata()
+        if self._iterator is None:
+            self._iterator = iter(self._call)
+        return next(self._iterator)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._call, name)
+
+    def _maybe_log_initial_metadata(self) -> None:
+        if self._headers_checked:
+            return
+        self._headers_checked = True
+        self._maybe_log_incompat_warning(self._call.initial_metadata())
 
 
 class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[misc]
