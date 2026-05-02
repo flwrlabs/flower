@@ -34,7 +34,6 @@ from flwr.common.config import (
 from flwr.common.constant import (
     RUNTIME_DEPENDENCY_INSTALL,
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
-    ExecPluginType,
     Status,
     SubStatus,
 )
@@ -61,7 +60,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.run_pb2 import UpdateRunStatusRequest  # pylint: disable=E0611
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
 from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
@@ -72,8 +70,7 @@ from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
-from flwr.supercore.superexec.plugin import ServerAppExecPlugin
-from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning
+from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 
 def _run_simulation_settings(
@@ -111,31 +108,15 @@ def _run_simulation_settings(
 
 def flwr_simulation() -> None:
     """Run process-isolated Flower Simulation."""
+    args = _parse_args_run_flwr_simulation().parse_args()
+
     # Capture stdout/stderr
     log_queue: Queue[str | None] = Queue()
     mirror_output_to_queue(log_queue)
 
-    args = _parse_args_run_flwr_simulation().parse_args()
-
-    if not args.insecure:
-        flwr_exit(
-            ExitCode.COMMON_TLS_NOT_SUPPORTED,
-            "`flwr-simulation` does not support TLS yet.",
-        )
-
-    # Disallow long-running `flwr-simulation` processes
-    if args.token is None:
-        run_with_deprecation_warning(
-            cmd="flwr-simulation",
-            plugin_type=ExecPluginType.SERVER_APP,
-            plugin_class=ServerAppExecPlugin,
-            stub_class=ServerAppIoStub,
-            appio_api_address=args.serverappio_api_address,
-            parent_pid=args.parent_pid,
-            warn_run_once=args.run_once,
-            runtime_dependency_install=args.runtime_dependency_install,
-        )
-        return
+    certificates = validate_and_resolve_root_certificates(
+        args.root_certificates, args.insecure
+    )
 
     log(INFO, "Starting Flower Simulation")
     log(
@@ -147,7 +128,8 @@ def flwr_simulation() -> None:
         serverappio_api_address=args.serverappio_api_address,
         log_queue=log_queue,
         token=args.token,
-        certificates=None,
+        insecure=args.insecure,
+        certificates=certificates,
         parent_pid=args.parent_pid,
         runtime_dependency_install=args.runtime_dependency_install,
     )
@@ -160,6 +142,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     serverappio_api_address: str,
     log_queue: Queue[str | None],
     token: str,
+    insecure: bool,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
@@ -171,6 +154,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
     conn = SimulationIoConnection(
         serverappio_api_address=serverappio_api_address,
+        insecure=insecure,
         root_certificates=certificates,
         token=token,
     )
@@ -210,6 +194,12 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     )
 
     try:
+        # Set up heartbeat sender
+        heartbeat_sender = HeartbeatSender(
+            make_app_heartbeat_fn_grpc(conn._stub, token)
+        )
+        heartbeat_sender.start()
+
         # Pull SimulationInputs from LinkState
         req = PullAppInputsRequest(token=token)
         res: PullAppInputsResponse = conn._stub.PullAppInputs(req)
@@ -292,12 +282,6 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
                 "run-id-hash": run_id_hash,
             },
         )
-
-        # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(
-            make_app_heartbeat_fn_grpc(conn._stub, token)
-        )
-        heartbeat_sender.start()
 
         # Launch the simulation
         updated_context = _run_simulation(

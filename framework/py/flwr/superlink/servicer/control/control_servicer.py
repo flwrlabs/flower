@@ -160,8 +160,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
 
         verification_dict: dict[str, str] = {}
+        note: str | None = None
         if request.app_spec:
-            fab_file, verification_dict = _get_remote_fab(
+            fab_file, verification_dict, note = _get_remote_fab(
                 self.fleet_api_type, request.app_spec, context
             )
         else:
@@ -210,16 +211,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 resolved_federation_config.CopyFrom(sim_cfg)
                 resolved_federation_config.MergeFrom(request.override_federation_config)
 
-            if not state.federation_manager.can_execute(
+            state.federation_manager.can_execute(
                 flwr_aid,
                 ActionType.START_RUN,
                 StartRunContext(federation_name=federation, runtime=runtime),
-            ):
-                raise FlowerError(
-                    ApiErrorCode.NO_PERMISSIONS,
-                    f"'{ActionType.START_RUN}' action cannot be executed on federation "
-                    f"'{federation}'.",
-                )
+            )
 
         try:
             # Validate user config overrides matches keys in run config in FAB
@@ -278,7 +274,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
 
         log(INFO, "Created %s run %s", run_type, str(run_id))
-        return StartRunResponse(run_id=run_id)
+        return StartRunResponse(run_id=run_id, note=note)
 
     def StreamLogs(  # pylint: disable=C0103
         self, request: StreamLogsRequest, context: grpc.ServicerContext
@@ -535,15 +531,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         flwr_aid = _get_flwr_aid(context)
         with rpc_error_translator(context, self.RegisterNode.__qualname__):
-            if not state.federation_manager.can_execute(
+            state.federation_manager.can_execute(
                 flwr_aid,
                 ActionType.REGISTER_SUPERNODE,
                 RegisterSupernodeContext(),
-            ):
-                raise FlowerError(
-                    ApiErrorCode.NO_PERMISSIONS,
-                    f"'{ActionType.REGISTER_SUPERNODE}' action cannot be executed.",
-                )
+            )
 
         # Account name exists if `flwr_aid` exists
         account_name = cast(str, get_current_account_info().account_name)
@@ -687,7 +679,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
             runtime = RunTime.SIMULATION if request.simulation else RunTime.DEPLOYMENT
             flwr_aid = cast(str, account.flwr_aid)
-            if not state.federation_manager.can_execute(
+            state.federation_manager.can_execute(
                 flwr_aid,
                 ActionType.CREATE_FEDERATION,
                 CreateFederationContext(
@@ -695,12 +687,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     runtime=runtime,
                     visibility="private",
                 ),
-            ):
-                raise FlowerError(
-                    ApiErrorCode.NO_PERMISSIONS,
-                    f"'{ActionType.CREATE_FEDERATION}' action cannot be executed with "
-                    f"a '{runtime}' runtime.",
-                )
+            )
 
             # Create federation
             federation = state.federation_manager.create_federation(
@@ -845,7 +832,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 else RunTime.DEPLOYMENT
             )
 
-            if not state.federation_manager.can_execute(
+            state.federation_manager.can_execute(
                 flwr_aid=flwr_aid,
                 action=ActionType.CREATE_INVITATION,
                 context=CreateInvitationContext(
@@ -853,12 +840,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     invitee_account_name=invitee_account_name,
                     runtime=runtime,
                 ),
-            ):
-                raise FlowerError(
-                    ApiErrorCode.NO_PERMISSIONS,
-                    f"'{ActionType.CREATE_INVITATION}' action cannot be executed on "
-                    f"federation '{federation}' for account '{invitee_account_name}'.",
-                )
+            )
 
             state.federation_manager.create_invitation(
                 flwr_aid=flwr_aid,
@@ -902,19 +884,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 else RunTime.DEPLOYMENT
             )
 
-            if not state.federation_manager.can_execute(
+            state.federation_manager.can_execute(
                 flwr_aid=flwr_aid,
                 action=ActionType.ACCEPT_INVITATION,
                 context=AcceptInvitationContext(
                     federation_name=federation,
                     runtime=runtime,
                 ),
-            ):
-                raise FlowerError(
-                    ApiErrorCode.NO_PERMISSIONS,
-                    f"'{ActionType.ACCEPT_INVITATION}' action cannot be executed on "
-                    f"federation '{federation}'.",
-                )
+            )
 
             state.federation_manager.accept_invitation(
                 flwr_aid=_get_flwr_aid(context),
@@ -1120,7 +1097,7 @@ def _get_remote_fab(
     fleet_api_type: str | None,
     app_spec: str,
     context: grpc.ServicerContext,
-) -> tuple[bytes, dict[str, str]]:
+) -> tuple[bytes, dict[str, str], str | None]:
     """Get remote FAB from Flower Hub."""
     if fleet_api_type == TRANSPORT_TYPE_GRPC_ADAPTER:
         context.abort(
@@ -1141,7 +1118,7 @@ def _get_remote_fab(
     # Request download link and verification information
     url = f"{PLATFORM_API_URL}/hub/fetch-fab"
     try:
-        presigned_url, verifications = request_download_link(
+        presigned_url, verifications, note = request_download_link(
             app_id, app_version, url, "fab_url"
         )
     except ValueError as e:
@@ -1167,4 +1144,4 @@ def _get_remote_fab(
             f"FAB download failed: {str(e)}",
         )
     fab_file = r.content
-    return fab_file, verification_dict
+    return fab_file, verification_dict, note

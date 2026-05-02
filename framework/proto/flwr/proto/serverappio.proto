@@ -23,6 +23,7 @@ import "flwr/proto/node.proto";
 import "flwr/proto/message.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/appio.proto";
+import "flwr/proto/task.proto";
 
 service ServerAppIo {
 
@@ -48,6 +49,13 @@ service ServerAppIo {
   rpc SendAppHeartbeat(SendAppHeartbeatRequest)
       returns (SendAppHeartbeatResponse) {}
 
+  // Claim task
+  rpc ClaimTask(ClaimTaskRequest) returns (ClaimTaskResponse) {}
+
+  // Task heartbeat
+  rpc SendTaskHeartbeat(SendTaskHeartbeatRequest)
+      returns (SendTaskHeartbeatResponse) {}
+
   // Pull app inputs
   rpc PullAppInputs(PullAppInputsRequest) returns (PullAppInputsResponse) {}
 
@@ -67,6 +75,9 @@ service ServerAppIo {
   // Confirm Message Received
   rpc ConfirmMessageReceived(ConfirmMessageReceivedRequest)
       returns (ConfirmMessageReceivedResponse) {}
+
+  // Create a task
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {}
 
   /////////////////////////////////////////////////////////////////////////////
   // Specific endpoints for ServerAppIo

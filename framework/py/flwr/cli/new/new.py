@@ -187,9 +187,14 @@ def download_remote_app_via_api(app_spec: str) -> None:
     # Fetch ZIP downloading URL
     url = f"{PLATFORM_API_URL}/hub/fetch-zip"
     try:
-        presigned_url, _ = request_download_link(app_id, app_version, url, "zip_url")
+        presigned_url, _, note = request_download_link(
+            app_id, app_version, url, "zip_url"
+        )
     except ValueError as e:
         raise click.ClickException(str(e)) from e
+
+    if note:
+        typer.secho(f"Note: {note}", fg=typer.colors.YELLOW, err=True)
 
     typer.secho(
         "🔽 Downloading app...",

@@ -25,8 +25,11 @@ from parameterized import parameterized
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 from .utils import (
+    MetadataLookupError,
+    find_metadata_keys,
     get_metadata_bytes,
     get_metadata_str,
+    get_metadata_str_checked,
     humanize_bytes,
     humanize_duration,
     int64_to_uint64,
@@ -37,6 +40,18 @@ from .utils import (
     simulation_config_to_json,
     uint64_to_int64,
 )
+
+
+def test_find_metadata_keys() -> None:
+    """Return the subset of requested keys present in metadata."""
+    assert find_metadata_keys(
+        [
+            ("x-token", "value"),
+            ("x-trace-id", "abc"),
+            ("x-token", "other"),
+        ],
+        ("x-token", "missing"),
+    ) == {"x-token"}
 
 
 def test_mask_string() -> None:
@@ -70,6 +85,33 @@ def test_get_metadata_str(
 ) -> None:
     """Return exactly one non-empty string value of the expected type."""
     assert get_metadata_str(metadata, key) == expected
+
+
+@pytest.mark.parametrize(
+    ("metadata", "key", "expected_value", "expected_error"),
+    [
+        ([("x-token", "value")], "x-token", "value", None),
+        ([("x-token", "")], "x-token", None, "empty"),
+        ([("x-token", "value"), ("x-token", "other")], "x-token", None, "duplicate"),
+        ([("x-token", b"value")], "x-token", None, "wrong_type"),
+        ([("other", "value")], "x-token", None, "missing"),
+    ],
+)
+def test_get_metadata_str_checked(
+    metadata: list[tuple[str, str | bytes]],
+    key: str,
+    expected_value: str | None,
+    expected_error: str | None,
+) -> None:
+    """Preserve metadata validation outcomes for callers that need them."""
+    value, error_type = None, None
+    try:
+        value = get_metadata_str_checked(metadata, key)
+    except MetadataLookupError as e:
+        error_type = e.error_type
+
+    assert value == expected_value
+    assert error_type == expected_error
 
 
 @pytest.mark.parametrize(
@@ -186,12 +228,14 @@ def test_request_download_link_all_scenarios(
                     "verifications": [
                         {"public_key_id": "key1", "sig": "abc", "algo": "ed25519"}
                     ],
+                    "note": "Compatibility fallback applied.",
                 },
             },
             "assert": lambda out: (
                 out[0] == "https://example.ai/fab.fab"
                 and isinstance(out[1], list)
                 and out[1][0]["public_key_id"] == "key1"
+                and out[2] == "Compatibility fallback applied."
             ),
         },
         {
@@ -202,7 +246,8 @@ def test_request_download_link_all_scenarios(
                 "json": {"fab_url": "https://example.ai/fab.fab"},
             },
             "assert": lambda out: out[0] == "https://example.ai/fab.fab"
-            and out[1] is None,
+            and out[1] is None
+            and out[2] is None,
         },
         {
             "name": "http_404_not_found",
@@ -300,9 +345,9 @@ def test_request_download_link_all_scenarios(
             if case["name"] == "http_404_not_found":
                 assert app_id in msg
         else:
-            # Expect a (fab_url, verifications) tuple
-            result: tuple[str, list[dict[str, str]] | None] = request_download_link(
-                app_id, app_version, in_url, out_url
+            # Expect a (fab_url, verifications, note) tuple
+            result: tuple[str, list[dict[str, str]] | None, str | None] = (
+                request_download_link(app_id, app_version, in_url, out_url)
             )
             assert case["assert"](result), f"Assertion failed for {case['name']}"
 

@@ -17,6 +17,7 @@
 
 import argparse
 from logging import INFO, WARN
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -42,19 +43,15 @@ from flwr.supercore.superexec.plugin import (
 )
 from flwr.supercore.superexec.run_superexec import run_superexec
 from flwr.supercore.update_check import warn_if_flwr_update_available
+from flwr.supercore.utils import disable_process_dumping
 from flwr.supercore.version import package_version
 
 
 def flower_superexec() -> None:
     """Run `flower-superexec` command."""
+    disable_process_dumping(strict=False)
     warn_if_flwr_update_available(process_name="flower-superexec")
     args = _parse_args().parse_args()
-
-    if not args.insecure:
-        flwr_exit(
-            ExitCode.COMMON_TLS_NOT_SUPPORTED,
-            "SuperExec does not support TLS yet.",
-        )
 
     # Log the first message after parsing arguments in case of `--help`
     log(INFO, "Starting Flower SuperExec")
@@ -107,12 +104,24 @@ def flower_superexec() -> None:
         except ValueError as err:
             flwr_exit(
                 ExitCode.SUPEREXEC_AUTH_SECRET_LOAD_FAILED,
-                f"Failed to load SuperExec auth secret: {err}",
+                f"Failed to load SuperExec authentication secret: {err}",
             )
+
+        # Destroy the auth secret file immediately after loading
+        if args.plugin_type == ExecPluginType.SERVER_APP_EPHEMERAL:
+            try:
+                secret_path = Path(args.superexec_auth_secret_file).expanduser()
+                secret_path.write_bytes(b"\x00" * secret_path.stat().st_size)
+                secret_path.unlink()
+            except OSError as e:
+                log(WARN, "Failed to destroy authentication secret file: %s", e)
+
     run_superexec(
         plugin_class=plugin_class,
         stub_class=stub_class,  # type: ignore
         appio_api_address=args.appio_api_address,
+        insecure=args.insecure,
+        root_certificates_path=args.root_certificates,
         superexec_auth_secret=superexec_auth_secret,
         plugin_config=plugin_config,
         parent_pid=args.parent_pid,
@@ -148,6 +157,13 @@ def _parse_args() -> argparse.ArgumentParser:
         help="Connect to the AppIO API without TLS. "
         "Data transmitted between the client and server is not encrypted. "
         "Use this flag only if you understand the risks.",
+    )
+    parser.add_argument(
+        "--root-certificates",
+        metavar="ROOT_CERT",
+        type=str,
+        help="Path to a PEM-encoded root CA certificate (or CA bundle) used to verify "
+        "the server's TLS certificate. This is not a client certificate for mTLS.",
     )
     parser.add_argument(
         "--parent-pid",

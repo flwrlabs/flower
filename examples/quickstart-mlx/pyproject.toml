@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-mlx"
-version = "1.1.0"
+version = "1.1.1"
 description = "Federated Learning with MLX and Flower (Quickstart Example)"
 license = {file = "LICENSE"}
 dependencies = [
@@ -19,7 +19,7 @@ packages = ["."]
 [tool.flwr.app]
 publisher = "flwrlabs"
 fab-format-version = 1
-flwr-version-target = "1.28.0"
+flwr-version-target = "1.29.0"
 
 [tool.flwr.app.components]
 serverapp = "mlxexample.server_app:app"

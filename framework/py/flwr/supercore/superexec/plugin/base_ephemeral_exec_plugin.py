@@ -17,7 +17,7 @@
 
 import os
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from flwr.common.exit import ExitCode, flwr_exit
 
@@ -34,6 +34,7 @@ class BaseEphemeralExecPlugin(ExecPlugin):
     # Placeholders to be defined in subclasses
     command = ""
     appio_api_address_arg = ""
+    cleanup_before_launch: Callable[[], None] | None = None
 
     def select_run_id(self, candidate_run_ids: Sequence[int]) -> int | None:
         """Select a run ID to execute from a sequence of candidates."""
@@ -43,12 +44,19 @@ class BaseEphemeralExecPlugin(ExecPlugin):
 
     def launch_app(self, token: str, run_id: int) -> None:
         """Launch the application associated with a given run ID and token."""
-        cmds = [self.command, "--insecure"]
+        cmds = [self.command]
+        if self.insecure:
+            cmds += ["--insecure"]
+        elif self.root_certificates_path:
+            cmds += ["--root-certificates", self.root_certificates_path]
         cmds += [self.appio_api_address_arg, self.appio_api_address]
         cmds += ["--token", token]
         cmds += ["--parent-pid", str(os.getpid())]
         if self.runtime_dependency_install:
             cmds += ["--allow-runtime-dependency-installation"]
+        # Perform any cleanup before launching the app
+        if self.cleanup_before_launch is not None:
+            self.cleanup_before_launch()
         # Launch the app process and wait for it to finish
         subprocess.run(cmds, check=False)
         flwr_exit(ExitCode.SUCCESS, "App process finished, exiting SuperExec.")

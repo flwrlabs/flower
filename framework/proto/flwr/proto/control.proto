@@ -123,7 +123,10 @@ message StartRunRequest {
   string app_spec = 4;
   string federation = 5;
 }
-message StartRunResponse { optional uint64 run_id = 1; }
+message StartRunResponse {
+  optional uint64 run_id = 1;
+  optional string note = 2;
+}
 message StreamLogsRequest {
   uint64 run_id = 1;
   double after_timestamp = 2;

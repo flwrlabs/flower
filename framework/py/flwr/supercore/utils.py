@@ -15,22 +15,49 @@
 """Utility functions for the infrastructure."""
 
 
+import ctypes
 import json
 import os
 import re
-from collections.abc import Sequence
+import sys
+from collections.abc import Iterable, Sequence
+from logging import WARN
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 
 import requests
 
 from flwr.common.constant import FLWR_DIR, FLWR_HOME
+from flwr.common.logger import log
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.supercore.version import package_version as flwr_version
 
 from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN, MAX_NAME_LENGTH
 
 T = TypeVar("T", str, bytes)
+PR_SET_DUMPABLE = 4  # from /usr/include/linux/prctl.h
+
+
+MetadataLookupErrorType = Literal["missing", "duplicate", "wrong_type", "empty"]
+
+
+class MetadataLookupError(Exception):
+    """Error type for metadata lookup failures."""
+
+    def __init__(self, key: str, error_type: MetadataLookupErrorType) -> None:
+        self.key = key
+        self.error_type = error_type
+        if error_type == "missing":
+            message = f"Metadata key '{key}' is missing."
+        elif error_type == "duplicate":
+            message = f"Metadata key '{key}' has duplicate values."
+        elif error_type == "wrong_type":
+            message = f"Metadata key '{key}' has a value of the wrong type."
+        elif error_type == "empty":
+            message = f"Metadata key '{key}' has an empty value."
+        else:
+            message = f"Metadata key '{key}' has an unknown error: {error_type}."
+        super().__init__(message)
 
 
 def mask_string(value: str, head: int = 4, tail: int = 4) -> str:
@@ -121,7 +148,7 @@ def parse_app_spec(app_spec: str) -> tuple[str, str | None]:
 
 def request_download_link(
     app_id: str, app_version: str | None, in_url: str, out_url: str
-) -> tuple[str, list[dict[str, str]] | None]:
+) -> tuple[str, list[dict[str, str]] | None, str | None]:
     """Request a download link for the given app from Flower Hub.
 
     Parameters
@@ -137,10 +164,11 @@ def request_download_link(
 
     Returns
     -------
-    tuple[str, list[dict[str, str]] | None]
+    tuple[str, list[dict[str, str]] | None, str | None]
         A tuple containing:
         - The download URL for the application.
         - A list of verification dictionaries if provided by the API, otherwise None.
+        - A compatibility note if provided by the API, otherwise None.
 
     Raises
     ------
@@ -196,8 +224,9 @@ def request_download_link(
         raise ValueError("Invalid response from Platform API")
 
     verifications = data["verifications"] if "verifications" in data else None
+    note = data["note"] if "note" in data else None
 
-    return str(data[out_url]), verifications
+    return str(data[out_url]), verifications, note
 
 
 def simulation_config_to_json(config: SimulationConfig) -> dict[str, Any]:
@@ -336,38 +365,117 @@ def is_valid_name(name: str) -> tuple[bool, str]:
     return True, ""
 
 
-def _get_metadata_typed(
+def find_metadata_keys(
+    metadata: Sequence[tuple[str, str | bytes]] | None,
+    keys: Iterable[str],
+) -> set[str]:
+    """Return the subset of `keys` present in the gRPC metadata sequence."""
+    if metadata is None:
+        return set()
+
+    key_set = set(keys)
+    return {metadata_key for metadata_key, _ in metadata if metadata_key in key_set}
+
+
+def _get_metadata_typed_checked(
     metadata: Sequence[tuple[str, str | bytes]] | None,
     key: str,
     value_type: type[T],
-) -> T | None:
-    """Return exactly one non-empty string or bytes metadata value for `key`."""
-    if metadata is None:
-        return None
+) -> T:
+    """Return exactly one non-empty string or bytes metadata value for `key`.
+
+    Raises
+    ------
+    MetadataLookupError
+        If the metadata value for `key` is missing, duplicated, of the wrong type,
+        or empty.
+    """
     values: list[Any] = [
-        value for metadata_key, value in metadata if metadata_key == key
+        value for metadata_key, value in metadata or [] if metadata_key == key
     ]
-    if len(values) != 1:
-        return None
+    if not values:
+        raise MetadataLookupError(key, "missing")
+    if len(values) > 1:
+        raise MetadataLookupError(key, "duplicate")
     value = values[0]
     if not isinstance(value, value_type):
-        return None
+        raise MetadataLookupError(key, "wrong_type")
     if value in ("", b""):
-        return None
+        raise MetadataLookupError(key, "empty")
     return value
+
+
+def get_metadata_str_checked(
+    metadata: Sequence[tuple[str, str | bytes]] | None,
+    key: str,
+) -> str:
+    """Return exactly one non-empty string metadata value for `key`.
+
+    Raises
+    ------
+    MetadataLookupError
+        If the metadata value for `key` is missing, duplicated, of the wrong type,
+        or empty.
+    """
+    return _get_metadata_typed_checked(metadata, key, str)
+
+
+def get_metadata_bytes_checked(
+    metadata: Sequence[tuple[str, str | bytes]] | None,
+    key: str,
+) -> bytes:
+    """Return exactly one non-empty bytes metadata value for `key`.
+
+    Raises
+    ------
+    MetadataLookupError
+        If the metadata value for `key` is missing, duplicated, of the wrong type,
+        or empty.
+    """
+    return _get_metadata_typed_checked(metadata, key, bytes)
 
 
 def get_metadata_str(
     metadata: Sequence[tuple[str, str | bytes]] | None,
     key: str,
 ) -> str | None:
-    """Return exactly one non-empty string metadata value for `key`."""
-    return _get_metadata_typed(metadata, key, str)
+    """Return exactly one non-empty string metadata value for `key`, or None if not
+    found or invalid."""
+    try:
+        return get_metadata_str_checked(metadata, key)
+    except MetadataLookupError:
+        return None
 
 
 def get_metadata_bytes(
     metadata: Sequence[tuple[str, str | bytes]] | None,
     key: str,
 ) -> bytes | None:
-    """Return exactly one non-empty bytes metadata value for `key`."""
-    return _get_metadata_typed(metadata, key, bytes)
+    """Return exactly one non-empty bytes metadata value for `key`, or None if not found
+    or invalid."""
+    try:
+        return get_metadata_bytes_checked(metadata, key)
+    except MetadataLookupError:
+        return None
+
+
+def disable_process_dumping(strict: bool) -> None:
+    """Disable process dumping (core dumps + ptrace) on Linux."""
+    if not sys.platform.startswith("linux"):
+        return  # No-op on non-Linux systems
+
+    try:
+        libc = ctypes.CDLL(None)
+
+        # Define argument and return types for prctl
+        libc.prctl.argtypes = [ctypes.c_int, ctypes.c_ulong]
+        libc.prctl.restype = ctypes.c_int
+
+        result = libc.prctl(PR_SET_DUMPABLE, 0)
+        if result != 0:
+            raise OSError("prctl(PR_SET_DUMPABLE, 0) failed")
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        if strict:
+            raise RuntimeError(f"Failed to disable process dumping: {e!r}") from e
+        log(WARN, "Failed to disable process dumping: %s", e)
