@@ -94,9 +94,10 @@ from flwr.supercore.inflatable.inflatable_object import (
     no_object_id_recompute,
 )
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
+from flwr.supercore.servicers import AppIoServicer
 
 
-class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
+class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoServicer):
     """ServerAppIo API servicer."""
 
     def __init__(
@@ -106,6 +107,10 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
     ) -> None:
         self.state_factory = state_factory
         self.objectstore_factory = objectstore_factory
+
+    def state(self) -> LinkState:
+        """Return the LinkState instance."""
+        return self.state_factory.state()
 
     def ListAppsToLaunch(
         self,
