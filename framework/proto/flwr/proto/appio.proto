@@ -63,6 +63,7 @@ message PullAppInputsResponse {
   Run run = 2;
   Fab fab = 3;
   SimulationConfig federation_config = 4;
+  uint64 task_id = 5;
 }
 
 // PushAppInputs messages
@@ -70,5 +71,17 @@ message PushAppOutputsRequest {
   string token = 1 [ deprecated = true ];
   uint64 run_id = 2;
   Context context = 3;
+  string sub_status = 4;
+  string details = 5;
 }
 message PushAppOutputsResponse {}
+
+// CreateTask messages
+message CreateTaskRequest {
+  string type = 1;
+  uint64 run_id = 2;
+  optional string fab_hash = 3;
+  optional string model_ref = 4;
+  optional string connector_ref = 5;
+}
+message CreateTaskResponse { optional uint64 task_id = 1; }

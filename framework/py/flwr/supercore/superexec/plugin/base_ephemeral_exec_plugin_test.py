@@ -33,32 +33,30 @@ class _EphemeralExecPlugin(BaseEphemeralExecPlugin):
     appio_api_address_arg = "--serverappio-api-address"
 
 
-def test_select_run_id_returns_none_when_no_candidates() -> None:
-    """The plugin should skip execution when no runs are available."""
-    plugin = _EphemeralExecPlugin(
+def _get_ephemeral_plugin() -> _EphemeralExecPlugin:
+    return _EphemeralExecPlugin(
         appio_api_address="127.0.0.1:9091",
         get_run=_get_run,
+        insecure=True,
+        root_certificates_path=None,
     )
 
+
+def test_select_run_id_returns_none_when_no_candidates() -> None:
+    """The plugin should skip execution when no runs are available."""
+    plugin = _get_ephemeral_plugin()
     assert plugin.select_run_id([]) is None
 
 
 def test_select_run_id_returns_first_candidate() -> None:
     """The plugin should always choose the first candidate run ID."""
-    plugin = _EphemeralExecPlugin(
-        appio_api_address="127.0.0.1:9091",
-        get_run=_get_run,
-    )
-
+    plugin = _get_ephemeral_plugin()
     assert plugin.select_run_id([7, 9, 11]) == 7
 
 
 def test_launch_app_runs_expected_command_and_exits() -> None:
     """Launch should invoke the app with token and parent PID, then exit."""
-    plugin = _EphemeralExecPlugin(
-        appio_api_address="127.0.0.1:9091",
-        get_run=_get_run,
-    )
+    plugin = _get_ephemeral_plugin()
 
     with (
         patch(
@@ -97,10 +95,7 @@ def test_launch_app_calls_cleanup_before_launch() -> None:
     """Launch should invoke cleanup_before_launch before running the subprocess."""
     # Prepare
     call_log: list[str] = []
-    plugin = _EphemeralExecPlugin(
-        appio_api_address="127.0.0.1:9091",
-        get_run=_get_run,
-    )
+    plugin = _get_ephemeral_plugin()
     plugin.cleanup_before_launch = lambda: call_log.append("cleanup")
 
     # Execute

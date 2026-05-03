@@ -16,6 +16,7 @@
 
 
 from .base import ApiErrorCode, FlowerError
+from .exceptions import EntitlementError
 from .grpc import rpc_error_translator
 
-__all__ = ["ApiErrorCode", "FlowerError", "rpc_error_translator"]
+__all__ = ["ApiErrorCode", "EntitlementError", "FlowerError", "rpc_error_translator"]

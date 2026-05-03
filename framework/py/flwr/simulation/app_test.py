@@ -52,11 +52,13 @@ class TestRunSimulationProcess(unittest.TestCase):
         run_simulation_process(
             serverappio_api_address="127.0.0.1:9091",
             log_queue=Queue(),
+            insecure=True,
             token="test-token",
         )
 
         mock_connection_cls.assert_called_once_with(
             serverappio_api_address="127.0.0.1:9091",
+            insecure=True,
             root_certificates=None,
             token="test-token",
         )
@@ -132,6 +134,7 @@ def test_flwr_simulation_forwards_cli_args(
         insecure=True,
         serverappio_api_address="127.0.0.1:9091",
         token="test-token",
+        root_certificates=None,
         parent_pid=321,
         runtime_dependency_install=True,
     )

@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15\x66lwr/proto/task.proto\x12\nflwr.proto\"\xa7\x02\n\x04Task\x12\x0f\n\x07task_id\x18\x01 \x01(\x04\x12\x0c\n\x04type\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\x04\x12&\n\x06status\x18\x04 \x01(\x0b\x32\x16.flwr.proto.TaskStatus\x12\x12\n\npending_at\x18\x05 \x01(\t\x12\x13\n\x0bstarting_at\x18\x06 \x01(\t\x12\x12\n\nrunning_at\x18\x07 \x01(\t\x12\x13\n\x0b\x66inished_at\x18\x08 \x01(\t\x12\x15\n\x08\x66\x61\x62_hash\x18\t \x01(\tH\x00\x88\x01\x01\x12\x16\n\tmodel_ref\x18\n \x01(\tH\x01\x88\x01\x01\x12\x1a\n\rconnector_ref\x18\x0b \x01(\tH\x02\x88\x01\x01\x42\x0b\n\t_fab_hashB\x0c\n\n_model_refB\x10\n\x0e_connector_ref\"A\n\nTaskStatus\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x12\n\nsub_status\x18\x02 \x01(\t\x12\x0f\n\x07\x64\x65tails\x18\x03 \x01(\tb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15\x66lwr/proto/task.proto\x12\nflwr.proto\"\xa7\x02\n\x04Task\x12\x0f\n\x07task_id\x18\x01 \x01(\x04\x12\x0c\n\x04type\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\x04\x12&\n\x06status\x18\x04 \x01(\x0b\x32\x16.flwr.proto.TaskStatus\x12\x12\n\npending_at\x18\x05 \x01(\t\x12\x13\n\x0bstarting_at\x18\x06 \x01(\t\x12\x12\n\nrunning_at\x18\x07 \x01(\t\x12\x13\n\x0b\x66inished_at\x18\x08 \x01(\t\x12\x15\n\x08\x66\x61\x62_hash\x18\t \x01(\tH\x00\x88\x01\x01\x12\x16\n\tmodel_ref\x18\n \x01(\tH\x01\x88\x01\x01\x12\x1a\n\rconnector_ref\x18\x0b \x01(\tH\x02\x88\x01\x01\x42\x0b\n\t_fab_hashB\x0c\n\n_model_refB\x10\n\x0e_connector_ref\"A\n\nTaskStatus\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x12\n\nsub_status\x18\x02 \x01(\t\x12\x0f\n\x07\x64\x65tails\x18\x03 \x01(\t\"#\n\x10\x43laimTaskRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\x04\"1\n\x11\x43laimTaskResponse\x12\x12\n\x05token\x18\x01 \x01(\tH\x00\x88\x01\x01\x42\x08\n\x06_tokenb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -35,4 +35,8 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_TASK']._serialized_end=333
   _globals['_TASKSTATUS']._serialized_start=335
   _globals['_TASKSTATUS']._serialized_end=400
+  _globals['_CLAIMTASKREQUEST']._serialized_start=402
+  _globals['_CLAIMTASKREQUEST']._serialized_end=437
+  _globals['_CLAIMTASKRESPONSE']._serialized_start=439
+  _globals['_CLAIMTASKRESPONSE']._serialized_end=488
 # @@protoc_insertion_point(module_scope)

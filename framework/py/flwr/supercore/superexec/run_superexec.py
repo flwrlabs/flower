@@ -39,6 +39,7 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
     CLIENTAPPIO_SUPEREXEC_METHODS,
     SERVERAPPIO_SUPEREXEC_METHODS,
 )
+from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 from .plugin import ExecPlugin
 from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
@@ -48,6 +49,8 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
     plugin_class: type[ExecPlugin],
     stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
     appio_api_address: str,
+    insecure: bool,
+    root_certificates_path: str | None = None,
     superexec_auth_secret: bytes | None = None,
     plugin_config: dict[str, Any] | None = None,
     parent_pid: int | None = None,
@@ -64,6 +67,11 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
         The gRPC stub class for the AppIO API.
     appio_api_address : str
         The address of the AppIO API.
+    insecure : bool
+        Whether to connect to the AppIO API without TLS.
+    root_certificates_path : Optional[str] (default: None)
+        The path to the PEM-encoded root certificate file used for secure TLS
+        connections.
     superexec_auth_secret : Optional[bytes] (default: None)
         Secret used to derive an HMAC signing key for SuperExec auth.
     plugin_config : Optional[dict[str, Any]] (default: None)
@@ -102,11 +110,12 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
         grpc_servers.append(health_server)
 
     # Create the channel to the AppIO API
-    # No TLS support for now, so insecure connection
     channel = create_channel(
         server_address=appio_api_address,
-        insecure=True,
-        root_certificates=None,
+        insecure=insecure,
+        root_certificates=validate_and_resolve_root_certificates(
+            root_certificates_path, insecure
+        ),
         interceptors=interceptors,
     )
     channel.subscribe(on_channel_state_change)
@@ -131,6 +140,8 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
     # Create the SuperExec plugin instance
     plugin = plugin_class(
         appio_api_address=appio_api_address,
+        insecure=insecure,
+        root_certificates_path=root_certificates_path,
         get_run=get_run,
         runtime_dependency_install=runtime_dependency_install,
     )

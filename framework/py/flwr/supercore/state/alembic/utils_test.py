@@ -25,7 +25,16 @@ from unittest.mock import patch
 from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import Column, Integer, MetaData, String, Table, create_engine, inspect
+from sqlalchemy import (
+    Column,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    create_engine,
+    inspect,
+    text,
+)
 from sqlalchemy.engine import URL, Engine
 
 from flwr.common.exit import ExitCode
@@ -105,6 +114,44 @@ class TestAlembicRun(unittest.TestCase):
                 diffs = compare_metadata(context, metadata)
             # Assert
             self.assertEqual(diffs, [])
+        finally:
+            engine.dispose()
+
+    def test_compare_metadata_detects_server_default_changes(self) -> None:
+        """Verify autogenerate reports added server defaults."""
+        engine = self.create_engine()
+        base_metadata = MetaData()
+        Table(
+            "server_default_example",
+            base_metadata,
+            Column("id", Integer, primary_key=True),
+            Column("value", Integer, nullable=False),
+        )
+        updated_metadata = MetaData()
+        Table(
+            "server_default_example",
+            updated_metadata,
+            Column("id", Integer, primary_key=True),
+            Column("value", Integer, nullable=False, server_default=text("0")),
+        )
+
+        try:
+            base_metadata.create_all(engine)
+
+            with engine.connect() as connection:
+                context = MigrationContext.configure(
+                    connection,
+                    opts={"compare_server_default": True},
+                )
+                diffs = compare_metadata(context, updated_metadata)
+
+            self.assertEqual(len(diffs), 1)
+            modify_default = diffs[0][0]
+            self.assertEqual(modify_default[0], "modify_default")
+            self.assertEqual(modify_default[2], "server_default_example")
+            self.assertEqual(modify_default[3], "value")
+            self.assertIsNone(modify_default[5])
+            self.assertIsNotNone(modify_default[6])
         finally:
             engine.dispose()
 
