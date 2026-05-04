@@ -1,6 +1,8 @@
 import os
 
+import numpy as np
 import tensorflow as tf
+from datasets import load_dataset
 
 from flwr.app import Context
 from flwr.client import NumPyClient, start_client
@@ -14,13 +16,21 @@ TEST_SUBSET_SIZE = 10
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 
-# Load CIFAR-10 using built-in Keras loader
-(x_train, y_train), (x_test, y_test) = tf.keras.datasets.cifar10.load_data()
+def load_cifar10():
+    trainset = load_dataset("uoft-cs/cifar10", split=f"train[:{TRAIN_SUBSET_SIZE}]")
+    testset = load_dataset("uoft-cs/cifar10", split=f"test[:{TEST_SUBSET_SIZE}]")
+    x_train = np.array([item["img"] for item in trainset])
+    y_train = np.array([item["label"] for item in trainset])
+    x_test = np.array([item["img"] for item in testset])
+    y_test = np.array([item["label"] for item in testset])
+    return (x_train, y_train), (x_test, y_test)
+
+
+# Load CIFAR-10 from Hugging Face
+(x_train, y_train), (x_test, y_test) = load_cifar10()
 
 x_train = x_train.astype("float32") / 255.0
 x_test = x_test.astype("float32") / 255.0
-x_train, y_train = x_train[:TRAIN_SUBSET_SIZE], y_train[:TRAIN_SUBSET_SIZE]
-x_test, y_test = x_test[:TEST_SUBSET_SIZE], y_test[:TEST_SUBSET_SIZE]
 
 ds_train = (
     tf.data.Dataset.from_tensor_slices((x_train, y_train))
