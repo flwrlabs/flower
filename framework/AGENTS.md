@@ -194,6 +194,6 @@ uv run --no-sync --python=3.10.19 ./dev/test-wheel.sh
 
 Do not commit `dist/` artifacts.
 
-- If dependency constraints change, update `pyproject.toml`, `uv.lock`, and
-  `poetry.lock` intentionally. CI checks `uv.lock` freshness, while framework CI
-  still installs with Poetry.
+- If dependency constraints change, update `pyproject.toml` and `uv.lock`
+  intentionally. CI checks `uv.lock` freshness, while framework CI still
+  installs with Poetry.
