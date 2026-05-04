@@ -25,7 +25,7 @@ root `AGENTS.md`.
 ## Environment and commands
 
 Run framework commands from `framework/` unless a command is explicitly shown from
-the repository root. The checked-in `.python-version` is `3.10.19`; CI also checks
+the repository root. Use Python `3.10.19` for local agent commands; CI also checks
 newer Python versions, but project tooling targets Python 3.10 syntax.
 
 Preferred local agent form:
