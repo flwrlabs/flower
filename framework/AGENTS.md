@@ -39,7 +39,7 @@ If the environment is missing or dependencies changed, synchronize intentionally
 
 ```bash
 cd framework
-uv sync --python=3.10.19 --all-extras --all-groups
+uv sync --locked --python=3.10.19 --all-extras --all-groups
 ```
 
 CI installs with Poetry, so when reproducing CI setup exactly use:
