@@ -25,7 +25,7 @@ root `AGENTS.md`.
 ## Environment and commands
 
 Run framework commands from `framework/` unless a command is explicitly shown from
-the repository root. The checked-in `.python-version` is `3.10.19`; CI also checks
+the repository root. Use Python `3.10.19` for local agent commands; CI also checks
 newer Python versions, but project tooling targets Python 3.10 syntax.
 
 Preferred local agent form:
@@ -39,7 +39,7 @@ If the environment is missing or dependencies changed, synchronize intentionally
 
 ```bash
 cd framework
-uv sync --python=3.10.19 --all-extras --all-groups
+uv sync --locked --python=3.10.19 --all-extras --all-groups
 ```
 
 CI installs with Poetry, so when reproducing CI setup exactly use:
@@ -105,8 +105,8 @@ Flower's Python public API is defined by recursively following `__all__` from
 `flwr/__init__.py`. See `docs/source/contributor-explanation-public-and-private-apis.rst`.
 
 - Adding a public symbol usually requires importing it in the relevant
-  `__init__.py`, adding it to `__all__`, adding/updating API docs under
-  `docs/source/ref-api/`, and adding tests for the public import path.
+  `__init__.py`, adding it to `__all__`, adding/updating API docs in
+  `docs/source/reference.rst`, and adding tests for the public import path.
 - Do not expose implementation modules accidentally. Prefer
   `from .module import Name as Name` plus `__all__ = ["Name"]`, as nearby code
   does.
@@ -194,6 +194,6 @@ uv run --no-sync --python=3.10.19 ./dev/test-wheel.sh
 
 Do not commit `dist/` artifacts.
 
-- If dependency constraints change, update `pyproject.toml`, `uv.lock`, and
-  `poetry.lock` intentionally. CI checks `uv.lock` freshness, while framework CI
-  still installs with Poetry.
+- If dependency constraints change, update `pyproject.toml` and `uv.lock`
+  intentionally. CI checks `uv.lock` freshness, while framework CI still
+  installs with Poetry.
