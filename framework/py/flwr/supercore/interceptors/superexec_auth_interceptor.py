@@ -47,6 +47,8 @@ SERVERAPPIO_SUPEREXEC_METHODS: frozenset[str] = frozenset(
     {
         "/flwr.proto.ServerAppIo/ListAppsToLaunch",
         "/flwr.proto.ServerAppIo/RequestToken",
+        "/flwr.proto.ServerAppIo/PullPendingTasks",
+        "/flwr.proto.ServerAppIo/ClaimTask",
         "/flwr.proto.ServerAppIo/GetRun",
     }
 )
@@ -55,6 +57,8 @@ CLIENTAPPIO_SUPEREXEC_METHODS: frozenset[str] = frozenset(
     {
         "/flwr.proto.ClientAppIo/ListAppsToLaunch",
         "/flwr.proto.ClientAppIo/RequestToken",
+        "/flwr.proto.ClientAppIo/PullPendingTasks",
+        "/flwr.proto.ClientAppIo/ClaimTask",
         "/flwr.proto.ClientAppIo/GetRun",
     }
 )

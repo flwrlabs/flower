@@ -23,7 +23,6 @@ import "flwr/proto/node.proto";
 import "flwr/proto/message.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/appio.proto";
-import "flwr/proto/task.proto";
 
 service ServerAppIo {
 
@@ -38,6 +37,13 @@ service ServerAppIo {
   // Request token for a run
   rpc RequestToken(RequestTokenRequest) returns (RequestTokenResponse) {}
 
+  // Pull pending tasks
+  rpc PullPendingTasks(PullPendingTasksRequest)
+      returns (PullPendingTasksResponse) {}
+
+  // Claim task
+  rpc ClaimTask(ClaimTaskRequest) returns (ClaimTaskResponse) {}
+
   /////////////////////////////////////////////////////////////////////////////
   // General *AppIo endpoints for App Executor processes
   /////////////////////////////////////////////////////////////////////////////
@@ -48,9 +54,6 @@ service ServerAppIo {
   // App heartbeat
   rpc SendAppHeartbeat(SendAppHeartbeatRequest)
       returns (SendAppHeartbeatResponse) {}
-
-  // Claim task
-  rpc ClaimTask(ClaimTaskRequest) returns (ClaimTaskResponse) {}
 
   // Task heartbeat
   rpc SendTaskHeartbeat(SendTaskHeartbeatRequest)

@@ -41,6 +41,7 @@ class MethodTokenPolicy:
 SERVERAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ServerAppIo/ListAppsToLaunch": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ServerAppIo/RequestToken": MethodTokenPolicy.no_auth(),
+    "/flwr.proto.ServerAppIo/PullPendingTasks": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ServerAppIo/ClaimTask": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ServerAppIo/GetRun": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ServerAppIo/SendAppHeartbeat": MethodTokenPolicy.token_required(),
@@ -63,8 +64,11 @@ SERVERAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
 CLIENTAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ClientAppIo/ListAppsToLaunch": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ClientAppIo/RequestToken": MethodTokenPolicy.no_auth(),
+    "/flwr.proto.ClientAppIo/PullPendingTasks": MethodTokenPolicy.no_auth(),
+    "/flwr.proto.ClientAppIo/ClaimTask": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ClientAppIo/GetRun": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ClientAppIo/SendAppHeartbeat": MethodTokenPolicy.token_required(),
+    "/flwr.proto.ClientAppIo/SendTaskHeartbeat": MethodTokenPolicy.token_required(),
     "/flwr.proto.ClientAppIo/PullAppInputs": MethodTokenPolicy.token_required(),
     "/flwr.proto.ClientAppIo/PushAppOutputs": MethodTokenPolicy.token_required(),
     "/flwr.proto.ClientAppIo/PushObject": MethodTokenPolicy.token_required(),
