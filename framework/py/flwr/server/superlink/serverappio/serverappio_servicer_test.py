@@ -566,11 +566,18 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 
     def test_create_task_rejects_missing_run(self) -> None:
         """Test `CreateTask` rejects unknown run IDs."""
+        # Seed a stale token binding so auth passes and the servicer still
+        # exercises the missing-run branch.
+        run_id = 42
+        token = self.state.create_token(run_id)
+        assert token is not None
+        self._set_token(token)
+
         with self.assertRaises(grpc.RpcError) as err:
             self._create_task.with_call(
                 request=CreateTaskRequest(
                     type=TaskType.MODEL,
-                    run_id=42,
+                    run_id=run_id,
                     model_ref="model://test",
                 )
             )
