@@ -172,7 +172,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         command = config["command"]
         popen_kwargs = config["popen_kwargs"]
         _validate_launch_request(command, popen_kwargs)
-        return _run_supervised_app(
+        return _run_supervised_process(
             command,
             lifeline_fd=lifeline_fd,
             popen_kwargs=popen_kwargs,
@@ -189,7 +189,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         _close_fd(status_fd)
 
 
-def _run_supervised_app(
+def _run_supervised_process(
     command: list[str],
     *,
     lifeline_fd: int,

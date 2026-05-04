@@ -30,7 +30,7 @@ from unittest.mock import patch
 import pytest
 
 from flwr.supercore.superexec.app_supervisor import (
-    _run_supervised_app,
+    _run_supervised_process,
     _validate_launch_request,
     _validate_termination_grace_period,
     launch_with_lifeline,
@@ -153,7 +153,7 @@ def test_lifeline_closure_terminates_app_process_group(tmp_path: Path) -> None:
     closer.start()
 
     try:
-        returncode = _run_supervised_app(
+        returncode = _run_supervised_process(
             [
                 sys.executable,
                 "-c",
@@ -188,7 +188,7 @@ def test_lifeline_closure_escalates_to_sigkill(tmp_path: Path) -> None:
     closer.start()
 
     try:
-        returncode = _run_supervised_app(
+        returncode = _run_supervised_process(
             [
                 sys.executable,
                 "-c",
@@ -237,7 +237,7 @@ def test_app_exit_cleans_remaining_process_group_children(tmp_path: Path) -> Non
     )
 
     try:
-        returncode = _run_supervised_app(
+        returncode = _run_supervised_process(
             [sys.executable, "-c", parent_code],
             lifeline_fd=read_fd,
             popen_kwargs={},
@@ -259,7 +259,7 @@ def test_app_process_does_not_inherit_lifeline_fd() -> None:
     env["LIFELINE_FD"] = str(read_fd)
 
     try:
-        returncode = _run_supervised_app(
+        returncode = _run_supervised_process(
             [
                 sys.executable,
                 "-c",
