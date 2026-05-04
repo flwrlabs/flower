@@ -342,6 +342,14 @@ class TestAppIoTokenServerInterceptor(TestCase):
 class TestMethodPolicyMaps(TestCase):
     """Validate method auth policy map coverage and values."""
 
+    NO_AUTH_BOOTSTRAP_METHODS = {
+        "ListAppsToLaunch",
+        "RequestToken",
+        "PullPendingTasks",
+        "ClaimTask",
+        "GetRun",
+    }
+
     @staticmethod
     def _serverappio_rpc_methods() -> set[str]:
         return {
@@ -365,13 +373,12 @@ class TestMethodPolicyMaps(TestCase):
 
     def test_only_expected_no_auth_methods_exist(self) -> None:
         """Only bootstrap methods should be marked no-auth in the policy table."""
-        expected_suffixes = {"ListAppsToLaunch", "RequestToken", "ClaimTask", "GetRun"}
         no_auth_methods = {
             method.rsplit("/", maxsplit=1)[-1]
             for method, policy in SERVERAPPIO_METHOD_AUTH_POLICY.items()
             if not policy.requires_token
         }
-        self.assertEqual(no_auth_methods, expected_suffixes)
+        self.assertEqual(no_auth_methods, self.NO_AUTH_BOOTSTRAP_METHODS)
 
     def test_clientappio_policy_has_full_coverage(self) -> None:
         """ClientAppIo policy map should cover all RPC methods exactly."""
@@ -380,13 +387,12 @@ class TestMethodPolicyMaps(TestCase):
 
     def test_clientappio_only_expected_no_auth_methods_exist(self) -> None:
         """ClientAppIo should only mark bootstrap methods as no-auth."""
-        expected_suffixes = {"ListAppsToLaunch", "RequestToken", "GetRun"}
         no_auth_methods = {
             method.rsplit("/", maxsplit=1)[-1]
             for method, policy in CLIENTAPPIO_METHOD_AUTH_POLICY.items()
             if not policy.requires_token
         }
-        self.assertEqual(no_auth_methods, expected_suffixes)
+        self.assertEqual(no_auth_methods, self.NO_AUTH_BOOTSTRAP_METHODS)
 
 
 class TestFactoryFunctions(TestCase):
