@@ -5,19 +5,14 @@ from datetime import datetime
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from datasets import load_dataset
 from torch.utils.data import DataLoader, Subset
-from torchvision.datasets import CIFAR10
 from torchvision.transforms import Compose, Normalize, ToTensor
 from tqdm import tqdm
 
 from flwr.app import ConfigRecord, Context, RecordDict
 from flwr.client import NumPyClient, start_client
 from flwr.clientapp import ClientApp
-
-CIFAR10.url = (
-    "https://huggingface.co/datasets/VerisimilitudeX/cifar10/resolve/main/"
-    "cifar-10-python.tar.gz"
-)
 
 # #############################################################################
 # 1. Regular PyTorch pipeline: nn.Module, train, test, and DataLoader
@@ -27,6 +22,21 @@ warnings.filterwarnings("ignore", category=UserWarning)
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 SUBSET_SIZE = 1000
 STATE_VAR = "timestamp"
+
+
+class Cifar10Dataset(torch.utils.data.Dataset):
+    """CIFAR-10 dataset loaded from Hugging Face."""
+
+    def __init__(self, split, transform):
+        self.dataset = load_dataset("uoft-cs/cifar10", split=split)
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        item = self.dataset[idx]
+        return self.transform(item["img"]), item["label"]
 
 
 class Net(nn.Module):
@@ -78,8 +88,8 @@ def test(net, testloader):
 def load_data():
     """Load CIFAR-10 (training and test set)."""
     trf = Compose([ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    trainset = CIFAR10("./../data", train=True, download=True, transform=trf)
-    testset = CIFAR10("./../data", train=False, download=True, transform=trf)
+    trainset = Cifar10Dataset("train", transform=trf)
+    testset = Cifar10Dataset("test", transform=trf)
     trainset = Subset(trainset, range(SUBSET_SIZE))
     testset = Subset(testset, range(10))
     return DataLoader(trainset, batch_size=32, shuffle=True), DataLoader(testset)
