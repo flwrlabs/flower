@@ -14,6 +14,11 @@ from flwr.app import ConfigRecord, Context, RecordDict
 from flwr.client import NumPyClient, start_client
 from flwr.clientapp import ClientApp
 
+CIFAR10.url = (
+    "https://huggingface.co/datasets/VerisimilitudeX/cifar10/resolve/main/"
+    "cifar-10-python.tar.gz"
+)
+
 # #############################################################################
 # 1. Regular PyTorch pipeline: nn.Module, train, test, and DataLoader
 # #############################################################################

@@ -158,6 +158,7 @@ jobs:
             e2e: e2e_pytorch
             dataset: |
               from torchvision.datasets import CIFAR10
+              CIFAR10.url = 'https://huggingface.co/datasets/VerisimilitudeX/cifar10/resolve/main/cifar-10-python.tar.gz'
               CIFAR10('./data', download=True)
 
           - directory: e2e-tensorflow
@@ -170,6 +171,7 @@ jobs:
             e2e: e2e_opacus
             dataset: |
               from torchvision.datasets import CIFAR10
+              CIFAR10.url = 'https://huggingface.co/datasets/VerisimilitudeX/cifar10/resolve/main/cifar-10-python.tar.gz'
               CIFAR10('./data', download=True)
 
           - directory: e2e-pytorch-lightning

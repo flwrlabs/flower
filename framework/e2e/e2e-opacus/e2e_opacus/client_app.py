@@ -13,6 +13,11 @@ from flwr.app import Context
 from flwr.client import NumPyClient, start_client
 from flwr.clientapp import ClientApp
 
+CIFAR10.url = (
+    "https://huggingface.co/datasets/VerisimilitudeX/cifar10/resolve/main/"
+    "cifar-10-python.tar.gz"
+)
+
 # Define parameters.
 PARAMS = {
     "batch_size": 32,
