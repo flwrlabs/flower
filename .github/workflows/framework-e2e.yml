@@ -163,8 +163,8 @@ jobs:
           - directory: e2e-tensorflow
             e2e: e2e_tensorflow
             dataset: |
-              import tensorflow as tf
-              tf.keras.datasets.cifar10.load_data()
+              from datasets import load_dataset
+              load_dataset('uoft-cs/cifar10')
 
           - directory: e2e-opacus
             e2e: e2e_opacus
