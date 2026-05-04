@@ -105,8 +105,8 @@ Flower's Python public API is defined by recursively following `__all__` from
 `flwr/__init__.py`. See `docs/source/contributor-explanation-public-and-private-apis.rst`.
 
 - Adding a public symbol usually requires importing it in the relevant
-  `__init__.py`, adding it to `__all__`, adding/updating API docs under
-  `docs/source/ref-api/`, and adding tests for the public import path.
+  `__init__.py`, adding it to `__all__`, adding/updating API docs in
+  `docs/source/reference.rst`, and adding tests for the public import path.
 - Do not expose implementation modules accidentally. Prefer
   `from .module import Name as Name` plus `__all__ = ["Name"]`, as nearby code
   does.
