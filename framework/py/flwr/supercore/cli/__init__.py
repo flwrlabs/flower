@@ -17,8 +17,10 @@
 
 from .flower_superexec import flower_superexec
 from .flwr_agentapp import flwr_agentapp
+from .flwr_model import flwr_model
 
 __all__ = [
     "flower_superexec",
     "flwr_agentapp",
+    "flwr_model",
 ]

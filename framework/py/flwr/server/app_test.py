@@ -15,14 +15,16 @@
 """Tests for Flower SuperLink app CLI argument parsing."""
 
 
+import argparse
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
 from flwr.supercore.version import package_version
 
 from . import app as app_module
-from .app import _parse_args_run_superlink
+from .app import _obtain_superlink_certificates, _parse_args_run_superlink
 
 
 def test_parse_superlink_log_rotation_args_defaults() -> None:
@@ -54,6 +56,24 @@ def test_parse_superlink_log_rotation_args_custom_values() -> None:
     assert args.log_file == "/tmp/superlink.log"
     assert args.log_rotation_interval_hours == 12
     assert args.log_rotation_backup_count == 14
+
+
+def test_parse_superlink_appio_tls_args() -> None:
+    """SuperLink should parse AppIO-specific TLS args for ServerAppIo."""
+    args = _parse_args_run_superlink().parse_args(
+        [
+            "--appio-ssl-certfile",
+            "appio-cert.pem",
+            "--appio-ssl-keyfile",
+            "appio-key.pem",
+            "--appio-ssl-ca-certfile",
+            "appio-ca.pem",
+        ]
+    )
+
+    assert args.appio_ssl_certfile == "appio-cert.pem"
+    assert args.appio_ssl_keyfile == "appio-key.pem"
+    assert args.appio_ssl_ca_certfile == "appio-ca.pem"
 
 
 @pytest.mark.parametrize("flag", ["--version", "-V"])
@@ -120,3 +140,68 @@ def test_run_superlink_checks_for_update(monkeypatch: pytest.MonkeyPatch) -> Non
         app_module.run_superlink()
 
     assert captured == ["update", "flower-superlink"]
+
+
+def test_obtain_superlink_certificates_keeps_appio_separate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SuperLink should load separate certificate tuples for Fleet and AppIO."""
+    fleet_certificates = (b"fleet-ca", b"fleet-cert", b"fleet-key")
+    appio_certificates = (b"appio-ca", b"appio-cert", b"appio-key")
+    monkeypatch.setattr(
+        app_module, "try_obtain_server_certificates", lambda _args: fleet_certificates
+    )
+    monkeypatch.setattr(
+        app_module,
+        "try_obtain_optional_appio_server_certificates",
+        lambda _args: appio_certificates,
+    )
+    args = argparse.Namespace(insecure=False)
+
+    certificates, appio_certificates_result = _obtain_superlink_certificates(args)
+
+    assert certificates == fleet_certificates
+    assert appio_certificates_result == appio_certificates
+
+
+def test_obtain_superlink_certificates_allows_plaintext_appio_when_secure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SuperLink should allow plaintext ServerAppIo with secure Fleet/Control APIs."""
+    fleet_certificates = (b"fleet-ca", b"fleet-cert", b"fleet-key")
+    monkeypatch.setattr(
+        app_module, "try_obtain_server_certificates", lambda _args: fleet_certificates
+    )
+    monkeypatch.setattr(
+        app_module, "try_obtain_optional_appio_server_certificates", lambda _args: None
+    )
+    args = argparse.Namespace(insecure=False)
+
+    certificates, appio_certificates = _obtain_superlink_certificates(args)
+
+    assert certificates == fleet_certificates
+    assert appio_certificates is None
+
+
+def test_obtain_superlink_certificates_skips_cert_loading_when_insecure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SuperLink should not load any TLS certificates when insecure."""
+    obtain_server_certificates_mock = Mock()
+    obtain_appio_certificates_mock = Mock()
+    monkeypatch.setattr(
+        app_module, "try_obtain_server_certificates", obtain_server_certificates_mock
+    )
+    monkeypatch.setattr(
+        app_module,
+        "try_obtain_optional_appio_server_certificates",
+        obtain_appio_certificates_mock,
+    )
+    args = argparse.Namespace(insecure=True)
+
+    certificates, appio_certificates = _obtain_superlink_certificates(args)
+
+    assert certificates is None
+    assert appio_certificates is None
+    obtain_server_certificates_mock.assert_not_called()
+    obtain_appio_certificates_mock.assert_not_called()

@@ -336,7 +336,7 @@ class FederationManager(ABC):
     @abstractmethod
     def can_execute(
         self, flwr_aid: str, action: ActionType, context: ActionContext
-    ) -> bool:
+    ) -> None:
         """Check if an account can execute an action under a given context.
 
         Parameters
@@ -348,8 +348,8 @@ class FederationManager(ABC):
         context : ActionContext
             Action-specific context required for authorization.
 
-        Returns
-        -------
-        bool
-            ``True`` if the action is allowed, otherwise ``False``.
+        Raises
+        ------
+        EntitlementError
+            If the action is not allowed under the given entitlement context.
         """

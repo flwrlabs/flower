@@ -108,10 +108,13 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
     ----------
     serverappio_service_address : str (default: "[::]:9091")
         The address (URL, IPv6, IPv4) of the SuperLink ServerAppIo API service.
+    insecure : bool (default: False)
+        If True, use plaintext (TLS disabled). If False, use TLS.
     root_certificates : Optional[bytes] (default: None)
         The PEM-encoded root certificates as a byte string.
-        If provided, a secure connection using the certificates will be
-        established to an SSL-enabled Flower server.
+        Used only when `insecure` is False. If provided, these certificates are
+        used to verify the server certificate. If None, gRPC default root
+        certificates are used.
     token : str
         Executor token used for ServerAppIo authentication.
     """
@@ -121,6 +124,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
     def __init__(  # pylint: disable=too-many-arguments
         self,
         serverappio_service_address: str = SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
+        insecure: bool = False,
         root_certificates: bytes | None = None,
         *,
         token: str,
@@ -128,6 +132,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
         if token == "":
             raise ValueError("`token` must be a non-empty string")
         self._addr = serverappio_service_address
+        self._insecure = insecure
         self._cert = root_certificates
         self._token = token
         self._run: Run | None = None
@@ -152,7 +157,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
             return
         self._channel = create_channel(
             server_address=self._addr,
-            insecure=(self._cert is None),
+            insecure=self._insecure,
             root_certificates=self._cert,
             interceptors=[AppIoTokenClientInterceptor(token=self._token)],
         )

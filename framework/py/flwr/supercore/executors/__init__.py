@@ -16,7 +16,9 @@
 
 
 from .run_agentapp import run_agentapp
+from .run_model import run_model
 
 __all__ = [
     "run_agentapp",
+    "run_model",
 ]

@@ -53,12 +53,6 @@ def flower_superexec() -> None:
     warn_if_flwr_update_available(process_name="flower-superexec")
     args = _parse_args().parse_args()
 
-    if not args.insecure:
-        flwr_exit(
-            ExitCode.COMMON_TLS_NOT_SUPPORTED,
-            "SuperExec does not support TLS yet.",
-        )
-
     # Log the first message after parsing arguments in case of `--help`
     log(INFO, "Starting Flower SuperExec")
 
@@ -126,6 +120,8 @@ def flower_superexec() -> None:
         plugin_class=plugin_class,
         stub_class=stub_class,  # type: ignore
         appio_api_address=args.appio_api_address,
+        insecure=args.insecure,
+        root_certificates_path=args.root_certificates,
         superexec_auth_secret=superexec_auth_secret,
         plugin_config=plugin_config,
         parent_pid=args.parent_pid,
@@ -161,6 +157,13 @@ def _parse_args() -> argparse.ArgumentParser:
         help="Connect to the AppIO API without TLS. "
         "Data transmitted between the client and server is not encrypted. "
         "Use this flag only if you understand the risks.",
+    )
+    parser.add_argument(
+        "--root-certificates",
+        metavar="ROOT_CERT",
+        type=str,
+        help="Path to a PEM-encoded root CA certificate (or CA bundle) used to verify "
+        "the server's TLS certificate. This is not a client certificate for mTLS.",
     )
     parser.add_argument(
         "--parent-pid",
