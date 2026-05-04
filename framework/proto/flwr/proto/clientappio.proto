@@ -35,6 +35,13 @@ service ClientAppIo {
   // Request token
   rpc RequestToken(RequestTokenRequest) returns (RequestTokenResponse) {}
 
+  // Pull pending tasks
+  rpc PullPendingTasks(PullPendingTasksRequest)
+      returns (PullPendingTasksResponse) {}
+
+  // Claim task
+  rpc ClaimTask(ClaimTaskRequest) returns (ClaimTaskResponse) {}
+
   /////////////////////////////////////////////////////////////////////////////
   // General *AppIo endpoints for App Executor processes
   /////////////////////////////////////////////////////////////////////////////
@@ -45,6 +52,10 @@ service ClientAppIo {
   // App heartbeat
   rpc SendAppHeartbeat(SendAppHeartbeatRequest)
       returns (SendAppHeartbeatResponse) {}
+
+  // Task heartbeat
+  rpc SendTaskHeartbeat(SendTaskHeartbeatRequest)
+      returns (SendTaskHeartbeatResponse) {}
 
   // Pull app inputs
   rpc PullAppInputs(PullAppInputsRequest) returns (PullAppInputsResponse) {}

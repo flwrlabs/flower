@@ -16,7 +16,6 @@
 
 
 from logging import DEBUG, ERROR, INFO, WARNING
-from typing import NoReturn
 
 import grpc
 
@@ -53,8 +52,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
     SendAppHeartbeatRequest,
     SendAppHeartbeatResponse,
-    SendTaskHeartbeatRequest,
-    SendTaskHeartbeatResponse,
 )
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
@@ -81,10 +78,6 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
 )
-from flwr.proto.task_pb2 import (  # pylint: disable=E0611
-    ClaimTaskRequest,
-    ClaimTaskResponse,
-)
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.superlink.utils import abort_if
 from flwr.server.utils.validator import validate_message
@@ -101,9 +94,10 @@ from flwr.supercore.inflatable.inflatable_object import (
     no_object_id_recompute,
 )
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
+from flwr.supercore.servicers import AppIoServicer
 
 
-class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
+class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoServicer):
     """ServerAppIo API servicer."""
 
     def __init__(
@@ -113,6 +107,10 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
     ) -> None:
         self.state_factory = state_factory
         self.objectstore_factory = objectstore_factory
+
+    def state(self) -> LinkState:
+        """Return the LinkState instance."""
+        return self.state_factory.state()
 
     def ListAppsToLaunch(
         self,
@@ -362,14 +360,6 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
 
         return GetRunResponse(run=run_to_proto(runs[0]))
 
-    def ClaimTask(
-        self, request: ClaimTaskRequest, context: grpc.ServicerContext
-    ) -> ClaimTaskResponse:
-        """Claim one task for an authenticated app executor."""
-        log(DEBUG, "ServerAppIoServicer.ClaimTask")
-        _ = request
-        _abort_unimplemented_rpc(context, "ClaimTask")
-
     def PullAppInputs(
         self, request: PullAppInputsRequest, context: grpc.ServicerContext
     ) -> PullAppInputsResponse:
@@ -488,14 +478,6 @@ class ServerAppIoServicer(serverappio_pb2_grpc.ServerAppIoServicer):
         # Acknowledge the heartbeat
         success = state.acknowledge_app_heartbeat(request.token)
         return SendAppHeartbeatResponse(success=success)
-
-    def SendTaskHeartbeat(
-        self, request: SendTaskHeartbeatRequest, context: grpc.ServicerContext
-    ) -> SendTaskHeartbeatResponse:
-        """Handle a heartbeat for a claimed task."""
-        log(DEBUG, "ServerAppIoServicer.SendTaskHeartbeat")
-        _ = request
-        _abort_unimplemented_rpc(context, "SendTaskHeartbeat")
 
     def PushObject(
         self, request: PushObjectRequest, context: grpc.ServicerContext
@@ -639,14 +621,3 @@ def _validate_create_task_request(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires connector_ref.",
         )
-
-
-def _abort_unimplemented_rpc(
-    context: grpc.ServicerContext, method_name: str
-) -> NoReturn:
-    """Abort an RPC with an explicit UNIMPLEMENTED status."""
-    context.abort(
-        grpc.StatusCode.UNIMPLEMENTED,
-        f"{method_name} is not implemented yet.",
-    )
-    raise RuntimeError("Unreachable code")
