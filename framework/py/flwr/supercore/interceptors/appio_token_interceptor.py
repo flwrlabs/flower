@@ -64,11 +64,7 @@ def _unauthenticated_terminator() -> grpc.RpcMethodHandler:
 
 
 def _get_request_run_id(request: GrpcMessage) -> int | None:
-    descriptor = getattr(request, "DESCRIPTOR", None)
-    if descriptor is None or "run_id" not in descriptor.fields_by_name:
-        return None
-    request_any = cast(Any, request)
-    return cast(int, request_any.run_id)
+    return cast(int, getattr(request, "run_id", None))
 
 
 class AppIoTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ignore
