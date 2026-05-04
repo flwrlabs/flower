@@ -21,6 +21,7 @@ import "flwr/proto/message.proto";
 import "flwr/proto/fab.proto";
 import "flwr/proto/federation_config.proto";
 import "flwr/proto/run.proto";
+import "flwr/proto/task.proto";
 
 // These messages are used by both ServerAppIo and ClientAppIo services
 
@@ -34,9 +35,21 @@ message ListAppsToLaunchResponse {
 message RequestTokenRequest { uint64 run_id = 1; }
 message RequestTokenResponse { string token = 1; }
 
+// PullPendingTasks messages
+message PullPendingTasksRequest {}
+message PullPendingTasksResponse { repeated Task tasks = 1; }
+
+// ClaimTask messages
+message ClaimTaskRequest { uint64 task_id = 1; }
+message ClaimTaskResponse { optional string token = 1; }
+
+// SendTaskHeartbeat messages
+message SendTaskHeartbeatRequest {}
+message SendTaskHeartbeatResponse { bool success = 1; }
+
 // PushAppMessages messages
 message PushAppMessagesRequest {
-  string token = 1;
+  string token = 1 [ deprecated = true ];
   repeated Message messages_list = 2;
   uint64 run_id = 3;
   repeated ObjectTree message_object_trees = 4;
@@ -48,7 +61,7 @@ message PushAppMessagesResponse {
 
 // PullAppMessages messages
 message PullAppMessagesRequest {
-  string token = 1;
+  string token = 1 [ deprecated = true ];
   repeated string message_ids = 2;
   uint64 run_id = 3;
 }
@@ -57,18 +70,31 @@ message PullAppMessagesResponse {
   repeated ObjectTree message_object_trees = 2;
 }
 // PullAppInputs messages
-message PullAppInputsRequest { string token = 1; }
+message PullAppInputsRequest { string token = 1 [ deprecated = true ]; }
 message PullAppInputsResponse {
   Context context = 1;
   Run run = 2;
   Fab fab = 3;
   SimulationConfig federation_config = 4;
+  uint64 task_id = 5;
 }
 
 // PushAppInputs messages
 message PushAppOutputsRequest {
-  string token = 1;
+  string token = 1 [ deprecated = true ];
   uint64 run_id = 2;
   Context context = 3;
+  string sub_status = 4;
+  string details = 5;
 }
 message PushAppOutputsResponse {}
+
+// CreateTask messages
+message CreateTaskRequest {
+  string type = 1;
+  uint64 run_id = 2;
+  optional string fab_hash = 3;
+  optional string model_ref = 4;
+  optional string connector_ref = 5;
+}
+message CreateTaskResponse { optional uint64 task_id = 1; }

@@ -55,6 +55,18 @@ class ServerAppIoStub:
     ]
     """Request token for a run"""
 
+    PullPendingTasks: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PullPendingTasksRequest,
+        flwr.proto.appio_pb2.PullPendingTasksResponse,
+    ]
+    """Pull pending tasks"""
+
+    ClaimTask: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.ClaimTaskRequest,
+        flwr.proto.appio_pb2.ClaimTaskResponse,
+    ]
+    """Claim task"""
+
     GetRun: grpc.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetRunRequest,
         flwr.proto.run_pb2.GetRunResponse,
@@ -71,6 +83,12 @@ class ServerAppIoStub:
         flwr.proto.heartbeat_pb2.SendAppHeartbeatResponse,
     ]
     """App heartbeat"""
+
+    SendTaskHeartbeat: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.SendTaskHeartbeatRequest,
+        flwr.proto.appio_pb2.SendTaskHeartbeatResponse,
+    ]
+    """Task heartbeat"""
 
     PullAppInputs: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullAppInputsRequest,
@@ -106,6 +124,12 @@ class ServerAppIoStub:
         flwr.proto.message_pb2.ConfirmMessageReceivedResponse,
     ]
     """Confirm Message Received"""
+
+    CreateTask: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.CreateTaskRequest,
+        flwr.proto.appio_pb2.CreateTaskResponse,
+    ]
+    """Create a task"""
 
     GetFederationOptions: grpc.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetFederationOptionsRequest,
@@ -166,6 +190,18 @@ class ServerAppIoAsyncStub:
     ]
     """Request token for a run"""
 
+    PullPendingTasks: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PullPendingTasksRequest,
+        flwr.proto.appio_pb2.PullPendingTasksResponse,
+    ]
+    """Pull pending tasks"""
+
+    ClaimTask: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.ClaimTaskRequest,
+        flwr.proto.appio_pb2.ClaimTaskResponse,
+    ]
+    """Claim task"""
+
     GetRun: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetRunRequest,
         flwr.proto.run_pb2.GetRunResponse,
@@ -182,6 +218,12 @@ class ServerAppIoAsyncStub:
         flwr.proto.heartbeat_pb2.SendAppHeartbeatResponse,
     ]
     """App heartbeat"""
+
+    SendTaskHeartbeat: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.SendTaskHeartbeatRequest,
+        flwr.proto.appio_pb2.SendTaskHeartbeatResponse,
+    ]
+    """Task heartbeat"""
 
     PullAppInputs: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullAppInputsRequest,
@@ -217,6 +259,12 @@ class ServerAppIoAsyncStub:
         flwr.proto.message_pb2.ConfirmMessageReceivedResponse,
     ]
     """Confirm Message Received"""
+
+    CreateTask: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.CreateTaskRequest,
+        flwr.proto.appio_pb2.CreateTaskResponse,
+    ]
+    """Create a task"""
 
     GetFederationOptions: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetFederationOptionsRequest,
@@ -282,6 +330,22 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         """Request token for a run"""
 
     @abc.abstractmethod
+    def PullPendingTasks(
+        self,
+        request: flwr.proto.appio_pb2.PullPendingTasksRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.PullPendingTasksResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PullPendingTasksResponse]]:
+        """Pull pending tasks"""
+
+    @abc.abstractmethod
+    def ClaimTask(
+        self,
+        request: flwr.proto.appio_pb2.ClaimTaskRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.ClaimTaskResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.ClaimTaskResponse]]:
+        """Claim task"""
+
+    @abc.abstractmethod
     def GetRun(
         self,
         request: flwr.proto.run_pb2.GetRunRequest,
@@ -301,6 +365,14 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.heartbeat_pb2.SendAppHeartbeatResponse, collections.abc.Awaitable[flwr.proto.heartbeat_pb2.SendAppHeartbeatResponse]]:
         """App heartbeat"""
+
+    @abc.abstractmethod
+    def SendTaskHeartbeat(
+        self,
+        request: flwr.proto.appio_pb2.SendTaskHeartbeatRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.SendTaskHeartbeatResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.SendTaskHeartbeatResponse]]:
+        """Task heartbeat"""
 
     @abc.abstractmethod
     def PullAppInputs(
@@ -346,6 +418,14 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.message_pb2.ConfirmMessageReceivedResponse, collections.abc.Awaitable[flwr.proto.message_pb2.ConfirmMessageReceivedResponse]]:
         """Confirm Message Received"""
+
+    @abc.abstractmethod
+    def CreateTask(
+        self,
+        request: flwr.proto.appio_pb2.CreateTaskRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.CreateTaskResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.CreateTaskResponse]]:
+        """Create a task"""
 
     @abc.abstractmethod
     def GetFederationOptions(

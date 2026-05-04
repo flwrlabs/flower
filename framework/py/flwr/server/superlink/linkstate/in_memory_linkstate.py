@@ -380,7 +380,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """Create, store in the link state, and return `node_id`."""
         # Sample a random int64 as node_id
         node_id = generate_rand_int_from_bytes(
-            NODE_ID_NUM_BYTES, exclude=[SUPERLINK_NODE_ID, 0]
+            NODE_ID_NUM_BYTES, exclude={SUPERLINK_NODE_ID, 0}
         )
 
         with self.lock:
@@ -571,6 +571,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         ),
                         flwr_aid=flwr_aid if flwr_aid else "",
                         federation=federation,
+                        primary_task_id=None,
                         bytes_sent=0,
                         bytes_recv=0,
                         clientapp_runtime=0.0,
@@ -755,12 +756,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 return True
             return False
 
-    def _on_tokens_expired(self, expired_records: list[tuple[int, float]]) -> None:
+    def _on_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
         """Transition runs with expired tokens to failed status.
 
         Parameters
         ----------
-        expired_records : list[tuple[int, float]]
+        expired_records : list[tuple[int, int]]
             List of tuples containing (run_id, active_until timestamp)
             for expired tokens.
         """

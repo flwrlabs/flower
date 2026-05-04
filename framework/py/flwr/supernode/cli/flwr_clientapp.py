@@ -20,8 +20,8 @@ from logging import DEBUG, INFO
 
 from flwr.common.args import add_args_flwr_app_common
 from flwr.common.constant import CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS
-from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
+from flwr.supercore.tls import validate_and_resolve_root_certificates
 from flwr.supercore.utils import mask_string
 from flwr.supernode.runtime.run_clientapp import run_clientapp
 
@@ -29,11 +29,6 @@ from flwr.supernode.runtime.run_clientapp import run_clientapp
 def flwr_clientapp() -> None:
     """Run process-isolated Flower ClientApp."""
     args = _parse_args_run_flwr_clientapp().parse_args()
-    if not args.insecure:
-        flwr_exit(
-            ExitCode.COMMON_TLS_NOT_SUPPORTED,
-            "flwr-clientapp does not support TLS yet.",
-        )
 
     log(INFO, "Start `flwr-clientapp` process")
     log(
@@ -46,7 +41,10 @@ def flwr_clientapp() -> None:
     run_clientapp(
         clientappio_api_address=args.clientappio_api_address,
         token=args.token,
-        certificates=None,
+        insecure=args.insecure,
+        certificates=validate_and_resolve_root_certificates(
+            args.root_certificates, args.insecure
+        ),
         parent_pid=args.parent_pid,
         runtime_dependency_install=args.runtime_dependency_install,
     )

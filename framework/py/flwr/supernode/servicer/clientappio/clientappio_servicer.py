@@ -35,6 +35,8 @@ from flwr.common.typing import Run
 # pylint: disable=E0611
 from flwr.proto import clientappio_pb2_grpc
 from flwr.proto.appio_pb2 import (
+    CreateTaskRequest,
+    CreateTaskResponse,
     ListAppsToLaunchRequest,
     ListAppsToLaunchResponse,
     PullAppInputsRequest,
@@ -61,12 +63,13 @@ from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
 from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
 from flwr.supercore.interceptors.appio_token_interceptor import APP_TOKEN_HEADER
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
+from flwr.supercore.servicers import AppIoServicer
 from flwr.supercore.utils import get_metadata_str
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
 
 
 # pylint: disable=C0103,W0613,W0201
-class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
+class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoServicer):
     """ClientAppIo API servicer."""
 
     def __init__(
@@ -76,6 +79,10 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
     ) -> None:
         self.state_factory = state_factory
         self.objectstore_factory = objectstore_factory
+
+    def state(self) -> NodeState:
+        """Return the NodeState instance."""
+        return self.state_factory.state()
 
     def ListAppsToLaunch(
         self,
@@ -303,6 +310,14 @@ class ClientAppIoServicer(clientappio_pb2_grpc.ClientAppIoServicer):
         store.delete(request.message_object_id)
 
         return ConfirmMessageReceivedResponse()
+
+    def CreateTask(
+        self, request: CreateTaskRequest, context: grpc.ServicerContext
+    ) -> CreateTaskResponse:
+        """Create a task for the given run ID."""
+        log(DEBUG, "ClientAppIoServicer.CreateTask")
+
+        raise NotImplementedError()
 
 
 def _resolve_app_token_from_metadata_or_request(
