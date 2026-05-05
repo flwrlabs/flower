@@ -151,6 +151,23 @@ class StateTest(CoreStateTest):
         assert run.override_config["test_key"] == "test_value"
         assert run.flwr_aid == "i1r9f"
 
+    def test_create_task_sets_primary_task_id_once(self) -> None:
+        """The first task created for a run should become its primary task."""
+        # Prepare
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+
+        # Execute
+        first_task_id = state.create_task(task_type="flwr-agentapp", run_id=run_id)
+        second_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+
+        # Assert
+        self.assertIsNotNone(first_task_id)
+        self.assertIsNotNone(second_task_id)
+        run = state.get_run_info(run_ids=[run_id])[0]
+        self.assertEqual(run.primary_task_id, first_task_id)
+        self.assertNotEqual(run.primary_task_id, second_task_id)
+
     def test_get_run_info_without_filters_returns_all_runs(self) -> None:
         """Test get_run_info returns all runs when no filter is provided."""
         # Prepare

@@ -18,13 +18,24 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
+from typing import cast
 from unittest.mock import patch
 
 from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import Column, Integer, MetaData, String, Table, create_engine, inspect
-from sqlalchemy.engine import Engine
+from sqlalchemy import (
+    Column,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    create_engine,
+    inspect,
+    text,
+)
+from sqlalchemy.engine import URL, Engine
 
 from flwr.common.exit import ExitCode
 from flwr.supercore.state.alembic.utils import (
@@ -106,6 +117,44 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
+    def test_compare_metadata_detects_server_default_changes(self) -> None:
+        """Verify autogenerate reports added server defaults."""
+        engine = self.create_engine()
+        base_metadata = MetaData()
+        Table(
+            "server_default_example",
+            base_metadata,
+            Column("id", Integer, primary_key=True),
+            Column("value", Integer, nullable=False),
+        )
+        updated_metadata = MetaData()
+        Table(
+            "server_default_example",
+            updated_metadata,
+            Column("id", Integer, primary_key=True),
+            Column("value", Integer, nullable=False, server_default=text("0")),
+        )
+
+        try:
+            base_metadata.create_all(engine)
+
+            with engine.connect() as connection:
+                context = MigrationContext.configure(
+                    connection,
+                    opts={"compare_server_default": True},
+                )
+                diffs = compare_metadata(context, updated_metadata)
+
+            self.assertEqual(len(diffs), 1)
+            modify_default = diffs[0][0]
+            self.assertEqual(modify_default[0], "modify_default")
+            self.assertEqual(modify_default[2], "server_default_example")
+            self.assertEqual(modify_default[3], "value")
+            self.assertIsNone(modify_default[5])
+            self.assertIsNotNone(modify_default[6])
+        finally:
+            engine.dispose()
+
     def test_migrations_create_fab_table(self) -> None:
         """Ensure FAB state storage is present after migrations."""
         engine = self.create_engine()
@@ -154,8 +203,12 @@ class TestAlembicRun(unittest.TestCase):
                 table.create(engine)
 
             # Execute & Assert
-            with patch("flwr.supercore.state.alembic.utils.flwr_exit") as mock_exit:
-                run_migrations(engine)
+            with patch(
+                "flwr.supercore.state.alembic.utils.flwr_exit",
+                side_effect=SystemExit(1),
+            ) as mock_exit:
+                with self.assertRaises(SystemExit):
+                    run_migrations(engine)
 
                 # Verify flwr_exit was called with correct arguments
                 mock_exit.assert_called_once()
@@ -187,8 +240,12 @@ class TestAlembicRun(unittest.TestCase):
                     baseline_metadata.tables[table_name].create(engine)
 
             # Execute & Assert
-            with patch("flwr.supercore.state.alembic.utils.flwr_exit") as mock_exit:
-                run_migrations(engine)
+            with patch(
+                "flwr.supercore.state.alembic.utils.flwr_exit",
+                side_effect=SystemExit(1),
+            ) as mock_exit:
+                with self.assertRaises(SystemExit):
+                    run_migrations(engine)
 
                 # Verify flwr_exit was called
                 mock_exit.assert_called_once()
@@ -436,3 +493,29 @@ class TestVersionLocationRegistry(unittest.TestCase):
             self.assertIn(str(external_versions), version_locations)
         finally:
             engine.dispose()
+
+    def test_build_alembic_config_preserves_url_password_and_percent_encoding(
+        self,
+    ) -> None:
+        """Ensure Alembic receives the unmasked URL with escaped percent signs."""
+        # Prepare: use a URL object so the test does not depend on a PostgreSQL driver.
+        url = URL.create(
+            "postgresql",
+            username="flower",
+            password="pa%ss=word",
+            host="db.example",
+            database="state",
+        )
+        engine = cast(Engine, SimpleNamespace(url=url))
+
+        # Execute
+        config = build_alembic_config(engine)
+
+        # Assert: get_main_option should not raise interpolation errors and should
+        # return the exact URL Alembic needs to connect.
+        expected_url = url.render_as_string(hide_password=False)
+        config_url = config.get_main_option("sqlalchemy.url")
+        self.assertEqual(config_url, expected_url)
+        assert config_url is not None
+        self.assertIn("pa%25ss%3Dword", config_url)
+        self.assertNotIn("***", config_url)

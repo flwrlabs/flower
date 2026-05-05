@@ -53,6 +53,18 @@ class ClientAppIoStub:
     ]
     """Request token"""
 
+    PullPendingTasks: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PullPendingTasksRequest,
+        flwr.proto.appio_pb2.PullPendingTasksResponse,
+    ]
+    """Pull pending tasks"""
+
+    ClaimTask: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.ClaimTaskRequest,
+        flwr.proto.appio_pb2.ClaimTaskResponse,
+    ]
+    """Claim task"""
+
     GetRun: grpc.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetRunRequest,
         flwr.proto.run_pb2.GetRunResponse,
@@ -69,6 +81,12 @@ class ClientAppIoStub:
         flwr.proto.heartbeat_pb2.SendAppHeartbeatResponse,
     ]
     """App heartbeat"""
+
+    SendTaskHeartbeat: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.SendTaskHeartbeatRequest,
+        flwr.proto.appio_pb2.SendTaskHeartbeatResponse,
+    ]
+    """Task heartbeat"""
 
     PullAppInputs: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullAppInputsRequest,
@@ -105,6 +123,12 @@ class ClientAppIoStub:
     ]
     """Confirm Message Received"""
 
+    CreateTask: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.CreateTaskRequest,
+        flwr.proto.appio_pb2.CreateTaskResponse,
+    ]
+    """Create a task"""
+
     PushMessage: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushAppMessagesRequest,
         flwr.proto.appio_pb2.PushAppMessagesResponse,
@@ -140,6 +164,18 @@ class ClientAppIoAsyncStub:
     ]
     """Request token"""
 
+    PullPendingTasks: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PullPendingTasksRequest,
+        flwr.proto.appio_pb2.PullPendingTasksResponse,
+    ]
+    """Pull pending tasks"""
+
+    ClaimTask: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.ClaimTaskRequest,
+        flwr.proto.appio_pb2.ClaimTaskResponse,
+    ]
+    """Claim task"""
+
     GetRun: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetRunRequest,
         flwr.proto.run_pb2.GetRunResponse,
@@ -156,6 +192,12 @@ class ClientAppIoAsyncStub:
         flwr.proto.heartbeat_pb2.SendAppHeartbeatResponse,
     ]
     """App heartbeat"""
+
+    SendTaskHeartbeat: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.SendTaskHeartbeatRequest,
+        flwr.proto.appio_pb2.SendTaskHeartbeatResponse,
+    ]
+    """Task heartbeat"""
 
     PullAppInputs: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullAppInputsRequest,
@@ -191,6 +233,12 @@ class ClientAppIoAsyncStub:
         flwr.proto.message_pb2.ConfirmMessageReceivedResponse,
     ]
     """Confirm Message Received"""
+
+    CreateTask: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.CreateTaskRequest,
+        flwr.proto.appio_pb2.CreateTaskResponse,
+    ]
+    """Create a task"""
 
     PushMessage: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushAppMessagesRequest,
@@ -232,6 +280,22 @@ class ClientAppIoServicer(metaclass=abc.ABCMeta):
         """Request token"""
 
     @abc.abstractmethod
+    def PullPendingTasks(
+        self,
+        request: flwr.proto.appio_pb2.PullPendingTasksRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.PullPendingTasksResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PullPendingTasksResponse]]:
+        """Pull pending tasks"""
+
+    @abc.abstractmethod
+    def ClaimTask(
+        self,
+        request: flwr.proto.appio_pb2.ClaimTaskRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.ClaimTaskResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.ClaimTaskResponse]]:
+        """Claim task"""
+
+    @abc.abstractmethod
     def GetRun(
         self,
         request: flwr.proto.run_pb2.GetRunRequest,
@@ -251,6 +315,14 @@ class ClientAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.heartbeat_pb2.SendAppHeartbeatResponse, collections.abc.Awaitable[flwr.proto.heartbeat_pb2.SendAppHeartbeatResponse]]:
         """App heartbeat"""
+
+    @abc.abstractmethod
+    def SendTaskHeartbeat(
+        self,
+        request: flwr.proto.appio_pb2.SendTaskHeartbeatRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.SendTaskHeartbeatResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.SendTaskHeartbeatResponse]]:
+        """Task heartbeat"""
 
     @abc.abstractmethod
     def PullAppInputs(
@@ -296,6 +368,14 @@ class ClientAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.message_pb2.ConfirmMessageReceivedResponse, collections.abc.Awaitable[flwr.proto.message_pb2.ConfirmMessageReceivedResponse]]:
         """Confirm Message Received"""
+
+    @abc.abstractmethod
+    def CreateTask(
+        self,
+        request: flwr.proto.appio_pb2.CreateTaskRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.CreateTaskResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.CreateTaskResponse]]:
+        """Create a task"""
 
     @abc.abstractmethod
     def PushMessage(
