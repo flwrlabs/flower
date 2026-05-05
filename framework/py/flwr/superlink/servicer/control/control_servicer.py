@@ -256,7 +256,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 task_type = TaskType.SERVER_APP
             else:
                 raise ValueError(f"Unsupported run type: {run_type}")
-            _ = state.create_task(task_type=task_type, run_id=run_id, fab_hash=fab_hash)
+            task_id = state.create_task(
+                task_type=task_type, run_id=run_id, fab_hash=fab_hash
+            )
+            if task_id is None:
+                log(ERROR, "Failed to create task for run ID %s", run_id)
+                context.abort(
+                    grpc.StatusCode.INTERNAL, "Failed to create task for the run."
+                )
 
             # Initialize node config
             node_config = {}

@@ -223,6 +223,37 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, expected_task_type)
 
+    def test_start_run_aborts_if_create_task_fails(self) -> None:
+        """Test StartRun aborts with INTERNAL if the initial task cannot be created."""
+        fab_content = b"test FAB content task failure"
+        request = StartRunRequest()
+        request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
+        request.fab.content = fab_content
+        request.federation = NOOP_FEDERATION
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+            ) as mock_get_fab_config,
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+            ) as mock_get_metadata_from_config,
+            patch.object(self.state, "create_task", return_value=None),
+            self.assertRaises(grpc.RpcError),
+        ):
+            mock_get_fab_config.return_value = {
+                "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
+            }
+            mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
+            self.servicer.StartRun(request, context)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.INTERNAL,
+            "Failed to create task for the run.",
+        )
+
     def test_start_run_returns_note_for_remote_app(self) -> None:
         """Test StartRun includes the Hub compatibility note for remote apps."""
         request = StartRunRequest(
