@@ -63,7 +63,7 @@ class TestAppIoServicer(unittest.TestCase):
 
         # Assert
         self.state.get_tasks.assert_called_once_with(
-            statuses=[Status.PENDING], order_by='pending_at', ascending=True
+            statuses=[Status.PENDING], order_by="pending_at", ascending=True
         )
         self.assertEqual(len(response.tasks), 1)
         self.assertEqual(response.tasks[0].task_id, 123)
