@@ -44,15 +44,15 @@ class ServerAppExecPlugin(BaseExecPlugin):
     def launch_app(self, token: str, task: Task) -> None:
         """Launch the application associated with a given task and token."""
         # Determine the command to launch based on the task type
-        if task.task_type == TaskType.SERVER_APP:
+        if task.type == TaskType.SERVER_APP:
             self.command = "flwr-serverapp"
-        elif task.task_type == TaskType.SIMULATION:
+        elif task.type == TaskType.SIMULATION:
             self.command = "flwr-simulation"
         else:
             log(
                 ERROR,
                 "Unknown task type '%s' for task_id %d.",
-                task.task_type,
+                task.type,
                 task.task_id,
             )
             return
