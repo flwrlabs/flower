@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from enum import Enum
 from logging import WARN
 from typing import Any
 
@@ -28,6 +29,13 @@ from flwr.common.logger import log
 from flwr.supercore.constant import VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
 from flwr.supercore.utils import get_metadata_str
+
+
+class RuntimeVersionCompatibilityAction(Enum):
+    """Server action to take when runtime version metadata is incompatible."""
+
+    OBSERVE_ONLY = "observe-only"
+    WARN = "warn"
 
 
 class RuntimeVersionClientInterceptor(
@@ -106,9 +114,13 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
         *,
         connection_name: str,
         local_metadata: RuntimeVersionMetadata,
+        compatibility_action: RuntimeVersionCompatibilityAction = (
+            RuntimeVersionCompatibilityAction.OBSERVE_ONLY
+        ),
     ) -> None:
         self._connection_name = connection_name
         self._local_metadata = local_metadata
+        self._compatibility_action = compatibility_action
 
     def intercept_service(
         self,
@@ -131,7 +143,10 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
 
         # Prepare trailing metadata
         trailing_metadata: tuple[tuple[str, str], ...] = ()
-        if incompat_details:
+        if (
+            incompat_details
+            and self._compatibility_action is RuntimeVersionCompatibilityAction.WARN
+        ):
             incompat_message = (
                 "Runtime version compatibility check failed for "
                 f"{self._connection_name}. {incompat_details}"
@@ -179,9 +194,13 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
 
 def create_serverappio_runtime_version_server_interceptor(
     connection_name: str = "Caller <-> SuperLink ServerAppIo API",
+    compatibility_action: RuntimeVersionCompatibilityAction = (
+        RuntimeVersionCompatibilityAction.OBSERVE_ONLY
+    ),
 ) -> RuntimeVersionServerInterceptor:
     """Create the default runtime version interceptor for ServerAppIo."""
     return RuntimeVersionServerInterceptor(
         connection_name=connection_name,
         local_metadata=RuntimeVersionMetadata.from_local_component("SuperLink"),
+        compatibility_action=compatibility_action,
     )

@@ -31,6 +31,7 @@ from flwr.supercore.constant import (
     VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
 )
 from flwr.supercore.interceptors import (
+    RuntimeVersionCompatibilityAction,
     RuntimeVersionClientInterceptor,
     RuntimeVersionServerInterceptor,
 )
@@ -201,8 +202,8 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_not_called()
 
-    def test_unparseable_peer_version_is_warned(self) -> None:
-        """Explicit unparseable peer versions should be warned."""
+    def test_unparseable_peer_version_is_observed(self) -> None:
+        """Explicit unparseable peer versions should not warn by default."""
         intercepted = self._intercept(
             "/flwr.proto.ServerAppIo/GetNodes",
             _make_runtime_metadata("main"),
@@ -211,10 +212,31 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         context = Mock()
         response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
         self.assertEqual(response, "ok")
-        context.set_trailing_metadata.assert_called_once()
+        context.set_trailing_metadata.assert_not_called()
 
-    def test_incompatible_metadata_is_warned(self) -> None:
-        """Different major.minor versions should still be warned."""
+    def test_incompatible_metadata_is_observed(self) -> None:
+        """Different major.minor versions should not warn by default."""
+        intercepted = self._intercept(
+            "/flwr.proto.ServerAppIo/GetNodes",
+            _make_runtime_metadata("1.30.1"),
+        )
+
+        context = Mock()
+        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        self.assertEqual(response, "ok")
+        context.set_trailing_metadata.assert_not_called()
+
+    def test_warning_action_returns_warning_metadata(self) -> None:
+        """Explicit warning action should set trailing metadata."""
+        self.interceptor = RuntimeVersionServerInterceptor(
+            connection_name="flwr-simulation <-> SuperLink ServerAppIo API",
+            local_metadata=RuntimeVersionMetadata.from_local_component(
+                "superlink",
+                package_name_value="flwr",
+                package_version_value="1.29.0",
+            ),
+            compatibility_action=RuntimeVersionCompatibilityAction.WARN,
+        )
         intercepted = self._intercept(
             "/flwr.proto.ServerAppIo/GetNodes",
             _make_runtime_metadata("1.30.1"),
@@ -238,8 +260,8 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_not_called()
 
-    def test_unary_stream_incompatible_metadata_is_warned(self) -> None:
-        """Incompatible peer version should set trailing metadata for stream
+    def test_unary_stream_incompatible_metadata_is_observed(self) -> None:
+        """Incompatible peer version should not warn by default for stream
         handlers."""
         intercepted = self._intercept(
             "/flwr.proto.ServerAppIo/PullTaskIns",
@@ -250,7 +272,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         context = Mock()
         responses = list(intercepted.unary_stream(GetNodesRequest(run_id=1), context))
         self.assertEqual(responses, ["a", "b"])
-        context.set_trailing_metadata.assert_called_once()
+        context.set_trailing_metadata.assert_not_called()
 
     def test_unary_stream_compatible_metadata_is_accepted(self) -> None:
         """Compatible peer version should not set trailing metadata for stream
