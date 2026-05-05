@@ -46,6 +46,7 @@ from flwr.common.constant import (
     TRANSPORT_TYPES,
     ErrorCode,
     ExecPluginType,
+    SubStatus,
 )
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import generic_create_grpc_server
@@ -451,6 +452,11 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
             )
             state.delete_messages(message_ids=[message.metadata.message_id])
             object_store.delete(message.metadata.message_id)
+            state.finish_task(
+                task_id,
+                sub_status=SubStatus.FAILED,
+                details="Pulling message objects failed.",
+            )
 
     except RunNotRunningException:
         if message is None:
