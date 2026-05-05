@@ -112,8 +112,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
     ) -> int | None:
         """Create a task and make it the run's primary task if none exists."""
         with self.lock:
-            task_id = InMemoryCoreState.create_task(
-                self,
+            task_id = super().create_task(
                 task_type=task_type,
                 run_id=run_id,
                 fab_hash=fab_hash,

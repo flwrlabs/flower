@@ -110,8 +110,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     ) -> int | None:
         """Create a task and make it the run's primary task if none exists."""
         with self.session():
-            task_id = SqlCoreState.create_task(
-                self,
+            task_id = super().create_task(
                 task_type=task_type,
                 run_id=run_id,
                 fab_hash=fab_hash,
