@@ -49,7 +49,9 @@ class AppIoServicer(ABC):
         """Pull pending tasks."""
         log(DEBUG, "AppIoServicer.PullPendingTasks")
 
-        tasks = self.state().get_tasks(statuses=[Status.PENDING])
+        tasks = self.state().get_tasks(
+            statuses=[Status.PENDING], order_by="pending_at", ascending=True
+        )
         return PullPendingTasksResponse(tasks=tasks)
 
     def ClaimTask(
