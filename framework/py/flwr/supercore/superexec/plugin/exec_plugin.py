@@ -60,12 +60,12 @@ class ExecPlugin(ABC):
         """
 
     @abstractmethod
-    def select_task(self, tasks: Sequence[Task]) -> Task | None:
+    def select_task(self, candidate_tasks: Sequence[Task]) -> Task | None:
         """Select a task to execute from a set of pending tasks.
 
         Parameters
         ----------
-        tasks : Sequence[Task]
+        candidate_tasks : Sequence[Task]
             A set of pending tasks to choose from.
 
         Returns
