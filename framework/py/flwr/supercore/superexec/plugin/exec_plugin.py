@@ -75,7 +75,7 @@ class ExecPlugin(ABC):
         """
 
     @abstractmethod
-    def launch_app(self, token: str, task: Task) -> None:
+    def launch_task(self, token: str, task: Task) -> None:
         """Launch the application associated with a given task and token.
 
         This method starts the application process using the given `token`.
