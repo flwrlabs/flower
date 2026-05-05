@@ -115,7 +115,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
         connection_name: str,
         local_metadata: RuntimeVersionMetadata,
         compatibility_action: RuntimeVersionCompatibilityAction = (
-            RuntimeVersionCompatibilityAction.OBSERVE_ONLY
+            RuntimeVersionCompatibilityAction.WARN
         ),
     ) -> None:
         self._connection_name = connection_name

@@ -34,6 +34,7 @@ from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
     RuntimeVersionCompatibilityAction,
     RuntimeVersionServerInterceptor,
+    create_serverappio_runtime_version_server_interceptor,
 )
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
 
@@ -175,6 +176,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
                 package_name_value="flwr",
                 package_version_value="1.29.0",
             ),
+            compatibility_action=RuntimeVersionCompatibilityAction.OBSERVE_ONLY,
         )
 
     def _intercept(
@@ -246,6 +248,39 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_called_once()
+
+    def test_generic_interceptor_warns_by_default(self) -> None:
+        """Direct interceptor construction should preserve warning behavior."""
+        self.interceptor = RuntimeVersionServerInterceptor(
+            connection_name="flwr-simulation <-> SuperLink ServerAppIo API",
+            local_metadata=RuntimeVersionMetadata.from_local_component(
+                "superlink",
+                package_name_value="flwr",
+                package_version_value="1.29.0",
+            ),
+        )
+        intercepted = self._intercept(
+            "/flwr.proto.ServerAppIo/GetNodes",
+            _make_runtime_metadata("1.30.1"),
+        )
+
+        context = Mock()
+        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        self.assertEqual(response, "ok")
+        context.set_trailing_metadata.assert_called_once()
+
+    def test_serverappio_factory_observes_by_default(self) -> None:
+        """ServerAppIo factory should not return warning metadata by default."""
+        self.interceptor = create_serverappio_runtime_version_server_interceptor()
+        intercepted = self._intercept(
+            "/flwr.proto.ServerAppIo/GetNodes",
+            _make_runtime_metadata("1.30.1"),
+        )
+
+        context = Mock()
+        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        self.assertEqual(response, "ok")
+        context.set_trailing_metadata.assert_not_called()
 
     def test_compatible_metadata_is_accepted(self) -> None:
         """Compatible peer version should not set trailing metadata for unary
