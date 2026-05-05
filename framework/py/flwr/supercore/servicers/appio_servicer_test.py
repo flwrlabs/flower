@@ -62,7 +62,9 @@ class TestAppIoServicer(unittest.TestCase):
         response = self.servicer.PullPendingTasks(PullPendingTasksRequest(), Mock())
 
         # Assert
-        self.state.get_tasks.assert_called_once_with(statuses=[Status.PENDING])
+        self.state.get_tasks.assert_called_once_with(
+            statuses=[Status.PENDING], order_by='pending_at', ascending=True
+        )
         self.assertEqual(len(response.tasks), 1)
         self.assertEqual(response.tasks[0].task_id, 123)
 
@@ -88,7 +90,7 @@ class TestAppIoServicer(unittest.TestCase):
 
         # Assert
         self.state.claim_task.assert_called_once_with(123)
-        self.assertEqual(response.token, "")
+        self.assertFalse(response.HasField("token"))
 
     def test_send_task_heartbeat_acknowledges_authenticated_task(self) -> None:
         """SendTaskHeartbeat should use the authenticated task ID."""
