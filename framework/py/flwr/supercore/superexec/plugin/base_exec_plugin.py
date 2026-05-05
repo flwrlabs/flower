@@ -20,6 +20,8 @@ import subprocess
 from collections.abc import Sequence
 from typing import Any
 
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+
 from .exec_plugin import ExecPlugin
 
 
@@ -39,8 +41,14 @@ class BaseExecPlugin(ExecPlugin):
             return None
         return candidate_run_ids[0]
 
-    def launch_app(self, token: str, run_id: int) -> None:
-        """Launch the application associated with a given run ID and token."""
+    def select_task(self, candidate_tasks: Sequence[Task]) -> Task | None:
+        """Select a Task to execute from a sequence of candidates."""
+        if not candidate_tasks:
+            return None
+        return candidate_tasks[0]
+
+    def launch_app(self, token: str, task: Task) -> None:
+        """Launch the application associated with a given task and token."""
         cmds = [self.command]
         if self.insecure:
             cmds.append("--insecure")
