@@ -78,6 +78,18 @@ class TestAppIoServicer(unittest.TestCase):
         self.state.claim_task.assert_called_once_with(123)
         self.assertEqual(response.token, "task-token")
 
+    def test_claim_task_returns_empty_token_when_claim_fails(self) -> None:
+        """ClaimTask should return an empty token if the claim fails."""
+        # Prepare
+        self.state.claim_task.return_value = None
+
+        # Execute
+        response = self.servicer.ClaimTask(ClaimTaskRequest(task_id=123), Mock())
+
+        # Assert
+        self.state.claim_task.assert_called_once_with(123)
+        self.assertEqual(response.token, "")
+
     def test_send_task_heartbeat_acknowledges_authenticated_task(self) -> None:
         """SendTaskHeartbeat should use the authenticated task ID."""
         # Prepare
