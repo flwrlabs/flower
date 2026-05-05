@@ -296,8 +296,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         context.set_trailing_metadata.assert_not_called()
 
     def test_unary_stream_incompatible_metadata_is_observed(self) -> None:
-        """Incompatible peer version should not warn by default for stream
-        handlers."""
+        """Incompatible peer version should not warn by default for stream handlers."""
         intercepted = self._intercept(
             "/flwr.proto.ServerAppIo/PullTaskIns",
             _make_runtime_metadata("1.30.1"),
