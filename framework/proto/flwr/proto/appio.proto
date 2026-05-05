@@ -21,6 +21,7 @@ import "flwr/proto/message.proto";
 import "flwr/proto/fab.proto";
 import "flwr/proto/federation_config.proto";
 import "flwr/proto/run.proto";
+import "flwr/proto/task.proto";
 
 // These messages are used by both ServerAppIo and ClientAppIo services
 
@@ -33,6 +34,18 @@ message ListAppsToLaunchResponse {
 // RequestToken messages
 message RequestTokenRequest { uint64 run_id = 1; }
 message RequestTokenResponse { string token = 1; }
+
+// PullPendingTasks messages
+message PullPendingTasksRequest {}
+message PullPendingTasksResponse { repeated Task tasks = 1; }
+
+// ClaimTask messages
+message ClaimTaskRequest { uint64 task_id = 1; }
+message ClaimTaskResponse { optional string token = 1; }
+
+// SendTaskHeartbeat messages
+message SendTaskHeartbeatRequest {}
+message SendTaskHeartbeatResponse { bool success = 1; }
 
 // PushAppMessages messages
 message PushAppMessagesRequest {
@@ -75,3 +88,13 @@ message PushAppOutputsRequest {
   string details = 5;
 }
 message PushAppOutputsResponse {}
+
+// CreateTask messages
+message CreateTaskRequest {
+  string type = 1;
+  uint64 run_id = 2;
+  optional string fab_hash = 3;
+  optional string model_ref = 4;
+  optional string connector_ref = 5;
+}
+message CreateTaskResponse { optional uint64 task_id = 1; }

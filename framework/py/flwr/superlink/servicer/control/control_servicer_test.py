@@ -83,6 +83,7 @@ from flwr.supercore.constant import (
     ActionType,
     RunTime,
     RunType,
+    TaskType,
 )
 from flwr.supercore.error import ApiErrorCode, EntitlementError, FlowerError
 from flwr.supercore.error.catalog import API_ERROR_MAP
@@ -174,6 +175,84 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(run_info.fab_version, fab_version)
         self.assertEqual(run_info.run_type, RunType.SERVER_APP)
         self.assertFalse(response.HasField("note"))
+
+    @parameterized.expand(
+        [
+            (None, RunType.SERVER_APP, TaskType.SERVER_APP),
+            (SimulationConfig(), RunType.SIMULATION, TaskType.SIMULATION),
+        ]
+    )  # type: ignore
+    def test_start_run_creates_task_with_matching_type(
+        self,
+        sim_cfg: SimulationConfig | None,
+        expected_run_type: RunType,
+        expected_task_type: TaskType,
+    ) -> None:
+        """Test StartRun creates an initial task matching the resolved run type."""
+        fab_content = b"test FAB content task type"
+        request = StartRunRequest()
+        request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
+        request.fab.content = fab_content
+        request.federation = NOOP_FEDERATION
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+            ) as mock_get_fab_config,
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+            ) as mock_get_metadata_from_config,
+            patch.object(
+                self.state.federation_manager,
+                "get_simulation_config",
+                return_value=sim_cfg,
+            ),
+        ):
+            mock_get_fab_config.return_value = {
+                "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
+            }
+            mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
+            response = self.servicer.StartRun(request, Mock())
+
+        runs = self.state.get_run_info(run_ids=[response.run_id])
+        tasks = self.state.get_tasks()
+
+        self.assertEqual(len(runs), 1)
+        self.assertEqual(runs[0].run_type, expected_run_type)
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].run_id, response.run_id)
+        self.assertEqual(tasks[0].type, expected_task_type)
+
+    def test_start_run_aborts_if_create_task_fails(self) -> None:
+        """Test StartRun aborts with INTERNAL if the initial task cannot be created."""
+        fab_content = b"test FAB content task failure"
+        request = StartRunRequest()
+        request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
+        request.fab.content = fab_content
+        request.federation = NOOP_FEDERATION
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+            ) as mock_get_fab_config,
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+            ) as mock_get_metadata_from_config,
+            patch.object(self.state, "create_task", return_value=None),
+            self.assertRaises(grpc.RpcError),
+        ):
+            mock_get_fab_config.return_value = {
+                "tool": {"flwr": {"app": {"config": {"train": {"lr": 0.1}}}}}
+            }
+            mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
+            self.servicer.StartRun(request, context)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.INTERNAL,
+            "Failed to create task for the run.",
+        )
 
     def test_start_run_returns_note_for_remote_app(self) -> None:
         """Test StartRun includes the Hub compatibility note for remote apps."""
