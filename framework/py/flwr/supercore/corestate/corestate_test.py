@@ -30,6 +30,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
+from flwr.supercore.constant import TaskType
 
 from . import CoreState
 
@@ -49,7 +50,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
 
         task_id = state.create_task(
-            task_type="flwr-model",
+            task_type=TaskType.MODEL,
             run_id=42,
             fab_hash=None,
             model_ref="model://test",
@@ -61,7 +62,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(tasks), 1)
         task = tasks[0]
         self.assertEqual(task.task_id, task_id)
-        self.assertEqual(task.type, "flwr-model")
+        self.assertEqual(task.type, TaskType.MODEL)
         self.assertEqual(task.run_id, 42)
         self.assertEqual(
             task.status,
@@ -83,7 +84,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_get_tasks_single_status_matches(self) -> None:
         """A single-item status sequence should match pending tasks."""
         state = self.state_factory()
-        _ = state.create_task(task_type="flwr-model", run_id=42)
+        _ = state.create_task(task_type=TaskType.MODEL, run_id=42)
 
         tasks = state.get_tasks(statuses=[Status.PENDING])
 
@@ -108,7 +109,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Retrieved task should be a defensive copy."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type="flwr-serverapp",
+            task_type=TaskType.SERVER_APP,
             run_id=42,
             fab_hash="fab-hash",
             model_ref=None,
