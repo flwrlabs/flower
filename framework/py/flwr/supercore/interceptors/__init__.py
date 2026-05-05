@@ -24,8 +24,8 @@ from .appio_token_interceptor import (
     create_serverappio_token_auth_server_interceptor,
 )
 from .runtime_version_interceptor import (
-    RuntimeVersionCompatibilityAction,
     RuntimeVersionClientInterceptor,
+    RuntimeVersionCompatibilityAction,
     RuntimeVersionServerInterceptor,
     create_serverappio_runtime_version_server_interceptor,
 )

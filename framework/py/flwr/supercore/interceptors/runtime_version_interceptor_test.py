@@ -31,8 +31,8 @@ from flwr.supercore.constant import (
     VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
 )
 from flwr.supercore.interceptors import (
-    RuntimeVersionCompatibilityAction,
     RuntimeVersionClientInterceptor,
+    RuntimeVersionCompatibilityAction,
     RuntimeVersionServerInterceptor,
 )
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
