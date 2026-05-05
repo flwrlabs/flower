@@ -20,6 +20,8 @@ import subprocess
 from collections.abc import Sequence
 from typing import Any
 
+from flwr.supercore.superexec.app_supervisor import launch_with_lifeline
+
 from .exec_plugin import ExecPlugin
 
 
@@ -41,6 +43,7 @@ class BaseExecPlugin(ExecPlugin):
 
     def launch_app(self, token: str, run_id: int) -> None:
         """Launch the application associated with a given run ID and token."""
+        use_lifeline_supervisor = os.name == "posix"
         cmds = [self.command]
         if self.insecure:
             cmds.append("--insecure")
@@ -48,10 +51,18 @@ class BaseExecPlugin(ExecPlugin):
             cmds += ["--root-certificates", self.root_certificates_path]
         cmds += [self.appio_api_address_arg, self.appio_api_address]
         cmds += ["--token", token]
-        cmds += ["--parent-pid", str(os.getpid())]
+        if not use_lifeline_supervisor:
+            cmds += ["--parent-pid", str(os.getpid())]
         if self.runtime_dependency_install:
             cmds += ["--allow-runtime-dependency-installation"]
-        # Launch the client app without waiting for it to complete.
+        if use_lifeline_supervisor:
+            launch_with_lifeline(
+                cmds,
+                wait=False,
+                popen_kwargs=self.get_popen_kwargs(),
+            )
+            return
+        # Launch the app directly on non-POSIX without waiting for it to complete.
         # Since we don't need to manage the process, we intentionally avoid using
         # a `with` statement. Suppress the pylint warning for it in this case.
         # pylint: disable-next=consider-using-with

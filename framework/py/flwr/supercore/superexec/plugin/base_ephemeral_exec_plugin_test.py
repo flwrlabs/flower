@@ -33,12 +33,15 @@ class _EphemeralExecPlugin(BaseEphemeralExecPlugin):
     appio_api_address_arg = "--serverappio-api-address"
 
 
-def _get_ephemeral_plugin() -> _EphemeralExecPlugin:
+def _get_ephemeral_plugin(
+    runtime_dependency_install: bool = False,
+) -> _EphemeralExecPlugin:
     return _EphemeralExecPlugin(
         appio_api_address="127.0.0.1:9091",
         get_run=_get_run,
         insecure=True,
         root_certificates_path=None,
+        runtime_dependency_install=runtime_dependency_install,
     )
 
 
@@ -55,20 +58,118 @@ def test_select_run_id_returns_first_candidate() -> None:
 
 
 def test_launch_app_runs_expected_command_and_exits() -> None:
-    """Launch should invoke the app with token and parent PID, then exit."""
+    """POSIX launch should invoke the app through the supervisor, then exit."""
     plugin = _get_ephemeral_plugin()
 
     with (
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.os.name",
+            "posix",
+        ),
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin."
+            "launch_with_lifeline"
+        ) as launch,
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"
+        ) as flwr_exit,
+    ):
+        plugin.launch_app(token="token-123", run_id=5)
+
+    launch.assert_called_once_with(
+        [
+            "flwr-serverapp",
+            "--insecure",
+            "--serverappio-api-address",
+            "127.0.0.1:9091",
+            "--token",
+            "token-123",
+        ],
+        wait=True,
+        popen_kwargs={},
+    )
+    flwr_exit.assert_called_once_with(
+        ExitCode.SUCCESS,
+        "App process finished, exiting SuperExec.",
+    )
+
+
+def test_launch_app_calls_cleanup_before_launch() -> None:
+    """Launch should invoke cleanup before supervision, then exit."""
+    # Prepare
+    call_log: list[str] = []
+    plugin = _get_ephemeral_plugin()
+    plugin.cleanup_before_launch = lambda: call_log.append("cleanup")
+
+    # Execute
+    with (
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.os.name",
+            "posix",
+        ),
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin."
+            "launch_with_lifeline",
+            side_effect=lambda *_, **__: call_log.append("launch"),
+        ),
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit",
+            side_effect=lambda *_, **__: call_log.append("exit"),
+        ),
+    ):
+        plugin.launch_app(token="token-abc", run_id=1)
+
+    # Assert
+    assert call_log == ["cleanup", "launch", "exit"]
+
+
+def test_launch_app_forwards_runtime_dependency_install_flag() -> None:
+    """POSIX launch should preserve optional runtime install flags."""
+    plugin = _get_ephemeral_plugin(runtime_dependency_install=True)
+
+    with (
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.os.name",
+            "posix",
+        ),
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin."
+            "launch_with_lifeline"
+        ) as launch,
+        patch("flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"),
+    ):
+        plugin.launch_app(token="token-123", run_id=5)
+
+    assert launch.call_args.args[0] == [
+        "flwr-serverapp",
+        "--insecure",
+        "--serverappio-api-address",
+        "127.0.0.1:9091",
+        "--token",
+        "token-123",
+        "--allow-runtime-dependency-installation",
+    ]
+    assert "--parent-pid" not in launch.call_args.args[0]
+
+
+def test_launch_app_non_posix_fallback_passes_parent_pid() -> None:
+    """Non-POSIX launch should keep the existing parent PID behavior."""
+    plugin = _get_ephemeral_plugin()
+
+    with (
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.os.name",
+            "nt",
+        ),
         patch(
             "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.os.getpid",
             return_value=1234,
         ),
         patch(
-            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.run"
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin."
+            "subprocess.run"
         ) as run,
-        patch(
-            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"
-        ) as flwr_exit,
+        patch("flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"),
     ):
         plugin.launch_app(token="token-123", run_id=5)
 
@@ -85,28 +186,3 @@ def test_launch_app_runs_expected_command_and_exits() -> None:
         ],
         check=False,
     )
-    flwr_exit.assert_called_once_with(
-        ExitCode.SUCCESS,
-        "App process finished, exiting SuperExec.",
-    )
-
-
-def test_launch_app_calls_cleanup_before_launch() -> None:
-    """Launch should invoke cleanup_before_launch before running the subprocess."""
-    # Prepare
-    call_log: list[str] = []
-    plugin = _get_ephemeral_plugin()
-    plugin.cleanup_before_launch = lambda: call_log.append("cleanup")
-
-    # Execute
-    with (
-        patch(
-            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.run",
-            side_effect=lambda *_, **__: call_log.append("subprocess"),
-        ),
-        patch("flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"),
-    ):
-        plugin.launch_app(token="token-abc", run_id=1)
-
-    # Assert
-    assert call_log == ["cleanup", "subprocess"]
