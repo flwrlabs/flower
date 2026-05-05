@@ -56,6 +56,7 @@ from flwr.common.typing import Fab, Run, RunNotRunningException
 from flwr.proto.clientappio_pb2_grpc import add_ClientAppIoServicer_to_server
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.supercore.address import parse_address, resolve_bind_address
+from flwr.supercore.constant import TaskType
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -408,6 +409,32 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
             state.store_context(run_ctx)
             state.store_run(run_info)
             state.store_fab(fab)
+        else:
+            # The FAB is already stored in the state
+            # fetch it in order to create the task
+            fab = state.get_fab(run_info.fab_hash)
+            if fab is None:
+                log(
+                    ERROR,
+                    "Failed to load FAB %s for run ID %s. The message will not be "
+                    "processed.",
+                    run_info.fab_hash,
+                    run_id,
+                )
+                return None
+
+        # Create task
+        task_id = state.create_task(
+            task_type=TaskType.CLIENT_APP, run_id=run_id, fab_hash=fab.hash_str
+        )
+        if task_id is None:
+            log(
+                ERROR,
+                "Failed to create task for run ID %s. The message will not be "
+                "processed.",
+                run_id,
+            )
+            return None
 
         # Preregister the object tree of the message
         obj_ids_to_pull = object_store.preregister(run_id, object_tree)

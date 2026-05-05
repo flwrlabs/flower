@@ -24,6 +24,7 @@ from flwr.common import ConfigRecord, Context, Message, RecordDict
 from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE
 from flwr.common.message import remove_content_from_message
 from flwr.common.typing import Fab
+from flwr.supercore.constant import TaskType
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
@@ -127,7 +128,14 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         """Test that a message of a known run ID is pulled and stored."""
         # Prepare
         self._prepare_for_pull_and_store_message()
-        self.mock_state.get_run.return_value = Mock()  # Mock non-None return
+        fab = Fab(
+            hash_str="abc123",
+            content=b"test_fab_content",
+            verifications={"abc123": "abc123"},
+        )
+        self.mock_state.get_run.return_value = Mock(fab_hash=fab.hash_str)
+        self.mock_state.get_fab.return_value = fab
+        self.mock_state.create_task.return_value = 123
 
         # Execute
         res = _pull_and_store_message(
@@ -145,6 +153,12 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         # Assert
         assert res == self.run_id
         self._assert_message_pulled_and_stored()
+        self.mock_state.get_fab.assert_called_once_with(fab.hash_str)
+        self.mock_state.create_task.assert_called_once_with(
+            task_type=TaskType.CLIENT_APP,
+            run_id=self.run_id,
+            fab_hash=fab.hash_str,
+        )
 
         # Assert: All are not called if run_id is known
         self.mock_get_run.assert_not_called()
@@ -152,6 +166,41 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_state.store_fab.assert_not_called()
         self.mock_state.store_run.assert_not_called()
         self.mock_state.store_context.assert_not_called()
+
+    def test_pull_and_store_message_returns_none_if_create_task_fails(self) -> None:
+        """Test that message processing stops if task creation fails."""
+        self._prepare_for_pull_and_store_message()
+        fab = Fab(
+            hash_str="abc123",
+            content=b"test_fab_content",
+            verifications={"abc123": "abc123"},
+        )
+        self.mock_state.get_run.return_value = Mock(fab_hash=fab.hash_str)
+        self.mock_state.get_fab.return_value = fab
+        self.mock_state.create_task.return_value = None
+
+        res = _pull_and_store_message(
+            state=self.mock_state,
+            object_store=self.mock_object_store,
+            node_config={},
+            receive=self.mock_receive,
+            get_run=self.mock_get_run,
+            get_fab=self.mock_get_fab,
+            pull_object=self.mock_pull_object,
+            confirm_message_received=self.mock_confirm_message_received,
+            trusted_entities={},
+        )
+
+        assert res is None
+        self.mock_state.get_fab.assert_called_once_with(fab.hash_str)
+        self.mock_state.create_task.assert_called_once_with(
+            task_type=TaskType.CLIENT_APP,
+            run_id=self.run_id,
+            fab_hash=fab.hash_str,
+        )
+        self.mock_object_store.preregister.assert_not_called()
+        self.mock_state.store_message.assert_not_called()
+        self.mock_confirm_message_received.assert_not_called()
 
     def test_pull_and_store_message_with_unknown_run_id(self) -> None:
         """Test that a message of an unknown run ID is pulled and stored."""
