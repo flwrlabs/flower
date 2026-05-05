@@ -40,7 +40,7 @@ def test_clientapp_launch_inherits_default_stdio() -> None:
     )
 
     with patch("subprocess.Popen") as popen:
-        plugin.launch_app(token="token", run_id=7)
+        plugin.launch_app(token="token", task_id=7)
 
     assert "stdout" not in popen.call_args.kwargs
     assert "stderr" not in popen.call_args.kwargs
@@ -56,7 +56,7 @@ def test_serverapp_launch_isolates_stdio() -> None:
     )
 
     with patch("subprocess.Popen") as popen:
-        plugin.launch_app(token="token", run_id=5)
+        plugin.launch_app(token="token", task_id=5)
 
     assert popen.call_args.kwargs["stdout"] is subprocess.DEVNULL
     assert popen.call_args.kwargs["stderr"] is subprocess.DEVNULL
@@ -88,7 +88,7 @@ def test_launch_app_forwards_runtime_dependency_install_flag() -> None:
             "flwr.supercore.superexec.plugin.base_exec_plugin.subprocess.Popen"
         ) as popen,
     ):
-        plugin.launch_app(token="token-123", run_id=7)
+        plugin.launch_app(token="token-123", task_id=7)
 
     assert popen.call_args.args[0] == [
         "dummy-app",
@@ -115,7 +115,7 @@ def test_launch_app_skips_optional_runtime_flags_by_default() -> None:
     with patch(
         "flwr.supercore.superexec.plugin.base_exec_plugin.subprocess.Popen"
     ) as popen:
-        plugin.launch_app(token="token-123", run_id=7)
+        plugin.launch_app(token="token-123", task_id=7)
 
     assert "--allow-runtime-dependency-installation" not in popen.call_args.args[0]
 
@@ -130,7 +130,7 @@ def test_clientapp_launch_forwards_root_certificate() -> None:
     )
 
     with patch("subprocess.Popen") as mock_popen:
-        plugin.launch_app(token="token", run_id=7)
+        plugin.launch_app(token="token", task_id=7)
 
     assert mock_popen.call_args.args[0][:3] == [
         "flwr-clientapp",
@@ -149,7 +149,7 @@ def test_clientapp_launch_omits_tls_flags_when_using_system_certificates() -> No
     )
 
     with patch("subprocess.Popen") as mock_popen:
-        plugin.launch_app(token="token", run_id=7)
+        plugin.launch_app(token="token", task_id=7)
 
     assert "--insecure" not in mock_popen.call_args.args[0]
     assert "--root-certificates" not in mock_popen.call_args.args[0]

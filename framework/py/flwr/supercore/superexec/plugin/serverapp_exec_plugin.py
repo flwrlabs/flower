@@ -40,17 +40,17 @@ class ServerAppExecPlugin(BaseExecPlugin):
             "stderr": subprocess.DEVNULL,
         }
 
-    def launch_app(self, token: str, run_id: int) -> None:
-        """Launch the application associated with a given run ID and token."""
+    def launch_app(self, token: str, task_id: int) -> None:
+        """Launch the application associated with a given task ID and token."""
         # Determine the command to launch based on the run type
-        run = self.get_run(run_id)
+        run = self.get_run(task_id)
         if run.run_type == RunType.SERVER_APP:
             self.command = "flwr-serverapp"
         elif run.run_type == RunType.SIMULATION:
             self.command = "flwr-simulation"
         else:
-            log(ERROR, "Unknown run type '%s' for run_id %d.", run.run_type, run_id)
+            log(ERROR, "Unknown run type '%s' for task_id %d.", run.run_type, task_id)
             return
 
         # Launch the executor process
-        super().launch_app(token, run_id)
+        super().launch_app(token, task_id)

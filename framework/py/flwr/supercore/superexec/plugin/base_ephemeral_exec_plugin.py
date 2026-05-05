@@ -36,14 +36,14 @@ class BaseEphemeralExecPlugin(ExecPlugin):
     appio_api_address_arg = ""
     cleanup_before_launch: Callable[[], None] | None = None
 
-    def select_run_id(self, candidate_run_ids: Sequence[int]) -> int | None:
-        """Select a run ID to execute from a sequence of candidates."""
-        if not candidate_run_ids:
+    def select_task_id(self, candidate_task_ids: Sequence[int]) -> int | None:
+        """Select a task ID to execute from a sequence of candidates."""
+        if not candidate_task_ids:
             return None
-        return candidate_run_ids[0]
+        return candidate_task_ids[0]
 
-    def launch_app(self, token: str, run_id: int) -> None:
-        """Launch the application associated with a given run ID and token."""
+    def launch_app(self, token: str, task_id: int) -> None:
+        """Launch the application associated with a given task ID and token."""
         cmds = [self.command]
         if self.insecure:
             cmds += ["--insecure"]

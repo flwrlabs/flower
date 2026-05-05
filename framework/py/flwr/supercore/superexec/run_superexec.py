@@ -26,8 +26,8 @@ from flwr.common.serde import run_from_proto
 from flwr.common.telemetry import EventType
 from flwr.common.typing import Run
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    ListAppsToLaunchRequest,
-    RequestTokenRequest,
+    ClaimTaskRequest,
+    PullPendingTasksRequest,
 )
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
@@ -159,22 +159,22 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
     # Start the main loop
     try:
         while True:
-            # Fetch suitable run IDs
-            ls_req = ListAppsToLaunchRequest()
-            ls_res = stub.ListAppsToLaunch(ls_req)
+            # Fetch pending tasks
+            tasks_res = stub.PullPendingTasks(request=PullPendingTasksRequest())
 
-            # Allow the plugin to select a run ID
-            run_id = None
-            if ls_res.run_ids:
-                run_id = plugin.select_run_id(candidate_run_ids=ls_res.run_ids)
+            # Allow the plugin to select a task ID
+            task_id = None
+            if tasks_res.tasks:
+                task_ids = [task.task_id for task in tasks_res.tasks]
+                task_id = plugin.select_task_id(candidate_task_ids=task_ids)
 
-            # Apply for a token if a run ID was selected
-            if run_id is not None:
-                tk_req = RequestTokenRequest(run_id=run_id)
-                tk_res = stub.RequestToken(tk_req)
+            # If a task was selected, claim it
+            if task_id is not None:
+                claim_req = ClaimTaskRequest(task_id=task_id)
+                claim_res = stub.ClaimTask(claim_req)
 
                 # Launch the app if a token was granted; do nothing if not
-                if tk_res.token:
+                if claim_res.token:
 
                     # Destroy the auth secret before launching the app
                     # for ephemeral plugins
@@ -190,7 +190,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
 
                         plugin.cleanup_before_launch = cleanup_auth_secret
 
-                    plugin.launch_app(token=tk_res.token, run_id=run_id)
+                    plugin.launch_app(token=claim_res.token, task_id=task_id)
 
             # Sleep for a while before checking again
             time.sleep(1)

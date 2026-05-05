@@ -42,16 +42,16 @@ def _get_ephemeral_plugin() -> _EphemeralExecPlugin:
     )
 
 
-def test_select_run_id_returns_none_when_no_candidates() -> None:
-    """The plugin should skip execution when no runs are available."""
+def test_select_task_id_returns_none_when_no_candidates() -> None:
+    """The plugin should skip execution when no task IDs are available."""
     plugin = _get_ephemeral_plugin()
-    assert plugin.select_run_id([]) is None
+    assert plugin.select_task_id([]) is None
 
 
-def test_select_run_id_returns_first_candidate() -> None:
-    """The plugin should always choose the first candidate run ID."""
+def test_select_task_id_returns_first_candidate() -> None:
+    """The plugin should always choose the first candidate task ID."""
     plugin = _get_ephemeral_plugin()
-    assert plugin.select_run_id([7, 9, 11]) == 7
+    assert plugin.select_task_id([7, 9, 11]) == 7
 
 
 def test_launch_app_runs_expected_command_and_exits() -> None:
@@ -70,7 +70,7 @@ def test_launch_app_runs_expected_command_and_exits() -> None:
             "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"
         ) as flwr_exit,
     ):
-        plugin.launch_app(token="token-123", run_id=5)
+        plugin.launch_app(token="token-123", task_id=5)
 
     run.assert_called_once_with(
         [
@@ -106,7 +106,7 @@ def test_launch_app_calls_cleanup_before_launch() -> None:
         ),
         patch("flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"),
     ):
-        plugin.launch_app(token="token-abc", run_id=1)
+        plugin.launch_app(token="token-abc", task_id=1)
 
     # Assert
     assert call_log == ["cleanup", "subprocess"]

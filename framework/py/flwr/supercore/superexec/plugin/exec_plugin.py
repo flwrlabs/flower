@@ -41,37 +41,37 @@ class ExecPlugin(ABC):
         self.runtime_dependency_install = runtime_dependency_install
 
     @abstractmethod
-    def select_run_id(self, candidate_run_ids: Sequence[int]) -> int | None:
-        """Select a run ID to execute from a sequence of candidates.
+    def select_task_id(self, candidate_task_ids: Sequence[int]) -> int | None:
+        """Select a task ID to execute from a sequence of candidates.
 
-        A candidate run ID is one that has at least one pending message and is
+        A candidate task ID is one that has at least one pending message and is
         not currently in progress (i.e., not associated with a token).
 
         Parameters
         ----------
-        candidate_run_ids : Sequence[int]
-            A sequence of candidate run IDs to choose from.
+        candidate_task_ids : Sequence[int]
+            A sequence of candidate task IDs to choose from.
 
         Returns
         -------
         Optional[int]
-            The selected run ID, or None if no suitable candidate is found.
+            The selected task ID, or None if no suitable candidate is found.
         """
 
     @abstractmethod
-    def launch_app(self, token: str, run_id: int) -> None:
-        """Launch the application associated with a given run ID and token.
+    def launch_app(self, token: str, task_id: int) -> None:
+        """Launch the application associated with a given task ID and token.
 
         This method starts the application process using the given `token`.
-        The `run_id` is used solely for bookkeeping purposes, allowing any
-        plugin implementation to associate this launch with a specific run.
+        The `task_id` is used solely for bookkeeping purposes, allowing any
+        plugin implementation to associate this launch with a specific task.
 
         Parameters
         ----------
         token : str
             The token required to run the application.
-        run_id : int
-           The ID of the run associated with the token, used for tracking or
+        task_id : int
+           The ID of the task associated with the token, used for tracking or
            logging purposes.
         """
 
