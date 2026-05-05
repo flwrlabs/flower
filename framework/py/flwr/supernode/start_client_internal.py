@@ -430,6 +430,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
             task_type=TaskType.CLIENT_APP, run_id=run_id, fab_hash=fab_hash_str
         )
         if task_id is None:
+            # Task creation can fail if the generated uint64 task ID collides
             log(
                 ERROR,
                 "Failed to create task for run ID %s. The message will not be "
