@@ -316,7 +316,7 @@ def _insert_message(msg: Message, state: NodeState, store: ObjectStore) -> None:
             store.put(obj_id, obj.deflate())
 
 
-def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
+def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0911
     state: NodeState,
     object_store: ObjectStore,
     node_config: UserConfig,
