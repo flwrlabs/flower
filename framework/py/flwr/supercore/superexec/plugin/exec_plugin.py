@@ -76,19 +76,18 @@ class ExecPlugin(ABC):
 
     @abstractmethod
     def launch_task(self, token: str, task: Task) -> None:
-        """Launch the application associated with a given task and token.
+        """Launch the process to execute the given task using the given token.
 
-        This method starts the application process using the given `token`.
-        The `task` is used solely for bookkeeping purposes, allowing any
-        plugin implementation to associate this launch with a specific task.
+        This method starts the executor process using the given `token`.
+        The `task` identifies what should be executed and allows plugin
+        implementations to associate the launch with a specific task.
 
         Parameters
         ----------
         token : str
-            The token required to run the application.
+                The token required to run the executor process.
         task : Task
-           The task associated with the token, used for tracking or
-           logging purposes.
+              The task to execute.
         """
 
     # This method is optional to implement

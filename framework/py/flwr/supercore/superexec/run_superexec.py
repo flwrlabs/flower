@@ -189,7 +189,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
 
                         plugin.cleanup_before_launch = cleanup_auth_secret
 
-                    plugin.launch_app(token=claim_res.token, task=task)
+                    plugin.launch_task(token=claim_res.token, task=task)
 
             # Sleep for a while before checking again
             time.sleep(1)

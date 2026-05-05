@@ -29,8 +29,8 @@ class ServerAppEphemeralExecPlugin(BaseEphemeralExecPlugin):
 
     appio_api_address_arg = "--serverappio-api-address"
 
-    def launch_app(self, token: str, task: Task) -> None:
-        """Launch the application associated with a given task and token."""
+    def launch_task(self, token: str, task: Task) -> None:
+        """Launch the process to execute the given task using the given token."""
         # Determine the command to launch based on the task type
         if task.type == TaskType.SERVER_APP:
             self.command = "flwr-serverapp"
@@ -46,4 +46,4 @@ class ServerAppEphemeralExecPlugin(BaseEphemeralExecPlugin):
             return
 
         # Launch the executor process
-        super().launch_app(token, task)
+        super().launch_task(token, task)

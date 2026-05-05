@@ -49,8 +49,8 @@ class BaseEphemeralExecPlugin(ExecPlugin):
             return None
         return candidate_tasks[0]
 
-    def launch_app(self, token: str, task: Task) -> None:
-        """Launch the application associated with a given task and token."""
+    def launch_task(self, token: str, task: Task) -> None:
+        """Launch the process to execute the given task using the given token."""
         cmds = [self.command]
         if self.insecure:
             cmds += ["--insecure"]

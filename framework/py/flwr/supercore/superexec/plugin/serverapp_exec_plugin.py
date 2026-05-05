@@ -41,8 +41,8 @@ class ServerAppExecPlugin(BaseExecPlugin):
             "stderr": subprocess.DEVNULL,
         }
 
-    def launch_app(self, token: str, task: Task) -> None:
-        """Launch the application associated with a given task and token."""
+    def launch_task(self, token: str, task: Task) -> None:
+        """Launch the process to execute the given task using the given token."""
         # Determine the command to launch based on the task type
         if task.type == TaskType.SERVER_APP:
             self.command = "flwr-serverapp"
@@ -58,4 +58,4 @@ class ServerAppExecPlugin(BaseExecPlugin):
             return
 
         # Launch the executor process
-        super().launch_app(token, task)
+        super().launch_task(token, task)
