@@ -116,6 +116,7 @@ from flwr.supercore.constant import (
     ActionType,
     RunTime,
     RunType,
+    TaskType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
 from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
@@ -247,6 +248,22 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 flwr_aid,
                 run_type,
             )
+
+            # Create primary task
+            if run_type == RunType.SIMULATION:
+                task_type = TaskType.SIMULATION
+            elif run_type == RunType.SERVER_APP:
+                task_type = TaskType.SERVER_APP
+            else:
+                raise ValueError(f"Unsupported run type: {run_type}")
+            task_id = state.create_task(
+                task_type=task_type, run_id=run_id, fab_hash=fab_hash
+            )
+            if task_id is None:
+                log(ERROR, "Failed to create task for run ID %s", run_id)
+                context.abort(
+                    grpc.StatusCode.INTERNAL, "Failed to create task for the run."
+                )
 
             # Initialize node config
             node_config = {}
