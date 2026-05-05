@@ -25,7 +25,6 @@ from .appio_token_interceptor import (
 )
 from .runtime_version_interceptor import (
     RuntimeVersionClientInterceptor,
-    RuntimeVersionCompatibilityAction,
     RuntimeVersionServerInterceptor,
     create_serverappio_runtime_version_server_interceptor,
 )
@@ -42,7 +41,6 @@ __all__ = [
     "AppIoTokenClientInterceptor",
     "AppIoTokenServerInterceptor",
     "RuntimeVersionClientInterceptor",
-    "RuntimeVersionCompatibilityAction",
     "RuntimeVersionServerInterceptor",
     "SuperExecAuthClientInterceptor",
     "SuperExecAuthServerInterceptor",

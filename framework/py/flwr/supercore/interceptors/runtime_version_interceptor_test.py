@@ -32,7 +32,6 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
-    RuntimeVersionCompatibilityAction,
     RuntimeVersionServerInterceptor,
     create_serverappio_runtime_version_server_interceptor,
 )
@@ -176,7 +175,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
                 package_name_value="flwr",
                 package_version_value="1.29.0",
             ),
-            compatibility_action=RuntimeVersionCompatibilityAction.OBSERVE_ONLY,
+            send_warning_metadata=False,
         )
 
     def _intercept(
@@ -228,8 +227,8 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_not_called()
 
-    def test_warning_action_returns_warning_metadata(self) -> None:
-        """Explicit warning action should set trailing metadata."""
+    def test_send_warning_metadata_returns_warning_metadata(self) -> None:
+        """Explicit warning metadata should set trailing metadata."""
         self.interceptor = RuntimeVersionServerInterceptor(
             connection_name="flwr-simulation <-> SuperLink ServerAppIo API",
             local_metadata=RuntimeVersionMetadata.from_local_component(
@@ -237,7 +236,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
                 package_name_value="flwr",
                 package_version_value="1.29.0",
             ),
-            compatibility_action=RuntimeVersionCompatibilityAction.WARN,
+            send_warning_metadata=True,
         )
         intercepted = self._intercept(
             "/flwr.proto.ServerAppIo/GetNodes",
