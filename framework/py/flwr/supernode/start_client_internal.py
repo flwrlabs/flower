@@ -367,7 +367,6 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
 
             # Pull and store the FAB
             fab = get_fab(run_info.fab_hash, run_id)
-            fab_hash_str = fab.hash_str
 
             # Verify the received FAB
             # FAB must be signed if trust entities provided
@@ -410,24 +409,10 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
             state.store_context(run_ctx)
             state.store_run(run_info)
             state.store_fab(fab)
-        else:
-            # The FAB is already stored in the state
-            # fetch it in order to create the task
-            fab_ = state.get_fab(run_info.fab_hash)
-            if fab_ is None:
-                log(
-                    ERROR,
-                    "Failed to load FAB %s for run ID %s. The message will not be "
-                    "processed.",
-                    run_info.fab_hash,
-                    run_id,
-                )
-                return None
-            fab_hash_str = fab_.hash_str
 
         # Create task
         task_id = state.create_task(
-            task_type=TaskType.CLIENT_APP, run_id=run_id, fab_hash=fab_hash_str
+            task_type=TaskType.CLIENT_APP, run_id=run_id, fab_hash=run_info.fab_hash
         )
         if task_id is None:
             # Task creation can fail if the generated uint64 task ID collides
