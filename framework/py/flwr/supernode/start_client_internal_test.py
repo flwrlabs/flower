@@ -128,13 +128,8 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         """Test that a message of a known run ID is pulled and stored."""
         # Prepare
         self._prepare_for_pull_and_store_message()
-        fab = Fab(
-            hash_str="abc123",
-            content=b"test_fab_content",
-            verifications={"abc123": "abc123"},
-        )
-        self.mock_state.get_run.return_value = Mock(fab_hash=fab.hash_str)
-        self.mock_state.get_fab.return_value = fab
+        fab_hash = "abc123"
+        self.mock_state.get_run.return_value = Mock(fab_hash=fab_hash)
         self.mock_state.create_task.return_value = 123
 
         # Execute
@@ -153,11 +148,10 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         # Assert
         assert res == self.run_id
         self._assert_message_pulled_and_stored()
-        self.mock_state.get_fab.assert_called_once_with(fab.hash_str)
         self.mock_state.create_task.assert_called_once_with(
             task_type=TaskType.CLIENT_APP,
             run_id=self.run_id,
-            fab_hash=fab.hash_str,
+            fab_hash=fab_hash,
         )
 
         # Assert: All are not called if run_id is known
@@ -170,13 +164,8 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
     def test_pull_and_store_message_returns_none_if_create_task_fails(self) -> None:
         """Test that message processing stops if task creation fails."""
         self._prepare_for_pull_and_store_message()
-        fab = Fab(
-            hash_str="abc123",
-            content=b"test_fab_content",
-            verifications={"abc123": "abc123"},
-        )
-        self.mock_state.get_run.return_value = Mock(fab_hash=fab.hash_str)
-        self.mock_state.get_fab.return_value = fab
+        fab_hash = "abc123"
+        self.mock_state.get_run.return_value = Mock(fab_hash=fab_hash)
         self.mock_state.create_task.return_value = None
 
         res = _pull_and_store_message(
@@ -192,11 +181,10 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         )
 
         assert res is None
-        self.mock_state.get_fab.assert_called_once_with(fab.hash_str)
         self.mock_state.create_task.assert_called_once_with(
             task_type=TaskType.CLIENT_APP,
             run_id=self.run_id,
-            fab_hash=fab.hash_str,
+            fab_hash=fab_hash,
         )
         self.mock_object_store.preregister.assert_not_called()
         self.mock_state.store_message.assert_not_called()
