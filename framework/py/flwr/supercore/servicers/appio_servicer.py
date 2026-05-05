@@ -20,6 +20,7 @@ from logging import DEBUG
 
 import grpc
 
+from flwr.common.constant import Status
 from flwr.common.logger import log
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
@@ -29,6 +30,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
+from flwr.supercore.interceptors import get_authenticated_task_id
 
 from ..corestate import CoreState
 
@@ -47,7 +49,10 @@ class AppIoServicer(ABC):
         """Pull pending tasks."""
         log(DEBUG, "AppIoServicer.PullPendingTasks")
 
-        raise NotImplementedError("PullPendingTasks is not implemented yet.")
+        tasks = self.state().get_tasks(
+            statuses=[Status.PENDING], order_by="pending_at", ascending=True
+        )
+        return PullPendingTasksResponse(tasks=tasks)
 
     def ClaimTask(
         self, request: ClaimTaskRequest, context: grpc.ServicerContext
@@ -55,7 +60,8 @@ class AppIoServicer(ABC):
         """Claim a pending task."""
         log(DEBUG, "AppIoServicer.ClaimTask")
 
-        raise NotImplementedError("ClaimTask is not implemented yet.")
+        token = self.state().claim_task(request.task_id)
+        return ClaimTaskResponse(token=token)
 
     def SendTaskHeartbeat(
         self, request: SendTaskHeartbeatRequest, context: grpc.ServicerContext
@@ -63,4 +69,6 @@ class AppIoServicer(ABC):
         """Handle a heartbeat for a claimed task."""
         log(DEBUG, "AppIoServicer.SendTaskHeartbeat")
 
-        raise NotImplementedError("SendTaskHeartbeat is not implemented yet.")
+        task_id = get_authenticated_task_id()
+        success = self.state().acknowledge_task_heartbeat(task_id)
+        return SendTaskHeartbeatResponse(success=success)

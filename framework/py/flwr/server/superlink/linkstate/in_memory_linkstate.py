@@ -102,6 +102,32 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """Get the FederationManager instance."""
         return self._federation_manager
 
+    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        task_type: str,
+        run_id: int,
+        fab_hash: str | None = None,
+        model_ref: str | None = None,
+        connector_ref: str | None = None,
+    ) -> int | None:
+        """Create a task and make it the run's primary task if none exists."""
+        with self.lock:
+            task_id = super().create_task(
+                task_type=task_type,
+                run_id=run_id,
+                fab_hash=fab_hash,
+                model_ref=model_ref,
+                connector_ref=connector_ref,
+            )
+            if task_id is None:
+                return None
+
+            run_record = self.run_ids.get(run_id)
+            if run_record is not None and run_record.run.primary_task_id is None:
+                run_record.run.primary_task_id = task_id
+
+            return task_id
+
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
         # Validate message
