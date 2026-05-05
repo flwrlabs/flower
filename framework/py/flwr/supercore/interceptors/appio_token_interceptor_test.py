@@ -44,6 +44,7 @@ from flwr.supercore.interceptors import (
     AppIoTokenServerInterceptor,
     create_clientappio_token_auth_server_interceptor,
     create_serverappio_token_auth_server_interceptor,
+    get_authenticated_task_id,
 )
 
 _ClientCallDetails = namedtuple(
@@ -74,6 +75,11 @@ class _TokenState:
         """Return whether the token is bound to the given run id."""
         return self._token_to_run_id.get(token) == run_id
 
+    def get_task_id_by_token(self, token: str) -> int | None:  # pylint: disable=R1711
+        """Return the task ID for a task token, if present."""
+        _ = token
+        return None  # make mypy happy
+
 
 def _make_unary_handler() -> grpc.RpcMethodHandler:
     def _handler(_request: GrpcMessage, _context: grpc.ServicerContext) -> str:
@@ -94,13 +100,13 @@ def _make_non_unary_handler() -> grpc.RpcMethodHandler:
 class TestAppIoTokenClientInterceptor(TestCase):
     """Unit tests for AppIoTokenClientInterceptor."""
 
-    def test_attach_and_replace_app_token_header(self) -> None:
-        """The interceptor should enforce a single App token header."""
+    def test_attach_app_token_header(self) -> None:
+        """The interceptor should attach App token metadata."""
         interceptor = AppIoTokenClientInterceptor(token="new-token")
         details = _ClientCallDetails(
             method="/flwr.proto.ServerAppIo/GetNodes",
             timeout=None,
-            metadata=(("x-test", "value"), (APP_TOKEN_HEADER, "old-token")),
+            metadata=(("x-test", "value"),),
             credentials=None,
             wait_for_ready=None,
             compression=None,
@@ -127,6 +133,25 @@ class TestAppIoTokenClientInterceptor(TestCase):
             [item for item in metadata if item[0] == APP_TOKEN_HEADER],
             [(APP_TOKEN_HEADER, "new-token")],
         )
+
+    def test_raise_if_app_token_header_already_present(self) -> None:
+        """The interceptor should reject duplicate App token metadata."""
+        interceptor = AppIoTokenClientInterceptor(token="new-token")
+        details = _ClientCallDetails(
+            method="/flwr.proto.ServerAppIo/GetNodes",
+            timeout=None,
+            metadata=(("x-test", "value"), (APP_TOKEN_HEADER, "old-token")),
+            credentials=None,
+            wait_for_ready=None,
+            compression=None,
+        )
+
+        with self.assertRaises(RuntimeError):
+            interceptor.intercept_unary_unary(
+                continuation=Mock(),
+                client_call_details=details,
+                request=GetNodesRequest(run_id=1),
+            )
 
 
 class TestAppIoTokenServerInterceptor(TestCase):
@@ -232,6 +257,36 @@ class TestAppIoTokenServerInterceptor(TestCase):
         self.assertEqual(response, "ok")
         # Run-id mismatch deny coverage belongs to the
         # follow-up PR that enforces run binding.
+
+    def test_valid_task_token_passes_and_sets_task_id(self) -> None:
+        """Protected methods should pass with a valid task token."""
+        state = Mock()
+        state.get_run_id_by_token.return_value = None
+        state.get_task_id_by_token.return_value = 123
+        interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
+        method = self._find_serverappio_method(requires_token=True)
+        if method is None:
+            self.skipTest("No token-required ServerAppIo method found in policy table.")
+        captured_task_id = None
+
+        def _handler(_request: GrpcMessage, _context: grpc.ServicerContext) -> str:
+            nonlocal captured_task_id
+            captured_task_id = get_authenticated_task_id()
+            return "ok"
+
+        intercepted = interceptor.intercept_service(
+            lambda _: grpc.unary_unary_rpc_method_handler(_handler),
+            _HandlerCallDetails(
+                method,
+                invocation_metadata=((APP_TOKEN_HEADER, "task-token"),),
+            ),
+        )
+
+        response = intercepted.unary_unary(GetNodesRequest(run_id=7), Mock())
+        self.assertEqual(response, "ok")
+        self.assertEqual(captured_task_id, 123)
+        state.get_run_id_by_token.assert_called_once_with("task-token")
+        state.get_task_id_by_token.assert_called_once_with("task-token")
 
     def test_metadata_token_used_even_when_request_has_token(self) -> None:
         """Metadata token should be authoritative when both sources exist."""
