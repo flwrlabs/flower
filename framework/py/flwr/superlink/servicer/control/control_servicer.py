@@ -249,7 +249,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 run_type,
             )
 
-            # Create task
+            # Create primary task
             if run_type == RunType.SIMULATION:
                 task_type = TaskType.SIMULATION
             elif run_type == RunType.SERVER_APP:
