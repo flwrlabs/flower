@@ -75,9 +75,10 @@ class _TokenState:
         """Return whether the token is bound to the given run id."""
         return self._token_to_run_id.get(token) == run_id
 
-    def get_task_id_by_token(self, token: str) -> int | None:
+    def get_task_id_by_token(self, token: str) -> int | None:  # pylint: disable=R1711
         """Return the task ID for a task token, if present."""
         _ = token
+        return None  # make mypy happy
 
 
 def _make_unary_handler() -> grpc.RpcMethodHandler:
