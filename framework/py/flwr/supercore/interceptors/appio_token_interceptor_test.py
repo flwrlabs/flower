@@ -78,7 +78,6 @@ class _TokenState:
     def get_task_id_by_token(self, token: str) -> int | None:
         """Return the task ID for a task token, if present."""
         _ = token
-        return None
 
 
 def _make_unary_handler() -> grpc.RpcMethodHandler:

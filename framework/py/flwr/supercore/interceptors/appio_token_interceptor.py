@@ -35,7 +35,7 @@ APP_TOKEN_HEADER = "flwr-app-token"
 AUTHENTICATION_FAILED_MESSAGE = "Authentication failed."
 
 
-_current_task_id = ContextVar("current_task_id", default=-1)
+_current_task_id: ContextVar[int | None] = ContextVar("current_task_id", default=None)
 
 
 class _TokenState(Protocol):
@@ -146,8 +146,11 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             # Validate task token and set task context for downstream handlers
             task_id = state.get_task_id_by_token(token)
             if task_id is not None:
-                _current_task_id.set(task_id)
-                return unary_handler(request, context)
+                ctx_token = _current_task_id.set(task_id)
+                try:
+                    return unary_handler(request, context)
+                finally:
+                    _current_task_id.reset(ctx_token)
 
             _abort_auth_denied(context)
 
@@ -159,8 +162,18 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
 
 
 def get_authenticated_task_id() -> int:
-    """Get the authenticated task ID from the current context."""
-    return _current_task_id.get()
+    """Return the task ID authenticated for the current RPC.
+
+    The task ID is available only while handling an RPC authenticated with an AppIo task
+    token.
+    """
+    ret = _current_task_id.get()
+    if ret is None:
+        raise RuntimeError(
+            "No authenticated task ID in the current RPC context. "
+            "This function must be called from a task-token-authenticated RPC handler."
+        )
+    return ret
 
 
 def create_serverappio_token_auth_server_interceptor(
