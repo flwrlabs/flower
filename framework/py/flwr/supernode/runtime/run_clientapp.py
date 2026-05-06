@@ -98,6 +98,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     channel.subscribe(on_channel_state_change)
     heartbeat_sender = None
     runtime_env_dir = None
+    exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
         if heartbeat_sender is not None and heartbeat_sender.is_running:
@@ -207,10 +208,11 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
             )
 
     except grpc.RpcError as e:
-        log(ERROR, "GRPC error occurred: %s", str(e))
+        log(ERROR, "gRPC error occurred: %s", str(e))
+        exit_code = ExitCode.CLIENTAPP_COMMUNICATION_ERROR
 
     flwr_exit(
-        code=ExitCode.SUCCESS,
+        code=exit_code,
         event_type=EventType.FLWR_CLIENTAPP_RUN_LEAVE,
     )
 
