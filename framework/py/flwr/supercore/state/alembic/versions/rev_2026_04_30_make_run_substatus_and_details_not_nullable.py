@@ -42,13 +42,13 @@ def upgrade() -> None:
         batch_op.alter_column(
             "sub_status",
             existing_type=sa.VARCHAR(),
-            server_default=sa.text("('')"),
+            server_default=sa.text("''"),
             nullable=False,
         )
         batch_op.alter_column(
             "details",
             existing_type=sa.VARCHAR(),
-            server_default=sa.text("('')"),
+            server_default=sa.text("''"),
             nullable=False,
         )
 
