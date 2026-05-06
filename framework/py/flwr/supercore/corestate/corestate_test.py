@@ -81,6 +81,18 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         self.assertEqual(state.get_tasks(task_ids=[123]), [])
 
+    def test_get_tasks_run_id_matches(self) -> None:
+        """Run ID filters should match only tasks from the requested runs."""
+        state = self.state_factory()
+        task_id_1 = state.create_task(task_type=TaskType.MODEL, run_id=42)
+        task_id_2 = state.create_task(task_type=TaskType.MODEL, run_id=123)
+        task_id_3 = state.create_task(task_type=TaskType.MODEL, run_id=42)
+        assert task_id_1 and task_id_2 and task_id_3
+
+        tasks = state.get_tasks(run_ids=[42])
+
+        self.assertEqual({task.task_id for task in tasks}, {task_id_1, task_id_3})
+
     def test_get_tasks_single_status_matches(self) -> None:
         """A single-item status sequence should match pending tasks."""
         state = self.state_factory()
