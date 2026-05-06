@@ -109,8 +109,8 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         # Initialize state connection
         state = self.state_factory.state()
 
-        # Attempt to create a token for the provided run ID
-        token = state.create_token(request.run_id)
+        # Get token for the task
+        token = state.claim_task(get_authenticated_task().task_id)
 
         # Return the token
         return RequestTokenResponse(token=token or "")
@@ -170,8 +170,8 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
             )
             raise RuntimeError("This line should never be reached.")
 
-        # Claim task
-        state.claim_task(task_id=get_authenticated_task().task_id)
+        # Activate task
+        state.activate_task(task_id=get_authenticated_task().task_id)
 
         return PullAppInputsResponse(
             context=context_to_proto(context),

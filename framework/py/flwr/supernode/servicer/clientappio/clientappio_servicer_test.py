@@ -168,8 +168,8 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_stub.PushMessage.assert_called_once()
         self.assertSetEqual(pushed_obj_ids, set(all_obj_ids))
 
-    def test_servicer_pull_appinputs_claims_task(self) -> None:
-        """PullAppInputs should claim the authenticated task."""
+    def test_servicer_pull_appinputs_activates_task(self) -> None:
+        """PullAppInputs should activate the authenticated task."""
         token = "test-token"
         run_id = 61016
         task_id = 123
@@ -207,7 +207,7 @@ class TestClientAppIoServicer(unittest.TestCase):
             response = self.servicer.PullAppInputs(request, Mock())
 
         self.assertIsInstance(response, PullAppInputsResponse)
-        self.mock_state.claim_task.assert_called_once_with(task_id=task_id)
+        self.mock_state.activate_task.assert_called_once_with(task_id=task_id)
 
     def test_servicer_push_appoutputs_finishes_task(self) -> None:
         """PushAppOutputs should finish the authenticated task."""
