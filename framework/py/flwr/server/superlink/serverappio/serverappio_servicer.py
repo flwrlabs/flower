@@ -206,9 +206,9 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                     request.connector_ref if request.HasField("connector_ref") else None
                 ),
             )
-        except ValueError:
+        except ValueError as err:
             context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
-            raise RuntimeError("This line should never be reached.")
+            raise RuntimeError("This line should never be reached.") from err
 
         if task_id is None:
             context.abort(grpc.StatusCode.INTERNAL, "Failed to create task")

@@ -89,9 +89,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_get_tasks_single_status_matches(self) -> None:
         """A single-item status sequence should match pending tasks."""
         state = self.state_factory()
-        _ = state.create_task(
-            task_type=TaskType.MODEL, run_id=self.task_run_id(state)
-        )
+        _ = state.create_task(task_type=TaskType.MODEL, run_id=self.task_run_id(state))
 
         tasks = state.get_tasks(statuses=[Status.PENDING])
 
