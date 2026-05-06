@@ -367,7 +367,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         if run and fab and serverapp_ctxt:
             # Update run status to RUNNING
             if state.activate_task(task.task_id):
-                log(INFO, "Starting task %d of run %d", task.task_id, run_id)
+                log(INFO, "Started task %d of run %d", task.task_id, run_id)
                 return PullAppInputsResponse(
                     context=context_to_proto(serverapp_ctxt),
                     run=run_to_proto(run),
@@ -398,14 +398,13 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
 
         # Finish the task
-        if not state.finish_task(
+        if state.finish_task(
             task.task_id, sub_status=request.sub_status, details=request.details
         ):
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION,
-                f"Failed to finish task {task.task_id} of run {run_id}",
-            )
-        state.set_serverapp_context(run_id, context_from_proto(request.context))
+            log(INFO, "Finished task %d of run %d", task.task_id, run_id)
+            state.set_serverapp_context(run_id, context_from_proto(request.context))
+        else:
+            log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
         return PushAppOutputsResponse()
 
     def UpdateRunStatus(
