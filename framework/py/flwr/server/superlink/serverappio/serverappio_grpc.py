@@ -52,7 +52,7 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
         )
 
     # Create ServerAppIo API gRPC server
-    serverappio_servicer = ServerAppIoServicer(
+    serverappio_servicer: grpc.Server = ServerAppIoServicer(
         state_factory=state_factory,
         objectstore_factory=objectstore_factory,
     )
