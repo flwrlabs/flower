@@ -246,7 +246,7 @@ def pull_appinputs(
         raise e
 
 
-def push_appoutputs(
+def push_appoutputs(  # pylint: disable=R0913, R0917
     stub: ClientAppIoStub,
     token: str,
     message: Message,
