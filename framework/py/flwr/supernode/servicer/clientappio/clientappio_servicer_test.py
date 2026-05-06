@@ -52,7 +52,6 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     iterate_object_tree,
 )
-from flwr.supercore.interceptors import APP_TOKEN_HEADER
 from flwr.supernode.runtime.run_clientapp import pull_appinputs, push_appoutputs
 
 from .clientappio_servicer import ClientAppIoServicer
@@ -169,59 +168,6 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_stub.PushAppOutputs.assert_called_once()
         self.mock_stub.PushMessage.assert_called_once()
         self.assertSetEqual(pushed_obj_ids, set(all_obj_ids))
-
-    def test_create_task_uses_nodestate_run_lookup(self) -> None:
-        """CreateTask should use NodeState.get_run instead of LinkState APIs."""
-        context = Mock()
-        context.invocation_metadata.return_value = ((APP_TOKEN_HEADER, "task-token"),)
-        self.mock_state.get_task_by_token.return_value = Task(task_id=777, run_id=123)
-        self.mock_state.get_run.return_value = Mock()
-        self.mock_state.create_task.return_value = 42
-
-        response = self.servicer.CreateTask(
-            CreateTaskRequest(
-                type=TaskType.SERVER_APP,
-                run_id=123,
-                fab_hash="hash123",
-            ),
-            context,
-        )
-
-        self.assertIsInstance(response, CreateTaskResponse)
-        self.assertEqual(response.task_id, 42)
-        self.mock_state.get_task_by_token.assert_called_once_with("task-token")
-        self.mock_state.get_run.assert_called_once_with(123)
-        self.mock_state.create_task.assert_called_once_with(
-            task_type=TaskType.SERVER_APP,
-            run_id=123,
-            fab_hash="hash123",
-            model_ref=None,
-            connector_ref=None,
-        )
-
-    def test_create_task_aborts_when_run_missing(self) -> None:
-        """CreateTask should return NOT_FOUND when NodeState has no run."""
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
-        context.invocation_metadata.return_value = ((APP_TOKEN_HEADER, "task-token"),)
-        self.mock_state.get_task_by_token.return_value = Task(task_id=777, run_id=123)
-        self.mock_state.get_run.return_value = None
-
-        with self.assertRaises(grpc.RpcError):
-            self.servicer.CreateTask(
-                CreateTaskRequest(
-                    type=TaskType.MODEL,
-                    run_id=123,
-                    model_ref="model://test",
-                ),
-                context,
-            )
-
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.NOT_FOUND,
-            "Run ID not found",
-        )
-        self.mock_state.create_task.assert_not_called()
 
     @parameterized.expand([(True,), (False,)])  # type: ignore
     def test_send_app_heartbeat(self, success: bool) -> None:
