@@ -33,7 +33,6 @@ from flwr.proto.clientappio_pb2_grpc import ClientAppIoServicer
 from flwr.proto.message_pb2 import PushObjectRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoServicer
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.auth import (
     CLIENTAPPIO_METHOD_AUTH_POLICY,
     SERVERAPPIO_METHOD_AUTH_POLICY,
@@ -45,6 +44,7 @@ from flwr.supercore.interceptors import (
     AppIoTokenServerInterceptor,
     create_clientappio_token_auth_server_interceptor,
     create_serverappio_token_auth_server_interceptor,
+    get_authenticated_task_id,
 )
 
 _ClientCallDetails = namedtuple(
@@ -75,8 +75,8 @@ class _TokenState:
         """Return whether the token is bound to the given run id."""
         return self._token_to_run_id.get(token) == run_id
 
-    def get_task_by_token(self, token: str) -> Task | None:  # pylint: disable=R1711
-        """Return the task for a task token, if present."""
+    def get_task_id_by_token(self, token: str) -> int | None:  # pylint: disable=R1711
+        """Return the task ID for a task token, if present."""
         _ = token
         return None  # make mypy happy
 
@@ -243,11 +243,8 @@ class TestAppIoTokenServerInterceptor(TestCase):
         if method is None:
             self.skipTest("No token-required ServerAppIo method found in policy table.")
 
-        def _handler(_request: GrpcMessage, _context: grpc.ServicerContext) -> str:
-            return "ok"
-
         intercepted = interceptor.intercept_service(
-            lambda _: grpc.unary_unary_rpc_method_handler(_handler),
+            lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 method,
                 invocation_metadata=((APP_TOKEN_HEADER, "valid"),),
@@ -258,17 +255,27 @@ class TestAppIoTokenServerInterceptor(TestCase):
         # cross-run use is expected.
         response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=7), Mock()))
         self.assertEqual(response, "ok")
+        # Run-id mismatch deny coverage belongs to the
+        # follow-up PR that enforces run binding.
 
-    def test_valid_task_token_passes_for_task_scoped_method(self) -> None:
-        """Task-scoped methods should pass with a valid task token."""
+    def test_valid_task_token_passes_and_sets_task_id(self) -> None:
+        """Protected methods should pass with a valid task token."""
         state = Mock()
         state.get_run_id_by_token.return_value = None
-        state.get_task_by_token.return_value = Task(task_id=123, run_id=7)
+        state.get_task_id_by_token.return_value = 123
         interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
-        method = "/flwr.proto.ServerAppIo/CreateTask"
+        method = self._find_serverappio_method(requires_token=True)
+        if method is None:
+            self.skipTest("No token-required ServerAppIo method found in policy table.")
+        captured_task_id = None
+
+        def _handler(_request: GrpcMessage, _context: grpc.ServicerContext) -> str:
+            nonlocal captured_task_id
+            captured_task_id = get_authenticated_task_id()
+            return "ok"
 
         intercepted = interceptor.intercept_service(
-            lambda _: _make_unary_handler(),
+            lambda _: grpc.unary_unary_rpc_method_handler(_handler),
             _HandlerCallDetails(
                 method,
                 invocation_metadata=((APP_TOKEN_HEADER, "task-token"),),
@@ -277,35 +284,9 @@ class TestAppIoTokenServerInterceptor(TestCase):
 
         response = intercepted.unary_unary(GetNodesRequest(run_id=7), Mock())
         self.assertEqual(response, "ok")
-        state.get_run_id_by_token.assert_not_called()
-        state.get_task_by_token.assert_called_once_with("task-token")
-
-    def test_task_token_required_method_rejects_valid_run_token(self) -> None:
-        """Task-scoped methods should not accept a run token."""
-        state = Mock()
-        state.get_run_id_by_token.return_value = 7
-        state.verify_token.return_value = True
-        state.get_task_by_token.return_value = None
-        interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
-
-        intercepted = interceptor.intercept_service(
-            lambda _: _make_unary_handler(),
-            _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/CreateTask",
-                invocation_metadata=((APP_TOKEN_HEADER, "run-token"),),
-            ),
-        )
-
-        with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(GetNodesRequest(run_id=7), context)
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
-        )
-        state.get_run_id_by_token.assert_not_called()
-        state.verify_token.assert_not_called()
-        state.get_task_by_token.assert_called_once_with("run-token")
+        self.assertEqual(captured_task_id, 123)
+        state.get_run_id_by_token.assert_called_once_with("task-token")
+        state.get_task_id_by_token.assert_called_once_with("task-token")
 
     def test_metadata_token_used_even_when_request_has_token(self) -> None:
         """Metadata token should be authoritative when both sources exist."""
@@ -474,34 +455,14 @@ class TestFactoryFunctions(TestCase):
 
     def test_serverappio_factory_uses_server_policy(self) -> None:
         """ServerAppIo factory should enforce ServerAppIo policy semantics."""
-        state = Mock()
-        state.get_run_id_by_token.return_value = None
-        state.get_task_by_token.return_value = Task(task_id=123, run_id=1)
+        state = _TokenState({"valid-token": 1})
         interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
 
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/CreateTask",
-                invocation_metadata=((APP_TOKEN_HEADER, "task-token"),),
-            ),
-        )
-
-        response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=1), Mock()))
-        self.assertEqual(response, "ok")
-
-    def test_clientappio_factory_uses_appio_create_task_policy(self) -> None:
-        """ClientAppIo factory should also allow the shared CreateTask path."""
-        state = Mock()
-        state.get_run_id_by_token.return_value = None
-        state.get_task_by_token.return_value = Task(task_id=123, run_id=1)
-        interceptor = create_clientappio_token_auth_server_interceptor(lambda: state)
-
-        intercepted = interceptor.intercept_service(
-            lambda _: _make_unary_handler(),
-            _HandlerCallDetails(
-                "/flwr.proto.ClientAppIo/CreateTask",
-                invocation_metadata=((APP_TOKEN_HEADER, "task-token"),),
+                "/flwr.proto.ServerAppIo/GetNodes",
+                invocation_metadata=((APP_TOKEN_HEADER, "valid-token"),),
             ),
         )
 

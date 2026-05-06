@@ -57,6 +57,26 @@ class AppIoServicer(ABC):
     def has_run(self, run_id: int) -> bool:
         """Return whether the run exists in the underlying state."""
 
+    def get_authenticated_task(self, context: grpc.ServicerContext) -> Task:
+        """Resolve the authenticated task from the App token metadata."""
+        token = get_metadata_str(context.invocation_metadata(), APP_TOKEN_HEADER)
+        if token is None:
+            context.abort(
+                grpc.StatusCode.UNAUTHENTICATED,
+                AUTHENTICATION_FAILED_MESSAGE,
+            )
+            raise RuntimeError("This line should never be reached.")
+
+        task = self.state().get_task_by_token(token)
+        if task is None:
+            context.abort(
+                grpc.StatusCode.UNAUTHENTICATED,
+                AUTHENTICATION_FAILED_MESSAGE,
+            )
+            raise RuntimeError("This line should never be reached.")
+
+        return task
+
     def PullPendingTasks(
         self, request: PullPendingTasksRequest, context: grpc.ServicerContext
     ) -> PullPendingTasksResponse:
@@ -84,7 +104,7 @@ class AppIoServicer(ABC):
         log(DEBUG, "AppIoServicer.SendTaskHeartbeat")
 
         state = self.state()
-        task = _get_task_from_metadata_token(state=state, context=context)
+        task = self.get_authenticated_task(context)
         success = state.acknowledge_task_heartbeat(task.task_id)
         return SendTaskHeartbeatResponse(success=success)
 
@@ -95,9 +115,7 @@ class AppIoServicer(ABC):
         log(DEBUG, "AppIoServicer.CreateTask")
 
         state = self.state()
-        authenticated_run_id = _get_task_from_metadata_token(
-            state=state, context=context
-        ).run_id
+        authenticated_run_id = self.get_authenticated_task(context).run_id
         if request.run_id != authenticated_run_id:
             context.abort(
                 grpc.StatusCode.PERMISSION_DENIED,
@@ -125,24 +143,6 @@ class AppIoServicer(ABC):
             raise RuntimeError("This line should never be reached.")
 
         return CreateTaskResponse(task_id=task_id)
-
-
-def _get_task_from_metadata_token(
-    state: CoreState,
-    context: grpc.ServicerContext,
-) -> Task:
-    """Resolve the authenticated task from the App token metadata."""
-    token = get_metadata_str(context.invocation_metadata(), APP_TOKEN_HEADER)
-    if token is None:
-        context.abort(grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE)
-        raise RuntimeError("This line should never be reached.")
-
-    task = state.get_task_by_token(token)
-    if task is None:
-        context.abort(grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE)
-        raise RuntimeError("This line should never be reached.")
-
-    return task
 
 
 def _validate_create_task_request(
