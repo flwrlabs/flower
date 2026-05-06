@@ -106,9 +106,11 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
         *,
         connection_name: str,
         local_metadata: RuntimeVersionMetadata,
+        send_warning_metadata: bool = True,
     ) -> None:
         self._connection_name = connection_name
         self._local_metadata = local_metadata
+        self._send_warning_metadata = send_warning_metadata
 
     def intercept_service(
         self,
@@ -131,7 +133,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
 
         # Prepare trailing metadata
         trailing_metadata: tuple[tuple[str, str], ...] = ()
-        if incompat_details:
+        if incompat_details and self._send_warning_metadata:
             incompat_message = (
                 "Runtime version compatibility check failed for "
                 f"{self._connection_name}. {incompat_details}"
@@ -179,9 +181,11 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
 
 def create_serverappio_runtime_version_server_interceptor(
     connection_name: str = "Caller <-> SuperLink ServerAppIo API",
+    send_warning_metadata: bool = False,
 ) -> RuntimeVersionServerInterceptor:
     """Create the default runtime version interceptor for ServerAppIo."""
     return RuntimeVersionServerInterceptor(
         connection_name=connection_name,
         local_metadata=RuntimeVersionMetadata.from_local_component("SuperLink"),
+        send_warning_metadata=send_warning_metadata,
     )

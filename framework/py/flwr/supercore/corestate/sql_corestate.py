@@ -226,20 +226,7 @@ class SqlCoreState(CoreState, SqlMixin):
 
         result: list[Task] = []
         for row in rows:
-            task = Task(
-                task_id=int64_to_uint64(row["task_id"]),
-                type=row["type"],
-                run_id=int64_to_uint64(row["run_id"]),
-                pending_at=row["pending_at"],
-                starting_at=row["starting_at"],
-                running_at=row["running_at"],
-                finished_at=row["finished_at"],
-                status=determine_task_status(row),
-                fab_hash=row["fab_hash"],
-                model_ref=row["model_ref"],
-                connector_ref=row["connector_ref"],
-            )
-            result.append(task)
+            result.append(task_from_row(row))
         return result
 
     def get_metadata(self) -> MetaData:
@@ -358,18 +345,18 @@ class SqlCoreState(CoreState, SqlMixin):
             )
         return len(rows) > 0
 
-    def get_task_id_by_token(self, token: str) -> int | None:
-        """Return the task ID associated with the task token, if valid."""
+    def get_task_by_token(self, token: str) -> Task | None:
+        """Return the task associated with the task token, if valid."""
         rows = self.query(
             """
-            SELECT task_id FROM task
+            SELECT * FROM task
             WHERE token = :token AND active_until >= :current AND finished_at IS NULL
             """,
             {"token": token, "current": int(now().timestamp())},
         )
         if not rows:
             return None
-        return int64_to_uint64(rows[0]["task_id"])
+        return task_from_row(rows[0])
 
     def _cleanup_expired_task_tokens(self) -> None:
         """Remove expired task heartbeat records.
@@ -540,3 +527,20 @@ def determine_task_status(row: dict[str, Any]) -> TaskStatus:
         return TaskStatus(status=Status.PENDING, sub_status="", details="")
     task_id = int64_to_uint64(row["task_id"])
     raise ValueError(f"The task {task_id} does not have a valid status.")
+
+
+def task_from_row(row: dict[str, Any]) -> Task:
+    """Convert a database row to a Task object."""
+    return Task(
+        task_id=int64_to_uint64(row["task_id"]),
+        type=row["type"],
+        run_id=int64_to_uint64(row["run_id"]),
+        pending_at=row["pending_at"],
+        starting_at=row["starting_at"],
+        running_at=row["running_at"],
+        finished_at=row["finished_at"],
+        status=determine_task_status(row),
+        fab_hash=row["fab_hash"],
+        model_ref=row["model_ref"],
+        connector_ref=row["connector_ref"],
+    )

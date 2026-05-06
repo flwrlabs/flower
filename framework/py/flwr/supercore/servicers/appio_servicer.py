@@ -38,7 +38,7 @@ from flwr.supercore.constant import (
     TASK_TYPES_REQUIRING_MODEL_REF,
     TaskType,
 )
-from flwr.supercore.interceptors import get_authenticated_task_id
+from flwr.supercore.interceptors import get_authenticated_task
 
 from ..corestate import CoreState
 
@@ -77,8 +77,8 @@ class AppIoServicer(ABC):
         """Handle a heartbeat for a claimed task."""
         log(DEBUG, "AppIoServicer.SendTaskHeartbeat")
 
-        task_id = get_authenticated_task_id()
-        success = self.state().acknowledge_task_heartbeat(task_id)
+        task = get_authenticated_task()
+        success = self.state().acknowledge_task_heartbeat(task.task_id)
         return SendTaskHeartbeatResponse(success=success)
 
     def CreateTask(

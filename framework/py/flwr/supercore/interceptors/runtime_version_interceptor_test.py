@@ -33,6 +33,7 @@ from flwr.supercore.constant import (
 from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
     RuntimeVersionServerInterceptor,
+    create_serverappio_runtime_version_server_interceptor,
 )
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
 
@@ -202,7 +203,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         context.set_trailing_metadata.assert_not_called()
 
     def test_unparseable_peer_version_is_warned(self) -> None:
-        """Explicit unparseable peer versions should be warned."""
+        """Explicit unparseable peer versions should set trailing metadata."""
         intercepted = self._intercept(
             "/flwr.proto.ServerAppIo/GetNodes",
             _make_runtime_metadata("main"),
@@ -214,7 +215,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         context.set_trailing_metadata.assert_called_once()
 
     def test_incompatible_metadata_is_warned(self) -> None:
-        """Different major.minor versions should still be warned."""
+        """Different major.minor versions should set trailing metadata."""
         intercepted = self._intercept(
             "/flwr.proto.ServerAppIo/GetNodes",
             _make_runtime_metadata("1.30.1"),
@@ -224,6 +225,19 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_called_once()
+
+    def test_serverappio_factory_observes_by_default(self) -> None:
+        """ServerAppIo factory should not return warning metadata by default."""
+        self.interceptor = create_serverappio_runtime_version_server_interceptor()
+        intercepted = self._intercept(
+            "/flwr.proto.ServerAppIo/GetNodes",
+            _make_runtime_metadata("1.30.1"),
+        )
+
+        context = Mock()
+        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        self.assertEqual(response, "ok")
+        context.set_trailing_metadata.assert_not_called()
 
     def test_compatible_metadata_is_accepted(self) -> None:
         """Compatible peer version should not set trailing metadata for unary

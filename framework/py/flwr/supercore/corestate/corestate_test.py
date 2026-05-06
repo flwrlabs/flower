@@ -138,7 +138,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertIsNotNone(token)
         assert token is not None
-        self.assertEqual(state.get_task_id_by_token(token), task_id)
+        assert (task := state.get_task_by_token(token))
+        self.assertEqual(task.task_id, task_id)
         tasks = state.get_tasks(task_ids=[task_id])
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].status.status, Status.STARTING)
@@ -253,13 +254,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             mock_dt.now.return_value = fixed_now + timedelta(
                 seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
             )
-            self.assertEqual(state.get_task_id_by_token(token), task_id)
+            assert (task := state.get_task_by_token(token))
+            self.assertEqual(task.task_id, task_id)
 
             # Once the extended deadline passes, the token no longer resolves.
             mock_dt.now.return_value = fixed_now + timedelta(
                 seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
             )
-            self.assertIsNone(state.get_task_id_by_token(token))
+            self.assertIsNone(state.get_task_by_token(token))
             self.assertFalse(state.acknowledge_task_heartbeat(task_id))
 
     def test_expired_task_token_transitions_task_to_finished_failed(self) -> None:
@@ -278,7 +280,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             mock_dt.now.return_value = fixed_now + timedelta(
                 seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
             )
-            self.assertIsNone(state.get_task_id_by_token(token))
+            self.assertIsNone(state.get_task_by_token(token))
             self.assertFalse(state.acknowledge_task_heartbeat(task_id))
 
         tasks = state.get_tasks(task_ids=[task_id])
@@ -293,11 +295,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertTrue(tasks[0].finished_at)
 
-    def test_get_task_id_by_token_returns_none_for_unknown_token(self) -> None:
+    def test_get_task_by_token_returns_none_for_unknown_token(self) -> None:
         """Unknown task tokens should not resolve to a task."""
         state = self.state_factory()
 
-        self.assertIsNone(state.get_task_id_by_token("missing-token"))
+        self.assertIsNone(state.get_task_by_token("missing-token"))
 
     def test_create_verify_and_delete_token(self) -> None:
         """Test creating, verifying, and deleting tokens."""
