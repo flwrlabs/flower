@@ -33,7 +33,7 @@ def _get_task(*, task_id: int = 1, task_type: str = TaskType.SERVER_APP) -> Mock
     """Return a minimal dummy task-like object."""
     task = Mock()
     task.task_id = task_id
-    task.task_type = task_type
+    task.type = task_type
     return task
 
 
