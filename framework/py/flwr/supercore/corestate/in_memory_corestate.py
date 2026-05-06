@@ -276,7 +276,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             task_id = self.task_token_to_task_id.get(token)
             if task_id is None:
                 return None
-            return self.task_store.get(task_id)
+            task = Task()
+            task.CopyFrom(self.task_store[task_id])
+            return task
 
     def _cleanup_expired_task_tokens_locked(self) -> None:
         """Remove expired task tokens.
