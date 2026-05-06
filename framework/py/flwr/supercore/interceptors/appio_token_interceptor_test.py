@@ -29,13 +29,16 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppMessagesRequest,
     PushAppOutputsRequest,
 )
+from flwr.proto.appio_pb2_grpc import AppIoServicer as GrpcAppIoServicer
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoServicer
 from flwr.proto.message_pb2 import PushObjectRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoServicer
 from flwr.supercore.auth import (
+    APPIO_METHOD_AUTH_POLICY,
     CLIENTAPPIO_METHOD_AUTH_POLICY,
     SERVERAPPIO_METHOD_AUTH_POLICY,
+    SERVERAPPIO_LEGACY_METHOD_AUTH_POLICY,
 )
 from flwr.supercore.interceptors import (
     APP_TOKEN_HEADER,
@@ -406,6 +409,14 @@ class TestMethodPolicyMaps(TestCase):
     }
 
     @staticmethod
+    def _appio_rpc_methods() -> set[str]:
+        return {
+            f"/flwr.proto.AppIo/{name}"
+            for name, ref in inspect.getmembers(GrpcAppIoServicer)
+            if inspect.isfunction(ref) and not name.startswith("_")
+        }
+
+    @staticmethod
     def _serverappio_rpc_methods() -> set[str]:
         return {
             f"/flwr.proto.ServerAppIo/{name}"
@@ -425,6 +436,20 @@ class TestMethodPolicyMaps(TestCase):
         """ServerAppIo policy map should cover all RPC methods exactly."""
         expected_methods = self._serverappio_rpc_methods()
         self.assertEqual(set(SERVERAPPIO_METHOD_AUTH_POLICY), expected_methods)
+
+    def test_appio_policy_has_full_coverage(self) -> None:
+        """AppIo policy map should cover all AppIo RPC methods exactly."""
+        expected_methods = self._appio_rpc_methods()
+        self.assertEqual(set(APPIO_METHOD_AUTH_POLICY), expected_methods)
+
+    def test_appio_methods_require_auth(self) -> None:
+        """AppIo methods should all require App token auth."""
+        no_auth_methods = {
+            method.rsplit("/", maxsplit=1)[-1]
+            for method, policy in APPIO_METHOD_AUTH_POLICY.items()
+            if not policy.requires_token
+        }
+        self.assertEqual(no_auth_methods, set())
 
     def test_only_expected_no_auth_methods_exist(self) -> None:
         """Only bootstrap methods should be marked no-auth in the policy table."""
@@ -449,6 +474,13 @@ class TestMethodPolicyMaps(TestCase):
         }
         self.assertEqual(no_auth_methods, self.NO_AUTH_BOOTSTRAP_METHODS)
 
+    def test_serverappio_legacy_policy_has_expected_coverage(self) -> None:
+        """Legacy ServerAppIo compatibility coverage should stay narrow."""
+        self.assertEqual(
+            set(SERVERAPPIO_LEGACY_METHOD_AUTH_POLICY),
+            {"/flwr.proto.ServerAppIo/CreateTask"},
+        )
+
 
 class TestFactoryFunctions(TestCase):
     """Validate interceptor factory behavior."""
@@ -461,7 +493,23 @@ class TestFactoryFunctions(TestCase):
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/GetNodes",
+                "/flwr.proto.AppIo/CreateTask",
+                invocation_metadata=((APP_TOKEN_HEADER, "valid-token"),),
+            ),
+        )
+
+        response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=1), Mock()))
+        self.assertEqual(response, "ok")
+
+    def test_serverappio_factory_uses_legacy_serverappio_policy(self) -> None:
+        """ServerAppIo factory should still accept the legacy CreateTask path."""
+        state = _TokenState({"valid-token": 1})
+        interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
+
+        intercepted = interceptor.intercept_service(
+            lambda _: _make_unary_handler(),
+            _HandlerCallDetails(
+                "/flwr.proto.ServerAppIo/CreateTask",
                 invocation_metadata=((APP_TOKEN_HEADER, "valid-token"),),
             ),
         )

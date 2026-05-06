@@ -3,6 +3,7 @@
 import grpc
 import warnings
 
+from flwr.proto import appio_pb2 as flwr_dot_proto_dot_appio__pb2
 
 GRPC_GENERATED_VERSION = '1.70.0'
 GRPC_VERSION = grpc.__version__
@@ -22,3 +23,82 @@ if _version_not_supported:
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
     )
+
+
+class AppIoStub(object):
+    """These messages are used by both ServerAppIo and ClientAppIo services
+
+    """
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.CreateTask = channel.unary_unary(
+                '/flwr.proto.AppIo/CreateTask',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.FromString,
+                _registered_method=True)
+
+
+class AppIoServicer(object):
+    """These messages are used by both ServerAppIo and ClientAppIo services
+
+    """
+
+    def CreateTask(self, request, context):
+        """Create a task
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_AppIoServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'CreateTask': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateTask,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'flwr.proto.AppIo', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('flwr.proto.AppIo', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class AppIo(object):
+    """These messages are used by both ServerAppIo and ClientAppIo services
+
+    """
+
+    @staticmethod
+    def CreateTask(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.AppIo/CreateTask',
+            flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)

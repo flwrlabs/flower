@@ -38,6 +38,10 @@ class MethodTokenPolicy:
 
 
 # In a follow-up PR, create explicit method maps using a shared builder.
+APPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
+    "/flwr.proto.AppIo/CreateTask": MethodTokenPolicy.token_required(),
+}
+
 SERVERAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ServerAppIo/ListAppsToLaunch": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ServerAppIo/RequestToken": MethodTokenPolicy.no_auth(),
@@ -58,6 +62,9 @@ SERVERAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ServerAppIo/PushMessages": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PullMessages": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/GetNodes": MethodTokenPolicy.token_required(),
+}
+
+SERVERAPPIO_LEGACY_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ServerAppIo/CreateTask": MethodTokenPolicy.token_required(),
 }
 
@@ -77,5 +84,4 @@ CLIENTAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ClientAppIo/ConfirmMessageReceived": MethodTokenPolicy.token_required(),  # noqa: E501
     "/flwr.proto.ClientAppIo/PushMessage": MethodTokenPolicy.token_required(),
     "/flwr.proto.ClientAppIo/PullMessage": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ClientAppIo/CreateTask": MethodTokenPolicy.token_required(),
 }

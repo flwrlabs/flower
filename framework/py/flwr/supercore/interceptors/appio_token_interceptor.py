@@ -25,8 +25,10 @@ import grpc
 from google.protobuf.message import Message as GrpcMessage
 
 from flwr.supercore.auth import (
+    APPIO_METHOD_AUTH_POLICY,
     CLIENTAPPIO_METHOD_AUTH_POLICY,
     SERVERAPPIO_METHOD_AUTH_POLICY,
+    SERVERAPPIO_LEGACY_METHOD_AUTH_POLICY,
     MethodTokenPolicy,
 )
 from flwr.supercore.utils import find_metadata_keys, get_metadata_str
@@ -182,7 +184,11 @@ def create_serverappio_token_auth_server_interceptor(
     """Create the default token interceptor for ServerAppIo."""
     return AppIoTokenServerInterceptor(
         state_provider=state_provider,
-        method_auth_policy=SERVERAPPIO_METHOD_AUTH_POLICY,
+        method_auth_policy=(
+            SERVERAPPIO_METHOD_AUTH_POLICY
+            | APPIO_METHOD_AUTH_POLICY
+            | SERVERAPPIO_LEGACY_METHOD_AUTH_POLICY
+        ),
     )
 
 

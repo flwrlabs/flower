@@ -125,12 +125,6 @@ class ServerAppIoStub:
     ]
     """Confirm Message Received"""
 
-    CreateTask: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.CreateTaskRequest,
-        flwr.proto.appio_pb2.CreateTaskResponse,
-    ]
-    """Create a task"""
-
     GetFederationOptions: grpc.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetFederationOptionsRequest,
         flwr.proto.run_pb2.GetFederationOptionsResponse,
@@ -259,12 +253,6 @@ class ServerAppIoAsyncStub:
         flwr.proto.message_pb2.ConfirmMessageReceivedResponse,
     ]
     """Confirm Message Received"""
-
-    CreateTask: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.CreateTaskRequest,
-        flwr.proto.appio_pb2.CreateTaskResponse,
-    ]
-    """Create a task"""
 
     GetFederationOptions: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetFederationOptionsRequest,
@@ -418,14 +406,6 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.message_pb2.ConfirmMessageReceivedResponse, collections.abc.Awaitable[flwr.proto.message_pb2.ConfirmMessageReceivedResponse]]:
         """Confirm Message Received"""
-
-    @abc.abstractmethod
-    def CreateTask(
-        self,
-        request: flwr.proto.appio_pb2.CreateTaskRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.CreateTaskResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.CreateTaskResponse]]:
-        """Create a task"""
 
     @abc.abstractmethod
     def GetFederationOptions(

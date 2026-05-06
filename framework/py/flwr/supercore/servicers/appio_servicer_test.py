@@ -18,13 +18,18 @@
 import unittest
 from unittest.mock import Mock, patch
 
+import grpc
+
 from flwr.common.constant import Status
+from flwr.common.constant import RUN_ID_NOT_FOUND_MESSAGE
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
+    CreateTaskRequest,
     PullPendingTasksRequest,
     SendTaskHeartbeatRequest,
 )
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
+from flwr.supercore.constant import TaskType
 
 from .appio_servicer import AppIoServicer
 
@@ -109,3 +114,52 @@ class TestAppIoServicer(unittest.TestCase):
         # Assert
         self.state.acknowledge_task_heartbeat.assert_called_once_with(123)
         self.assertTrue(response.success)
+
+    def test_create_task_uses_state_create_task(self) -> None:
+        """CreateTask should validate and persist a task through state."""
+        # Prepare
+        self.state.get_run_info.return_value = {123: Mock()}
+        self.state.create_task.return_value = 321
+
+        # Execute
+        response = self.servicer.CreateTask(
+            CreateTaskRequest(
+                type=TaskType.SERVER_APP,
+                run_id=123,
+                fab_hash="hash123",
+            ),
+            Mock(),
+        )
+
+        # Assert
+        self.state.get_run_info.assert_called_once_with(run_ids=[123])
+        self.state.create_task.assert_called_once_with(
+            task_type=TaskType.SERVER_APP,
+            run_id=123,
+            fab_hash="hash123",
+            model_ref=None,
+            connector_ref=None,
+        )
+        self.assertEqual(response.task_id, 321)
+
+    def test_create_task_rejects_unknown_run(self) -> None:
+        """CreateTask should abort when the run does not exist."""
+        # Prepare
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+        self.state.get_run_info.return_value = {}
+
+        # Execute / Assert
+        with self.assertRaises(grpc.RpcError):
+            self.servicer.CreateTask(
+                CreateTaskRequest(
+                    type=TaskType.MODEL,
+                    run_id=999,
+                    model_ref="model://test",
+                ),
+                context,
+            )
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE
+        )
