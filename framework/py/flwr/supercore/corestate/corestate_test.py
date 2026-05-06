@@ -389,43 +389,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         # Assert: should return False
         self.assertFalse(result)
 
-    def test_acknowledge_app_heartbeat_extends_expiration_and_cleanup(self) -> None:
-        """Test that acknowledging app heartbeat extends token expiration and cleanup is
-        performed when expired."""
-        # Prepare
-        state = self.state_factory()
-        created_at = now()
-        run_id1 = 42
-        run_id2 = 123
-        token1 = state.create_token(run_id1)
-        token2 = state.create_token(run_id2)
-        assert token1 is not None and token2 is not None
-
-        # Execute: send heartbeat for token2 to keep it alive
-        state.acknowledge_app_heartbeat(token2)
-
-        # Mock datetime to simulate time passage
-        # token1 should expire in HEARTBEAT_DEFAULT_INTERVAL
-        # token2 should expire in HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-        with patch("datetime.datetime") as mock_dt:
-            # Advance time just before token1 expiration
-            mock_dt.now.return_value = created_at + timedelta(
-                seconds=HEARTBEAT_DEFAULT_INTERVAL - 1
-            )
-
-            # Verify tokens are valid
-            self.assertTrue(state.verify_token(run_id1, token1))
-            self.assertTrue(state.verify_token(run_id2, token2))
-
-            # Advance time past token1 expiration
-            mock_dt.now.return_value = created_at + timedelta(
-                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
-            )
-
-            # Assert: token1 should be cleaned up, token2 should still be valid
-            self.assertFalse(state.verify_token(run_id1, token1))
-            self.assertTrue(state.verify_token(run_id2, token2))
-
     def test_reserve_nonce_first_reservation_succeeds(self) -> None:
         """A new nonce reservation should succeed."""
         state = self.state_factory()

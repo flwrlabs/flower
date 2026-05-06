@@ -32,6 +32,7 @@ from flwr.common.serde import (
     run_status_from_proto,
     run_to_proto,
 )
+from flwr.common.typing import RunStatus
 from flwr.proto import serverappio_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
@@ -147,6 +148,9 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
 
         if not token:
             return RequestTokenResponse(token="")
+
+        # Keep run status working
+        state.update_run_status(request.run_id, RunStatus(Status.STARTING, "", ""))
 
         # Return the token
         return RequestTokenResponse(token=token)
@@ -368,6 +372,8 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             # Update run status to RUNNING
             if state.activate_task(task.task_id):
                 log(INFO, "Started task %d of run %d", task.task_id, run_id)
+                # Keep run status working
+                state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
                 return PullAppInputsResponse(
                     context=context_to_proto(serverapp_ctxt),
                     run=run_to_proto(run),
@@ -402,6 +408,10 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             task.task_id, sub_status=request.sub_status, details=request.details
         ):
             log(INFO, "Finished task %d of run %d", task.task_id, run_id)
+            # Keep run status working
+            state.update_run_status(
+                run_id, RunStatus(Status.FINISHED, request.sub_status, request.details)
+            )
             state.set_serverapp_context(run_id, context_from_proto(request.context))
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
