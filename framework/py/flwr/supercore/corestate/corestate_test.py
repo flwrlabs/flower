@@ -45,13 +45,18 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Provide state implementation to test."""
         raise NotImplementedError()
 
+    def task_run_id(self, state: CoreState) -> int:
+        """Provide a run ID to use when creating tasks in tests."""
+        return 42
+
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
         state = self.state_factory()
+        run_id = self.task_run_id(state)
 
         task_id = state.create_task(
             task_type=TaskType.MODEL,
-            run_id=42,
+            run_id=run_id,
             fab_hash=None,
             model_ref="model://test",
             connector_ref=None,
@@ -63,7 +68,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task = tasks[0]
         self.assertEqual(task.task_id, task_id)
         self.assertEqual(task.type, TaskType.MODEL)
-        self.assertEqual(task.run_id, 42)
+        self.assertEqual(task.run_id, run_id)
         self.assertEqual(
             task.status,
             TaskStatus(status=Status.PENDING, sub_status="", details=""),
@@ -84,7 +89,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_get_tasks_single_status_matches(self) -> None:
         """A single-item status sequence should match pending tasks."""
         state = self.state_factory()
-        _ = state.create_task(task_type=TaskType.MODEL, run_id=42)
+        _ = state.create_task(
+            task_type=TaskType.MODEL, run_id=self.task_run_id(state)
+        )
 
         tasks = state.get_tasks(statuses=[Status.PENDING])
 
@@ -108,9 +115,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_get_task_returns_copy(self) -> None:
         """Retrieved task should be a defensive copy."""
         state = self.state_factory()
+        run_id = self.task_run_id(state)
         task_id = state.create_task(
             task_type=TaskType.SERVER_APP,
-            run_id=42,
+            run_id=run_id,
             fab_hash="fab-hash",
             model_ref=None,
             connector_ref=None,
@@ -130,7 +138,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_claim_task_transitions_pending_to_starting(self) -> None:
         """Claiming a task should create a token and move it to starting."""
         state = self.state_factory()
-        task_id = state.create_task(task_type="flwr-model", run_id=42)
+        task_id = state.create_task(
+            task_type="flwr-model", run_id=self.task_run_id(state)
+        )
         assert task_id is not None
 
         # Claim should persist token ownership and move the task to STARTING.
@@ -150,12 +160,13 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_claim_task_rejects_missing_claimed_and_non_pending(self) -> None:
         """Only existing pending unclaimed tasks should be claimable."""
         state = self.state_factory()
+        run_id = self.task_run_id(state)
 
         # Missing tasks cannot be claimed.
         self.assertIsNone(state.claim_task(61016))
 
-        claimed_task_id = state.create_task(task_type="flwr-model", run_id=42)
-        finished_task_id = state.create_task(task_type="flwr-model", run_id=42)
+        claimed_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+        finished_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
         assert claimed_task_id is not None and finished_task_id is not None
 
         # Claiming is single-owner and cannot be repeated.
@@ -169,7 +180,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_activate_task_transitions_starting_to_running(self) -> None:
         """Only starting tasks should transition to running."""
         state = self.state_factory()
-        task_id = state.create_task(task_type="flwr-model", run_id=42)
+        task_id = state.create_task(
+            task_type="flwr-model", run_id=self.task_run_id(state)
+        )
         assert task_id is not None
 
         # Task does not exist, so it cannot be activated.
@@ -201,7 +214,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     ) -> None:
         """Finishing a task should store the terminal status details."""
         state = self.state_factory()
-        task_id = state.create_task(task_type="flwr-model", run_id=42)
+        task_id = state.create_task(
+            task_type="flwr-model", run_id=self.task_run_id(state)
+        )
         assert task_id is not None
 
         # Task does not exist.
@@ -237,10 +252,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Task heartbeat should keep a claimed task token valid."""
         state = self.state_factory()
         fixed_now = now()
+        run_id = self.task_run_id(state)
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type="flwr-model", run_id=42)
+            task_id = state.create_task(task_type="flwr-model", run_id=run_id)
             assert task_id is not None
             token = state.claim_task(task_id)
             assert token is not None
@@ -268,10 +284,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Expired task claims should transition tasks to FINISHED:FAILED."""
         state = self.state_factory()
         fixed_now = now()
+        run_id = self.task_run_id(state)
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type="flwr-model", run_id=42)
+            task_id = state.create_task(task_type="flwr-model", run_id=run_id)
             assert task_id is not None
 
             token = state.claim_task(task_id)
