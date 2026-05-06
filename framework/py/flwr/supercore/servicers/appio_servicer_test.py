@@ -110,15 +110,18 @@ class TestAppIoServicer(unittest.TestCase):
     def test_send_task_heartbeat_acknowledges_authenticated_task(self) -> None:
         """SendTaskHeartbeat should use the authenticated task ID."""
         # Prepare
-        context = self._context_with_token()
-        self.state.get_task_by_token.return_value = Task(task_id=123, run_id=456)
         self.state.acknowledge_task_heartbeat.return_value = True
 
         # Execute
-        response = self.servicer.SendTaskHeartbeat(SendTaskHeartbeatRequest(), context)
+        with patch(
+            "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+            return_value=Mock(task_id=123),
+        ):
+            response = self.servicer.SendTaskHeartbeat(
+                SendTaskHeartbeatRequest(), Mock()
+            )
 
         # Assert
-        self.state.get_task_by_token.assert_called_once_with("task-token")
         self.state.acknowledge_task_heartbeat.assert_called_once_with(123)
         self.assertTrue(response.success)
 
