@@ -24,6 +24,7 @@ from typing import Any, NoReturn, Protocol, cast
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.auth import (
     CLIENTAPPIO_METHOD_AUTH_POLICY,
     SERVERAPPIO_METHOD_AUTH_POLICY,
@@ -35,7 +36,7 @@ APP_TOKEN_HEADER = "flwr-app-token"
 AUTHENTICATION_FAILED_MESSAGE = "Authentication failed."
 
 
-_current_task_id: ContextVar[int | None] = ContextVar("current_task_id", default=None)
+_current_task: ContextVar[Task | None] = ContextVar("current_task", default=None)
 
 
 class _TokenState(Protocol):
@@ -47,8 +48,8 @@ class _TokenState(Protocol):
     def verify_token(self, run_id: int, token: str) -> bool:
         """Return whether token is valid for run_id."""
 
-    def get_task_id_by_token(self, token: str) -> int | None:
-        """Return the task ID associated with the task token, if valid."""
+    def get_task_by_token(self, token: str) -> Task | None:
+        """Return the task associated with the task token, if valid."""
 
 
 def _abort_auth_denied(context: grpc.ServicerContext) -> NoReturn:
@@ -144,13 +145,13 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 return unary_handler(request, context)
 
             # Validate task token and set task context for downstream handlers
-            task_id = state.get_task_id_by_token(token)
-            if task_id is not None:
-                ctx_token = _current_task_id.set(task_id)
+            task = state.get_task_by_token(token)
+            if task is not None:
+                ctx_token = _current_task.set(task)
                 try:
                     return unary_handler(request, context)
                 finally:
-                    _current_task_id.reset(ctx_token)
+                    _current_task.reset(ctx_token)
 
             _abort_auth_denied(context)
 
@@ -161,16 +162,16 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         )
 
 
-def get_authenticated_task_id() -> int:
-    """Return the task ID authenticated for the current RPC.
+def get_authenticated_task() -> Task:
+    """Return the task identity authenticated for the current RPC.
 
-    The task ID is available only while handling an RPC authenticated with an AppIo task
+    The task is available only while handling an RPC authenticated with an AppIo task
     token.
     """
-    ret = _current_task_id.get()
+    ret = _current_task.get()
     if ret is None:
         raise RuntimeError(
-            "No authenticated task ID in the current RPC context. "
+            "No authenticated task in the current RPC context. "
             "This function must be called from a task-token-authenticated RPC handler."
         )
     return ret

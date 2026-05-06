@@ -268,12 +268,17 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             )
             return True
 
-    def get_task_id_by_token(self, token: str) -> int | None:
-        """Return the task ID associated with the task token, if valid."""
+    def get_task_by_token(self, token: str) -> Task | None:
+        """Return the task associated with the task token, if valid."""
         with self.lock_task_store:
             # Resolve tokens after cleanup so callers never receive expired claims.
             self._cleanup_expired_task_tokens_locked()
-            return self.task_token_to_task_id.get(token)
+            task_id = self.task_token_to_task_id.get(token)
+            if task_id is None:
+                return None
+            task = Task()
+            task.CopyFrom(self.task_store[task_id])
+            return task
 
     def _cleanup_expired_task_tokens_locked(self) -> None:
         """Remove expired task tokens.
