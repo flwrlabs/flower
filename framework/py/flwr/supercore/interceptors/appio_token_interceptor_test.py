@@ -33,6 +33,7 @@ from flwr.proto.clientappio_pb2_grpc import ClientAppIoServicer
 from flwr.proto.message_pb2 import PushObjectRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoServicer
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.auth import (
     CLIENTAPPIO_METHOD_AUTH_POLICY,
     SERVERAPPIO_METHOD_AUTH_POLICY,
@@ -44,7 +45,7 @@ from flwr.supercore.interceptors import (
     AppIoTokenServerInterceptor,
     create_clientappio_token_auth_server_interceptor,
     create_serverappio_token_auth_server_interceptor,
-    get_authenticated_task_id,
+    get_authenticated_task,
 )
 
 _ClientCallDetails = namedtuple(
@@ -75,8 +76,8 @@ class _TokenState:
         """Return whether the token is bound to the given run id."""
         return self._token_to_run_id.get(token) == run_id
 
-    def get_task_id_by_token(self, token: str) -> int | None:  # pylint: disable=R1711
-        """Return the task ID for a task token, if present."""
+    def get_task_by_token(self, token: str) -> Task | None:  # pylint: disable=R1711
+        """Return the task for a task token, if present."""
         _ = token
         return None  # make mypy happy
 
@@ -262,16 +263,16 @@ class TestAppIoTokenServerInterceptor(TestCase):
         """Protected methods should pass with a valid task token."""
         state = Mock()
         state.get_run_id_by_token.return_value = None
-        state.get_task_id_by_token.return_value = 123
+        state.get_task_by_token.return_value = Mock(task_id=123)
         interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
         method = self._find_serverappio_method(requires_token=True)
         if method is None:
             self.skipTest("No token-required ServerAppIo method found in policy table.")
-        captured_task_id = None
+        captured_task = None
 
         def _handler(_request: GrpcMessage, _context: grpc.ServicerContext) -> str:
-            nonlocal captured_task_id
-            captured_task_id = get_authenticated_task_id()
+            nonlocal captured_task
+            captured_task = get_authenticated_task()
             return "ok"
 
         intercepted = interceptor.intercept_service(
@@ -284,9 +285,10 @@ class TestAppIoTokenServerInterceptor(TestCase):
 
         response = intercepted.unary_unary(GetNodesRequest(run_id=7), Mock())
         self.assertEqual(response, "ok")
-        self.assertEqual(captured_task_id, 123)
+        self.assertIsNotNone(captured_task)
+        self.assertEqual(cast(Mock, captured_task).task_id, 123)
         state.get_run_id_by_token.assert_called_once_with("task-token")
-        state.get_task_id_by_token.assert_called_once_with("task-token")
+        state.get_task_by_token.assert_called_once_with("task-token")
 
     def test_metadata_token_used_even_when_request_has_token(self) -> None:
         """Metadata token should be authoritative when both sources exist."""
