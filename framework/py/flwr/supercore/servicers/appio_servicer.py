@@ -106,7 +106,8 @@ class AppIoServicer(ABC):
             raise RuntimeError("This line should never be reached.")
 
         _validate_create_task_request(request, context)
-
+        
+        state = self.state_factory.state()
         task_id = state.create_task(
             task_type=request.type,
             run_id=authenticated_run_id,
