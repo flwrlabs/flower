@@ -61,6 +61,7 @@ from flwr.proto.message_pb2 import (
 )
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
 from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
+from flwr.supercore.interceptors import get_authenticated_task_id
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
 from flwr.supercore.servicers import AppIoServicer
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
@@ -169,6 +170,9 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
             )
             raise RuntimeError("This line should never be reached.")
 
+        # Claim task
+        state.claim_task(task_id=get_authenticated_task_id())
+
         return PullAppInputsResponse(
             context=context_to_proto(context),
             run=run_to_proto(run),
@@ -199,6 +203,13 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         # Remove the token to make the run eligible for processing
         # A run associated with a token cannot be handled until its token is cleared
         state.delete_token(run_id)
+
+        # Flag task as finished
+        state.finish_task(
+            task_id=get_authenticated_task_id(),
+            sub_status=request.sub_status,
+            details=request.details,
+        )
 
         return PushAppOutputsResponse()
 

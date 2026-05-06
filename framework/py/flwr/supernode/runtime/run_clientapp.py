@@ -16,6 +16,7 @@
 
 
 from logging import DEBUG, ERROR, INFO
+from typing import cast
 
 import grpc
 
@@ -25,7 +26,7 @@ from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
 from flwr.common import Context, Message
 from flwr.common.config import get_project_dir
-from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode, SubStatus
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
@@ -252,6 +253,12 @@ def push_appoutputs(
         with no_object_id_recompute():
             # Get object tree and all objects to push
             object_tree = get_object_tree(message)
+            has_error = message.has_error()
+            details_msg = (
+                cast(str, message.error.reason)
+                if has_error
+                else "ClientApp execution completed successfully"
+            )
 
             # Push Message
             # This is temporary. The message should not contain its content
@@ -281,8 +288,14 @@ def push_appoutputs(
             )
 
         # Push Context
+        sub_status = SubStatus.FAILED if has_error else SubStatus.COMPLETED
         res: PushAppOutputsResponse = stub.PushAppOutputs(
-            PushAppOutputsRequest(token=token, context=proto_context)
+            PushAppOutputsRequest(
+                token=token,
+                context=proto_context,
+                sub_status=sub_status,
+                details=details_msg,
+            )
         )
         return res
     except grpc.RpcError as e:
