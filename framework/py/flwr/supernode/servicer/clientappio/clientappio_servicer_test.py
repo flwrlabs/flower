@@ -124,6 +124,8 @@ class TestClientAppIoServicer(unittest.TestCase):
     def test_push_clientapp_outputs(self) -> None:
         """Test pushing messages to SuperNode."""
         # Prepare: Create Message and context
+        sub_status = SubStatus.COMPLETED
+        details = "ClientApp execution completed successfully"
         message = make_message(
             metadata=self.maker.metadata(),
             content=self.maker.recorddict(2, 2, 1),
@@ -160,13 +162,21 @@ class TestClientAppIoServicer(unittest.TestCase):
 
         # Execute
         _ = push_appoutputs(
-            stub=self.mock_stub, token="abc", message=message, context=context
+            stub=self.mock_stub,
+            token="abc",
+            message=message,
+            context=context,
+            sub_status=sub_status,
+            details=details,
         )
 
         # Assert
         self.mock_stub.PushAppOutputs.assert_called_once()
         self.mock_stub.PushMessage.assert_called_once()
         self.assertSetEqual(pushed_obj_ids, set(all_obj_ids))
+        push_outputs_request = self.mock_stub.PushAppOutputs.call_args.args[0]
+        self.assertEqual(push_outputs_request.sub_status, sub_status)
+        self.assertEqual(push_outputs_request.details, details)
 
     def test_servicer_pull_appinputs_activates_task(self) -> None:
         """PullAppInputs should activate the authenticated task."""

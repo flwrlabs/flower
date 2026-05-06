@@ -16,7 +16,6 @@
 
 
 from logging import DEBUG, ERROR, INFO
-from typing import cast
 
 import grpc
 
@@ -123,6 +122,8 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
         # Pull Message, Context, Run and FAB from SuperNode
         message, context, run, fab = pull_appinputs(stub=stub, token=token)
 
+        sub_status = SubStatus.COMPLETED
+        details = ""
         try:
 
             # Install FAB
@@ -183,9 +184,17 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
             # Create error message
             reply_message = Message(Error(code=e_code, reason=reason), reply_to=message)
 
+            sub_status = SubStatus.FAILED
+            details = reason
+
         # Push Message and Context to SuperNode
         _ = push_appoutputs(
-            stub=stub, token=token, message=reply_message, context=context
+            stub=stub,
+            token=token,
+            message=reply_message,
+            context=context,
+            sub_status=sub_status,
+            details=details,
         )
 
     except grpc.RpcError as e:
@@ -238,7 +247,12 @@ def pull_appinputs(
 
 
 def push_appoutputs(
-    stub: ClientAppIoStub, token: str, message: Message, context: Context
+    stub: ClientAppIoStub,
+    token: str,
+    message: Message,
+    context: Context,
+    sub_status: str,
+    details: str,
 ) -> PushAppOutputsResponse:
     """Push AppOutputs to SuperNode."""
     masked_token = mask_string(token)
@@ -253,12 +267,6 @@ def push_appoutputs(
         with no_object_id_recompute():
             # Get object tree and all objects to push
             object_tree = get_object_tree(message)
-            has_error = message.has_error()
-            details_msg = (
-                cast(str, message.error.reason)
-                if has_error
-                else "ClientApp execution completed successfully"
-            )
 
             # Push Message
             # This is temporary. The message should not contain its content
@@ -288,13 +296,12 @@ def push_appoutputs(
             )
 
         # Push Context
-        sub_status = SubStatus.FAILED if has_error else SubStatus.COMPLETED
         res: PushAppOutputsResponse = stub.PushAppOutputs(
             PushAppOutputsRequest(
                 token=token,
                 context=proto_context,
                 sub_status=sub_status,
-                details=details_msg,
+                details=details,
             )
         )
         return res
