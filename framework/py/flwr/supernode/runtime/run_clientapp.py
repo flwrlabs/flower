@@ -99,8 +99,36 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     channel.subscribe(on_channel_state_change)
     heartbeat_sender = None
     runtime_env_dir = None
+    stub: ClientAppIoStub | None = None
+    message: Message | None = None
+    context: Context | None = None
+    details = "ClientApp task failed due to unknown reason"
+    appoutputs_push_attempted = False
 
     def on_exit() -> None:
+        if (
+            not appoutputs_push_attempted
+            and stub is not None
+            and message is not None
+            and context is not None
+        ):
+            try:
+                _ = push_appoutputs(
+                    stub=stub,
+                    token=token,
+                    message=Message(
+                        Error(
+                            code=ErrorCode.CLIENT_APP_CRASHED,
+                            reason=details,
+                        ),
+                        reply_to=message,
+                    ),
+                    context=context,
+                    sub_status=SubStatus.FAILED,
+                    details=details,
+                )
+            except grpc.RpcError as e:
+                log(ERROR, "[on_exit] Failed to push `AppOutputs`: %s", str(e))
         if heartbeat_sender is not None and heartbeat_sender.is_running:
             heartbeat_sender.stop()
         channel.close()
@@ -122,7 +150,6 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         # Pull Message, Context, Run and FAB from SuperNode
         message, context, run, fab = pull_appinputs(stub=stub, token=token)
         sub_status = SubStatus.FAILED
-        details = "ClientApp task failed due to unknown reason"
 
         try:
 
@@ -189,6 +216,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
             sub_status = SubStatus.FAILED
             details = reason
 
+        appoutputs_push_attempted = True
         _ = push_appoutputs(
             stub=stub,
             token=token,
