@@ -142,6 +142,93 @@ class TestAppIoServicer(unittest.TestCase):
         )
         self.assertEqual(response.task_id, 321)
 
+    def test_create_task_aborts_if_state_create_task_fails(self) -> None:
+        """CreateTask should abort when state.create_task returns None."""
+        # Prepare
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+        self.state.get_run_info.return_value = {123: Mock()}
+        self.state.create_task.return_value = None
+
+        # Execute / Assert
+        with self.assertRaises(grpc.RpcError):
+            self.servicer.CreateTask(
+                CreateTaskRequest(
+                    type=TaskType.SERVER_APP,
+                    run_id=123,
+                    fab_hash="hash123",
+                ),
+                context,
+            )
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.INTERNAL, "Failed to create task"
+        )
+
+    def test_create_task_rejects_unknown_type(self) -> None:
+        """CreateTask should reject unknown task types."""
+        # Prepare
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+        self.state.get_run_info.return_value = {123: Mock()}
+
+        # Execute / Assert
+        with self.assertRaises(grpc.RpcError):
+            self.servicer.CreateTask(
+                CreateTaskRequest(type="unknown-task", run_id=123),
+                context,
+            )
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            "Invalid task type: unknown-task",
+        )
+        self.state.create_task.assert_not_called()
+
+    def test_create_task_rejects_missing_required_fields(self) -> None:
+        """CreateTask should reject missing per-type required fields."""
+        cases = [
+            (
+                TaskType.SERVER_APP,
+                f"Task type '{TaskType.SERVER_APP}' requires fab_hash.",
+            ),
+            (
+                TaskType.CLIENT_APP,
+                f"Task type '{TaskType.CLIENT_APP}' requires fab_hash.",
+            ),
+            (
+                TaskType.AGENT_APP,
+                f"Task type '{TaskType.AGENT_APP}' requires fab_hash.",
+            ),
+            (
+                TaskType.MODEL,
+                f"Task type '{TaskType.MODEL}' requires model_ref.",
+            ),
+            (
+                TaskType.CONNECTOR,
+                f"Task type '{TaskType.CONNECTOR}' requires connector_ref.",
+            ),
+        ]
+
+        for task_type, error_msg in cases:
+            with self.subTest(task_type=task_type):
+                context = Mock()
+                context.abort.side_effect = grpc.RpcError()
+                self.state.get_run_info.return_value = {123: Mock()}
+
+                with self.assertRaises(grpc.RpcError):
+                    self.servicer.CreateTask(
+                        CreateTaskRequest(type=task_type, run_id=123),
+                        context,
+                    )
+
+                context.abort.assert_called_once_with(
+                    grpc.StatusCode.FAILED_PRECONDITION,
+                    error_msg,
+                )
+                self.state.create_task.assert_not_called()
+                self.state.create_task.reset_mock()
+
     def test_create_task_rejects_unknown_run(self) -> None:
         """CreateTask should abort when the run does not exist."""
         # Prepare
