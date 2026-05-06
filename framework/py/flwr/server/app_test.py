@@ -219,7 +219,7 @@ def test_run_fleet_api_grpc_rere_adds_runtime_version_interceptor(
     existing_interceptor = Mock(spec=grpc.ServerInterceptor)
     monkeypatch.setattr(app_module, "generic_create_grpc_server", create_grpc_server)
 
-    app_module._run_fleet_api_grpc_rere(
+    app_module._run_fleet_api_grpc_rere(  # pylint: disable=protected-access
         address="127.0.0.1:9092",
         state_factory=Mock(),
         objectstore_factory=Mock(),
@@ -242,7 +242,7 @@ def test_run_fleet_api_grpc_adapter_adds_runtime_version_interceptor(
     create_grpc_server = Mock(return_value=grpc_server)
     monkeypatch.setattr(app_module, "generic_create_grpc_server", create_grpc_server)
 
-    app_module._run_fleet_api_grpc_adapter(
+    app_module._run_fleet_api_grpc_adapter(  # pylint: disable=protected-access
         address="127.0.0.1:9092",
         state_factory=Mock(),
         objectstore_factory=Mock(),
