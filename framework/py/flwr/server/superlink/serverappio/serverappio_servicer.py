@@ -412,7 +412,10 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             state.update_run_status(
                 run_id, RunStatus(Status.FINISHED, request.sub_status, request.details)
             )
-            state.set_serverapp_context(run_id, context_from_proto(request.context))
+            if request.HasField("context"):
+                state.set_serverapp_context(
+                    run_id, context_from_proto(request.context)
+                )
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
         return PushAppOutputsResponse()
