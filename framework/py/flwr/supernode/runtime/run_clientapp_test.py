@@ -18,7 +18,11 @@
 import unittest
 from unittest.mock import patch
 
-from flwr.supercore.interceptors import AppIoTokenClientInterceptor
+from flwr.supercore.constant import TaskType
+from flwr.supercore.interceptors import (
+    AppIoTokenClientInterceptor,
+    RuntimeVersionClientInterceptor,
+)
 
 from .run_clientapp import run_clientapp
 
@@ -26,8 +30,8 @@ from .run_clientapp import run_clientapp
 class TestRunClientApp(unittest.TestCase):
     """Tests for `run_clientapp`."""
 
-    def test_run_clientapp_adds_token_client_interceptor(self) -> None:
-        """`run_clientapp` should add token interceptor to gRPC channel creation."""
+    def test_run_clientapp_adds_client_interceptors(self) -> None:
+        """`run_clientapp` should add client interceptors to gRPC channel creation."""
         with patch(
             "flwr.supernode.runtime.run_clientapp.create_channel",
             side_effect=RuntimeError,
@@ -39,5 +43,8 @@ class TestRunClientApp(unittest.TestCase):
         interceptors = kwargs["interceptors"]
         self.assertIsNotNone(interceptors)
         assert interceptors is not None
-        self.assertEqual(len(interceptors), 1)
-        self.assertIsInstance(interceptors[0], AppIoTokenClientInterceptor)
+        self.assertEqual(len(interceptors), 2)
+        self.assertIsInstance(interceptors[0], RuntimeVersionClientInterceptor)
+        self.assertIsInstance(interceptors[1], AppIoTokenClientInterceptor)
+        # pylint: disable-next=protected-access
+        self.assertEqual(interceptors[0]._metadata.component_name, TaskType.CLIENT_APP)

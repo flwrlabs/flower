@@ -70,6 +70,7 @@ from flwr.supercore.inflatable.inflatable_utils import (
     push_object_contents_from_iterable,
 )
 from flwr.supercore.interceptors import (
+    create_clientappio_runtime_version_server_interceptor,
     create_clientappio_superexec_auth_server_interceptor,
     create_clientappio_token_auth_server_interceptor,
 )
@@ -694,6 +695,7 @@ def run_clientappio_api_grpc(  # pylint: disable=R0913,R0917
                 master_secret=superexec_auth_secret,
             )
         )
+    interceptors.append(create_clientappio_runtime_version_server_interceptor())
     clientappio_add_servicer_to_server_fn = add_ClientAppIoServicer_to_server
     clientappio_grpc_server = generic_create_grpc_server(
         servicer_and_add_fn=(
