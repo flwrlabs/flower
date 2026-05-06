@@ -16,6 +16,7 @@
 
 
 import unittest
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from parameterized import parameterized
@@ -200,8 +201,8 @@ class TestClientAppIoServicer(unittest.TestCase):
 
         with patch(
             "flwr.supernode.servicer.clientappio.clientappio_servicer."
-            "get_authenticated_task_id",
-            return_value=task_id,
+            "get_authenticated_task",
+            return_value=SimpleNamespace(task_id=task_id),
         ):
             response = self.servicer.PullAppInputs(request, Mock())
 
@@ -231,8 +232,8 @@ class TestClientAppIoServicer(unittest.TestCase):
 
         with patch(
             "flwr.supernode.servicer.clientappio.clientappio_servicer."
-            "get_authenticated_task_id",
-            return_value=task_id,
+            "get_authenticated_task",
+            return_value=SimpleNamespace(task_id=task_id),
         ):
             response = self.servicer.PushAppOutputs(request, Mock())
 
