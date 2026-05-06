@@ -20,8 +20,7 @@ from unittest.mock import Mock, patch
 
 import grpc
 
-from flwr.common.constant import Status
-from flwr.common.constant import RUN_ID_NOT_FOUND_MESSAGE
+from flwr.common.constant import RUN_ID_NOT_FOUND_MESSAGE, Status
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     CreateTaskRequest,

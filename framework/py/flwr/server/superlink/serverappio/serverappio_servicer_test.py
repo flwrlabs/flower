@@ -84,11 +84,7 @@ from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
 from flwr.server.superlink.serverappio.serverappio_servicer import _raise_if
 from flwr.server.superlink.utils import _STATUS_TO_MSG
-from flwr.supercore.constant import (
-    FLWR_IN_MEMORY_DB_NAME,
-    NOOP_FEDERATION,
-    RunType,
-)
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
 from flwr.supercore.date import now
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,

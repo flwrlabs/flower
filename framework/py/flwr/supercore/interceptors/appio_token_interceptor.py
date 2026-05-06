@@ -187,8 +187,8 @@ def get_authenticated_task() -> Task:
 def get_authenticated_run_id() -> int:
     """Return the run ID authenticated for the current RPC.
 
-    The run ID is available while handling an RPC authenticated with either an AppIo
-    run token or a task token.
+    The run ID is available while handling an RPC authenticated with either an AppIo run
+    token or a task token.
     """
     ret = _current_run_id.get()
     if ret is None:

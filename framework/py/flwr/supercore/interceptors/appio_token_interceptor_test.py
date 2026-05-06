@@ -461,6 +461,7 @@ class TestMethodPolicyMaps(TestCase):
         }
         self.assertEqual(no_auth_methods, self.NO_AUTH_BOOTSTRAP_METHODS)
 
+
 class TestFactoryFunctions(TestCase):
     """Validate interceptor factory behavior."""
 
