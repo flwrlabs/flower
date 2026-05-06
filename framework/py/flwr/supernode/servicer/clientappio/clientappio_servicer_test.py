@@ -16,18 +16,21 @@
 
 
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from parameterized import parameterized
 
 from flwr.common import Context, typing
+from flwr.common.constant import SubStatus
 from flwr.common.message import make_message
-from flwr.common.serde import fab_to_proto, message_to_proto
+from flwr.common.serde import context_to_proto, fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker
 from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
+    PullAppInputsRequest,
     PullAppInputsResponse,
     PullAppMessagesResponse,
     PushAppMessagesResponse,
+    PushAppOutputsRequest,
     PushAppOutputsResponse,
 )
 from flwr.proto.heartbeat_pb2 import (  # pylint:disable=E0611
@@ -103,7 +106,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_stub.PullAppInputs.return_value = mock_response
 
         # Execute
-        message, context, run, fab = pull_appinputs(self.mock_stub, token="abc")
+        message, context, run, fab = pull_appinputs(self.mock_stub)
 
         # Assert
         self.mock_stub.PullAppInputs.assert_called_once()
@@ -120,6 +123,8 @@ class TestClientAppIoServicer(unittest.TestCase):
     def test_push_clientapp_outputs(self) -> None:
         """Test pushing messages to SuperNode."""
         # Prepare: Create Message and context
+        sub_status = SubStatus.COMPLETED
+        details = "ClientApp execution completed successfully"
         message = make_message(
             metadata=self.maker.metadata(),
             content=self.maker.recorddict(2, 2, 1),
@@ -156,26 +161,114 @@ class TestClientAppIoServicer(unittest.TestCase):
 
         # Execute
         _ = push_appoutputs(
-            stub=self.mock_stub, token="abc", message=message, context=context
+            stub=self.mock_stub,
+            message=message,
+            context=context,
+            sub_status=sub_status,
+            details=details,
         )
 
         # Assert
         self.mock_stub.PushAppOutputs.assert_called_once()
         self.mock_stub.PushMessage.assert_called_once()
         self.assertSetEqual(pushed_obj_ids, set(all_obj_ids))
+        push_outputs_request = self.mock_stub.PushAppOutputs.call_args.args[0]
+        self.assertEqual(push_outputs_request.sub_status, sub_status)
+        self.assertEqual(push_outputs_request.details, details)
+
+    def test_servicer_pull_appinputs_activates_task(self) -> None:
+        """PullAppInputs should activate the authenticated task."""
+        token = "test-token"
+        run_id = 61016
+        task_id = 123
+        request = PullAppInputsRequest(token=token)
+
+        run = typing.Run.create_empty(run_id=run_id)
+        run.fab_id = "mock/mock"
+        run.fab_version = "v1.0.0"
+        run.fab_hash = "fab-hash"
+
+        app_context = Context(
+            run_id=run_id,
+            node_id=1,
+            node_config={"nodeconfig1": 4.2},
+            state=self.maker.recorddict(1, 1, 1),
+            run_config={"runconfig1": 6.1},
+        )
+        fab = typing.Fab(
+            hash_str="fab-hash",
+            content=b"fab-content",
+            verifications={"sig": "value"},
+        )
+
+        self.mock_state.get_run_id_by_token.return_value = run_id
+        self.mock_state.verify_token.return_value = True
+        self.mock_state.get_context.return_value = app_context
+        self.mock_state.get_run.return_value = run
+        self.mock_state.get_fab.return_value = fab
+
+        with patch(
+            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(task_id=task_id, run_id=run_id),
+        ):
+            response = self.servicer.PullAppInputs(request, Mock())
+
+        self.assertIsInstance(response, PullAppInputsResponse)
+        self.mock_state.activate_task.assert_called_once_with(task_id=task_id)
+
+    def test_servicer_push_appoutputs_finishes_task(self) -> None:
+        """PushAppOutputs should finish the authenticated task."""
+        token = "test-token"
+        run_id = 61016
+        task_id = 123
+        app_context = Context(
+            run_id=run_id,
+            node_id=1,
+            node_config={"nodeconfig1": 4.2},
+            state=self.maker.recorddict(1, 1, 1),
+            run_config={"runconfig1": 6.1},
+        )
+        request = PushAppOutputsRequest(
+            token=token,
+            context=context_to_proto(app_context),
+            sub_status=SubStatus.COMPLETED,
+        )
+
+        self.mock_state.get_run_id_by_token.return_value = run_id
+        self.mock_state.verify_token.return_value = True
+
+        with patch(
+            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(task_id=task_id, run_id=run_id),
+        ):
+            response = self.servicer.PushAppOutputs(request, Mock())
+
+        self.assertIsInstance(response, PushAppOutputsResponse)
+        self.mock_state.store_context.assert_called_once()
+        self.mock_state.finish_task.assert_called_once()
+        finish_task_kwargs = self.mock_state.finish_task.call_args.kwargs
+        self.assertEqual(finish_task_kwargs["task_id"], task_id)
+        self.assertEqual(finish_task_kwargs["sub_status"], request.sub_status)
 
     @parameterized.expand([(True,), (False,)])  # type: ignore
     def test_send_app_heartbeat(self, success: bool) -> None:
         """Test sending an app heartbeat."""
         # Prepare
-        token = "test-token"
-        request = SendAppHeartbeatRequest(token=token)
-        self.mock_state.acknowledge_app_heartbeat.return_value = success
+        task_id = 123
+        request = SendAppHeartbeatRequest()
+        self.mock_state.acknowledge_task_heartbeat.return_value = success
 
         # Execute
-        response = self.servicer.SendAppHeartbeat(request, Mock())
+        with patch(
+            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(task_id=task_id),
+        ):
+            response = self.servicer.SendAppHeartbeat(request, Mock())
 
         # Assert
         self.assertIsInstance(response, SendAppHeartbeatResponse)
         self.assertEqual(response.success, success)
-        self.mock_state.acknowledge_app_heartbeat.assert_called_once_with(token)
+        self.mock_state.acknowledge_task_heartbeat.assert_called_once_with(task_id)

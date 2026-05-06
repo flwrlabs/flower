@@ -83,6 +83,7 @@ class CoreState(ABC):
         self,
         *,
         task_ids: Sequence[int] | None = None,
+        run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
@@ -98,6 +99,8 @@ class CoreState(ABC):
         ----------
         task_ids : Optional[Sequence[int]] (default: None)
             Sequence of task IDs to filter by.
+        run_ids : Optional[Sequence[int]] (default: None)
+            Sequence of run IDs to filter by.
         statuses : Optional[Sequence[str]] (default: None)
             Sequence of task status values to filter by.
         order_by : Optional[Literal["pending_at"]] (default: None)
@@ -186,8 +189,8 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def get_task_id_by_token(self, token: str) -> int | None:
-        """Return the task ID associated with the task token, if valid.
+    def get_task_by_token(self, token: str) -> Task | None:
+        """Return the task associated with the task token, if valid.
 
         Parameters
         ----------
@@ -196,8 +199,8 @@ class CoreState(ABC):
 
         Returns
         -------
-        Optional[int]
-            The task ID if the token is valid, otherwise None.
+        Task | None
+            The task if the token is valid, otherwise None.
         """
 
     @abstractmethod
@@ -211,7 +214,7 @@ class CoreState(ABC):
 
         Returns
         -------
-        str
+        str | None
             The newly generated token if one does not already exist
             for the given run ID, otherwise None.
         """
