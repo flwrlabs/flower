@@ -16,7 +16,7 @@
 
 
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import grpc
 from parameterized import parameterized
@@ -45,12 +45,14 @@ from flwr.proto.message_pb2 import (  # pylint:disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import Run as ProtoRun  # pylint:disable=E0611
+from flwr.proto.task_pb2 import Task  # pylint:disable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
     iterate_object_tree,
 )
+from flwr.supercore.interceptors import APP_TOKEN_HEADER
 from flwr.supernode.runtime.run_clientapp import pull_appinputs, push_appoutputs
 
 from .clientappio_servicer import ClientAppIoServicer
@@ -170,24 +172,24 @@ class TestClientAppIoServicer(unittest.TestCase):
 
     def test_create_task_uses_nodestate_run_lookup(self) -> None:
         """CreateTask should use NodeState.get_run instead of LinkState APIs."""
+        context = Mock()
+        context.invocation_metadata.return_value = ((APP_TOKEN_HEADER, "task-token"),)
+        self.mock_state.get_task_by_token.return_value = Task(task_id=777, run_id=123)
         self.mock_state.get_run.return_value = Mock()
         self.mock_state.create_task.return_value = 42
 
-        with patch(
-            "flwr.supercore.servicers.appio_servicer.get_authenticated_run_id",
-            return_value=123,
-        ):
-            response = self.servicer.CreateTask(
-                CreateTaskRequest(
-                    type=TaskType.SERVER_APP,
-                    run_id=123,
-                    fab_hash="hash123",
-                ),
-                Mock(),
-            )
+        response = self.servicer.CreateTask(
+            CreateTaskRequest(
+                type=TaskType.SERVER_APP,
+                run_id=123,
+                fab_hash="hash123",
+            ),
+            context,
+        )
 
         self.assertIsInstance(response, CreateTaskResponse)
         self.assertEqual(response.task_id, 42)
+        self.mock_state.get_task_by_token.assert_called_once_with("task-token")
         self.mock_state.get_run.assert_called_once_with(123)
         self.mock_state.create_task.assert_called_once_with(
             task_type=TaskType.SERVER_APP,
@@ -201,21 +203,19 @@ class TestClientAppIoServicer(unittest.TestCase):
         """CreateTask should return NOT_FOUND when NodeState has no run."""
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
+        context.invocation_metadata.return_value = ((APP_TOKEN_HEADER, "task-token"),)
+        self.mock_state.get_task_by_token.return_value = Task(task_id=777, run_id=123)
         self.mock_state.get_run.return_value = None
 
-        with patch(
-            "flwr.supercore.servicers.appio_servicer.get_authenticated_run_id",
-            return_value=123,
-        ):
-            with self.assertRaises(grpc.RpcError):
-                self.servicer.CreateTask(
-                    CreateTaskRequest(
-                        type=TaskType.MODEL,
-                        run_id=123,
-                        model_ref="model://test",
-                    ),
-                    context,
-                )
+        with self.assertRaises(grpc.RpcError):
+            self.servicer.CreateTask(
+                CreateTaskRequest(
+                    type=TaskType.MODEL,
+                    run_id=123,
+                    model_ref="model://test",
+                ),
+                context,
+            )
 
         context.abort.assert_called_once_with(
             grpc.StatusCode.NOT_FOUND,

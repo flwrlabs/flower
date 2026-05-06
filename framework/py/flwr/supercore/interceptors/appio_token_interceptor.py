@@ -18,7 +18,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from contextvars import ContextVar
 from typing import Any, NoReturn, Protocol, cast
 
 import grpc
@@ -35,9 +34,12 @@ from flwr.supercore.utils import find_metadata_keys, get_metadata_str
 APP_TOKEN_HEADER = "flwr-app-token"
 AUTHENTICATION_FAILED_MESSAGE = "Authentication failed."
 
-_current_run_id: ContextVar[int | None] = ContextVar("current_run_id", default=None)
-
-_current_task: ContextVar[Task | None] = ContextVar("current_task", default=None)
+_TASK_TOKEN_REQUIRED_METHODS = {
+    "/flwr.proto.ServerAppIo/CreateTask",
+    "/flwr.proto.ServerAppIo/SendTaskHeartbeat",
+    "/flwr.proto.ClientAppIo/CreateTask",
+    "/flwr.proto.ClientAppIo/SendTaskHeartbeat",
+}
 
 
 class _TokenState(Protocol):
@@ -140,25 +142,16 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
 
             state = self._state_provider()
 
-            # Legacy: Validate both token->run lookup and run->token mapping.
-            run_id = state.get_run_id_by_token(token)
-            if run_id is not None and state.verify_token(run_id, token):
-                run_ctx_token = _current_run_id.set(run_id)
-                try:
+            if method not in _TASK_TOKEN_REQUIRED_METHODS:
+                # Legacy: Validate both token->run lookup and run->token mapping.
+                run_id = state.get_run_id_by_token(token)
+                if run_id is not None and state.verify_token(run_id, token):
                     return unary_handler(request, context)
-                finally:
-                    _current_run_id.reset(run_ctx_token)
 
-            # Validate task token and set task context for downstream handlers
+            # Validate task token for task-scoped methods.
             task = state.get_task_by_token(token)
             if task is not None:
-                run_ctx_token = _current_run_id.set(task.run_id)
-                task_ctx_token = _current_task.set(task)
-                try:
-                    return unary_handler(request, context)
-                finally:
-                    _current_task.reset(task_ctx_token)
-                    _current_run_id.reset(run_ctx_token)
+                return unary_handler(request, context)
 
             _abort_auth_denied(context)
 
@@ -167,37 +160,6 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             request_deserializer=method_handler.request_deserializer,
             response_serializer=method_handler.response_serializer,
         )
-
-
-def get_authenticated_task() -> Task:
-    """Return the task identity authenticated for the current RPC.
-
-    The task is available only while handling an RPC authenticated with an AppIo task
-    token.
-    """
-    ret = _current_task.get()
-    if ret is None:
-        raise RuntimeError(
-            "No authenticated task in the current RPC context. "
-            "This function must be called from a task-token-authenticated RPC handler."
-        )
-    return ret
-
-
-def get_authenticated_run_id() -> int:
-    """Return the run ID authenticated for the current RPC.
-
-    The run ID is available while handling an RPC authenticated with either an AppIo run
-    token or a task token.
-    """
-    ret = _current_run_id.get()
-    if ret is None:
-        raise RuntimeError(
-            "No authenticated run ID in the current RPC context. "
-            "This function must be called from an AppIo-token-authenticated RPC "
-            "handler."
-        )
-    return ret
 
 
 def create_serverappio_token_auth_server_interceptor(

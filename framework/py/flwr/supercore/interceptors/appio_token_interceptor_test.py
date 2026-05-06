@@ -45,8 +45,6 @@ from flwr.supercore.interceptors import (
     AppIoTokenServerInterceptor,
     create_clientappio_token_auth_server_interceptor,
     create_serverappio_token_auth_server_interceptor,
-    get_authenticated_run_id,
-    get_authenticated_task,
 )
 
 _ClientCallDetails = namedtuple(
@@ -244,11 +242,8 @@ class TestAppIoTokenServerInterceptor(TestCase):
         method = self._find_serverappio_method(requires_token=True)
         if method is None:
             self.skipTest("No token-required ServerAppIo method found in policy table.")
-        captured_run_id = None
 
         def _handler(_request: GrpcMessage, _context: grpc.ServicerContext) -> str:
-            nonlocal captured_run_id
-            captured_run_id = get_authenticated_run_id()
             return "ok"
 
         intercepted = interceptor.intercept_service(
@@ -263,29 +258,17 @@ class TestAppIoTokenServerInterceptor(TestCase):
         # cross-run use is expected.
         response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=7), Mock()))
         self.assertEqual(response, "ok")
-        self.assertEqual(captured_run_id, 7)
 
-    def test_valid_task_token_passes_and_sets_task_id(self) -> None:
-        """Protected methods should pass with a valid task token."""
+    def test_valid_task_token_passes_for_task_scoped_method(self) -> None:
+        """Task-scoped methods should pass with a valid task token."""
         state = Mock()
         state.get_run_id_by_token.return_value = None
         state.get_task_by_token.return_value = Task(task_id=123, run_id=7)
         interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
-        method = self._find_serverappio_method(requires_token=True)
-        if method is None:
-            self.skipTest("No token-required ServerAppIo method found in policy table.")
-        captured_task = None
-        captured_run_id = None
-
-        def _handler(_request: GrpcMessage, _context: grpc.ServicerContext) -> str:
-            nonlocal captured_task
-            nonlocal captured_run_id
-            captured_task = get_authenticated_task()
-            captured_run_id = get_authenticated_run_id()
-            return "ok"
+        method = "/flwr.proto.ServerAppIo/CreateTask"
 
         intercepted = interceptor.intercept_service(
-            lambda _: grpc.unary_unary_rpc_method_handler(_handler),
+            lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 method,
                 invocation_metadata=((APP_TOKEN_HEADER, "task-token"),),
@@ -294,11 +277,35 @@ class TestAppIoTokenServerInterceptor(TestCase):
 
         response = intercepted.unary_unary(GetNodesRequest(run_id=7), Mock())
         self.assertEqual(response, "ok")
-        self.assertIsNotNone(captured_task)
-        self.assertEqual(cast(Task, captured_task).task_id, 123)
-        self.assertEqual(captured_run_id, 7)
-        state.get_run_id_by_token.assert_called_once_with("task-token")
+        state.get_run_id_by_token.assert_not_called()
         state.get_task_by_token.assert_called_once_with("task-token")
+
+    def test_task_token_required_method_rejects_valid_run_token(self) -> None:
+        """Task-scoped methods should not accept a run token."""
+        state = Mock()
+        state.get_run_id_by_token.return_value = 7
+        state.verify_token.return_value = True
+        state.get_task_by_token.return_value = None
+        interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        intercepted = interceptor.intercept_service(
+            lambda _: _make_unary_handler(),
+            _HandlerCallDetails(
+                "/flwr.proto.ServerAppIo/CreateTask",
+                invocation_metadata=((APP_TOKEN_HEADER, "run-token"),),
+            ),
+        )
+
+        with self.assertRaises(grpc.RpcError):
+            intercepted.unary_unary(GetNodesRequest(run_id=7), context)
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
+        )
+        state.get_run_id_by_token.assert_not_called()
+        state.verify_token.assert_not_called()
+        state.get_task_by_token.assert_called_once_with("run-token")
 
     def test_metadata_token_used_even_when_request_has_token(self) -> None:
         """Metadata token should be authoritative when both sources exist."""
@@ -467,14 +474,16 @@ class TestFactoryFunctions(TestCase):
 
     def test_serverappio_factory_uses_server_policy(self) -> None:
         """ServerAppIo factory should enforce ServerAppIo policy semantics."""
-        state = _TokenState({"valid-token": 1})
+        state = Mock()
+        state.get_run_id_by_token.return_value = None
+        state.get_task_by_token.return_value = Task(task_id=123, run_id=1)
         interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
 
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 "/flwr.proto.ServerAppIo/CreateTask",
-                invocation_metadata=((APP_TOKEN_HEADER, "valid-token"),),
+                invocation_metadata=((APP_TOKEN_HEADER, "task-token"),),
             ),
         )
 
@@ -483,14 +492,16 @@ class TestFactoryFunctions(TestCase):
 
     def test_clientappio_factory_uses_appio_create_task_policy(self) -> None:
         """ClientAppIo factory should also allow the shared CreateTask path."""
-        state = _TokenState({"valid-token": 1})
+        state = Mock()
+        state.get_run_id_by_token.return_value = None
+        state.get_task_by_token.return_value = Task(task_id=123, run_id=1)
         interceptor = create_clientappio_token_auth_server_interceptor(lambda: state)
 
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 "/flwr.proto.ClientAppIo/CreateTask",
-                invocation_metadata=((APP_TOKEN_HEADER, "valid-token"),),
+                invocation_metadata=((APP_TOKEN_HEADER, "task-token"),),
             ),
         )
 

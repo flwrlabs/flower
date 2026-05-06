@@ -32,13 +32,15 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import (
     TASK_TYPES_REQUIRING_CONNECTOR_REF,
     TASK_TYPES_REQUIRING_FAB_HASH,
     TASK_TYPES_REQUIRING_MODEL_REF,
     TaskType,
 )
-from flwr.supercore.interceptors import get_authenticated_run_id, get_authenticated_task
+from flwr.supercore.interceptors import APP_TOKEN_HEADER, AUTHENTICATION_FAILED_MESSAGE
+from flwr.supercore.utils import get_metadata_str
 
 from ..corestate import CoreState
 
@@ -81,8 +83,9 @@ class AppIoServicer(ABC):
         """Handle a heartbeat for a claimed task."""
         log(DEBUG, "AppIoServicer.SendTaskHeartbeat")
 
-        task = get_authenticated_task()
-        success = self.state().acknowledge_task_heartbeat(task.task_id)
+        state = self.state()
+        task = _get_task_from_metadata_token(state=state, context=context)
+        success = state.acknowledge_task_heartbeat(task.task_id)
         return SendTaskHeartbeatResponse(success=success)
 
     def CreateTask(
@@ -91,7 +94,10 @@ class AppIoServicer(ABC):
         """Create a task."""
         log(DEBUG, "AppIoServicer.CreateTask")
 
-        authenticated_run_id = get_authenticated_run_id()
+        state = self.state()
+        authenticated_run_id = _get_task_from_metadata_token(
+            state=state, context=context
+        ).run_id
         if request.run_id != authenticated_run_id:
             context.abort(
                 grpc.StatusCode.PERMISSION_DENIED,
@@ -99,7 +105,6 @@ class AppIoServicer(ABC):
             )
             raise RuntimeError("This line should never be reached.")
 
-        state = self.state()
         if not self.has_run(authenticated_run_id):
             context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
             raise RuntimeError("This line should never be reached.")
@@ -120,6 +125,24 @@ class AppIoServicer(ABC):
             raise RuntimeError("This line should never be reached.")
 
         return CreateTaskResponse(task_id=task_id)
+
+
+def _get_task_from_metadata_token(
+    state: CoreState,
+    context: grpc.ServicerContext,
+) -> Task:
+    """Resolve the authenticated task from the App token metadata."""
+    token = get_metadata_str(context.invocation_metadata(), APP_TOKEN_HEADER)
+    if token is None:
+        context.abort(grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE)
+        raise RuntimeError("This line should never be reached.")
+
+    task = state.get_task_by_token(token)
+    if task is None:
+        context.abort(grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE)
+        raise RuntimeError("This line should never be reached.")
+
+    return task
 
 
 def _validate_create_task_request(
