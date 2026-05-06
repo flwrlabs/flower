@@ -21,6 +21,7 @@ from typing import cast
 import grpc
 
 from flwr.common import Context
+from flwr.common.constant import Status
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -94,8 +95,9 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         # Initialize state connection
         state = self.state_factory.state()
 
-        # Get run IDs with pending messages
-        run_ids = state.get_run_ids_with_pending_messages()
+        # Get run IDs with pending tasks
+        tasks = state.get_tasks(statuses=[Status.PENDING])
+        run_ids = [task.run_id for task in tasks]
 
         # Return run IDs
         return ListAppsToLaunchResponse(run_ids=run_ids)
@@ -110,7 +112,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         state = self.state_factory.state()
 
         # Get token for the task
-        tasks = state.get_tasks()
+        tasks = state.get_tasks(statuses=[Status.PENDING])
         task = [t for t in tasks if t.run_id == request.run_id][0]
         token = state.claim_task(task.task_id)
 
@@ -148,7 +150,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         state = self.state_factory.state()
 
         # Retrieve context, run and fab for this run
-        context = cast(Context, state.get_context(run_id))
+        serverapp_context = cast(Context, state.get_context(run_id))
         run = cast(Run, state.get_run(run_id))
 
         # Retrieve FAB from NodeState
@@ -171,7 +173,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         if state.activate_task(task_id=task.task_id):
             log(INFO, "Started task %d of run %s", task.task_id, run_id)
             return PullAppInputsResponse(
-                context=context_to_proto(context),
+                context=context_to_proto(serverapp_context),
                 run=run_to_proto(run),
                 fab=fab_to_proto(fab),
             )
