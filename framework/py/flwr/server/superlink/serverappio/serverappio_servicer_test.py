@@ -1072,9 +1072,8 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Request token to transition to STARTING
         token_request = RequestTokenRequest(run_id=run_id)
         token_response, call = self._request_token.with_call(request=token_request)
-        self._appio_auth_interceptor._token = (
-            token_response.token
-        )  # pylint: disable=W0212
+        # pylint: disable-next=protected-access
+        self._appio_auth_interceptor._token = token_response.token
 
         # Assert: Response is successful and run status is STARTING
         assert isinstance(token_response, RequestTokenResponse)
