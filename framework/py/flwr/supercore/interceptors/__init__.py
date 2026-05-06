@@ -22,7 +22,7 @@ from .appio_token_interceptor import (
     AppIoTokenServerInterceptor,
     create_clientappio_token_auth_server_interceptor,
     create_serverappio_token_auth_server_interceptor,
-    get_authenticated_task_id,
+    get_authenticated_task,
 )
 from .runtime_version_interceptor import (
     RuntimeVersionClientInterceptor,
@@ -50,5 +50,5 @@ __all__ = [
     "create_serverappio_runtime_version_server_interceptor",
     "create_serverappio_superexec_auth_server_interceptor",
     "create_serverappio_token_auth_server_interceptor",
-    "get_authenticated_task_id",
+    "get_authenticated_task",
 ]
