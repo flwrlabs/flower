@@ -77,6 +77,7 @@ def test_get_details_with_valid_federation() -> None:
         status=RunStatus(status="running", sub_status="", details=""),
         flwr_aid=NOOP_FLWR_AID,
         federation=NOOP_FEDERATION,
+        primary_task_id=None,
         bytes_sent=1024,
         bytes_recv=512,
         clientapp_runtime=1.1,
@@ -94,6 +95,7 @@ def test_get_details_with_valid_federation() -> None:
         status=RunStatus(status="finished", sub_status="", details=""),
         flwr_aid=NOOP_FLWR_AID,
         federation=NOOP_FEDERATION,
+        primary_task_id=None,
         bytes_sent=2048,
         bytes_recv=1024,
         clientapp_runtime=1.2,
@@ -247,11 +249,10 @@ def test_has_node() -> None:
     ]
 )  # type: ignore
 def test_can_execute(action: ActionType) -> None:
-    """Test can_execute method returns True for NOOP_FEDERATION."""
+    """Test can_execute completes for allowed actions."""
     manager = NoOpFederationManager()
 
-    allowed = manager.can_execute(NOOP_FLWR_AID, action, ActionContext())
-    assert allowed is True
+    manager.can_execute(NOOP_FLWR_AID, action, ActionContext())
 
 
 def test_get_federations() -> None:

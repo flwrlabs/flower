@@ -108,3 +108,8 @@ In this setup, the SuperLink downloads the app from Flower Hub and—when using 
    Flower version compatibility does not match the Flower version used by the
    local environment (Simulation) or the SuperNodes (Deployment). See
    :doc:`fab-format-version`.
+
+.. tip::
+   Before running a Hub app, you can inspect the app page's
+   :code:`Verifications` section to evaluate which signers you trust. For
+   details on how app signing works, see :doc:`how-to-sign-hub-apps`.

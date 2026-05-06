@@ -36,7 +36,6 @@ from flwr.common.config import (
 from flwr.common.constant import (
     RUNTIME_DEPENDENCY_INSTALL,
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
-    ExecPluginType,
     Status,
     SubStatus,
 )
@@ -63,7 +62,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppOutputsRequest,
 )
 from flwr.proto.run_pb2 import UpdateRunStatusRequest  # pylint: disable=E0611
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.server.grid.grpc_grid import GrpcGrid
 from flwr.server.run_serverapp import run as run_
 from flwr.supercore.app_utils import start_parent_process_monitor
@@ -72,37 +70,16 @@ from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
-from flwr.supercore.superexec.plugin import ServerAppExecPlugin
-from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning
+from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 
 def flwr_serverapp() -> None:
     """Run process-isolated Flower ServerApp."""
+    args = _parse_args_run_flwr_serverapp().parse_args()
+
     # Capture stdout/stderr
     log_queue: Queue[str | None] = Queue()
     mirror_output_to_queue(log_queue)
-
-    args = _parse_args_run_flwr_serverapp().parse_args()
-
-    if not args.insecure:
-        flwr_exit(
-            ExitCode.COMMON_TLS_NOT_SUPPORTED,
-            "`flwr-serverapp` does not support TLS yet.",
-        )
-
-    # Disallow long-running `flwr-serverapp` processes
-    if args.token is None:
-        run_with_deprecation_warning(
-            cmd="flwr-serverapp",
-            plugin_type=ExecPluginType.SERVER_APP,
-            plugin_class=ServerAppExecPlugin,
-            stub_class=ServerAppIoStub,
-            appio_api_address=args.serverappio_api_address,
-            parent_pid=args.parent_pid,
-            warn_run_once=args.run_once,
-            runtime_dependency_install=args.runtime_dependency_install,
-        )
-        return
 
     log(INFO, "Start `flwr-serverapp` process")
     log(
@@ -115,7 +92,10 @@ def flwr_serverapp() -> None:
         serverappio_api_address=args.serverappio_api_address,
         log_queue=log_queue,
         token=args.token,
-        certificates=None,
+        insecure=args.insecure,
+        certificates=validate_and_resolve_root_certificates(
+            args.root_certificates, args.insecure
+        ),
         parent_pid=args.parent_pid,
         runtime_dependency_install=args.runtime_dependency_install,
     )
@@ -128,6 +108,7 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     serverappio_api_address: str,
     log_queue: Queue[str | None],
     token: str,
+    insecure: bool,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
@@ -190,6 +171,7 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         # Initialize the GrpcGrid
         grid = GrpcGrid(
             serverappio_service_address=serverappio_api_address,
+            insecure=insecure,
             root_certificates=certificates,
             token=token,
         )

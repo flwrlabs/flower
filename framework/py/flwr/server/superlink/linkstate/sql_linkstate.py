@@ -100,6 +100,40 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """Return the FederationManager instance."""
         return self._federation_manager
 
+    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        task_type: str,
+        run_id: int,
+        fab_hash: str | None = None,
+        model_ref: str | None = None,
+        connector_ref: str | None = None,
+    ) -> int | None:
+        """Create a task and make it the run's primary task if none exists."""
+        with self.session():
+            task_id = super().create_task(
+                task_type=task_type,
+                run_id=run_id,
+                fab_hash=fab_hash,
+                model_ref=model_ref,
+                connector_ref=connector_ref,
+            )
+            if task_id is None:
+                return None
+
+            self.query(
+                """
+                UPDATE run
+                SET primary_task_id = :task_id
+                WHERE run_id = :run_id AND primary_task_id IS NULL
+                """,
+                {
+                    "run_id": uint64_to_int64(run_id),
+                    "task_id": uint64_to_int64(task_id),
+                },
+            )
+
+            return task_id
+
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
         # Validate message
@@ -543,7 +577,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """Create, store in the link state, and return `node_id`."""
         # Sample a random uint64 as node_id
         uint64_node_id = generate_rand_int_from_bytes(
-            NODE_ID_NUM_BYTES, exclude=[SUPERLINK_NODE_ID, 0]
+            NODE_ID_NUM_BYTES, exclude={SUPERLINK_NODE_ID, 0}
         )
 
         # Convert the uint64 value to sint64 for SQLite
@@ -815,14 +849,15 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 query = """
                     INSERT INTO run
                     (run_id, fab_id, fab_version, fab_hash, override_config, federation,
-                    federation_config, run_type, pending_at, starting_at, running_at,
-                    finished_at, usage_reported_at, sub_status, details, flwr_aid,
-                    bytes_sent, bytes_recv, clientapp_runtime)
+                    primary_task_id, federation_config, run_type, pending_at,
+                    starting_at, running_at, finished_at, usage_reported_at,
+                    sub_status, details, flwr_aid, bytes_sent, bytes_recv,
+                    clientapp_runtime)
                     VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
-                    :federation, :federation_config, :run_type, :pending_at,
-                    :starting_at, :running_at, :finished_at, :usage_reported_at,
-                    :sub_status, :details, :flwr_aid, :bytes_sent, :bytes_recv,
-                    :clientapp_runtime)
+                    :federation, :primary_task_id, :federation_config, :run_type,
+                    :pending_at, :starting_at, :running_at, :finished_at,
+                    :usage_reported_at, :sub_status, :details, :flwr_aid,
+                    :bytes_sent, :bytes_recv, :clientapp_runtime)
                 """
                 override_config_json = json.dumps(override_config)
                 params = {
@@ -832,6 +867,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     "fab_hash": fab_hash or "",
                     "override_config": override_config_json,
                     "federation": federation,
+                    "primary_task_id": None,
                     "federation_config": fed_config_json,
                     "run_type": run_type,
                     "pending_at": now().isoformat(),
@@ -954,6 +990,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 ),
                 flwr_aid=row["flwr_aid"],
                 federation=row["federation"],
+                primary_task_id=(
+                    int64_to_uint64(row["primary_task_id"])
+                    if row["primary_task_id"] is not None
+                    else None
+                ),
                 bytes_sent=row["bytes_sent"],
                 bytes_recv=row["bytes_recv"],
                 clientapp_runtime=row["clientapp_runtime"],

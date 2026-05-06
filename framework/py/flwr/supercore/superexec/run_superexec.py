@@ -16,13 +16,11 @@
 
 
 import time
-from logging import WARN
 from typing import Any
 
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
-from flwr.common.logger import log
 from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.common.serde import run_from_proto
 from flwr.common.telemetry import EventType
@@ -41,6 +39,7 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
     CLIENTAPPIO_SUPEREXEC_METHODS,
     SERVERAPPIO_SUPEREXEC_METHODS,
 )
+from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 from .plugin import ExecPlugin
 from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
@@ -50,6 +49,8 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
     plugin_class: type[ExecPlugin],
     stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
     appio_api_address: str,
+    insecure: bool,
+    root_certificates_path: str | None = None,
     superexec_auth_secret: bytes | None = None,
     plugin_config: dict[str, Any] | None = None,
     parent_pid: int | None = None,
@@ -66,6 +67,11 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
         The gRPC stub class for the AppIO API.
     appio_api_address : str
         The address of the AppIO API.
+    insecure : bool
+        Whether to connect to the AppIO API without TLS.
+    root_certificates_path : Optional[str] (default: None)
+        The path to the PEM-encoded root certificate file used for secure TLS
+        connections.
     superexec_auth_secret : Optional[bytes] (default: None)
         Secret used to derive an HMAC signing key for SuperExec auth.
     plugin_config : Optional[dict[str, Any]] (default: None)
@@ -104,11 +110,12 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
         grpc_servers.append(health_server)
 
     # Create the channel to the AppIO API
-    # No TLS support for now, so insecure connection
     channel = create_channel(
         server_address=appio_api_address,
-        insecure=True,
-        root_certificates=None,
+        insecure=insecure,
+        root_certificates=validate_and_resolve_root_certificates(
+            root_certificates_path, insecure
+        ),
         interceptors=interceptors,
     )
     channel.subscribe(on_channel_state_change)
@@ -133,6 +140,8 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
     # Create the SuperExec plugin instance
     plugin = plugin_class(
         appio_api_address=appio_api_address,
+        insecure=insecure,
+        root_certificates_path=root_certificates_path,
         get_run=get_run,
         runtime_dependency_install=runtime_dependency_install,
     )
@@ -187,48 +196,3 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
             time.sleep(1)
     finally:
         channel.close()
-
-
-def run_with_deprecation_warning(  # pylint: disable=R0913, R0917
-    cmd: str,
-    plugin_type: str,
-    plugin_class: type[ExecPlugin],
-    stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
-    appio_api_address: str,
-    parent_pid: int | None,
-    warn_run_once: bool,
-    superexec_auth_secret: bytes | None = None,
-    runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
-) -> None:
-    """Log a deprecation warning and run the equivalent `flower-superexec` command.
-
-    Used for legacy long-running `flwr-*` commands (i.e., without `--token`) that will
-    be removed in favor of `flower-superexec`.
-    """
-    log(
-        WARN,
-        "Directly executing `%s` is DEPRECATED and will be prohibited "
-        "in a future release. Please use `flower-superexec` instead.",
-        cmd,
-    )
-    log(WARN, "For now, the following command is being run automatically:")
-    new_cmd = f"flower-superexec --insecure --plugin-type {plugin_type} "
-    new_cmd += f"--appio-api-address {appio_api_address} "
-    if parent_pid is not None:
-        new_cmd += f"--parent-pid {parent_pid}"
-    if runtime_dependency_install:
-        new_cmd += " --allow-runtime-dependency-installation"
-    log(WARN, new_cmd)
-
-    # Warn about unsupported `--run-once` flag
-    if warn_run_once:
-        log(WARN, "`flower-superexec` does not support the `--run-once` flag.")
-
-    run_superexec(
-        plugin_class=plugin_class,
-        stub_class=stub_class,
-        appio_api_address=appio_api_address,
-        superexec_auth_secret=superexec_auth_secret,
-        parent_pid=parent_pid,
-        runtime_dependency_install=runtime_dependency_install,
-    )

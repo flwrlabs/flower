@@ -59,6 +59,9 @@ class ExitCode:
     COMMON_ADDRESS_INVALID = 600
     COMMON_MISSING_EXTRA_REST = 601
     COMMON_TLS_NOT_SUPPORTED = 602
+    COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE = 603
+    COMMON_PATH_INVALID = 604
+    COMMON_TLS_SERVER_CERTIFICATES_INVALID = 605
 
     # Simulation exit codes (700-799)
     SIMULATION_EXCEPTION = 700
@@ -164,6 +167,15 @@ To use the REST API, install `flwr` with the `rest` extra:
     `pip install "flwr[rest]"`.
 """,
     ExitCode.COMMON_TLS_NOT_SUPPORTED: "Please use the '--insecure' flag.",
+    ExitCode.COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE: (
+        "The '--root-certificates' option cannot be used together with '--insecure'."
+    ),
+    ExitCode.COMMON_PATH_INVALID: (
+        "The provided path is invalid or does not point to the expected file."
+    ),
+    ExitCode.COMMON_TLS_SERVER_CERTIFICATES_INVALID: (
+        "TLS server certificate configuration is incomplete or invalid."
+    ),
     # Simulation exit codes (700-799)
     ExitCode.SIMULATION_EXCEPTION: (
         "An unhandled exception occurred when running the simulation."

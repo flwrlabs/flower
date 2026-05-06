@@ -5,9 +5,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as transforms
+from datasets import load_dataset
 from opacus import PrivacyEngine
 from torch.utils.data import DataLoader
-from torchvision.datasets import CIFAR10
 
 from flwr.app import Context
 from flwr.client import NumPyClient, start_client
@@ -26,6 +26,21 @@ PRIVACY_PARAMS = {
     "max_grad_norm": 1.2,
 }
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+
+class Cifar10Dataset(torch.utils.data.Dataset):
+    """CIFAR-10 dataset loaded from Hugging Face."""
+
+    def __init__(self, split, transform):
+        self.dataset = load_dataset("uoft-cs/cifar10", split=split)
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        item = self.dataset[idx]
+        return self.transform(item["img"]), item["label"]
 
 
 # Define model used for training.
@@ -80,7 +95,7 @@ def load_data():
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
     )
-    data = CIFAR10("./../data", train=True, download=True, transform=transform)
+    data = Cifar10Dataset("train", transform=transform)
     split = math.floor(len(data) * 0.01 * PARAMS["train_split"])
     trainset = torch.utils.data.Subset(data, list(range(0, split)))
     testset = torch.utils.data.Subset(

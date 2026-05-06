@@ -15,7 +15,6 @@
 """Utility functions for State."""
 
 
-from os import urandom
 from typing import Any
 
 from flwr.common import ConfigRecord, Context, Error, Message, Metadata, now, serde
@@ -37,6 +36,9 @@ from flwr.proto.message_pb2 import Context as ProtoContext
 from flwr.proto.recorddict_pb2 import ConfigRecord as ProtoConfigRecord
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE
+from flwr.supercore.corestate.utils import (
+    generate_rand_int_from_bytes as corestate_generate_rand_int_from_bytes,
+)
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 # pylint: enable=E0611
@@ -68,18 +70,10 @@ NODE_UNAVAILABLE_ERROR_REASON = (
 
 
 def generate_rand_int_from_bytes(
-    num_bytes: int, exclude: list[int] | None = None
+    num_bytes: int, exclude: set[int] | None = None
 ) -> int:
-    """Generate a random unsigned integer from `num_bytes` bytes.
-
-    If `exclude` is set, this function guarantees such number is not returned.
-    """
-    num = int.from_bytes(urandom(num_bytes), "little", signed=False)
-
-    if exclude:
-        while num in exclude:
-            num = int.from_bytes(urandom(num_bytes), "little", signed=False)
-    return num
+    """Generate a random unsigned integer from `num_bytes` bytes."""
+    return corestate_generate_rand_int_from_bytes(num_bytes, exclude)
 
 
 def convert_uint64_values_in_dict_to_sint64(

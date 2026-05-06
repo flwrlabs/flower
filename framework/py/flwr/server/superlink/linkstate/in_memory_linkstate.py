@@ -102,6 +102,32 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """Get the FederationManager instance."""
         return self._federation_manager
 
+    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        task_type: str,
+        run_id: int,
+        fab_hash: str | None = None,
+        model_ref: str | None = None,
+        connector_ref: str | None = None,
+    ) -> int | None:
+        """Create a task and make it the run's primary task if none exists."""
+        with self.lock:
+            task_id = super().create_task(
+                task_type=task_type,
+                run_id=run_id,
+                fab_hash=fab_hash,
+                model_ref=model_ref,
+                connector_ref=connector_ref,
+            )
+            if task_id is None:
+                return None
+
+            run_record = self.run_ids.get(run_id)
+            if run_record is not None and run_record.run.primary_task_id is None:
+                run_record.run.primary_task_id = task_id
+
+            return task_id
+
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
         # Validate message
@@ -380,7 +406,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """Create, store in the link state, and return `node_id`."""
         # Sample a random int64 as node_id
         node_id = generate_rand_int_from_bytes(
-            NODE_ID_NUM_BYTES, exclude=[SUPERLINK_NODE_ID, 0]
+            NODE_ID_NUM_BYTES, exclude={SUPERLINK_NODE_ID, 0}
         )
 
         with self.lock:
@@ -571,6 +597,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         ),
                         flwr_aid=flwr_aid if flwr_aid else "",
                         federation=federation,
+                        primary_task_id=None,
                         bytes_sent=0,
                         bytes_recv=0,
                         clientapp_runtime=0.0,
@@ -755,12 +782,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 return True
             return False
 
-    def _on_tokens_expired(self, expired_records: list[tuple[int, float]]) -> None:
+    def _on_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
         """Transition runs with expired tokens to failed status.
 
         Parameters
         ----------
-        expired_records : list[tuple[int, float]]
+        expired_records : list[tuple[int, int]]
             List of tuples containing (run_id, active_until timestamp)
             for expired tokens.
         """

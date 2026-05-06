@@ -194,7 +194,7 @@ class InMemoryNodeState(
             ret -= set(self.token_store.keys())
             return list(ret)
 
-    def _on_tokens_expired(self, expired_records: list[tuple[int, float]]) -> None:
+    def _on_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
         """Insert error replies for messages associated with expired tokens."""
         with self.lock_msg_store:
             # Find all retrieved messages associated with expired run IDs
