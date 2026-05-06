@@ -35,6 +35,7 @@ from flwr.supercore.utils import find_metadata_keys, get_metadata_str
 APP_TOKEN_HEADER = "flwr-app-token"
 AUTHENTICATION_FAILED_MESSAGE = "Authentication failed."
 
+_current_run_id: ContextVar[int | None] = ContextVar("current_run_id", default=None)
 
 _current_task: ContextVar[Task | None] = ContextVar("current_task", default=None)
 
@@ -142,16 +143,22 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             # Legacy: Validate both token->run lookup and run->token mapping.
             run_id = state.get_run_id_by_token(token)
             if run_id is not None and state.verify_token(run_id, token):
-                return unary_handler(request, context)
+                run_ctx_token = _current_run_id.set(run_id)
+                try:
+                    return unary_handler(request, context)
+                finally:
+                    _current_run_id.reset(run_ctx_token)
 
             # Validate task token and set task context for downstream handlers
             task = state.get_task_by_token(token)
             if task is not None:
-                ctx_token = _current_task.set(task)
+                run_ctx_token = _current_run_id.set(task.run_id)
+                task_ctx_token = _current_task.set(task)
                 try:
                     return unary_handler(request, context)
                 finally:
-                    _current_task.reset(ctx_token)
+                    _current_task.reset(task_ctx_token)
+                    _current_run_id.reset(run_ctx_token)
 
             _abort_auth_denied(context)
 
@@ -173,6 +180,22 @@ def get_authenticated_task() -> Task:
         raise RuntimeError(
             "No authenticated task in the current RPC context. "
             "This function must be called from a task-token-authenticated RPC handler."
+        )
+    return ret
+
+
+def get_authenticated_run_id() -> int:
+    """Return the run ID authenticated for the current RPC.
+
+    The run ID is available while handling an RPC authenticated with either an AppIo
+    run token or a task token.
+    """
+    ret = _current_run_id.get()
+    if ret is None:
+        raise RuntimeError(
+            "No authenticated run ID in the current RPC context. "
+            "This function must be called from an AppIo-token-authenticated RPC "
+            "handler."
         )
     return ret
 

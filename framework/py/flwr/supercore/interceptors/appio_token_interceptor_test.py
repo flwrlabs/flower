@@ -45,6 +45,7 @@ from flwr.supercore.interceptors import (
     AppIoTokenServerInterceptor,
     create_clientappio_token_auth_server_interceptor,
     create_serverappio_token_auth_server_interceptor,
+    get_authenticated_run_id,
     get_authenticated_task,
 )
 
@@ -243,9 +244,15 @@ class TestAppIoTokenServerInterceptor(TestCase):
         method = self._find_serverappio_method(requires_token=True)
         if method is None:
             self.skipTest("No token-required ServerAppIo method found in policy table.")
+        captured_run_id = None
+
+        def _handler(_request: GrpcMessage, _context: grpc.ServicerContext) -> str:
+            nonlocal captured_run_id
+            captured_run_id = get_authenticated_run_id()
+            return "ok"
 
         intercepted = interceptor.intercept_service(
-            lambda _: _make_unary_handler(),
+            lambda _: grpc.unary_unary_rpc_method_handler(_handler),
             _HandlerCallDetails(
                 method,
                 invocation_metadata=((APP_TOKEN_HEADER, "valid"),),
@@ -256,23 +263,25 @@ class TestAppIoTokenServerInterceptor(TestCase):
         # cross-run use is expected.
         response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=7), Mock()))
         self.assertEqual(response, "ok")
-        # Run-id mismatch deny coverage belongs to the
-        # follow-up PR that enforces run binding.
+        self.assertEqual(captured_run_id, 7)
 
     def test_valid_task_token_passes_and_sets_task_id(self) -> None:
         """Protected methods should pass with a valid task token."""
         state = Mock()
         state.get_run_id_by_token.return_value = None
-        state.get_task_by_token.return_value = Mock(task_id=123)
+        state.get_task_by_token.return_value = Task(task_id=123, run_id=7)
         interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
         method = self._find_serverappio_method(requires_token=True)
         if method is None:
             self.skipTest("No token-required ServerAppIo method found in policy table.")
         captured_task = None
+        captured_run_id = None
 
         def _handler(_request: GrpcMessage, _context: grpc.ServicerContext) -> str:
             nonlocal captured_task
+            nonlocal captured_run_id
             captured_task = get_authenticated_task()
+            captured_run_id = get_authenticated_run_id()
             return "ok"
 
         intercepted = interceptor.intercept_service(
@@ -286,7 +295,8 @@ class TestAppIoTokenServerInterceptor(TestCase):
         response = intercepted.unary_unary(GetNodesRequest(run_id=7), Mock())
         self.assertEqual(response, "ok")
         self.assertIsNotNone(captured_task)
-        self.assertEqual(cast(Mock, captured_task).task_id, 123)
+        self.assertEqual(cast(Task, captured_task).task_id, 123)
+        self.assertEqual(captured_run_id, 7)
         state.get_run_id_by_token.assert_called_once_with("task-token")
         state.get_task_by_token.assert_called_once_with("task-token")
 

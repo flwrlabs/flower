@@ -38,7 +38,7 @@ from flwr.supercore.constant import (
     TASK_TYPES_REQUIRING_MODEL_REF,
     TaskType,
 )
-from flwr.supercore.interceptors import get_authenticated_task
+from flwr.supercore.interceptors import get_authenticated_run_id, get_authenticated_task
 
 from ..corestate import CoreState
 
@@ -91,8 +91,16 @@ class AppIoServicer(ABC):
         """Create a task."""
         log(DEBUG, "AppIoServicer.CreateTask")
 
+        authenticated_run_id = get_authenticated_run_id()
+        if request.run_id != authenticated_run_id:
+            context.abort(
+                grpc.StatusCode.PERMISSION_DENIED,
+                "`run_id` does not match authenticated token.",
+            )
+            raise RuntimeError("This line should never be reached.")
+
         state = self.state()
-        if not self.has_run(request.run_id):
+        if not self.has_run(authenticated_run_id):
             context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
             raise RuntimeError("This line should never be reached.")
 
@@ -100,7 +108,7 @@ class AppIoServicer(ABC):
 
         task_id = state.create_task(
             task_type=request.type,
-            run_id=request.run_id,
+            run_id=authenticated_run_id,
             fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
             model_ref=request.model_ref if request.HasField("model_ref") else None,
             connector_ref=(

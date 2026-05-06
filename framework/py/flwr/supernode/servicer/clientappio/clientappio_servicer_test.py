@@ -16,7 +16,7 @@
 
 
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import grpc
 from parameterized import parameterized
@@ -173,14 +173,18 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_state.get_run.return_value = Mock()
         self.mock_state.create_task.return_value = 42
 
-        response = self.servicer.CreateTask(
-            CreateTaskRequest(
-                type=TaskType.SERVER_APP,
-                run_id=123,
-                fab_hash="hash123",
-            ),
-            Mock(),
-        )
+        with patch(
+            "flwr.supercore.servicers.appio_servicer.get_authenticated_run_id",
+            return_value=123,
+        ):
+            response = self.servicer.CreateTask(
+                CreateTaskRequest(
+                    type=TaskType.SERVER_APP,
+                    run_id=123,
+                    fab_hash="hash123",
+                ),
+                Mock(),
+            )
 
         self.assertIsInstance(response, CreateTaskResponse)
         self.assertEqual(response.task_id, 42)
@@ -199,15 +203,19 @@ class TestClientAppIoServicer(unittest.TestCase):
         context.abort.side_effect = grpc.RpcError()
         self.mock_state.get_run.return_value = None
 
-        with self.assertRaises(grpc.RpcError):
-            self.servicer.CreateTask(
-                CreateTaskRequest(
-                    type=TaskType.MODEL,
-                    run_id=123,
-                    model_ref="model://test",
-                ),
-                context,
-            )
+        with patch(
+            "flwr.supercore.servicers.appio_servicer.get_authenticated_run_id",
+            return_value=123,
+        ):
+            with self.assertRaises(grpc.RpcError):
+                self.servicer.CreateTask(
+                    CreateTaskRequest(
+                        type=TaskType.MODEL,
+                        run_id=123,
+                        model_ref="model://test",
+                    ),
+                    context,
+                )
 
         context.abort.assert_called_once_with(
             grpc.StatusCode.NOT_FOUND,
