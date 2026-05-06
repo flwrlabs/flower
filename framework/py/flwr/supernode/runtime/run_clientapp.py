@@ -15,7 +15,7 @@
 """Flower ClientApp process."""
 
 
-from logging import DEBUG, ERROR, INFO
+from logging import DEBUG, ERROR
 
 import grpc
 
@@ -25,7 +25,7 @@ from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
 from flwr.common import Context, Message
 from flwr.common.config import get_project_dir
-from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode, SubStatus
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
@@ -72,10 +72,9 @@ from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
-from flwr.supercore.utils import mask_string
 
 
-def run_clientapp(  # pylint: disable=R0913, R0914, R0917
+def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     clientappio_api_address: str,
     token: str,
     insecure: bool,
@@ -120,7 +119,10 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
         heartbeat_sender.start()
 
         # Pull Message, Context, Run and FAB from SuperNode
-        message, context, run, fab = pull_appinputs(stub=stub, token=token)
+        message, context, run, fab = pull_appinputs(stub)
+        reply_message: Message | None = None
+        sub_status = SubStatus.FAILED
+        details = "ClientApp task failed due to unknown reason"
 
         try:
 
@@ -165,6 +167,8 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
 
             # Execute ClientApp
             reply_message = client_app(message=message, context=context)
+            sub_status = SubStatus.COMPLETED
+            details = ""
 
         except Exception as ex:  # pylint: disable=broad-exception-caught
             # Don't update/change NodeState
@@ -182,10 +186,25 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
             # Create error message
             reply_message = Message(Error(code=e_code, reason=reason), reply_to=message)
 
-        # Push Message and Context to SuperNode
-        _ = push_appoutputs(
-            stub=stub, token=token, message=reply_message, context=context
-        )
+            sub_status = SubStatus.FAILED
+            details = reason
+        finally:
+            if reply_message is None:
+                reply_message = Message(
+                    Error(
+                        code=ErrorCode.CLIENT_APP_CRASHED,
+                        reason=details,
+                    ),
+                    reply_to=message,
+                )
+
+            push_appoutputs(
+                stub=stub,
+                message=reply_message,
+                context=context,
+                sub_status=sub_status,
+                details=details,
+            )
 
     except grpc.RpcError as e:
         log(ERROR, "GRPC error occurred: %s", str(e))
@@ -196,24 +215,18 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
     )
 
 
-def pull_appinputs(
-    stub: ClientAppIoStub, token: str
-) -> tuple[Message, Context, Run, Fab]:
+def pull_appinputs(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
     """Pull AppInputs from SuperNode."""
-    masked_token = mask_string(token)
-    log(INFO, "[flwr-clientapp] Pull `AppInputs` for token %s", masked_token)
     try:
         # Pull Context, Run and FAB
-        res: PullAppInputsResponse = stub.PullAppInputs(
-            PullAppInputsRequest(token=token)
-        )
+        res: PullAppInputsResponse = stub.PullAppInputs(PullAppInputsRequest())
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
         fab = fab_from_proto(res.fab)
 
         # Pull and inflate the message
         pull_msg_res: PullAppMessagesResponse = stub.PullMessage(
-            PullAppMessagesRequest(token=token)
+            PullAppMessagesRequest()
         )
         run_id = context.run_id
         node = Node(node_id=context.node_id)
@@ -236,12 +249,14 @@ def pull_appinputs(
         raise e
 
 
-def push_appoutputs(
-    stub: ClientAppIoStub, token: str, message: Message, context: Context
+def push_appoutputs(  # pylint: disable=R0913, R0917
+    stub: ClientAppIoStub,
+    message: Message,
+    context: Context,
+    sub_status: str,
+    details: str,
 ) -> PushAppOutputsResponse:
     """Push AppOutputs to SuperNode."""
-    masked_token = mask_string(token)
-    log(INFO, "[flwr-clientapp] Push `AppOutputs` for token %s", masked_token)
     # Set message ID
     message.metadata.__dict__["_message_id"] = message.object_id
     proto_message = message_to_proto(remove_content_from_message(message))
@@ -257,9 +272,7 @@ def push_appoutputs(
             # This is temporary. The message should not contain its content
             push_msg_res = stub.PushMessage(
                 PushAppMessagesRequest(
-                    token=token,
-                    messages_list=[proto_message],
-                    message_object_trees=[object_tree],
+                    messages_list=[proto_message], message_object_trees=[object_tree]
                 )
             )
             del proto_message
@@ -282,7 +295,9 @@ def push_appoutputs(
 
         # Push Context
         res: PushAppOutputsResponse = stub.PushAppOutputs(
-            PushAppOutputsRequest(token=token, context=proto_context)
+            PushAppOutputsRequest(
+                context=proto_context, sub_status=sub_status, details=details
+            )
         )
         return res
     except grpc.RpcError as e:
