@@ -15,7 +15,7 @@
 """ClientAppIo API servicer."""
 
 
-from logging import DEBUG, ERROR, INFO
+from logging import DEBUG, ERROR
 from typing import cast
 
 import grpc
@@ -171,7 +171,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
 
         # Activate task
         if state.activate_task(task_id=task.task_id):
-            log(INFO, "Started task %d of run %s", task.task_id, run_id)
+            log(DEBUG, "Started task %d of run %s", task.task_id, run_id)
             return PullAppInputsResponse(
                 context=context_to_proto(serverapp_context),
                 run=run_to_proto(run),
@@ -201,7 +201,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
             sub_status=request.sub_status,
             details=request.details,
         ):
-            log(INFO, "Finished task %d of run %s", task.task_id, run_id)
+            log(DEBUG, "Finished task %d of run %s", task.task_id, run_id)
             # Save the context to the state
             state.store_context(context_from_proto(request.context))
         else:
