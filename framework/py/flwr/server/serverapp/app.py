@@ -139,21 +139,6 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         if log_uploader:
             stop_log_uploader(log_queue, log_uploader)
 
-        # Update run status
-        if grid:
-            try:
-                log(DEBUG, "[flwr-serverapp] Will push ServerApp task output")
-                out_req = PushAppOutputsRequest(
-                    token=token,
-                    run_id=run.run_id,
-                    context=context_to_proto(context) if context else None,
-                    sub_status=sub_status,
-                    details=details,
-                )
-                _ = grid._stub.PushAppOutputs(out_req)
-            except grpc.RpcError:
-                pass
-
         # Close the Grpc connection
         if grid:
             grid.close()
@@ -295,6 +280,19 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         exit_code = ExitCode.SERVERAPP_EXCEPTION  # General exit code
         if isinstance(ex, AppExitException):
             exit_code = ex.exit_code
+    finally:
+        # Update run status
+        if grid:
+            log(DEBUG, "[flwr-serverapp] Will push ServerApp task output")
+            pushoutput_req = PushAppOutputsRequest(
+                context=context_to_proto(context) if context else None,
+                sub_status=sub_status,
+                details=details,
+            )
+            try:
+                grid._stub.PushAppOutputs(pushoutput_req)
+            except grpc.RpcError:
+                pass
 
     flwr_exit(
         code=exit_code,
