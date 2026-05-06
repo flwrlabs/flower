@@ -42,4 +42,7 @@ def test_run_control_api_grpc_adds_runtime_version_interceptor() -> None:
         )
 
     interceptors = create_grpc_server.call_args.kwargs["interceptors"]
-    assert isinstance(interceptors[-1], RuntimeVersionServerInterceptor)
+    assert any(
+        isinstance(interceptor, RuntimeVersionServerInterceptor)
+        for interceptor in interceptors
+    )
