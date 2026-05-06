@@ -32,7 +32,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import (
     TASK_TYPES_REQUIRING_CONNECTOR_REF,
     TASK_TYPES_REQUIRING_FAB_HASH,
@@ -40,7 +39,6 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.interceptors import get_authenticated_task
-from flwr.supercore.utils import get_metadata_str
 
 from ..corestate import CoreState
 
@@ -106,7 +104,7 @@ class AppIoServicer(ABC):
             raise RuntimeError("This line should never be reached.")
 
         _validate_create_task_request(request, context)
-        
+
         state = self.state_factory.state()
         task_id = state.create_task(
             task_type=request.type,

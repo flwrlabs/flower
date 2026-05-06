@@ -18,7 +18,6 @@
 import unittest
 from unittest.mock import Mock
 
-import grpc
 from parameterized import parameterized
 
 from flwr.common import Context, typing
@@ -26,8 +25,6 @@ from flwr.common.message import make_message
 from flwr.common.serde import fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker
 from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
-    CreateTaskRequest,
-    CreateTaskResponse,
     PullAppInputsResponse,
     PullAppMessagesResponse,
     PushAppMessagesResponse,
@@ -45,8 +42,6 @@ from flwr.proto.message_pb2 import (  # pylint:disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import Run as ProtoRun  # pylint:disable=E0611
-from flwr.proto.task_pb2 import Task  # pylint:disable=E0611
-from flwr.supercore.constant import TaskType
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
