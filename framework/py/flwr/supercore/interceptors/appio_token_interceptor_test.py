@@ -38,7 +38,6 @@ from flwr.supercore.auth import (
     APPIO_METHOD_AUTH_POLICY,
     CLIENTAPPIO_METHOD_AUTH_POLICY,
     SERVERAPPIO_METHOD_AUTH_POLICY,
-    SERVERAPPIO_LEGACY_METHOD_AUTH_POLICY,
 )
 from flwr.supercore.interceptors import (
     APP_TOKEN_HEADER,
@@ -474,14 +473,6 @@ class TestMethodPolicyMaps(TestCase):
         }
         self.assertEqual(no_auth_methods, self.NO_AUTH_BOOTSTRAP_METHODS)
 
-    def test_serverappio_legacy_policy_has_expected_coverage(self) -> None:
-        """Legacy ServerAppIo compatibility coverage should stay narrow."""
-        self.assertEqual(
-            set(SERVERAPPIO_LEGACY_METHOD_AUTH_POLICY),
-            {"/flwr.proto.ServerAppIo/CreateTask"},
-        )
-
-
 class TestFactoryFunctions(TestCase):
     """Validate interceptor factory behavior."""
 
@@ -494,22 +485,6 @@ class TestFactoryFunctions(TestCase):
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 "/flwr.proto.AppIo/CreateTask",
-                invocation_metadata=((APP_TOKEN_HEADER, "valid-token"),),
-            ),
-        )
-
-        response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=1), Mock()))
-        self.assertEqual(response, "ok")
-
-    def test_serverappio_factory_uses_legacy_serverappio_policy(self) -> None:
-        """ServerAppIo factory should still accept the legacy CreateTask path."""
-        state = _TokenState({"valid-token": 1})
-        interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
-
-        intercepted = interceptor.intercept_service(
-            lambda _: _make_unary_handler(),
-            _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/CreateTask",
                 invocation_metadata=((APP_TOKEN_HEADER, "valid-token"),),
             ),
         )

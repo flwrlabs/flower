@@ -19,7 +19,6 @@ from .policy import (
     APPIO_METHOD_AUTH_POLICY,
     CLIENTAPPIO_METHOD_AUTH_POLICY,
     SERVERAPPIO_METHOD_AUTH_POLICY,
-    SERVERAPPIO_LEGACY_METHOD_AUTH_POLICY,
     MethodTokenPolicy,
 )
 from .superexec import (
@@ -35,7 +34,6 @@ __all__ = [
     "CLIENTAPPIO_METHOD_AUTH_POLICY",
     "MethodTokenPolicy",
     "SERVERAPPIO_METHOD_AUTH_POLICY",
-    "SERVERAPPIO_LEGACY_METHOD_AUTH_POLICY",
     "add_superexec_auth_secret_args",
     "compute_request_body_sha256",
     "compute_superexec_signature",

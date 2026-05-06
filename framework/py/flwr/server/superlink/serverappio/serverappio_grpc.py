@@ -22,7 +22,6 @@ import grpc
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.grpc import generic_create_grpc_server
 from flwr.common.logger import log
-from flwr.proto.appio_pb2 import CreateTaskRequest, CreateTaskResponse  # pylint: disable=E0611
 from flwr.proto.appio_pb2_grpc import add_AppIoServicer_to_server  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import (  # pylint: disable=E0611
     add_ServerAppIoServicer_to_server,
@@ -85,28 +84,9 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
         interceptors=interceptors,
     )
     add_AppIoServicer_to_server(serverappio_servicer, serverappio_grpc_server)
-    _add_legacy_create_task_handler(serverappio_servicer, serverappio_grpc_server)
 
     address = serverappio_grpc_server.bound_address
     log(INFO, "Flower Deployment Runtime: Starting ServerAppIo API on %s", address)
     serverappio_grpc_server.start()
 
     return serverappio_grpc_server
-
-
-def _add_legacy_create_task_handler(
-    servicer: ServerAppIoServicer, server: grpc.Server
-) -> None:
-    """Register a compatibility handler for ServerAppIo.CreateTask."""
-    rpc_method_handlers = {
-        "CreateTask": grpc.unary_unary_rpc_method_handler(
-            servicer.CreateTask,
-            request_deserializer=CreateTaskRequest.FromString,
-            response_serializer=CreateTaskResponse.SerializeToString,
-        )
-    }
-    generic_handler = grpc.method_handlers_generic_handler(
-        "flwr.proto.ServerAppIo", rpc_method_handlers
-    )
-    server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers("flwr.proto.ServerAppIo", rpc_method_handlers)

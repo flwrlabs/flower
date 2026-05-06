@@ -64,10 +64,6 @@ SERVERAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ServerAppIo/GetNodes": MethodTokenPolicy.token_required(),
 }
 
-SERVERAPPIO_LEGACY_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
-    "/flwr.proto.ServerAppIo/CreateTask": MethodTokenPolicy.token_required(),
-}
-
 CLIENTAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ClientAppIo/ListAppsToLaunch": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ClientAppIo/RequestToken": MethodTokenPolicy.no_auth(),

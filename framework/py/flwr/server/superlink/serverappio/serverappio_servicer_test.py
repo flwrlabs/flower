@@ -363,13 +363,8 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=GetNodesRequest.SerializeToString,
             response_deserializer=GetNodesResponse.FromString,
         )
-        self._appio_create_task = self._channel.unary_unary(
-            "/flwr.proto.AppIo/CreateTask",
-            request_serializer=CreateTaskRequest.SerializeToString,
-            response_deserializer=CreateTaskResponse.FromString,
-        )
         self._create_task = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/CreateTask",
+            "/flwr.proto.AppIo/CreateTask",
             request_serializer=CreateTaskRequest.SerializeToString,
             response_deserializer=CreateTaskResponse.FromString,
         )
@@ -478,7 +473,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             fab_hash="hash123",
         )
 
-        response, call = self._appio_create_task.with_call(request=request)
+        response, call = self._create_task.with_call(request=request)
 
         assert isinstance(response, CreateTaskResponse)
         assert grpc.StatusCode.OK == call.code()
@@ -497,22 +492,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         self.assertEqual(task.starting_at, "")
         self.assertEqual(task.running_at, "")
         self.assertEqual(task.finished_at, "")
-
-    def test_legacy_create_task_path_stores_pending_task(self) -> None:
-        """Test the legacy `ServerAppIo.CreateTask` path remains functional."""
-        run_id = self._create_dummy_run()
-        request = CreateTaskRequest(
-            type=TaskType.SERVER_APP,
-            run_id=run_id,
-            fab_hash="hash123",
-        )
-
-        response, call = self._create_task.with_call(request=request)
-
-        assert isinstance(response, CreateTaskResponse)
-        assert grpc.StatusCode.OK == call.code()
-        tasks = self.state.get_tasks(task_ids=[response.task_id])
-        self.assertEqual(len(tasks), 1)
 
     def test_create_task_aborts_if_state_create_task_fails(self) -> None:
         """Test `CreateTask` aborts if state.create_task returns None."""
