@@ -16,7 +16,7 @@
 
 
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import grpc
 
@@ -29,7 +29,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
-from flwr.supercore.interceptors import APP_TOKEN_HEADER
 
 from .appio_servicer import AppIoServicer
 
@@ -118,3 +117,152 @@ class TestAppIoServicer(unittest.TestCase):
         # Assert
         self.state.acknowledge_task_heartbeat.assert_called_once_with(123)
         self.assertTrue(response.success)
+
+    def test_create_task_returns_task_id(self) -> None:
+        """CreateTask should create a task for the authenticated run."""
+        # Prepare
+        self.state.get_run_info.return_value = [Mock()]
+        self.state.create_task.return_value = 456
+        request = CreateTaskRequest(
+            type=TaskType.MODEL,
+            run_id=123,
+            model_ref="models/abc",
+        )
+
+        # Execute
+        with patch(
+            "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+            return_value=Mock(run_id=123),
+        ):
+            response = self.servicer.CreateTask(request, Mock())
+
+        # Assert
+        self.state.create_task.assert_called_once_with(
+            task_type=TaskType.MODEL,
+            run_id=123,
+            fab_hash=None,
+            model_ref="models/abc",
+            connector_ref=None,
+        )
+        self.assertEqual(response.task_id, 456)
+
+    def test_create_task_aborts_if_run_id_does_not_match_token(self) -> None:
+        """CreateTask should reject requests for a different run."""
+        # Prepare
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+
+        # Execute
+        with (
+            patch(
+                "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+                return_value=Mock(run_id=123),
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.CreateTask(
+                CreateTaskRequest(type=TaskType.MODEL, run_id=999, model_ref="model"),
+                context,
+            )
+
+        # Assert
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.PERMISSION_DENIED,
+            "`run_id` does not match authenticated token.",
+        )
+        self.state.create_task.assert_not_called()
+
+    def test_create_task_aborts_if_run_does_not_exist(self) -> None:
+        """CreateTask should reject requests for missing runs."""
+        # Prepare
+        self.state.get_run_info.return_value = []
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+
+        # Execute
+        with (
+            patch(
+                "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+                return_value=Mock(run_id=123),
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.CreateTask(
+                CreateTaskRequest(type=TaskType.MODEL, run_id=123, model_ref="model"),
+                context,
+            )
+
+        # Assert
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.NOT_FOUND,
+            RUN_ID_NOT_FOUND_MESSAGE,
+        )
+        self.state.create_task.assert_not_called()
+
+    def test_create_task_aborts_if_required_field_is_missing(self) -> None:
+        """CreateTask should validate task-type-specific required fields."""
+        # Prepare
+        self.state.get_run_info.return_value = [Mock()]
+        test_cases = [
+            (
+                CreateTaskRequest(type=TaskType.SERVER_APP, run_id=123),
+                "Task type 'flwr-serverapp' requires fab_hash.",
+            ),
+            (
+                CreateTaskRequest(type=TaskType.MODEL, run_id=123),
+                "Task type 'flwr-model' requires model_ref.",
+            ),
+            (
+                CreateTaskRequest(type=TaskType.CONNECTOR, run_id=123),
+                "Task type 'flwr-connector' requires connector_ref.",
+            ),
+        ]
+
+        for request, detail in test_cases:
+            context = Mock(spec=grpc.ServicerContext)
+            context.abort.side_effect = grpc.RpcError()
+
+            with self.subTest(task_type=request.type):
+                with (
+                    patch(
+                        "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+                        return_value=Mock(run_id=123),
+                    ),
+                    self.assertRaises(grpc.RpcError),
+                ):
+                    self.servicer.CreateTask(request, context)
+
+                context.abort.assert_called_once_with(
+                    grpc.StatusCode.FAILED_PRECONDITION,
+                    detail,
+                )
+                self.state.create_task.assert_not_called()
+
+    def test_create_task_aborts_if_state_creation_fails(self) -> None:
+        """CreateTask should surface task creation failures as INTERNAL."""
+        # Prepare
+        self.state.get_run_info.return_value = [Mock()]
+        self.state.create_task.return_value = None
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+        request = CreateTaskRequest(
+            type=TaskType.MODEL,
+            run_id=123,
+            model_ref="models/abc",
+        )
+
+        # Execute
+        with (
+            patch(
+                "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+                return_value=Mock(run_id=123),
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.CreateTask(request, context)
+
+        # Assert
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.INTERNAL,
+            "Failed to create task",
+        )

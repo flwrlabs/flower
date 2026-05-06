@@ -105,7 +105,7 @@ class AppIoServicer(ABC):
 
         _validate_create_task_request(request, context)
 
-        state = self.state_factory.state()
+        state = self.state()
         task_id = state.create_task(
             task_type=request.type,
             run_id=authenticated_run_id,
