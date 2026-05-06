@@ -104,6 +104,10 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         """Return the LinkState instance."""
         return self.state_factory.state()
 
+    def has_run(self, run_id: int) -> bool:
+        """Return whether the run exists in LinkState."""
+        return bool(self.state_factory.state().get_run_info(run_ids=[run_id]))
+
     def ListAppsToLaunch(
         self,
         request: ListAppsToLaunchRequest,

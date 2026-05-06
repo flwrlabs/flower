@@ -44,6 +44,10 @@ class _TestAppIoServicer(AppIoServicer):
         """Return mocked CoreState."""
         return self._state
 
+    def has_run(self, run_id: int) -> bool:
+        """Return whether the mocked state has the requested run."""
+        return bool(self._state.get_run_info(run_ids=[run_id]))
+
 
 class TestAppIoServicer(unittest.TestCase):
     """Tests for shared AppIoServicer task RPCs."""

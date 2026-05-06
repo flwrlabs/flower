@@ -51,6 +51,10 @@ class AppIoServicer(ABC):
     def state(self) -> CoreState:
         """Return the CoreState instance."""
 
+    @abstractmethod
+    def has_run(self, run_id: int) -> bool:
+        """Return whether the run exists in the underlying state."""
+
     def PullPendingTasks(
         self, request: PullPendingTasksRequest, context: grpc.ServicerContext
     ) -> PullPendingTasksResponse:
@@ -88,8 +92,7 @@ class AppIoServicer(ABC):
         log(DEBUG, "AppIoServicer.CreateTask")
 
         state = self.state()
-        runs = state.get_run_info(run_ids=[request.run_id])
-        if not runs:
+        if not self.has_run(request.run_id):
             context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
             raise RuntimeError("This line should never be reached.")
 

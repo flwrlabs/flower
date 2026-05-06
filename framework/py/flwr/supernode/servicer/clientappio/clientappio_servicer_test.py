@@ -18,6 +18,7 @@
 import unittest
 from unittest.mock import Mock
 
+import grpc
 from parameterized import parameterized
 
 from flwr.common import Context, typing
@@ -25,6 +26,8 @@ from flwr.common.message import make_message
 from flwr.common.serde import fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker
 from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
+    CreateTaskRequest,
+    CreateTaskResponse,
     PullAppInputsResponse,
     PullAppMessagesResponse,
     PushAppMessagesResponse,
@@ -42,6 +45,7 @@ from flwr.proto.message_pb2 import (  # pylint:disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import Run as ProtoRun  # pylint:disable=E0611
+from flwr.supercore.constant import TaskType
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
@@ -163,6 +167,53 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_stub.PushAppOutputs.assert_called_once()
         self.mock_stub.PushMessage.assert_called_once()
         self.assertSetEqual(pushed_obj_ids, set(all_obj_ids))
+
+    def test_create_task_uses_nodestate_run_lookup(self) -> None:
+        """CreateTask should use NodeState.get_run instead of LinkState APIs."""
+        self.mock_state.get_run.return_value = Mock()
+        self.mock_state.create_task.return_value = 42
+
+        response = self.servicer.CreateTask(
+            CreateTaskRequest(
+                type=TaskType.SERVER_APP,
+                run_id=123,
+                fab_hash="hash123",
+            ),
+            Mock(),
+        )
+
+        self.assertIsInstance(response, CreateTaskResponse)
+        self.assertEqual(response.task_id, 42)
+        self.mock_state.get_run.assert_called_once_with(123)
+        self.mock_state.create_task.assert_called_once_with(
+            task_type=TaskType.SERVER_APP,
+            run_id=123,
+            fab_hash="hash123",
+            model_ref=None,
+            connector_ref=None,
+        )
+
+    def test_create_task_aborts_when_run_missing(self) -> None:
+        """CreateTask should return NOT_FOUND when NodeState has no run."""
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+        self.mock_state.get_run.return_value = None
+
+        with self.assertRaises(grpc.RpcError):
+            self.servicer.CreateTask(
+                CreateTaskRequest(
+                    type=TaskType.MODEL,
+                    run_id=123,
+                    model_ref="model://test",
+                ),
+                context,
+            )
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.NOT_FOUND,
+            "Run ID not found",
+        )
+        self.mock_state.create_task.assert_not_called()
 
     @parameterized.expand([(True,), (False,)])  # type: ignore
     def test_send_app_heartbeat(self, success: bool) -> None:
