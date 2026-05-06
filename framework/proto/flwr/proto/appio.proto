@@ -25,11 +25,6 @@ import "flwr/proto/task.proto";
 
 // These messages are used by both ServerAppIo and ClientAppIo services
 
-service AppIo {
-  // Create a task
-  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {}
-}
-
 // ListAppsToLaunch messages
 message ListAppsToLaunchRequest {}
 message ListAppsToLaunchResponse {

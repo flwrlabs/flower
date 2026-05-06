@@ -19,7 +19,6 @@ limitations under the License.
 
 import abc
 import collections.abc
-import flwr.proto.appio_pb2
 import grpc
 import grpc.aio
 import typing
@@ -30,35 +29,3 @@ class _MaybeAsyncIterator(collections.abc.AsyncIterator[_T], collections.abc.Ite
 
 class _ServicerContext(grpc.ServicerContext, grpc.aio.ServicerContext):  # type: ignore[misc, type-arg]
     ...
-
-class AppIoStub:
-    """These messages are used by both ServerAppIo and ClientAppIo services"""
-
-    def __init__(self, channel: typing.Union[grpc.Channel, grpc.aio.Channel]) -> None: ...
-    CreateTask: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.CreateTaskRequest,
-        flwr.proto.appio_pb2.CreateTaskResponse,
-    ]
-    """Create a task"""
-
-class AppIoAsyncStub:
-    """These messages are used by both ServerAppIo and ClientAppIo services"""
-
-    CreateTask: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.CreateTaskRequest,
-        flwr.proto.appio_pb2.CreateTaskResponse,
-    ]
-    """Create a task"""
-
-class AppIoServicer(metaclass=abc.ABCMeta):
-    """These messages are used by both ServerAppIo and ClientAppIo services"""
-
-    @abc.abstractmethod
-    def CreateTask(
-        self,
-        request: flwr.proto.appio_pb2.CreateTaskRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.CreateTaskResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.CreateTaskResponse]]:
-        """Create a task"""
-
-def add_AppIoServicer_to_server(servicer: AppIoServicer, server: typing.Union[grpc.Server, grpc.aio.Server]) -> None: ...

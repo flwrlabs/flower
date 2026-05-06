@@ -364,7 +364,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             response_deserializer=GetNodesResponse.FromString,
         )
         self._create_task = self._channel.unary_unary(
-            "/flwr.proto.AppIo/CreateTask",
+            "/flwr.proto.ServerAppIo/CreateTask",
             request_serializer=CreateTaskRequest.SerializeToString,
             response_deserializer=CreateTaskResponse.FromString,
         )
@@ -465,7 +465,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert grpc.StatusCode.OK == call.code()
 
     def test_create_task_stores_pending_task(self) -> None:
-        """Test `AppIo.CreateTask` stores a pending task."""
+        """Test `ServerAppIo.CreateTask` stores a pending task."""
         run_id = self._create_dummy_run()
         request = CreateTaskRequest(
             type=TaskType.SERVER_APP,

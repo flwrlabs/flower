@@ -33,7 +33,10 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 @typing.final
 class ListAppsToLaunchRequest(google.protobuf.message.Message):
-    """ListAppsToLaunch messages"""
+    """These messages are used by both ServerAppIo and ClientAppIo services
+
+    ListAppsToLaunch messages
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

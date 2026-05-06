@@ -22,7 +22,6 @@ import grpc
 
 from flwr.common.constant import RUN_ID_NOT_FOUND_MESSAGE, Status
 from flwr.common.logger import log
-from flwr.proto import appio_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
@@ -45,7 +44,7 @@ from ..corestate import CoreState
 
 
 # pylint: disable=invalid-name, unused-argument
-class AppIoServicer(ABC, appio_pb2_grpc.AppIoServicer):
+class AppIoServicer(ABC):
     """Shared scaffolding for task-based AppIo RPCs."""
 
     @abstractmethod

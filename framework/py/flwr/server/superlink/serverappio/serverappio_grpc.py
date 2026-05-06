@@ -22,7 +22,6 @@ import grpc
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.grpc import generic_create_grpc_server
 from flwr.common.logger import log
-from flwr.proto.appio_pb2_grpc import add_AppIoServicer_to_server  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import (  # pylint: disable=E0611
     add_ServerAppIoServicer_to_server,
 )
@@ -83,7 +82,6 @@ def run_serverappio_api_grpc(  # pylint: disable=R0913,R0917
         certificates=certificates,
         interceptors=interceptors,
     )
-    add_AppIoServicer_to_server(serverappio_servicer, serverappio_grpc_server)
 
     address = serverappio_grpc_server.bound_address
     log(INFO, "Flower Deployment Runtime: Starting ServerAppIo API on %s", address)
