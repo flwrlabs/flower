@@ -110,7 +110,9 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         state = self.state_factory.state()
 
         # Get token for the task
-        token = state.claim_task(get_authenticated_task().task_id)
+        tasks = state.get_tasks()
+        task = [t for t in tasks if t.run_id == request.run_id][0]
+        token = state.claim_task(task.task_id)
 
         # Return the token
         return RequestTokenResponse(token=token or "")

@@ -75,7 +75,7 @@ from flwr.supercore.superexec.dependency_installer import (
 from flwr.supercore.utils import mask_string
 
 
-def run_clientapp(  # pylint: disable=R0913, R0914, R0917
+def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     clientappio_api_address: str,
     token: str,
     insecure: bool,
@@ -99,8 +99,42 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
     channel.subscribe(on_channel_state_change)
     heartbeat_sender = None
     runtime_env_dir = None
+    stub: ClientAppIoStub | None = None
+    message: Message | None = None
+    context: Context | None = None
+    reply_message: Message | None = None
+    sub_status = SubStatus.FAILED
+    details = "ClientApp task failed due to unknown reason"
+    outputs_pushed = False
 
     def on_exit() -> None:
+        nonlocal outputs_pushed, reply_message
+        if (
+            not outputs_pushed
+            and stub is not None
+            and message is not None
+            and context is not None
+        ):
+            if reply_message is None:
+                reply_message = Message(
+                    Error(
+                        code=ErrorCode.CLIENT_APP_CRASHED,
+                        reason=details,
+                    ),
+                    reply_to=message,
+                )
+            try:
+                _ = push_appoutputs(
+                    stub=stub,
+                    token=token,
+                    message=reply_message,
+                    context=context,
+                    sub_status=sub_status,
+                    details=details,
+                )
+                outputs_pushed = True
+            except grpc.RpcError as e:
+                log(ERROR, "[on_exit] Failed to push `AppOutputs`: %s", str(e))
         if heartbeat_sender is not None and heartbeat_sender.is_running:
             heartbeat_sender.stop()
         channel.close()
@@ -122,8 +156,6 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
         # Pull Message, Context, Run and FAB from SuperNode
         message, context, run, fab = pull_appinputs(stub=stub, token=token)
 
-        sub_status = SubStatus.COMPLETED
-        details = ""
         try:
 
             # Install FAB
@@ -167,6 +199,8 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
 
             # Execute ClientApp
             reply_message = client_app(message=message, context=context)
+            sub_status = SubStatus.COMPLETED
+            details = ""
 
         except Exception as ex:  # pylint: disable=broad-exception-caught
             # Don't update/change NodeState
@@ -186,16 +220,6 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0917
 
             sub_status = SubStatus.FAILED
             details = reason
-
-        # Push Message and Context to SuperNode
-        _ = push_appoutputs(
-            stub=stub,
-            token=token,
-            message=reply_message,
-            context=context,
-            sub_status=sub_status,
-            details=details,
-        )
 
     except grpc.RpcError as e:
         log(ERROR, "GRPC error occurred: %s", str(e))
