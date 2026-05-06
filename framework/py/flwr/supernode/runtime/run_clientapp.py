@@ -15,7 +15,7 @@
 """Flower ClientApp process."""
 
 
-from logging import DEBUG, ERROR, INFO
+from logging import DEBUG, ERROR
 
 import grpc
 
@@ -72,7 +72,6 @@ from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
-from flwr.supercore.utils import mask_string
 
 
 def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
@@ -120,7 +119,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         heartbeat_sender.start()
 
         # Pull Message, Context, Run and FAB from SuperNode
-        message, context, run, fab = pull_appinputs(stub=stub, token=token)
+        message, context, run, fab = pull_appinputs(stub)
         reply_message: Message | None = None
         sub_status = SubStatus.FAILED
         details = "ClientApp task failed due to unknown reason"
@@ -199,9 +198,8 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
                     reply_to=message,
                 )
 
-            _ = push_appoutputs(
+            push_appoutputs(
                 stub=stub,
-                token=token,
                 message=reply_message,
                 context=context,
                 sub_status=sub_status,
@@ -217,24 +215,18 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     )
 
 
-def pull_appinputs(
-    stub: ClientAppIoStub, token: str
-) -> tuple[Message, Context, Run, Fab]:
+def pull_appinputs(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
     """Pull AppInputs from SuperNode."""
-    masked_token = mask_string(token)
-    log(INFO, "[flwr-clientapp] Pull `AppInputs` for token %s", masked_token)
     try:
         # Pull Context, Run and FAB
-        res: PullAppInputsResponse = stub.PullAppInputs(
-            PullAppInputsRequest(token=token)
-        )
+        res: PullAppInputsResponse = stub.PullAppInputs(PullAppInputsRequest())
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
         fab = fab_from_proto(res.fab)
 
         # Pull and inflate the message
         pull_msg_res: PullAppMessagesResponse = stub.PullMessage(
-            PullAppMessagesRequest(token=token)
+            PullAppMessagesRequest()
         )
         run_id = context.run_id
         node = Node(node_id=context.node_id)
@@ -259,15 +251,12 @@ def pull_appinputs(
 
 def push_appoutputs(  # pylint: disable=R0913, R0917
     stub: ClientAppIoStub,
-    token: str,
     message: Message,
     context: Context,
     sub_status: str,
     details: str,
 ) -> PushAppOutputsResponse:
     """Push AppOutputs to SuperNode."""
-    masked_token = mask_string(token)
-    log(INFO, "[flwr-clientapp] Push `AppOutputs` for token %s", masked_token)
     # Set message ID
     message.metadata.__dict__["_message_id"] = message.object_id
     proto_message = message_to_proto(remove_content_from_message(message))
@@ -283,9 +272,7 @@ def push_appoutputs(  # pylint: disable=R0913, R0917
             # This is temporary. The message should not contain its content
             push_msg_res = stub.PushMessage(
                 PushAppMessagesRequest(
-                    token=token,
-                    messages_list=[proto_message],
-                    message_object_trees=[object_tree],
+                    messages_list=[proto_message], message_object_trees=[object_tree]
                 )
             )
             del proto_message
@@ -309,10 +296,7 @@ def push_appoutputs(  # pylint: disable=R0913, R0917
         # Push Context
         res: PushAppOutputsResponse = stub.PushAppOutputs(
             PushAppOutputsRequest(
-                token=token,
-                context=proto_context,
-                sub_status=sub_status,
-                details=details,
+                context=proto_context, sub_status=sub_status, details=details
             )
         )
         return res

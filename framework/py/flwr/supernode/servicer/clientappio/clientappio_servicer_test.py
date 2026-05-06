@@ -16,7 +16,6 @@
 
 
 import unittest
-from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from parameterized import parameterized
@@ -107,7 +106,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_stub.PullAppInputs.return_value = mock_response
 
         # Execute
-        message, context, run, fab = pull_appinputs(self.mock_stub, token="abc")
+        message, context, run, fab = pull_appinputs(self.mock_stub)
 
         # Assert
         self.mock_stub.PullAppInputs.assert_called_once()
@@ -163,7 +162,6 @@ class TestClientAppIoServicer(unittest.TestCase):
         # Execute
         _ = push_appoutputs(
             stub=self.mock_stub,
-            token="abc",
             message=message,
             context=context,
             sub_status=sub_status,
@@ -212,7 +210,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         with patch(
             "flwr.supernode.servicer.clientappio.clientappio_servicer."
             "get_authenticated_task",
-            return_value=SimpleNamespace(task_id=task_id),
+            return_value=Mock(task_id=task_id, run_id=run_id),
         ):
             response = self.servicer.PullAppInputs(request, Mock())
 
@@ -243,13 +241,12 @@ class TestClientAppIoServicer(unittest.TestCase):
         with patch(
             "flwr.supernode.servicer.clientappio.clientappio_servicer."
             "get_authenticated_task",
-            return_value=SimpleNamespace(task_id=task_id),
+            return_value=Mock(task_id=task_id, run_id=run_id),
         ):
             response = self.servicer.PushAppOutputs(request, Mock())
 
         self.assertIsInstance(response, PushAppOutputsResponse)
         self.mock_state.store_context.assert_called_once()
-        self.mock_state.delete_token.assert_called_once_with(run_id)
         self.mock_state.finish_task.assert_called_once()
         finish_task_kwargs = self.mock_state.finish_task.call_args.kwargs
         self.assertEqual(finish_task_kwargs["task_id"], task_id)
@@ -259,14 +256,19 @@ class TestClientAppIoServicer(unittest.TestCase):
     def test_send_app_heartbeat(self, success: bool) -> None:
         """Test sending an app heartbeat."""
         # Prepare
-        token = "test-token"
-        request = SendAppHeartbeatRequest(token=token)
-        self.mock_state.acknowledge_app_heartbeat.return_value = success
+        task_id = 123
+        request = SendAppHeartbeatRequest()
+        self.mock_state.acknowledge_task_heartbeat.return_value = success
 
         # Execute
-        response = self.servicer.SendAppHeartbeat(request, Mock())
+        with patch(
+            "flwr.supernode.servicer.clientappio.clientappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(task_id=task_id),
+        ):
+            response = self.servicer.SendAppHeartbeat(request, Mock())
 
         # Assert
         self.assertIsInstance(response, SendAppHeartbeatResponse)
         self.assertEqual(response.success, success)
-        self.mock_state.acknowledge_app_heartbeat.assert_called_once_with(token)
+        self.mock_state.acknowledge_task_heartbeat.assert_called_once_with(task_id)
