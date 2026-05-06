@@ -202,10 +202,9 @@ class SqlCoreState(CoreState, SqlMixin):
             if not statuses:
                 return []
             status_conditions = []
-            for status in statuses:
-                if status not in STATUS_CONDITIONS:
-                    raise ValueError(f"Invalid status: {status}")
-                status_conditions.append(STATUS_CONDITIONS[status])
+            for status, condition in STATUS_CONDITIONS.items():
+                if status in statuses:
+                    status_conditions.append(condition)
             if not status_conditions:
                 return []
             conditions.append(f"({' OR '.join(status_conditions)})")
