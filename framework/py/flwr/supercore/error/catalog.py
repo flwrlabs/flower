@@ -88,4 +88,8 @@ API_ERROR_MAP: Final[dict[int, ApiErrorSpec]] = {
         status_code=StatusCode.PERMISSION_DENIED,
         public_message="Entitlement error.",
     ),
+    ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE: ApiErrorSpec(
+        status_code=StatusCode.FAILED_PRECONDITION,
+        public_message="Runtime version compatibility check failed.",
+    ),
 }
