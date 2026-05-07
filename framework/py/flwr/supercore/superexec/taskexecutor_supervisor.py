@@ -220,12 +220,14 @@ def _run_supervised_process(
         _close_fd(status_fd)
     process_group_id = supervised_process.pid
     returncode: int | None = None
+    lifeline_selector = selectors.DefaultSelector()
     try:
+        lifeline_selector.register(lifeline_fd, selectors.EVENT_READ)
         while True:
             returncode = _peek_process_returncode(supervised_process)
             if returncode is not None:
                 return returncode
-            if _lifeline_closed(lifeline_fd):
+            if _lifeline_closed(lifeline_selector, lifeline_fd):
                 # EOF on the pipe means SuperExec exited or deliberately closed its
                 # control end; cleanup is enforced outside any TaskExecutor PID
                 # namespace.
@@ -247,16 +249,15 @@ def _run_supervised_process(
         )
         if returncode is not None and supervised_process.returncode is None:
             supervised_process.wait()
+        lifeline_selector.close()
 
 
-def _lifeline_closed(lifeline_fd: int) -> bool:
+def _lifeline_closed(
+    lifeline_selector: selectors.BaseSelector,
+    lifeline_fd: int,
+) -> bool:
     """Return True if the lifeline FD has reached EOF."""
-    selector = selectors.DefaultSelector()
-    try:
-        selector.register(lifeline_fd, selectors.EVENT_READ)
-        events = selector.select(timeout=0)
-    finally:
-        selector.close()
+    events = lifeline_selector.select(timeout=0)
     if not events:
         return False
     return os.read(lifeline_fd, 1) == b""
