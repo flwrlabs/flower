@@ -72,7 +72,11 @@ def _unauthenticated_terminator() -> grpc.RpcMethodHandler:
 
 
 def _get_request_run_id(request: GrpcMessage) -> int | None:
-    return cast(int, getattr(request, "run_id", None))
+    run_id = cast(int | None, getattr(request, "run_id", None))
+    # Proto3 scalar fields without presence expose an omitted uint64 as 0.
+    if run_id == 0:
+        return None
+    return run_id
 
 
 class AppIoTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ignore

@@ -315,6 +315,56 @@ class TestAppIoTokenServerInterceptor(TestCase):
         state.get_run_id_by_token.assert_called_once_with("task-token")
         state.get_task_by_token.assert_called_once_with("task-token")
 
+    def test_task_token_passes_when_run_id_omitted(self) -> None:
+        """Task-token protected methods should accept omitted request run IDs."""
+        state = Mock()
+        state.get_run_id_by_token.return_value = None
+        state.get_task_by_token.return_value = Mock(task_id=123, run_id=7)
+        interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
+        captured_task = None
+
+        def _handler(_request: GrpcMessage, _context: grpc.ServicerContext) -> str:
+            nonlocal captured_task
+            captured_task = get_authenticated_task()
+            return "ok"
+
+        intercepted = interceptor.intercept_service(
+            lambda _: grpc.unary_unary_rpc_method_handler(_handler),
+            _HandlerCallDetails(
+                "/flwr.proto.ServerAppIo/PushAppOutputs",
+                invocation_metadata=((APP_TOKEN_HEADER, "task-token"),),
+            ),
+        )
+
+        response = intercepted.unary_unary(PushAppOutputsRequest(), Mock())
+        self.assertEqual(response, "ok")
+        self.assertIsNotNone(captured_task)
+        self.assertEqual(cast(Mock, captured_task).task_id, 123)
+
+    def test_task_token_run_id_mismatch_denied(self) -> None:
+        """Task-token protected methods should deny a different request run."""
+        state = Mock()
+        state.get_run_id_by_token.return_value = None
+        state.get_task_by_token.return_value = Mock(task_id=123, run_id=7)
+        interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        intercepted = interceptor.intercept_service(
+            lambda _: _make_unary_handler(),
+            _HandlerCallDetails(
+                "/flwr.proto.ServerAppIo/PushAppOutputs",
+                invocation_metadata=((APP_TOKEN_HEADER, "task-token"),),
+            ),
+        )
+
+        with self.assertRaises(grpc.RpcError):
+            intercepted.unary_unary(PushAppOutputsRequest(run_id=8), context)
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.PERMISSION_DENIED,
+            RUN_BINDING_FAILED_MESSAGE,
+        )
+
     def test_metadata_token_used_even_when_request_has_token(self) -> None:
         """Metadata token should be authoritative when both sources exist."""
         interceptor = self._new_interceptor(token_to_run_id={"metadata-token": 5})
