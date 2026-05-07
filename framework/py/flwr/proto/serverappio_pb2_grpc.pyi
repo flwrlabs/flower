@@ -71,17 +71,17 @@ class ServerAppIoStub:
     ]
     """Task heartbeat"""
 
-    PullAppInputs: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PullAppInputsRequest,
-        flwr.proto.appio_pb2.PullAppInputsResponse,
+    PullTaskInputs: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PullTaskInputsRequest,
+        flwr.proto.appio_pb2.PullTaskInputsResponse,
     ]
-    """Pull app inputs"""
+    """Pull task inputs"""
 
-    PushAppOutputs: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PushAppOutputsRequest,
-        flwr.proto.appio_pb2.PushAppOutputsResponse,
+    PushTaskOutputs: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushTaskOutputsRequest,
+        flwr.proto.appio_pb2.PushTaskOutputsResponse,
     ]
-    """Push app outputs"""
+    """Push task outputs"""
 
     PushObject: grpc.UnaryUnaryMultiCallable[
         flwr.proto.message_pb2.PushObjectRequest,
@@ -182,17 +182,17 @@ class ServerAppIoAsyncStub:
     ]
     """Task heartbeat"""
 
-    PullAppInputs: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PullAppInputsRequest,
-        flwr.proto.appio_pb2.PullAppInputsResponse,
+    PullTaskInputs: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PullTaskInputsRequest,
+        flwr.proto.appio_pb2.PullTaskInputsResponse,
     ]
-    """Pull app inputs"""
+    """Pull task inputs"""
 
-    PushAppOutputs: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PushAppOutputsRequest,
-        flwr.proto.appio_pb2.PushAppOutputsResponse,
+    PushTaskOutputs: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushTaskOutputsRequest,
+        flwr.proto.appio_pb2.PushTaskOutputsResponse,
     ]
-    """Push app outputs"""
+    """Push task outputs"""
 
     PushObject: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.message_pb2.PushObjectRequest,
@@ -302,20 +302,20 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         """Task heartbeat"""
 
     @abc.abstractmethod
-    def PullAppInputs(
+    def PullTaskInputs(
         self,
-        request: flwr.proto.appio_pb2.PullAppInputsRequest,
+        request: flwr.proto.appio_pb2.PullTaskInputsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.PullAppInputsResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PullAppInputsResponse]]:
-        """Pull app inputs"""
+    ) -> typing.Union[flwr.proto.appio_pb2.PullTaskInputsResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PullTaskInputsResponse]]:
+        """Pull task inputs"""
 
     @abc.abstractmethod
-    def PushAppOutputs(
+    def PushTaskOutputs(
         self,
-        request: flwr.proto.appio_pb2.PushAppOutputsRequest,
+        request: flwr.proto.appio_pb2.PushTaskOutputsRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.PushAppOutputsResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushAppOutputsResponse]]:
-        """Push app outputs"""
+    ) -> typing.Union[flwr.proto.appio_pb2.PushTaskOutputsResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushTaskOutputsResponse]]:
+        """Push task outputs"""
 
     @abc.abstractmethod
     def PushObject(

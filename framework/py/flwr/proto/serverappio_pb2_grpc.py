@@ -58,15 +58,15 @@ class ServerAppIoStub(object):
                 request_serializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatResponse.FromString,
                 _registered_method=True)
-        self.PullAppInputs = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PullAppInputs',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.PullAppInputsRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.PullAppInputsResponse.FromString,
+        self.PullTaskInputs = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/PullTaskInputs',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputsResponse.FromString,
                 _registered_method=True)
-        self.PushAppOutputs = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PushAppOutputs',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.PushAppOutputsRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushAppOutputsResponse.FromString,
+        self.PushTaskOutputs = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/PushTaskOutputs',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputsResponse.FromString,
                 _registered_method=True)
         self.PushObject = channel.unary_unary(
                 '/flwr.proto.ServerAppIo/PushObject',
@@ -154,15 +154,15 @@ class ServerAppIoServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def PullAppInputs(self, request, context):
-        """Pull app inputs
+    def PullTaskInputs(self, request, context):
+        """Pull task inputs
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def PushAppOutputs(self, request, context):
-        """Push app outputs
+    def PushTaskOutputs(self, request, context):
+        """Push task outputs
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -262,15 +262,15 @@ def add_ServerAppIoServicer_to_server(servicer, server):
                     request_deserializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatResponse.SerializeToString,
             ),
-            'PullAppInputs': grpc.unary_unary_rpc_method_handler(
-                    servicer.PullAppInputs,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PullAppInputsRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.PullAppInputsResponse.SerializeToString,
+            'PullTaskInputs': grpc.unary_unary_rpc_method_handler(
+                    servicer.PullTaskInputs,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputsResponse.SerializeToString,
             ),
-            'PushAppOutputs': grpc.unary_unary_rpc_method_handler(
-                    servicer.PushAppOutputs,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushAppOutputsRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushAppOutputsResponse.SerializeToString,
+            'PushTaskOutputs': grpc.unary_unary_rpc_method_handler(
+                    servicer.PushTaskOutputs,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputsResponse.SerializeToString,
             ),
             'PushObject': grpc.unary_unary_rpc_method_handler(
                     servicer.PushObject,
@@ -437,7 +437,7 @@ class ServerAppIo(object):
             _registered_method=True)
 
     @staticmethod
-    def PullAppInputs(request,
+    def PullTaskInputs(request,
             target,
             options=(),
             channel_credentials=None,
@@ -450,9 +450,9 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/PullAppInputs',
-            flwr_dot_proto_dot_appio__pb2.PullAppInputsRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.PullAppInputsResponse.FromString,
+            '/flwr.proto.ServerAppIo/PullTaskInputs',
+            flwr_dot_proto_dot_appio__pb2.PullTaskInputsRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PullTaskInputsResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -464,7 +464,7 @@ class ServerAppIo(object):
             _registered_method=True)
 
     @staticmethod
-    def PushAppOutputs(request,
+    def PushTaskOutputs(request,
             target,
             options=(),
             channel_credentials=None,
@@ -477,9 +477,9 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/PushAppOutputs',
-            flwr_dot_proto_dot_appio__pb2.PushAppOutputsRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.PushAppOutputsResponse.FromString,
+            '/flwr.proto.ServerAppIo/PushTaskOutputs',
+            flwr_dot_proto_dot_appio__pb2.PushTaskOutputsRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PushTaskOutputsResponse.FromString,
             options,
             channel_credentials,
             insecure,

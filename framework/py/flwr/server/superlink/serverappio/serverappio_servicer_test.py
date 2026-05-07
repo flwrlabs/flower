@@ -42,14 +42,14 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
-    PullAppInputsRequest,
-    PullAppInputsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
+    PullTaskInputsRequest,
+    PullTaskInputsResponse,
     PushAppMessagesRequest,
     PushAppMessagesResponse,
-    PushAppOutputsRequest,
-    PushAppOutputsResponse,
+    PushTaskOutputsRequest,
+    PushTaskOutputsResponse,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
@@ -251,14 +251,14 @@ def _claim_in_parallel(
     channel_0: grpc.Channel, channel_1: grpc.Channel, token: str
 ) -> list[grpc.StatusCode | None]:
     pull_app_inputs_0 = channel_0.unary_unary(
-        "/flwr.proto.ServerAppIo/PullAppInputs",
-        request_serializer=PullAppInputsRequest.SerializeToString,
-        response_deserializer=PullAppInputsResponse.FromString,
+        "/flwr.proto.ServerAppIo/PullTaskInputs",
+        request_serializer=PullTaskInputsRequest.SerializeToString,
+        response_deserializer=PullTaskInputsResponse.FromString,
     )
     pull_app_inputs_1 = channel_1.unary_unary(
-        "/flwr.proto.ServerAppIo/PullAppInputs",
-        request_serializer=PullAppInputsRequest.SerializeToString,
-        response_deserializer=PullAppInputsResponse.FromString,
+        "/flwr.proto.ServerAppIo/PullTaskInputs",
+        request_serializer=PullTaskInputsRequest.SerializeToString,
+        response_deserializer=PullTaskInputsResponse.FromString,
     )
     timeout = 5.0
     barrier = threading.Barrier(3)
@@ -269,7 +269,7 @@ def _claim_in_parallel(
         try:
             barrier.wait(timeout=timeout)
             response, call = pull_fn.with_call(
-                PullAppInputsRequest(),
+                PullTaskInputsRequest(),
                 metadata=((APP_TOKEN_HEADER, token),),
             )
             del response
@@ -295,7 +295,7 @@ def _claim_in_parallel(
     alive_threads = [thread for thread in threads if thread.is_alive()]
     if alive_threads:
         raise AssertionError(
-            f"Concurrent PullAppInputs test timed out; {len(alive_threads)} "
+            f"Concurrent PullTaskInputs test timed out; {len(alive_threads)} "
             f"thread(s) still alive after {timeout} seconds."
         )
     if exceptions:
@@ -376,9 +376,9 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             response_deserializer=PullAppMessagesResponse.FromString,
         )
         self._push_serverapp_outputs = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/PushAppOutputs",
-            request_serializer=PushAppOutputsRequest.SerializeToString,
-            response_deserializer=PushAppOutputsResponse.FromString,
+            "/flwr.proto.ServerAppIo/PushTaskOutputs",
+            request_serializer=PushTaskOutputsRequest.SerializeToString,
+            response_deserializer=PushTaskOutputsResponse.FromString,
         )
         self._send_task_heartbeat = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/SendTaskHeartbeat",
@@ -401,9 +401,9 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             response_deserializer=ConfirmMessageReceivedResponse.FromString,
         )
         self._pull_app_inputs = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/PullAppInputs",
-            request_serializer=PullAppInputsRequest.SerializeToString,
-            response_deserializer=PullAppInputsResponse.FromString,
+            "/flwr.proto.ServerAppIo/PullTaskInputs",
+            request_serializer=PullTaskInputsRequest.SerializeToString,
+            response_deserializer=PullTaskInputsResponse.FromString,
         )
 
     def tearDown(self) -> None:
@@ -843,7 +843,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         run_id = self.state.get_run_id_by_token(token)
         assert run_id is not None, "Invalid token is provided."
         run_status = self.state.get_run_status({run_id})[run_id]
-        request = PushAppOutputsRequest(
+        request = PushTaskOutputsRequest(
             token=token, run_id=run_id, context=context_to_proto(context)
         )
 
@@ -1017,7 +1017,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert len(self.store) == 0
 
     def test_run_status_transitions(self) -> None:
-        """Test `PullAppInputs` activates a claimed task and marks the run running."""
+        """Test `PullTaskInputs` activates a claimed task and marks the run running."""
         # Prepare: Create a run with FAB
         fab_content = b"mock fab content"
         fab_hash = self.state.store_fab(
@@ -1042,22 +1042,22 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert run_status.status == Status.STARTING
 
         # Execute: Pull app inputs
-        request = PullAppInputsRequest()
+        request = PullTaskInputsRequest()
         with patch(
             "flwr.server.superlink.serverappio.serverappio_servicer."
             "get_authenticated_task",
             return_value=Mock(task_id=task_id, run_id=run_id),
         ):
-            response = servicer.PullAppInputs(request, Mock())
+            response = servicer.PullTaskInputs(request, Mock())
 
         # Assert: Response is successful and run status is now RUNNING
-        assert isinstance(response, PullAppInputsResponse)
+        assert isinstance(response, PullTaskInputsResponse)
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.RUNNING
 
 
-def test_ha_pull_app_inputs_claim_is_unique_across_replicas() -> None:
-    """Ensure only one replica can claim STARTING -> RUNNING via PullAppInputs."""
+def test_ha_pull_task_inputs_claim_is_unique_across_replicas() -> None:
+    """Ensure only one replica can claim STARTING -> RUNNING via PullTaskInputs."""
     with tempfile.TemporaryDirectory() as tmpdir:
         _, task_id, state_0, server_0, server_1 = _create_shared_runtime(tmpdir)
         channel_0 = grpc.insecure_channel(server_0.bound_address)

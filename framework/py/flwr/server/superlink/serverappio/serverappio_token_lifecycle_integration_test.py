@@ -22,8 +22,8 @@ import grpc
 
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    PushAppOutputsRequest,
-    PushAppOutputsResponse,
+    PushTaskOutputsRequest,
+    PushTaskOutputsResponse,
 )
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
@@ -61,9 +61,9 @@ class TestServerAppIoTokenLifecycleIntegration(unittest.TestCase):
 
         channel = grpc.insecure_channel("localhost:9091")
         self._push_app_outputs = channel.unary_unary(
-            "/flwr.proto.ServerAppIo/PushAppOutputs",
-            request_serializer=PushAppOutputsRequest.SerializeToString,
-            response_deserializer=PushAppOutputsResponse.FromString,
+            "/flwr.proto.ServerAppIo/PushTaskOutputs",
+            request_serializer=PushTaskOutputsRequest.SerializeToString,
+            response_deserializer=PushTaskOutputsResponse.FromString,
         )
 
     def tearDown(self) -> None:

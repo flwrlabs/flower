@@ -37,14 +37,14 @@ from flwr.proto import clientappio_pb2_grpc
 from flwr.proto.appio_pb2 import (
     CreateTaskRequest,
     CreateTaskResponse,
-    PullAppInputsRequest,
-    PullAppInputsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
+    PullTaskInputsRequest,
+    PullTaskInputsResponse,
     PushAppMessagesRequest,
     PushAppMessagesResponse,
-    PushAppOutputsRequest,
-    PushAppOutputsResponse,
+    PushTaskOutputsRequest,
+    PushTaskOutputsResponse,
 )
 from flwr.proto.message_pb2 import (
     ConfirmMessageReceivedRequest,
@@ -95,11 +95,11 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
 
         return GetRunResponse(run=run_to_proto(run))
 
-    def PullAppInputs(
-        self, request: PullAppInputsRequest, context: grpc.ServicerContext
-    ) -> PullAppInputsResponse:
+    def PullTaskInputs(
+        self, request: PullTaskInputsRequest, context: grpc.ServicerContext
+    ) -> PullTaskInputsResponse:
         """Pull Message, Context, and Run."""
-        log(DEBUG, "ClientAppIo.PullAppInputs")
+        log(DEBUG, "ClientAppIo.PullTaskInputs")
 
         # Get the authenticated task and associated run ID
         task = get_authenticated_task()
@@ -131,7 +131,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         # Activate task
         if state.activate_task(task_id=task.task_id):
             log(DEBUG, "Started task %d of run %s", task.task_id, run_id)
-            return PullAppInputsResponse(
+            return PullTaskInputsResponse(
                 context=context_to_proto(serverapp_context),
                 run=run_to_proto(run),
                 fab=fab_to_proto(fab),
@@ -141,11 +141,11 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         context.abort(grpc.StatusCode.FAILED_PRECONDITION, "Failed to start task.")
         raise RuntimeError("Unreachable code")  # for mypy
 
-    def PushAppOutputs(
-        self, request: PushAppOutputsRequest, context: grpc.ServicerContext
-    ) -> PushAppOutputsResponse:
+    def PushTaskOutputs(
+        self, request: PushTaskOutputsRequest, context: grpc.ServicerContext
+    ) -> PushTaskOutputsResponse:
         """Push Message and Context."""
-        log(DEBUG, "ClientAppIo.PushAppOutputs")
+        log(DEBUG, "ClientAppIo.PushTaskOutputs")
 
         # Get the authenticated task and associated run ID
         task = get_authenticated_task()
@@ -166,7 +166,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
 
-        return PushAppOutputsResponse()
+        return PushTaskOutputsResponse()
 
     def PullMessage(
         self, request: PullAppMessagesRequest, context: grpc.ServicerContext

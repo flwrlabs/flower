@@ -37,14 +37,14 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
-    PullAppInputsRequest,
-    PullAppInputsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
+    PullTaskInputsRequest,
+    PullTaskInputsResponse,
     PushAppMessagesRequest,
     PushAppMessagesResponse,
-    PushAppOutputsRequest,
-    PushAppOutputsResponse,
+    PushTaskOutputsRequest,
+    PushTaskOutputsResponse,
 )
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
@@ -307,11 +307,11 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
 
         return GetRunResponse(run=run_to_proto(runs[0]))
 
-    def PullAppInputs(
-        self, request: PullAppInputsRequest, context: grpc.ServicerContext
-    ) -> PullAppInputsResponse:
+    def PullTaskInputs(
+        self, request: PullTaskInputsRequest, context: grpc.ServicerContext
+    ) -> PullTaskInputsResponse:
         """Pull ServerApp process inputs."""
-        log(DEBUG, "ServerAppIoServicer.PullAppInputs")
+        log(DEBUG, "ServerAppIoServicer.PullTaskInputs")
         # Init access to LinkState
         state = self.state_factory.state()
 
@@ -330,7 +330,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 log(INFO, "Started task %d of run %d", task.task_id, run_id)
                 # Keep run status working
                 state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
-                return PullAppInputsResponse(
+                return PullTaskInputsResponse(
                     context=context_to_proto(serverapp_ctxt),
                     run=run_to_proto(run),
                     fab=fab_to_proto(fab),
@@ -346,11 +346,11 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         )
         raise RuntimeError("Unreachable code")  # for mypy
 
-    def PushAppOutputs(
-        self, request: PushAppOutputsRequest, context: grpc.ServicerContext
-    ) -> PushAppOutputsResponse:
+    def PushTaskOutputs(
+        self, request: PushTaskOutputsRequest, context: grpc.ServicerContext
+    ) -> PushTaskOutputsResponse:
         """Push ServerApp process outputs."""
-        log(DEBUG, "ServerAppIoServicer.PushAppOutputs")
+        log(DEBUG, "ServerAppIoServicer.PushTaskOutputs")
 
         # Get the authenticated task and associated run ID
         task = get_authenticated_task()
@@ -372,7 +372,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 state.set_serverapp_context(run_id, context_from_proto(request.context))
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
-        return PushAppOutputsResponse()
+        return PushTaskOutputsResponse()
 
     def PushLogs(
         self, request: PushLogsRequest, context: grpc.ServicerContext
