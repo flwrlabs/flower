@@ -62,6 +62,7 @@ from flwr.supercore.constant import (
     MAX_NAME_LENGTH,
 )
 from flwr.supercore.credential_store import get_credential_store
+from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 from flwr.supercore.utils import is_valid_name
 
 from .auth_plugin import CliAuthPlugin, get_cli_plugin_class
@@ -361,7 +362,10 @@ def init_channel_from_connection(
         insecure=connection.insecure,
         root_certificates=root_certificates_bytes,
         max_message_length=GRPC_MAX_MESSAGE_LENGTH,
-        interceptors=[CliAccountAuthInterceptor(auth_plugin)],
+        interceptors=[
+            RuntimeVersionClientInterceptor(component_name="flwr CLI"),
+            CliAccountAuthInterceptor(auth_plugin),
+        ],
     )
     channel.subscribe(on_channel_state_change)
     return channel
