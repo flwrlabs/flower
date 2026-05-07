@@ -20,6 +20,8 @@ from dataclasses import replace
 from logging import DEBUG, ERROR, INFO
 from queue import Queue
 
+import grpc
+
 from flwr.app import RecordDict
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
@@ -34,7 +36,6 @@ from flwr.common.config import (
 from flwr.common.constant import (
     RUNTIME_DEPENDENCY_INSTALL,
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
-    Status,
     SubStatus,
 )
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
@@ -50,16 +51,13 @@ from flwr.common.serde import (
     context_to_proto,
     fab_from_proto,
     run_from_proto,
-    run_status_to_proto,
 )
-from flwr.common.typing import RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppInputsRequest,
     PullAppInputsResponse,
     PushAppOutputsRequest,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
-from flwr.proto.run_pb2 import UpdateRunStatusRequest  # pylint: disable=E0611
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
 from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
@@ -163,9 +161,9 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     log_uploader = None
     run_id_hash = None
     heartbeat_sender = None
-    run = None
-    run_status = None
-    run_id_hash = None
+    sub_status = SubStatus.FAILED
+    details = "Task failed with unknown error."
+    context = None
     runtime_env_dir = None
     exit_code = ExitCode.SUCCESS
 
@@ -177,13 +175,6 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         # Stop log uploader for this run and upload final logs
         if log_uploader:
             stop_log_uploader(log_queue, log_uploader)
-
-        # Update run status
-        if run and run_status:
-            run_status_proto = run_status_to_proto(run_status)
-            conn._stub.UpdateRunStatus(
-                UpdateRunStatusRequest(run_id=run.run_id, run_status=run_status_proto)
-            )
 
         cleanup_app_runtime_environment(runtime_env_dir)
 
@@ -284,7 +275,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         )
 
         # Launch the simulation
-        updated_context = _run_simulation(
+        context = _run_simulation(
             server_app_attr=server_app_attr,
             client_app_attr=client_app_attr,
             num_supernodes=num_supernodes,
@@ -301,22 +292,30 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
         # Send resulting context
         # Temporarily disable pushing resulting context to SuperLink
-        updated_context.state = RecordDict()
-        context_proto = context_to_proto(updated_context)
-        out_req = PushAppOutputsRequest(
-            token=token, run_id=run.run_id, context=context_proto
-        )
-        _ = conn._stub.PushAppOutputs(out_req)
+        context.state = RecordDict()
 
-        run_status = RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
+        sub_status = SubStatus.COMPLETED
+        details = ""
 
     except Exception as ex:  # pylint: disable=broad-exception-caught
         exc_entity = "Simulation"
         log(ERROR, "%s raised an exception", exc_entity, exc_info=ex)
-        run_status = RunStatus(Status.FINISHED, SubStatus.FAILED, str(ex))
+        sub_status = SubStatus.FAILED
+        details = f"Simulation failed with exception: {str(ex)}"
 
         # General exit code
         exit_code = ExitCode.SIMULATION_EXCEPTION
+    finally:
+        log(DEBUG, "[flwr-simulation] Will push Simulation task output")
+        out_req = PushAppOutputsRequest(
+            context=context_to_proto(context) if context else None,
+            sub_status=sub_status,
+            details=details,
+        )
+        try:
+            _ = conn._stub.PushAppOutputs(out_req)
+        except grpc.RpcError:
+            pass
 
     flwr_exit(
         code=exit_code,
