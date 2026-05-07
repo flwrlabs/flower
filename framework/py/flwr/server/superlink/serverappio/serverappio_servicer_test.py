@@ -23,7 +23,7 @@ import tempfile
 import threading
 import unittest
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import grpc
 from parameterized import parameterized
@@ -42,8 +42,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
-    ListAppsToLaunchRequest,
-    ListAppsToLaunchResponse,
     PullAppInputsRequest,
     PullAppInputsResponse,
     PullAppMessagesRequest,
@@ -52,12 +50,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppMessagesResponse,
     PushAppOutputsRequest,
     PushAppOutputsResponse,
-    RequestTokenRequest,
-    RequestTokenResponse,
-)
-from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
-    SendAppHeartbeatRequest,
-    SendAppHeartbeatResponse,
+    SendTaskHeartbeatRequest,
+    SendTaskHeartbeatResponse,
 )
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
@@ -72,10 +66,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
-from flwr.proto.run_pb2 import (  # pylint: disable=E0611
-    UpdateRunStatusRequest,
-    UpdateRunStatusResponse,
-)
 from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
@@ -85,7 +75,10 @@ from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
-from flwr.server.superlink.serverappio.serverappio_servicer import _raise_if
+from flwr.server.superlink.serverappio.serverappio_servicer import (
+    ServerAppIoServicer,
+    _raise_if,
+)
 from flwr.server.superlink.utils import _STATUS_TO_MSG
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
@@ -319,6 +312,8 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         state_factory = LinkStateFactory(
             FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), objectstore_factory
         )
+        self.objectstore_factory = objectstore_factory
+        self.state_factory = state_factory
         self.state = state_factory.state()
         self.store = objectstore_factory.store()
         self.node_pk = b"fake public key"
@@ -385,15 +380,10 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=PushAppOutputsRequest.SerializeToString,
             response_deserializer=PushAppOutputsResponse.FromString,
         )
-        self._update_run_status = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/UpdateRunStatus",
-            request_serializer=UpdateRunStatusRequest.SerializeToString,
-            response_deserializer=UpdateRunStatusResponse.FromString,
-        )
-        self._send_app_heartbeat = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/SendAppHeartbeat",
-            request_serializer=SendAppHeartbeatRequest.SerializeToString,
-            response_deserializer=SendAppHeartbeatResponse.FromString,
+        self._send_task_heartbeat = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/SendTaskHeartbeat",
+            request_serializer=SendTaskHeartbeatRequest.SerializeToString,
+            response_deserializer=SendTaskHeartbeatResponse.FromString,
         )
         self._push_object = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/PushObject",
@@ -409,16 +399,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             "/flwr.proto.ServerAppIo/ConfirmMessageReceived",
             request_serializer=ConfirmMessageReceivedRequest.SerializeToString,
             response_deserializer=ConfirmMessageReceivedResponse.FromString,
-        )
-        self._list_apps_to_launch = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/ListAppsToLaunch",
-            request_serializer=ListAppsToLaunchRequest.SerializeToString,
-            response_deserializer=ListAppsToLaunchResponse.FromString,
-        )
-        self._request_token = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/RequestToken",
-            request_serializer=RequestTokenRequest.SerializeToString,
-            response_deserializer=RequestTokenResponse.FromString,
         )
         self._pull_app_inputs = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/PullAppInputs",
@@ -1036,59 +1016,42 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Assert: Message is removed from LinkState
         assert len(self.store) == 0
 
-    def test_list_apps_to_launch(self) -> None:
-        """Test `ListAppsToLaunch`."""
-        # Prepare
-        _run_id1 = self._create_dummy_run(running=True)  # Run ID 1 is running
-        run_id2 = self._create_dummy_run(running=False)  # Run ID 2 is pending
-
-        # Execute
-        request = ListAppsToLaunchRequest()
-        response, call = self._list_apps_to_launch.with_call(request=request)
-
-        # Assert
-        assert isinstance(response, ListAppsToLaunchResponse)
-        assert grpc.StatusCode.OK == call.code()
-
-        # Assert: Run ID 2 is returned
-        assert response.run_ids == [run_id2]
-
     def test_run_status_transitions(self) -> None:
-        """Test `RequestToken` and `PullAppInputs` transitions run status from PENDING
-        to STARTING to RUNNING."""
+        """Test `PullAppInputs` activates a claimed task and marks the run running."""
         # Prepare: Create a run with FAB
         fab_content = b"mock fab content"
         fab_hash = self.state.store_fab(
             Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
         )
         run_id = self._create_dummy_run(running=False, fab_hash=fab_hash)
-        self.state.create_task(
+        task_id = self.state.create_task(
             task_type=TaskType.SERVER_APP, run_id=run_id, fab_hash=fab_hash
         )
+        assert task_id is not None
+        servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
+
+        # Claim task through the servicer to transition the run to STARTING.
+        claim_response = servicer.ClaimTask(ClaimTaskRequest(task_id=task_id), Mock())
+        assert claim_response.HasField("token")
 
         # Set serverapp context
         context = Context(run_id, SUPERLINK_NODE_ID, {}, RecordDict(), {})
         self.state.set_serverapp_context(run_id, context)
 
-        # Request token to transition to STARTING
-        token_request = RequestTokenRequest(run_id=run_id)
-        token_response, call = self._request_token.with_call(request=token_request)
-        # pylint: disable-next=protected-access
-        self._appio_auth_interceptor._token = token_response.token
-
-        # Assert: Response is successful and run status is STARTING
-        assert isinstance(token_response, RequestTokenResponse)
-        assert grpc.StatusCode.OK == call.code()
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.STARTING
 
         # Execute: Pull app inputs
         request = PullAppInputsRequest()
-        response, call = self._pull_app_inputs.with_call(request=request)
+        with patch(
+            "flwr.server.superlink.serverappio.serverappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(task_id=task_id, run_id=run_id),
+        ):
+            response = servicer.PullAppInputs(request, Mock())
 
         # Assert: Response is successful and run status is now RUNNING
         assert isinstance(response, PullAppInputsResponse)
-        assert grpc.StatusCode.OK == call.code()
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.RUNNING
 

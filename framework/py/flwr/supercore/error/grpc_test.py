@@ -66,6 +66,18 @@ def test_flower_error_from_json() -> None:
     assert parsed.message == "public message"
     assert parsed.public_details == "public details"
 
+def test_flower_error_from_json_returns_base_error_for_subclass_call() -> None:
+    """Deserialize public payloads into a base FlowerError."""
+    err = EntitlementError("internal diagnostic message", entitlement_code=123)
+
+    parsed = EntitlementError.from_json(err.to_json("public message"))
+
+    assert isinstance(parsed, FlowerError)
+    assert not isinstance(parsed, EntitlementError)
+    assert parsed.code == ApiErrorCode.ENTITLEMENT_ERROR
+    assert parsed.message == "public message"
+    assert parsed.public_details == "internal diagnostic message"
+
 
 @pytest.mark.parametrize(
     "value",
@@ -76,6 +88,7 @@ def test_flower_error_from_json() -> None:
         '{"public_message": "missing code"}',
         '{"code": 1}',
         '{"code": "1", "public_message": "wrong code type"}',
+        '{"code": true, "public_message": "wrong code type"}',
         '{"code": 1, "public_message": "ok", "public_details": 1}',
     ],
 )

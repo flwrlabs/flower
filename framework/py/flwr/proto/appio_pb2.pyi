@@ -32,73 +32,11 @@ import typing
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 @typing.final
-class ListAppsToLaunchRequest(google.protobuf.message.Message):
+class PullPendingTasksRequest(google.protobuf.message.Message):
     """These messages are used by both ServerAppIo and ClientAppIo services
 
-    ListAppsToLaunch messages
+    PullPendingTasks messages
     """
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    def __init__(
-        self,
-    ) -> None: ...
-
-global___ListAppsToLaunchRequest = ListAppsToLaunchRequest
-
-@typing.final
-class ListAppsToLaunchResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    RUN_IDS_FIELD_NUMBER: builtins.int
-    @property
-    def run_ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
-        """List of run IDs of the apps to launch"""
-
-    def __init__(
-        self,
-        *,
-        run_ids: collections.abc.Iterable[builtins.int] | None = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["run_ids", b"run_ids"]) -> None: ...
-
-global___ListAppsToLaunchResponse = ListAppsToLaunchResponse
-
-@typing.final
-class RequestTokenRequest(google.protobuf.message.Message):
-    """RequestToken messages"""
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    RUN_ID_FIELD_NUMBER: builtins.int
-    run_id: builtins.int
-    def __init__(
-        self,
-        *,
-        run_id: builtins.int = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["run_id", b"run_id"]) -> None: ...
-
-global___RequestTokenRequest = RequestTokenRequest
-
-@typing.final
-class RequestTokenResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    TOKEN_FIELD_NUMBER: builtins.int
-    token: builtins.str
-    def __init__(
-        self,
-        *,
-        token: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["token", b"token"]) -> None: ...
-
-global___RequestTokenResponse = RequestTokenResponse
-
-@typing.final
-class PullPendingTasksRequest(google.protobuf.message.Message):
-    """PullPendingTasks messages"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
