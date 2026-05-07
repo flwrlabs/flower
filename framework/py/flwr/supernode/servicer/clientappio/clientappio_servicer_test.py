@@ -178,10 +178,9 @@ class TestClientAppIoServicer(unittest.TestCase):
 
     def test_servicer_pull_appinputs_activates_task(self) -> None:
         """PullAppInputs should activate the authenticated task."""
-        token = "test-token"
         run_id = 61016
         task_id = 123
-        request = PullAppInputsRequest(token=token)
+        request = PullAppInputsRequest()
 
         run = typing.Run.create_empty(run_id=run_id)
         run.fab_id = "mock/mock"
@@ -201,8 +200,6 @@ class TestClientAppIoServicer(unittest.TestCase):
             verifications={"sig": "value"},
         )
 
-        self.mock_state.get_run_id_by_token.return_value = run_id
-        self.mock_state.verify_token.return_value = True
         self.mock_state.get_context.return_value = app_context
         self.mock_state.get_run.return_value = run
         self.mock_state.get_fab.return_value = fab

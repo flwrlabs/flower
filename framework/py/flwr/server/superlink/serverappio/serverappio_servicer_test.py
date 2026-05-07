@@ -276,7 +276,7 @@ def _claim_in_parallel(
         try:
             barrier.wait(timeout=timeout)
             response, call = pull_fn.with_call(
-                PullAppInputsRequest(token=token),
+                PullAppInputsRequest(),
                 metadata=((APP_TOKEN_HEADER, token),),
             )
             del response
