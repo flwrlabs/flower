@@ -4,7 +4,6 @@ import grpc
 import warnings
 
 from flwr.proto import appio_pb2 as flwr_dot_proto_dot_appio__pb2
-from flwr.proto import heartbeat_pb2 as flwr_dot_proto_dot_heartbeat__pb2
 from flwr.proto import message_pb2 as flwr_dot_proto_dot_message__pb2
 from flwr.proto import run_pb2 as flwr_dot_proto_dot_run__pb2
 
@@ -37,16 +36,6 @@ class ClientAppIoStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.ListAppsToLaunch = channel.unary_unary(
-                '/flwr.proto.ClientAppIo/ListAppsToLaunch',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchResponse.FromString,
-                _registered_method=True)
-        self.RequestToken = channel.unary_unary(
-                '/flwr.proto.ClientAppIo/RequestToken',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.RequestTokenRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.RequestTokenResponse.FromString,
-                _registered_method=True)
         self.PullPendingTasks = channel.unary_unary(
                 '/flwr.proto.ClientAppIo/PullPendingTasks',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.PullPendingTasksRequest.SerializeToString,
@@ -61,11 +50,6 @@ class ClientAppIoStub(object):
                 '/flwr.proto.ClientAppIo/GetRun',
                 request_serializer=flwr_dot_proto_dot_run__pb2.GetRunRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_run__pb2.GetRunResponse.FromString,
-                _registered_method=True)
-        self.SendAppHeartbeat = channel.unary_unary(
-                '/flwr.proto.ClientAppIo/SendAppHeartbeat',
-                request_serializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatResponse.FromString,
                 _registered_method=True)
         self.SendTaskHeartbeat = channel.unary_unary(
                 '/flwr.proto.ClientAppIo/SendTaskHeartbeat',
@@ -117,26 +101,12 @@ class ClientAppIoStub(object):
 class ClientAppIoServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def ListAppsToLaunch(self, request, context):
+    def PullPendingTasks(self, request, context):
         """///////////////////////////////////////////////////////////////////////////
         General *AppIo endpoints for SuperExec processes
         ///////////////////////////////////////////////////////////////////////////
 
-        Get run IDs with pending messages
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def RequestToken(self, request, context):
-        """Request token
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def PullPendingTasks(self, request, context):
-        """Pull pending tasks
+        Pull pending tasks
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -155,13 +125,6 @@ class ClientAppIoServicer(object):
         ///////////////////////////////////////////////////////////////////////////
 
         Get run details
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def SendAppHeartbeat(self, request, context):
-        """App heartbeat
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -241,16 +204,6 @@ class ClientAppIoServicer(object):
 
 def add_ClientAppIoServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'ListAppsToLaunch': grpc.unary_unary_rpc_method_handler(
-                    servicer.ListAppsToLaunch,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchResponse.SerializeToString,
-            ),
-            'RequestToken': grpc.unary_unary_rpc_method_handler(
-                    servicer.RequestToken,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.RequestTokenRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.RequestTokenResponse.SerializeToString,
-            ),
             'PullPendingTasks': grpc.unary_unary_rpc_method_handler(
                     servicer.PullPendingTasks,
                     request_deserializer=flwr_dot_proto_dot_appio__pb2.PullPendingTasksRequest.FromString,
@@ -265,11 +218,6 @@ def add_ClientAppIoServicer_to_server(servicer, server):
                     servicer.GetRun,
                     request_deserializer=flwr_dot_proto_dot_run__pb2.GetRunRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_run__pb2.GetRunResponse.SerializeToString,
-            ),
-            'SendAppHeartbeat': grpc.unary_unary_rpc_method_handler(
-                    servicer.SendAppHeartbeat,
-                    request_deserializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatResponse.SerializeToString,
             ),
             'SendTaskHeartbeat': grpc.unary_unary_rpc_method_handler(
                     servicer.SendTaskHeartbeat,
@@ -326,60 +274,6 @@ def add_ClientAppIoServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class ClientAppIo(object):
     """Missing associated documentation comment in .proto file."""
-
-    @staticmethod
-    def ListAppsToLaunch(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/flwr.proto.ClientAppIo/ListAppsToLaunch',
-            flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.ListAppsToLaunchResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def RequestToken(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/flwr.proto.ClientAppIo/RequestToken',
-            flwr_dot_proto_dot_appio__pb2.RequestTokenRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.RequestTokenResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
 
     @staticmethod
     def PullPendingTasks(request,
@@ -452,33 +346,6 @@ class ClientAppIo(object):
             '/flwr.proto.ClientAppIo/GetRun',
             flwr_dot_proto_dot_run__pb2.GetRunRequest.SerializeToString,
             flwr_dot_proto_dot_run__pb2.GetRunResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def SendAppHeartbeat(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/flwr.proto.ClientAppIo/SendAppHeartbeat',
-            flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatRequest.SerializeToString,
-            flwr_dot_proto_dot_heartbeat__pb2.SendAppHeartbeatResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -36,7 +36,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.message import get_message_to_descendant_id_mapping
-from flwr.common.serde import context_to_proto, message_from_proto, run_status_to_proto
+from flwr.common.serde import context_to_proto, message_from_proto
 from flwr.common.serde_test import RecordMaker
 from flwr.common.typing import Fab, RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
@@ -44,8 +44,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
-    ListAppsToLaunchRequest,
-    ListAppsToLaunchResponse,
     PullAppInputsRequest,
     PullAppInputsResponse,
     PullAppMessagesRequest,
@@ -54,12 +52,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppMessagesResponse,
     PushAppOutputsRequest,
     PushAppOutputsResponse,
-    RequestTokenRequest,
-    RequestTokenResponse,
-)
-from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
-    SendAppHeartbeatRequest,
-    SendAppHeartbeatResponse,
+    SendTaskHeartbeatRequest,
+    SendTaskHeartbeatResponse,
 )
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
@@ -74,10 +68,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
-from flwr.proto.run_pb2 import (  # pylint: disable=E0611
-    UpdateRunStatusRequest,
-    UpdateRunStatusResponse,
-)
 from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
@@ -87,7 +77,10 @@ from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
-from flwr.server.superlink.serverappio.serverappio_servicer import _raise_if
+from flwr.server.superlink.serverappio.serverappio_servicer import (
+    ServerAppIoServicer,
+    _raise_if,
+)
 from flwr.server.superlink.utils import _STATUS_TO_MSG
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
@@ -321,6 +314,8 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         state_factory = LinkStateFactory(
             FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), objectstore_factory
         )
+        self.objectstore_factory = objectstore_factory
+        self.state_factory = state_factory
         self.state = state_factory.state()
         self.store = objectstore_factory.store()
         self.node_pk = b"fake public key"
@@ -374,15 +369,10 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=PushAppOutputsRequest.SerializeToString,
             response_deserializer=PushAppOutputsResponse.FromString,
         )
-        self._update_run_status = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/UpdateRunStatus",
-            request_serializer=UpdateRunStatusRequest.SerializeToString,
-            response_deserializer=UpdateRunStatusResponse.FromString,
-        )
-        self._send_app_heartbeat = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/SendAppHeartbeat",
-            request_serializer=SendAppHeartbeatRequest.SerializeToString,
-            response_deserializer=SendAppHeartbeatResponse.FromString,
+        self._send_task_heartbeat = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/SendTaskHeartbeat",
+            request_serializer=SendTaskHeartbeatRequest.SerializeToString,
+            response_deserializer=SendTaskHeartbeatResponse.FromString,
         )
         self._push_object = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/PushObject",
@@ -398,16 +388,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             "/flwr.proto.ServerAppIo/ConfirmMessageReceived",
             request_serializer=ConfirmMessageReceivedRequest.SerializeToString,
             response_deserializer=ConfirmMessageReceivedResponse.FromString,
-        )
-        self._list_apps_to_launch = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/ListAppsToLaunch",
-            request_serializer=ListAppsToLaunchRequest.SerializeToString,
-            response_deserializer=ListAppsToLaunchResponse.FromString,
-        )
-        self._request_token = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/RequestToken",
-            request_serializer=RequestTokenRequest.SerializeToString,
-            response_deserializer=RequestTokenResponse.FromString,
         )
         self._pull_app_inputs = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/PullAppInputs",
@@ -913,73 +893,21 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         self.assertEqual(task.status.status, Status.FINISHED)
         self.assertEqual(task.status.sub_status, SubStatus.COMPLETED)
 
-    @parameterized.expand(
-        [
-            (0,),  # Test successful if RunStatus is pending.
-            (1,),  # Test successful if RunStatus is starting.
-            (2,),  # Test successful if RunStatus is running.
-        ]
-    )  # type: ignore
-    def test_update_run_status_successful_if_not_finished(
-        self, num_transitions: int
-    ) -> None:
-        """Test `UpdateRunStatus` success."""
-        # Prepare
-        run_id = self._create_dummy_run(running=False)
-        _ = self.state.get_run_status({run_id})[run_id]
-        next_run_status = RunStatus(Status.STARTING, "", "")
-
-        if num_transitions > 0:
-            _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-            next_run_status = RunStatus(Status.RUNNING, "", "")
-        if num_transitions > 1:
-            _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
-            next_run_status = RunStatus(Status.FINISHED, "", "")
-
-        request = UpdateRunStatusRequest(
-            run_id=run_id, run_status=run_status_to_proto(next_run_status)
-        )
-
-        # Execute
-        response, call = self._update_run_status.with_call(request=request)
-
-        # Assert
-        assert isinstance(response, UpdateRunStatusResponse)
-        assert grpc.StatusCode.OK == call.code()
-
-    def test_update_run_status_not_successful_if_finished(self) -> None:
-        """Test `UpdateRunStatus` not successful."""
-        # Prepare
-        run_id = self._create_dummy_run(running=False)
-        _ = self.state.get_run_status({run_id})[run_id]
-        _ = self.state.update_run_status(run_id, RunStatus(Status.FINISHED, "", ""))
-        run_status = self.state.get_run_status({run_id})[run_id]
-        next_run_status = RunStatus(Status.FINISHED, "", "")
-
-        request = UpdateRunStatusRequest(
-            run_id=run_id, run_status=run_status_to_proto(next_run_status)
-        )
-
-        with self.assertRaises(grpc.RpcError) as e:
-            self._update_run_status.with_call(request=request)
-        assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
-        assert e.exception.details() == self.status_to_msg[run_status.status]
-
     @parameterized.expand([(True,), (False,)])  # type: ignore
-    def test_send_app_heartbeat(self, success: bool) -> None:
-        """Test sending an app heartbeat."""
+    def test_send_task_heartbeat(self, success: bool) -> None:
+        """Test sending a task heartbeat."""
         # Prepare
         run_id = self._create_dummy_run(create_token=False)
         task_id, _ = self._create_claimed_task_token(run_id)
-        request = SendAppHeartbeatRequest()
+        request = SendTaskHeartbeatRequest()
         mock_ack_method = Mock(return_value=success)
         self.state.acknowledge_task_heartbeat = mock_ack_method  # type: ignore
 
         # Execute
-        response, _ = self._send_app_heartbeat.with_call(request=request)
+        response, _ = self._send_task_heartbeat.with_call(request=request)
 
         # Assert
-        self.assertIsInstance(response, SendAppHeartbeatResponse)
+        self.assertIsInstance(response, SendTaskHeartbeatResponse)
         self.assertEqual(response.success, success)
         mock_ack_method.assert_called_once_with(task_id)
 
@@ -1147,124 +1075,42 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Assert: Message is removed from LinkState
         assert len(self.store) == 0
 
-    def test_list_apps_to_launch(self) -> None:
-        """Test `ListAppsToLaunch`."""
-        # Prepare
-        _run_id1 = self._create_dummy_run(running=True)  # Run ID 1 is running
-        run_id2 = self._create_dummy_run(running=False)  # Run ID 2 is pending
-
-        # Execute
-        request = ListAppsToLaunchRequest()
-        response, call = self._list_apps_to_launch.with_call(request=request)
-
-        # Assert
-        assert isinstance(response, ListAppsToLaunchResponse)
-        assert grpc.StatusCode.OK == call.code()
-
-        # Assert: Run ID 2 is returned
-        assert response.run_ids == [run_id2]
-
-    def test_request_token(self) -> None:
-        """Test `RequestToken`."""
-        # Prepare
-        run_id = self._create_dummy_run(running=False, create_token=False)
-        task_id = self.state.create_task(
-            task_type=TaskType.SERVER_APP,
-            run_id=run_id,
-        )
-        assert task_id is not None
-
-        # Execute
-        request = RequestTokenRequest(run_id=run_id)
-        response1, call1 = self._request_token.with_call(request=request)
-        response2, call2 = self._request_token.with_call(request=request)
-
-        # Assert
-        assert isinstance(response1, RequestTokenResponse)
-        assert isinstance(response2, RequestTokenResponse)
-        assert grpc.StatusCode.OK == call1.code()
-        assert grpc.StatusCode.OK == call2.code()
-
-        # Assert: Only one token is issued
-        assert response1.token != ""
-        assert response2.token == ""
-
-    def test_request_token_fail_closed_for_finished_run(self) -> None:
-        """Ensure `RequestToken` returns empty token for finished runs."""
-        # Prepare
-        run_id = self._create_dummy_run(running=False, create_token=False)
-        task_id = self.state.create_task(
-            task_type=TaskType.SERVER_APP,
-            run_id=run_id,
-        )
-        assert task_id is not None
-        task_before = self.state.get_tasks(task_ids=[task_id])[0]
-        self._transition_run_status(run_id, 2)
-        assert self.state.update_run_status(
-            run_id,
-            RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done"),
-        )
-        before = self.state.get_run_status({run_id})[run_id]
-
-        # Execute
-        response, call = self._request_token.with_call(
-            request=RequestTokenRequest(run_id=run_id)
-        )
-
-        # Assert: token issuance fails closed
-        assert isinstance(response, RequestTokenResponse)
-        assert grpc.StatusCode.OK == call.code()
-        assert response.token == ""
-
-        # Assert: terminal run status/details remain unchanged
-        after = self.state.get_run_status({run_id})[run_id]
-        assert before.status == after.status == Status.FINISHED
-        assert before.sub_status == after.sub_status == SubStatus.COMPLETED
-        assert before.details == after.details == "done"
-
-        # Assert: task token state remains unchanged
-        task_after = self.state.get_tasks(task_ids=[task_id])[0]
-        self.assertEqual(task_before, task_after)
-
     def test_run_status_transitions(self) -> None:
-        """Test `RequestToken` and `PullAppInputs` transitions run status from PENDING
-        to STARTING to RUNNING."""
+        """Test `PullAppInputs` activates a claimed task and marks the run running."""
         # Prepare: Create a run with FAB
         fab_content = b"mock fab content"
         fab_hash = self.state.store_fab(
             Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
         )
-        run_id = self._create_dummy_run(
-            running=False, fab_hash=fab_hash, create_token=False
-        )
+        run_id = self._create_dummy_run(running=False, fab_hash=fab_hash)
         task_id = self.state.create_task(
             task_type=TaskType.SERVER_APP, run_id=run_id, fab_hash=fab_hash
         )
         assert task_id is not None
+        servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
+
+        # Claim task through the servicer to transition the run to STARTING.
+        claim_response = servicer.ClaimTask(ClaimTaskRequest(task_id=task_id), Mock())
+        assert claim_response.HasField("token")
 
         # Set serverapp context
         context = Context(run_id, SUPERLINK_NODE_ID, {}, RecordDict(), {})
         self.state.set_serverapp_context(run_id, context)
 
-        # Request token to transition to STARTING
-        token_request = RequestTokenRequest(run_id=run_id)
-        token_response, call = self._request_token.with_call(request=token_request)
-        token = token_response.token
-        self._set_token(token)
-
-        # Assert: Response is successful and run status is STARTING
-        assert isinstance(token_response, RequestTokenResponse)
-        assert grpc.StatusCode.OK == call.code()
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.STARTING
 
         # Execute: Pull app inputs
         request = PullAppInputsRequest()
-        response, call = self._pull_app_inputs.with_call(request=request)
+        with patch(
+            "flwr.server.superlink.serverappio.serverappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(task_id=task_id, run_id=run_id),
+        ):
+            response = servicer.PullAppInputs(request, Mock())
 
         # Assert: Response is successful and run status is now RUNNING
         assert isinstance(response, PullAppInputsResponse)
-        assert grpc.StatusCode.OK == call.code()
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.RUNNING
 
