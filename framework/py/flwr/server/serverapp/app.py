@@ -172,7 +172,7 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         # Pull ServerAppInputs from LinkState
         try:
             log(DEBUG, "[flwr-serverapp] Pull ServerAppInputs")
-            req = PullAppInputsRequest(token=token)
+            req = PullAppInputsRequest()
             res: PullAppInputsResponse = grid._stub.PullAppInputs(req)
         except grpc.RpcError as ex:
             if ex.code() == grpc.StatusCode.FAILED_PRECONDITION:

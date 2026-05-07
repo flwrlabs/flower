@@ -192,8 +192,8 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         heartbeat_sender.start()
 
         # Pull SimulationInputs from LinkState
-        req = PullAppInputsRequest(token=token)
-        res: PullAppInputsResponse = conn._stub.PullAppInputs(req)
+        res: PullAppInputsResponse = conn._stub.PullAppInputs(PullAppInputsRequest())
+        task_id = res.task_id
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
         fab = fab_from_proto(res.fab)

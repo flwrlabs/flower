@@ -181,7 +181,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         token = "test-token"
         run_id = 61016
         task_id = 123
-        request = PullAppInputsRequest(token=token)
+        request = PullAppInputsRequest()
 
         run = typing.Run.create_empty(run_id=run_id)
         run.fab_id = "mock/mock"
