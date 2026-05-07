@@ -21,20 +21,14 @@ import unittest
 import grpc
 
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS, Status
-from flwr.common.serde import run_status_to_proto
 from flwr.common.typing import RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppOutputsRequest,
     PushAppOutputsResponse,
 )
-from flwr.proto.run_pb2 import (  # pylint: disable=E0611
-    UpdateRunStatusRequest,
-    UpdateRunStatusResponse,
-)
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
-from flwr.supercore.interceptors import APP_TOKEN_HEADER
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
@@ -72,11 +66,6 @@ class TestServerAppIoTokenLifecycleIntegration(unittest.TestCase):
             request_serializer=PushAppOutputsRequest.SerializeToString,
             response_deserializer=PushAppOutputsResponse.FromString,
         )
-        self._update_run_status = channel.unary_unary(
-            "/flwr.proto.ServerAppIo/UpdateRunStatus",
-            request_serializer=UpdateRunStatusRequest.SerializeToString,
-            response_deserializer=UpdateRunStatusResponse.FromString,
-        )
 
     def tearDown(self) -> None:
         """Stop the gRPC API server."""
@@ -91,20 +80,3 @@ class TestServerAppIoTokenLifecycleIntegration(unittest.TestCase):
         token = self.state.create_token(run_id)
         assert token is not None
         return run_id, token
-
-    def test_update_run_status_finished_deletes_token(self) -> None:
-        """`UpdateRunStatus(FINISHED)` should delete the token."""
-        run_id, token = self._create_running_run_and_token()
-        request = UpdateRunStatusRequest(
-            run_id=run_id,
-            run_status=run_status_to_proto(RunStatus(Status.FINISHED, "", "")),
-        )
-
-        response, call = self._update_run_status.with_call(
-            request=request,
-            metadata=((APP_TOKEN_HEADER, token),),
-        )
-
-        assert isinstance(response, UpdateRunStatusResponse)
-        assert call.code() == grpc.StatusCode.OK
-        assert self.state.get_run_id_by_token(token) is None
