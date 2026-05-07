@@ -178,7 +178,6 @@ class TestClientAppIoServicer(unittest.TestCase):
 
     def test_servicer_pull_appinputs_activates_task(self) -> None:
         """PullAppInputs should activate the authenticated task."""
-        token = "test-token"
         run_id = 61016
         task_id = 123
         request = PullAppInputsRequest()
