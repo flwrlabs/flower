@@ -12,7 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Trusted local supervisor for SuperExec-launched TaskExecutor processes."""
+"""Trusted local supervisor for SuperExec-launched TaskExecutor processes.
+
+SuperExec starts this module as a small host-side lifecycle process, then sends the real
+TaskExecutor command over a config pipe so token-bearing argv entries are not visible in
+the supervisor process listing. The supervisor starts that command in a new process
+group, reports launch success over a status pipe, and watches a parent-owned lifeline
+FD. When the lifeline reaches EOF, the supervisor terminates the TaskExecutor process
+group from outside any TaskExecutor-visible PID namespace.
+"""
 
 
 import argparse
@@ -208,7 +216,12 @@ def _run_supervised_process(
     termination_grace_period: float,
     status_fd: int | None = None,
 ) -> int:
-    """Launch and supervise the command."""
+    """Launch and supervise the command in its own process group.
+
+    The loop uses a persistent selector for the lifeline FD and checks process exit
+    without reaping when possible. That keeps process-group cleanup tied to the original
+    group leader until the final wait.
+    """
     supervised_process = subprocess.Popen(  # pylint: disable=consider-using-with
         command,
         **popen_kwargs,
@@ -316,6 +329,8 @@ def _terminate_process_group(
     _send_signal_to_process_group(process_group_id, signal.SIGTERM)
     deadline = time.monotonic() + grace_period
     while time.monotonic() < deadline:
+        # If the group leader has exited, reap it so the process group can
+        # disappear once any remaining children have handled SIGTERM.
         if (
             _peek_process_returncode(supervised_process) is not None
             and supervised_process.returncode is None
