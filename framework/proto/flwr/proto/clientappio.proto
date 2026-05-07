@@ -28,13 +28,6 @@ service ClientAppIo {
   // General *AppIo endpoints for SuperExec processes
   /////////////////////////////////////////////////////////////////////////////
 
-  // Get run IDs with pending messages
-  rpc ListAppsToLaunch(ListAppsToLaunchRequest)
-      returns (ListAppsToLaunchResponse) {}
-
-  // Request token
-  rpc RequestToken(RequestTokenRequest) returns (RequestTokenResponse) {}
-
   // Pull pending tasks
   rpc PullPendingTasks(PullPendingTasksRequest)
       returns (PullPendingTasksResponse) {}
@@ -48,10 +41,6 @@ service ClientAppIo {
 
   // Get run details
   rpc GetRun(GetRunRequest) returns (GetRunResponse) {}
-
-  // App heartbeat
-  rpc SendAppHeartbeat(SendAppHeartbeatRequest)
-      returns (SendAppHeartbeatResponse) {}
 
   // Task heartbeat
   rpc SendTaskHeartbeat(SendTaskHeartbeatRequest)

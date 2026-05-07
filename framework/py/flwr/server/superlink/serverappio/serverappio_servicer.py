@@ -16,7 +16,6 @@
 
 
 from logging import DEBUG, ERROR, INFO
-from typing import cast
 
 import grpc
 
@@ -29,7 +28,6 @@ from flwr.common.serde import (
     fab_to_proto,
     message_from_proto,
     message_to_proto,
-    run_status_from_proto,
     run_to_proto,
 )
 from flwr.common.typing import RunStatus
@@ -39,8 +37,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
-    ListAppsToLaunchRequest,
-    ListAppsToLaunchResponse,
     PullAppInputsRequest,
     PullAppInputsResponse,
     PullAppMessagesRequest,
@@ -49,12 +45,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppMessagesResponse,
     PushAppOutputsRequest,
     PushAppOutputsResponse,
-    RequestTokenRequest,
-    RequestTokenResponse,
-)
-from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
-    SendAppHeartbeatRequest,
-    SendAppHeartbeatResponse,
 )
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
@@ -74,8 +64,6 @@ from flwr.proto.run_pb2 import (  # pylint: disable=E0611
     GetFederationOptionsResponse,
     GetRunRequest,
     GetRunResponse,
-    UpdateRunStatusRequest,
-    UpdateRunStatusResponse,
 )
 from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
@@ -115,47 +103,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
     def state(self) -> LinkState:
         """Return the LinkState instance."""
         return self.state_factory.state()
-
-    def ListAppsToLaunch(
-        self,
-        request: ListAppsToLaunchRequest,
-        context: grpc.ServicerContext,
-    ) -> ListAppsToLaunchResponse:
-        """Get run IDs with pending messages."""
-        log(DEBUG, "ServerAppIoServicer.ListAppsToLaunch")
-
-        # Initialize state connection
-        state = self.state_factory.state()
-
-        # Get IDs of runs in pending status
-        pending_run_ids = [
-            run.run_id for run in state.get_run_info(statuses=[Status.PENDING])
-        ]
-
-        # Return run IDs
-        return ListAppsToLaunchResponse(run_ids=pending_run_ids)
-
-    def RequestToken(
-        self, request: RequestTokenRequest, context: grpc.ServicerContext
-    ) -> RequestTokenResponse:
-        """Request token."""
-        log(DEBUG, "ServerAppIoServicer.RequestToken")
-
-        # Initialize state connection
-        state = self.state_factory.state()
-
-        # Attempt to create a token for the provided run ID
-        run = state.get_run_info(run_ids=[request.run_id])[0]
-        token = state.claim_task(cast(int, run.primary_task_id))
-
-        if not token:
-            return RequestTokenResponse(token="")
-
-        # Keep run status working
-        state.update_run_status(request.run_id, RunStatus(Status.STARTING, "", ""))
-
-        # Return the token
-        return RequestTokenResponse(token=token)
 
     def ClaimTask(
         self, request: ClaimTaskRequest, context: grpc.ServicerContext
@@ -427,33 +374,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
         return PushAppOutputsResponse()
 
-    def UpdateRunStatus(
-        self, request: UpdateRunStatusRequest, context: grpc.ServicerContext
-    ) -> UpdateRunStatusResponse:
-        """Update the status of a run."""
-        log(DEBUG, "ServerAppIoServicer.UpdateRunStatus")
-
-        # Init state and store
-        state = self.state_factory.state()
-        store = self.objectstore_factory.store()
-
-        # Abort if the run is finished
-        abort_if(request.run_id, [Status.FINISHED], state, store, context)
-
-        # Update the run status
-        state.update_run_status(
-            run_id=request.run_id, new_status=run_status_from_proto(request.run_status)
-        )
-
-        # If the run is finished, delete the run from ObjectStore
-        if request.run_status.status == Status.FINISHED:
-            # Remove the token once the run completes.
-            state.delete_token(request.run_id)
-            # Delete all objects related to the run
-            store.delete_objects_in_run(request.run_id)
-
-        return UpdateRunStatusResponse()
-
     def PushLogs(
         self, request: PushLogsRequest, context: grpc.ServicerContext
     ) -> PushLogsResponse:
@@ -472,22 +392,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         """Get Federation Options associated with a run."""
         log(DEBUG, "ServerAppIoServicer.GetFederationOptions")
         raise NotImplementedError("To be removed")
-
-    def SendAppHeartbeat(
-        self, request: SendAppHeartbeatRequest, context: grpc.ServicerContext
-    ) -> SendAppHeartbeatResponse:
-        """Handle a heartbeat from an app process."""
-        log(DEBUG, "ServerAppIoServicer.SendAppHeartbeat")
-
-        # Get the authenticated task
-        task = get_authenticated_task()
-
-        # Init state
-        state = self.state_factory.state()
-
-        # Acknowledge the heartbeat
-        success = state.acknowledge_task_heartbeat(task.task_id)
-        return SendAppHeartbeatResponse(success=success)
 
     def PushObject(
         self, request: PushObjectRequest, context: grpc.ServicerContext
