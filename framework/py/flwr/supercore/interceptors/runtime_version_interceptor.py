@@ -192,7 +192,7 @@ def create_serverappio_runtime_version_server_interceptor(
 
 
 def create_control_runtime_version_server_interceptor(
-    connection_name: str = "CLI <-> SuperLink Control API",
+    connection_name: str = "flwr CLI <-> SuperLink Control API",
     send_warning_metadata: bool = False,
 ) -> RuntimeVersionServerInterceptor:
     """Create the default runtime version interceptor for Control API."""

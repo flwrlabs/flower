@@ -264,7 +264,7 @@ def test_init_channel_from_connection_uses_resolved_connection() -> None:
     assert len(kwargs["interceptors"]) == 2
     assert isinstance(kwargs["interceptors"][0], RuntimeVersionClientInterceptor)
     # pylint: disable-next=protected-access
-    assert kwargs["interceptors"][0]._metadata.component_name == "cli"
+    assert kwargs["interceptors"][0]._metadata.component_name == "flwr CLI"
     channel.subscribe.assert_called_once()
 
 

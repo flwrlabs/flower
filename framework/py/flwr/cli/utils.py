@@ -363,7 +363,7 @@ def init_channel_from_connection(
         root_certificates=root_certificates_bytes,
         max_message_length=GRPC_MAX_MESSAGE_LENGTH,
         interceptors=[
-            RuntimeVersionClientInterceptor(component_name="cli"),
+            RuntimeVersionClientInterceptor(component_name="flwr CLI"),
             CliAccountAuthInterceptor(auth_plugin),
         ],
     )
