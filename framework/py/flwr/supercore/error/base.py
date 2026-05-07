@@ -66,8 +66,8 @@ class FlowerError(Exception):
             }
         )
 
-    @classmethod
-    def from_json(cls, value: str | None) -> "FlowerError | None":
+    @staticmethod
+    def from_json(value: str | None) -> "FlowerError | None":
         """Deserialize a client-visible error payload.
 
         The internal diagnostic message is not transmitted over the wire. The returned
@@ -93,7 +93,7 @@ class FlowerError(Exception):
         if public_details is not None and not isinstance(public_details, str):
             return None
 
-        return cls(
+        return FlowerError(
             code=code,
             message=public_message,
             public_details=public_details,
