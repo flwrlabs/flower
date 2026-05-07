@@ -21,7 +21,6 @@ from typing import cast
 import grpc
 
 from flwr.common import Context
-from flwr.common.constant import Status
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -38,8 +37,6 @@ from flwr.proto import clientappio_pb2_grpc
 from flwr.proto.appio_pb2 import (
     CreateTaskRequest,
     CreateTaskResponse,
-    ListAppsToLaunchRequest,
-    ListAppsToLaunchResponse,
     PullAppInputsRequest,
     PullAppInputsResponse,
     PullAppMessagesRequest,
@@ -48,8 +45,6 @@ from flwr.proto.appio_pb2 import (
     PushAppMessagesResponse,
     PushAppOutputsRequest,
     PushAppOutputsResponse,
-    RequestTokenRequest,
-    RequestTokenResponse,
 )
 from flwr.proto.heartbeat_pb2 import SendAppHeartbeatRequest, SendAppHeartbeatResponse
 from flwr.proto.message_pb2 import (
@@ -83,41 +78,6 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
     def state(self) -> NodeState:
         """Return the NodeState instance."""
         return self.state_factory.state()
-
-    def ListAppsToLaunch(
-        self,
-        request: ListAppsToLaunchRequest,
-        context: grpc.ServicerContext,
-    ) -> ListAppsToLaunchResponse:
-        """Get run IDs with apps to launch."""
-        log(DEBUG, "ClientAppIo.ListAppsToLaunch")
-
-        # Initialize state connection
-        state = self.state_factory.state()
-
-        # Get run IDs with pending tasks
-        tasks = state.get_tasks(statuses=[Status.PENDING])
-        run_ids = [task.run_id for task in tasks]
-
-        # Return run IDs
-        return ListAppsToLaunchResponse(run_ids=run_ids)
-
-    def RequestToken(
-        self, request: RequestTokenRequest, context: grpc.ServicerContext
-    ) -> RequestTokenResponse:
-        """Request token."""
-        log(DEBUG, "ClientAppIo.RequestToken")
-
-        # Initialize state connection
-        state = self.state_factory.state()
-
-        # Get token for the task
-        tasks = state.get_tasks(statuses=[Status.PENDING])
-        task = [t for t in tasks if t.run_id == request.run_id][0]
-        token = state.claim_task(task.task_id)
-
-        # Return the token
-        return RequestTokenResponse(token=token or "")
 
     def GetRun(
         self, request: GetRunRequest, context: grpc.ServicerContext
