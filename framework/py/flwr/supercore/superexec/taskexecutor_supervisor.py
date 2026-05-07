@@ -142,8 +142,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         type=int,
         required=True,
         help=(
-            "Read end of the parent-owned lifeline pipe; EOF means SuperExec "
-            "exited."
+            "Read end of the parent-owned lifeline pipe; EOF means SuperExec " "exited."
         ),
     )
     parser.add_argument(

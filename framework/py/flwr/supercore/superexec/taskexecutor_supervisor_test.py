@@ -101,9 +101,7 @@ def test_launch_with_lifeline_keeps_command_out_of_supervisor_argv() -> None:
             "flwr.supercore.superexec.taskexecutor_supervisor.subprocess.Popen",
             _popen,
         ),
-        patch(
-            "flwr.supercore.superexec.taskexecutor_supervisor._check_launch_status"
-        ),
+        patch("flwr.supercore.superexec.taskexecutor_supervisor._check_launch_status"),
         patch("flwr.supercore.superexec.taskexecutor_supervisor._write_config"),
     ):
         launch_with_lifeline(
