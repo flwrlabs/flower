@@ -115,8 +115,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 {"run_id": uint64_to_int64(run_id)},
             ):
                 raise RuntimeError(
-                    f"Run {run_id} not found. This indicates an internal control-flow "
-                    "error: create_task should only be called for existing runs."
+                    f"Run {run_id} not found. create_task requires an existing run."
                 )
 
             task_id = super().create_task(

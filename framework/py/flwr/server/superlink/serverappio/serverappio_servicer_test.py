@@ -574,9 +574,8 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             )
 
         assert err.exception.code() == grpc.StatusCode.UNKNOWN
-        assert (
-            "Run 42 not found. This indicates an internal control-flow error"
-            in err.exception.details()
+        assert "Run 42 not found. create_task requires an existing run." in (
+            err.exception.details()
         )
 
     def _assert_get_nodes_not_allowed(self, run_id: int) -> None:

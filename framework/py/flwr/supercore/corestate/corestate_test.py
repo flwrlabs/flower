@@ -53,6 +53,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """
         return 42
 
+    def other_task_run_id(self, _state: CoreState) -> int:
+        """Return a second run ID for task tests that need multiple runs.
+
+        Subclasses can override this hook when task creation requires existing run
+        records instead of arbitrary placeholder IDs.
+        """
+        return 123
+
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
         state = self.state_factory()
@@ -93,12 +101,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_get_tasks_run_id_matches(self) -> None:
         """Run ID filters should match only tasks from the requested runs."""
         state = self.state_factory()
-        task_id_1 = state.create_task(task_type=TaskType.MODEL, run_id=42)
-        task_id_2 = state.create_task(task_type=TaskType.MODEL, run_id=123)
-        task_id_3 = state.create_task(task_type=TaskType.MODEL, run_id=42)
+        run_id_1 = self.task_run_id(state)
+        run_id_2 = self.other_task_run_id(state)
+        task_id_1 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_1)
+        task_id_2 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_2)
+        task_id_3 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_1)
         assert task_id_1 and task_id_2 and task_id_3
 
-        tasks = state.get_tasks(run_ids=[42])
+        tasks = state.get_tasks(run_ids=[run_id_1])
 
         self.assertEqual({task.task_id for task in tasks}, {task_id_1, task_id_3})
 

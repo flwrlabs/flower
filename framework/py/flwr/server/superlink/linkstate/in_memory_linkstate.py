@@ -115,8 +115,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         with self.lock:
             if run_id not in self.run_ids:
                 raise RuntimeError(
-                    f"Run {run_id} not found. This indicates an internal control-flow "
-                    "error: create_task should only be called for existing runs."
+                    f"Run {run_id} not found. create_task requires an existing run."
                 )
 
             task_id = super().create_task(

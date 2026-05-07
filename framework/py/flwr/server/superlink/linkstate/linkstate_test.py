@@ -79,6 +79,11 @@ class StateTest(CoreStateTest):
         assert isinstance(state, LinkState)
         return create_dummy_run(state)
 
+    def other_task_run_id(self, state: CoreState) -> int:
+        """Provide a second existing run ID for inherited CoreState task tests."""
+        assert isinstance(state, LinkState)
+        return create_dummy_run(state)
+
     def create_public_key(self) -> bytes:
         """Create a P-384 public key for node creation."""
         _, public_key = generate_key_pairs()
@@ -180,7 +185,7 @@ class StateTest(CoreStateTest):
 
         with self.assertRaisesRegex(
             RuntimeError,
-            "Run 42 not found. This indicates an internal control-flow error",
+            "Run 42 not found. create_task requires an existing run.",
         ):
             state.create_task(task_type="flwr-model", run_id=42)
 
