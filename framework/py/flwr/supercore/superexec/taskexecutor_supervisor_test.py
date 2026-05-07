@@ -30,7 +30,10 @@ from unittest.mock import patch
 import pytest
 
 from flwr.supercore.superexec.taskexecutor_supervisor import (
+    _NON_REAPING_WAIT_ATTRS,
+    _process_group_exists,
     _run_supervised_process,
+    _send_signal_to_process_group,
     _validate_launch_request,
     _validate_termination_grace_period,
     launch_with_lifeline,
@@ -40,9 +43,20 @@ POSIX_ONLY = pytest.mark.skipif(
     os.name != "posix",
     reason="Lifeline supervision depends on POSIX FD and signal behavior.",
 )
+LIFELINE_SUPPORTED = pytest.mark.skipif(
+    not (
+        os.name == "posix"
+        and callable(getattr(os, "waitid", None))
+        and all(getattr(os, attr, None) is not None for attr in _NON_REAPING_WAIT_ATTRS)
+    ),
+    reason=(
+        "Lifeline supervision depends on POSIX FD/signal behavior and "
+        "waitid/WNOWAIT non-reaping child status checks."
+    ),
+)
 
 
-@POSIX_ONLY
+@LIFELINE_SUPPORTED
 def test_launch_with_lifeline_wait_returns_supervised_process_exit_code() -> None:
     """Waiting launch should return the supervised process exit code."""
     returncode = launch_with_lifeline(
@@ -54,7 +68,7 @@ def test_launch_with_lifeline_wait_returns_supervised_process_exit_code() -> Non
     assert returncode == 7
 
 
-@POSIX_ONLY
+@LIFELINE_SUPPORTED
 def test_launch_with_lifeline_without_wait_returns_none_after_launch() -> None:
     """Non-waiting launch should return None after command launch is confirmed."""
     result = launch_with_lifeline(
@@ -66,7 +80,7 @@ def test_launch_with_lifeline_without_wait_returns_none_after_launch() -> None:
     assert result is None
 
 
-@POSIX_ONLY
+@LIFELINE_SUPPORTED
 def test_launch_with_lifeline_keeps_command_out_of_supervisor_argv() -> None:
     """Command details should travel over the config pipe, not process argv."""
 
@@ -113,7 +127,65 @@ def test_launch_with_lifeline_keeps_command_out_of_supervisor_argv() -> None:
     assert "secret-token" not in captured
 
 
-@POSIX_ONLY
+@LIFELINE_SUPPORTED
+def test_launch_with_lifeline_reaps_supervisor_after_setup_failure() -> None:
+    """Supervisor process should be reaped if parent-side setup fails."""
+
+    class _Popen:
+        pid = 1234
+
+        def __init__(self, args: list[str], **_: object) -> None:
+            self.args = args
+            self.terminated = False
+            self.waited = False
+            self.returncode: int | None = None
+
+        def poll(self) -> int | None:
+            """Return current fake process status."""
+            return self.returncode
+
+        def wait(self, timeout: float | None = None) -> int:
+            """Record that the fake process was reaped."""
+            del timeout
+            self.waited = True
+            self.returncode = -signal.SIGTERM
+            return self.returncode
+
+        def terminate(self) -> None:
+            """Terminate the fake process."""
+            self.terminated = True
+
+        def kill(self) -> None:
+            """Kill the fake process."""
+            raise AssertionError("kill should not be needed when wait succeeds")
+
+    fake_supervisor: _Popen | None = None
+
+    def _popen(args: list[str], **kwargs: object) -> _Popen:
+        del kwargs
+        nonlocal fake_supervisor
+        fake_supervisor = _Popen(args)
+        return fake_supervisor
+
+    with (
+        patch(
+            "flwr.supercore.superexec.taskexecutor_supervisor.subprocess.Popen",
+            _popen,
+        ),
+        patch(
+            "flwr.supercore.superexec.taskexecutor_supervisor._write_config",
+            side_effect=RuntimeError("config write failed"),
+        ),
+        pytest.raises(RuntimeError, match="config write failed"),
+    ):
+        launch_with_lifeline([sys.executable, "-c", "pass"], wait=False)
+
+    assert fake_supervisor is not None
+    assert fake_supervisor.terminated
+    assert fake_supervisor.waited
+
+
+@LIFELINE_SUPPORTED
 def test_launch_with_lifeline_reports_command_launch_failure(tmp_path: Path) -> None:
     """Non-waiting launch should fail if the supervisor cannot launch the command."""
     missing_command = tmp_path / "missing-command"
@@ -126,7 +198,7 @@ def test_launch_with_lifeline_reports_command_launch_failure(tmp_path: Path) -> 
         )
 
 
-@POSIX_ONLY
+@LIFELINE_SUPPORTED
 def test_launch_with_lifeline_preserves_devnull_stdio() -> None:
     """DEVNULL stdio kwargs should survive the supervisor config pipe."""
     returncode = launch_with_lifeline(
@@ -143,7 +215,7 @@ def test_launch_with_lifeline_preserves_devnull_stdio() -> None:
     assert returncode == 0
 
 
-@POSIX_ONLY
+@LIFELINE_SUPPORTED
 def test_lifeline_closure_terminates_supervised_process_group(
     tmp_path: Path,
 ) -> None:
@@ -180,7 +252,7 @@ def test_lifeline_closure_terminates_supervised_process_group(
     assert returncode < 0
 
 
-@POSIX_ONLY
+@LIFELINE_SUPPORTED
 def test_lifeline_closure_escalates_to_sigkill(tmp_path: Path) -> None:
     """Supervisor should escalate if the supervised process ignores SIGTERM."""
     pid_file = tmp_path / "supervised.pid"
@@ -216,7 +288,7 @@ def test_lifeline_closure_escalates_to_sigkill(tmp_path: Path) -> None:
     assert returncode == -signal.SIGKILL
 
 
-@POSIX_ONLY
+@LIFELINE_SUPPORTED
 def test_process_exit_cleans_remaining_process_group_children(tmp_path: Path) -> None:
     """Supervisor should clean children left behind by the supervised command."""
     ready_file = tmp_path / "child.ready"
@@ -256,7 +328,7 @@ def test_process_exit_cleans_remaining_process_group_children(tmp_path: Path) ->
     assert terminated_file.exists()
 
 
-@POSIX_ONLY
+@LIFELINE_SUPPORTED
 def test_supervised_process_does_not_inherit_lifeline_fd() -> None:
     """The supervised process should not inherit the supervisor lifeline FD."""
     read_fd, write_fd = os.pipe()
@@ -322,6 +394,51 @@ def test_validate_termination_grace_period_rejects_negative_values() -> None:
     """Negative grace periods should not silently mean immediate SIGKILL."""
     with pytest.raises(ValueError, match="finite non-negative"):
         _validate_termination_grace_period(-1.0)
+
+
+@POSIX_ONLY
+def test_launch_with_lifeline_rejects_missing_non_reaping_wait_support() -> None:
+    """Supervisor should fail before launch if waitid support is unavailable."""
+    with (
+        patch(
+            "flwr.supercore.superexec.taskexecutor_supervisor.os.waitid",
+            None,
+            create=True,
+        ),
+        patch(
+            "flwr.supercore.superexec.taskexecutor_supervisor.subprocess.Popen",
+        ) as popen,
+        pytest.raises(RuntimeError, match="waitid"),
+    ):
+        launch_with_lifeline([sys.executable, "-c", "pass"], wait=False)
+
+    popen.assert_not_called()
+
+
+@POSIX_ONLY
+def test_process_group_exists_raises_on_permission_error() -> None:
+    """Permission errors should not be treated as missing process groups."""
+    with (
+        patch(
+            "flwr.supercore.superexec.taskexecutor_supervisor.os.killpg",
+            side_effect=PermissionError,
+        ),
+        pytest.raises(RuntimeError, match="permission denied"),
+    ):
+        _process_group_exists(1234)
+
+
+@POSIX_ONLY
+def test_send_signal_to_process_group_raises_on_permission_error() -> None:
+    """Permission errors while signaling should be surfaced to callers."""
+    with (
+        patch(
+            "flwr.supercore.superexec.taskexecutor_supervisor.os.killpg",
+            side_effect=PermissionError,
+        ),
+        pytest.raises(RuntimeError, match="permission denied"),
+    ):
+        _send_signal_to_process_group(1234, signal.SIGTERM)
 
 
 def test_launch_with_lifeline_rejects_non_posix_platform() -> None:

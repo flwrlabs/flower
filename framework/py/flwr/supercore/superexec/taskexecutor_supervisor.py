@@ -48,7 +48,17 @@ _LIFECYCLE_POPEN_KWARGS = frozenset(
 )
 _READ_SIZE = 65536
 _POLL_INTERVAL = 0.1
+_SUPERVISOR_STOP_TIMEOUT = 1.0
 _STDIO_POPEN_KWARGS = frozenset({"stdin", "stdout", "stderr"})
+_NON_REAPING_WAIT_ATTRS = (
+    "P_PID",
+    "WEXITED",
+    "WNOHANG",
+    "WNOWAIT",
+    "CLD_EXITED",
+    "CLD_KILLED",
+    "CLD_DUMPED",
+)
 
 
 def launch_with_lifeline(
@@ -68,6 +78,7 @@ def launch_with_lifeline(
     """
     if os.name != "posix":
         raise RuntimeError("lifeline supervision requires POSIX FD inheritance")
+    _validate_non_reaping_wait_supported()
     _validate_launch_request(command, popen_kwargs)
     _validate_termination_grace_period(termination_grace_period)
     # Lifeline pipe: SuperExec keeps the write end, supervisor watches the read end.
@@ -129,7 +140,7 @@ def launch_with_lifeline(
         return None
     except Exception:
         if supervisor is not None and supervisor.poll() is None:
-            supervisor.terminate()
+            _stop_supervisor_process(supervisor)
         raise
     finally:
         _close_fd(lifeline_read_fd)
@@ -222,6 +233,7 @@ def _run_supervised_process(
     without reaping when possible. That keeps process-group cleanup tied to the original
     group leader until the final wait.
     """
+    _validate_non_reaping_wait_supported()
     supervised_process = subprocess.Popen(  # pylint: disable=consider-using-with
         command,
         **popen_kwargs,
@@ -285,28 +297,17 @@ def _peek_process_returncode(supervised_process: subprocess.Popen[bytes]) -> int
     """
     if supervised_process.returncode is not None:
         return supervised_process.returncode
-    waitid = getattr(os, "waitid", None)
-    p_pid = getattr(os, "P_PID", None)
-    w_exited = getattr(os, "WEXITED", None)
-    w_nohang = getattr(os, "WNOHANG", None)
-    w_nowait = getattr(os, "WNOWAIT", None)
-    if (
-        not callable(waitid)
-        or p_pid is None
-        or w_exited is None
-        or w_nohang is None
-        or w_nowait is None
-    ):
-        return supervised_process.poll()
-    waitid_fn = cast(Callable[[int, int, int], Any], waitid)
+    waitid_fn = _non_reaping_waitid()
     try:
         wait_result = waitid_fn(  # pylint: disable=not-callable
-            p_pid,
+            os.P_PID,
             supervised_process.pid,
-            w_exited | w_nohang | w_nowait,
+            os.WEXITED | os.WNOHANG | os.WNOWAIT,
         )
-    except ChildProcessError:
-        return supervised_process.poll()
+    except ChildProcessError as exc:
+        raise RuntimeError(
+            "unable to inspect supervised process status without reaping"
+        ) from exc
     returncode: int | None = None
     if wait_result is None:
         return returncode
@@ -347,8 +348,12 @@ def _send_signal_to_process_group(process_group_id: int, sig: signal.Signals) ->
     """Send a signal to a process group, ignoring already-exited groups."""
     try:
         os.killpg(process_group_id, sig)
-    except (PermissionError, ProcessLookupError):
+    except ProcessLookupError:
         pass
+    except PermissionError as exc:
+        raise RuntimeError(
+            f"permission denied while signaling process group {process_group_id}"
+        ) from exc
 
 
 def _process_group_exists(process_group_id: int) -> bool:
@@ -357,9 +362,46 @@ def _process_group_exists(process_group_id: int) -> bool:
         os.killpg(process_group_id, 0)
     except ProcessLookupError:
         return False
-    except PermissionError:
-        return False
+    except PermissionError as exc:
+        raise RuntimeError(
+            f"permission denied while checking process group {process_group_id}"
+        ) from exc
     return True
+
+
+def _validate_non_reaping_wait_supported() -> None:
+    """Raise if this platform cannot check child status without reaping.
+
+    Falling back to ``Popen.poll``/``wait`` would reap the process-group leader before
+    group cleanup and could let PID/PGID reuse redirect cleanup signals.
+    """
+    _non_reaping_waitid()
+
+
+def _non_reaping_waitid() -> Callable[[int, int, int], Any]:
+    """Return ``os.waitid`` only when the required non-reaping flags exist."""
+    waitid = getattr(os, "waitid", None)
+    missing = [
+        attr for attr in _NON_REAPING_WAIT_ATTRS if getattr(os, attr, None) is None
+    ]
+    if not callable(waitid) or missing:
+        missing_details = ["waitid"] if not callable(waitid) else []
+        missing_details.extend(missing)
+        raise RuntimeError(
+            "lifeline supervision requires os.waitid with WNOWAIT support"
+            f" ({', '.join(missing_details)} unavailable)"
+        )
+    return cast(Callable[[int, int, int], Any], waitid)
+
+
+def _stop_supervisor_process(supervisor: subprocess.Popen[bytes]) -> None:
+    """Terminate and reap a supervisor subprocess after failed setup."""
+    supervisor.terminate()
+    try:
+        supervisor.wait(timeout=_SUPERVISOR_STOP_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        supervisor.kill()
+        supervisor.wait()
 
 
 def _supervisor_env() -> dict[str, str]:
