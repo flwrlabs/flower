@@ -115,7 +115,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         stub = ClientAppIoStub(channel)
         wrap_stub(stub, make_simple_grpc_retry_invoker())
 
-        # Start app heartbeat
+        # Start task heartbeat
         heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
         heartbeat_sender.start()
 
