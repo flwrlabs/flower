@@ -52,7 +52,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
+from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
@@ -67,7 +67,10 @@ from flwr.supercore.inflatable.inflatable_utils import (
     pull_and_inflate_object_from_tree,
     push_objects,
 )
-from flwr.supercore.interceptors import AppIoTokenClientInterceptor
+from flwr.supercore.interceptors import (
+    AppIoTokenClientInterceptor,
+    RuntimeVersionClientInterceptor,
+)
 from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
@@ -93,7 +96,10 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         server_address=clientappio_api_address,
         insecure=insecure,
         root_certificates=certificates,
-        interceptors=[AppIoTokenClientInterceptor(token)],
+        interceptors=[
+            RuntimeVersionClientInterceptor(component_name="flwr-clientapp"),
+            AppIoTokenClientInterceptor(token),
+        ],
     )
     channel.subscribe(on_channel_state_change)
     heartbeat_sender = None
@@ -115,8 +121,8 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         stub = ClientAppIoStub(channel)
         wrap_stub(stub, make_simple_grpc_retry_invoker())
 
-        # Start app heartbeat
-        heartbeat_sender = HeartbeatSender(make_app_heartbeat_fn_grpc(stub, token))
+        # Start task heartbeat
+        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
         heartbeat_sender.start()
 
         # Pull Message, Context, Run and FAB from SuperNode

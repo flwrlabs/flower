@@ -68,6 +68,7 @@ from flwr.supercore.auth import (
 )
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
+from flwr.supercore.interceptors import create_fleet_runtime_version_server_interceptor
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.tls import (
     get_client_tls_args,
@@ -627,6 +628,9 @@ def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917
     interceptors: Sequence[grpc.ServerInterceptor] | None = None,
 ) -> grpc.Server:
     """Run Fleet API (gRPC, request-response)."""
+    interceptors = list(interceptors or [])
+    interceptors.append(create_fleet_runtime_version_server_interceptor())
+
     # Create Fleet API gRPC server
     fleet_servicer = FleetServicer(
         state_factory=state_factory,
