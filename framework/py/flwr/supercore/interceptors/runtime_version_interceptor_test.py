@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for runtime version metadata interceptors."""
 
+import json
 from collections import namedtuple
 from collections.abc import Iterable, Iterator
 from logging import WARN
@@ -255,6 +256,35 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_called_once()
+
+    def test_incompatible_metadata_is_rejected(self) -> None:
+        """Reject mode should abort with a structured FlowerError."""
+        self.interceptor = RuntimeVersionServerInterceptor(
+            connection_name="flwr-simulation <-> SuperLink ServerAppIo API",
+            local_metadata=RuntimeVersionMetadata.from_local_component(
+                "superlink",
+                package_name_value="flwr",
+                package_version_value="1.29.0",
+            ),
+            reject_incompatible=True,
+        )
+        intercepted = self._intercept(
+            "/flwr.proto.ServerAppIo/GetNodes",
+            _make_runtime_metadata("1.30.1"),
+        )
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+        context.code.return_value = None
+
+        with self.assertRaises(grpc.RpcError):
+            intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+
+        status, payload = context.abort.call_args.args
+        self.assertEqual(status, grpc.StatusCode.FAILED_PRECONDITION)
+        self.assertEqual(
+            json.loads(payload)["code"],
+            ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
+        )
 
     def test_serverappio_factory_observes_by_default(self) -> None:
         """ServerAppIo factory should not return warning metadata by default."""
