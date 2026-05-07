@@ -36,7 +36,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppMessagesRequest,
 )
 from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
-from flwr.supercore.constant import PULL_MAX_TIME, PULL_MAX_TRIES_PER_OBJECT, TaskType
+from flwr.supercore.constant import PULL_MAX_TIME, PULL_MAX_TRIES_PER_OBJECT
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
@@ -287,7 +287,7 @@ class TestGrpcGrid(unittest.TestCase):
         self.assertIsInstance(interceptors[0], RuntimeVersionClientInterceptor)
         self.assertIsInstance(interceptors[1], AppIoTokenClientInterceptor)
         # pylint: disable-next=protected-access
-        self.assertEqual(interceptors[0]._metadata.component_name, TaskType.SERVER_APP)
+        self.assertEqual(interceptors[0]._metadata.component_name, "flwr-serverapp")
 
     def test_init_rejects_empty_token(
         self,

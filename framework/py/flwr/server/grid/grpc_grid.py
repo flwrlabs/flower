@@ -50,7 +50,7 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
 )
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
-from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE, TaskType
+from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE
 from flwr.supercore.inflatable.inflatable_object import (
     InflatableObject,
     get_all_nested_objects,
@@ -163,7 +163,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
             insecure=self._insecure,
             root_certificates=self._cert,
             interceptors=[
-                RuntimeVersionClientInterceptor(component_name=TaskType.SERVER_APP),
+                RuntimeVersionClientInterceptor(component_name="flwr-serverapp"),
                 AppIoTokenClientInterceptor(token=self._token),
             ],
         )
