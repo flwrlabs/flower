@@ -105,6 +105,8 @@ class InMemoryNodeState(
         limit: int | None = None,
     ) -> Sequence[Message]:
         """Retrieve messages based on the specified filters."""
+        with self.lock_task_store:
+            self._cleanup_expired_task_tokens_locked()
         self._cleanup_expired_tokens()
 
         selected_messages: list[Message] = []
@@ -178,15 +180,13 @@ class InMemoryNodeState(
         with self.lock_ctx_store:
             return self.ctx_store.get(run_id)
 
-    def _on_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
-        """Insert error replies for messages associated with expired tokens."""
+    def _store_error_replies(self, run_ids: set[int]) -> None:
+        """Insert error replies for retrieved messages associated with run IDs."""
         with self.lock_msg_store:
-            # Find all retrieved messages associated with expired run IDs
-            expired_run_ids = {run_id for run_id, _ in expired_records}
             messages_to_reply: list[Message] = []
             for entry in self.msg_store.values():
                 msg = entry.message
-                if msg.metadata.run_id in expired_run_ids and entry.is_retrieved:
+                if msg.metadata.run_id in run_ids and entry.is_retrieved:
                     messages_to_reply.append(msg)
 
             # Create and store error replies for each message
@@ -204,6 +204,14 @@ class InMemoryNodeState(
 
                 # Store the error reply message
                 self.store_message(error_reply)
+
+    def _on_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
+        """Insert error replies for messages associated with expired app tokens."""
+        self._store_error_replies({run_id for run_id, _ in expired_records})
+
+    def _on_task_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
+        """Insert error replies for messages associated with expired task tokens."""
+        self._store_error_replies({run_id for _, run_id in expired_records})
 
     def record_message_processing_start(self, message_id: str) -> None:
         """Record the start time of message processing based on the message ID."""

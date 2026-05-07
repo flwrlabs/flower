@@ -300,6 +300,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         """
         expired_at = now()
         current = int(expired_at.timestamp())
+        expired_records: list[tuple[int, int]] = []
         for task_id, record in list(self.task_token_store.items()):
             if record.active_until < current:
                 # The task is considered expired. Mark it as finished with a failed
@@ -314,8 +315,23 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                             details="No heartbeat received from the task",
                         )
                     )
+                    expired_records.append((task_id, task.run_id))
                 del self.task_token_store[task_id]
                 self.task_token_to_task_id.pop(record.token, None)
+
+        if expired_records:
+            self._on_task_tokens_expired(expired_records)
+
+    def _on_task_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
+        """Handle cleanup of expired task tokens.
+
+        Override in subclasses to add custom cleanup logic.
+
+        Parameters
+        ----------
+        expired_records : list[tuple[int, int]]
+            List of tuples containing (task_id, run_id) for expired task tokens.
+        """
 
     def verify_token(self, run_id: int, token: str) -> bool:
         """Verify a token for the given run ID."""
