@@ -35,6 +35,7 @@ from flwr.supercore.auth import (
 )
 from flwr.supercore.constant import EXEC_PLUGIN_SECTION
 from flwr.supercore.grpc_health import add_args_health
+from flwr.supercore.superexec.sandbox import resolve_sandbox_config
 from flwr.supercore.superexec.plugin import (
     ClientAppExecPlugin,
     ExecPlugin,
@@ -116,6 +117,18 @@ def flower_superexec() -> None:
             except OSError as e:
                 log(WARN, "Failed to destroy authentication secret file: %s", e)
 
+    try:
+        sandbox_config = resolve_sandbox_config(
+            mode=args.sandbox,
+            nsjail_config_path=args.sandbox_config,
+            nsjail_binary=args.nsjail_binary,
+        )
+    except ValueError as err:
+        flwr_exit(
+            ExitCode.SUPEREXEC_INVALID_PLUGIN_CONFIG,
+            f"Invalid SuperExec sandbox config: {err}",
+        )
+
     run_superexec(
         plugin_class=plugin_class,
         stub_class=stub_class,  # type: ignore
@@ -127,6 +140,7 @@ def flower_superexec() -> None:
         parent_pid=args.parent_pid,
         health_server_address=args.health_server_address,
         runtime_dependency_install=args.runtime_dependency_install,
+        sandbox_config=sandbox_config,
     )
 
 
@@ -171,6 +185,29 @@ def _parse_args() -> argparse.ArgumentParser:
         default=None,
         help="The PID of the parent process. When set, the process will terminate "
         "when the parent process exits.",
+    )
+    parser.add_argument(
+        "--sandbox",
+        type=str,
+        default=None,
+        help="App sandbox mode for SuperExec launches. Supported values: "
+        "'disabled' and 'nsjail'. Defaults to FLWR_SUPEREXEC_SANDBOX or "
+        "'disabled'.",
+    )
+    parser.add_argument(
+        "--sandbox-config",
+        type=str,
+        default=None,
+        help="Path to an nsjail config file. Defaults to "
+        "FLWR_SUPEREXEC_SANDBOX_CONFIG or the packaged GPU-container PoC "
+        "config when --sandbox nsjail is used.",
+    )
+    parser.add_argument(
+        "--nsjail-binary",
+        type=str,
+        default=None,
+        help="Path or name of the nsjail executable. Defaults to "
+        "FLWR_SUPEREXEC_NSJAIL_BINARY or 'nsjail'.",
     )
     add_superexec_auth_secret_args(parser)
     add_args_health(parser)

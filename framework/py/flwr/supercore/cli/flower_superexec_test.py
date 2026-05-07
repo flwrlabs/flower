@@ -96,6 +96,9 @@ def test_flower_superexec_clientapp_allows_missing_secret(
         parent_pid=None,
         health_server_address=None,
         runtime_dependency_install=False,
+        sandbox="disabled",
+        sandbox_config=None,
+        nsjail_binary=None,
     )
     captured: dict[str, object] = {}
 
@@ -123,6 +126,7 @@ def test_flower_superexec_clientapp_allows_missing_secret(
     flower_superexec_module.flower_superexec()
 
     assert captured["superexec_auth_secret"] is None
+    assert captured["sandbox_config"].mode == "disabled"
 
 
 def test_flower_superexec_serverapp_allows_missing_secret(
@@ -139,6 +143,9 @@ def test_flower_superexec_serverapp_allows_missing_secret(
         parent_pid=None,
         health_server_address=None,
         runtime_dependency_install=False,
+        sandbox="disabled",
+        sandbox_config=None,
+        nsjail_binary=None,
     )
 
     class _Parser:
@@ -167,3 +174,4 @@ def test_flower_superexec_serverapp_allows_missing_secret(
     flower_superexec_module.flower_superexec()
 
     assert captured["superexec_auth_secret"] is None
+    assert captured["sandbox_config"].mode == "disabled"

@@ -21,6 +21,7 @@ from typing import Any
 
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.typing import Run
+from flwr.supercore.superexec.sandbox import SandboxConfig
 
 
 class ExecPlugin(ABC):
@@ -33,12 +34,14 @@ class ExecPlugin(ABC):
         root_certificates_path: str | None,
         get_run: Callable[[int], Run],
         runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
+        sandbox_config: SandboxConfig | None = None,
     ) -> None:
         self.appio_api_address = appio_api_address
         self.insecure = insecure
         self.root_certificates_path = root_certificates_path
         self.get_run = get_run
         self.runtime_dependency_install = runtime_dependency_install
+        self.sandbox_config = sandbox_config or SandboxConfig()
 
     @abstractmethod
     def select_run_id(self, candidate_run_ids: Sequence[int]) -> int | None:

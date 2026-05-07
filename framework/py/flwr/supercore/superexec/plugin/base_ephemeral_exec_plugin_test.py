@@ -15,10 +15,14 @@
 """Tests for SuperExec base ephemeral plugin behavior."""
 
 
+from pathlib import Path
 from unittest.mock import patch
+
+from pytest import MonkeyPatch
 
 from flwr.common.exit import ExitCode
 from flwr.common.typing import Run
+from flwr.supercore.superexec.sandbox import SandboxConfig
 
 from .base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
 
@@ -110,3 +114,43 @@ def test_launch_app_calls_cleanup_before_launch() -> None:
 
     # Assert
     assert call_log == ["cleanup", "subprocess"]
+
+
+def test_launch_app_wraps_ephemeral_command_when_nsjail_enabled(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """Sandboxed ephemeral launch should wrap command and omit parent PID."""
+    serverapp = tmp_path / "flwr-serverapp"
+    serverapp.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    serverapp.chmod(serverapp.stat().st_mode | 0o111)
+    monkeypatch.setenv("PATH", str(tmp_path))
+    plugin = _get_ephemeral_plugin()
+    plugin.sandbox_config = SandboxConfig(
+        mode="nsjail",
+        nsjail_binary="/usr/bin/nsjail",
+        nsjail_config_path="/tmp/nsjail.cfg",
+    )
+
+    with (
+        patch(
+            "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.subprocess.run"
+        ) as run,
+        patch("flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"),
+    ):
+        plugin.launch_app(token="token-123", run_id=5)
+
+    run.assert_called_once_with(
+        [
+            "/usr/bin/nsjail",
+            "--config",
+            "/tmp/nsjail.cfg",
+            "--",
+            str(serverapp),
+            "--insecure",
+            "--serverappio-api-address",
+            "127.0.0.1:9091",
+            "--token",
+            "token-123",
+        ],
+        check=False,
+    )

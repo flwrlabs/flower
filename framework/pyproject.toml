@@ -155,6 +155,9 @@ devtool = { path = "../dev", editable = true }
 
 [tool.poetry]
 packages = [{ include = "flwr", from = "py" }]
+include = [
+    { path = "py/flwr/supercore/superexec/sandbox/config/*.cfg", format = ["sdist", "wheel"] },
+]
 exclude = ["py/**/*_test.py"]
 
 [tool.poetry.group.dev.dependencies]

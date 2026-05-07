@@ -51,9 +51,11 @@ class BaseEphemeralExecPlugin(ExecPlugin):
             cmds += ["--root-certificates", self.root_certificates_path]
         cmds += [self.appio_api_address_arg, self.appio_api_address]
         cmds += ["--token", token]
-        cmds += ["--parent-pid", str(os.getpid())]
+        if self.sandbox_config.include_parent_pid:
+            cmds += ["--parent-pid", str(os.getpid())]
         if self.runtime_dependency_install:
             cmds += ["--allow-runtime-dependency-installation"]
+        cmds = self.sandbox_config.wrap_command(cmds)
         # Perform any cleanup before launching the app
         if self.cleanup_before_launch is not None:
             self.cleanup_before_launch()

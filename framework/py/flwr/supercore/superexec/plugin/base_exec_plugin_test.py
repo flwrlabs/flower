@@ -16,9 +16,13 @@
 
 
 import subprocess
+from pathlib import Path
 from unittest.mock import Mock, patch
 
+from pytest import MonkeyPatch
+
 from flwr.common.typing import Run
+from flwr.supercore.superexec.sandbox import SandboxConfig
 from flwr.supercore.superexec.plugin.base_exec_plugin import BaseExecPlugin
 from flwr.supercore.superexec.plugin.clientapp_exec_plugin import ClientAppExecPlugin
 
@@ -118,6 +122,92 @@ def test_launch_app_skips_optional_runtime_flags_by_default() -> None:
         plugin.launch_app(token="token-123", run_id=7)
 
     assert "--allow-runtime-dependency-installation" not in popen.call_args.args[0]
+
+
+def test_launch_app_redirects_stdio_to_configured_log_file(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """Configured app log directory should receive child stdout/stderr."""
+    monkeypatch.setenv("FLWR_SUPEREXEC_APP_LOG_DIR", str(tmp_path))
+    plugin = DummyExecPlugin(
+        appio_api_address="127.0.0.1:9091",
+        insecure=True,
+        root_certificates_path=None,
+        get_run=Mock(),
+    )
+
+    with patch(
+        "flwr.supercore.superexec.plugin.base_exec_plugin.subprocess.Popen"
+    ) as popen:
+        plugin.launch_app(token="token-123", run_id=7)
+
+    assert popen.call_args.kwargs["stderr"] is subprocess.STDOUT
+    assert popen.call_args.kwargs["stdout"].name == str(tmp_path / "dummy-app-7.log")
+    assert popen.call_args.kwargs["stdout"].closed
+
+
+def test_launch_app_checks_for_immediate_exit(monkeypatch: MonkeyPatch) -> None:
+    """Startup check should poll launched processes when configured."""
+    monkeypatch.setenv("FLWR_SUPEREXEC_APP_STARTUP_CHECK_SECONDS", "1")
+    plugin = DummyExecPlugin(
+        appio_api_address="127.0.0.1:9091",
+        insecure=True,
+        root_certificates_path=None,
+        get_run=Mock(),
+    )
+    process = Mock()
+    process.poll.return_value = 2
+
+    with (
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.subprocess.Popen",
+            return_value=process,
+        ),
+        patch("flwr.supercore.superexec.plugin.base_exec_plugin.time.sleep") as sleep,
+    ):
+        plugin.launch_app(token="token-123", run_id=7)
+
+    sleep.assert_called_once_with(1.0)
+    process.poll.assert_called_once_with()
+
+
+def test_launch_app_wraps_command_when_nsjail_enabled(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """Ensure nsjail mode wraps app launch and omits parent PID."""
+    dummy_app = tmp_path / "dummy-app"
+    dummy_app.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    dummy_app.chmod(dummy_app.stat().st_mode | 0o111)
+    monkeypatch.setenv("PATH", str(tmp_path))
+    plugin = DummyExecPlugin(
+        appio_api_address="127.0.0.1:9091",
+        insecure=True,
+        root_certificates_path=None,
+        get_run=Mock(),
+        sandbox_config=SandboxConfig(
+            mode="nsjail",
+            nsjail_binary="/usr/bin/nsjail",
+            nsjail_config_path="/tmp/nsjail.cfg",
+        ),
+    )
+
+    with patch(
+        "flwr.supercore.superexec.plugin.base_exec_plugin.subprocess.Popen"
+    ) as popen:
+        plugin.launch_app(token="token-123", run_id=7)
+
+    assert popen.call_args.args[0] == [
+        "/usr/bin/nsjail",
+        "--config",
+        "/tmp/nsjail.cfg",
+        "--",
+        str(dummy_app),
+        "--insecure",
+        "--appio-api-address",
+        "127.0.0.1:9091",
+        "--token",
+        "token-123",
+    ]
 
 
 def test_clientapp_launch_forwards_root_certificate() -> None:

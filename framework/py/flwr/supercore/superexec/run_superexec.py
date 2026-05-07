@@ -43,6 +43,7 @@ from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 from .plugin import ExecPlugin
 from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
+from .sandbox import SandboxConfig
 
 
 def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
@@ -56,6 +57,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
     parent_pid: int | None = None,
     health_server_address: str | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
+    sandbox_config: SandboxConfig | None = None,
 ) -> None:
     """Run Flower SuperExec.
 
@@ -85,6 +87,8 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
         NOT be started.
     runtime_dependency_install : bool (default: False)
         Whether runtime dependency installation is allowed.
+    sandbox_config : Optional[SandboxConfig] (default: None)
+        App sandbox configuration used to wrap app launch commands.
     """
     interceptors: list[SuperExecAuthClientInterceptor] | None = None
     if superexec_auth_secret:
@@ -144,6 +148,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
         root_certificates_path=root_certificates_path,
         get_run=get_run,
         runtime_dependency_install=runtime_dependency_install,
+        sandbox_config=sandbox_config,
     )
 
     # Load plugin configuration from file if provided
