@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Trusted local supervisor for SuperExec-launched app processes."""
+"""Trusted local supervisor for SuperExec-launched TaskExecutor processes."""
 
 
 import argparse
@@ -50,13 +50,13 @@ def launch_with_lifeline(
     popen_kwargs: dict[str, Any] | None = None,
     termination_grace_period: float = 5.0,
 ) -> int | None:
-    """Launch an app command through a supervisor with a lifeline FD.
+    """Launch a supervised command through a supervisor with a lifeline FD.
 
     When ``wait`` is ``False``, this returns after the supervisor starts and
-    reports that the app command was launched. When ``wait`` is ``True``, this
+    reports that the command was launched. When ``wait`` is ``True``, this
     waits for the supervisor and returns its exit code.
-    ``popen_kwargs`` must be JSON-serializable because the launch request is sent to
-    the supervisor over a config pipe.
+    ``popen_kwargs`` must be JSON-serializable because the launch request is
+    sent to the supervisor over a config pipe.
     """
     if os.name != "posix":
         raise RuntimeError("lifeline supervision requires POSIX FD inheritance")
@@ -64,19 +64,20 @@ def launch_with_lifeline(
     _validate_termination_grace_period(termination_grace_period)
     # Lifeline pipe: SuperExec keeps the write end, supervisor watches the read end.
     lifeline_read_fd, lifeline_write_fd = os.pipe()
-    # Config pipe: SuperExec sends token-bearing app command details off-argv.
+    # Config pipe: SuperExec sends token-bearing TaskExecutor command details
+    # off-argv.
     config_read_fd, config_write_fd = os.pipe()
-    # Status pipe: supervisor reports app launch success/failure before we return.
+    # Status pipe: supervisor reports command launch success/failure before we return.
     status_read_fd, status_write_fd = os.pipe()
     supervisor: subprocess.Popen[bytes] | None = None
 
     try:
-        # Keep app command details out of supervisor argv so token-bearing launch
+        # Keep command details out of supervisor argv so token-bearing launch
         # commands are not exposed through process listings.
         supervisor_command = [
             sys.executable,
             "-m",
-            "flwr.supercore.superexec.app_supervisor",
+            "flwr.supercore.superexec.taskexecutor_supervisor",
             "--lifeline-fd",
             str(lifeline_read_fd),
             "--config-fd",
@@ -107,8 +108,8 @@ def launch_with_lifeline(
         status_read_fd = -1
 
         if wait:
-            # Keep the lifeline open while SuperExec waits so normal app exit is not
-            # misinterpreted as parent death by the supervisor.
+            # Keep the lifeline open while SuperExec waits so normal process exit
+            # is not misinterpreted as parent death by the supervisor.
             try:
                 return supervisor.wait()
             finally:
@@ -132,31 +133,42 @@ def launch_with_lifeline(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the app supervisor entrypoint."""
-    parser = argparse.ArgumentParser(description="Run a supervised Flower app command.")
+    """Run the TaskExecutor supervisor entrypoint."""
+    parser = argparse.ArgumentParser(
+        description="Run a supervised Flower TaskExecutor command."
+    )
     parser.add_argument(
         "--lifeline-fd",
         type=int,
         required=True,
-        help="Read end of the parent-owned lifeline pipe; EOF means SuperExec exited.",
+        help=(
+            "Read end of the parent-owned lifeline pipe; EOF means SuperExec "
+            "exited."
+        ),
     )
     parser.add_argument(
         "--config-fd",
         type=int,
         required=True,
-        help="Read end of the config pipe carrying app command and subprocess kwargs.",
+        help="Read end of the config pipe carrying command and subprocess kwargs.",
     )
     parser.add_argument(
         "--status-fd",
         type=int,
         required=True,
-        help="Write end of the status pipe reporting app launch success or failure.",
+        help=(
+            "Write end of the status pipe reporting command launch success or "
+            "failure."
+        ),
     )
     parser.add_argument(
         "--termination-grace-period",
         type=float,
         default=5.0,
-        help="Seconds between SIGTERM and SIGKILL when cleaning the app process group.",
+        help=(
+            "Seconds between SIGTERM and SIGKILL when cleaning the supervised "
+            "process group."
+        ),
     )
     args = parser.parse_args(argv)
     config_fd = args.config_fd
@@ -181,7 +193,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     except Exception as exc:  # pylint: disable=broad-exception-caught
         _write_launch_status(status_fd, ok=False, error=str(exc))
-        print(f"Failed to supervise app command: {exc}", file=sys.stderr)
+        print(f"Failed to supervise command: {exc}", file=sys.stderr)
         return 2
     finally:
         _close_fd(config_fd)
@@ -197,8 +209,8 @@ def _run_supervised_process(
     termination_grace_period: float,
     status_fd: int | None = None,
 ) -> int:
-    """Launch and supervise the app command."""
-    app_process = subprocess.Popen(  # pylint: disable=consider-using-with
+    """Launch and supervise the command."""
+    supervised_process = subprocess.Popen(  # pylint: disable=consider-using-with
         command,
         **popen_kwargs,
         start_new_session=True,
@@ -207,28 +219,29 @@ def _run_supervised_process(
     if status_fd is not None:
         _write_launch_status(status_fd, ok=True)
         _close_fd(status_fd)
-    process_group_id = app_process.pid
+    process_group_id = supervised_process.pid
     try:
         while True:
-            returncode = app_process.poll()
+            returncode = supervised_process.poll()
             if returncode is not None:
                 return returncode
             if _lifeline_closed(lifeline_fd):
                 # EOF on the pipe means SuperExec exited or deliberately closed its
-                # control end; cleanup is enforced outside any app PID namespace.
+                # control end; cleanup is enforced outside any TaskExecutor PID
+                # namespace.
                 _terminate_process_group(
                     process_group_id,
-                    app_process,
+                    supervised_process,
                     termination_grace_period,
                 )
-                return app_process.wait()
+                return supervised_process.wait()
             time.sleep(_POLL_INTERVAL)
     finally:
-        # The wrapper/app can leave same-process-group children after the leader exits;
-        # cleanup the whole group even on normal return.
+        # The wrapper/TaskExecutor can leave same-process-group children after the
+        # leader exits; cleanup the whole group even on normal return.
         _terminate_process_group(
             process_group_id,
-            app_process,
+            supervised_process,
             termination_grace_period,
         )
 
@@ -248,17 +261,17 @@ def _lifeline_closed(lifeline_fd: int) -> bool:
 
 def _terminate_process_group(
     process_group_id: int,
-    app_process: subprocess.Popen[bytes],
+    supervised_process: subprocess.Popen[bytes],
     grace_period: float,
 ) -> None:
-    """Terminate the app process group, escalating to SIGKILL if necessary."""
+    """Terminate the supervised process group, escalating to SIGKILL if necessary."""
     if not _process_group_exists(process_group_id):
         return
 
     _send_signal_to_process_group(process_group_id, signal.SIGTERM)
     deadline = time.monotonic() + grace_period
     while time.monotonic() < deadline:
-        app_process.poll()
+        supervised_process.poll()
         if not _process_group_exists(process_group_id):
             return
         time.sleep(_POLL_INTERVAL)
@@ -360,7 +373,7 @@ def _write_launch_status(
     ok: bool,
     error: str | None = None,
 ) -> None:
-    """Write app launch status back to the parent SuperExec process."""
+    """Write command launch status back to the parent SuperExec process."""
     if status_fd < 0:
         return
     status: dict[str, object] = {"ok": ok}
@@ -376,7 +389,7 @@ def _write_launch_status(
 
 
 def _check_launch_status(status_read_fd: int) -> None:
-    """Raise if the supervisor failed before launching the app command."""
+    """Raise if the supervisor failed before launching the command."""
     try:
         status = _read_json_fd(status_read_fd)
     except json.JSONDecodeError as exc:
@@ -387,8 +400,8 @@ def _check_launch_status(status_read_fd: int) -> None:
         return
     error = status.get("error")
     if not isinstance(error, str) or not error:
-        error = "unknown app launch failure"
-    raise RuntimeError(f"supervisor failed to launch app command: {error}")
+        error = "unknown supervised process launch failure"
+    raise RuntimeError(f"supervisor failed to launch command: {error}")
 
 
 def _read_config(config_read_fd: int) -> dict[str, Any]:
@@ -423,7 +436,7 @@ def _start_supervisor_reaper(
             supervisor.wait()
         finally:
             # Closing this FD after supervisor exit also releases the descriptor if
-            # the app exits normally before SuperExec shuts down.
+            # the supervised process exits normally before SuperExec shuts down.
             _close_fd(lifeline_write_fd)
 
     # The thread is daemonized because SuperExec shutdown should still close the

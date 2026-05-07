@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the SuperExec app supervisor."""
+"""Tests for the SuperExec TaskExecutor supervisor."""
 
 
 # pylint: disable=protected-access
@@ -29,7 +29,7 @@ from unittest.mock import patch
 
 import pytest
 
-from flwr.supercore.superexec.app_supervisor import (
+from flwr.supercore.superexec.taskexecutor_supervisor import (
     _run_supervised_process,
     _validate_launch_request,
     _validate_termination_grace_period,
@@ -43,8 +43,8 @@ POSIX_ONLY = pytest.mark.skipif(
 
 
 @POSIX_ONLY
-def test_launch_with_lifeline_wait_returns_app_exit_code() -> None:
-    """Waiting launch should return the supervised app exit code."""
+def test_launch_with_lifeline_wait_returns_supervised_process_exit_code() -> None:
+    """Waiting launch should return the supervised process exit code."""
     returncode = launch_with_lifeline(
         [sys.executable, "-c", "import sys; sys.exit(7)"],
         wait=True,
@@ -56,7 +56,7 @@ def test_launch_with_lifeline_wait_returns_app_exit_code() -> None:
 
 @POSIX_ONLY
 def test_launch_with_lifeline_without_wait_returns_none_after_launch() -> None:
-    """Non-waiting launch should return None after app launch is confirmed."""
+    """Non-waiting launch should return None after command launch is confirmed."""
     result = launch_with_lifeline(
         [sys.executable, "-c", "pass"],
         wait=False,
@@ -67,8 +67,8 @@ def test_launch_with_lifeline_without_wait_returns_none_after_launch() -> None:
 
 
 @POSIX_ONLY
-def test_launch_with_lifeline_keeps_app_command_out_of_supervisor_argv() -> None:
-    """App command details should travel over the config pipe, not process argv."""
+def test_launch_with_lifeline_keeps_command_out_of_supervisor_argv() -> None:
+    """Command details should travel over the config pipe, not process argv."""
 
     class _Popen:
         pid = 1234
@@ -97,25 +97,30 @@ def test_launch_with_lifeline_keeps_app_command_out_of_supervisor_argv() -> None
         return _Popen(args)
 
     with (
-        patch("flwr.supercore.superexec.app_supervisor.subprocess.Popen", _popen),
-        patch("flwr.supercore.superexec.app_supervisor._check_launch_status"),
-        patch("flwr.supercore.superexec.app_supervisor._write_config"),
+        patch(
+            "flwr.supercore.superexec.taskexecutor_supervisor.subprocess.Popen",
+            _popen,
+        ),
+        patch(
+            "flwr.supercore.superexec.taskexecutor_supervisor._check_launch_status"
+        ),
+        patch("flwr.supercore.superexec.taskexecutor_supervisor._write_config"),
     ):
         launch_with_lifeline(
-            ["dummy-app", "--token", "secret-token"],
+            ["flwr-taskexecutor", "--token", "secret-token"],
             wait=False,
         )
 
-    assert "dummy-app" not in captured
+    assert "flwr-taskexecutor" not in captured
     assert "secret-token" not in captured
 
 
 @POSIX_ONLY
-def test_launch_with_lifeline_reports_app_launch_failure(tmp_path: Path) -> None:
-    """Non-waiting launch should fail if the supervisor cannot launch the app."""
+def test_launch_with_lifeline_reports_command_launch_failure(tmp_path: Path) -> None:
+    """Non-waiting launch should fail if the supervisor cannot launch the command."""
     missing_command = tmp_path / "missing-command"
 
-    with pytest.raises(RuntimeError, match="failed to launch app command"):
+    with pytest.raises(RuntimeError, match="failed to launch command"):
         launch_with_lifeline(
             [str(missing_command)],
             wait=False,
@@ -141,9 +146,11 @@ def test_launch_with_lifeline_preserves_devnull_stdio() -> None:
 
 
 @POSIX_ONLY
-def test_lifeline_closure_terminates_app_process_group(tmp_path: Path) -> None:
-    """Closing the lifeline should terminate the supervised app."""
-    pid_file = tmp_path / "app.pid"
+def test_lifeline_closure_terminates_supervised_process_group(
+    tmp_path: Path,
+) -> None:
+    """Closing the lifeline should terminate the supervised process."""
+    pid_file = tmp_path / "supervised.pid"
     read_fd, write_fd = os.pipe()
     closer = threading.Thread(
         target=_close_fd_when_file_exists,
@@ -177,8 +184,8 @@ def test_lifeline_closure_terminates_app_process_group(tmp_path: Path) -> None:
 
 @POSIX_ONLY
 def test_lifeline_closure_escalates_to_sigkill(tmp_path: Path) -> None:
-    """Supervisor should escalate if the app ignores SIGTERM."""
-    pid_file = tmp_path / "app.pid"
+    """Supervisor should escalate if the supervised process ignores SIGTERM."""
+    pid_file = tmp_path / "supervised.pid"
     read_fd, write_fd = os.pipe()
     closer = threading.Thread(
         target=_close_fd_when_file_exists,
@@ -212,8 +219,8 @@ def test_lifeline_closure_escalates_to_sigkill(tmp_path: Path) -> None:
 
 
 @POSIX_ONLY
-def test_app_exit_cleans_remaining_process_group_children(tmp_path: Path) -> None:
-    """Supervisor should clean app children left behind by the app command."""
+def test_process_exit_cleans_remaining_process_group_children(tmp_path: Path) -> None:
+    """Supervisor should clean children left behind by the supervised command."""
     ready_file = tmp_path / "child.ready"
     terminated_file = tmp_path / "child.terminated"
     read_fd, write_fd = os.pipe()
@@ -252,8 +259,8 @@ def test_app_exit_cleans_remaining_process_group_children(tmp_path: Path) -> Non
 
 
 @POSIX_ONLY
-def test_app_process_does_not_inherit_lifeline_fd() -> None:
-    """The supervised app should not inherit the supervisor lifeline FD."""
+def test_supervised_process_does_not_inherit_lifeline_fd() -> None:
+    """The supervised process should not inherit the supervisor lifeline FD."""
     read_fd, write_fd = os.pipe()
     env = os.environ.copy()
     env["LIFELINE_FD"] = str(read_fd)
@@ -322,7 +329,7 @@ def test_validate_termination_grace_period_rejects_negative_values() -> None:
 def test_launch_with_lifeline_rejects_non_posix_platform() -> None:
     """The public launch helper should fail clearly outside POSIX platforms."""
     with (
-        patch("flwr.supercore.superexec.app_supervisor.os.name", "nt"),
+        patch("flwr.supercore.superexec.taskexecutor_supervisor.os.name", "nt"),
         pytest.raises(RuntimeError, match="requires POSIX"),
     ):
         launch_with_lifeline([sys.executable, "-c", "pass"], wait=True)
