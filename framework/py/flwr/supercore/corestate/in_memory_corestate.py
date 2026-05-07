@@ -132,6 +132,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self,
         *,
         task_ids: Sequence[int] | None = None,
+        run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
@@ -154,6 +155,16 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 if not task_ids:
                     return []
                 matched_task_ids &= set(task_ids)
+
+            if run_ids is not None:
+                if not run_ids:
+                    return []
+                run_id_set = set(run_ids)
+                matched_task_ids &= {
+                    task_id
+                    for task_id in matched_task_ids
+                    if self.task_store[task_id].run_id in run_id_set
+                }
 
             if statuses is not None:
                 if not statuses:
