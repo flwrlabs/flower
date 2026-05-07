@@ -664,7 +664,6 @@ def _run_fleet_api_grpc_adapter(
     certificates: tuple[bytes, bytes, bytes] | None,
 ) -> grpc.Server:
     """Run Fleet API (GrpcAdapter)."""
-    interceptors = [create_fleet_runtime_version_server_interceptor()]
 
     # Create Fleet API gRPC server
     fleet_servicer = GrpcAdapterServicer(
@@ -678,7 +677,6 @@ def _run_fleet_api_grpc_adapter(
         server_address=address,
         max_message_length=GRPC_MAX_MESSAGE_LENGTH,
         certificates=certificates,
-        interceptors=interceptors,
     )
 
     log(

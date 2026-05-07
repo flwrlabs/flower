@@ -147,7 +147,7 @@ def grpc_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
 
     # Always configure auth interceptor, with either user-provided or generated keys
     interceptors: Sequence[grpc.UnaryUnaryClientInterceptor] = [
-        RuntimeVersionClientInterceptor(component_name="supernode"),
+        RuntimeVersionClientInterceptor(component_name="SuperNode"),
         NodeAuthClientInterceptor(*authentication_keys),
     ]
     node_pk = public_key_to_bytes(authentication_keys[1])
