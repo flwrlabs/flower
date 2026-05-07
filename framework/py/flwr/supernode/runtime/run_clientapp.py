@@ -116,7 +116,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         wrap_stub(stub, make_simple_grpc_retry_invoker())
 
         # Start app heartbeat
-        heartbeat_sender = HeartbeatSender(make_app_heartbeat_fn_grpc(stub, token))
+        heartbeat_sender = HeartbeatSender(make_app_heartbeat_fn_grpc(stub))
         heartbeat_sender.start()
 
         # Pull Message, Context, Run and FAB from SuperNode

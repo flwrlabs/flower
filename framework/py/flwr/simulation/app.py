@@ -186,9 +186,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
     try:
         # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(
-            make_app_heartbeat_fn_grpc(conn._stub, token)
-        )
+        heartbeat_sender = HeartbeatSender(make_app_heartbeat_fn_grpc(conn._stub))
         heartbeat_sender.start()
 
         # Pull SimulationInputs from LinkState
