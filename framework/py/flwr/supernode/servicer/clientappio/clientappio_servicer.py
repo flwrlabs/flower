@@ -21,6 +21,7 @@ from typing import cast
 import grpc
 
 from flwr.common import Context
+from flwr.common.constant import Status
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -61,6 +62,7 @@ from flwr.proto.message_pb2 import (
 )
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
 from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
+from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
 from flwr.supercore.servicers import AppIoServicer
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
@@ -93,8 +95,9 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         # Initialize state connection
         state = self.state_factory.state()
 
-        # Get run IDs with pending messages
-        run_ids = state.get_run_ids_with_pending_messages()
+        # Get run IDs with pending tasks
+        tasks = state.get_tasks(statuses=[Status.PENDING])
+        run_ids = [task.run_id for task in tasks]
 
         # Return run IDs
         return ListAppsToLaunchResponse(run_ids=run_ids)
@@ -108,8 +111,10 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         # Initialize state connection
         state = self.state_factory.state()
 
-        # Attempt to create a token for the provided run ID
-        token = state.create_token(request.run_id)
+        # Get token for the task
+        tasks = state.get_tasks(statuses=[Status.PENDING])
+        task = [t for t in tasks if t.run_id == request.run_id][0]
+        token = state.claim_task(task.task_id)
 
         # Return the token
         return RequestTokenResponse(token=token or "")
@@ -137,20 +142,15 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         """Pull Message, Context, and Run."""
         log(DEBUG, "ClientAppIo.PullAppInputs")
 
+        # Get the authenticated task and associated run ID
+        task = get_authenticated_task()
+        run_id = task.run_id
+
         # Initialize state connection
         state = self.state_factory.state()
 
-        # Validate the token
-        run_id = state.get_run_id_by_token(request.token)
-        if run_id is None or not state.verify_token(run_id, request.token):
-            context.abort(
-                grpc.StatusCode.PERMISSION_DENIED,
-                "Invalid token.",
-            )
-            raise RuntimeError("This line should never be reached.")
-
         # Retrieve context, run and fab for this run
-        context = cast(Context, state.get_context(run_id))
+        serverapp_context = cast(Context, state.get_context(run_id))
         run = cast(Run, state.get_run(run_id))
 
         # Retrieve FAB from NodeState
@@ -169,11 +169,18 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
             )
             raise RuntimeError("This line should never be reached.")
 
-        return PullAppInputsResponse(
-            context=context_to_proto(context),
-            run=run_to_proto(run),
-            fab=fab_to_proto(fab),
-        )
+        # Activate task
+        if state.activate_task(task_id=task.task_id):
+            log(DEBUG, "Started task %d of run %s", task.task_id, run_id)
+            return PullAppInputsResponse(
+                context=context_to_proto(serverapp_context),
+                run=run_to_proto(run),
+                fab=fab_to_proto(fab),
+            )
+
+        log(ERROR, "Failed to start task %d of run %s", task.task_id, run_id)
+        context.abort(grpc.StatusCode.FAILED_PRECONDITION, "Failed to start task.")
+        raise RuntimeError("Unreachable code")  # for mypy
 
     def PushAppOutputs(
         self, request: PushAppOutputsRequest, context: grpc.ServicerContext
@@ -181,24 +188,24 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         """Push Message and Context."""
         log(DEBUG, "ClientAppIo.PushAppOutputs")
 
+        # Get the authenticated task and associated run ID
+        task = get_authenticated_task()
+        run_id = task.run_id
+
         # Initialize state connection
         state = self.state_factory.state()
 
-        # Validate the token
-        run_id = state.get_run_id_by_token(request.token)
-        if run_id is None or not state.verify_token(run_id, request.token):
-            context.abort(
-                grpc.StatusCode.PERMISSION_DENIED,
-                "Invalid token.",
-            )
-            raise RuntimeError("This line should never be reached.")
-
-        # Save the context to the state
-        state.store_context(context_from_proto(request.context))
-
-        # Remove the token to make the run eligible for processing
-        # A run associated with a token cannot be handled until its token is cleared
-        state.delete_token(run_id)
+        # Flag task as finished
+        if state.finish_task(
+            task_id=task.task_id,
+            sub_status=request.sub_status,
+            details=request.details,
+        ):
+            log(DEBUG, "Finished task %d of run %s", task.task_id, run_id)
+            # Save the context to the state
+            state.store_context(context_from_proto(request.context))
+        else:
+            log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
 
         return PushAppOutputsResponse()
 
@@ -206,18 +213,15 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         self, request: PullAppMessagesRequest, context: grpc.ServicerContext
     ) -> PullAppMessagesResponse:
         """Pull one Message."""
+        log(DEBUG, "ClientAppIo.PullMessage")
+
+        # Get the authenticated task and associated run ID
+        task = get_authenticated_task()
+        run_id = task.run_id
+
         # Initialize state and store connection
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
-
-        # Validate the token
-        run_id = state.get_run_id_by_token(request.token)
-        if run_id is None or not state.verify_token(run_id, request.token):
-            context.abort(
-                grpc.StatusCode.PERMISSION_DENIED,
-                "Invalid token.",
-            )
-            raise RuntimeError("This line should never be reached.")
 
         # Retrieve message for this run
         message = state.get_messages(run_ids=[run_id], is_reply=False)[0]
@@ -237,18 +241,15 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         self, request: PushAppMessagesRequest, context: grpc.ServicerContext
     ) -> PushAppMessagesResponse:
         """Push one Message."""
+        log(DEBUG, "ClientAppIo.PushMessage")
+
+        # Get the authenticated task and associated run ID
+        task = get_authenticated_task()
+        run_id = task.run_id
+
         # Initialize state and store connection
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
-
-        # Validate the token
-        run_id = state.get_run_id_by_token(request.token)
-        if run_id is None or not state.verify_token(run_id, request.token):
-            context.abort(
-                grpc.StatusCode.PERMISSION_DENIED,
-                "Invalid token.",
-            )
-            raise RuntimeError("This line should never be reached.")
 
         # Record message processing end time
         state.record_message_processing_end(
@@ -269,11 +270,15 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
     ) -> SendAppHeartbeatResponse:
         """Handle a heartbeat from an app process."""
         log(DEBUG, "ClientAppIoServicer.SendAppHeartbeat")
+
+        # Get the authenticated task and associated run ID
+        task = get_authenticated_task()
+
         # Initialize state
         state = self.state_factory.state()
 
         # Acknowledge the heartbeat
-        success = state.acknowledge_app_heartbeat(request.token)
+        success = state.acknowledge_task_heartbeat(task.task_id)
         return SendAppHeartbeatResponse(success=success)
 
     def PushObject(
