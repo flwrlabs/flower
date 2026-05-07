@@ -67,7 +67,10 @@ from flwr.supercore.inflatable.inflatable_utils import (
     pull_and_inflate_object_from_tree,
     push_objects,
 )
-from flwr.supercore.interceptors import AppIoTokenClientInterceptor
+from flwr.supercore.interceptors import (
+    AppIoTokenClientInterceptor,
+    RuntimeVersionClientInterceptor,
+)
 from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
@@ -93,7 +96,10 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         server_address=clientappio_api_address,
         insecure=insecure,
         root_certificates=certificates,
-        interceptors=[AppIoTokenClientInterceptor(token)],
+        interceptors=[
+            RuntimeVersionClientInterceptor(component_name="flwr-clientapp"),
+            AppIoTokenClientInterceptor(token),
+        ],
     )
     channel.subscribe(on_channel_state_change)
     heartbeat_sender = None
