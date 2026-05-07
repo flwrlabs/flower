@@ -338,13 +338,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             record = self.token_store.get(run_id)
             return record is not None and record.token == token
 
-    def delete_token(self, run_id: int) -> None:
-        """Delete the token for the given run ID."""
-        with self.lock_token_store:
-            record = self.token_store.pop(run_id, None)
-            if record is not None:
-                self.token_to_run_id.pop(record.token, None)
-
     def get_run_id_by_token(self, token: str) -> int | None:
         """Get the run ID associated with a given token."""
         self._cleanup_expired_tokens()
