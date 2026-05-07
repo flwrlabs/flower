@@ -22,10 +22,6 @@ import grpc
 
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS, Status
 from flwr.common.typing import RunStatus
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    ListAppsToLaunchRequest,
-    ListAppsToLaunchResponse,
-)
 from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
@@ -95,11 +91,6 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
             request_serializer=GetNodesRequest.SerializeToString,
             response_deserializer=GetNodesResponse.FromString,
         )
-        self._list_apps_to_launch_no_auth = base_channel.unary_unary(
-            "/flwr.proto.ServerAppIo/ListAppsToLaunch",
-            request_serializer=ListAppsToLaunchRequest.SerializeToString,
-            response_deserializer=ListAppsToLaunchResponse.FromString,
-        )
         auth_channel = grpc.intercept_channel(
             base_channel,
             AppIoTokenClientInterceptor(token=auth_token),
@@ -112,11 +103,6 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
             "/flwr.proto.ServerAppIo/GetNodes",
             request_serializer=GetNodesRequest.SerializeToString,
             response_deserializer=GetNodesResponse.FromString,
-        )
-        self._list_apps_to_launch = auth_channel.unary_unary(
-            "/flwr.proto.ServerAppIo/ListAppsToLaunch",
-            request_serializer=ListAppsToLaunchRequest.SerializeToString,
-            response_deserializer=ListAppsToLaunchResponse.FromString,
         )
 
     def tearDown(self) -> None:
@@ -157,21 +143,4 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         )
 
         assert isinstance(response, GetNodesResponse)
-        assert call.code() == grpc.StatusCode.OK
-
-    def test_list_apps_to_launch_denied_without_superexec_metadata(self) -> None:
-        """SuperExec RPC should deny requests missing signed metadata."""
-        with self.assertRaises(grpc.RpcError) as err:
-            self._list_apps_to_launch_no_auth.with_call(
-                request=ListAppsToLaunchRequest()
-            )
-        assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
-        assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE
-
-    def test_list_apps_to_launch_allows_with_superexec_metadata(self) -> None:
-        """SuperExec RPC should allow requests with valid signed metadata."""
-        response, call = self._list_apps_to_launch.with_call(
-            request=ListAppsToLaunchRequest()
-        )
-        assert isinstance(response, ListAppsToLaunchResponse)
         assert call.code() == grpc.StatusCode.OK
