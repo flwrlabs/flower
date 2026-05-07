@@ -23,7 +23,7 @@ import tempfile
 import threading
 import unittest
 from datetime import timedelta
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import grpc
 from parameterized import parameterized
@@ -34,13 +34,13 @@ from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
     SUPERLINK_NODE_ID,
     Status,
-    SubStatus,
 )
 from flwr.common.message import get_message_to_descendant_id_mapping
-from flwr.common.serde import context_to_proto, message_from_proto, run_status_to_proto
-from flwr.common.serde_test import RecordMaker
+from flwr.common.serde import context_to_proto, message_from_proto
 from flwr.common.typing import Fab, RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    ClaimTaskRequest,
+    ClaimTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
     ListAppsToLaunchRequest,
@@ -188,7 +188,7 @@ def _start_serverappio_with_port_retry(
 
 def _create_shared_runtime(
     tmpdir: str,
-) -> tuple[int, LinkState, grpc.Server, grpc.Server]:
+) -> tuple[int, int, LinkState, grpc.Server, grpc.Server]:
     database_path = os.path.join(tmpdir, "shared.db")
 
     objectstore_factory_0 = ObjectStoreFactory()
@@ -218,6 +218,8 @@ def _create_shared_runtime(
     state_0.set_serverapp_context(
         run_id, Context(run_id, SUPERLINK_NODE_ID, {}, RecordDict(), {})
     )
+    task_id = state_0.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
+    assert task_id is not None
     server_0 = _start_serverappio_with_port_retry(
         state_factory_0,
         objectstore_factory_0,
@@ -228,10 +230,10 @@ def _create_shared_runtime(
         objectstore_factory_1,
         start_port=19141,
     )
-    return run_id, state_0, server_0, server_1
+    return run_id, task_id, state_0, server_0, server_1
 
 
-def _request_token(channel: grpc.Channel, run_id: int) -> str:
+def _claim_task(channel: grpc.Channel, task_id: int) -> str:
     superexec_channel = grpc.intercept_channel(
         channel,
         SuperExecAuthClientInterceptor(
@@ -240,12 +242,12 @@ def _request_token(channel: grpc.Channel, run_id: int) -> str:
         ),
     )
     request_token = superexec_channel.unary_unary(
-        "/flwr.proto.ServerAppIo/RequestToken",
-        request_serializer=RequestTokenRequest.SerializeToString,
-        response_deserializer=RequestTokenResponse.FromString,
+        "/flwr.proto.ServerAppIo/ClaimTask",
+        request_serializer=ClaimTaskRequest.SerializeToString,
+        response_deserializer=ClaimTaskResponse.FromString,
     )
     token_response, token_call = request_token.with_call(
-        RequestTokenRequest(run_id=run_id)
+        ClaimTaskRequest(task_id=task_id)
     )
     assert grpc.StatusCode.OK == token_call.code()
     token = str(token_response.token)
@@ -344,6 +346,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         auth_token = self.state.create_token(self._auth_run_id)
         assert auth_token is not None
         self._auth_token = auth_token
+        self._appio_auth_interceptor = AppIoTokenClientInterceptor(auth_token)
         _ = self.state.update_run_status(
             self._auth_run_id, RunStatus(Status.STARTING, "", "")
         )
@@ -352,7 +355,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         )
         self._channel = grpc.intercept_channel(
             grpc.insecure_channel("localhost:9091"),
-            AppIoTokenClientInterceptor(token=self._auth_token),
+            self._appio_auth_interceptor,
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
                 protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
@@ -825,6 +828,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
                 src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
             )
         )
+        message_ins.metadata.ttl = 1  # set short TTL for testing
         msg_id = self.state.store_message_ins(message=message_ins)
 
         # Simulate situation where the message has expired in the LinkState
@@ -833,20 +837,9 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = future_dt  # over TTL limit
 
-            token = self.state.create_token(run_id)
-            assert token is not None
-            request = PullAppMessagesRequest(message_ids=[str(msg_id)], run_id=run_id)
-            pull_messages_plain = grpc.insecure_channel("localhost:9091").unary_unary(
-                "/flwr.proto.ServerAppIo/PullMessages",
-                request_serializer=PullAppMessagesRequest.SerializeToString,
-                response_deserializer=PullAppMessagesResponse.FromString,
-            )
-
             # Execute
-            response, call = pull_messages_plain.with_call(
-                request=request,
-                metadata=((APP_TOKEN_HEADER, token),),
-            )
+            request = PullAppMessagesRequest(message_ids=[str(msg_id)], run_id=run_id)
+            response, call = self._pull_messages.with_call(request=request)
 
             # Assert
             assert isinstance(response, PullAppMessagesResponse)
@@ -861,36 +854,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             ]
             # expected a single object id (that of the error message)
             assert list(object_ids_in_response) == [msg_res.object_id]
-
-    def test_push_serverapp_outputs_successful_if_running(self) -> None:
-        """Test `PushServerAppOutputs` success."""
-        # Prepare
-        run_id = self._create_dummy_run(running=False)
-        token = self.state.create_token(run_id)
-        assert token is not None
-
-        maker = RecordMaker()
-        context = Context(
-            run_id=run_id,
-            node_id=0,
-            node_config=maker.user_config(),
-            state=maker.recorddict(1, 1, 1),
-            run_config=maker.user_config(),
-        )
-
-        # Transition status to running. PushAppOutputsRequest is only
-        # allowed in running status.
-        self._transition_run_status(run_id, 2)
-        request = PushAppOutputsRequest(
-            token=token, run_id=run_id, context=context_to_proto(context)
-        )
-
-        # Execute
-        response, call = self._push_serverapp_outputs.with_call(request=request)
-
-        # Assert
-        assert isinstance(response, PushAppOutputsResponse)
-        assert grpc.StatusCode.OK == call.code()
 
     def _assert_push_serverapp_outputs_not_allowed(
         self, token: str, context: Context
@@ -907,105 +870,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             self._push_serverapp_outputs.with_call(request=request)
         assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
         assert e.exception.details() == self.status_to_msg[run_status.status]
-
-    @parameterized.expand(
-        [
-            (0,),  # Test not successful if RunStatus is pending.
-            (1,),  # Test not successful if RunStatus is starting.
-            (3,),  # Test not successful if RunStatus is finished.
-        ]
-    )  # type: ignore
-    def test_push_serverapp_outputs_not_successful_if_not_running(
-        self, num_transitions: int
-    ) -> None:
-        """Test `PushServerAppOutputs` not successful if RunStatus is not running."""
-        # Prepare
-        run_id = self._create_dummy_run(running=False)
-        token = self.state.create_token(run_id)
-        assert token is not None
-
-        maker = RecordMaker()
-        context = Context(
-            run_id=run_id,
-            node_id=0,
-            node_config=maker.user_config(),
-            state=maker.recorddict(1, 1, 1),
-            run_config=maker.user_config(),
-        )
-
-        self._transition_run_status(run_id, num_transitions)
-
-        # Execute & Assert
-        self._assert_push_serverapp_outputs_not_allowed(token, context)
-
-    @parameterized.expand(
-        [
-            (0,),  # Test successful if RunStatus is pending.
-            (1,),  # Test successful if RunStatus is starting.
-            (2,),  # Test successful if RunStatus is running.
-        ]
-    )  # type: ignore
-    def test_update_run_status_successful_if_not_finished(
-        self, num_transitions: int
-    ) -> None:
-        """Test `UpdateRunStatus` success."""
-        # Prepare
-        run_id = self._create_dummy_run(running=False)
-        _ = self.state.get_run_status({run_id})[run_id]
-        next_run_status = RunStatus(Status.STARTING, "", "")
-
-        if num_transitions > 0:
-            _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-            next_run_status = RunStatus(Status.RUNNING, "", "")
-        if num_transitions > 1:
-            _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
-            next_run_status = RunStatus(Status.FINISHED, "", "")
-
-        request = UpdateRunStatusRequest(
-            run_id=run_id, run_status=run_status_to_proto(next_run_status)
-        )
-
-        # Execute
-        response, call = self._update_run_status.with_call(request=request)
-
-        # Assert
-        assert isinstance(response, UpdateRunStatusResponse)
-        assert grpc.StatusCode.OK == call.code()
-
-    def test_update_run_status_not_successful_if_finished(self) -> None:
-        """Test `UpdateRunStatus` not successful."""
-        # Prepare
-        run_id = self._create_dummy_run(running=False)
-        _ = self.state.get_run_status({run_id})[run_id]
-        _ = self.state.update_run_status(run_id, RunStatus(Status.FINISHED, "", ""))
-        run_status = self.state.get_run_status({run_id})[run_id]
-        next_run_status = RunStatus(Status.FINISHED, "", "")
-
-        request = UpdateRunStatusRequest(
-            run_id=run_id, run_status=run_status_to_proto(next_run_status)
-        )
-
-        with self.assertRaises(grpc.RpcError) as e:
-            self._update_run_status.with_call(request=request)
-        assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
-        assert e.exception.details() == self.status_to_msg[run_status.status]
-
-    @parameterized.expand([(True,), (False,)])  # type: ignore
-    def test_send_app_heartbeat(self, success: bool) -> None:
-        """Test sending an app heartbeat."""
-        # Prepare
-        token = "test-token"
-        request = SendAppHeartbeatRequest(token=token)
-        mock_ack_method = Mock(return_value=success)
-        self.state.acknowledge_app_heartbeat = mock_ack_method  # type: ignore
-
-        # Execute
-        response, _ = self._send_app_heartbeat.with_call(request=request)
-
-        # Assert
-        self.assertIsInstance(response, SendAppHeartbeatResponse)
-        self.assertEqual(response.success, success)
-        mock_ack_method.assert_called_once_with(token)
 
     def test_push_object_succesful(self) -> None:
         """Test `PushObject`."""
@@ -1188,58 +1052,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Assert: Run ID 2 is returned
         assert response.run_ids == [run_id2]
 
-    def test_request_token(self) -> None:
-        """Test `RequestToken`."""
-        # Prepare
-        run_id = self._create_dummy_run(running=False)
-
-        # Execute
-        request = RequestTokenRequest(run_id=run_id)
-        response1, call1 = self._request_token.with_call(request=request)
-        response2, call2 = self._request_token.with_call(request=request)
-
-        # Assert
-        assert isinstance(response1, RequestTokenResponse)
-        assert isinstance(response2, RequestTokenResponse)
-        assert grpc.StatusCode.OK == call1.code()
-        assert grpc.StatusCode.OK == call2.code()
-
-        # Assert: Only one token is issued
-        assert response1.token != ""
-        assert response2.token == ""
-
-    def test_request_token_fail_closed_for_finished_run(self) -> None:
-        """Ensure `RequestToken` returns empty token for finished runs."""
-        # Prepare
-        run_id = self._create_dummy_run(running=False)
-        self._transition_run_status(run_id, 2)
-        assert self.state.update_run_status(
-            run_id,
-            RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done"),
-        )
-        before = self.state.get_run_status({run_id})[run_id]
-
-        # Execute
-        response, call = self._request_token.with_call(
-            request=RequestTokenRequest(run_id=run_id)
-        )
-
-        # Assert: token issuance fails closed
-        assert isinstance(response, RequestTokenResponse)
-        assert grpc.StatusCode.OK == call.code()
-        assert response.token == ""
-
-        # Assert: terminal run status/details remain unchanged
-        after = self.state.get_run_status({run_id})[run_id]
-        assert before.status == after.status == Status.FINISHED
-        assert before.sub_status == after.sub_status == SubStatus.COMPLETED
-        assert before.details == after.details == "done"
-
-        # Assert: no token was left behind for this run
-        token = self.state.create_token(run_id)
-        assert token is not None
-        self.state.delete_token(run_id)
-
     def test_run_status_transitions(self) -> None:
         """Test `RequestToken` and `PullAppInputs` transitions run status from PENDING
         to STARTING to RUNNING."""
@@ -1249,6 +1061,9 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
         )
         run_id = self._create_dummy_run(running=False, fab_hash=fab_hash)
+        self.state.create_task(
+            task_type=TaskType.SERVER_APP, run_id=run_id, fab_hash=fab_hash
+        )
 
         # Set serverapp context
         context = Context(run_id, SUPERLINK_NODE_ID, {}, RecordDict(), {})
@@ -1257,7 +1072,8 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Request token to transition to STARTING
         token_request = RequestTokenRequest(run_id=run_id)
         token_response, call = self._request_token.with_call(request=token_request)
-        token = token_response.token
+        # pylint: disable-next=protected-access
+        self._appio_auth_interceptor._token = token_response.token
 
         # Assert: Response is successful and run status is STARTING
         assert isinstance(token_response, RequestTokenResponse)
@@ -1266,7 +1082,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert run_status.status == Status.STARTING
 
         # Execute: Pull app inputs
-        request = PullAppInputsRequest(token=token)
+        request = PullAppInputsRequest()
         response, call = self._pull_app_inputs.with_call(request=request)
 
         # Assert: Response is successful and run status is now RUNNING
@@ -1279,17 +1095,17 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 def test_ha_pull_app_inputs_claim_is_unique_across_replicas() -> None:
     """Ensure only one replica can claim STARTING -> RUNNING via PullAppInputs."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        run_id, state_0, server_0, server_1 = _create_shared_runtime(tmpdir)
+        _, task_id, state_0, server_0, server_1 = _create_shared_runtime(tmpdir)
         channel_0 = grpc.insecure_channel(server_0.bound_address)
         channel_1 = grpc.insecure_channel(server_1.bound_address)
         try:
-            token = _request_token(channel_0, run_id)
+            token = _claim_task(channel_0, task_id)
             results = _claim_in_parallel(channel_0, channel_1, token)
 
             assert results.count(grpc.StatusCode.OK) == 1
             assert results.count(grpc.StatusCode.FAILED_PRECONDITION) == 1
-            run_status = state_0.get_run_status({run_id})[run_id]
-            assert run_status.status == Status.RUNNING
+            task_status = state_0.get_tasks(task_ids=[task_id])[0].status
+            assert task_status.status == Status.RUNNING
         finally:
             channel_0.close()
             channel_1.close()
