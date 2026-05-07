@@ -15,7 +15,8 @@
 """ServerAppIo API servicer."""
 
 
-from logging import DEBUG, ERROR, INFO, WARNING
+from logging import DEBUG, ERROR, INFO
+from typing import cast
 
 import grpc
 
@@ -34,6 +35,10 @@ from flwr.common.serde import (
 from flwr.common.typing import RunStatus
 from flwr.proto import serverappio_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    ClaimTaskRequest,
+    ClaimTaskResponse,
+    CreateTaskRequest,
+    CreateTaskResponse,
     ListAppsToLaunchRequest,
     ListAppsToLaunchResponse,
     PullAppInputsRequest,
@@ -79,12 +84,19 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.superlink.utils import abort_if
 from flwr.server.utils.validator import validate_message
+from flwr.supercore.constant import (
+    TASK_TYPES_REQUIRING_CONNECTOR_REF,
+    TASK_TYPES_REQUIRING_FAB_HASH,
+    TASK_TYPES_REQUIRING_MODEL_REF,
+    TaskType,
+)
 from flwr.supercore.inflatable.inflatable_object import (
     UnexpectedObjectContentError,
     get_all_nested_objects,
     get_object_tree,
     no_object_id_recompute,
 )
+from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
 from flwr.supercore.servicers import AppIoServicer
 
@@ -137,28 +149,30 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
 
         # Attempt to create a token for the provided run ID
-        token = state.create_token(request.run_id)
+        run = state.get_run_info(run_ids=[request.run_id])[0]
+        token = state.claim_task(cast(int, run.primary_task_id))
 
         if not token:
             return RequestTokenResponse(token="")
 
-        # Transition the run to STARTING. If this fails (e.g., stale run_id pointing
-        # to a non-launchable run), roll back token creation and fail closed.
-        if not state.update_run_status(
-            run_id=request.run_id,
-            new_status=RunStatus(Status.STARTING, "", ""),
-        ):
-            state.delete_token(request.run_id)
-            log(
-                WARNING,
-                "ServerAppIoServicer.RequestToken rolled back token for run %d: "
-                "failed to transition to STARTING.",
-                request.run_id,
-            )
-            return RequestTokenResponse(token="")
+        # Keep run status working
+        state.update_run_status(request.run_id, RunStatus(Status.STARTING, "", ""))
 
         # Return the token
         return RequestTokenResponse(token=token)
+
+    def ClaimTask(
+        self, request: ClaimTaskRequest, context: grpc.ServicerContext
+    ) -> ClaimTaskResponse:
+        """Claim a pending task."""
+        res = super().ClaimTask(request, context)
+
+        # Keep run status working
+        if res.HasField("token"):
+            state = self.state_factory.state()
+            task = state.get_tasks(task_ids=[request.task_id])[0]
+            state.update_run_status(task.run_id, RunStatus(Status.STARTING, "", ""))
+        return res
 
     def GetNodes(
         self, request: GetNodesRequest, context: grpc.ServicerContext
@@ -182,6 +196,30 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         all_ids: set[int] = state.get_nodes(request.run_id)
         nodes: list[Node] = [Node(node_id=node_id) for node_id in all_ids]
         return GetNodesResponse(nodes=nodes)
+
+    def CreateTask(
+        self, request: CreateTaskRequest, context: grpc.ServicerContext
+    ) -> CreateTaskResponse:
+        """Create a task."""
+        log(DEBUG, "ServerAppIoServicer.CreateTask")
+
+        state = self.state_factory.state()
+        _validate_create_task_request(request, context)
+
+        task_id = state.create_task(
+            task_type=request.type,
+            run_id=request.run_id,
+            fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
+            model_ref=request.model_ref if request.HasField("model_ref") else None,
+            connector_ref=(
+                request.connector_ref if request.HasField("connector_ref") else None
+            ),
+        )
+        if task_id is None:
+            context.abort(grpc.StatusCode.INTERNAL, "Failed to create task")
+            raise RuntimeError("This line should never be reached.")
+
+        return CreateTaskResponse(task_id=task_id)
 
     def PushMessages(
         self, request: PushAppMessagesRequest, context: grpc.ServicerContext
@@ -334,8 +372,9 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         # Init access to LinkState
         state = self.state_factory.state()
 
-        # Validate the token
-        run_id = self._verify_token(request.token, context)
+        # Get the authenticated task and associated run ID
+        task = get_authenticated_task()
+        run_id = task.run_id
 
         # Retrieve Context, Run and Fab for the run_id
         serverapp_ctxt = state.get_serverapp_context(run_id)
@@ -344,20 +383,23 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         fab = state.get_fab(run.fab_hash) if run and run.fab_hash else None
         if run and fab and serverapp_ctxt:
             # Update run status to RUNNING
-            if state.update_run_status(run_id, RunStatus(Status.RUNNING, "", "")):
-                log(INFO, "Starting run %d", run_id)
+            if state.activate_task(task.task_id):
+                log(INFO, "Started task %d of run %d", task.task_id, run_id)
+                # Keep run status working
+                state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
                 return PullAppInputsResponse(
                     context=context_to_proto(serverapp_ctxt),
                     run=run_to_proto(run),
                     fab=fab_to_proto(fab),
                     federation_config=state.get_federation_config(run_id),
+                    task_id=task.task_id,
                 )
 
         # Raise an exception if the Run or Fab is not found,
         # or if the status cannot be updated to RUNNING
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
-            f"Failed to start run {run_id}",
+            f"Failed to start task {task.task_id} of run {run_id}",
         )
         raise RuntimeError("Unreachable code")  # for mypy
 
@@ -367,23 +409,26 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         """Push ServerApp process outputs."""
         log(DEBUG, "ServerAppIoServicer.PushAppOutputs")
 
-        # Validate the token
-        _ = self._verify_token(request.token, context)
+        # Get the authenticated task and associated run ID
+        task = get_authenticated_task()
+        run_id = task.run_id
 
         # Init state and store
         state = self.state_factory.state()
-        store = self.objectstore_factory.store()
 
-        # Abort if the run is not running
-        abort_if(
-            request.run_id,
-            [Status.PENDING, Status.STARTING, Status.FINISHED],
-            state,
-            store,
-            context,
-        )
-
-        state.set_serverapp_context(request.run_id, context_from_proto(request.context))
+        # Finish the task
+        if state.finish_task(
+            task.task_id, sub_status=request.sub_status, details=request.details
+        ):
+            log(INFO, "Finished task %d of run %d", task.task_id, run_id)
+            # Keep run status working
+            state.update_run_status(
+                run_id, RunStatus(Status.FINISHED, request.sub_status, request.details)
+            )
+            if request.HasField("context"):
+                state.set_serverapp_context(run_id, context_from_proto(request.context))
+        else:
+            log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
         return PushAppOutputsResponse()
 
     def UpdateRunStatus(
@@ -438,11 +483,14 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         """Handle a heartbeat from an app process."""
         log(DEBUG, "ServerAppIoServicer.SendAppHeartbeat")
 
+        # Get the authenticated task
+        task = get_authenticated_task()
+
         # Init state
         state = self.state_factory.state()
 
         # Acknowledge the heartbeat
-        success = state.acknowledge_app_heartbeat(request.token)
+        success = state.acknowledge_task_heartbeat(task.task_id)
         return SendAppHeartbeatResponse(success=success)
 
     def PushObject(
@@ -539,20 +587,39 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
 
         return ConfirmMessageReceivedResponse()
 
-    def _verify_token(self, token: str, context: grpc.ServicerContext) -> int:
-        """Verify the token and return the associated run ID."""
-        state = self.state_factory.state()
-        run_id = state.get_run_id_by_token(token)
-        if run_id is None or not state.verify_token(run_id, token):
-            context.abort(
-                grpc.StatusCode.PERMISSION_DENIED,
-                "Invalid token.",
-            )
-            raise RuntimeError("This line should never be reached.")
-        return run_id
-
 
 def _raise_if(validation_error: bool, request_name: str, detail: str) -> None:
     """Raise a `ValueError` with a detailed message if a validation error occurs."""
     if validation_error:
         raise ValueError(f"Malformed {request_name}: {detail}")
+
+
+def _validate_create_task_request(
+    request: CreateTaskRequest, context: grpc.ServicerContext
+) -> None:
+    """Validate the task creation request."""
+    try:
+        task_type = TaskType(request.type)
+    except ValueError:
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Invalid task type: {request.type}",
+        )
+
+    if task_type in TASK_TYPES_REQUIRING_FAB_HASH and not request.fab_hash:
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Task type '{request.type}' requires fab_hash.",
+        )
+
+    if task_type in TASK_TYPES_REQUIRING_MODEL_REF and not request.model_ref:
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Task type '{request.type}' requires model_ref.",
+        )
+
+    if task_type in TASK_TYPES_REQUIRING_CONNECTOR_REF and not request.connector_ref:
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Task type '{request.type}' requires connector_ref.",
+        )

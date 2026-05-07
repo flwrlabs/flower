@@ -18,6 +18,9 @@
 import unittest
 from unittest.mock import patch
 
+import grpc
+
+from flwr.common.exit import ExitCode
 from flwr.supercore.interceptors import AppIoTokenClientInterceptor
 
 from .run_clientapp import run_clientapp
@@ -41,3 +44,25 @@ class TestRunClientApp(unittest.TestCase):
         assert interceptors is not None
         self.assertEqual(len(interceptors), 1)
         self.assertIsInstance(interceptors[0], AppIoTokenClientInterceptor)
+
+    def test_run_clientapp_exits_nonzero_on_grpc_error(self) -> None:
+        """`run_clientapp` should not report success after AppIO gRPC failures."""
+        with (
+            patch("flwr.supernode.runtime.run_clientapp.create_channel") as channel,
+            patch("flwr.supernode.runtime.run_clientapp.HeartbeatSender"),
+            patch(
+                "flwr.supernode.runtime.run_clientapp.pull_appinputs",
+                side_effect=grpc.RpcError,
+            ),
+            patch("flwr.supernode.runtime.run_clientapp.flwr_exit") as flwr_exit,
+        ):
+            flwr_exit.side_effect = RuntimeError
+            with self.assertRaises(RuntimeError):
+                run_clientapp("127.0.0.1:9094", insecure=True, token="test-token")
+
+        channel.return_value.subscribe.assert_called_once()
+        flwr_exit.assert_called_once()
+        self.assertEqual(
+            flwr_exit.call_args.kwargs["code"],
+            ExitCode.CLIENTAPP_COMMUNICATION_ERROR,
+        )

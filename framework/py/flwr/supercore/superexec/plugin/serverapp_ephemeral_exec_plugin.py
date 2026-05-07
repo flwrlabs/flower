@@ -18,7 +18,8 @@
 from logging import ERROR
 
 from flwr.common.logger import log
-from flwr.supercore.constant import RunType
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore.constant import TaskType
 
 from .base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
 
@@ -28,17 +29,21 @@ class ServerAppEphemeralExecPlugin(BaseEphemeralExecPlugin):
 
     appio_api_address_arg = "--serverappio-api-address"
 
-    def launch_app(self, token: str, run_id: int) -> None:
-        """Launch the application associated with a given run ID and token."""
-        # Determine the command to launch based on the run type
-        run = self.get_run(run_id)
-        if run.run_type == RunType.SERVER_APP:
+    def launch_task(self, token: str, task: Task) -> None:
+        """Launch the process to execute the given task using the given token."""
+        # Determine the command to launch based on the task type
+        if task.type == TaskType.SERVER_APP:
             self.command = "flwr-serverapp"
-        elif run.run_type == RunType.SIMULATION:
+        elif task.type == TaskType.SIMULATION:
             self.command = "flwr-simulation"
         else:
-            log(ERROR, "Unknown run type '%s' for run_id %d.", run.run_type, run_id)
+            log(
+                ERROR,
+                "Unknown task type '%s' for task_id %d.",
+                task.type,
+                task.task_id,
+            )
             return
 
         # Launch the executor process
-        super().launch_app(token, run_id)
+        super().launch_task(token, task)
