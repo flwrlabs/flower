@@ -160,8 +160,8 @@ class NodeState(CoreState):
     def get_run_ids_with_pending_messages(self) -> Sequence[int]:
         """Retrieve run IDs that have at least one pending message.
 
-        Run IDs that are currently in progress (i.e., those associated with tokens)
-        will not be returned, even if they have pending messages.
+        Run IDs that are currently in progress (for example, those with an active
+        task claim) will not be returned, even if they have pending messages.
 
         Returns
         -------

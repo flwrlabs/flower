@@ -447,6 +447,12 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
 
         # If the run is finished, delete the run from ObjectStore
         if request.run_status.status == Status.FINISHED:
+            task = get_authenticated_task()
+            state.finish_task(
+                task.task_id,
+                sub_status=request.run_status.sub_status,
+                details=request.run_status.details,
+            )
             # Remove the token once the run completes.
             state.delete_token(request.run_id)
             # Delete all objects related to the run

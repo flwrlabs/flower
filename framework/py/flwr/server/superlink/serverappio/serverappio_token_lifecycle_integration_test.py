@@ -33,7 +33,12 @@ from flwr.proto.run_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_DB_NAME,
+    NOOP_FEDERATION,
+    RunType,
+    TaskType,
+)
 from flwr.supercore.interceptors import APP_TOKEN_HEADER
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
@@ -88,8 +93,11 @@ class TestServerAppIoTokenLifecycleIntegration(unittest.TestCase):
         )
         _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
         _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
-        token = self.state.create_token(run_id)
+        task_id = self.state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
+        assert task_id is not None
+        token = self.state.claim_task(task_id)
         assert token is not None
+        assert self.state.activate_task(task_id)
         return run_id, token
 
     def test_update_run_status_finished_deletes_token(self) -> None:
@@ -107,4 +115,4 @@ class TestServerAppIoTokenLifecycleIntegration(unittest.TestCase):
 
         assert isinstance(response, UpdateRunStatusResponse)
         assert call.code() == grpc.StatusCode.OK
-        assert self.state.get_run_id_by_token(token) is None
+        assert self.state.get_task_by_token(token) is None
