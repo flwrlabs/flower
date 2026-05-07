@@ -7,8 +7,9 @@
 ########################
 
 Transport Layer Security (TLS) ensures the communication between endpoints is encrypted.
-This guide describes how to establish secure TLS Superlink ↔ SuperNodes as well as User
-↔ SuperLink connections.
+This guide describes how to establish secure TLS SuperLink ↔ SuperNodes as well as User
+↔ SuperLink connections. It also explains how to enable TLS on the internal AppIo
+connections used by SuperExec, ``ServerApp`` processes, and ``ClientApp`` processes.
 
 .. note::
 
@@ -32,7 +33,8 @@ This guide describes how to establish secure TLS Superlink ↔ SuperNodes as wel
 Using TLS-enabled connections expects some certificates generated and passed when
 launching the SuperLink, the SuperNodes and when a user (e.g. a data scientist that
 wants to submit a ``Run``) interacts with the federation via the `flwr CLI
-<ref-api-cli.html>`_.
+<ref-api-cli.html>`_. The same certificates can be used for local prototyping when
+enabling TLS on internal AppIo connections.
 
 We have prepared a script that can be used to generate such set of certificates. While
 using these are fine for prototyping, we advice you to follow the standards set in your
@@ -49,12 +51,18 @@ This will generate the TLS certificates in a new ``certificates/`` directory. Co
 directory into the directory of your app (e.g. a directory generated earlier via ``flwr
 new``).
 
-The approach for generating TLS certificates in the context of this example can serve as
-an inspiration and starting point, but it should not be used as a reference for
-production environments. Please refer to other sources regarding the issue of correctly
-generating certificates for production environments. For non-critical prototyping or
-research projects, it might be sufficient to use the self-signed certificates generated
-using the scripts mentioned in this guide.
+.. warning::
+
+    The approach for generating TLS certificates in the context of this example can
+    serve as an inspiration and starting point, but it should not be used as a reference
+    for production environments. Please refer to other sources regarding the issue of
+    correctly generating certificates for production environments. For non-critical
+    prototyping or research projects, it might be sufficient to use the self-signed
+    certificates generated using the scripts mentioned in this guide. In production, do
+    not reuse the same server certificate and private key for multiple services. A
+    better practice is to use a unique key pair for each service, for example the
+    SuperLink Fleet API, the SuperLink ServerAppIo API, and each SuperNode ClientAppIo
+    API.
 
 **********************************
  Launching the SuperLink with TLS
@@ -63,22 +71,30 @@ using the scripts mentioned in this guide.
 This section describes how to launch a SuperLink that works on TLS-enabled connections.
 The code snippet below assumes the `certificates/` directory is in the same directory
 where you execute the command from. Edit the paths accordingtly if that is not the case.
-When providing certificates, the SuperLink expects a tuple of three certificates paths:
-CA certificate, server certificate and server private key.
+When providing certificates for the Fleet API and Control API, the SuperLink expects a
+tuple of three certificates paths: CA certificate, server certificate and server private
+key. The same command can also provide AppIo certificates for the internal ServerAppIo
+API.
 
 .. code-block:: bash
-    :emphasize-lines: 2,3,4
+    :emphasize-lines: 2,3,4,5,6,7
 
     $ flower-superlink \
         --ssl-ca-certfile certificates/ca.crt \
         --ssl-certfile certificates/server.pem \
-        --ssl-keyfile certificates/server.key
+        --ssl-keyfile certificates/server.key \
+        --appio-ssl-ca-certfile certificates/ca.crt \
+        --appio-ssl-certfile certificates/server.pem \
+        --appio-ssl-keyfile certificates/server.key
 
 .. dropdown:: Understand the command
 
     * ``--ssl-ca-certfile``: Specify the location of the CA certificate file in your file. This file is a certificate that is used to verify the identity of the SuperLink.
     * | ``--ssl-certfile``: Specify the location of the SuperLink's TLS certificate file. This file is used to identify the SuperLink and to encrypt the packages that are transmitted over the network.
     * | ``--ssl-keyfile``: Specify the location of the SuperLink's TLS private key file. This file is used to decrypt the packages that are transmitted over the network.
+    * | ``--appio-ssl-ca-certfile``: Specify the location of the CA certificate file used by SuperExec to verify the SuperLink's ServerAppIo API server certificate.
+    * | ``--appio-ssl-certfile``: Specify the location of the ServerAppIo API server TLS certificate file.
+    * | ``--appio-ssl-keyfile``: Specify the location of the ServerAppIo API server TLS private key file.
 
 ************************************
  Connecting the SuperNodes with TLS
@@ -86,33 +102,82 @@ CA certificate, server certificate and server private key.
 
 This section describes how to launch a SuperNode that works on TLS-enabled connections.
 The code snippet below assumes the `certificates/` directory is in the same directory
-where you execute the command from. To enable TLS, the only change required when
-launching the SuperNode is replacing ``--insecure`` with ``--root-certificates``
+where you execute the command from. To secure the SuperNode ↔ SuperLink connection,
+replace ``--insecure`` with ``--root-certificates``. The same command can also provide
+AppIo certificates for the internal ClientAppIo API.
 
 .. code-block:: bash
-    :emphasize-lines: 2,2
+    :emphasize-lines: 2,3,4,5
 
     $ flower-supernode \
         --root-certificates certificates/ca.crt \
+        --appio-ssl-ca-certfile certificates/ca.crt \
+        --appio-ssl-certfile certificates/server.pem \
+        --appio-ssl-keyfile certificates/server.key \
         --superlink 127.0.0.1:9092 \
         --clientappio-api-address 127.0.0.1:9094 \
         --node-config="partition-id=0 num-partitions=2"
 
 .. dropdown:: Understand the command
 
-    * ``--root-certificates``:This specifies the location of the CA certificate file. The ``ca.crt`` file is used to verify the identity of the SuperLink.
+    * ``--root-certificates``: This specifies the location of the CA certificate file. The ``ca.crt`` file is used to verify the identity of the SuperLink.
+    * | ``--appio-ssl-ca-certfile``: Specify the location of the CA certificate file used by SuperExec to verify the SuperNode's ClientAppIo API server certificate.
+    * | ``--appio-ssl-certfile``: Specify the location of the ClientAppIo API server TLS certificate file.
+    * | ``--appio-ssl-keyfile``: Specify the location of the ClientAppIo API server TLS private key file.
 
 Follow the same procedure, i.e. replacing ``--insecure`` with ``--root-certificates``,
 to launch the second SuperNode.
 
 .. code-block:: bash
-    :emphasize-lines: 2,2
+    :emphasize-lines: 2,3,4,5
 
     $ flower-supernode \
         --root-certificates certificates/ca.crt \
+        --appio-ssl-ca-certfile certificates/ca.crt \
+        --appio-ssl-certfile certificates/server.pem \
+        --appio-ssl-keyfile certificates/server.key \
         --superlink 127.0.0.1:9092 \
         --clientappio-api-address 127.0.0.1:9095 \
         --node-config="partition-id=1 num-partitions=2"
+
+**********************************************
+ Securing internal AppIo connections with TLS
+**********************************************
+
+This section describes how to enable TLS for the internal AppIo connections between
+SuperExec and the ServerAppIo or ClientAppIo APIs. The commands above already include
+the ``--appio-ssl-*`` options needed to start the ServerAppIo and ClientAppIo APIs with
+TLS enabled.
+
+When SuperLink or SuperNode run in the default ``subprocess`` isolation mode, they start
+SuperExec for you and pass the AppIo root certificate to it automatically. When using
+``process`` isolation mode, you start SuperExec separately and need to pass the same CA
+certificate with ``--root-certificates``.
+
+.. code-block:: bash
+    :emphasize-lines: 2,2
+
+    $ flower-superexec \
+        --root-certificates certificates/ca.crt \
+        --appio-api-address 127.0.0.1:9091 \
+        --plugin-type serverapp
+
+.. dropdown:: Understand the command
+
+    * ``--root-certificates``: Specify the location of the CA certificate file. The ``ca.crt`` file is used by SuperExec to verify the AppIo API server certificate.
+    * | ``--appio-api-address``: Specify the address of the AppIo API that SuperExec should connect to. In this example, ``127.0.0.1:9091`` is the SuperLink's ServerAppIo API.
+    * | ``--plugin-type``: Specify the type of app process SuperExec should launch. Use ``serverapp`` for a ``ServerApp`` SuperExec.
+
+Use the same procedure for a ``ClientApp`` SuperExec. Pass the SuperNode's ClientAppIo
+API address, e.g. ``127.0.0.1:9094``, and set ``--plugin-type clientapp``.
+
+.. note::
+
+    The AppIo TLS options configure server-authenticated TLS. They do not configure
+    mutual TLS. The ``--appio-ssl-ca-certfile`` file is used by SuperExec and app
+    processes to verify the AppIo server certificate, not as a client certificate. If
+    AppIo TLS is not configured, internal AppIo connections remain unencrypted and
+    should stay inside a trusted network.
 
 ************************
  TLS-enabled Flower CLI
@@ -152,10 +217,10 @@ Now, you can run the example by executing ``flwr run``:
 ************
 
 You should now have learned how to generate self-signed certificates using the given
-script, start an TLS-enabled server and have two clients establish secure connections to
+script, start a TLS-enabled server and have two clients establish secure connections to
 it. You should also have learned how to run your Flower project using ``flwr run`` with
-TLS enabled. All other commands in the `Flower CLI <ref-api-cli.html>`_ will also be
-TLS-enabled.
+TLS enabled and how to secure internal AppIo connections. All other commands in the
+`Flower CLI <ref-api-cli.html>`_ will also be TLS-enabled.
 
 .. note::
 
