@@ -76,6 +76,7 @@ def test_flower_error_from_json() -> None:
         '{"public_message": "missing code"}',
         '{"code": 1}',
         '{"code": "1", "public_message": "wrong code type"}',
+        '{"code": true, "public_message": "wrong code type"}',
         '{"code": 1, "public_message": "ok", "public_details": 1}',
     ],
 )

@@ -88,7 +88,7 @@ class FlowerError(Exception):
         public_message = payload.get("public_message")
         public_details = payload.get("public_details")
 
-        if not isinstance(code, int) or not isinstance(public_message, str):
+        if type(code) is not int or not isinstance(public_message, str):
             return None
         if public_details is not None and not isinstance(public_details, str):
             return None
