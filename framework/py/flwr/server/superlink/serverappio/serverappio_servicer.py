@@ -20,7 +20,7 @@ from logging import DEBUG, ERROR, INFO, WARNING
 import grpc
 
 from flwr.common import Message
-from flwr.common.constant import RUN_ID_NOT_FOUND_MESSAGE, SUPERLINK_NODE_ID, Status
+from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -196,19 +196,15 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
         _validate_create_task_request(request, context)
 
-        try:
-            task_id = state.create_task(
-                task_type=request.type,
-                run_id=request.run_id,
-                fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
-                model_ref=request.model_ref if request.HasField("model_ref") else None,
-                connector_ref=(
-                    request.connector_ref if request.HasField("connector_ref") else None
-                ),
-            )
-        except ValueError as err:
-            context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
-            raise RuntimeError("This line should never be reached.") from err
+        task_id = state.create_task(
+            task_type=request.type,
+            run_id=request.run_id,
+            fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
+            model_ref=request.model_ref if request.HasField("model_ref") else None,
+            connector_ref=(
+                request.connector_ref if request.HasField("connector_ref") else None
+            ),
+        )
 
         if task_id is None:
             context.abort(grpc.StatusCode.INTERNAL, "Failed to create task")

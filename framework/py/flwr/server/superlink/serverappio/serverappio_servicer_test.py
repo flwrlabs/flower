@@ -30,7 +30,6 @@ from parameterized import parameterized
 
 from flwr.common import ConfigRecord, Context, Error, Message, RecordDict
 from flwr.common.constant import (
-    RUN_ID_NOT_FOUND_MESSAGE,
     SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
     SUPERLINK_NODE_ID,
     Status,
@@ -560,8 +559,8 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert err.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
         assert err.exception.details() == error_msg
 
-    def test_create_task_rejects_missing_run(self) -> None:
-        """Test `CreateTask` rejects unknown run IDs."""
+    def test_create_task_fast_fails_missing_run(self) -> None:
+        """Test `CreateTask` propagates an unknown run ID as an RPC failure."""
         with self.assertRaises(grpc.RpcError) as err:
             self._create_task.with_call(
                 request=CreateTaskRequest(
@@ -571,8 +570,8 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
                 )
             )
 
-        assert err.exception.code() == grpc.StatusCode.NOT_FOUND
-        assert err.exception.details() == RUN_ID_NOT_FOUND_MESSAGE
+        assert err.exception.code() == grpc.StatusCode.UNKNOWN
+        assert "Run 42 not found" in err.exception.details()
 
     def _assert_get_nodes_not_allowed(self, run_id: int) -> None:
         """Assert `GetNodes` not allowed."""
