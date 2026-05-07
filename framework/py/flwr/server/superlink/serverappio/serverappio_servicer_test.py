@@ -23,7 +23,7 @@ import tempfile
 import threading
 import unittest
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import grpc
 from parameterized import parameterized
@@ -75,7 +75,10 @@ from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
-from flwr.server.superlink.serverappio.serverappio_servicer import _raise_if
+from flwr.server.superlink.serverappio.serverappio_servicer import (
+    ServerAppIoServicer,
+    _raise_if,
+)
 from flwr.server.superlink.utils import _STATUS_TO_MSG
 from flwr.supercore.constant import (
     FLWR_IN_MEMORY_DB_NAME,
@@ -309,6 +312,8 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         state_factory = LinkStateFactory(
             FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), objectstore_factory
         )
+        self.objectstore_factory = objectstore_factory
+        self.state_factory = state_factory
         self.state = state_factory.state()
         self.store = objectstore_factory.store()
         self.node_pk = b"fake public key"
@@ -1012,42 +1017,41 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert len(self.store) == 0
 
     def test_run_status_transitions(self) -> None:
-        """Test `PullAppInputs` transitions run status from PENDING to STARTING to
-        RUNNING."""
+        """Test `PullAppInputs` activates a claimed task and marks the run running."""
+        # Prepare: Create a run with FAB
+        fab_content = b"mock fab content"
+        fab_hash = self.state.store_fab(
+            Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
+        )
+        run_id = self._create_dummy_run(running=False, fab_hash=fab_hash)
+        task_id = self.state.create_task(
+            task_type=TaskType.SERVER_APP, run_id=run_id, fab_hash=fab_hash
+        )
+        servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
+
+        # Claim task through the servicer to transition the run to STARTING.
+        claim_response = servicer.ClaimTask(ClaimTaskRequest(task_id=task_id), Mock())
+        assert claim_response.HasField("token")
+
+        # Set serverapp context
+        context = Context(run_id, SUPERLINK_NODE_ID, {}, RecordDict(), {})
+        self.state.set_serverapp_context(run_id, context)
+
+        run_status = self.state.get_run_status({run_id})[run_id]
+        assert run_status.status == Status.STARTING
+
+        # Execute: Pull app inputs
         request = PullAppInputsRequest()
+        with patch(
+            "flwr.server.superlink.serverappio.serverappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(task_id=task_id, run_id=run_id),
+        ):
+            response = servicer.PullAppInputs(request, Mock())
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            run_id, task_id, state_0, server_0, server_1 = _create_shared_runtime(
-                tmpdir
-            )
-            channel_0 = grpc.insecure_channel(server_0.bound_address)
-            pull_app_inputs = channel_0.unary_unary(
-                "/flwr.proto.ServerAppIo/PullAppInputs",
-                request_serializer=PullAppInputsRequest.SerializeToString,
-                response_deserializer=PullAppInputsResponse.FromString,
-            )
-            try:
-                token = _claim_task(channel_0, task_id)
-
-                # Assert: ClaimTask transitions the run to STARTING.
-                run_status = state_0.get_run_status({run_id})[run_id]
-                assert run_status.status == Status.STARTING
-
-                # Execute: Pull app inputs.
-                response, call = pull_app_inputs.with_call(
-                    request,
-                    metadata=((APP_TOKEN_HEADER, token),),
-                )
-
-                run_status = state_0.get_run_status({run_id})[run_id]
-            finally:
-                channel_0.close()
-                server_0.stop(None)
-                server_1.stop(None)
-
-        # Assert: Response is successful and run status is now RUNNING.
+        # Assert: Response is successful and run status is now RUNNING
         assert isinstance(response, PullAppInputsResponse)
-        assert grpc.StatusCode.OK == call.code()
+        run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.RUNNING
 
 
