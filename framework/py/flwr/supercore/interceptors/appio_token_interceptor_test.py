@@ -25,7 +25,7 @@ import grpc
 from google.protobuf.message import Message as GrpcMessage
 
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    ListAppsToLaunchRequest,
+    PullPendingTasksRequest,
     PushAppMessagesRequest,
     PushAppOutputsRequest,
 )
@@ -188,7 +188,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
             ),
         )
 
-        response = cast(str, intercepted.unary_unary(ListAppsToLaunchRequest(), Mock()))
+        response = cast(str, intercepted.unary_unary(PullPendingTasksRequest(), Mock()))
         self.assertEqual(response, "ok")
 
     def test_missing_token_denied_for_protected_method(self) -> None:
@@ -400,8 +400,6 @@ class TestMethodPolicyMaps(TestCase):
     """Validate method auth policy map coverage and values."""
 
     NO_AUTH_BOOTSTRAP_METHODS = {
-        "ListAppsToLaunch",
-        "RequestToken",
         "PullPendingTasks",
         "ClaimTask",
         "GetRun",

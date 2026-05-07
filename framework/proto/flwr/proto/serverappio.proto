@@ -30,13 +30,6 @@ service ServerAppIo {
   // General *AppIo endpoints for SuperExec processes
   /////////////////////////////////////////////////////////////////////////////
 
-  // List runs to launch
-  rpc ListAppsToLaunch(ListAppsToLaunchRequest)
-      returns (ListAppsToLaunchResponse) {}
-
-  // Request token for a run
-  rpc RequestToken(RequestTokenRequest) returns (RequestTokenResponse) {}
-
   // Pull pending tasks
   rpc PullPendingTasks(PullPendingTasksRequest)
       returns (PullPendingTasksResponse) {}
@@ -50,10 +43,6 @@ service ServerAppIo {
 
   // Get run details
   rpc GetRun(GetRunRequest) returns (GetRunResponse) {}
-
-  // App heartbeat
-  rpc SendAppHeartbeat(SendAppHeartbeatRequest)
-      returns (SendAppHeartbeatResponse) {}
 
   // Task heartbeat
   rpc SendTaskHeartbeat(SendTaskHeartbeatRequest)
@@ -89,10 +78,6 @@ service ServerAppIo {
   // Get Federation Options (only used by flwr-simulation)
   rpc GetFederationOptions(GetFederationOptionsRequest)
       returns (GetFederationOptionsResponse) {}
-
-  // Update the status of a given run
-  rpc UpdateRunStatus(UpdateRunStatusRequest)
-      returns (UpdateRunStatusResponse) {}
 
   // Push ServerApp logs
   rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
