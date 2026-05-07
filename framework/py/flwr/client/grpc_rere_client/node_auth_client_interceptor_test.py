@@ -216,7 +216,7 @@ class TestAuthenticateClientInterceptor(unittest.TestCase):
             expected_public_key = public_key_to_bytes(self._client_public_key)
 
             # Assert
-            assert metadata_dict[FLWR_COMPONENT_NAME_METADATA_KEY] == "supernode"
+            assert metadata_dict[FLWR_COMPONENT_NAME_METADATA_KEY] == "SuperNode"
             assert FLWR_PACKAGE_NAME_METADATA_KEY in metadata_dict
             assert FLWR_PACKAGE_VERSION_METADATA_KEY in metadata_dict
             assert isinstance(signature, bytes)
