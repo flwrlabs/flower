@@ -45,7 +45,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Provide state implementation to test."""
         raise NotImplementedError()
 
-    def task_run_id(self, state: CoreState) -> int:
+    def task_run_id(self, _state: CoreState) -> int:
         """Provide a run ID to use when creating tasks in tests."""
         return 42
 

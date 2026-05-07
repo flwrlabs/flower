@@ -114,7 +114,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 "SELECT run_id FROM run WHERE run_id = :run_id",
                 {"run_id": uint64_to_int64(run_id)},
             ):
-                raise ValueError(f"Run {run_id} not found")
+                raise RuntimeError(f"Run {run_id} not found")
 
             task_id = super().create_task(
                 task_type=task_type,
