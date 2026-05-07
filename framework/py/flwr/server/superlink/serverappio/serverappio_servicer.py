@@ -21,7 +21,7 @@ from typing import cast
 import grpc
 
 from flwr.common import Message
-from flwr.common.constant import RUN_ID_NOT_FOUND_MESSAGE, SUPERLINK_NODE_ID, Status
+from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -200,12 +200,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         log(DEBUG, "ServerAppIoServicer.CreateTask")
 
         state = self.state_factory.state()
-        runs = state.get_run_info(run_ids=[request.run_id])
-
-        if not runs:
-            context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
-            raise RuntimeError("This line should never be reached.")
-
         _validate_create_task_request(request, context)
 
         task_id = state.create_task(
