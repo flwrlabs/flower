@@ -37,6 +37,8 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any, cast
 
+# These Popen kwargs are owned by the supervisor to preserve FD isolation and
+# process-group control, so callers may not override exactly these lifecycle hooks.
 _LIFECYCLE_POPEN_KWARGS = frozenset(
     {
         "close_fds",
@@ -46,10 +48,19 @@ _LIFECYCLE_POPEN_KWARGS = frozenset(
         "start_new_session",
     }
 )
+# Read config/status pipes in bounded chunks; 64 KiB keeps reads efficient without
+# assuming the JSON payload fits in a single OS pipe buffer.
 _READ_SIZE = 65536
+# Poll often enough for prompt cleanup while avoiding a busy loop in the supervisor.
 _POLL_INTERVAL = 0.1
+# Failed setup should not leave a supervisor process behind; one second gives normal
+# termination a chance before escalating to kill.
 _SUPERVISOR_STOP_TIMEOUT = 1.0
+# Only stdio kwargs need special validation today, and these are the subprocess stdio
+# keys whose FD semantics would otherwise cross the config-pipe boundary.
 _STDIO_POPEN_KWARGS = frozenset({"stdin", "stdout", "stderr"})
+# All of these os.waitid names are required to check child status without reaping;
+# missing any one means the platform cannot safely avoid the PID/PGID reuse hazard.
 _NON_REAPING_WAIT_ATTRS = (
     "P_PID",
     "WEXITED",
