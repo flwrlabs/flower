@@ -51,6 +51,41 @@ def test_rpc_error_translator_mapped_flower_error() -> None:
     }
 
 
+def test_flower_error_from_json() -> None:
+    """Deserialize the public FlowerError payload on the client side."""
+    err = FlowerError(
+        ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
+        "internal diagnostic message",
+        public_details="public details",
+    )
+
+    parsed = FlowerError.from_json(err.to_json("public message"))
+
+    assert parsed is not None
+    assert parsed.code == ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
+    assert parsed.message == "public message"
+    assert parsed.public_details == "public details"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        None,
+        "not json",
+        "[]",
+        '{"public_message": "missing code"}',
+        '{"code": 1}',
+        '{"code": "1", "public_message": "wrong code type"}',
+        '{"code": 1, "public_message": "ok", "public_details": 1}',
+    ],
+)
+def test_flower_error_from_json_returns_none_for_invalid_payloads(
+    value: str | None,
+) -> None:
+    """Invalid public FlowerError payloads should not raise."""
+    assert FlowerError.from_json(value) is None
+
+
 def test_rpc_error_translator_grpc_error() -> None:
     """Allow `context.abort()` to propagate unmodified."""
     context = Mock(spec=grpc.ServicerContext)

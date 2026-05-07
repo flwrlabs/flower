@@ -66,6 +66,39 @@ class FlowerError(Exception):
             }
         )
 
+    @classmethod
+    def from_json(cls, value: str | None) -> "FlowerError | None":
+        """Deserialize a client-visible error payload.
+
+        The internal diagnostic message is not transmitted over the wire. The returned
+        error therefore uses the public message as its ``message`` value.
+        """
+        if value is None:
+            return None
+
+        try:
+            payload = json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return None
+
+        if not isinstance(payload, dict):
+            return None
+
+        code = payload.get("code")
+        public_message = payload.get("public_message")
+        public_details = payload.get("public_details")
+
+        if not isinstance(code, int) or not isinstance(public_message, str):
+            return None
+        if public_details is not None and not isinstance(public_details, str):
+            return None
+
+        return cls(
+            code=code,
+            message=public_message,
+            public_details=public_details,
+        )
+
 
 class ApiErrorCode(IntEnum):
     """API error code."""
