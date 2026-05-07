@@ -66,6 +66,7 @@ def test_flower_error_from_json() -> None:
     assert parsed.message == "public message"
     assert parsed.public_details == "public details"
 
+
 def test_flower_error_from_json_returns_base_error_for_subclass_call() -> None:
     """Deserialize public payloads into a base FlowerError."""
     err = EntitlementError("internal diagnostic message", entitlement_code=123)
