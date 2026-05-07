@@ -14,7 +14,6 @@
 # ==============================================================================
 """Flower server app."""
 
-
 import argparse
 import importlib.util
 import os
@@ -664,7 +663,6 @@ def _run_fleet_api_grpc_adapter(
     certificates: tuple[bytes, bytes, bytes] | None,
 ) -> grpc.Server:
     """Run Fleet API (GrpcAdapter)."""
-
     # Create Fleet API gRPC server
     fleet_servicer = GrpcAdapterServicer(
         state_factory=state_factory,
