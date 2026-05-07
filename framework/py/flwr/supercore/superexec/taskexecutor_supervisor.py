@@ -448,7 +448,7 @@ def _validate_launch_request(
         raise ValueError(f"popen_kwargs includes unsupported stdio keys: {rejected}")
     try:
         json.dumps({"command": command, "popen_kwargs": popen_kwargs})
-    except TypeError as exc:
+    except (TypeError, ValueError) as exc:
         raise TypeError("popen_kwargs must be JSON serializable") from exc
 
 

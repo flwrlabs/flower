@@ -384,6 +384,15 @@ def test_validate_launch_request_accepts_devnull_stdio() -> None:
     )
 
 
+def test_validate_launch_request_rejects_circular_popen_kwargs() -> None:
+    """Circular kwargs should get the normalized JSON-serializable error."""
+    popen_kwargs: dict[str, Any] = {}
+    popen_kwargs["self"] = popen_kwargs
+
+    with pytest.raises(TypeError, match="must be JSON serializable"):
+        _validate_launch_request([sys.executable, "-c", "pass"], popen_kwargs)
+
+
 def test_validate_launch_request_rejects_unavailable_stdio_fd() -> None:
     """Arbitrary stdio FDs should not be passed through the supervisor config."""
     with pytest.raises(ValueError, match="unsupported stdio"):
