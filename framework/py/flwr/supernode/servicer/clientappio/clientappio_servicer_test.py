@@ -27,11 +27,11 @@ from flwr.common.serde import context_to_proto, fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker
 from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
     PullAppMessagesResponse,
-    PullTaskInputsRequest,
-    PullTaskInputsResponse,
+    PullTaskInputRequest,
+    PullTaskInputResponse,
     PushAppMessagesResponse,
-    PushTaskOutputsRequest,
-    PushTaskOutputsResponse,
+    PushTaskOutputRequest,
+    PushTaskOutputResponse,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
@@ -77,7 +77,7 @@ class TestClientAppIoServicer(unittest.TestCase):
             content=b"\xf3\xf5\xf8\x98",
             verifications={"ab12#$%": "abc123#$%"},
         )
-        mock_response = PullTaskInputsResponse(
+        mock_response = PullTaskInputResponse(
             context=ProtoContext(node_id=123),
             run=ProtoRun(run_id=61016, fab_id="mock/mock", fab_version="v1.0.0"),
             fab=fab_to_proto(mock_fab),
@@ -101,13 +101,13 @@ class TestClientAppIoServicer(unittest.TestCase):
             )
 
         self.mock_stub.PullObject.side_effect = pull_object_side_effect
-        self.mock_stub.PullTaskInputs.return_value = mock_response
+        self.mock_stub.PullTaskInput.return_value = mock_response
 
         # Execute
         message, context, run, fab = pull_task_inputs(self.mock_stub)
 
         # Assert
-        self.mock_stub.PullTaskInputs.assert_called_once()
+        self.mock_stub.PullTaskInput.assert_called_once()
         self.assertEqual(len(message.content.array_records), 3)
         self.assertEqual(len(message.content.metric_records), 2)
         self.assertEqual(len(message.content.config_records), 1)
@@ -135,9 +135,9 @@ class TestClientAppIoServicer(unittest.TestCase):
             run_config={"runconfig1": 6.1},
         )
 
-        # Prepare: Mock PushTaskOutputs RPC call
-        mock_response = PushTaskOutputsResponse()
-        self.mock_stub.PushTaskOutputs.return_value = mock_response
+        # Prepare: Mock PushTaskOutput RPC call
+        mock_response = PushTaskOutputResponse()
+        self.mock_stub.PushTaskOutput.return_value = mock_response
 
         # Prepare: Mock PushMessage RPC call
         object_tree = get_object_tree(message)
@@ -167,18 +167,18 @@ class TestClientAppIoServicer(unittest.TestCase):
         )
 
         # Assert
-        self.mock_stub.PushTaskOutputs.assert_called_once()
+        self.mock_stub.PushTaskOutput.assert_called_once()
         self.mock_stub.PushMessage.assert_called_once()
         self.assertSetEqual(pushed_obj_ids, set(all_obj_ids))
-        push_outputs_request = self.mock_stub.PushTaskOutputs.call_args.args[0]
+        push_outputs_request = self.mock_stub.PushTaskOutput.call_args.args[0]
         self.assertEqual(push_outputs_request.sub_status, sub_status)
         self.assertEqual(push_outputs_request.details, details)
 
     def test_servicer_pull_task_inputs_activates_task(self) -> None:
-        """PullTaskInputs should activate the authenticated task."""
+        """PullTaskInput should activate the authenticated task."""
         run_id = 61016
         task_id = 123
-        request = PullTaskInputsRequest()
+        request = PullTaskInputRequest()
 
         run = typing.Run.create_empty(run_id=run_id)
         run.fab_id = "mock/mock"
@@ -207,13 +207,13 @@ class TestClientAppIoServicer(unittest.TestCase):
             "get_authenticated_task",
             return_value=Mock(task_id=task_id, run_id=run_id),
         ):
-            response = self.servicer.PullTaskInputs(request, Mock())
+            response = self.servicer.PullTaskInput(request, Mock())
 
-        self.assertIsInstance(response, PullTaskInputsResponse)
+        self.assertIsInstance(response, PullTaskInputResponse)
         self.mock_state.activate_task.assert_called_once_with(task_id=task_id)
 
     def test_servicer_push_task_outputs_finishes_task(self) -> None:
-        """PushTaskOutputs should finish the authenticated task."""
+        """PushTaskOutput should finish the authenticated task."""
         token = "test-token"
         run_id = 61016
         task_id = 123
@@ -224,7 +224,7 @@ class TestClientAppIoServicer(unittest.TestCase):
             state=self.maker.recorddict(1, 1, 1),
             run_config={"runconfig1": 6.1},
         )
-        request = PushTaskOutputsRequest(
+        request = PushTaskOutputRequest(
             token=token,
             context=context_to_proto(app_context),
             sub_status=SubStatus.COMPLETED,
@@ -238,9 +238,9 @@ class TestClientAppIoServicer(unittest.TestCase):
             "get_authenticated_task",
             return_value=Mock(task_id=task_id, run_id=run_id),
         ):
-            response = self.servicer.PushTaskOutputs(request, Mock())
+            response = self.servicer.PushTaskOutput(request, Mock())
 
-        self.assertIsInstance(response, PushTaskOutputsResponse)
+        self.assertIsInstance(response, PushTaskOutputResponse)
         self.mock_state.store_context.assert_called_once()
         self.mock_state.finish_task.assert_called_once()
         finish_task_kwargs = self.mock_state.finish_task.call_args.kwargs

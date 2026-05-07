@@ -43,11 +43,11 @@ from flwr.common.typing import Fab, Run
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppMessagesRequest,
     PullAppMessagesResponse,
-    PullTaskInputsRequest,
-    PullTaskInputsResponse,
+    PullTaskInputRequest,
+    PullTaskInputResponse,
     PushAppMessagesRequest,
-    PushTaskOutputsRequest,
-    PushTaskOutputsResponse,
+    PushTaskOutputRequest,
+    PushTaskOutputResponse,
 )
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
@@ -227,7 +227,7 @@ def pull_task_inputs(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]
     """Pull TaskInputs from SuperNode."""
     try:
         # Pull Context, Run and FAB
-        res: PullTaskInputsResponse = stub.PullTaskInputs(PullTaskInputsRequest())
+        res: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
         fab = fab_from_proto(res.fab)
@@ -253,7 +253,7 @@ def pull_task_inputs(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]
         message.metadata.__dict__["_message_id"] = object_tree.object_id
         return message, context, run, fab
     except grpc.RpcError as e:
-        log(ERROR, "[PullTaskInputs] gRPC error occurred: %s", str(e))
+        log(ERROR, "[PullTaskInput] gRPC error occurred: %s", str(e))
         raise e
 
 
@@ -263,7 +263,7 @@ def push_task_outputs(  # pylint: disable=R0913, R0917
     context: Context,
     sub_status: str,
     details: str,
-) -> PushTaskOutputsResponse:
+) -> PushTaskOutputResponse:
     """Push TaskOutputs to SuperNode."""
     # Set message ID
     message.metadata.__dict__["_message_id"] = message.object_id
@@ -302,12 +302,12 @@ def push_task_outputs(  # pylint: disable=R0913, R0917
             )
 
         # Push Context
-        res: PushTaskOutputsResponse = stub.PushTaskOutputs(
-            PushTaskOutputsRequest(
+        res: PushTaskOutputResponse = stub.PushTaskOutput(
+            PushTaskOutputRequest(
                 context=proto_context, sub_status=sub_status, details=details
             )
         )
         return res
     except grpc.RpcError as e:
-        log(ERROR, "[PushTaskOutputs] gRPC error occurred: %s", str(e))
+        log(ERROR, "[PushTaskOutput] gRPC error occurred: %s", str(e))
         raise e

@@ -58,15 +58,15 @@ class ServerAppIoStub(object):
                 request_serializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatResponse.FromString,
                 _registered_method=True)
-        self.PullTaskInputs = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PullTaskInputs',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputsRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputsResponse.FromString,
+        self.PullTaskInput = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/PullTaskInput',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputResponse.FromString,
                 _registered_method=True)
-        self.PushTaskOutputs = channel.unary_unary(
-                '/flwr.proto.ServerAppIo/PushTaskOutputs',
-                request_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputsRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputsResponse.FromString,
+        self.PushTaskOutput = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/PushTaskOutput',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputResponse.FromString,
                 _registered_method=True)
         self.PushObject = channel.unary_unary(
                 '/flwr.proto.ServerAppIo/PushObject',
@@ -154,14 +154,14 @@ class ServerAppIoServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def PullTaskInputs(self, request, context):
+    def PullTaskInput(self, request, context):
         """Pull task inputs
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def PushTaskOutputs(self, request, context):
+    def PushTaskOutput(self, request, context):
         """Push task outputs
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -262,15 +262,15 @@ def add_ServerAppIoServicer_to_server(servicer, server):
                     request_deserializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_appio__pb2.SendTaskHeartbeatResponse.SerializeToString,
             ),
-            'PullTaskInputs': grpc.unary_unary_rpc_method_handler(
-                    servicer.PullTaskInputs,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputsRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputsResponse.SerializeToString,
+            'PullTaskInput': grpc.unary_unary_rpc_method_handler(
+                    servicer.PullTaskInput,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskInputResponse.SerializeToString,
             ),
-            'PushTaskOutputs': grpc.unary_unary_rpc_method_handler(
-                    servicer.PushTaskOutputs,
-                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputsRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputsResponse.SerializeToString,
+            'PushTaskOutput': grpc.unary_unary_rpc_method_handler(
+                    servicer.PushTaskOutput,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputResponse.SerializeToString,
             ),
             'PushObject': grpc.unary_unary_rpc_method_handler(
                     servicer.PushObject,
@@ -437,7 +437,7 @@ class ServerAppIo(object):
             _registered_method=True)
 
     @staticmethod
-    def PullTaskInputs(request,
+    def PullTaskInput(request,
             target,
             options=(),
             channel_credentials=None,
@@ -450,9 +450,9 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/PullTaskInputs',
-            flwr_dot_proto_dot_appio__pb2.PullTaskInputsRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.PullTaskInputsResponse.FromString,
+            '/flwr.proto.ServerAppIo/PullTaskInput',
+            flwr_dot_proto_dot_appio__pb2.PullTaskInputRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PullTaskInputResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -464,7 +464,7 @@ class ServerAppIo(object):
             _registered_method=True)
 
     @staticmethod
-    def PushTaskOutputs(request,
+    def PushTaskOutput(request,
             target,
             options=(),
             channel_credentials=None,
@@ -477,9 +477,9 @@ class ServerAppIo(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/flwr.proto.ServerAppIo/PushTaskOutputs',
-            flwr_dot_proto_dot_appio__pb2.PushTaskOutputsRequest.SerializeToString,
-            flwr_dot_proto_dot_appio__pb2.PushTaskOutputsResponse.FromString,
+            '/flwr.proto.ServerAppIo/PushTaskOutput',
+            flwr_dot_proto_dot_appio__pb2.PushTaskOutputRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PushTaskOutputResponse.FromString,
             options,
             channel_credentials,
             insecure,

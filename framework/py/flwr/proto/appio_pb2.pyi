@@ -216,8 +216,8 @@ class PullAppMessagesResponse(google.protobuf.message.Message):
 global___PullAppMessagesResponse = PullAppMessagesResponse
 
 @typing.final
-class PullTaskInputsRequest(google.protobuf.message.Message):
-    """PullTaskInputs messages"""
+class PullTaskInputRequest(google.protobuf.message.Message):
+    """PullTaskInput messages"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -230,10 +230,10 @@ class PullTaskInputsRequest(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["token", b"token"]) -> None: ...
 
-global___PullTaskInputsRequest = PullTaskInputsRequest
+global___PullTaskInputRequest = PullTaskInputRequest
 
 @typing.final
-class PullTaskInputsResponse(google.protobuf.message.Message):
+class PullTaskInputResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     CONTEXT_FIELD_NUMBER: builtins.int
@@ -262,11 +262,11 @@ class PullTaskInputsResponse(google.protobuf.message.Message):
     def HasField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run", "task_id", b"task_id"]) -> None: ...
 
-global___PullTaskInputsResponse = PullTaskInputsResponse
+global___PullTaskInputResponse = PullTaskInputResponse
 
 @typing.final
-class PushTaskOutputsRequest(google.protobuf.message.Message):
-    """PushTaskOutputs messages"""
+class PushTaskOutputRequest(google.protobuf.message.Message):
+    """PushTaskOutput messages"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -293,17 +293,17 @@ class PushTaskOutputsRequest(google.protobuf.message.Message):
     def HasField(self, field_name: typing.Literal["context", b"context"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing.Literal["context", b"context", "details", b"details", "run_id", b"run_id", "sub_status", b"sub_status", "token", b"token"]) -> None: ...
 
-global___PushTaskOutputsRequest = PushTaskOutputsRequest
+global___PushTaskOutputRequest = PushTaskOutputRequest
 
 @typing.final
-class PushTaskOutputsResponse(google.protobuf.message.Message):
+class PushTaskOutputResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     def __init__(
         self,
     ) -> None: ...
 
-global___PushTaskOutputsResponse = PushTaskOutputsResponse
+global___PushTaskOutputResponse = PushTaskOutputResponse
 
 @typing.final
 class CreateTaskRequest(google.protobuf.message.Message):

@@ -59,9 +59,9 @@ message PullAppMessagesResponse {
   repeated Message messages_list = 1;
   repeated ObjectTree message_object_trees = 2;
 }
-// PullTaskInputs messages
-message PullTaskInputsRequest { string token = 1 [ deprecated = true ]; }
-message PullTaskInputsResponse {
+// PullTaskInput messages
+message PullTaskInputRequest { string token = 1 [ deprecated = true ]; }
+message PullTaskInputResponse {
   Context context = 1;
   Run run = 2;
   Fab fab = 3;
@@ -69,15 +69,15 @@ message PullTaskInputsResponse {
   uint64 task_id = 5;
 }
 
-// PushTaskOutputs messages
-message PushTaskOutputsRequest {
+// PushTaskOutput messages
+message PushTaskOutputRequest {
   string token = 1 [ deprecated = true ];
   uint64 run_id = 2;
   Context context = 3;
   string sub_status = 4;
   string details = 5;
 }
-message PushTaskOutputsResponse {}
+message PushTaskOutputResponse {}
 
 // CreateTask messages
 message CreateTaskRequest {

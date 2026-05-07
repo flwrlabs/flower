@@ -54,9 +54,9 @@ from flwr.common.serde import (
 )
 from flwr.common.telemetry import EventType, event
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    PullTaskInputsRequest,
-    PullTaskInputsResponse,
-    PushTaskOutputsRequest,
+    PullTaskInputRequest,
+    PullTaskInputResponse,
+    PushTaskOutputRequest,
 )
 from flwr.server.grid.grpc_grid import GrpcGrid
 from flwr.server.run_serverapp import run as run_
@@ -170,8 +170,8 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         # Pull ServerAppInputs from LinkState
         try:
             log(DEBUG, "[flwr-serverapp] Pull ServerAppInputs")
-            req = PullTaskInputsRequest()
-            res: PullTaskInputsResponse = grid._stub.PullTaskInputs(req)
+            req = PullTaskInputRequest()
+            res: PullTaskInputResponse = grid._stub.PullTaskInput(req)
         except grpc.RpcError as ex:
             if ex.code() == grpc.StatusCode.FAILED_PRECONDITION:
                 raise RuntimeError("Failed to start the run.") from ex
@@ -282,13 +282,13 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         # Update run status
         if grid:
             log(DEBUG, "[flwr-serverapp] Will push ServerApp task output")
-            pushoutput_req = PushTaskOutputsRequest(
+            pushoutput_req = PushTaskOutputRequest(
                 context=context_to_proto(context) if context else None,
                 sub_status=sub_status,
                 details=details,
             )
             try:
-                grid._stub.PushTaskOutputs(pushoutput_req)
+                grid._stub.PushTaskOutput(pushoutput_req)
             except grpc.RpcError:
                 pass
 
