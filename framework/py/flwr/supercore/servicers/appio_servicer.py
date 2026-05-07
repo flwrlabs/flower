@@ -20,7 +20,7 @@ from logging import DEBUG
 
 import grpc
 
-from flwr.common.constant import RUN_ID_NOT_FOUND_MESSAGE, Status
+from flwr.common.constant import Status
 from flwr.common.logger import log
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
