@@ -20,9 +20,8 @@ from dataclasses import dataclass
 from threading import Lock, RLock
 
 from flwr.common import Context, Error, Message, now
-from flwr.common.constant import ErrorCode, Status, SubStatus
+from flwr.common.constant import ErrorCode
 from flwr.common.typing import Run
-from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
 from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.inflatable.inflatable_object import (

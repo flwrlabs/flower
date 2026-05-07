@@ -23,7 +23,7 @@ from unittest.mock import patch
 from parameterized import parameterized
 
 from flwr.common import ConfigRecord, Context, Message, Metadata, RecordDict, now
-from flwr.common.constant import ErrorCode, SubStatus
+from flwr.common.constant import ErrorCode
 from flwr.common.message import make_message
 from flwr.common.typing import Fab, Run
 from flwr.supercore.constant import TaskType
