@@ -56,6 +56,7 @@ from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 # pylint: enable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
 from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, RunType
+from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
@@ -72,6 +73,16 @@ class StateTest(CoreStateTest):
     def state_factory(self) -> LinkState:
         """Provide state implementation to test."""
         raise NotImplementedError()
+
+    def task_run_id(self, state: CoreState) -> int:
+        """Provide an existing run ID for inherited CoreState task tests."""
+        assert isinstance(state, LinkState)
+        return create_dummy_run(state)
+
+    def other_task_run_id(self, state: CoreState) -> int:
+        """Provide a second existing run ID for inherited CoreState task tests."""
+        assert isinstance(state, LinkState)
+        return create_dummy_run(state)
 
     def create_public_key(self) -> bytes:
         """Create a P-384 public key for node creation."""
@@ -167,6 +178,16 @@ class StateTest(CoreStateTest):
         run = state.get_run_info(run_ids=[run_id])[0]
         self.assertEqual(run.primary_task_id, first_task_id)
         self.assertNotEqual(run.primary_task_id, second_task_id)
+
+    def test_create_task_rejects_missing_run(self) -> None:
+        """Creating a task for an unknown run should fail."""
+        state = self.state_factory()
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "Run 42 not found. create_task requires an existing run.",
+        ):
+            state.create_task(task_type="flwr-model", run_id=42)
 
     def test_get_run_info_without_filters_returns_all_runs(self) -> None:
         """Test get_run_info returns all runs when no filter is provided."""

@@ -110,6 +110,14 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     ) -> int | None:
         """Create a task and make it the run's primary task if none exists."""
         with self.session():
+            if not self.query(
+                "SELECT run_id FROM run WHERE run_id = :run_id",
+                {"run_id": uint64_to_int64(run_id)},
+            ):
+                raise RuntimeError(
+                    f"Run {run_id} not found. create_task requires an existing run."
+                )
+
             task_id = super().create_task(
                 task_type=task_type,
                 run_id=run_id,
