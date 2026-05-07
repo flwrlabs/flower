@@ -35,6 +35,8 @@ from flwr.common.serde import (
 from flwr.common.typing import RunStatus
 from flwr.proto import serverappio_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    ClaimTaskRequest,
+    ClaimTaskResponse,
     CreateTaskRequest,
     CreateTaskResponse,
     ListAppsToLaunchRequest,
@@ -154,6 +156,19 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
 
         # Return the token
         return RequestTokenResponse(token=token)
+
+    def ClaimTask(
+        self, request: ClaimTaskRequest, context: grpc.ServicerContext
+    ) -> ClaimTaskResponse:
+        """Claim a pending task."""
+        res = super().ClaimTask(request, context)
+
+        # Keep run status working
+        if res.HasField("token"):
+            state = self.state_factory.state()
+            task = state.get_tasks(task_ids=[request.task_id])[0]
+            state.update_run_status(task.run_id, RunStatus(Status.STARTING, "", ""))
+        return res
 
     def GetNodes(
         self, request: GetNodesRequest, context: grpc.ServicerContext
@@ -413,9 +428,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 run_id, RunStatus(Status.FINISHED, request.sub_status, request.details)
             )
             if request.HasField("context"):
-                state.set_serverapp_context(
-                    run_id, context_from_proto(request.context)
-                )
+                state.set_serverapp_context(run_id, context_from_proto(request.context))
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
         return PushAppOutputsResponse()
