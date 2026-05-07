@@ -264,7 +264,7 @@ def push_task_outputs(  # pylint: disable=R0913, R0917
     sub_status: str,
     details: str,
 ) -> PushTaskOutputsResponse:
-    """Push AppOutputs to SuperNode."""
+    """Push TaskOutputs to SuperNode."""
     # Set message ID
     message.metadata.__dict__["_message_id"] = message.object_id
     proto_message = message_to_proto(remove_content_from_message(message))
