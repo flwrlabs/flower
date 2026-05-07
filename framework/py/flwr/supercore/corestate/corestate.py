@@ -237,16 +237,6 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def delete_token(self, run_id: int) -> None:
-        """Delete the token for the given run ID.
-
-        Parameters
-        ----------
-        run_id : int
-            The ID of the run for which to delete the token.
-        """
-
-    @abstractmethod
     def get_run_id_by_token(self, token: str) -> int | None:
         """Get the run ID associated with a given token.
 

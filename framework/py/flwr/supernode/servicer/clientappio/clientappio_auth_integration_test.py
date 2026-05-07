@@ -21,8 +21,8 @@ import unittest
 import grpc
 
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    ListAppsToLaunchRequest,
-    ListAppsToLaunchResponse,
+    PullPendingTasksRequest,
+    PullPendingTasksResponse,
 )
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PullObjectRequest,
@@ -75,9 +75,9 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
             response_deserializer=PullObjectResponse.FromString,
         )
         self._list_apps_to_launch_no_auth = self._base_channel.unary_unary(
-            "/flwr.proto.ClientAppIo/ListAppsToLaunch",
-            request_serializer=ListAppsToLaunchRequest.SerializeToString,
-            response_deserializer=ListAppsToLaunchResponse.FromString,
+            "/flwr.proto.ClientAppIo/PullPendingTasks",
+            request_serializer=PullPendingTasksRequest.SerializeToString,
+            response_deserializer=PullPendingTasksResponse.FromString,
         )
         self._auth_channel = grpc.intercept_channel(
             self._base_channel,
@@ -88,9 +88,9 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
             ),
         )
         self._list_apps_to_launch_with_superexec_auth = self._auth_channel.unary_unary(
-            "/flwr.proto.ClientAppIo/ListAppsToLaunch",
-            request_serializer=ListAppsToLaunchRequest.SerializeToString,
-            response_deserializer=ListAppsToLaunchResponse.FromString,
+            "/flwr.proto.ClientAppIo/PullPendingTasks",
+            request_serializer=PullPendingTasksRequest.SerializeToString,
+            response_deserializer=PullPendingTasksResponse.FromString,
         )
 
     def tearDown(self) -> None:
@@ -124,21 +124,21 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         assert isinstance(response, PullObjectResponse)
         assert call.code() == grpc.StatusCode.OK
 
-    def test_list_apps_to_launch_denied_without_superexec_metadata(self) -> None:
+    def test_pull_pending_tasks_denied_without_superexec_metadata(self) -> None:
         """SuperExec RPC should deny requests missing signed metadata."""
         with self.assertRaises(grpc.RpcError) as err:
             self._list_apps_to_launch_no_auth.with_call(
-                request=ListAppsToLaunchRequest()
+                request=PullPendingTasksRequest()
             )
         assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
         assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE
 
-    def test_list_apps_to_launch_allows_with_superexec_metadata(self) -> None:
+    def test_pull_pending_tasks_allows_with_superexec_metadata(self) -> None:
         """SuperExec RPC should allow requests with valid signed metadata."""
         response, call = self._list_apps_to_launch_with_superexec_auth.with_call(
-            request=ListAppsToLaunchRequest()
+            request=PullPendingTasksRequest()
         )
-        assert isinstance(response, ListAppsToLaunchResponse)
+        assert isinstance(response, PullPendingTasksResponse)
         assert call.code() == grpc.StatusCode.OK
 
 
@@ -163,19 +163,19 @@ class TestClientAppIoAuthIntegrationWithoutSuperExecSecret(unittest.TestCase):
 
         channel = grpc.insecure_channel(self._server.bound_address)
         self._list_apps_to_launch = channel.unary_unary(
-            "/flwr.proto.ClientAppIo/ListAppsToLaunch",
-            request_serializer=ListAppsToLaunchRequest.SerializeToString,
-            response_deserializer=ListAppsToLaunchResponse.FromString,
+            "/flwr.proto.ClientAppIo/PullPendingTasks",
+            request_serializer=PullPendingTasksRequest.SerializeToString,
+            response_deserializer=PullPendingTasksResponse.FromString,
         )
 
     def tearDown(self) -> None:
         """Stop the gRPC API server."""
         self._server.stop(None)
 
-    def test_list_apps_to_launch_allows_without_superexec_metadata(self) -> None:
+    def test_pull_pending_tasks_allows_without_superexec_metadata(self) -> None:
         """No SuperExec signing should be required when auth is disabled."""
         response, call = self._list_apps_to_launch.with_call(
-            request=ListAppsToLaunchRequest()
+            request=PullPendingTasksRequest()
         )
-        assert isinstance(response, ListAppsToLaunchResponse)
+        assert isinstance(response, PullPendingTasksResponse)
         assert call.code() == grpc.StatusCode.OK

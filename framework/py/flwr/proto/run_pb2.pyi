@@ -178,38 +178,6 @@ class GetRunResponse(google.protobuf.message.Message):
 global___GetRunResponse = GetRunResponse
 
 @typing.final
-class UpdateRunStatusRequest(google.protobuf.message.Message):
-    """UpdateRunStatus"""
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    RUN_ID_FIELD_NUMBER: builtins.int
-    RUN_STATUS_FIELD_NUMBER: builtins.int
-    run_id: builtins.int
-    @property
-    def run_status(self) -> global___RunStatus: ...
-    def __init__(
-        self,
-        *,
-        run_id: builtins.int = ...,
-        run_status: global___RunStatus | None = ...,
-    ) -> None: ...
-    def HasField(self, field_name: typing.Literal["run_status", b"run_status"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["run_id", b"run_id", "run_status", b"run_status"]) -> None: ...
-
-global___UpdateRunStatusRequest = UpdateRunStatusRequest
-
-@typing.final
-class UpdateRunStatusResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    def __init__(
-        self,
-    ) -> None: ...
-
-global___UpdateRunStatusResponse = UpdateRunStatusResponse
-
-@typing.final
 class GetFederationOptionsRequest(google.protobuf.message.Message):
     """Get Federation Options associated with run"""
 
