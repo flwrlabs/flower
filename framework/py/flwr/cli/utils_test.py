@@ -42,6 +42,7 @@ from flwr.common.constant import (
 )
 from flwr.common.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
+from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 
 from .utils import (
     _format_grpc_error,
@@ -260,7 +261,10 @@ def test_init_channel_from_connection_uses_resolved_connection() -> None:
     assert kwargs["insecure"] is True
     assert kwargs["root_certificates"] is None
     assert kwargs["max_message_length"] == GRPC_MAX_MESSAGE_LENGTH
-    assert len(kwargs["interceptors"]) == 1
+    assert len(kwargs["interceptors"]) == 2
+    assert isinstance(kwargs["interceptors"][0], RuntimeVersionClientInterceptor)
+    # pylint: disable-next=protected-access
+    assert kwargs["interceptors"][0]._metadata.component_name == "flwr CLI"
     channel.subscribe.assert_called_once()
 
 
