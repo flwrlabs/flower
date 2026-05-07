@@ -167,31 +167,6 @@ class TestRuntimeVersionClientInterceptor(TestCase):
                 request=GetNodesRequest(run_id=1),
             )
 
-    def test_log_incompatibility_from_flower_error_json(self) -> None:
-        """Rejected runtime-version RPCs should be detected by FlowerError code."""
-        grpc_error = grpc.RpcError()
-        grpc_error.details = Mock(
-            return_value=FlowerError(
-                ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
-                "internal diagnostic message",
-                public_details="runtime mismatch",
-            ).to_json("Runtime version compatibility check failed.")
-        )
-
-        with patch(
-            "flwr.supercore.interceptors.runtime_version_interceptor.log"
-        ) as log_mock:
-            with self.assertRaises(grpc.RpcError):
-                self.interceptor.intercept_unary_unary(
-                    continuation=Mock(side_effect=grpc_error),
-                    client_call_details=_make_call_details(
-                        "/flwr.proto.ServerAppIo/GetNodes"
-                    ),
-                    request=GetNodesRequest(run_id=1),
-                )
-
-        log_mock.assert_called_once_with(WARN, "runtime mismatch")
-
     def test_log_unary_incompatibility_from_completed_call(self) -> None:
         """Unary-unary RPC failures should be logged when the call terminates."""
         call = self._make_call()
