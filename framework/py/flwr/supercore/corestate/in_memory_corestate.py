@@ -345,12 +345,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             if record is not None:
                 self.token_to_run_id.pop(record.token, None)
 
-    def get_run_id_by_token(self, token: str) -> int | None:
-        """Get the run ID associated with a given token."""
-        self._cleanup_expired_tokens()
-        with self.lock_token_store:
-            return self.token_to_run_id.get(token)
-
     def acknowledge_app_heartbeat(self, token: str) -> bool:
         """Acknowledge an app heartbeat with the provided token."""
         # Clean up expired tokens

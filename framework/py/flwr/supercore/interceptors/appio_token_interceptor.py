@@ -42,12 +42,6 @@ _current_task: ContextVar[Task | None] = ContextVar("current_task", default=None
 class _TokenState(Protocol):
     """State methods required by token auth."""
 
-    def get_run_id_by_token(self, token: str) -> int | None:
-        """Return the run id associated with token, if it exists."""
-
-    def verify_token(self, run_id: int, token: str) -> bool:
-        """Return whether token is valid for run_id."""
-
     def get_task_by_token(self, token: str) -> Task | None:
         """Return the task associated with the task token, if valid."""
 
@@ -138,11 +132,6 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 _abort_auth_denied(context)
 
             state = self._state_provider()
-
-            # Legacy: Validate both token->run lookup and run->token mapping.
-            run_id = state.get_run_id_by_token(token)
-            if run_id is not None and state.verify_token(run_id, token):
-                return unary_handler(request, context)
 
             # Validate task token and set task context for downstream handlers
             task = state.get_task_by_token(token)

@@ -374,22 +374,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         # Assert: The return is None
         self.assertIsNone(ret)
 
-    def test_get_run_id_by_token(self) -> None:
-        """Test retrieving run ID by token."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-        token = state.create_token(run_id)
-        assert token is not None
-
-        # Execute: get run ID by token
-        retrieved_run_id1 = state.get_run_id_by_token(token)
-        retrieved_run_id2 = state.get_run_id_by_token("nonexistent_token")
-
-        # Assert: should return the correct run ID
-        self.assertEqual(retrieved_run_id1, run_id)
-        self.assertIsNone(retrieved_run_id2)
-
     def test_acknowledge_app_heartbeat_success(self) -> None:
         """Test successfully acknowledging an app heartbeat."""
         # Prepare

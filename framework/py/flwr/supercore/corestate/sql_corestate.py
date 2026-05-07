@@ -423,16 +423,6 @@ class SqlCoreState(CoreState, SqlMixin):
         data = {"run_id": uint64_to_int64(run_id)}
         self.query(query, data)
 
-    def get_run_id_by_token(self, token: str) -> int | None:
-        """Get the run ID associated with a given token."""
-        self._cleanup_expired_tokens()
-        query = "SELECT run_id FROM token_store WHERE token = :token;"
-        data = {"token": token}
-        rows = self.query(query, data)
-        if not rows:
-            return None
-        return int64_to_uint64(rows[0]["run_id"])
-
     def acknowledge_app_heartbeat(self, token: str) -> bool:
         """Acknowledge an app heartbeat with the provided token."""
         # Clean up expired tokens

@@ -247,21 +247,6 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def get_run_id_by_token(self, token: str) -> int | None:
-        """Get the run ID associated with a given token.
-
-        Parameters
-        ----------
-        token : str
-            The token to look up.
-
-        Returns
-        -------
-        Optional[int]
-            The run ID if the token is valid, otherwise None.
-        """
-
-    @abstractmethod
     def acknowledge_app_heartbeat(self, token: str) -> bool:
         """Acknowledge an app heartbeat with the provided token.
 
