@@ -26,6 +26,7 @@ from google.protobuf.message import Message as GrpcMessage
 
 from flwr.common.logger import log
 from flwr.supercore.constant import VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
 from flwr.supercore.utils import get_metadata_str
 
@@ -56,6 +57,20 @@ class RuntimeVersionClientInterceptor(
             self._compatibility_warning_logged = True
             log(WARN, incompat_message)
 
+    def _maybe_log_incompat_error(self, grpc_error: Any) -> None:
+        """Log runtime-version rejections encoded as FlowerError JSON."""
+        if self._compatibility_warning_logged:
+            return
+
+        details = grpc_error.details() if hasattr(grpc_error, "details") else None
+        flower_error = FlowerError.from_json(details)
+        if (
+            flower_error is not None
+            and flower_error.code == ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
+        ):
+            self._compatibility_warning_logged = True
+            log(WARN, flower_error.public_details or flower_error.message)
+
     def intercept_unary_unary(
         self,
         continuation: Callable[[Any, Any], Any],
@@ -68,7 +83,11 @@ class RuntimeVersionClientInterceptor(
                 client_call_details.metadata
             )
         )
-        call: grpc.Call = continuation(details, request)
+        try:
+            call: grpc.Call = continuation(details, request)
+        except grpc.RpcError as err:
+            self._maybe_log_incompat_error(err)
+            raise
 
         # Log the incompatibility message from the response metadata
         self._maybe_log_incompat_warning(call.trailing_metadata())
@@ -87,10 +106,15 @@ class RuntimeVersionClientInterceptor(
                 client_call_details.metadata
             )
         )
-        call: grpc.Call = continuation(details, request)
+        try:
+            call: grpc.Call = continuation(details, request)
+        except grpc.RpcError as err:
+            self._maybe_log_incompat_error(err)
+            raise
 
         def _log_incompat_warning() -> None:
             self._maybe_log_incompat_warning(call.trailing_metadata())
+            self._maybe_log_incompat_error(call)
 
         if not call.add_callback(_log_incompat_warning):
             _log_incompat_warning()

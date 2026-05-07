@@ -16,6 +16,7 @@
 
 from collections import namedtuple
 from collections.abc import Iterable, Iterator
+from logging import WARN
 from typing import cast
 from unittest import TestCase
 from unittest.mock import Mock, patch
@@ -30,6 +31,7 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_VERSION_METADATA_KEY,
     VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
 )
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
     RuntimeVersionServerInterceptor,
@@ -164,6 +166,31 @@ class TestRuntimeVersionClientInterceptor(TestCase):
                 client_call_details=details,
                 request=GetNodesRequest(run_id=1),
             )
+
+    def test_log_incompatibility_from_flower_error_json(self) -> None:
+        """Rejected runtime-version RPCs should be detected by FlowerError code."""
+        grpc_error = grpc.RpcError()
+        grpc_error.details = Mock(  # type: ignore[method-assign]
+            return_value=FlowerError(
+                ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
+                "internal diagnostic message",
+                public_details="runtime mismatch",
+            ).to_json("Runtime version compatibility check failed.")
+        )
+
+        with patch(
+            "flwr.supercore.interceptors.runtime_version_interceptor.log"
+        ) as log_mock:
+            with self.assertRaises(grpc.RpcError):
+                self.interceptor.intercept_unary_unary(
+                    continuation=Mock(side_effect=grpc_error),
+                    client_call_details=_make_call_details(
+                        "/flwr.proto.ServerAppIo/GetNodes"
+                    ),
+                    request=GetNodesRequest(run_id=1),
+                )
+
+        log_mock.assert_called_once_with(WARN, "runtime mismatch")
 
 
 class TestRuntimeVersionServerInterceptor(TestCase):
