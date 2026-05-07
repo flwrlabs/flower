@@ -82,10 +82,6 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         """Return the NodeState instance."""
         return self.state_factory.state()
 
-    def has_run(self, run_id: int) -> bool:
-        """Return whether the run exists in NodeState."""
-        return self.state_factory.state().get_run(run_id) is not None
-
     def ListAppsToLaunch(
         self,
         request: ListAppsToLaunchRequest,

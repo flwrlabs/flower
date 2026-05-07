@@ -38,7 +38,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
     CreateTaskRequest,
-    CreateTaskResponse,
     ListAppsToLaunchRequest,
     ListAppsToLaunchResponse,
     PullAppInputsRequest,
@@ -116,10 +115,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         """Return the LinkState instance."""
         return self.state_factory.state()
 
-    def has_run(self, run_id: int) -> bool:
-        """Return whether the run exists in LinkState."""
-        return bool(self.state_factory.state().get_run_info(run_ids=[run_id]))
-
     def ListAppsToLaunch(
         self,
         request: ListAppsToLaunchRequest,
@@ -196,30 +191,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         all_ids: set[int] = state.get_nodes(request.run_id)
         nodes: list[Node] = [Node(node_id=node_id) for node_id in all_ids]
         return GetNodesResponse(nodes=nodes)
-
-    def CreateTask(
-        self, request: CreateTaskRequest, context: grpc.ServicerContext
-    ) -> CreateTaskResponse:
-        """Create a task."""
-        log(DEBUG, "ServerAppIoServicer.CreateTask")
-
-        state = self.state_factory.state()
-        _validate_create_task_request(request, context)
-
-        task_id = state.create_task(
-            task_type=request.type,
-            run_id=request.run_id,
-            fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
-            model_ref=request.model_ref if request.HasField("model_ref") else None,
-            connector_ref=(
-                request.connector_ref if request.HasField("connector_ref") else None
-            ),
-        )
-        if task_id is None:
-            context.abort(grpc.StatusCode.INTERNAL, "Failed to create task")
-            raise RuntimeError("This line should never be reached.")
-
-        return CreateTaskResponse(task_id=task_id)
 
     def PushMessages(
         self, request: PushAppMessagesRequest, context: grpc.ServicerContext

@@ -51,10 +51,6 @@ class AppIoServicer(ABC):
     def state(self) -> CoreState:
         """Return the CoreState instance."""
 
-    @abstractmethod
-    def has_run(self, run_id: int) -> bool:
-        """Return whether the run exists in the underlying state."""
-
     def PullPendingTasks(
         self, request: PullPendingTasksRequest, context: grpc.ServicerContext
     ) -> PullPendingTasksResponse:
@@ -97,10 +93,6 @@ class AppIoServicer(ABC):
                 grpc.StatusCode.PERMISSION_DENIED,
                 "`run_id` does not match authenticated token.",
             )
-            raise RuntimeError("This line should never be reached.")
-
-        if not self.has_run(authenticated_run_id):
-            context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
             raise RuntimeError("This line should never be reached.")
 
         _validate_create_task_request(request, context)
