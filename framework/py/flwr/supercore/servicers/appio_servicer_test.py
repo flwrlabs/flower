@@ -20,7 +20,7 @@ from unittest.mock import Mock, patch
 
 import grpc
 
-from flwr.common.constant import RUN_ID_NOT_FOUND_MESSAGE, Status
+from flwr.common.constant import Status
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     CreateTaskRequest,
@@ -117,7 +117,6 @@ class TestAppIoServicer(unittest.TestCase):
     def test_create_task_returns_task_id(self) -> None:
         """CreateTask should create a task for the authenticated run."""
         # Prepare
-        self.state.get_run_info.return_value = [Mock()]
         self.state.create_task.return_value = 456
         request = CreateTaskRequest(
             type=TaskType.MODEL,
@@ -168,12 +167,12 @@ class TestAppIoServicer(unittest.TestCase):
         )
         self.state.create_task.assert_not_called()
 
-    def test_create_task_aborts_if_run_does_not_exist(self) -> None:
-        """CreateTask should reject requests for missing runs."""
+    def test_create_task_propagates_state_error(self) -> None:
+        """CreateTask should let state-layer run validation errors propagate."""
         # Prepare
-        self.state.get_run_info.return_value = []
-        context = Mock(spec=grpc.ServicerContext)
-        context.abort.side_effect = grpc.RpcError()
+        self.state.create_task.side_effect = RuntimeError(
+            "Run 123 not found. create_task requires an existing run."
+        )
 
         # Execute
         with (
@@ -181,24 +180,29 @@ class TestAppIoServicer(unittest.TestCase):
                 "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
                 return_value=Mock(run_id=123),
             ),
-            self.assertRaises(grpc.RpcError),
+            self.assertRaises(RuntimeError) as err,
         ):
             self.servicer.CreateTask(
                 CreateTaskRequest(type=TaskType.MODEL, run_id=123, model_ref="model"),
-                context,
+                Mock(),
             )
 
         # Assert
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.NOT_FOUND,
-            RUN_ID_NOT_FOUND_MESSAGE,
+        self.assertEqual(
+            str(err.exception),
+            "Run 123 not found. create_task requires an existing run.",
         )
-        self.state.create_task.assert_not_called()
+        self.state.create_task.assert_called_once_with(
+            task_type=TaskType.MODEL,
+            run_id=123,
+            fab_hash=None,
+            model_ref="model",
+            connector_ref=None,
+        )
 
     def test_create_task_aborts_if_required_field_is_missing(self) -> None:
         """CreateTask should validate task-type-specific required fields."""
         # Prepare
-        self.state.get_run_info.return_value = [Mock()]
         test_cases = [
             (
                 CreateTaskRequest(type=TaskType.SERVER_APP, run_id=123),
@@ -237,7 +241,6 @@ class TestAppIoServicer(unittest.TestCase):
     def test_create_task_aborts_if_state_creation_fails(self) -> None:
         """CreateTask should surface task creation failures as INTERNAL."""
         # Prepare
-        self.state.get_run_info.return_value = [Mock()]
         self.state.create_task.return_value = None
         context = Mock(spec=grpc.ServicerContext)
         context.abort.side_effect = grpc.RpcError()

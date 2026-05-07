@@ -40,8 +40,6 @@ from flwr.common.typing import Fab, RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
-    CreateTaskRequest,
-    CreateTaskResponse,
     ListAppsToLaunchRequest,
     ListAppsToLaunchResponse,
     PullAppInputsRequest,
@@ -80,7 +78,6 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
 )
-from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
@@ -365,11 +362,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=GetNodesRequest.SerializeToString,
             response_deserializer=GetNodesResponse.FromString,
         )
-        self._create_task = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/CreateTask",
-            request_serializer=CreateTaskRequest.SerializeToString,
-            response_deserializer=CreateTaskResponse.FromString,
-        )
         self._push_messages = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/PushMessages",
             request_serializer=PushAppMessagesRequest.SerializeToString,
@@ -465,118 +457,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Assert
         assert isinstance(response, GetNodesResponse)
         assert grpc.StatusCode.OK == call.code()
-
-    def test_create_task_stores_pending_task(self) -> None:
-        """Test `CreateTask` stores a pending task."""
-        run_id = self._create_dummy_run()
-        request = CreateTaskRequest(
-            type=TaskType.SERVER_APP,
-            run_id=run_id,
-            fab_hash="hash123",
-        )
-
-        response, call = self._create_task.with_call(request=request)
-
-        assert isinstance(response, CreateTaskResponse)
-        assert grpc.StatusCode.OK == call.code()
-        tasks = self.state.get_tasks(task_ids=[response.task_id])
-        self.assertEqual(len(tasks), 1)
-        task = tasks[0]
-        self.assertEqual(task.task_id, response.task_id)
-        self.assertEqual(task.type, TaskType.SERVER_APP)
-        self.assertEqual(task.run_id, run_id)
-        self.assertEqual(
-            task.status,
-            TaskStatus(status=Status.PENDING, sub_status="", details=""),
-        )
-        self.assertEqual(task.fab_hash, "hash123")
-        self.assertTrue(task.pending_at)
-        self.assertEqual(task.starting_at, "")
-        self.assertEqual(task.running_at, "")
-        self.assertEqual(task.finished_at, "")
-
-    def test_create_task_aborts_if_state_create_task_fails(self) -> None:
-        """Test `CreateTask` aborts if state.create_task returns None."""
-        run_id = self._create_dummy_run()
-
-        with patch.object(self.state, "create_task", return_value=None):
-            with self.assertRaises(grpc.RpcError) as err:
-                self._create_task.with_call(
-                    request=CreateTaskRequest(
-                        type=TaskType.SERVER_APP,
-                        run_id=run_id,
-                        fab_hash="hash123",
-                    )
-                )
-
-        assert err.exception.code() == grpc.StatusCode.INTERNAL
-        assert err.exception.details() == "Failed to create task"
-
-    def test_create_task_rejects_unknown_type(self) -> None:
-        """Test `CreateTask` rejects unknown task types."""
-        run_id = self._create_dummy_run()
-
-        with self.assertRaises(grpc.RpcError) as err:
-            self._create_task.with_call(
-                request=CreateTaskRequest(type="unknown-task", run_id=run_id)
-            )
-
-        assert err.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
-        assert err.exception.details() == "Invalid task type: unknown-task"
-
-    @parameterized.expand(
-        [
-            (
-                TaskType.SERVER_APP,
-                f"Task type '{TaskType.SERVER_APP}' requires fab_hash.",
-            ),
-            (
-                TaskType.CLIENT_APP,
-                f"Task type '{TaskType.CLIENT_APP}' requires fab_hash.",
-            ),
-            (
-                TaskType.AGENT_APP,
-                f"Task type '{TaskType.AGENT_APP}' requires fab_hash.",
-            ),
-            (
-                TaskType.MODEL,
-                f"Task type '{TaskType.MODEL}' requires model_ref.",
-            ),
-            (
-                TaskType.CONNECTOR,
-                f"Task type '{TaskType.CONNECTOR}' requires connector_ref.",
-            ),
-        ]
-    )  # type: ignore
-    def test_create_task_rejects_missing_required_fields(
-        self, task_type: str, error_msg: str
-    ) -> None:
-        """Test `CreateTask` rejects missing per-type required fields."""
-        run_id = self._create_dummy_run()
-
-        with self.assertRaises(grpc.RpcError) as err:
-            self._create_task.with_call(
-                request=CreateTaskRequest(type=task_type, run_id=run_id)
-            )
-
-        assert err.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
-        assert err.exception.details() == error_msg
-
-    def test_create_task_fast_fails_missing_run(self) -> None:
-        """Test `CreateTask` propagates an unknown run ID as an RPC failure."""
-        with self.assertRaises(grpc.RpcError) as err:
-            self._create_task.with_call(
-                request=CreateTaskRequest(
-                    type=TaskType.MODEL,
-                    run_id=42,
-                    model_ref="model://test",
-                )
-            )
-
-        assert err.exception.code() == grpc.StatusCode.UNKNOWN
-        assert "Run 42 not found. create_task requires an existing run." in (
-            err.exception.details()
-        )
 
     def _assert_get_nodes_not_allowed(self, run_id: int) -> None:
         """Assert `GetNodes` not allowed."""
