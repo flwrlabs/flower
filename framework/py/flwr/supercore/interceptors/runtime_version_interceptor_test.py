@@ -34,6 +34,7 @@ from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
     RuntimeVersionServerInterceptor,
     create_control_runtime_version_server_interceptor,
+    create_fleet_runtime_version_server_interceptor,
     create_serverappio_runtime_version_server_interceptor,
 )
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
@@ -232,6 +233,19 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         self.interceptor = create_serverappio_runtime_version_server_interceptor()
         intercepted = self._intercept(
             "/flwr.proto.ServerAppIo/GetNodes",
+            _make_runtime_metadata("1.30.1"),
+        )
+
+        context = Mock()
+        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        self.assertEqual(response, "ok")
+        context.set_trailing_metadata.assert_not_called()
+
+    def test_fleet_factory_observes_by_default(self) -> None:
+        """Fleet factory should not return warning metadata by default."""
+        self.interceptor = create_fleet_runtime_version_server_interceptor()
+        intercepted = self._intercept(
+            "/flwr.proto.Fleet/ActivateNode",
             _make_runtime_metadata("1.30.1"),
         )
 

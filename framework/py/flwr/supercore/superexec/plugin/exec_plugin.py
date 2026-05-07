@@ -21,6 +21,7 @@ from typing import Any
 
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.typing import Run
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 
 
 class ExecPlugin(ABC):
@@ -59,20 +60,34 @@ class ExecPlugin(ABC):
         """
 
     @abstractmethod
-    def launch_app(self, token: str, run_id: int) -> None:
-        """Launch the application associated with a given run ID and token.
+    def select_task(self, candidate_tasks: Sequence[Task]) -> Task | None:
+        """Select a task to execute from a set of pending tasks.
 
-        This method starts the application process using the given `token`.
-        The `run_id` is used solely for bookkeeping purposes, allowing any
-        plugin implementation to associate this launch with a specific run.
+        Parameters
+        ----------
+        candidate_tasks : Sequence[Task]
+            A set of pending tasks to choose from.
+
+        Returns
+        -------
+        Optional[Task]
+            The selected task, or None if no suitable task is found.
+        """
+
+    @abstractmethod
+    def launch_task(self, token: str, task: Task) -> None:
+        """Launch the process to execute the given task using the given token.
+
+        This method starts the executor process using the given `token`.
+        The `task` identifies what should be executed and allows plugin
+        implementations to associate the launch with a specific task.
 
         Parameters
         ----------
         token : str
-            The token required to run the application.
-        run_id : int
-           The ID of the run associated with the token, used for tracking or
-           logging purposes.
+            The token required to run the executor process.
+        task : Task
+            The task to execute.
         """
 
     # This method is optional to implement
