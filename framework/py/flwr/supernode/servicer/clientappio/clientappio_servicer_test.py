@@ -230,8 +230,6 @@ class TestClientAppIoServicer(unittest.TestCase):
             sub_status=SubStatus.COMPLETED,
         )
 
-        self.mock_state.verify_token.return_value = True
-
         with patch(
             "flwr.supernode.servicer.clientappio.clientappio_servicer."
             "get_authenticated_task",
