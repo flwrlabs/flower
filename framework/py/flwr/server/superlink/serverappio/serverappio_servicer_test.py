@@ -33,11 +33,9 @@ from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
     SUPERLINK_NODE_ID,
     Status,
-    SubStatus,
 )
 from flwr.common.message import get_message_to_descendant_id_mapping
 from flwr.common.serde import context_to_proto, message_from_proto
-from flwr.common.serde_test import RecordMaker
 from flwr.common.typing import Fab, RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
@@ -323,7 +321,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             "mock_owner", "fake_name", self.node_pk, 30
         )
         self.state.acknowledge_node_heartbeat(self.node_id, 1e3)
-        self._run_id_to_token: dict[int, str] = {}
 
         self.status_to_msg = _STATUS_TO_MSG
 
@@ -407,9 +404,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         if num_transitions > 2:
             _ = self.state.update_run_status(run_id, RunStatus(Status.FINISHED, "", ""))
 
-    def _create_dummy_run(
-        self, running: bool = True, *, fab_hash: str = "", create_token: bool = True
-    ) -> int:
+    def _create_dummy_run(self, running: bool = True, *, fab_hash: str = "") -> int:
         run_id = self.state.create_run(
             "",
             "",
@@ -422,29 +417,16 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         )
 
         # Set token in the client interceptor to pass authentication
-        if create_token:
-            assert (token := self.state.create_token(run_id)) is not None
-            self._set_token(token)
-            self._run_id_to_token[run_id] = token
+        assert (token := self.state.create_token(run_id)) is not None
+        self._set_token(token)
 
         # Transition run status if required
         if running:
             self._transition_run_status(run_id, 2)
         return run_id
 
-    def _get_token(self, run_id: int) -> str:
-        return self._run_id_to_token[run_id]
-
     def _set_token(self, token: str) -> None:
         self._appio_token_client_interceptor._token = token  # pylint: disable=W0212
-
-    def _create_claimed_task_token(self, run_id: int) -> tuple[int, str]:
-        task_id = self.state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
-        assert task_id is not None
-        token = self.state.claim_task(task_id)
-        assert token
-        self._set_token(token)
-        return task_id, token
 
     def test_successful_get_node_if_running(self) -> None:
         """Test `GetNode` success."""
@@ -822,8 +804,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         of an Error message created by the LinkState due to an expired TTL."""
         # Prepare
         run_id = self._create_dummy_run()
-        token = self._get_token(run_id)
-        self.state.acknowledge_app_heartbeat(token)
 
         # Push Messages and reply
         message_ins = message_from_proto(
@@ -831,7 +811,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
                 src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
             )
         )
-        message_ins.metadata.ttl = 1  # Use short message TTL for testing
+        message_ins.metadata.ttl = 1  # set short TTL for testing
         msg_id = self.state.store_message_ins(message=message_ins)
 
         # Simulate situation where the message has expired in the LinkState
@@ -839,9 +819,9 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         future_dt = now() + timedelta(seconds=message_ins.metadata.ttl + 0.1)
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = future_dt  # over TTL limit
-            request = PullAppMessagesRequest(message_ids=[str(msg_id)], run_id=run_id)
 
             # Execute
+            request = PullAppMessagesRequest(message_ids=[str(msg_id)], run_id=run_id)
             response, call = self._pull_messages.with_call(request=request)
 
             # Assert
@@ -858,58 +838,21 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             # expected a single object id (that of the error message)
             assert list(object_ids_in_response) == [msg_res.object_id]
 
-    def test_push_serverapp_outputs_successful_if_running(self) -> None:
-        """Test `PushServerAppOutputs` success."""
-        # Prepare
-        run_id = self._create_dummy_run(running=False, create_token=False)
-        task_id, _ = self._create_claimed_task_token(run_id)
-        assert self.state.activate_task(task_id)
-
-        maker = RecordMaker()
-        context = Context(
-            run_id=run_id,
-            node_id=0,
-            node_config=maker.user_config(),
-            state=maker.recorddict(1, 1, 1),
-            run_config=maker.user_config(),
-        )
-
-        # Keep run status aligned with the claimed task lifecycle.
-        self._transition_run_status(run_id, 2)
+    def _assert_push_serverapp_outputs_not_allowed(
+        self, token: str, context: Context
+    ) -> None:
+        """Assert `PushServerAppOutputs` not allowed."""
+        run_id = self.state.get_run_id_by_token(token)
+        assert run_id is not None, "Invalid token is provided."
+        run_status = self.state.get_run_status({run_id})[run_id]
         request = PushAppOutputsRequest(
-            run_id=run_id,
-            context=context_to_proto(context),
-            sub_status=SubStatus.COMPLETED,
-            details="",
+            token=token, run_id=run_id, context=context_to_proto(context)
         )
 
-        # Execute
-        response, call = self._push_serverapp_outputs.with_call(request=request)
-
-        # Assert
-        assert isinstance(response, PushAppOutputsResponse)
-        assert grpc.StatusCode.OK == call.code()
-        task = self.state.get_tasks(task_ids=[task_id])[0]
-        self.assertEqual(task.status.status, Status.FINISHED)
-        self.assertEqual(task.status.sub_status, SubStatus.COMPLETED)
-
-    @parameterized.expand([(True,), (False,)])  # type: ignore
-    def test_send_task_heartbeat(self, success: bool) -> None:
-        """Test sending a task heartbeat."""
-        # Prepare
-        run_id = self._create_dummy_run(create_token=False)
-        task_id, _ = self._create_claimed_task_token(run_id)
-        request = SendTaskHeartbeatRequest()
-        mock_ack_method = Mock(return_value=success)
-        self.state.acknowledge_task_heartbeat = mock_ack_method  # type: ignore
-
-        # Execute
-        response, _ = self._send_task_heartbeat.with_call(request=request)
-
-        # Assert
-        self.assertIsInstance(response, SendTaskHeartbeatResponse)
-        self.assertEqual(response.success, success)
-        mock_ack_method.assert_called_once_with(task_id)
+        with self.assertRaises(grpc.RpcError) as e:
+            self._push_serverapp_outputs.with_call(request=request)
+        assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
+        assert e.exception.details() == self.status_to_msg[run_status.status]
 
     def test_push_object_succesful(self) -> None:
         """Test `PushObject`."""
