@@ -38,7 +38,7 @@ enabling TLS on internal AppIo connections.
 
 We have prepared a script that can be used to generate such set of certificates. While
 using these is fine for prototyping, we advise you to follow the standards set in your
-team/organization and generated the certificates and share them with the corresponding
+team/organization and to generate the certificates and share them with the corresponding
 parties. Refer to the **Generate TLS certificates** section in the example linked at the
 top of this guide.
 
