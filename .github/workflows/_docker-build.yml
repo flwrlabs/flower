@@ -9,7 +9,7 @@ on:
         required: true
         type: string
       registry:
-        description: "Docker registry host. Leave empty for Docker Hub."
+        description: "Docker registry host supplied by the caller."
         required: false
         type: string
         default: ""
@@ -86,7 +86,6 @@ jobs:
           ]
     steps:
       - name: Checkout code
-        if: ${{ inputs.prepare-framework || inputs.patch-base-dockerfiles || inputs.build-local-wheel || inputs.context == '.' }}
         uses: actions/checkout@v5
         with:
           fetch-depth: 0

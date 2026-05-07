@@ -6,12 +6,8 @@ on:
     types: [released]
   workflow_dispatch:
     inputs:
-      flower-repo-ref:
-        description: "Flower repository branch, tag, or commit to sync before building."
-        required: false
-        default: main
       package-version:
-        description: "Framework package version. Leave empty to derive from the release tag or pyproject.toml."
+        description: "Framework package version. Leave empty to derive from the release tag."
         required: false
         default: ""
       pypi-repository-url:
@@ -22,6 +18,18 @@ on:
         description: "Poetry repository alias for the Python package repository. Defaults to vars.PYPI_REPOSITORY_NAME."
         required: false
         default: ""
+      docker-registry:
+        description: "Docker registry host. Defaults to vars.DOCKER_IMAGE_REGISTRY."
+        required: false
+        default: ""
+      docker-registry-user:
+        description: "Docker registry username. Defaults to vars.DOCKER_IMAGE_REGISTRY_USER."
+        required: false
+        default: ""
+      docker-image-namespace:
+        description: "Docker image namespace. Defaults to vars.DOCKER_IMAGE_NAMESPACE."
+        required: false
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -29,6 +37,11 @@ concurrency:
 
 permissions:
   contents: read
+
+env:
+  DOCKER_REGISTRY: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY }}
+  DOCKER_IMAGE_REGISTRY_USER: ${{ inputs.docker-registry-user || vars.DOCKER_IMAGE_REGISTRY_USER }}
+  DOCKER_IMAGE_NAMESPACE: ${{ inputs.docker-image-namespace || vars.DOCKER_IMAGE_NAMESPACE }}
 
 jobs:
   publish-wheel:
@@ -49,16 +62,97 @@ jobs:
       - name: Bootstrap
         uses: ./.github/actions/bootstrap
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y patch rsync
-
       - id: publish
         env:
-          FLOWER_REPO_REF: ${{ inputs.flower-repo-ref || 'main' }}
           PACKAGE_VERSION: ${{ inputs.package-version }}
           PYPI_REPOSITORY_URL: ${{ inputs.pypi-repository-url || vars.PYPI_REPOSITORY_URL }}
           PYPI_REPOSITORY_NAME: ${{ inputs.pypi-repository-name || vars.PYPI_REPOSITORY_NAME }}
           PYPI_REPOSITORY_USERNAME: ${{ vars.PYPI_REPOSITORY_USERNAME }}
         run: ./framework/dev/release/publish-wheel.sh
+
+  parameters:
+    name: Collect docker build parameters
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    needs: publish-wheel
+    outputs:
+      pip-version: ${{ steps.versions.outputs.pip-version }}
+      setuptools-version: ${{ steps.versions.outputs.setuptools-version }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/bootstrap
+        id: bootstrap
+
+      - name: Validate Docker publishing configuration
+        run: |
+          if [ -z "${DOCKER_REGISTRY}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_REGISTRY" >&2
+            exit 1
+          fi
+          if [ -z "${DOCKER_IMAGE_REGISTRY_USER}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_REGISTRY_USER" >&2
+            exit 1
+          fi
+          if [ -z "${DOCKER_IMAGE_NAMESPACE}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_NAMESPACE" >&2
+            exit 1
+          fi
+
+      - id: versions
+        run: |
+          echo "pip-version=${{ steps.bootstrap.outputs.pip-version }}" >> "$GITHUB_OUTPUT"
+          echo "setuptools-version=${{ steps.bootstrap.outputs.setuptools-version }}" >> "$GITHUB_OUTPUT"
+
+      - id: matrix
+        run: |
+          python framework/dev/build-docker-image-matrix.py \
+            --flwr-version "${{ needs.publish-wheel.outputs.flwr-version }}" \
+            --matrix stable > matrix.raw.json
+          python framework/dev/release/resolve-docker-matrix.py \
+            --input matrix.raw.json \
+            --output matrix.json \
+            --docker-image-namespace "${DOCKER_IMAGE_NAMESPACE}"
+          echo "matrix=$(cat matrix.json)" >> "$GITHUB_OUTPUT"
+
+  build-docker-base-images:
+    name: Build base images
+    uses: ./.github/workflows/_docker-build.yml
+    needs: parameters
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.parameters.outputs.matrix).base }}
+    with:
+      registry: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY }}
+      namespace-repository: ${{ matrix.images.namespace_repository }}
+      file-dir: ${{ matrix.images.file_dir }}
+      build-args: |
+        PIP_VERSION=${{ needs.parameters.outputs.pip-version }}
+        SETUPTOOLS_VERSION=${{ needs.parameters.outputs.setuptools-version }}
+        ${{ matrix.images.build_args_encoded }}
+      tags: ${{ matrix.images.tags_encoded }}
+      docker-registry-user: ${{ inputs.docker-registry-user || vars.DOCKER_IMAGE_REGISTRY_USER }}
+    secrets:
+      docker-registry-token: ${{ secrets.DOCKER_IMAGE_REGISTRY_PASSWORD }}
+
+  build-docker-binary-images:
+    name: Build binary images
+    uses: ./.github/workflows/_docker-build.yml
+    needs: [parameters, build-docker-base-images]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.parameters.outputs.matrix).binary }}
+    with:
+      registry: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY }}
+      namespace-repository: ${{ matrix.images.namespace_repository }}
+      file-dir: ${{ matrix.images.file_dir }}
+      build-args: |
+        BASE_REPOSITORY=${{ inputs.docker-image-namespace || vars.DOCKER_IMAGE_NAMESPACE }}/base
+        BASE_IMAGE=${{ matrix.images.base_image }}
+      tags: ${{ matrix.images.tags_encoded }}
+      docker-registry-user: ${{ inputs.docker-registry-user || vars.DOCKER_IMAGE_REGISTRY_USER }}
+    secrets:
+      docker-registry-token: ${{ secrets.DOCKER_IMAGE_REGISTRY_PASSWORD }}

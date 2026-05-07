@@ -5,11 +5,12 @@
 set -euo pipefail
 
 build_args="${INPUT_BUILD_ARGS:-}"
-if [[ "${BUILD_EE_WHEEL:-false}" == "true" ]]; then
+if [[ "${BUILD_LOCAL_WHEEL:-false}" == "true" ]]; then
   flwr_wheel=$(basename framework/dist/*.whl)
   build_args=${build_args//__FLWR_WHEEL__/${flwr_wheel}}
 fi
 
+# Indent multiline build args for the nested docker/build-push-action input.
 build_args=${build_args//$'\n'/$'\n  '}
 {
   echo "build-args<<EOF"

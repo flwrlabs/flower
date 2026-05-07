@@ -20,7 +20,7 @@ on:
         required: false
         default: unstable
       docker-registry:
-        description: "Docker registry host. Leave empty for Docker Hub. Defaults to vars.DOCKER_IMAGE_REGISTRY."
+        description: "Docker registry host. Defaults to vars.DOCKER_IMAGE_REGISTRY."
         required: false
         default: ""
       docker-registry-user:
@@ -38,6 +38,7 @@ concurrency:
 
 env:
   DOCKER_REGISTRY: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY }}
+  DOCKER_IMAGE_REGISTRY_USER: ${{ inputs.docker-registry-user || vars.DOCKER_IMAGE_REGISTRY_USER }}
   DOCKER_IMAGE_NAMESPACE: ${{ inputs.docker-image-namespace || vars.DOCKER_IMAGE_NAMESPACE }}
   FLOWER_REPO_REF: ${{ inputs.flower-repo-ref || 'main' }}
   DOCKER_IMAGE_TAG: ${{ inputs.docker-image-tag || 'unstable' }}
@@ -69,6 +70,14 @@ jobs:
 
       - name: Validate Docker publishing configuration
         run: |
+          if [ -z "${DOCKER_REGISTRY}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_REGISTRY" >&2
+            exit 1
+          fi
+          if [ -z "${DOCKER_IMAGE_REGISTRY_USER}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_REGISTRY_USER" >&2
+            exit 1
+          fi
           if [ -z "${DOCKER_IMAGE_NAMESPACE}" ]; then
             echo "Missing required configuration: DOCKER_IMAGE_NAMESPACE" >&2
             exit 1
@@ -88,7 +97,8 @@ jobs:
             --output matrix.json \
             --docker-image-namespace "${DOCKER_IMAGE_NAMESPACE}" \
             --tag "${DOCKER_IMAGE_TAG}" \
-            --strip-flwr-version-ref
+            --strip-flwr-version-ref \
+            --build-local-wheel
           echo "matrix=$(cat matrix.json)" >> "$GITHUB_OUTPUT"
 
   build-docker-base-images:
