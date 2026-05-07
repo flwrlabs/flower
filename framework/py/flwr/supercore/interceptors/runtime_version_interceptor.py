@@ -189,3 +189,15 @@ def create_serverappio_runtime_version_server_interceptor(
         local_metadata=RuntimeVersionMetadata.from_local_component("SuperLink"),
         send_warning_metadata=send_warning_metadata,
     )
+
+
+def create_control_runtime_version_server_interceptor(
+    connection_name: str = "flwr CLI <-> SuperLink Control API",
+    send_warning_metadata: bool = False,
+) -> RuntimeVersionServerInterceptor:
+    """Create the default runtime version interceptor for Control API."""
+    return RuntimeVersionServerInterceptor(
+        connection_name=connection_name,
+        local_metadata=RuntimeVersionMetadata.from_local_component("SuperLink"),
+        send_warning_metadata=send_warning_metadata,
+    )
