@@ -1027,6 +1027,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         task_id = self.state.create_task(
             task_type=TaskType.SERVER_APP, run_id=run_id, fab_hash=fab_hash
         )
+        assert task_id is not None
         servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
 
         # Claim task through the servicer to transition the run to STARTING.
