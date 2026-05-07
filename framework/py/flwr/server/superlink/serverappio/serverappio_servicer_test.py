@@ -50,10 +50,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppMessagesResponse,
     PushAppOutputsRequest,
     PushAppOutputsResponse,
-)
-from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
-    SendAppHeartbeatRequest,
-    SendAppHeartbeatResponse,
+    SendTaskHeartbeatRequest,
+    SendTaskHeartbeatResponse,
 )
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
@@ -377,10 +375,10 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=PushAppOutputsRequest.SerializeToString,
             response_deserializer=PushAppOutputsResponse.FromString,
         )
-        self._send_app_heartbeat = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/SendAppHeartbeat",
-            request_serializer=SendAppHeartbeatRequest.SerializeToString,
-            response_deserializer=SendAppHeartbeatResponse.FromString,
+        self._send_task_heartbeat = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/SendTaskHeartbeat",
+            request_serializer=SendTaskHeartbeatRequest.SerializeToString,
+            response_deserializer=SendTaskHeartbeatResponse.FromString,
         )
         self._push_object = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/PushObject",

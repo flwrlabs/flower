@@ -46,7 +46,6 @@ from flwr.proto.appio_pb2 import (
     PushAppOutputsRequest,
     PushAppOutputsResponse,
 )
-from flwr.proto.heartbeat_pb2 import SendAppHeartbeatRequest, SendAppHeartbeatResponse
 from flwr.proto.message_pb2 import (
     ConfirmMessageReceivedRequest,
     ConfirmMessageReceivedResponse,
@@ -224,22 +223,6 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         # Save the message to the state
         state.store_message(message_from_proto(request.messages_list[0]))
         return PushAppMessagesResponse(objects_to_push=objects_to_push)
-
-    def SendAppHeartbeat(
-        self, request: SendAppHeartbeatRequest, context: grpc.ServicerContext
-    ) -> SendAppHeartbeatResponse:
-        """Handle a heartbeat from an app process."""
-        log(DEBUG, "ClientAppIoServicer.SendAppHeartbeat")
-
-        # Get the authenticated task and associated run ID
-        task = get_authenticated_task()
-
-        # Initialize state
-        state = self.state_factory.state()
-
-        # Acknowledge the heartbeat
-        success = state.acknowledge_task_heartbeat(task.task_id)
-        return SendAppHeartbeatResponse(success=success)
 
     def PushObject(
         self, request: PushObjectRequest, context: grpc.ServicerContext

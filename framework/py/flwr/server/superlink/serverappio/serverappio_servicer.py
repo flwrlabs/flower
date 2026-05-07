@@ -46,10 +46,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppOutputsRequest,
     PushAppOutputsResponse,
 )
-from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
-    SendAppHeartbeatRequest,
-    SendAppHeartbeatResponse,
-)
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
     PushLogsResponse,
@@ -396,22 +392,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         """Get Federation Options associated with a run."""
         log(DEBUG, "ServerAppIoServicer.GetFederationOptions")
         raise NotImplementedError("To be removed")
-
-    def SendAppHeartbeat(
-        self, request: SendAppHeartbeatRequest, context: grpc.ServicerContext
-    ) -> SendAppHeartbeatResponse:
-        """Handle a heartbeat from an app process."""
-        log(DEBUG, "ServerAppIoServicer.SendAppHeartbeat")
-
-        # Get the authenticated task
-        task = get_authenticated_task()
-
-        # Init state
-        state = self.state_factory.state()
-
-        # Acknowledge the heartbeat
-        success = state.acknowledge_task_heartbeat(task.task_id)
-        return SendAppHeartbeatResponse(success=success)
 
     def PushObject(
         self, request: PushObjectRequest, context: grpc.ServicerContext
