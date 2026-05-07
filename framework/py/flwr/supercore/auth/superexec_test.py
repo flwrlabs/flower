@@ -81,7 +81,7 @@ class TestSuperExecAuthPrimitives(TestCase):
         auth_secret = derive_auth_secret(b"master-secret")
         good_signature = compute_superexec_signature(
             auth_secret=auth_secret,
-            method="/flwr.proto.ServerAppIo/RequestToken",
+            method="/flwr.proto.ServerAppIo/ClaimTask",
             timestamp=456,
             nonce="nonce-2",
             body_sha256="f" * 64,

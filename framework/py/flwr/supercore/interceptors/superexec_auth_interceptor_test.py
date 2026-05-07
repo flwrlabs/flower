@@ -92,7 +92,7 @@ class TestSuperExecAuthClientInterceptor(TestCase):
             protected_methods=_SERVERAPPIO_SUPEREXEC_METHODS,
         )
         details = _ClientCallDetails(
-            method="/flwr.proto.ServerAppIo/RequestToken",
+            method="/flwr.proto.ServerAppIo/PullPendingTasks",
             timeout=None,
             metadata=(),
             credentials=None,
@@ -187,7 +187,7 @@ class TestSuperExecAuthServerInterceptor(TestCase):
 
     def test_missing_metadata_is_denied(self) -> None:
         """Missing SuperExec metadata should be denied."""
-        method = "/flwr.proto.ServerAppIo/ListAppsToLaunch"
+        method = "/flwr.proto.ServerAppIo/PullPendingTasks"
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
 
