@@ -317,20 +317,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 del self.task_token_store[task_id]
                 self.task_token_to_task_id.pop(record.token, None)
 
-    def create_token(self, run_id: int) -> str | None:
-        """Create a token for the given run ID."""
-        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)  # Generate a random token
-        with self.lock_token_store:
-            if run_id in self.token_store:
-                return None  # Token already created for this run ID
-
-            active_until = int(now().timestamp()) + HEARTBEAT_DEFAULT_INTERVAL
-            self.token_store[run_id] = TokenRecord(
-                token=token, active_until=active_until
-            )
-            self.token_to_run_id[token] = run_id
-        return token
-
     def verify_token(self, run_id: int, token: str) -> bool:
         """Verify a token for the given run ID."""
         self._cleanup_expired_tokens()

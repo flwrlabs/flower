@@ -386,27 +386,6 @@ class SqlCoreState(CoreState, SqlMixin):
             },
         )
 
-    def create_token(self, run_id: int) -> str | None:
-        """Create a token for the given run ID."""
-        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)  # Generate a random token
-        current = now().timestamp()
-        active_until = current + HEARTBEAT_DEFAULT_INTERVAL
-        query = """
-            INSERT INTO token_store (run_id, token, active_until)
-            VALUES (:run_id, :token, :active_until)
-            RETURNING token;
-        """
-        data = {
-            "run_id": uint64_to_int64(run_id),
-            "token": token,
-            "active_until": active_until,
-        }
-        try:
-            rows = self.query(query, data)
-            return cast(str, rows[0]["token"])
-        except IntegrityError:
-            return None  # Token already created for this run ID
-
     def verify_token(self, run_id: int, token: str) -> bool:
         """Verify a token for the given run ID."""
         self._cleanup_expired_tokens()

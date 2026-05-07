@@ -204,22 +204,6 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def create_token(self, run_id: int) -> str | None:
-        """Create a token for the given run ID.
-
-        Parameters
-        ----------
-        run_id : int
-            The ID of the run for which to create a token.
-
-        Returns
-        -------
-        str | None
-            The newly generated token if one does not already exist
-            for the given run ID, otherwise None.
-        """
-
-    @abstractmethod
     def verify_token(self, run_id: int, token: str) -> bool:
         """Verify a token for the given run ID.
 

@@ -337,12 +337,16 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             superexec_auth_secret=_SUPEREXEC_SECRET,
         )
 
-        # Provide a valid metadata token on the default test channel so existing
+        # Provide a valid claimed-task token on the default test channel so existing
         # servicer behavior tests continue to exercise business logic paths.
         self._auth_run_id = self.state.create_run(
             "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
         )
-        auth_token = self.state.create_token(self._auth_run_id)
+        auth_task_id = self.state.create_task(
+            task_type=TaskType.SERVER_APP, run_id=self._auth_run_id
+        )
+        assert auth_task_id is not None
+        auth_token = self.state.claim_task(auth_task_id)
         assert auth_token is not None
         self._auth_token = auth_token
         self._appio_auth_interceptor = AppIoTokenClientInterceptor(auth_token)
