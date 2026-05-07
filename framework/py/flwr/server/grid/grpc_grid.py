@@ -68,7 +68,10 @@ from flwr.supercore.inflatable.inflatable_utils import (
     pull_objects,
     push_objects,
 )
-from flwr.supercore.interceptors import AppIoTokenClientInterceptor
+from flwr.supercore.interceptors import (
+    AppIoTokenClientInterceptor,
+    RuntimeVersionClientInterceptor,
+)
 
 from .grid import Grid
 
@@ -159,7 +162,10 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
             server_address=self._addr,
             insecure=self._insecure,
             root_certificates=self._cert,
-            interceptors=[AppIoTokenClientInterceptor(token=self._token)],
+            interceptors=[
+                RuntimeVersionClientInterceptor(component_name="flwr-serverapp"),
+                AppIoTokenClientInterceptor(token=self._token),
+            ],
         )
         self._channel.subscribe(on_channel_state_change)
         self._grpc_stub = ServerAppIoStub(self._channel)
