@@ -28,7 +28,7 @@ from .exec_plugin import ExecPlugin
 class BaseEphemeralExecPlugin(ExecPlugin):
     """Simple ephemeral Flower SuperExec plugin for app processes.
 
-    The plugin always selects the first candidate run ID, launches the corresponding app
+    The plugin always selects the first candidate task, launches the corresponding app
     process, waits for it to finish, and then terminates the SuperExec process.
     """
 

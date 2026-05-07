@@ -28,7 +28,7 @@ from .exec_plugin import ExecPlugin
 class BaseExecPlugin(ExecPlugin):
     """Simple Flower SuperExec plugin for app processes.
 
-    The plugin always selects the first candidate run ID.
+    The plugin always selects the first candidate task.
     """
 
     # Placeholders to be defined in subclasses

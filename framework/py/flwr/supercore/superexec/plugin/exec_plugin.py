@@ -85,9 +85,9 @@ class ExecPlugin(ABC):
         Parameters
         ----------
         token : str
-                The token required to run the executor process.
+            The token required to run the executor process.
         task : Task
-              The task to execute.
+            The task to execute.
         """
 
     # This method is optional to implement

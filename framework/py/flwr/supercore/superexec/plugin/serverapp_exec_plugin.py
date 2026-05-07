@@ -29,7 +29,7 @@ from .base_exec_plugin import BaseExecPlugin
 class ServerAppExecPlugin(BaseExecPlugin):
     """Simple Flower SuperExec plugin for ServerApp.
 
-    The plugin always selects the first candidate run ID.
+    The plugin always selects the first candidate task.
     """
 
     appio_api_address_arg = "--serverappio-api-address"

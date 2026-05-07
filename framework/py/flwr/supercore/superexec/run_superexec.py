@@ -162,7 +162,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
             # Fetch pending tasks
             tasks_res = stub.PullPendingTasks(request=PullPendingTasksRequest())
 
-            # Sekect a task to execute using the plugin's selection logic
+            # Select a task to execute using the plugin's selection logic
             task = None
             if tasks_res.tasks:
                 task = plugin.select_task(tasks_res.tasks)
