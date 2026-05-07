@@ -94,6 +94,9 @@ API.
     * | ``--ssl-keyfile``: Specify the location of the SuperLink's TLS private key file. This file is used to decrypt the packages that are transmitted over the network.
     * | ``--appio-ssl-ca-certfile``: Specify the location of the CA certificate file used by SuperExec to verify the SuperLink's ServerAppIo API server certificate.
     * | ``--appio-ssl-certfile``: Specify the location of the ServerAppIo API server TLS certificate file.
+        The certificate must include Subject Alternative Names (SANs) for the AppIo API address used by
+        SuperExec. When using an IP address such as ``127.0.0.1``, the certificate must include a
+        matching IP SAN.
     * | ``--appio-ssl-keyfile``: Specify the location of the ServerAppIo API server TLS private key file.
 
 ************************************
@@ -123,6 +126,9 @@ AppIo certificates for the internal ClientAppIo API.
     * ``--root-certificates``: This specifies the location of the CA certificate file. The ``ca.crt`` file is used to verify the identity of the SuperLink.
     * | ``--appio-ssl-ca-certfile``: Specify the location of the CA certificate file used by SuperExec to verify the SuperNode's ClientAppIo API server certificate.
     * | ``--appio-ssl-certfile``: Specify the location of the ClientAppIo API server TLS certificate file.
+        The certificate must include Subject Alternative Names (SANs) for the AppIo API address used by
+        SuperExec. When using an IP address such as ``127.0.0.1``, the certificate must include a
+        matching IP SAN.
     * | ``--appio-ssl-keyfile``: Specify the location of the ClientAppIo API server TLS private key file.
 
 Follow the same procedure, i.e. replacing ``--insecure`` with ``--root-certificates``,
