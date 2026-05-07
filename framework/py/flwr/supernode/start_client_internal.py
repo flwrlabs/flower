@@ -46,6 +46,7 @@ from flwr.common.constant import (
     TRANSPORT_TYPES,
     ErrorCode,
     ExecPluginType,
+    SubStatus,
 )
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import generic_create_grpc_server
@@ -56,6 +57,7 @@ from flwr.common.typing import Fab, Run, RunNotRunningException
 from flwr.proto.clientappio_pb2_grpc import add_ClientAppIoServicer_to_server
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.supercore.address import parse_address, resolve_bind_address
+from flwr.supercore.constant import TaskType
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -68,6 +70,7 @@ from flwr.supercore.inflatable.inflatable_utils import (
     push_object_contents_from_iterable,
 )
 from flwr.supercore.interceptors import (
+    create_clientappio_runtime_version_server_interceptor,
     create_clientappio_superexec_auth_server_interceptor,
     create_clientappio_token_auth_server_interceptor,
 )
@@ -315,7 +318,7 @@ def _insert_message(msg: Message, state: NodeState, store: ObjectStore) -> None:
             store.put(obj_id, obj.deflate())
 
 
-def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
+def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0911
     state: NodeState,
     object_store: ObjectStore,
     node_config: UserConfig,
@@ -409,6 +412,20 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
             state.store_run(run_info)
             state.store_fab(fab)
 
+        # Create task
+        task_id = state.create_task(
+            task_type=TaskType.CLIENT_APP, run_id=run_id, fab_hash=run_info.fab_hash
+        )
+        if task_id is None:
+            # Task creation can fail if the generated uint64 task ID collides
+            log(
+                ERROR,
+                "Failed to create task for run ID %s. The message will not be "
+                "processed.",
+                run_id,
+            )
+            return None
+
         # Preregister the object tree of the message
         obj_ids_to_pull = object_store.preregister(run_id, object_tree)
 
@@ -436,6 +453,11 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments
             )
             state.delete_messages(message_ids=[message.metadata.message_id])
             object_store.delete(message.metadata.message_id)
+            state.finish_task(
+                task_id,
+                sub_status=SubStatus.FAILED,
+                details="Pulling message objects failed.",
+            )
 
     except RunNotRunningException:
         if message is None:
@@ -673,6 +695,7 @@ def run_clientappio_api_grpc(  # pylint: disable=R0913,R0917
                 master_secret=superexec_auth_secret,
             )
         )
+    interceptors.append(create_clientappio_runtime_version_server_interceptor())
     clientappio_add_servicer_to_server_fn = add_ClientAppIoServicer_to_server
     clientappio_grpc_server = generic_create_grpc_server(
         servicer_and_add_fn=(

@@ -19,8 +19,10 @@ import argparse
 from types import SimpleNamespace
 from unittest.mock import Mock
 
+import grpc
 import pytest
 
+from flwr.supercore.interceptors import RuntimeVersionServerInterceptor
 from flwr.supercore.version import package_version
 
 from . import app as app_module
@@ -205,3 +207,27 @@ def test_obtain_superlink_certificates_skips_cert_loading_when_insecure(
     assert appio_certificates is None
     obtain_server_certificates_mock.assert_not_called()
     obtain_appio_certificates_mock.assert_not_called()
+
+
+def test_run_fleet_api_grpc_rere_adds_runtime_version_interceptor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Fleet gRPC-rere server should observe runtime-version metadata."""
+    grpc_server = Mock()
+    grpc_server.bound_address = "127.0.0.1:9092"
+    create_grpc_server = Mock(return_value=grpc_server)
+    existing_interceptor = Mock(spec=grpc.ServerInterceptor)
+    monkeypatch.setattr(app_module, "generic_create_grpc_server", create_grpc_server)
+
+    app_module._run_fleet_api_grpc_rere(  # pylint: disable=protected-access
+        address="127.0.0.1:9092",
+        state_factory=Mock(),
+        objectstore_factory=Mock(),
+        enable_supernode_auth=False,
+        certificates=None,
+        interceptors=[existing_interceptor],
+    )
+
+    interceptors = create_grpc_server.call_args.kwargs["interceptors"]
+    assert interceptors[0] is existing_interceptor
+    assert isinstance(interceptors[1], RuntimeVersionServerInterceptor)
