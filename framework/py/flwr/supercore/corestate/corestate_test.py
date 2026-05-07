@@ -48,8 +48,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def task_run_id(self, _state: CoreState) -> int:
         """Return the run ID to use in task-related tests.
 
-        Subclasses can override this hook when task creation requires an
-        existing run record instead of an arbitrary placeholder ID.
+        Subclasses can override this hook when task creation requires an existing run
+        record instead of an arbitrary placeholder ID.
         """
         return 42
 
