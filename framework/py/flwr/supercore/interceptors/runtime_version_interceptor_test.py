@@ -170,7 +170,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
     def test_log_incompatibility_from_flower_error_json(self) -> None:
         """Rejected runtime-version RPCs should be detected by FlowerError code."""
         grpc_error = grpc.RpcError()
-        grpc_error.details = Mock(  # type: ignore[method-assign]
+        grpc_error.details = Mock(
             return_value=FlowerError(
                 ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
                 "internal diagnostic message",
