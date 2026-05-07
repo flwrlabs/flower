@@ -260,7 +260,7 @@ class InMemoryNodeState(
                 for entry in self.msg_store.values()
                 if entry.message.metadata.run_id in expired_run_ids
                 and entry.is_retrieved
-                and entry.message.object_id not in existing_error_replies
+                and entry.message.metadata.message_id not in existing_error_replies
             ]
 
             for msg in messages_to_reply:
