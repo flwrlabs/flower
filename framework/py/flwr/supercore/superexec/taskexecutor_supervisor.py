@@ -25,9 +25,9 @@ import subprocess
 import sys
 import threading
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 _LIFECYCLE_POPEN_KWARGS = frozenset(
     {
@@ -142,7 +142,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         type=int,
         required=True,
         help=(
-            "Read end of the parent-owned lifeline pipe; EOF means SuperExec " "exited."
+            "Read end of the parent-owned lifeline pipe; EOF means SuperExec exited."
         ),
     )
     parser.add_argument(
@@ -219,9 +219,10 @@ def _run_supervised_process(
         _write_launch_status(status_fd, ok=True)
         _close_fd(status_fd)
     process_group_id = supervised_process.pid
+    returncode: int | None = None
     try:
         while True:
-            returncode = supervised_process.poll()
+            returncode = _peek_process_returncode(supervised_process)
             if returncode is not None:
                 return returncode
             if _lifeline_closed(lifeline_fd):
@@ -233,7 +234,8 @@ def _run_supervised_process(
                     supervised_process,
                     termination_grace_period,
                 )
-                return supervised_process.wait()
+                returncode = supervised_process.wait()
+                return returncode
             time.sleep(_POLL_INTERVAL)
     finally:
         # The wrapper/TaskExecutor can leave same-process-group children after the
@@ -243,6 +245,8 @@ def _run_supervised_process(
             supervised_process,
             termination_grace_period,
         )
+        if returncode is not None and supervised_process.returncode is None:
+            supervised_process.wait()
 
 
 def _lifeline_closed(lifeline_fd: int) -> bool:
@@ -258,6 +262,47 @@ def _lifeline_closed(lifeline_fd: int) -> bool:
     return os.read(lifeline_fd, 1) == b""
 
 
+def _peek_process_returncode(supervised_process: subprocess.Popen[bytes]) -> int | None:
+    """Return process exit status without reaping the process when possible.
+
+    The supervisor must clean up the process group before it reaps the group leader;
+    otherwise, a reused PID/PGID could receive cleanup signals meant for the supervised
+    TaskExecutor group.
+    """
+    if supervised_process.returncode is not None:
+        return supervised_process.returncode
+    waitid = getattr(os, "waitid", None)
+    p_pid = getattr(os, "P_PID", None)
+    w_exited = getattr(os, "WEXITED", None)
+    w_nohang = getattr(os, "WNOHANG", None)
+    w_nowait = getattr(os, "WNOWAIT", None)
+    if (
+        not callable(waitid)
+        or p_pid is None
+        or w_exited is None
+        or w_nohang is None
+        or w_nowait is None
+    ):
+        return supervised_process.poll()
+    waitid_fn = cast(Callable[[int, int, int], Any], waitid)
+    try:
+        wait_result = waitid_fn(  # pylint: disable=not-callable
+            p_pid,
+            supervised_process.pid,
+            w_exited | w_nohang | w_nowait,
+        )
+    except ChildProcessError:
+        return supervised_process.poll()
+    returncode: int | None = None
+    if wait_result is None:
+        return returncode
+    if wait_result.si_code == os.CLD_EXITED:
+        returncode = int(wait_result.si_status)
+    elif wait_result.si_code in (os.CLD_KILLED, os.CLD_DUMPED):
+        returncode = -int(wait_result.si_status)
+    return returncode
+
+
 def _terminate_process_group(
     process_group_id: int,
     supervised_process: subprocess.Popen[bytes],
@@ -270,7 +315,11 @@ def _terminate_process_group(
     _send_signal_to_process_group(process_group_id, signal.SIGTERM)
     deadline = time.monotonic() + grace_period
     while time.monotonic() < deadline:
-        supervised_process.poll()
+        if (
+            _peek_process_returncode(supervised_process) is not None
+            and supervised_process.returncode is None
+        ):
+            supervised_process.wait()
         if not _process_group_exists(process_group_id):
             return
         time.sleep(_POLL_INTERVAL)
