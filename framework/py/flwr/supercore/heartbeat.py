@@ -118,7 +118,7 @@ class HeartbeatSender:
                 raise HeartbeatFailure
 
 
-def make_app_heartbeat_fn_grpc(
+def make_task_heartbeat_fn_grpc(
     stub: ServerAppIoStub | ClientAppIoStub,
 ) -> Callable[[], bool]:
     """Get the function to send a heartbeat to gRPC endpoint from an task process.

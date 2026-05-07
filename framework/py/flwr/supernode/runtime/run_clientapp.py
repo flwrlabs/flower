@@ -52,7 +52,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
+from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
@@ -116,7 +116,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         wrap_stub(stub, make_simple_grpc_retry_invoker())
 
         # Start app heartbeat
-        heartbeat_sender = HeartbeatSender(make_app_heartbeat_fn_grpc(stub))
+        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
         heartbeat_sender.start()
 
         # Pull Message, Context, Run and FAB from SuperNode
