@@ -46,7 +46,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         raise NotImplementedError()
 
     def task_run_id(self, _state: CoreState) -> int:
-        """Provide a run ID to use when creating tasks in tests."""
+        """Return the run ID to use in task-related tests.
+
+        Subclasses can override this hook when task creation requires an
+        existing run record instead of an arbitrary placeholder ID.
+        """
         return 42
 
     def test_create_and_get_task(self) -> None:

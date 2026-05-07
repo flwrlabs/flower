@@ -178,7 +178,10 @@ class StateTest(CoreStateTest):
         """Creating a task for an unknown run should fail."""
         state = self.state_factory()
 
-        with self.assertRaisesRegex(ValueError, "Run 42 not found"):
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "Run 42 not found. This indicates an internal control-flow error",
+        ):
             state.create_task(task_type="flwr-model", run_id=42)
 
     def test_get_run_info_without_filters_returns_all_runs(self) -> None:
