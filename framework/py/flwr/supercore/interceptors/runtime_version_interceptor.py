@@ -93,6 +93,10 @@ class RuntimeVersionClientInterceptor(
             self._maybe_log_incompat_warning(call.trailing_metadata())
             self._maybe_log_incompat_error(call)
 
+        if isinstance(call, grpc.RpcError):
+            _log_incompat_warning()
+            return call
+
         if not call.add_callback(_log_incompat_warning):
             _log_incompat_warning()
 
