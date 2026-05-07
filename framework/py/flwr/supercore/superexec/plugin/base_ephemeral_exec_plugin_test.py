@@ -15,10 +15,11 @@
 """Tests for SuperExec base ephemeral plugin behavior."""
 
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from flwr.common.exit import ExitCode
 from flwr.common.typing import Run
+from flwr.supercore.constant import TaskType
 
 from .base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
 
@@ -26,6 +27,14 @@ from .base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
 def _get_run(_: int) -> Run:
     """Return a minimal dummy run."""
     return Run.create_empty(run_id=1)
+
+
+def _get_task(*, task_id: int = 1, task_type: str = TaskType.SERVER_APP) -> Mock:
+    """Return a minimal dummy task-like object."""
+    task = Mock()
+    task.task_id = task_id
+    task.type = task_type
+    return task
 
 
 class _EphemeralExecPlugin(BaseEphemeralExecPlugin):
@@ -54,7 +63,7 @@ def test_select_run_id_returns_first_candidate() -> None:
     assert plugin.select_run_id([7, 9, 11]) == 7
 
 
-def test_launch_app_runs_expected_command_and_exits() -> None:
+def test_launch_task_runs_expected_command_and_exits() -> None:
     """Launch should invoke the app with token and parent PID, then exit."""
     plugin = _get_ephemeral_plugin()
 
@@ -70,7 +79,7 @@ def test_launch_app_runs_expected_command_and_exits() -> None:
             "flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"
         ) as flwr_exit,
     ):
-        plugin.launch_app(token="token-123", run_id=5)
+        plugin.launch_task(token="token-123", task=_get_task(task_id=5))
 
     run.assert_called_once_with(
         [
@@ -91,7 +100,7 @@ def test_launch_app_runs_expected_command_and_exits() -> None:
     )
 
 
-def test_launch_app_calls_cleanup_before_launch() -> None:
+def test_launch_task_calls_cleanup_before_launch() -> None:
     """Launch should invoke cleanup_before_launch before running the subprocess."""
     # Prepare
     call_log: list[str] = []
@@ -106,7 +115,7 @@ def test_launch_app_calls_cleanup_before_launch() -> None:
         ),
         patch("flwr.supercore.superexec.plugin.base_ephemeral_exec_plugin.flwr_exit"),
     ):
-        plugin.launch_app(token="token-abc", run_id=1)
+        plugin.launch_task(token="token-abc", task=_get_task(task_id=1))
 
     # Assert
     assert call_log == ["cleanup", "subprocess"]

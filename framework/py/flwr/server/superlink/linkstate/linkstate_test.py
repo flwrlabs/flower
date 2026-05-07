@@ -374,7 +374,9 @@ class StateTest(CoreStateTest):
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
-        assert state.create_token(run_id) is not None
+        task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
+        assert task_id is not None
+        state.claim_task(task_id)
         state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
 
         # Execute
@@ -491,14 +493,17 @@ class StateTest(CoreStateTest):
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
-        assert state.create_token(run_id) is not None
+        task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
+        assert task_id is not None
+        state.claim_task(task_id)
         state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
         state.federation_manager.report_run_usage = Mock()  # type: ignore
         # Execute: advance time past token expiry and trigger cleanup via verify_token
         patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = patched_dt
-            state.verify_token(run_id, "dummy_token")
+            state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
+
         # Assert
         state.federation_manager.report_run_usage.assert_called_once()
 

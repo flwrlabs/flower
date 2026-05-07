@@ -36,7 +36,6 @@ from flwr.common.config import (
 from flwr.common.constant import (
     RUNTIME_DEPENDENCY_INSTALL,
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
-    Status,
     SubStatus,
 )
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
@@ -52,16 +51,13 @@ from flwr.common.serde import (
     context_to_proto,
     fab_from_proto,
     run_from_proto,
-    run_status_to_proto,
 )
 from flwr.common.telemetry import EventType, event
-from flwr.common.typing import RunNotRunningException, RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppInputsRequest,
     PullAppInputsResponse,
     PushAppOutputsRequest,
 )
-from flwr.proto.run_pb2 import UpdateRunStatusRequest  # pylint: disable=E0611
 from flwr.server.grid.grpc_grid import GrpcGrid
 from flwr.server.run_serverapp import run as run_
 from flwr.supercore.app_utils import start_parent_process_monitor
@@ -122,7 +118,8 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     log_uploader = None
     hash_run_id = None
     run = None
-    run_status = None
+    sub_status = SubStatus.FAILED
+    details = "Task failed with unknown error."
     heartbeat_sender = None
     grid = None
     context = None
@@ -141,16 +138,6 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         # Stop log uploader for this run and upload final logs
         if log_uploader:
             stop_log_uploader(log_queue, log_uploader)
-
-        # Update run status
-        if run and run_status and grid:
-            try:
-                req = UpdateRunStatusRequest(
-                    run_id=run.run_id, run_status=run_status_to_proto(run_status)
-                )
-                grid._stub.UpdateRunStatus(req)
-            except grpc.RpcError:
-                pass
 
         # Close the Grpc connection
         if grid:
@@ -260,46 +247,52 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         )
 
         # Load and run the ServerApp with the Grid
-        updated_context = run_(
+        context = run_(
             grid=grid,
             server_app_dir=app_path,
             server_app_attr=server_app_attr,
             context=context,
         )
 
+        # Update sub_status and details for successful completion
+        sub_status = SubStatus.COMPLETED
+        details = ""
+
         # Send resulting context
         # Temporarily disable pushing resulting context to servicer
-        updated_context.state = RecordDict()
-        context_proto = context_to_proto(updated_context)
-        log(DEBUG, "[flwr-serverapp] Will push ServerAppOutputs")
-        out_req = PushAppOutputsRequest(
-            token=token, run_id=run.run_id, context=context_proto
-        )
-        _ = grid._stub.PushAppOutputs(out_req)
-
-        run_status = RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
-
-    # Raised when the run is already stopped by the user
-    except RunNotRunningException:
-        log(INFO, "")
-        log(INFO, "Run ID %s stopped.", run.run_id)  # type: ignore[union-attr]
-        log(INFO, "")
-        run_status = None
-        # No need to update the exit code since this is expected behavior
+        context.state = RecordDict()
 
     except RuntimeError:
         log(ERROR, "Failed to start run.")
         exit_code = ExitCode.SERVERAPP_RUN_START_REJECTED
+        sub_status = SubStatus.FAILED
+        details = "Failed when pulling task input."
 
     except Exception as ex:  # pylint: disable=broad-exception-caught
         exc_entity = "ServerApp"
         log(ERROR, "%s raised an exception", exc_entity, exc_info=ex)
-        run_status = RunStatus(Status.FINISHED, SubStatus.FAILED, str(ex))
+
+        # Update sub_status and details based on the exception
+        sub_status = SubStatus.FAILED
+        details = f"ServerApp failed with exception: {str(ex)}"
 
         # Set exit code
         exit_code = ExitCode.SERVERAPP_EXCEPTION  # General exit code
         if isinstance(ex, AppExitException):
             exit_code = ex.exit_code
+    finally:
+        # Update run status
+        if grid:
+            log(DEBUG, "[flwr-serverapp] Will push ServerApp task output")
+            pushoutput_req = PushAppOutputsRequest(
+                context=context_to_proto(context) if context else None,
+                sub_status=sub_status,
+                details=details,
+            )
+            try:
+                grid._stub.PushAppOutputs(pushoutput_req)
+            except grpc.RpcError:
+                pass
 
     flwr_exit(
         code=exit_code,

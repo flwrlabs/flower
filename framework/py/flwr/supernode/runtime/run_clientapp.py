@@ -52,7 +52,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.constant import TaskType
 from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -105,6 +104,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     channel.subscribe(on_channel_state_change)
     heartbeat_sender = None
     runtime_env_dir = None
+    exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
         if heartbeat_sender is not None and heartbeat_sender.is_running:
@@ -214,10 +214,11 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
             )
 
     except grpc.RpcError as e:
-        log(ERROR, "GRPC error occurred: %s", str(e))
+        log(ERROR, "gRPC error occurred: %s", str(e))
+        exit_code = ExitCode.CLIENTAPP_COMMUNICATION_ERROR
 
     flwr_exit(
-        code=ExitCode.SUCCESS,
+        code=exit_code,
         event_type=EventType.FLWR_CLIENTAPP_RUN_LEAVE,
     )
 
