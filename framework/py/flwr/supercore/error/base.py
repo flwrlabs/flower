@@ -15,6 +15,8 @@
 """Base error types for API-facing error translation."""
 
 
+from __future__ import annotations
+
 import json
 from enum import IntEnum
 
@@ -64,6 +66,43 @@ class FlowerError(Exception):
                 "public_message": public_message,
                 "public_details": self.public_details,
             }
+        )
+
+    @staticmethod
+    def from_json(value: str | None) -> FlowerError | None:
+        """Deserialize a client-visible error payload.
+
+        The internal diagnostic message is not transmitted over the wire. The returned
+        error therefore uses the public message as its ``message`` value.
+        """
+        if value is None:
+            return None
+
+        try:
+            payload = json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return None
+
+        if not isinstance(payload, dict):
+            return None
+
+        code = payload.get("code")
+        public_message = payload.get("public_message")
+        public_details = payload.get("public_details")
+
+        if (
+            not isinstance(code, int)
+            or isinstance(code, bool)
+            or not isinstance(public_message, str)
+        ):
+            return None
+        if public_details is not None and not isinstance(public_details, str):
+            return None
+
+        return FlowerError(
+            code=code,
+            message=public_message,
+            public_details=public_details,
         )
 
 
