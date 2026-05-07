@@ -121,7 +121,7 @@ class HeartbeatSender:
 def make_task_heartbeat_fn_grpc(
     stub: ServerAppIoStub | ClientAppIoStub,
 ) -> Callable[[], bool]:
-    """Get the function to send a heartbeat to gRPC endpoint from a task process.
+    """Get the function to send a heartbeat to gRPC endpoint from a task executor.
 
     Parameters
     ----------
