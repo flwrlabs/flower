@@ -200,8 +200,6 @@ class TestClientAppIoServicer(unittest.TestCase):
             verifications={"sig": "value"},
         )
 
-        self.mock_state.get_run_id_by_token.return_value = run_id
-        self.mock_state.verify_token.return_value = True
         self.mock_state.get_context.return_value = app_context
         self.mock_state.get_run.return_value = run
         self.mock_state.get_fab.return_value = fab
