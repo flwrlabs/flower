@@ -15,13 +15,13 @@ on:
         required: false
         default: ""
       pypi-repository-url:
-        description: "Python package repository URL. Leave empty for the repository default."
+        description: "Python package repository URL. Defaults to vars.PYPI_REPOSITORY_URL."
         required: false
         default: ""
       pypi-repository-name:
-        description: "Poetry repository alias for the Python package repository."
+        description: "Poetry repository alias for the Python package repository. Defaults to vars.PYPI_REPOSITORY_NAME."
         required: false
-        default: "private"
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -39,7 +39,7 @@ jobs:
       flwr-version: ${{ steps.publish.outputs.flwr-version }}
     env:
       FLWR_TELEMETRY_ENABLED: 0
-      PYPI_REPOSITORY_PASSWORD: ${{ secrets.PYPI_REPOSITORY_PASSWORD || secrets.PYPI_TOKEN_RELEASE_FLWR }}
+      PYPI_REPOSITORY_PASSWORD: ${{ secrets.PYPI_REPOSITORY_PASSWORD }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -59,6 +59,6 @@ jobs:
           FLOWER_REPO_REF: ${{ inputs.flower-repo-ref || 'main' }}
           PACKAGE_VERSION: ${{ inputs.package-version }}
           PYPI_REPOSITORY_URL: ${{ inputs.pypi-repository-url || vars.PYPI_REPOSITORY_URL }}
-          PYPI_REPOSITORY_NAME: ${{ inputs.pypi-repository-name || 'private' }}
-          PYPI_REPOSITORY_USERNAME: ${{ vars.PYPI_REPOSITORY_USERNAME || '__token__' }}
+          PYPI_REPOSITORY_NAME: ${{ inputs.pypi-repository-name || vars.PYPI_REPOSITORY_NAME }}
+          PYPI_REPOSITORY_USERNAME: ${{ vars.PYPI_REPOSITORY_USERNAME }}
         run: ./framework/dev/release/publish-wheel.sh

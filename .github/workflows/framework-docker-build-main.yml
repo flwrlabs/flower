@@ -20,7 +20,7 @@ on:
         required: false
         default: unstable
       docker-registry:
-        description: "Docker registry host. Leave empty for Docker Hub. Defaults to vars.DOCKER_IMAGE_REGISTRY or registry.gitlab.com."
+        description: "Docker registry host. Leave empty for Docker Hub. Defaults to vars.DOCKER_IMAGE_REGISTRY."
         required: false
         default: ""
       docker-registry-user:
@@ -37,8 +37,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  DOCKER_REGISTRY: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY || 'registry.gitlab.com' }}
-  DOCKER_IMAGE_NAMESPACE: ${{ inputs.docker-image-namespace || vars.DOCKER_IMAGE_NAMESPACE || 'flwr' }}
+  DOCKER_REGISTRY: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY }}
+  DOCKER_IMAGE_NAMESPACE: ${{ inputs.docker-image-namespace || vars.DOCKER_IMAGE_NAMESPACE }}
   FLOWER_REPO_REF: ${{ inputs.flower-repo-ref || 'main' }}
   DOCKER_IMAGE_TAG: ${{ inputs.docker-image-tag || 'unstable' }}
 
@@ -67,6 +67,13 @@ jobs:
       - name: Prepare framework
         run: ./framework/dev/prepare-framework.sh
 
+      - name: Validate Docker publishing configuration
+        run: |
+          if [ -z "${DOCKER_IMAGE_NAMESPACE}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_NAMESPACE" >&2
+            exit 1
+          fi
+
       - id: versions
         run: |
           echo "pip-version=${{ steps.bootstrap.outputs.pip-version }}" >> "$GITHUB_OUTPUT"
@@ -92,7 +99,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.parameters.outputs.matrix).base }}
     with:
-      registry: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY || 'registry.gitlab.com' }}
+      registry: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY }}
       namespace-repository: ${{ matrix.images.namespace_repository }}
       file-dir: ${{ matrix.images.file_dir }}
       context: .
@@ -118,7 +125,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.parameters.outputs.matrix).binary }}
     with:
-      registry: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY || 'registry.gitlab.com' }}
+      registry: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY }}
       namespace-repository: ${{ matrix.images.namespace_repository }}
       file-dir: ${{ matrix.images.file_dir }}
       context: .
@@ -126,7 +133,7 @@ jobs:
       prepare-framework: true
       flower-repo-ref: ${{ inputs.flower-repo-ref || 'main' }}
       build-args: |
-        BASE_REPOSITORY=${{ inputs.docker-image-namespace || vars.DOCKER_IMAGE_NAMESPACE || 'flwr' }}/base
+        BASE_REPOSITORY=${{ inputs.docker-image-namespace || vars.DOCKER_IMAGE_NAMESPACE }}/base
         BASE_IMAGE=${{ matrix.images.base_image }}
       tags: ${{ matrix.images.tags_encoded }}
       docker-registry-user: ${{ inputs.docker-registry-user || vars.DOCKER_IMAGE_REGISTRY_USER }}
