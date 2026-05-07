@@ -98,7 +98,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         insecure=insecure,
         root_certificates=certificates,
         interceptors=[
-            RuntimeVersionClientInterceptor(component_name=TaskType.CLIENT_APP),
+            RuntimeVersionClientInterceptor(component_name="flwr-clientapp"),
             AppIoTokenClientInterceptor(token),
         ],
     )

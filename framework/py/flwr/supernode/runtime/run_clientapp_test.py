@@ -18,7 +18,6 @@
 import unittest
 from unittest.mock import patch
 
-from flwr.supercore.constant import TaskType
 from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
@@ -47,4 +46,4 @@ class TestRunClientApp(unittest.TestCase):
         self.assertIsInstance(interceptors[0], RuntimeVersionClientInterceptor)
         self.assertIsInstance(interceptors[1], AppIoTokenClientInterceptor)
         # pylint: disable-next=protected-access
-        self.assertEqual(interceptors[0]._metadata.component_name, TaskType.CLIENT_APP)
+        self.assertEqual(interceptors[0]._metadata.component_name, "flwr-clientapp")
