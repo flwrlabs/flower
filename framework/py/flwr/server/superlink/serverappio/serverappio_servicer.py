@@ -205,7 +205,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 request.connector_ref if request.HasField("connector_ref") else None
             ),
         )
-
         if task_id is None:
             context.abort(grpc.StatusCode.INTERNAL, "Failed to create task")
             raise RuntimeError("This line should never be reached.")
