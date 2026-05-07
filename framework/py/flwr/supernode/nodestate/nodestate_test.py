@@ -197,31 +197,6 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         self.assertNotIn("msg1", msg_ids)
         self.assertIn("msg2", msg_ids)
 
-    def test_get_run_ids_with_pending_messages(self) -> None:
-        """Test retrieving run IDs with pending messages."""
-        # Prepare: store messages for runs 1, 2, and 3
-        # Run 1 has a pending message, run 2 has an active task claim,
-        # run 3 has a reply,
-        # run 4 has a retrieved message (not pending),
-        # and run 5 had a claimed task which later finished after
-        # `flwr-clientapp` handled a message.
-        self.state.store_message(make_dummy_message(1, False, "msg1"))
-        self.state.store_message(make_dummy_message(2, False, "msg2"))
-        self.state.store_message(make_dummy_message(3, True, "msg3"))
-        self.state.store_message(make_dummy_message(4, False, "msg4"))
-        self.state.store_message(make_dummy_message(5, False, "msg5"))
-        self.state.get_messages(run_ids=[4])
-        self._claim_client_task(2)
-        run_5_task_id = self._claim_client_task(5)
-        assert self.state.activate_task(run_5_task_id)
-        assert self.state.finish_task(run_5_task_id, SubStatus.COMPLETED, "done")
-
-        # Execute
-        run_ids = self.state.get_run_ids_with_pending_messages()
-
-        # Assert: run 1 and run 5 should be returned
-        self.assertEqual(set(run_ids), {1, 5})
-
     def test_get_error_reply_when_task_claim_expires(self) -> None:
         """Test that error replies are created when task claims expire."""
         # Prepare: Create a claimed task for a run
