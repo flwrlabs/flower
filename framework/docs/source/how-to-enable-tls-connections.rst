@@ -37,7 +37,7 @@ wants to submit a ``Run``) interacts with the federation via the `flwr CLI
 enabling TLS on internal AppIo connections.
 
 We have prepared a script that can be used to generate such set of certificates. While
-using these are fine for prototyping, we advice you to follow the standards set in your
+using these is fine for prototyping, we advise you to follow the standards set in your
 team/organization and generated the certificates and share them with the corresponding
 parties. Refer to the **Generate TLS certificates** section in the example linked at the
 top of this guide.
@@ -70,7 +70,7 @@ new``).
 
 This section describes how to launch a SuperLink that works on TLS-enabled connections.
 The code snippet below assumes the `certificates/` directory is in the same directory
-where you execute the command from. Edit the paths accordingtly if that is not the case.
+where you execute the command from. Edit the paths accordingly if that is not the case.
 When providing certificates for the Fleet API and Control API, the SuperLink expects a
 tuple of three certificates paths: CA certificate, server certificate and server private
 key. The same command can also provide AppIo certificates for the internal ServerAppIo
@@ -155,7 +155,7 @@ SuperExec for you and pass the AppIo root certificate to it automatically. When 
 certificate with ``--root-certificates``.
 
 .. code-block:: bash
-    :emphasize-lines: 2,2
+    :emphasize-lines: 2
 
     $ flower-superexec \
         --root-certificates certificates/ca.crt \
