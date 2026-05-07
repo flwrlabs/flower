@@ -49,7 +49,6 @@ SERVERAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ServerAppIo/PullObject": MethodTokenPolicy.token_required(),
     # pylint: disable-next=line-too-long
     "/flwr.proto.ServerAppIo/ConfirmMessageReceived": MethodTokenPolicy.token_required(),  # noqa: E501
-    "/flwr.proto.ServerAppIo/UpdateRunStatus": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PushLogs": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/GetFederationOptions": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PushMessages": MethodTokenPolicy.token_required(),

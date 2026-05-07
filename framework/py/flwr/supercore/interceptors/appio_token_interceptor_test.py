@@ -399,8 +399,6 @@ class TestMethodPolicyMaps(TestCase):
     """Validate method auth policy map coverage and values."""
 
     NO_AUTH_BOOTSTRAP_METHODS = {
-        "ListAppsToLaunch",
-        "RequestToken",
         "PullPendingTasks",
         "ClaimTask",
         "GetRun",
