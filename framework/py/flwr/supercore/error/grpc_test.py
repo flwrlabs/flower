@@ -73,7 +73,8 @@ def test_flower_error_from_json_returns_base_error_for_subclass_call() -> None:
 
     parsed = EntitlementError.from_json(err.to_json("public message"))
 
-    assert type(parsed) is FlowerError
+    assert isinstance(parsed, FlowerError)
+    assert not isinstance(parsed, EntitlementError)
     assert parsed.code == ApiErrorCode.ENTITLEMENT_ERROR
     assert parsed.message == "public message"
     assert parsed.public_details == "internal diagnostic message"
