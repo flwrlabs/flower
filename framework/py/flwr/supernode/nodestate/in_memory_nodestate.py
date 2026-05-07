@@ -107,7 +107,6 @@ class InMemoryNodeState(
         """Retrieve messages based on the specified filters."""
         with self.lock_task_store:
             self._cleanup_expired_task_tokens_locked()
-        self._cleanup_expired_tokens()
 
         selected_messages: list[Message] = []
         with self.lock_msg_store:
@@ -204,10 +203,6 @@ class InMemoryNodeState(
 
                 # Store the error reply message
                 self.store_message(error_reply)
-
-    def _on_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
-        """Insert error replies for messages associated with expired app tokens."""
-        self._store_error_replies({run_id for run_id, _ in expired_records})
 
     def _on_task_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
         """Insert error replies for messages associated with expired task tokens."""
