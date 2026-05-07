@@ -132,6 +132,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self,
         *,
         task_ids: Sequence[int] | None = None,
+        run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
@@ -154,6 +155,16 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 if not task_ids:
                     return []
                 matched_task_ids &= set(task_ids)
+
+            if run_ids is not None:
+                if not run_ids:
+                    return []
+                run_id_set = set(run_ids)
+                matched_task_ids &= {
+                    task_id
+                    for task_id in matched_task_ids
+                    if self.task_store[task_id].run_id in run_id_set
+                }
 
             if statuses is not None:
                 if not statuses:
@@ -268,12 +279,17 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             )
             return True
 
-    def get_task_id_by_token(self, token: str) -> int | None:
-        """Return the task ID associated with the task token, if valid."""
+    def get_task_by_token(self, token: str) -> Task | None:
+        """Return the task associated with the task token, if valid."""
         with self.lock_task_store:
             # Resolve tokens after cleanup so callers never receive expired claims.
             self._cleanup_expired_task_tokens_locked()
-            return self.task_token_to_task_id.get(token)
+            task_id = self.task_token_to_task_id.get(token)
+            if task_id is None:
+                return None
+            task = Task()
+            task.CopyFrom(self.task_store[task_id])
+            return task
 
     def _cleanup_expired_task_tokens_locked(self) -> None:
         """Remove expired task tokens.
@@ -321,13 +337,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         with self.lock_token_store:
             record = self.token_store.get(run_id)
             return record is not None and record.token == token
-
-    def delete_token(self, run_id: int) -> None:
-        """Delete the token for the given run ID."""
-        with self.lock_token_store:
-            record = self.token_store.pop(run_id, None)
-            if record is not None:
-                self.token_to_run_id.pop(record.token, None)
 
     def get_run_id_by_token(self, token: str) -> int | None:
         """Get the run ID associated with a given token."""
