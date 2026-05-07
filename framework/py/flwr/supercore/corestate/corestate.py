@@ -236,15 +236,6 @@ class CoreState(ABC):
             True if the token is valid for the run ID, False otherwise.
         """
 
-    @abstractmethod
-    def delete_token(self, run_id: int) -> None:
-        """Delete the token for the given run ID.
-
-        Parameters
-        ----------
-        run_id : int
-            The ID of the run for which to delete the token.
-        """
 
     @abstractmethod
     def acknowledge_app_heartbeat(self, token: str) -> bool:

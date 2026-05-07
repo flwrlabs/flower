@@ -417,12 +417,6 @@ class SqlCoreState(CoreState, SqlMixin):
             return False
         return cast(str, rows[0]["token"]) == token
 
-    def delete_token(self, run_id: int) -> None:
-        """Delete the token for the given run ID."""
-        query = "DELETE FROM token_store WHERE run_id = :run_id;"
-        data = {"run_id": uint64_to_int64(run_id)}
-        self.query(query, data)
-
     def acknowledge_app_heartbeat(self, token: str) -> bool:
         """Acknowledge an app heartbeat with the provided token."""
         # Clean up expired tokens
