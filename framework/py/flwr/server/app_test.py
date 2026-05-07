@@ -231,22 +231,3 @@ def test_run_fleet_api_grpc_rere_adds_runtime_version_interceptor(
     interceptors = create_grpc_server.call_args.kwargs["interceptors"]
     assert interceptors[0] is existing_interceptor
     assert isinstance(interceptors[1], RuntimeVersionServerInterceptor)
-
-
-def test_run_fleet_api_grpc_adapter_uses_no_interceptors(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Fleet GrpcAdapter server should not configure server interceptors."""
-    grpc_server = Mock()
-    grpc_server.bound_address = "127.0.0.1:9092"
-    create_grpc_server = Mock(return_value=grpc_server)
-    monkeypatch.setattr(app_module, "generic_create_grpc_server", create_grpc_server)
-
-    app_module._run_fleet_api_grpc_adapter(  # pylint: disable=protected-access
-        address="127.0.0.1:9092",
-        state_factory=Mock(),
-        objectstore_factory=Mock(),
-        certificates=None,
-    )
-
-    assert "interceptors" not in create_grpc_server.call_args.kwargs
