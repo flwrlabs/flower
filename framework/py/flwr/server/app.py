@@ -628,21 +628,22 @@ def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917
     interceptors: Sequence[grpc.ServerInterceptor] | None = None,
 ) -> grpc.Server:
     """Run Fleet API (gRPC, request-response)."""
-    fleet_interceptors = list(interceptors or [])
-    fleet_interceptors.append(create_fleet_runtime_version_server_interceptor())
-
-    # Create Fleet API gRPC server
     interceptors = list(interceptors or [])
     interceptors .append(create_fleet_runtime_version_server_interceptor())
 
-# Create Fleet API gRPC server
-fleet_servicer = FleetServicer(
-state_factory=state_factory,
-@@ -639,7 +643,7 @@
-server_address=address,
-max_message_length=GRPC_MAX_MESSAGE_LENGTH,
-certificates=certificates,
-        interceptors=interceptors ,
+    # Create Fleet API gRPC server
+    fleet_servicer = FleetServicer(
+        state_factory=state_factory,
+        objectstore_factory=objectstore_factory,
+        enable_supernode_auth=enable_supernode_auth,
+    )
+    fleet_add_servicer_to_server_fn = add_FleetServicer_to_server
+    fleet_grpc_server = generic_create_grpc_server(
+        servicer_and_add_fn=(fleet_servicer, fleet_add_servicer_to_server_fn),
+        server_address=address,
+        max_message_length=GRPC_MAX_MESSAGE_LENGTH,
+        certificates=certificates,
+        interceptors=interceptors,
     )
 
     log(
