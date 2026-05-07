@@ -15,6 +15,8 @@
 """Base error types for API-facing error translation."""
 
 
+from __future__ import annotations
+
 import json
 from enum import IntEnum
 
@@ -67,7 +69,7 @@ class FlowerError(Exception):
         )
 
     @staticmethod
-    def from_json(value: str | None) -> "FlowerError | None":
+    def from_json(value: str | None) -> FlowerError | None:
         """Deserialize a client-visible error payload.
 
         The internal diagnostic message is not transmitted over the wire. The returned
