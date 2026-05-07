@@ -39,6 +39,7 @@ from flwr.common.constant import (
 from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.utils import validate_message
 from flwr.supercore.constant import NodeStatus
@@ -874,3 +875,34 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             if run_id not in self.run_ids:
                 raise ValueError(f"Run {run_id} not found")
             self.run_ids[run_id].run.clientapp_runtime += runtime
+
+    def _cleanup_expired_tokens(self) -> None:
+        """Remove expired tokens.
+
+        Temporary solution until we link run status to the status of its primary task
+        """
+        with self.lock_task_store:
+            expired_records = []
+            expired_at = now()
+            current = int(expired_at.timestamp())
+            for task_id, record in list(self.task_token_store.items()):
+                if record.active_until < current:
+                    # The task is considered expired. Mark it as finished with a failed
+                    # status if it's not already finished, and remove the token.
+                    task = self.task_store.get(task_id)
+                    if task and task.status.status != Status.FINISHED:
+                        task.finished_at = expired_at.isoformat()
+                        task.status.CopyFrom(
+                            TaskStatus(
+                                status=Status.FINISHED,
+                                sub_status=SubStatus.FAILED,
+                                details="No heartbeat received from the task",
+                            )
+                        )
+                        expired_records += [(task.run_id, record.active_until)]
+                    del self.task_token_store[task_id]
+                    self.task_token_to_task_id.pop(record.token, None)
+
+            # Hook for subclasses
+            if expired_records:
+                self._on_tokens_expired(expired_records)

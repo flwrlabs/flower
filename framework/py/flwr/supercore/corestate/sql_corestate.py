@@ -159,6 +159,7 @@ class SqlCoreState(CoreState, SqlMixin):
         self,
         *,
         task_ids: Sequence[int] | None = None,
+        run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
@@ -187,23 +188,23 @@ class SqlCoreState(CoreState, SqlMixin):
                 {f"tid_{i}": task_id for i, task_id in enumerate(sint64_task_ids)}
             )
 
+        if run_ids is not None:
+            if not run_ids:
+                return []
+            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
+            placeholders = ",".join([f":rid_{i}" for i in range(len(sint64_run_ids))])
+            conditions.append(f"run_id IN ({placeholders})")
+            params.update(
+                {f"rid_{i}": run_id for i, run_id in enumerate(sint64_run_ids)}
+            )
+
         if statuses is not None:
             if not statuses:
                 return []
             status_conditions = []
-            if "pending" in statuses:
-                status_conditions.append("starting_at IS NULL AND finished_at IS NULL")
-            if "starting" in statuses:
-                status_conditions.append(
-                    "starting_at IS NOT NULL AND running_at IS NULL "
-                    "AND finished_at IS NULL"
-                )
-            if "running" in statuses:
-                status_conditions.append(
-                    "running_at IS NOT NULL AND finished_at IS NULL"
-                )
-            if "finished" in statuses:
-                status_conditions.append("finished_at IS NOT NULL")
+            for status, condition in STATUS_CONDITIONS.items():
+                if status in statuses:
+                    status_conditions.append(condition)
             if not status_conditions:
                 return []
             conditions.append(f"({' OR '.join(status_conditions)})")

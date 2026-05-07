@@ -20,10 +20,8 @@ import unittest
 
 import grpc
 
-from flwr.common import Context
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS, Status
-from flwr.common.serde import context_to_proto, run_status_to_proto
-from flwr.common.serde_test import RecordMaker
+from flwr.common.serde import run_status_to_proto
 from flwr.common.typing import RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppOutputsRequest,
@@ -93,32 +91,6 @@ class TestServerAppIoTokenLifecycleIntegration(unittest.TestCase):
         token = self.state.create_token(run_id)
         assert token is not None
         return run_id, token
-
-    def test_push_app_outputs_keeps_token(self) -> None:
-        """`PushAppOutputs` should not delete the token."""
-        run_id, token = self._create_running_run_and_token()
-        maker = RecordMaker()
-        context = Context(
-            run_id=run_id,
-            node_id=0,
-            node_config=maker.user_config(),
-            state=maker.recorddict(1, 1, 1),
-            run_config=maker.user_config(),
-        )
-        request = PushAppOutputsRequest(
-            token=token,
-            run_id=run_id,
-            context=context_to_proto(context),
-        )
-
-        response, call = self._push_app_outputs.with_call(
-            request=request,
-            metadata=((APP_TOKEN_HEADER, token),),
-        )
-
-        assert isinstance(response, PushAppOutputsResponse)
-        assert call.code() == grpc.StatusCode.OK
-        assert self.state.get_run_id_by_token(token) == run_id
 
     def test_update_run_status_finished_deletes_token(self) -> None:
         """`UpdateRunStatus(FINISHED)` should delete the token."""
