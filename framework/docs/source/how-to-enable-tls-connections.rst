@@ -155,10 +155,11 @@ SuperExec and the ServerAppIo or ClientAppIo APIs. The commands above already in
 the ``--appio-ssl-*`` options needed to start the ServerAppIo and ClientAppIo APIs with
 TLS enabled.
 
-When SuperLink or SuperNode run in the default ``subprocess`` isolation mode, they start
-SuperExec for you and pass the AppIo root certificate to it automatically. When using
-``process`` isolation mode, you start SuperExec separately and need to pass the same CA
-certificate with ``--root-certificates``.
+The commands above use the default ``subprocess`` isolation mode. In this mode,
+SuperLink or SuperNode start SuperExec for you and pass the AppIo root certificate to it
+automatically. If you want to start SuperExec separately, relaunch the corresponding
+SuperLink or SuperNode command with ``--isolation process`` first. Then start SuperExec
+and pass the same CA certificate with ``--root-certificates``.
 
 .. code-block:: bash
     :emphasize-lines: 2
