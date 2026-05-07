@@ -250,12 +250,12 @@ def _claim_task(channel: grpc.Channel, task_id: int) -> str:
 def _claim_in_parallel(
     channel_0: grpc.Channel, channel_1: grpc.Channel, token: str
 ) -> list[grpc.StatusCode | None]:
-    pull_app_inputs_0 = channel_0.unary_unary(
+    pull_task_inputs_0 = channel_0.unary_unary(
         "/flwr.proto.ServerAppIo/PullTaskInputs",
         request_serializer=PullTaskInputsRequest.SerializeToString,
         response_deserializer=PullTaskInputsResponse.FromString,
     )
-    pull_app_inputs_1 = channel_1.unary_unary(
+    pull_task_inputs_1 = channel_1.unary_unary(
         "/flwr.proto.ServerAppIo/PullTaskInputs",
         request_serializer=PullTaskInputsRequest.SerializeToString,
         response_deserializer=PullTaskInputsResponse.FromString,
@@ -280,8 +280,8 @@ def _claim_in_parallel(
             exceptions.append(ex)
 
     threads = [
-        threading.Thread(target=claim_inputs, args=(0, pull_app_inputs_0)),
-        threading.Thread(target=claim_inputs, args=(1, pull_app_inputs_1)),
+        threading.Thread(target=claim_inputs, args=(0, pull_task_inputs_0)),
+        threading.Thread(target=claim_inputs, args=(1, pull_task_inputs_1)),
     ]
     for thread in threads:
         thread.start()
@@ -400,7 +400,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=ConfirmMessageReceivedRequest.SerializeToString,
             response_deserializer=ConfirmMessageReceivedResponse.FromString,
         )
-        self._pull_app_inputs = self._channel.unary_unary(
+        self._pull_task_inputs = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/PullTaskInputs",
             request_serializer=PullTaskInputsRequest.SerializeToString,
             response_deserializer=PullTaskInputsResponse.FromString,
