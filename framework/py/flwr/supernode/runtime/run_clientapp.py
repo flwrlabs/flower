@@ -224,7 +224,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
 
 def pull_task_inputs(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
-    """Pull AppInputs from SuperNode."""
+    """Pull TaskInputs from SuperNode."""
     try:
         # Pull Context, Run and FAB
         res: PullTaskInputsResponse = stub.PullTaskInputs(PullTaskInputsRequest())
