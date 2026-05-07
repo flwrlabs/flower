@@ -629,7 +629,7 @@ def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917
 ) -> grpc.Server:
     """Run Fleet API (gRPC, request-response)."""
     interceptors = list(interceptors or [])
-    interceptors .append(create_fleet_runtime_version_server_interceptor())
+    interceptors.append(create_fleet_runtime_version_server_interceptor())
 
     # Create Fleet API gRPC server
     fleet_servicer = FleetServicer(
