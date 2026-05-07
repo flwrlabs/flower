@@ -106,8 +106,6 @@ class InMemoryNodeState(
         limit: int | None = None,
     ) -> Sequence[Message]:
         """Retrieve messages based on the specified filters."""
-        with self.lock_task_store:
-            self._cleanup_expired_task_tokens_locked()
         self._cleanup_expired_tokens()
 
         selected_messages: list[Message] = []
@@ -181,91 +179,22 @@ class InMemoryNodeState(
         with self.lock_ctx_store:
             return self.ctx_store.get(run_id)
 
-    def get_run_ids_with_pending_messages(self) -> Sequence[int]:
-        """Retrieve run IDs that have at least one pending message."""
-        with self.lock_task_store:
-            self._cleanup_expired_task_tokens_locked()
-            active_task_run_ids = {
-                self.task_store[task_id].run_id
-                for task_id in self.task_token_store
-                if task_id in self.task_store
-            }
-
-        self._cleanup_expired_tokens()
-        with self.lock_token_store:
-            active_run_token_ids = set(self.token_store.keys())
-
-        # Collect run IDs from messages
-        with self.lock_msg_store:
-            ret = {
-                entry.message.metadata.run_id
-                for entry in self.msg_store.values()
-                if entry.message.metadata.reply_to_message_id == ""
-                and not entry.is_retrieved
-            }
-
-        # Exclude runs with an active claim already in progress.
-        ret -= active_task_run_ids
-        ret -= active_run_token_ids
-        return list(ret)
-
-    def _cleanup_expired_task_tokens_locked(self) -> None:
-        """Remove expired task tokens and create crash replies as needed.
-
-        Callers must acquire `lock_task_store` before calling this method.
-        """
-        expired_at = now()
-        current = int(expired_at.timestamp())
-        expired_run_ids: set[int] = set()
-        for task_id, record in list(self.task_token_store.items()):
-            if record.active_until < current:
-                task = self.task_store.get(task_id)
-                if task and task.status.status != Status.FINISHED:
-                    task.finished_at = expired_at.isoformat()
-                    task.status.CopyFrom(
-                        TaskStatus(
-                            status=Status.FINISHED,
-                            sub_status=SubStatus.FAILED,
-                            details="No heartbeat received from the task",
-                        )
-                    )
-                    expired_run_ids.add(task.run_id)
-                del self.task_token_store[task_id]
-                self.task_token_to_task_id.pop(record.token, None)
-
-        self._store_error_replies_for_retrieved_messages(expired_run_ids)
-
     def _on_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
         """Insert error replies for messages associated with expired tokens."""
-        self._store_error_replies_for_retrieved_messages(
-            {run_id for run_id, _ in expired_records}
-        )
-
-    def _store_error_replies_for_retrieved_messages(
-        self, expired_run_ids: set[int]
-    ) -> None:
-        """Insert crash replies for retrieved messages of expired runs."""
-        if not expired_run_ids:
-            return
-
         with self.lock_msg_store:
-            existing_error_replies = {
-                entry.message.metadata.reply_to_message_id
-                for entry in self.msg_store.values()
-                if entry.message.has_error()
-                and entry.message.error.code == ErrorCode.CLIENT_APP_CRASHED
-            }
-            messages_to_reply = [
-                entry.message
-                for entry in self.msg_store.values()
-                if entry.message.metadata.run_id in expired_run_ids
-                and entry.is_retrieved
-                and entry.message.metadata.message_id not in existing_error_replies
-            ]
+            # Find all retrieved messages associated with expired run IDs
+            expired_run_ids = {run_id for run_id, _ in expired_records}
+            messages_to_reply: list[Message] = []
+            for entry in self.msg_store.values():
+                msg = entry.message
+                if msg.metadata.run_id in expired_run_ids and entry.is_retrieved:
+                    messages_to_reply.append(msg)
 
+            # Create and store error replies for each message
             for msg in messages_to_reply:
                 error_reply = Message(CLIENT_APP_CRASHED_ERROR, reply_to=msg)
 
+                # Insert objects of the error reply into the object store
                 with no_object_id_recompute():
                     # pylint: disable-next=W0212
                     error_reply.metadata._message_id = error_reply.object_id  # type: ignore
@@ -274,6 +203,7 @@ class InMemoryNodeState(
                     for obj_id, obj in get_all_nested_objects(error_reply).items():
                         self.object_store.put(obj_id, obj.deflate())
 
+                # Store the error reply message
                 self.store_message(error_reply)
 
     def record_message_processing_start(self, message_id: str) -> None:
