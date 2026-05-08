@@ -108,6 +108,19 @@ def _make_stream_call(
     return call
 
 
+def _make_runtime_rpc_error() -> grpc.RpcError:
+    rpc_error = grpc.RpcError()
+    rpc_error.details = Mock(
+        return_value=FlowerError(
+            ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
+            "internal diagnostic message",
+            public_details="runtime mismatch",
+        ).to_json("Runtime version compatibility check failed.")
+    )
+    rpc_error.add_callback = Mock(side_effect=NotImplementedError)
+    return rpc_error
+
+
 class TestRuntimeVersionClientInterceptor(TestCase):
     """Unit tests for RuntimeVersionClientInterceptor."""
 
@@ -196,16 +209,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
 
     def test_log_unary_incompatibility_from_returned_rpc_error(self) -> None:
         """Unary-unary RpcError outcomes should not register callbacks."""
-        rpc_error = grpc.RpcError()
-        rpc_error.details = Mock(
-            return_value=FlowerError(
-                ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
-                "internal diagnostic message",
-                public_details="runtime mismatch",
-            ).to_json("Runtime version compatibility check failed.")
-        )
-        rpc_error.trailing_metadata = Mock(return_value=())
-        rpc_error.add_callback = Mock(side_effect=NotImplementedError)
+        rpc_error = _make_runtime_rpc_error()
 
         with patch(
             "flwr.supercore.interceptors.runtime_version_interceptor.log"
@@ -479,3 +483,20 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
         self.assertIs(response, mock_call)
         mock_call.add_callback.assert_called_once()
         log_mock.assert_called_once()
+
+    def test_log_stream_incompatibility_from_returned_rpc_error(self) -> None:
+        """Unary-stream RpcError outcomes should not register callbacks."""
+        rpc_error = _make_runtime_rpc_error()
+
+        with patch(
+            "flwr.supercore.interceptors.runtime_version_interceptor.log"
+        ) as log_mock:
+            response = self.interceptor.intercept_unary_stream(
+                continuation=lambda _details, _request: rpc_error,
+                client_call_details=_make_call_details("/flwr.proto.Fleet/PullTaskIns"),
+                request=GetNodesRequest(run_id=1),
+            )
+
+        self.assertIs(response, rpc_error)
+        rpc_error.add_callback.assert_not_called()
+        log_mock.assert_called_once_with(WARN, "runtime mismatch")

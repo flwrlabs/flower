@@ -83,22 +83,18 @@ class RuntimeVersionClientInterceptor(
                 client_call_details.metadata
             )
         )
-        try:
-            call: grpc.Call = continuation(details, request)
-        except grpc.RpcError as err:
-            self._maybe_log_incompat_error(err)
-            raise
+        call: grpc.Call = continuation(details, request)
 
-        def _log_incompat_warning() -> None:
+        def _log_on_completion() -> None:
             self._maybe_log_incompat_warning(call.trailing_metadata())
             self._maybe_log_incompat_error(call)
 
         if isinstance(call, grpc.RpcError):
-            _log_incompat_warning()
+            self._maybe_log_incompat_error(call)
             return call
 
-        if not call.add_callback(_log_incompat_warning):
-            _log_incompat_warning()
+        if not call.add_callback(_log_on_completion):
+            _log_on_completion()
 
         return call
 
@@ -114,18 +110,18 @@ class RuntimeVersionClientInterceptor(
                 client_call_details.metadata
             )
         )
-        try:
-            call: grpc.Call = continuation(details, request)
-        except grpc.RpcError as err:
-            self._maybe_log_incompat_error(err)
-            raise
+        call: grpc.Call = continuation(details, request)
 
-        def _log_incompat_warning() -> None:
+        def _log_on_completion() -> None:
             self._maybe_log_incompat_warning(call.trailing_metadata())
             self._maybe_log_incompat_error(call)
 
-        if not call.add_callback(_log_incompat_warning):
-            _log_incompat_warning()
+        if isinstance(call, grpc.RpcError):
+            self._maybe_log_incompat_error(call)
+            return call
+
+        if not call.add_callback(_log_on_completion):
+            _log_on_completion()
 
         return call
 
