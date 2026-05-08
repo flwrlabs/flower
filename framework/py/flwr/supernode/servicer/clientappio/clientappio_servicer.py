@@ -35,8 +35,6 @@ from flwr.common.typing import Run
 # pylint: disable=E0611
 from flwr.proto import clientappio_pb2_grpc
 from flwr.proto.appio_pb2 import (
-    CreateTaskRequest,
-    CreateTaskResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
