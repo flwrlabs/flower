@@ -204,53 +204,6 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def verify_token(self, run_id: int, token: str) -> bool:
-        """Verify a token for the given run ID.
-
-        Parameters
-        ----------
-        run_id : int
-            The ID of the run for which to verify the token.
-        token : str
-            The token to verify.
-
-        Returns
-        -------
-        bool
-            True if the token is valid for the run ID, False otherwise.
-        """
-
-    @abstractmethod
-    def get_run_id_by_token(self, token: str) -> int | None:
-        """Get the run ID associated with a given token.
-
-        Parameters
-        ----------
-        token : str
-            The token to look up.
-
-        Returns
-        -------
-        Optional[int]
-            The run ID if the token is valid, otherwise None.
-        """
-
-    @abstractmethod
-    def acknowledge_app_heartbeat(self, token: str) -> bool:
-        """Acknowledge an app heartbeat with the provided token.
-
-        Parameters
-        ----------
-        token : str
-            The token associated with the app.
-
-        Returns
-        -------
-        bool
-            True if the heartbeat is acknowledged successfully, False otherwise.
-        """
-
-    @abstractmethod
     def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:
         """Atomically reserve a nonce in a namespace until `expires_at`.
 
