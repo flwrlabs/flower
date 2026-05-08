@@ -167,9 +167,9 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(grid._stub))
         heartbeat_sender.start()
 
-        # Pull ServerAppInputs from LinkState
+        # Pull PullTaskInput from LinkState
         try:
-            log(DEBUG, "[flwr-serverapp] Pull ServerAppInputs")
+            log(DEBUG, "[flwr-serverapp] Pull PullTaskInput")
             req = PullTaskInputRequest()
             res: PullTaskInputResponse = grid._stub.PullTaskInput(req)
         except grpc.RpcError as ex:

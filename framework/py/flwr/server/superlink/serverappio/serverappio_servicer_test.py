@@ -375,7 +375,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=PullAppMessagesRequest.SerializeToString,
             response_deserializer=PullAppMessagesResponse.FromString,
         )
-        self._push_serverapp_outputs = self._channel.unary_unary(
+        self._push_task_output = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/PushTaskOutput",
             request_serializer=PushTaskOutputRequest.SerializeToString,
             response_deserializer=PushTaskOutputResponse.FromString,
@@ -836,10 +836,10 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             # expected a single object id (that of the error message)
             assert list(object_ids_in_response) == [msg_res.object_id]
 
-    def _assert_push_serverapp_outputs_not_allowed(
+    def _assert_push_task_output_not_allowed(
         self, token: str, context: Context
     ) -> None:
-        """Assert `PushServerAppOutputs` not allowed."""
+        """Assert `PushTaskOutput` not allowed."""
         run_id = self.state.get_run_id_by_token(token)
         assert run_id is not None, "Invalid token is provided."
         run_status = self.state.get_run_status({run_id})[run_id]
@@ -848,7 +848,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         )
 
         with self.assertRaises(grpc.RpcError) as e:
-            self._push_serverapp_outputs.with_call(request=request)
+            self._push_task_output.with_call(request=request)
         assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
         assert e.exception.details() == self.status_to_msg[run_status.status]
 
@@ -1041,7 +1041,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.STARTING
 
-        # Execute: Pull app inputs
+        # Execute: Pull task input
         request = PullTaskInputRequest()
         with patch(
             "flwr.server.superlink.serverappio.serverappio_servicer."

@@ -48,7 +48,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     iterate_object_tree,
 )
-from flwr.supernode.runtime.run_clientapp import pull_task_inputs, push_task_outputs
+from flwr.supernode.runtime.run_clientapp import pull_task_input, push_task_output
 
 from .clientappio_servicer import ClientAppIoServicer
 
@@ -65,7 +65,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         mock_state_factory.state.return_value = self.mock_state
         self.servicer = ClientAppIoServicer(mock_state_factory, Mock())
 
-    def test_pull_clientapp_inputs(self) -> None:
+    def test_pull_task_input(self) -> None:
         """Test pulling messages from SuperNode."""
         # Prepare
         mock_message = make_message(
@@ -104,7 +104,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_stub.PullTaskInput.return_value = mock_response
 
         # Execute
-        message, context, run, fab = pull_task_inputs(self.mock_stub)
+        message, context, run, fab = pull_task_input(self.mock_stub)
 
         # Assert
         self.mock_stub.PullTaskInput.assert_called_once()
@@ -118,7 +118,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.assertEqual(fab.hash_str, mock_fab.hash_str)
         self.assertEqual(fab.content, mock_fab.content)
 
-    def test_push_clientapp_outputs(self) -> None:
+    def test_push_task_output(self) -> None:
         """Test pushing messages to SuperNode."""
         # Prepare: Create Message and context
         sub_status = SubStatus.COMPLETED
@@ -158,7 +158,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_stub.PushObject.side_effect = mock_push_object
 
         # Execute
-        _ = push_task_outputs(
+        _ = push_task_output(
             stub=self.mock_stub,
             message=message,
             context=context,
@@ -174,7 +174,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.assertEqual(push_outputs_request.sub_status, sub_status)
         self.assertEqual(push_outputs_request.details, details)
 
-    def test_servicer_pull_task_inputs_activates_task(self) -> None:
+    def test_servicer_pull_task_input_activates_task(self) -> None:
         """PullTaskInput should activate the authenticated task."""
         run_id = 61016
         task_id = 123
@@ -212,7 +212,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.assertIsInstance(response, PullTaskInputResponse)
         self.mock_state.activate_task.assert_called_once_with(task_id=task_id)
 
-    def test_servicer_push_task_outputs_finishes_task(self) -> None:
+    def test_servicer_push_task_output_finishes_task(self) -> None:
         """PushTaskOutput should finish the authenticated task."""
         token = "test-token"
         run_id = 61016

@@ -126,7 +126,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         heartbeat_sender.start()
 
         # Pull Message, Context, Run and FAB from SuperNode
-        message, context, run, fab = pull_task_inputs(stub)
+        message, context, run, fab = pull_task_input(stub)
         reply_message: Message | None = None
         sub_status = SubStatus.FAILED
         details = "ClientApp task failed due to unknown reason"
@@ -205,7 +205,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
                     reply_to=message,
                 )
 
-            push_task_outputs(
+            push_task_output(
                 stub=stub,
                 message=reply_message,
                 context=context,
@@ -223,8 +223,8 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     )
 
 
-def pull_task_inputs(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
-    """Pull TaskInputs from SuperNode."""
+def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
+    """Pull TaskInput from SuperNode."""
     try:
         # Pull Context, Run and FAB
         res: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
@@ -257,14 +257,14 @@ def pull_task_inputs(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]
         raise e
 
 
-def push_task_outputs(  # pylint: disable=R0913, R0917
+def push_task_output(  # pylint: disable=R0913, R0917
     stub: ClientAppIoStub,
     message: Message,
     context: Context,
     sub_status: str,
     details: str,
 ) -> PushTaskOutputResponse:
-    """Push TaskOutputs to SuperNode."""
+    """Push TaskOutput to SuperNode."""
     # Set message ID
     message.metadata.__dict__["_message_id"] = message.object_id
     proto_message = message_to_proto(remove_content_from_message(message))
