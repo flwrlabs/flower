@@ -52,6 +52,7 @@ from .utils import (
     generate_rand_int_from_bytes,
     has_valid_sub_status,
     is_valid_transition,
+    primary_task_type_from_run_type,
     verify_found_message_replies,
     verify_message_ids,
 )
@@ -580,6 +581,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         run_type: str,
     ) -> int:
         """Create a new run."""
+        task_type = primary_task_type_from_run_type(run_type)
+
         # Sample a random int64 as run_id
         with self.lock:
             run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
@@ -615,6 +618,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 # Add run_id to the flwr_aid_to_run_ids mapping if flwr_aid is provided
                 if flwr_aid:
                     self.flwr_aid_to_run_ids[flwr_aid].add(run_id)
+
+                if self.create_task(task_type, run_id, fab_hash) is None:
+                    log(ERROR, "Failed to create task for run ID %s", run_id)
+                    return 0
 
                 return run_id
         log(ERROR, "Unexpected run creation failure.")

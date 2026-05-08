@@ -65,6 +65,7 @@ from .utils import (
     dict_to_message,
     generate_rand_int_from_bytes,
     message_to_dict,
+    primary_task_type_from_run_type,
     verify_found_message_replies,
     verify_message_ids,
 )
@@ -838,6 +839,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         run_type: str,
     ) -> int:
         """Create a new run."""
+        task_type = primary_task_type_from_run_type(run_type)
+
         # Sample a random int64 as run_id
         uint64_run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
 
@@ -891,6 +894,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     "usage_reported_at": "",
                 }
                 self.query(query, params)
+                if self.create_task(task_type, uint64_run_id, fab_hash) is None:
+                    log(ERROR, "Failed to create task for run ID %s", uint64_run_id)
+                    return 0
                 return uint64_run_id
         log(ERROR, "Unexpected run creation failure.")
         return 0

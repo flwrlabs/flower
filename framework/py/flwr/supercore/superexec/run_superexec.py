@@ -18,6 +18,8 @@
 import time
 from typing import Any
 
+import grpc
+
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
@@ -34,7 +36,10 @@ from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
-from flwr.supercore.interceptors import SuperExecAuthClientInterceptor
+from flwr.supercore.interceptors import (
+    RuntimeVersionClientInterceptor,
+    SuperExecAuthClientInterceptor,
+)
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
     CLIENTAPPIO_SUPEREXEC_METHODS,
     SERVERAPPIO_SUPEREXEC_METHODS,
@@ -86,18 +91,20 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
     runtime_dependency_install : bool (default: False)
         Whether runtime dependency installation is allowed.
     """
-    interceptors: list[SuperExecAuthClientInterceptor] | None = None
+    interceptors: list[grpc.UnaryUnaryClientInterceptor] = [
+        RuntimeVersionClientInterceptor(component_name="SuperExec")
+    ]
+    auth_interceptor: SuperExecAuthClientInterceptor | None = None
     if superexec_auth_secret:
         if stub_class is ServerAppIoStub:
             protected_methods = SERVERAPPIO_SUPEREXEC_METHODS
         else:
             protected_methods = CLIENTAPPIO_SUPEREXEC_METHODS
-        interceptors = [
-            SuperExecAuthClientInterceptor(
-                master_secret=superexec_auth_secret,
-                protected_methods=protected_methods,
-            )
-        ]
+        auth_interceptor = SuperExecAuthClientInterceptor(
+            master_secret=superexec_auth_secret,
+            protected_methods=protected_methods,
+        )
+        interceptors.append(auth_interceptor)
 
     # Start monitoring the parent process if a PID is provided
     if parent_pid is not None:
@@ -180,12 +187,12 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
                     if isinstance(plugin, BaseEphemeralExecPlugin):
 
                         def cleanup_auth_secret() -> None:
-                            nonlocal superexec_auth_secret, interceptors
+                            nonlocal superexec_auth_secret
                             if superexec_auth_secret is not None:
                                 superexec_auth_secret = None
-                            if interceptors:
+                            if auth_interceptor is not None:
                                 # pylint: disable-next=protected-access
-                                interceptors[0]._auth_secret = b"\x00" * 32
+                                auth_interceptor._auth_secret = b"\x00" * 32
 
                         plugin.cleanup_before_launch = cleanup_auth_secret
 
