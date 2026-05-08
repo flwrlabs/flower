@@ -220,7 +220,6 @@ class CoreState(ABC):
             True if the token is valid for the run ID, False otherwise.
         """
 
-
     @abstractmethod
     def acknowledge_app_heartbeat(self, token: str) -> bool:
         """Acknowledge an app heartbeat with the provided token.
