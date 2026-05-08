@@ -530,21 +530,23 @@ class StateTest(CoreStateTest):
 
     def test_usage_report_hook_not_called_when_no_runs_updated(self) -> None:
         """Test report_run_usage is not called when expired tokens match no runs."""
-        # Prepare: create a run already in FINISHED state
+        # Prepare: create a run already in FINISHED state with an active task claim
         state = self.state_factory()
         run_id = create_dummy_run(state)
-        assert state.create_token(run_id) is not None
+        task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
+        assert task_id is not None
+        assert state.claim_task(task_id) is not None
         state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
         state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
         state.update_run_status(
             run_id, RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done")
         )
         state.federation_manager.report_run_usage = Mock()  # type: ignore
-        # Execute: advance time past token expiry and trigger cleanup
+        # Execute: advance time past task claim expiry and trigger cleanup
         patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = patched_dt
-            state.verify_token(run_id, "dummy_token")
+            state.get_run_status({run_id})
         # Assert: hook should NOT be called since the run was already finished
         state.federation_manager.report_run_usage.assert_not_called()
 
@@ -2110,12 +2112,14 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
+        task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
+        assert task_id is not None
+        assert state.claim_task(task_id) is not None
         assert state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
         assert state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
         assert state.update_run_status(
             run_id, RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done")
         )
-        assert state.create_token(run_id) is not None
 
         # Execute: force token expiry and trigger cleanup
         patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)

@@ -342,36 +342,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertIsNone(state.get_task_by_token("missing-token"))
 
-    def test_create_token_already_exists(self) -> None:
-        """Test creating a token that already exists."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-        state.create_token(run_id)
-
-        # Execute
-        ret = state.create_token(run_id)
-
-        # Assert: The return is None
-        self.assertIsNone(ret)
-
-    def test_acknowledge_app_heartbeat_success(self) -> None:
-        """Test successfully acknowledging an app heartbeat."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-        token = state.create_token(run_id)
-        assert token is not None
-
-        # Execute: acknowledge heartbeat
-        result = state.acknowledge_app_heartbeat(token)
-
-        # Assert: should return True
-        self.assertTrue(result)
-
-        # Assert: token should still be valid
-        self.assertTrue(state.verify_token(run_id, token))
-
     def test_acknowledge_app_heartbeat_nonexistent_token(self) -> None:
         """Test acknowledging heartbeat with nonexistent token."""
         # Prepare
