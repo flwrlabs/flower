@@ -25,16 +25,6 @@ import "flwr/proto/task.proto";
 
 // These messages are used by both ServerAppIo and ClientAppIo services
 
-// ListAppsToLaunch messages
-message ListAppsToLaunchRequest {}
-message ListAppsToLaunchResponse {
-  repeated uint64 run_ids = 1; // List of run IDs of the apps to launch
-}
-
-// RequestToken messages
-message RequestTokenRequest { uint64 run_id = 1; }
-message RequestTokenResponse { string token = 1; }
-
 // PullPendingTasks messages
 message PullPendingTasksRequest {}
 message PullPendingTasksResponse { repeated Task tasks = 1; }

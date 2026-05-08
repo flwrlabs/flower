@@ -63,7 +63,7 @@ from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import NOOP_FEDERATION
-from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
+from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
@@ -186,14 +186,11 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
     try:
         # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(
-            make_app_heartbeat_fn_grpc(conn._stub, token)
-        )
+        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(conn._stub))
         heartbeat_sender.start()
 
         # Pull SimulationInputs from LinkState
-        req = PullAppInputsRequest(token=token)
-        res: PullAppInputsResponse = conn._stub.PullAppInputs(req)
+        res: PullAppInputsResponse = conn._stub.PullAppInputs(PullAppInputsRequest())
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
         fab = fab_from_proto(res.fab)

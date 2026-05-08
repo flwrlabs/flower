@@ -61,7 +61,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.server.grid.grpc_grid import GrpcGrid
 from flwr.server.run_serverapp import run as run_
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
+from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
@@ -164,15 +164,13 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         )
 
         # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(
-            make_app_heartbeat_fn_grpc(grid._stub, token)
-        )
+        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(grid._stub))
         heartbeat_sender.start()
 
         # Pull ServerAppInputs from LinkState
         try:
             log(DEBUG, "[flwr-serverapp] Pull ServerAppInputs")
-            req = PullAppInputsRequest(token=token)
+            req = PullAppInputsRequest()
             res: PullAppInputsResponse = grid._stub.PullAppInputs(req)
         except grpc.RpcError as ex:
             if ex.code() == grpc.StatusCode.FAILED_PRECONDITION:
