@@ -146,20 +146,36 @@ to launch the second SuperNode.
         --clientappio-api-address 127.0.0.1:9095 \
         --node-config="partition-id=1 num-partitions=2"
 
-**********************************************
- Securing internal AppIo connections with TLS
-**********************************************
+At this point, you have successfully launched a SuperLink and two SuperNodes with
+TLS-enabled connections.
 
-This section describes how to enable TLS for the internal AppIo connections between
-SuperExec and the ServerAppIo or ClientAppIo APIs. The commands above already include
-the ``--appio-ssl-*`` options needed to start the ServerAppIo and ClientAppIo APIs with
-TLS enabled.
+.. note::
 
-The commands above use the default ``subprocess`` isolation mode. In this mode,
-SuperLink or SuperNode start SuperExec for you and pass the AppIo root certificate to it
-automatically. If you want to start SuperExec separately, relaunch the corresponding
-SuperLink or SuperNode command with ``--isolation process`` first. Then start SuperExec
-and pass the same CA certificate with ``--root-certificates``.
+    The AppIo TLS options configure server-authenticated TLS. They do not configure
+    mutual TLS. The ``--appio-ssl-ca-certfile`` file is used by SuperExec and app
+    processes to verify the AppIo server certificate, not as a client certificate. If
+    AppIo TLS is not configured, internal AppIo connections remain unencrypted and
+    should stay inside a trusted network.
+
+*****************************************************************
+ Securing AppIo Connections with TLS in "Process" Isolation Mode
+*****************************************************************
+
+(see :ref:`how-to-run-flower-with-deployment-engine` for more details about SuperExec,
+"process" isolation mode, and "subprocess" isolation mode)
+
+So far, we've been showing you how to enable TLS for AppIo connections when using the
+default "subprocess" isolation mode. In this mode, SuperLink and SuperNode automatically
+start theis SuperExecs with the correct AppIo TLS options. However, if you want to run
+SuperExec separately in "process" isolation mode, you need to do a few things
+differently to enable TLS for the AppIo connections.
+
+First, we need to relaunch the SuperLink and SuperNode with the AppIo TLS options and
+with ``--isolation=process``. This tells the SuperLink and SuperNode that the SuperExecs
+will be launched separately, e.g. by an orchestration system. Next, in order for the
+SuperExecs to establish TLS connections to the AppIo APIs, we need to provide the AppIo
+TLS options when launching the SuperExecs. Below is an example command to launch a
+SuperExec that can establish TLS connections to the ServerAppIo API of the SuperLink:
 
 .. code-block:: bash
     :emphasize-lines: 2
@@ -175,16 +191,15 @@ and pass the same CA certificate with ``--root-certificates``.
     * | ``--appio-api-address``: Specify the address of the AppIo API that SuperExec should connect to. In this example, ``127.0.0.1:9091`` is the SuperLink's ServerAppIo API.
     * | ``--plugin-type``: Specify the type of app process SuperExec should launch. Use ``serverapp`` for a ``ServerApp`` SuperExec.
 
-Use the same procedure for a ``ClientApp`` SuperExec. Pass the SuperNode's ClientAppIo
-API address, e.g. ``127.0.0.1:9094``, and set ``--plugin-type clientapp``.
+Next, use the same procedure for a ``ClientApp`` SuperExec, but pass the SuperNode's
+ClientAppIo API address, e.g. ``127.0.0.1:9094``, and set ``--plugin-type clientapp``.
 
-.. note::
-
-    The AppIo TLS options configure server-authenticated TLS. They do not configure
-    mutual TLS. The ``--appio-ssl-ca-certfile`` file is used by SuperExec and app
-    processes to verify the AppIo server certificate, not as a client certificate. If
-    AppIo TLS is not configured, internal AppIo connections remain unencrypted and
-    should stay inside a trusted network.
+Now your SuperLink-side SuperExec and SuperNode-side SuperExec can establish TLS
+connections to their respective AppIo APIs. When using "process" isolation mode, it is
+the responsibility of the process launcher (e.g. user or orchestrator) to launch the
+SuperExecs with the correct AppIo TLS options. If you use an orchestration system to
+launch the SuperExecs, make sure to include the AppIo TLS options in the commands or
+configuration used by your orchestration system.
 
 ************************
  TLS-enabled Flower CLI
