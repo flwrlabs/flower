@@ -27,6 +27,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullPendingTasksRequest,
     SendTaskHeartbeatRequest,
 )
+from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 
@@ -239,3 +240,15 @@ class TestAppIoServicer(unittest.TestCase):
             grpc.StatusCode.INTERNAL,
             "Failed to create task",
         )
+
+    def test_push_logs_merges_logs_and_stores_them(self) -> None:
+        """PushLogs should concatenate fragments and store them via state."""
+        # Execute
+        response = self.servicer.PushLogs(
+            PushLogsRequest(run_id=123, logs=["hello", " ", "world"]),
+            Mock(),
+        )
+
+        # Assert
+        self.state.add_serverapp_log.assert_called_once_with(123, "hello world")
+        self.assertEqual(response.__class__.__name__, "PushLogsResponse")
