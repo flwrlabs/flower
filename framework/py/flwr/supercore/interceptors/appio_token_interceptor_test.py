@@ -27,7 +27,7 @@ from google.protobuf.message import Message as GrpcMessage
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullPendingTasksRequest,
     PushAppMessagesRequest,
-    PushAppOutputsRequest,
+    PushTaskOutputRequest,
 )
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoServicer
 from flwr.proto.message_pb2 import PushObjectRequest  # pylint: disable=E0611
@@ -297,7 +297,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/PushAppOutputs",
+                "/flwr.proto.ServerAppIo/PushTaskOutput",
                 invocation_metadata=((APP_TOKEN_HEADER, "metadata-token"),),
             ),
         )
@@ -305,7 +305,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
         response = cast(
             str,
             intercepted.unary_unary(
-                PushAppOutputsRequest(token="request-token", run_id=5), Mock()
+                PushTaskOutputRequest(token="request-token", run_id=5), Mock()
             ),
         )
         self.assertEqual(response, "ok")
@@ -337,14 +337,14 @@ class TestAppIoTokenServerInterceptor(TestCase):
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/PushAppOutputs",
+                "/flwr.proto.ServerAppIo/PushTaskOutput",
                 invocation_metadata=(),
             ),
         )
 
         with self.assertRaises(grpc.RpcError):
             intercepted.unary_unary(
-                PushAppOutputsRequest(token="request-token", run_id=5), context
+                PushTaskOutputRequest(token="request-token", run_id=5), context
             )
         context.abort.assert_called_once_with(
             grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE

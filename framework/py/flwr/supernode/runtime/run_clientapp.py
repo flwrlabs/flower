@@ -41,13 +41,13 @@ from flwr.common.serde import (
 from flwr.common.telemetry import EventType, event
 from flwr.common.typing import Fab, Run
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    PullAppInputsRequest,
-    PullAppInputsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
+    PullTaskInputRequest,
+    PullTaskInputResponse,
     PushAppMessagesRequest,
-    PushAppOutputsRequest,
-    PushAppOutputsResponse,
+    PushTaskOutputRequest,
+    PushTaskOutputResponse,
 )
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
@@ -126,7 +126,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         heartbeat_sender.start()
 
         # Pull Message, Context, Run and FAB from SuperNode
-        message, context, run, fab = pull_appinputs(stub)
+        message, context, run, fab = pull_task_input(stub)
         reply_message: Message | None = None
         sub_status = SubStatus.FAILED
         details = "ClientApp task failed due to unknown reason"
@@ -205,7 +205,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
                     reply_to=message,
                 )
 
-            push_appoutputs(
+            push_task_output(
                 stub=stub,
                 message=reply_message,
                 context=context,
@@ -223,11 +223,11 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     )
 
 
-def pull_appinputs(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
-    """Pull AppInputs from SuperNode."""
+def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
+    """Pull TaskInput from SuperNode."""
     try:
         # Pull Context, Run and FAB
-        res: PullAppInputsResponse = stub.PullAppInputs(PullAppInputsRequest())
+        res: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
         fab = fab_from_proto(res.fab)
@@ -253,18 +253,18 @@ def pull_appinputs(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
         message.metadata.__dict__["_message_id"] = object_tree.object_id
         return message, context, run, fab
     except grpc.RpcError as e:
-        log(ERROR, "[PullAppInputs] gRPC error occurred: %s", str(e))
+        log(ERROR, "[PullTaskInput] gRPC error occurred: %s", str(e))
         raise e
 
 
-def push_appoutputs(  # pylint: disable=R0913, R0917
+def push_task_output(  # pylint: disable=R0913, R0917
     stub: ClientAppIoStub,
     message: Message,
     context: Context,
     sub_status: str,
     details: str,
-) -> PushAppOutputsResponse:
-    """Push AppOutputs to SuperNode."""
+) -> PushTaskOutputResponse:
+    """Push TaskOutput to SuperNode."""
     # Set message ID
     message.metadata.__dict__["_message_id"] = message.object_id
     proto_message = message_to_proto(remove_content_from_message(message))
@@ -302,12 +302,12 @@ def push_appoutputs(  # pylint: disable=R0913, R0917
             )
 
         # Push Context
-        res: PushAppOutputsResponse = stub.PushAppOutputs(
-            PushAppOutputsRequest(
+        res: PushTaskOutputResponse = stub.PushTaskOutput(
+            PushTaskOutputRequest(
                 context=proto_context, sub_status=sub_status, details=details
             )
         )
         return res
     except grpc.RpcError as e:
-        log(ERROR, "[PushAppOutputs] gRPC error occurred: %s", str(e))
+        log(ERROR, "[PushTaskOutput] gRPC error occurred: %s", str(e))
         raise e

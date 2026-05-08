@@ -28,6 +28,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PullObjectRequest,
     PullObjectResponse,
 )
+from flwr.supercore.constant import TaskType
 from flwr.supercore.interceptors import (
     APP_TOKEN_HEADER,
     AUTHENTICATION_FAILED_MESSAGE,
@@ -56,7 +57,9 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         state_factory = NodeStateFactory(objectstore_factory=objectstore_factory)
 
         state = state_factory.state()
-        token = state.create_token(99)
+        task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99)
+        assert task_id is not None
+        token = state.claim_task(task_id)
         assert token is not None
         self.valid_token = token
 

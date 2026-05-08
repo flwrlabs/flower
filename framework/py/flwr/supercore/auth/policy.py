@@ -43,8 +43,8 @@ SERVERAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ServerAppIo/ClaimTask": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ServerAppIo/GetRun": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ServerAppIo/SendTaskHeartbeat": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ServerAppIo/PullAppInputs": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ServerAppIo/PushAppOutputs": MethodTokenPolicy.token_required(),
+    "/flwr.proto.ServerAppIo/PullTaskInput": MethodTokenPolicy.token_required(),
+    "/flwr.proto.ServerAppIo/PushTaskOutput": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PushObject": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PullObject": MethodTokenPolicy.token_required(),
     # pylint: disable-next=line-too-long
@@ -62,8 +62,8 @@ CLIENTAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ClientAppIo/ClaimTask": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ClientAppIo/GetRun": MethodTokenPolicy.no_auth(),
     "/flwr.proto.ClientAppIo/SendTaskHeartbeat": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ClientAppIo/PullAppInputs": MethodTokenPolicy.token_required(),
-    "/flwr.proto.ClientAppIo/PushAppOutputs": MethodTokenPolicy.token_required(),
+    "/flwr.proto.ClientAppIo/PullTaskInput": MethodTokenPolicy.token_required(),
+    "/flwr.proto.ClientAppIo/PushTaskOutput": MethodTokenPolicy.token_required(),
     "/flwr.proto.ClientAppIo/PushObject": MethodTokenPolicy.token_required(),
     "/flwr.proto.ClientAppIo/PullObject": MethodTokenPolicy.token_required(),
     # pylint: disable-next=line-too-long
