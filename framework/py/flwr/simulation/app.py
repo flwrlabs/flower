@@ -53,9 +53,9 @@ from flwr.common.serde import (
     run_from_proto,
 )
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    PullAppInputsRequest,
-    PullAppInputsResponse,
-    PushAppOutputsRequest,
+    PullTaskInputRequest,
+    PullTaskInputResponse,
+    PushTaskOutputRequest,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
@@ -190,7 +190,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         heartbeat_sender.start()
 
         # Pull SimulationInputs from LinkState
-        res: PullAppInputsResponse = conn._stub.PullAppInputs(PullAppInputsRequest())
+        res: PullTaskInputResponse = conn._stub.PullTaskInput(PullTaskInputRequest())
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
         fab = fab_from_proto(res.fab)
@@ -304,13 +304,13 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         exit_code = ExitCode.SIMULATION_EXCEPTION
     finally:
         log(DEBUG, "[flwr-simulation] Will push Simulation task output")
-        out_req = PushAppOutputsRequest(
+        out_req = PushTaskOutputRequest(
             context=context_to_proto(context) if context else None,
             sub_status=sub_status,
             details=details,
         )
         try:
-            _ = conn._stub.PushAppOutputs(out_req)
+            _ = conn._stub.PushTaskOutput(out_req)
         except grpc.RpcError:
             pass
 
