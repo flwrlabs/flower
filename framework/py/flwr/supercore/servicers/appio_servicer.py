@@ -87,31 +87,25 @@ class AppIoServicer(ABC):
         """Create a task."""
         log(DEBUG, "AppIoServicer.CreateTask")
 
-        authenticated_run_id = get_authenticated_task().run_id
-        if request.run_id != authenticated_run_id:
-            context.abort(
-                grpc.StatusCode.PERMISSION_DENIED,
-                "`run_id` does not match authenticated token.",
-            )
-            raise RuntimeError("This line should never be reached.")
+        run_id = get_authenticated_task().run_id
 
         _validate_create_task_request(request, context)
 
         state = self.state()
-        task_id = state.create_task(
+        created_task_id = state.create_task(
             task_type=request.type,
-            run_id=authenticated_run_id,
+            run_id=run_id,
             fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
             model_ref=request.model_ref if request.HasField("model_ref") else None,
             connector_ref=(
                 request.connector_ref if request.HasField("connector_ref") else None
             ),
         )
-        if task_id is None:
+        if created_task_id is None:
             context.abort(grpc.StatusCode.INTERNAL, "Failed to create task")
             raise RuntimeError("This line should never be reached.")
 
-        return CreateTaskResponse(task_id=task_id)
+        return CreateTaskResponse(task_id=created_task_id)
 
 
 def _validate_create_task_request(
