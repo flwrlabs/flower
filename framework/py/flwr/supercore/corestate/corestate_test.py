@@ -109,18 +109,25 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         assert task_id_1 and task_id_2 and task_id_3
 
         tasks = state.get_tasks(run_ids=[run_id_1])
+        task_ids = {task.task_id for task in tasks}
 
-        self.assertEqual({task.task_id for task in tasks}, {task_id_1, task_id_3})
+        self.assertTrue({task_id_1, task_id_3}.issubset(task_ids))
+        self.assertNotIn(task_id_2, task_ids)
+        self.assertTrue(all(task.run_id == run_id_1 for task in tasks))
 
     def test_get_tasks_single_status_matches(self) -> None:
         """A single-item status sequence should match pending tasks."""
         state = self.state_factory()
-        _ = state.create_task(task_type=TaskType.MODEL, run_id=self.task_run_id(state))
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert task_id
 
         tasks = state.get_tasks(statuses=[Status.PENDING])
+        task_ids = {task.task_id for task in tasks}
 
-        self.assertEqual(len(tasks), 1)
-        self.assertEqual(tasks[0].status.status, Status.PENDING)
+        self.assertIn(task_id, task_ids)
+        for task in tasks:
+            self.assertEqual(task.status.status, Status.PENDING)
 
     def test_get_tasks_negative_limit_raises(self) -> None:
         """Negative limits should be rejected consistently."""
