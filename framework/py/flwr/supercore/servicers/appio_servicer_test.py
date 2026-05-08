@@ -120,7 +120,6 @@ class TestAppIoServicer(unittest.TestCase):
         self.state.create_task.return_value = 456
         request = CreateTaskRequest(
             type=TaskType.MODEL,
-            run_id=123,
             model_ref="models/abc",
         )
 
@@ -157,7 +156,7 @@ class TestAppIoServicer(unittest.TestCase):
             self.assertRaises(RuntimeError) as err,
         ):
             self.servicer.CreateTask(
-                CreateTaskRequest(type=TaskType.MODEL, run_id=123, model_ref="model"),
+                CreateTaskRequest(type=TaskType.MODEL, model_ref="model"),
                 Mock(),
             )
 
@@ -179,15 +178,15 @@ class TestAppIoServicer(unittest.TestCase):
         # Prepare
         test_cases = [
             (
-                CreateTaskRequest(type=TaskType.SERVER_APP, run_id=123),
+                CreateTaskRequest(type=TaskType.SERVER_APP),
                 "Task type 'flwr-serverapp' requires fab_hash.",
             ),
             (
-                CreateTaskRequest(type=TaskType.MODEL, run_id=123),
+                CreateTaskRequest(type=TaskType.MODEL),
                 "Task type 'flwr-model' requires model_ref.",
             ),
             (
-                CreateTaskRequest(type=TaskType.CONNECTOR, run_id=123),
+                CreateTaskRequest(type=TaskType.CONNECTOR),
                 "Task type 'flwr-connector' requires connector_ref.",
             ),
         ]
@@ -220,7 +219,6 @@ class TestAppIoServicer(unittest.TestCase):
         context.abort.side_effect = grpc.RpcError()
         request = CreateTaskRequest(
             type=TaskType.MODEL,
-            run_id=123,
             model_ref="models/abc",
         )
 
