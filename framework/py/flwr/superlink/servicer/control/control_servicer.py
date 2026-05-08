@@ -250,7 +250,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
             if run_id == 0:
                 context.abort(
-                    grpc.StatusCode.INTERNAL, "Failed to create task for the run."
+                    grpc.StatusCode.INTERNAL,
+                    "Failed to create or initialize the run.",
                 )
 
             # Initialize node config
