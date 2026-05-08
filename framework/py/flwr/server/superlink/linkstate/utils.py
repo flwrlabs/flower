@@ -35,7 +35,7 @@ from flwr.proto.error_pb2 import Error as ProtoError
 from flwr.proto.message_pb2 import Context as ProtoContext
 from flwr.proto.recorddict_pb2 import ConfigRecord as ProtoConfigRecord
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
-from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE
+from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE, RunType, TaskType
 from flwr.supercore.corestate.utils import (
     generate_rand_int_from_bytes as corestate_generate_rand_int_from_bytes,
 )
@@ -67,6 +67,15 @@ NODE_UNAVAILABLE_ERROR_REASON = (
     "Error: Node Unavailable — The destination node failed to report a heartbeat "
     f"within {HEARTBEAT_PATIENCE} × its expected interval."
 )
+
+
+def primary_task_type_from_run_type(run_type: str) -> TaskType:
+    """Return the primary task type for a run type."""
+    if run_type == RunType.SIMULATION:
+        return TaskType.SIMULATION
+    if run_type == RunType.SERVER_APP:
+        return TaskType.SERVER_APP
+    raise ValueError(f"Unsupported run type: {run_type}")
 
 
 def generate_rand_int_from_bytes(

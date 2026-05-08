@@ -55,7 +55,7 @@ from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 
 # pylint: enable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
-from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, RunType
+from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, RunType, TaskType
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
@@ -162,21 +162,37 @@ class StateTest(CoreStateTest):
         assert run.override_config["test_key"] == "test_value"
         assert run.flwr_aid == "i1r9f"
 
+    def test_create_run_creates_primary_task(self) -> None:
+        """Creating a run should also create its primary task."""
+        # Prepare
+        state = self.state_factory()
+
+        # Execute
+        run_id = create_dummy_run(state)
+
+        # Assert
+        tasks = state.get_tasks(run_ids=[run_id])
+        run = state.get_run_info(run_ids=[run_id])[0]
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
+        self.assertEqual(run.primary_task_id, tasks[0].task_id)
+
     def test_create_task_sets_primary_task_id_once(self) -> None:
-        """The first task created for a run should become its primary task."""
+        """New tasks should not replace the run's primary task."""
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
+        run = state.get_run_info(run_ids=[run_id])[0]
+        primary_task_id = run.primary_task_id
 
         # Execute
-        first_task_id = state.create_task(task_type="flwr-agentapp", run_id=run_id)
         second_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
 
         # Assert
-        self.assertIsNotNone(first_task_id)
+        self.assertIsNotNone(primary_task_id)
         self.assertIsNotNone(second_task_id)
         run = state.get_run_info(run_ids=[run_id])[0]
-        self.assertEqual(run.primary_task_id, first_task_id)
+        self.assertEqual(run.primary_task_id, primary_task_id)
         self.assertNotEqual(run.primary_task_id, second_task_id)
 
     def test_create_task_rejects_missing_run(self) -> None:
