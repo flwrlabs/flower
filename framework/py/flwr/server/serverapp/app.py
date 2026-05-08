@@ -169,7 +169,7 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
         # Pull PullTaskInput from LinkState
         try:
-            log(DEBUG, "[flwr-serverapp] Pull PullTaskInput")
+            log(DEBUG, "[flwr-serverapp] Pull task input")
             req = PullTaskInputRequest()
             res: PullTaskInputResponse = grid._stub.PullTaskInput(req)
         except grpc.RpcError as ex:
