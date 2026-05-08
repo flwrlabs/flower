@@ -191,6 +191,18 @@ def create_serverappio_runtime_version_server_interceptor(
     )
 
 
+def create_clientappio_runtime_version_server_interceptor(
+    connection_name: str = "Caller <-> SuperNode ClientAppIo API",
+    send_warning_metadata: bool = False,
+) -> RuntimeVersionServerInterceptor:
+    """Create the default runtime version interceptor for ClientAppIo."""
+    return RuntimeVersionServerInterceptor(
+        connection_name=connection_name,
+        local_metadata=RuntimeVersionMetadata.from_local_component("SuperNode"),
+        send_warning_metadata=send_warning_metadata,
+    )
+
+
 def create_fleet_runtime_version_server_interceptor(
     connection_name: str = "SuperNode <-> SuperLink Fleet API",
     send_warning_metadata: bool = False,

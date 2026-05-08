@@ -29,10 +29,10 @@ from flwr.common.constant import (
     HEARTBEAT_RANDOM_RANGE,
 )
 from flwr.common.retry_invoker import RetryInvoker, exponential
-from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 
 # pylint: disable=E0611
-from flwr.proto.heartbeat_pb2 import SendAppHeartbeatRequest
+from flwr.proto.appio_pb2 import SendTaskHeartbeatRequest
+from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 
 # pylint: enable=E0611
@@ -118,18 +118,15 @@ class HeartbeatSender:
                 raise HeartbeatFailure
 
 
-def make_app_heartbeat_fn_grpc(
+def make_task_heartbeat_fn_grpc(
     stub: ServerAppIoStub | ClientAppIoStub,
-    token: str,
 ) -> Callable[[], bool]:
-    """Get the function to send a heartbeat to gRPC endpoint from an app process.
+    """Get the function to send a heartbeat to gRPC endpoint from a task executor.
 
     Parameters
     ----------
     stub : ServerAppIoStub | ClientAppIoStub
         gRPC stub to send the heartbeat.
-    token : str
-        The token to use in the heartbeat request.
 
     Returns
     -------
@@ -137,12 +134,12 @@ def make_app_heartbeat_fn_grpc(
         Function that sends a heartbeat to the gRPC endpoint.
     """
     # Construct the heartbeat request
-    req = SendAppHeartbeatRequest(token=token)
+    req = SendTaskHeartbeatRequest()
 
     def fn() -> bool:
         # Call ServerAppIo API
         try:
-            res = stub.SendAppHeartbeat(req)
+            res = stub.SendTaskHeartbeat(req)
         except grpc.RpcError as e:
             status_code = e.code()
             if status_code == grpc.StatusCode.UNAVAILABLE:

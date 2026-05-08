@@ -342,25 +342,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertIsNone(state.get_task_by_token("missing-token"))
 
-    def test_create_verify_and_delete_token(self) -> None:
-        """Test creating, verifying, and deleting tokens."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-
-        # Execute: create a token
-        token = state.create_token(run_id)
-        assert token is not None
-
-        # Assert: token should be valid
-        self.assertTrue(state.verify_token(run_id, token))
-
-        # Execute: delete the token
-        state.delete_token(run_id)
-
-        # Assert: token should no longer be valid
-        self.assertFalse(state.verify_token(run_id, token))
-
     def test_create_token_already_exists(self) -> None:
         """Test creating a token that already exists."""
         # Prepare

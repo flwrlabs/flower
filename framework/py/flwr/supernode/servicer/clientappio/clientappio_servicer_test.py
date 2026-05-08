@@ -32,10 +32,8 @@ from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
     PushAppMessagesResponse,
     PushAppOutputsRequest,
     PushAppOutputsResponse,
-)
-from flwr.proto.heartbeat_pb2 import (  # pylint:disable=E0611
-    SendAppHeartbeatRequest,
-    SendAppHeartbeatResponse,
+    SendTaskHeartbeatRequest,
+    SendTaskHeartbeatResponse,
 )
 from flwr.proto.message_pb2 import Context as ProtoContext  # pylint:disable=E0611
 from flwr.proto.message_pb2 import (  # pylint:disable=E0611
@@ -178,10 +176,9 @@ class TestClientAppIoServicer(unittest.TestCase):
 
     def test_servicer_pull_appinputs_activates_task(self) -> None:
         """PullAppInputs should activate the authenticated task."""
-        token = "test-token"
         run_id = 61016
         task_id = 123
-        request = PullAppInputsRequest(token=token)
+        request = PullAppInputsRequest()
 
         run = typing.Run.create_empty(run_id=run_id)
         run.fab_id = "mock/mock"
@@ -201,8 +198,6 @@ class TestClientAppIoServicer(unittest.TestCase):
             verifications={"sig": "value"},
         )
 
-        self.mock_state.get_run_id_by_token.return_value = run_id
-        self.mock_state.verify_token.return_value = True
         self.mock_state.get_context.return_value = app_context
         self.mock_state.get_run.return_value = run
         self.mock_state.get_fab.return_value = fab
@@ -253,22 +248,21 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.assertEqual(finish_task_kwargs["sub_status"], request.sub_status)
 
     @parameterized.expand([(True,), (False,)])  # type: ignore
-    def test_send_app_heartbeat(self, success: bool) -> None:
-        """Test sending an app heartbeat."""
+    def test_send_task_heartbeat(self, success: bool) -> None:
+        """Test sending a task heartbeat."""
         # Prepare
         task_id = 123
-        request = SendAppHeartbeatRequest()
+        request = SendTaskHeartbeatRequest()
         self.mock_state.acknowledge_task_heartbeat.return_value = success
 
         # Execute
         with patch(
-            "flwr.supernode.servicer.clientappio.clientappio_servicer."
-            "get_authenticated_task",
+            "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
             return_value=Mock(task_id=task_id),
         ):
-            response = self.servicer.SendAppHeartbeat(request, Mock())
+            response = self.servicer.SendTaskHeartbeat(request, Mock())
 
         # Assert
-        self.assertIsInstance(response, SendAppHeartbeatResponse)
+        self.assertIsInstance(response, SendTaskHeartbeatResponse)
         self.assertEqual(response.success, success)
         self.mock_state.acknowledge_task_heartbeat.assert_called_once_with(task_id)

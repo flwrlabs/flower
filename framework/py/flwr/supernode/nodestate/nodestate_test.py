@@ -189,29 +189,6 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         self.assertNotIn("msg1", msg_ids)
         self.assertIn("msg2", msg_ids)
 
-    def test_get_run_ids_with_pending_messages(self) -> None:
-        """Test retrieving run IDs with pending messages."""
-        # Prepare: store messages for runs 1, 2, and 3
-        # Run 1 has a pending message, run 2 has a token, run 3 has a reply,
-        # run 4 has a retrieved message (not pending),
-        #  and run 5 was assigned a token but was later deleted due to
-        # `flwr-clientapp` finishing the handling of a message.
-        self.state.store_message(make_dummy_message(1, False, "msg1"))
-        self.state.store_message(make_dummy_message(2, False, "msg2"))
-        self.state.store_message(make_dummy_message(3, True, "msg3"))
-        self.state.store_message(make_dummy_message(4, False, "msg4"))
-        self.state.store_message(make_dummy_message(5, False, "msg5"))
-        self.state.get_messages(run_ids=[4])
-        self.state.create_token(2)
-        self.state.create_token(5)
-        self.state.delete_token(5)
-
-        # Execute
-        run_ids = self.state.get_run_ids_with_pending_messages()
-
-        # Assert: run 1 and run 5 should be returned
-        self.assertEqual(set(run_ids), {1, 5})
-
     def test_get_error_reply_when_token_expires(self) -> None:
         """Test that error replies are created when tokens expire."""
         # Prepare: Create a token for a run

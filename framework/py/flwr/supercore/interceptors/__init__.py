@@ -27,6 +27,7 @@ from .appio_token_interceptor import (
 from .runtime_version_interceptor import (
     RuntimeVersionClientInterceptor,
     RuntimeVersionServerInterceptor,
+    create_clientappio_runtime_version_server_interceptor,
     create_control_runtime_version_server_interceptor,
     create_fleet_runtime_version_server_interceptor,
     create_serverappio_runtime_version_server_interceptor,
@@ -47,6 +48,7 @@ __all__ = [
     "RuntimeVersionServerInterceptor",
     "SuperExecAuthClientInterceptor",
     "SuperExecAuthServerInterceptor",
+    "create_clientappio_runtime_version_server_interceptor",
     "create_clientappio_superexec_auth_server_interceptor",
     "create_clientappio_token_auth_server_interceptor",
     "create_control_runtime_version_server_interceptor",

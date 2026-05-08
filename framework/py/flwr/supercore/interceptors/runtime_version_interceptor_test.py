@@ -33,6 +33,7 @@ from flwr.supercore.constant import (
 from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
     RuntimeVersionServerInterceptor,
+    create_clientappio_runtime_version_server_interceptor,
     create_control_runtime_version_server_interceptor,
     create_fleet_runtime_version_server_interceptor,
     create_serverappio_runtime_version_server_interceptor,
@@ -233,6 +234,19 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         self.interceptor = create_serverappio_runtime_version_server_interceptor()
         intercepted = self._intercept(
             "/flwr.proto.ServerAppIo/GetNodes",
+            _make_runtime_metadata("1.30.1"),
+        )
+
+        context = Mock()
+        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        self.assertEqual(response, "ok")
+        context.set_trailing_metadata.assert_not_called()
+
+    def test_clientappio_factory_observes_by_default(self) -> None:
+        """ClientAppIo factory should not return warning metadata by default."""
+        self.interceptor = create_clientappio_runtime_version_server_interceptor()
+        intercepted = self._intercept(
+            "/flwr.proto.ClientAppIo/GetRun",
             _make_runtime_metadata("1.30.1"),
         )
 
