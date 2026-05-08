@@ -126,7 +126,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             task_logs = self.task_logs.get(task_id, [])
             if after_timestamp is None:
                 after_timestamp = 0.0
-            index = bisect_right(task_logs, (after_timestamp, ""))
+            timestamps = [timestamp for timestamp, _ in task_logs]
+            index = bisect_right(timestamps, after_timestamp)
             latest_timestamp = task_logs[-1][0] if index < len(task_logs) else 0.0
             return "".join(log for _, log in task_logs[index:]), latest_timestamp
 
