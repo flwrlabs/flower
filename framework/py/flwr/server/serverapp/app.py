@@ -167,7 +167,7 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(grid._stub))
         heartbeat_sender.start()
 
-        # Pull PullTaskInput from LinkState
+        # Pull task input from SuperLink
         try:
             log(DEBUG, "[flwr-serverapp] Pull task input")
             req = PullTaskInputRequest()
