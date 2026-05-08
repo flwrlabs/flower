@@ -104,10 +104,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
             master_secret=superexec_auth_secret,
             protected_methods=protected_methods,
         )
-        interceptors = [
-            *interceptors,
-            auth_interceptor,
-        ]
+        interceptors.append(auth_interceptor)
 
     # Start monitoring the parent process if a PID is provided
     if parent_pid is not None:
