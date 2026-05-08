@@ -386,24 +386,6 @@ class SqlCoreState(CoreState, SqlMixin):
             },
         )
 
-    def acknowledge_app_heartbeat(self, token: str) -> bool:
-        """Acknowledge an app heartbeat with the provided token."""
-        # Clean up expired tokens
-        self._cleanup_expired_tokens()
-
-        # Update the active_until field
-        current = now().timestamp()
-        active_until = current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-        query = """
-            UPDATE token_store
-            SET active_until = :active_until
-            WHERE token = :token
-            RETURNING run_id;
-        """
-        data = {"active_until": active_until, "token": token}
-        rows = self.query(query, data)
-        return len(rows) > 0
-
     def _cleanup_expired_tokens(self) -> None:
         """Remove expired tokens and perform additional cleanup.
 

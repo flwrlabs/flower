@@ -204,21 +204,6 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def acknowledge_app_heartbeat(self, token: str) -> bool:
-        """Acknowledge an app heartbeat with the provided token.
-
-        Parameters
-        ----------
-        token : str
-            The token associated with the app.
-
-        Returns
-        -------
-        bool
-            True if the heartbeat is acknowledged successfully, False otherwise.
-        """
-
-    @abstractmethod
     def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:
         """Atomically reserve a nonce in a namespace until `expires_at`.
 
