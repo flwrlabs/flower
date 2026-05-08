@@ -66,7 +66,7 @@ def _unauthenticated_terminator() -> grpc.RpcMethodHandler:
 
 
 class AppIoTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ignore
-    """Attach App token metadata to outbound unary RPCs."""
+    """Attach task-token metadata to outbound unary RPCs."""
 
     def __init__(self, token: str) -> None:
         self._token = token
@@ -77,7 +77,7 @@ class AppIoTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ig
         client_call_details: grpc.ClientCallDetails,
         request: GrpcMessage,
     ) -> grpc.Call:
-        """Add/replace the App token metadata on outbound unary requests."""
+        """Attach task-token metadata to outbound unary requests."""
         metadata = tuple(client_call_details.metadata or ())
         if find_metadata_keys(metadata, (TASK_TOKEN_HEADER,)):
             raise RuntimeError(

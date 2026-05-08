@@ -24,7 +24,7 @@ from typing import Literal
 
 from flwr.common import now
 from flwr.common.constant import (
-    FLWR_APP_TOKEN_LENGTH,
+    FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
     TASK_ID_NUM_BYTES,
@@ -197,7 +197,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
 
     def claim_task(self, task_id: int) -> str | None:
         """Atomically claim a pending task."""
-        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
+        token = secrets.token_hex(FLWR_TASK_TOKEN_LENGTH)
         with self.lock_task_store:
             task = self.task_store.get(task_id)
             if task is None or task_id in self.task_token_store:

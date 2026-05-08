@@ -102,7 +102,7 @@ class TestAppIoTokenClientInterceptor(TestCase):
     """Unit tests for AppIoTokenClientInterceptor."""
 
     def test_attach_task_token_header(self) -> None:
-        """The interceptor should attach App token metadata."""
+        """The interceptor should attach task-token metadata."""
         interceptor = AppIoTokenClientInterceptor(token="new-token")
         details = _ClientCallDetails(
             method="/flwr.proto.ServerAppIo/GetNodes",
@@ -136,7 +136,7 @@ class TestAppIoTokenClientInterceptor(TestCase):
         )
 
     def test_raise_if_task_token_header_already_present(self) -> None:
-        """The interceptor should reject duplicate App token metadata."""
+        """The interceptor should reject duplicate task-token metadata."""
         interceptor = AppIoTokenClientInterceptor(token="new-token")
         details = _ClientCallDetails(
             method="/flwr.proto.ServerAppIo/GetNodes",
