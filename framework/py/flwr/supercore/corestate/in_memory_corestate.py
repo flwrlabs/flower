@@ -17,6 +17,7 @@
 
 import hashlib
 import secrets
+from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
 from threading import Lock
@@ -65,6 +66,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.task_token_store: dict[int, TokenRecord] = {}
         # Store token to task ID mapping
         self.task_token_to_task_id: dict[str, int] = {}
+        self.task_logs: dict[int, list[tuple[float, str]]] = {}
+        self.log_lock = Lock()
         self.lock_task_store = Lock()
 
     @property
@@ -101,6 +104,31 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 content=fab.content,
                 verifications=dict(fab.verifications),
             )
+
+    def add_task_log(self, task_id: int, log_message: str) -> None:
+        """Add a log entry to the task logs for the specified `task_id`."""
+        with self.lock_task_store:
+            if task_id not in self.task_store:
+                raise ValueError(f"Task {task_id} not found")
+        with self.log_lock:
+            self.task_logs.setdefault(task_id, []).append(
+                (now().timestamp(), log_message)
+            )
+
+    def get_task_log(
+        self, task_id: int, after_timestamp: float | None
+    ) -> tuple[str, float]:
+        """Get task logs for the specified `task_id`."""
+        with self.lock_task_store:
+            if task_id not in self.task_store:
+                raise ValueError(f"Task {task_id} not found")
+        with self.log_lock:
+            task_logs = self.task_logs.get(task_id, [])
+            if after_timestamp is None:
+                after_timestamp = 0.0
+            index = bisect_right(task_logs, (after_timestamp, ""))
+            latest_timestamp = task_logs[-1][0] if index < len(task_logs) else 0.0
+            return "".join(log for _, log in task_logs[index:]), latest_timestamp
 
     def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,

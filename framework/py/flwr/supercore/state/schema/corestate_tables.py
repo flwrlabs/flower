@@ -19,11 +19,13 @@ from sqlalchemy import (
     BigInteger,
     Column,
     Float,
+    ForeignKey,
     Index,
     LargeBinary,
     MetaData,
     String,
     Table,
+    UniqueConstraint,
     text,
 )
 
@@ -83,6 +85,19 @@ def create_corestate_metadata() -> MetaData:
         Column("finished_at", String, nullable=True),
         Column("sub_status", String, nullable=False, server_default=text("''")),
         Column("details", String, nullable=False, server_default=text("''")),
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: task_logs
+    # --------------------------------------------------------------------------
+    Table(
+        "task_logs",
+        metadata,
+        Column("timestamp", Float),
+        Column("task_id", BigInteger, ForeignKey("task.task_id")),
+        Column("log", String),
+        # Composite PK equivalent
+        UniqueConstraint("timestamp", "task_id"),
     )
 
     return metadata

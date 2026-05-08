@@ -15,6 +15,7 @@
 """Tests all CoreState implementations have to conform to."""
 
 
+import time
 import unittest
 from datetime import timedelta
 from typing import Any, cast
@@ -165,6 +166,77 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(reloaded_tasks), 1)
         reloaded = reloaded_tasks[0]
         self.assertEqual(reloaded.fab_hash, "fab-hash")
+
+    def test_add_task_log_invalid_task_id(self) -> None:
+        """Adding a task log with an invalid task_id should fail."""
+        state = self.state_factory()
+
+        with self.assertRaises(ValueError):
+            state.add_task_log(99999, "Invalid log entry")
+
+    def test_get_task_log_invalid_task_id(self) -> None:
+        """Retrieving task logs with an invalid task_id should fail."""
+        state = self.state_factory()
+
+        with self.assertRaises(ValueError):
+            state.get_task_log(99999, after_timestamp=None)
+
+    def test_add_and_get_task_log(self) -> None:
+        """Adding and retrieving task logs should preserve concatenation order."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        log_entry_1 = "Log entry 1"
+        log_entry_2 = "Log entry 2"
+        timestamp = now().timestamp()
+
+        state.add_task_log(task_id, log_entry_1)
+        state.add_task_log(task_id, log_entry_2)
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=timestamp)
+
+        assert latest > timestamp
+        assert log_entry_1 + log_entry_2 == retrieved_logs
+
+    def test_get_task_log_after_timestamp(self) -> None:
+        """Retrieving task logs after a specific timestamp should filter old logs."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        log_entry_1 = "Log entry 1"
+        log_entry_2 = "Log entry 2"
+        state.add_task_log(task_id, log_entry_1)
+        time.sleep(1e-6)
+        timestamp = now().timestamp()
+        time.sleep(1e-6)
+        state.add_task_log(task_id, log_entry_2)
+
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=timestamp)
+
+        assert latest > timestamp
+        assert log_entry_1 not in retrieved_logs
+        assert log_entry_2 == retrieved_logs
+
+    def test_get_task_log_after_timestamp_no_logs(self) -> None:
+        """Retrieving task logs after the last entry should return an empty result."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        state.add_task_log(task_id, "Log entry")
+        timestamp = now().timestamp() + 0.001
+
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=timestamp)
+
+        assert latest == 0
+        assert retrieved_logs == ""
 
     def test_claim_task_transitions_pending_to_starting(self) -> None:
         """Claiming a task should create a token and move it to starting."""
