@@ -57,13 +57,6 @@ message GetRunRequest {
 }
 message GetRunResponse { Run run = 1; }
 
-// UpdateRunStatus
-message UpdateRunStatusRequest {
-  uint64 run_id = 1;
-  RunStatus run_status = 2;
-}
-message UpdateRunStatusResponse {}
-
 // Get Federation Options associated with run
 message GetFederationOptionsRequest { uint64 run_id = 1; }
 message GetFederationOptionsResponse { ConfigRecord federation_options = 1; }

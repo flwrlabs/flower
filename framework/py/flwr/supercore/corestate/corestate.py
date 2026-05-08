@@ -83,6 +83,7 @@ class CoreState(ABC):
         self,
         *,
         task_ids: Sequence[int] | None = None,
+        run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
@@ -98,6 +99,8 @@ class CoreState(ABC):
         ----------
         task_ids : Optional[Sequence[int]] (default: None)
             Sequence of task IDs to filter by.
+        run_ids : Optional[Sequence[int]] (default: None)
+            Sequence of run IDs to filter by.
         statuses : Optional[Sequence[str]] (default: None)
             Sequence of task status values to filter by.
         order_by : Optional[Literal["pending_at"]] (default: None)
@@ -186,8 +189,8 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def get_task_id_by_token(self, token: str) -> int | None:
-        """Return the task ID associated with the task token, if valid.
+    def get_task_by_token(self, token: str) -> Task | None:
+        """Return the task associated with the task token, if valid.
 
         Parameters
         ----------
@@ -196,81 +199,8 @@ class CoreState(ABC):
 
         Returns
         -------
-        Optional[int]
-            The task ID if the token is valid, otherwise None.
-        """
-
-    @abstractmethod
-    def create_token(self, run_id: int) -> str | None:
-        """Create a token for the given run ID.
-
-        Parameters
-        ----------
-        run_id : int
-            The ID of the run for which to create a token.
-
-        Returns
-        -------
-        str
-            The newly generated token if one does not already exist
-            for the given run ID, otherwise None.
-        """
-
-    @abstractmethod
-    def verify_token(self, run_id: int, token: str) -> bool:
-        """Verify a token for the given run ID.
-
-        Parameters
-        ----------
-        run_id : int
-            The ID of the run for which to verify the token.
-        token : str
-            The token to verify.
-
-        Returns
-        -------
-        bool
-            True if the token is valid for the run ID, False otherwise.
-        """
-
-    @abstractmethod
-    def delete_token(self, run_id: int) -> None:
-        """Delete the token for the given run ID.
-
-        Parameters
-        ----------
-        run_id : int
-            The ID of the run for which to delete the token.
-        """
-
-    @abstractmethod
-    def get_run_id_by_token(self, token: str) -> int | None:
-        """Get the run ID associated with a given token.
-
-        Parameters
-        ----------
-        token : str
-            The token to look up.
-
-        Returns
-        -------
-        Optional[int]
-            The run ID if the token is valid, otherwise None.
-        """
-
-    @abstractmethod
-    def acknowledge_app_heartbeat(self, token: str) -> bool:
-        """Acknowledge an app heartbeat with the provided token.
-
-        Parameters
-        ----------
-        token : str
-            The token associated with the app.
-
-        Returns
-        -------
-        bool
-            True if the heartbeat is acknowledged successfully, False otherwise.
+        Task | None
+            The task if the token is valid, otherwise None.
         """
 
     @abstractmethod

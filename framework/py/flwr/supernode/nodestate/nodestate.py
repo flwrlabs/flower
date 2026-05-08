@@ -157,19 +157,6 @@ class NodeState(CoreState):
         """
 
     @abstractmethod
-    def get_run_ids_with_pending_messages(self) -> Sequence[int]:
-        """Retrieve run IDs that have at least one pending message.
-
-        Run IDs that are currently in progress (i.e., those associated with tokens)
-        will not be returned, even if they have pending messages.
-
-        Returns
-        -------
-        Sequence[int]
-            Sequence of run IDs with pending messages.
-        """
-
-    @abstractmethod
     def record_message_processing_start(self, message_id: str) -> None:
         """Record the start time of message processing based on the message ID.
 
