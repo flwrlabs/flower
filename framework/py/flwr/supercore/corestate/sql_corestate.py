@@ -386,16 +386,6 @@ class SqlCoreState(CoreState, SqlMixin):
             },
         )
 
-    def verify_token(self, run_id: int, token: str) -> bool:
-        """Verify a token for the given run ID."""
-        self._cleanup_expired_tokens()
-        query = "SELECT token FROM token_store WHERE run_id = :run_id;"
-        data = {"run_id": uint64_to_int64(run_id)}
-        rows = self.query(query, data)
-        if not rows:
-            return False
-        return cast(str, rows[0]["token"]) == token
-
     def acknowledge_app_heartbeat(self, token: str) -> bool:
         """Acknowledge an app heartbeat with the provided token."""
         # Clean up expired tokens

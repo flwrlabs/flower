@@ -204,23 +204,6 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def verify_token(self, run_id: int, token: str) -> bool:
-        """Verify a token for the given run ID.
-
-        Parameters
-        ----------
-        run_id : int
-            The ID of the run for which to verify the token.
-        token : str
-            The token to verify.
-
-        Returns
-        -------
-        bool
-            True if the token is valid for the run ID, False otherwise.
-        """
-
-    @abstractmethod
     def acknowledge_app_heartbeat(self, token: str) -> bool:
         """Acknowledge an app heartbeat with the provided token.
 
