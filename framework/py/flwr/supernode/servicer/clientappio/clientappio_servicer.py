@@ -279,11 +279,3 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         store.delete(request.message_object_id)
 
         return ConfirmMessageReceivedResponse()
-
-    def CreateTask(
-        self, request: CreateTaskRequest, context: grpc.ServicerContext
-    ) -> CreateTaskResponse:
-        """Create a task for the given run ID."""
-        log(DEBUG, "ClientAppIoServicer.CreateTask")
-
-        raise NotImplementedError()
