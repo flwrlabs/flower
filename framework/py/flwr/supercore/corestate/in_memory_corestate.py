@@ -300,6 +300,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         """
         expired_at = now()
         current = int(expired_at.timestamp())
+        expired_tasks: list[Task] = []
         for task_id, record in list(self.task_token_store.items()):
             if record.active_until < current:
                 # The task is considered expired. Mark it as finished with a failed
@@ -314,54 +315,25 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                             details="No heartbeat received from the task",
                         )
                     )
+                    expired_task = Task()
+                    expired_task.CopyFrom(task)
+                    expired_tasks.append(expired_task)
                 del self.task_token_store[task_id]
                 self.task_token_to_task_id.pop(record.token, None)
 
-    def create_token(self, run_id: int) -> str | None:
-        """Create a token for the given run ID."""
-        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)  # Generate a random token
-        with self.lock_token_store:
-            if run_id in self.token_store:
-                return None  # Token already created for this run ID
+        if expired_tasks:
+            self._on_task_tokens_expired(expired_tasks)
 
-            active_until = int(now().timestamp()) + HEARTBEAT_DEFAULT_INTERVAL
-            self.token_store[run_id] = TokenRecord(
-                token=token, active_until=active_until
-            )
-            self.token_to_run_id[token] = run_id
-        return token
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+        """Handle cleanup of expired task tokens.
 
-    def verify_token(self, run_id: int, token: str) -> bool:
-        """Verify a token for the given run ID."""
-        self._cleanup_expired_tokens()
-        with self.lock_token_store:
-            record = self.token_store.get(run_id)
-            return record is not None and record.token == token
+        Override in subclasses to add custom cleanup logic.
 
-    def get_run_id_by_token(self, token: str) -> int | None:
-        """Get the run ID associated with a given token."""
-        self._cleanup_expired_tokens()
-        with self.lock_token_store:
-            return self.token_to_run_id.get(token)
-
-    def acknowledge_app_heartbeat(self, token: str) -> bool:
-        """Acknowledge an app heartbeat with the provided token."""
-        # Clean up expired tokens
-        self._cleanup_expired_tokens()
-
-        with self.lock_token_store:
-            # Return False if token is not found
-            if token not in self.token_to_run_id:
-                return False
-
-            # Get the run_id and update heartbeat info
-            run_id = self.token_to_run_id[token]
-            record = self.token_store[run_id]
-            current = int(now().timestamp())
-            record.active_until = (
-                current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-            )
-            return True
+        Parameters
+        ----------
+        tasks : list[Task]
+            Copies of tasks whose claims expired and were marked FINISHED:FAILED.
+        """
 
     def _cleanup_expired_tokens(self) -> None:
         """Remove expired tokens and perform additional cleanup.

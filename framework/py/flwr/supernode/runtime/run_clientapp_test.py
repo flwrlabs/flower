@@ -57,7 +57,7 @@ class TestRunClientApp(unittest.TestCase):
             patch("flwr.supernode.runtime.run_clientapp.create_channel") as channel,
             patch("flwr.supernode.runtime.run_clientapp.HeartbeatSender"),
             patch(
-                "flwr.supernode.runtime.run_clientapp.pull_appinputs",
+                "flwr.supernode.runtime.run_clientapp.pull_task_input",
                 side_effect=grpc.RpcError,
             ),
             patch("flwr.supernode.runtime.run_clientapp.flwr_exit") as flwr_exit,

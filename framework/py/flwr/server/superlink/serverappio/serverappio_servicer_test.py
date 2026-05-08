@@ -35,21 +35,19 @@ from flwr.common.constant import (
     Status,
 )
 from flwr.common.message import get_message_to_descendant_id_mapping
-from flwr.common.serde import context_to_proto, message_from_proto
+from flwr.common.serde import message_from_proto
 from flwr.common.typing import Fab, RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
-    CreateTaskRequest,
-    CreateTaskResponse,
-    PullAppInputsRequest,
-    PullAppInputsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
+    PullTaskInputRequest,
+    PullTaskInputResponse,
     PushAppMessagesRequest,
     PushAppMessagesResponse,
-    PushAppOutputsRequest,
-    PushAppOutputsResponse,
+    PushTaskOutputRequest,
+    PushTaskOutputResponse,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
@@ -70,7 +68,6 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
 )
-from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
@@ -250,15 +247,15 @@ def _claim_task(channel: grpc.Channel, task_id: int) -> str:
 def _claim_in_parallel(
     channel_0: grpc.Channel, channel_1: grpc.Channel, token: str
 ) -> list[grpc.StatusCode | None]:
-    pull_app_inputs_0 = channel_0.unary_unary(
-        "/flwr.proto.ServerAppIo/PullAppInputs",
-        request_serializer=PullAppInputsRequest.SerializeToString,
-        response_deserializer=PullAppInputsResponse.FromString,
+    pull_task_input_0 = channel_0.unary_unary(
+        "/flwr.proto.ServerAppIo/PullTaskInput",
+        request_serializer=PullTaskInputRequest.SerializeToString,
+        response_deserializer=PullTaskInputResponse.FromString,
     )
-    pull_app_inputs_1 = channel_1.unary_unary(
-        "/flwr.proto.ServerAppIo/PullAppInputs",
-        request_serializer=PullAppInputsRequest.SerializeToString,
-        response_deserializer=PullAppInputsResponse.FromString,
+    pull_task_input_1 = channel_1.unary_unary(
+        "/flwr.proto.ServerAppIo/PullTaskInput",
+        request_serializer=PullTaskInputRequest.SerializeToString,
+        response_deserializer=PullTaskInputResponse.FromString,
     )
     timeout = 5.0
     barrier = threading.Barrier(3)
@@ -269,7 +266,7 @@ def _claim_in_parallel(
         try:
             barrier.wait(timeout=timeout)
             response, call = pull_fn.with_call(
-                PullAppInputsRequest(),
+                PullTaskInputRequest(),
                 metadata=((APP_TOKEN_HEADER, token),),
             )
             del response
@@ -280,8 +277,8 @@ def _claim_in_parallel(
             exceptions.append(ex)
 
     threads = [
-        threading.Thread(target=claim_inputs, args=(0, pull_app_inputs_0)),
-        threading.Thread(target=claim_inputs, args=(1, pull_app_inputs_1)),
+        threading.Thread(target=claim_inputs, args=(0, pull_task_input_0)),
+        threading.Thread(target=claim_inputs, args=(1, pull_task_input_1)),
     ]
     for thread in threads:
         thread.start()
@@ -295,7 +292,7 @@ def _claim_in_parallel(
     alive_threads = [thread for thread in threads if thread.is_alive()]
     if alive_threads:
         raise AssertionError(
-            f"Concurrent PullAppInputs test timed out; {len(alive_threads)} "
+            f"Concurrent PullTaskInput test timed out; {len(alive_threads)} "
             f"thread(s) still alive after {timeout} seconds."
         )
     if exceptions:
@@ -332,12 +329,16 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             superexec_auth_secret=_SUPEREXEC_SECRET,
         )
 
-        # Provide a valid metadata token on the default test channel so existing
+        # Provide a valid claimed-task token on the default test channel so existing
         # servicer behavior tests continue to exercise business logic paths.
         self._auth_run_id = self.state.create_run(
             "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
         )
-        auth_token = self.state.create_token(self._auth_run_id)
+        auth_task_id = self.state.create_task(
+            task_type=TaskType.SERVER_APP, run_id=self._auth_run_id
+        )
+        assert auth_task_id is not None
+        auth_token = self.state.claim_task(auth_task_id)
         assert auth_token is not None
         self._auth_token = auth_token
         self._appio_auth_interceptor = AppIoTokenClientInterceptor(auth_token)
@@ -360,11 +361,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=GetNodesRequest.SerializeToString,
             response_deserializer=GetNodesResponse.FromString,
         )
-        self._create_task = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/CreateTask",
-            request_serializer=CreateTaskRequest.SerializeToString,
-            response_deserializer=CreateTaskResponse.FromString,
-        )
         self._push_messages = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/PushMessages",
             request_serializer=PushAppMessagesRequest.SerializeToString,
@@ -375,10 +371,10 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=PullAppMessagesRequest.SerializeToString,
             response_deserializer=PullAppMessagesResponse.FromString,
         )
-        self._push_serverapp_outputs = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/PushAppOutputs",
-            request_serializer=PushAppOutputsRequest.SerializeToString,
-            response_deserializer=PushAppOutputsResponse.FromString,
+        self._push_task_output = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PushTaskOutput",
+            request_serializer=PushTaskOutputRequest.SerializeToString,
+            response_deserializer=PushTaskOutputResponse.FromString,
         )
         self._send_task_heartbeat = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/SendTaskHeartbeat",
@@ -400,10 +396,10 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=ConfirmMessageReceivedRequest.SerializeToString,
             response_deserializer=ConfirmMessageReceivedResponse.FromString,
         )
-        self._pull_app_inputs = self._channel.unary_unary(
-            "/flwr.proto.ServerAppIo/PullAppInputs",
-            request_serializer=PullAppInputsRequest.SerializeToString,
-            response_deserializer=PullAppInputsResponse.FromString,
+        self._pull_task_input = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PullTaskInput",
+            request_serializer=PullTaskInputRequest.SerializeToString,
+            response_deserializer=PullTaskInputResponse.FromString,
         )
 
     def tearDown(self) -> None:
@@ -445,118 +441,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Assert
         assert isinstance(response, GetNodesResponse)
         assert grpc.StatusCode.OK == call.code()
-
-    def test_create_task_stores_pending_task(self) -> None:
-        """Test `CreateTask` stores a pending task."""
-        run_id = self._create_dummy_run()
-        request = CreateTaskRequest(
-            type=TaskType.SERVER_APP,
-            run_id=run_id,
-            fab_hash="hash123",
-        )
-
-        response, call = self._create_task.with_call(request=request)
-
-        assert isinstance(response, CreateTaskResponse)
-        assert grpc.StatusCode.OK == call.code()
-        tasks = self.state.get_tasks(task_ids=[response.task_id])
-        self.assertEqual(len(tasks), 1)
-        task = tasks[0]
-        self.assertEqual(task.task_id, response.task_id)
-        self.assertEqual(task.type, TaskType.SERVER_APP)
-        self.assertEqual(task.run_id, run_id)
-        self.assertEqual(
-            task.status,
-            TaskStatus(status=Status.PENDING, sub_status="", details=""),
-        )
-        self.assertEqual(task.fab_hash, "hash123")
-        self.assertTrue(task.pending_at)
-        self.assertEqual(task.starting_at, "")
-        self.assertEqual(task.running_at, "")
-        self.assertEqual(task.finished_at, "")
-
-    def test_create_task_aborts_if_state_create_task_fails(self) -> None:
-        """Test `CreateTask` aborts if state.create_task returns None."""
-        run_id = self._create_dummy_run()
-
-        with patch.object(self.state, "create_task", return_value=None):
-            with self.assertRaises(grpc.RpcError) as err:
-                self._create_task.with_call(
-                    request=CreateTaskRequest(
-                        type=TaskType.SERVER_APP,
-                        run_id=run_id,
-                        fab_hash="hash123",
-                    )
-                )
-
-        assert err.exception.code() == grpc.StatusCode.INTERNAL
-        assert err.exception.details() == "Failed to create task"
-
-    def test_create_task_rejects_unknown_type(self) -> None:
-        """Test `CreateTask` rejects unknown task types."""
-        run_id = self._create_dummy_run()
-
-        with self.assertRaises(grpc.RpcError) as err:
-            self._create_task.with_call(
-                request=CreateTaskRequest(type="unknown-task", run_id=run_id)
-            )
-
-        assert err.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
-        assert err.exception.details() == "Invalid task type: unknown-task"
-
-    @parameterized.expand(
-        [
-            (
-                TaskType.SERVER_APP,
-                f"Task type '{TaskType.SERVER_APP}' requires fab_hash.",
-            ),
-            (
-                TaskType.CLIENT_APP,
-                f"Task type '{TaskType.CLIENT_APP}' requires fab_hash.",
-            ),
-            (
-                TaskType.AGENT_APP,
-                f"Task type '{TaskType.AGENT_APP}' requires fab_hash.",
-            ),
-            (
-                TaskType.MODEL,
-                f"Task type '{TaskType.MODEL}' requires model_ref.",
-            ),
-            (
-                TaskType.CONNECTOR,
-                f"Task type '{TaskType.CONNECTOR}' requires connector_ref.",
-            ),
-        ]
-    )  # type: ignore
-    def test_create_task_rejects_missing_required_fields(
-        self, task_type: str, error_msg: str
-    ) -> None:
-        """Test `CreateTask` rejects missing per-type required fields."""
-        run_id = self._create_dummy_run()
-
-        with self.assertRaises(grpc.RpcError) as err:
-            self._create_task.with_call(
-                request=CreateTaskRequest(type=task_type, run_id=run_id)
-            )
-
-        assert err.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
-        assert err.exception.details() == error_msg
-
-    def test_create_task_fast_fails_missing_run(self) -> None:
-        """Test `CreateTask` propagates an unknown run ID as an RPC failure."""
-        with self.assertRaises(grpc.RpcError) as err:
-            self._create_task.with_call(
-                request=CreateTaskRequest(
-                    type=TaskType.MODEL,
-                    run_id=42,
-                    model_ref="model://test",
-                )
-            )
-
-        assert err.exception.code() == grpc.StatusCode.UNKNOWN
-        assert "Run 42 not found. create_task requires an existing run." in (
-            err.exception.details()
-        )
 
     def _assert_get_nodes_not_allowed(self, run_id: int) -> None:
         """Assert `GetNodes` not allowed."""
@@ -836,22 +720,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             # expected a single object id (that of the error message)
             assert list(object_ids_in_response) == [msg_res.object_id]
 
-    def _assert_push_serverapp_outputs_not_allowed(
-        self, token: str, context: Context
-    ) -> None:
-        """Assert `PushServerAppOutputs` not allowed."""
-        run_id = self.state.get_run_id_by_token(token)
-        assert run_id is not None, "Invalid token is provided."
-        run_status = self.state.get_run_status({run_id})[run_id]
-        request = PushAppOutputsRequest(
-            token=token, run_id=run_id, context=context_to_proto(context)
-        )
-
-        with self.assertRaises(grpc.RpcError) as e:
-            self._push_serverapp_outputs.with_call(request=request)
-        assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
-        assert e.exception.details() == self.status_to_msg[run_status.status]
-
     def test_push_object_succesful(self) -> None:
         """Test `PushObject`."""
         # Prepare
@@ -1017,7 +885,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert len(self.store) == 0
 
     def test_run_status_transitions(self) -> None:
-        """Test `PullAppInputs` activates a claimed task and marks the run running."""
+        """Test `PullTaskInput` activates a claimed task and marks the run running."""
         # Prepare: Create a run with FAB
         fab_content = b"mock fab content"
         fab_hash = self.state.store_fab(
@@ -1041,23 +909,23 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.STARTING
 
-        # Execute: Pull app inputs
-        request = PullAppInputsRequest()
+        # Execute: Pull task input
+        request = PullTaskInputRequest()
         with patch(
             "flwr.server.superlink.serverappio.serverappio_servicer."
             "get_authenticated_task",
             return_value=Mock(task_id=task_id, run_id=run_id),
         ):
-            response = servicer.PullAppInputs(request, Mock())
+            response = servicer.PullTaskInput(request, Mock())
 
         # Assert: Response is successful and run status is now RUNNING
-        assert isinstance(response, PullAppInputsResponse)
+        assert isinstance(response, PullTaskInputResponse)
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.RUNNING
 
 
-def test_ha_pull_app_inputs_claim_is_unique_across_replicas() -> None:
-    """Ensure only one replica can claim STARTING -> RUNNING via PullAppInputs."""
+def test_ha_pull_task_input_claim_is_unique_across_replicas() -> None:
+    """Ensure only one replica can claim STARTING -> RUNNING via PullTaskInput."""
     with tempfile.TemporaryDirectory() as tmpdir:
         _, task_id, state_0, server_0, server_1 = _create_shared_runtime(tmpdir)
         channel_0 = grpc.insecure_channel(server_0.bound_address)
