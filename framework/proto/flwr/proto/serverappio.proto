@@ -48,11 +48,11 @@ service ServerAppIo {
   rpc SendTaskHeartbeat(SendTaskHeartbeatRequest)
       returns (SendTaskHeartbeatResponse) {}
 
-  // Pull app inputs
-  rpc PullAppInputs(PullAppInputsRequest) returns (PullAppInputsResponse) {}
+  // Pull task inputs
+  rpc PullTaskInput(PullTaskInputRequest) returns (PullTaskInputResponse) {}
 
-  // Push app outputs
-  rpc PushAppOutputs(PushAppOutputsRequest) returns (PushAppOutputsResponse) {}
+  // Push task outputs
+  rpc PushTaskOutput(PushTaskOutputRequest) returns (PushTaskOutputResponse) {}
 
   /////////////////////////////////////////////////////////////////////////////
   // Specific endpoints shared by ServerAppIo and ClientAppIo
