@@ -35,8 +35,6 @@ from flwr.common.typing import Run
 # pylint: disable=E0611
 from flwr.proto import clientappio_pb2_grpc
 from flwr.proto.appio_pb2 import (
-    CreateTaskRequest,
-    CreateTaskResponse,
     PullAppInputsRequest,
     PullAppInputsResponse,
     PullAppMessagesRequest,
@@ -279,11 +277,3 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         store.delete(request.message_object_id)
 
         return ConfirmMessageReceivedResponse()
-
-    def CreateTask(
-        self, request: CreateTaskRequest, context: grpc.ServicerContext
-    ) -> CreateTaskResponse:
-        """Create a task for the given run ID."""
-        log(DEBUG, "ClientAppIoServicer.CreateTask")
-
-        raise NotImplementedError()
