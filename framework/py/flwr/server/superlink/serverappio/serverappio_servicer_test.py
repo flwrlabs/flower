@@ -247,12 +247,12 @@ def _claim_task(channel: grpc.Channel, task_id: int) -> str:
 def _claim_in_parallel(
     channel_0: grpc.Channel, channel_1: grpc.Channel, token: str
 ) -> list[grpc.StatusCode | None]:
-    pull_task_inputs_0 = channel_0.unary_unary(
+    pull_task_input_0 = channel_0.unary_unary(
         "/flwr.proto.ServerAppIo/PullTaskInput",
         request_serializer=PullTaskInputRequest.SerializeToString,
         response_deserializer=PullTaskInputResponse.FromString,
     )
-    pull_task_inputs_1 = channel_1.unary_unary(
+    pull_task_input_1 = channel_1.unary_unary(
         "/flwr.proto.ServerAppIo/PullTaskInput",
         request_serializer=PullTaskInputRequest.SerializeToString,
         response_deserializer=PullTaskInputResponse.FromString,
@@ -277,8 +277,8 @@ def _claim_in_parallel(
             exceptions.append(ex)
 
     threads = [
-        threading.Thread(target=claim_inputs, args=(0, pull_task_inputs_0)),
-        threading.Thread(target=claim_inputs, args=(1, pull_task_inputs_1)),
+        threading.Thread(target=claim_inputs, args=(0, pull_task_input_0)),
+        threading.Thread(target=claim_inputs, args=(1, pull_task_input_1)),
     ]
     for thread in threads:
         thread.start()
@@ -392,7 +392,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=ConfirmMessageReceivedRequest.SerializeToString,
             response_deserializer=ConfirmMessageReceivedResponse.FromString,
         )
-        self._pull_task_inputs = self._channel.unary_unary(
+        self._pull_task_input = self._channel.unary_unary(
             "/flwr.proto.ServerAppIo/PullTaskInput",
             request_serializer=PullTaskInputRequest.SerializeToString,
             response_deserializer=PullTaskInputResponse.FromString,
@@ -936,7 +936,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert run_status.status == Status.RUNNING
 
 
-def test_ha_pull_task_inputs_claim_is_unique_across_replicas() -> None:
+def test_ha_pull_task_input_claim_is_unique_across_replicas() -> None:
     """Ensure only one replica can claim STARTING -> RUNNING via PullTaskInput."""
     with tempfile.TemporaryDirectory() as tmpdir:
         _, task_id, state_0, server_0, server_1 = _create_shared_runtime(tmpdir)
