@@ -251,7 +251,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         context.abort.assert_called_once_with(
             grpc.StatusCode.INTERNAL,
-            "Failed to create task for the run.",
+            "Failed to create or initialize the run.",
         )
 
     def test_start_run_returns_note_for_remote_app(self) -> None:
