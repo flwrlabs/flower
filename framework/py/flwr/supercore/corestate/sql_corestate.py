@@ -19,7 +19,7 @@ import hashlib
 import json
 import secrets
 from collections.abc import Sequence
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 from sqlalchemy import MetaData, text
 from sqlalchemy.exc import IntegrityError
