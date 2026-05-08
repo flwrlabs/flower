@@ -57,11 +57,16 @@ on:
         default: main
       docker-registry-user:
         description: "Docker registry username."
-        required: true
+        required: false
+        default: ""
         type: string
     secrets:
       docker-registry-token:
-        required: true
+        required: false
+      dockerhub-user:
+        required: false
+      dockerhub-token:
+        required: false
     outputs:
       metadata:
         description: "Metadata of the Docker image."
@@ -143,8 +148,8 @@ jobs:
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
         with:
           registry: ${{ inputs.registry }}
-          username: ${{ inputs.docker-registry-user }}
-          password: ${{ secrets.docker-registry-token }}
+          username: ${{ inputs.docker-registry-user != '' && inputs.docker-registry-user || secrets.dockerhub-user }}
+          password: ${{ secrets.docker-registry-token || secrets.dockerhub-token }}
 
       - name: Build and push
         uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea
@@ -158,7 +163,7 @@ jobs:
             sbom: true
             platforms: ${{ matrix.platform.docker }}
             context: ${{ inputs.context != '' && inputs.context || format('{{defaultContext}}:{0}', inputs.file-dir) }}
-            file: ${{ inputs.dockerfile != '' && inputs.dockerfile || format('{0}/Dockerfile', inputs.file-dir) }}
+            file: ${{ inputs.dockerfile != '' && inputs.dockerfile || (inputs.context != '' && format('{0}/Dockerfile', inputs.file-dir) || 'Dockerfile') }}
             outputs: type=image,name=${{ inputs.namespace-repository }},push-by-digest=true,name-canonical=true,push=true
             build-args: |
               ${{ steps.resolved-build-args.outputs.build-args }}
@@ -206,8 +211,8 @@ jobs:
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
         with:
           registry: ${{ inputs.registry }}
-          username: ${{ inputs.docker-registry-user }}
-          password: ${{ secrets.docker-registry-token }}
+          username: ${{ inputs.docker-registry-user != '' && inputs.docker-registry-user || secrets.dockerhub-user }}
+          password: ${{ secrets.docker-registry-token || secrets.dockerhub-token }}
 
       - name: Create Docker manifest list and push
         working-directory: /tmp/digests
