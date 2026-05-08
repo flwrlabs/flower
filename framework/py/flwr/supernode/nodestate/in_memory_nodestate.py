@@ -22,6 +22,7 @@ from threading import Lock, RLock
 from flwr.common import Context, Error, Message, now
 from flwr.common.constant import ErrorCode
 from flwr.common.typing import Run
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.inflatable.inflatable_object import (
@@ -204,9 +205,9 @@ class InMemoryNodeState(
                 # Store the error reply message
                 self.store_message(error_reply)
 
-    def _on_task_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
         """Insert error replies for messages associated with expired task tokens."""
-        self._store_error_replies({run_id for _, run_id in expired_records})
+        self._store_error_replies({task.run_id for task in tasks})
 
     def record_message_processing_start(self, message_id: str) -> None:
         """Record the start time of message processing based on the message ID."""
