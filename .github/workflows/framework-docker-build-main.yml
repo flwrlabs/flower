@@ -96,9 +96,7 @@ jobs:
             --input matrix.raw.json \
             --output matrix.json \
             --docker-image-namespace "${DOCKER_IMAGE_NAMESPACE}" \
-            --tag "${DOCKER_IMAGE_TAG}" \
-            --strip-flwr-version-ref \
-            --build-local-wheel
+            --tag "${DOCKER_IMAGE_TAG}"
           echo "matrix=$(cat matrix.json)" >> "$GITHUB_OUTPUT"
 
   build-docker-base-images:
@@ -116,7 +114,6 @@ jobs:
       dockerfile: ${{ matrix.images.file_dir }}/Dockerfile
       prepare-framework: true
       patch-base-dockerfiles: true
-      build-local-wheel: true
       flower-repo-ref: ${{ inputs.flower-repo-ref || 'main' }}
       build-args: |
         PIP_VERSION=${{ needs.parameters.outputs.pip-version }}
