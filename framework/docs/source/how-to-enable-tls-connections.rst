@@ -170,12 +170,13 @@ start their SuperExecs with the correct AppIo TLS options. However, if you want 
 SuperExec separately in "process" isolation mode, you need to do a few things
 differently to enable TLS for the AppIo connections.
 
-First, we need to launch the SuperLink and SuperNode with the AppIo TLS options and with
-``--isolation=process``. This tells the SuperLink and SuperNode that the SuperExecs will
-be launched separately, e.g. by an operator or orchestration system. Next, in order for
-the SuperExecs to establish TLS connections to the AppIo APIs, we need to provide the
-AppIo TLS options when launching the SuperExecs. Below is an example command to launch a
-SuperExec that can establish TLS connections to the ServerAppIo API of the SuperLink:
+First, we need to launch the SuperLink and SuperNode with ``--isolation=process`` and
+with the AppIo TLS options. This tells the SuperLink and SuperNode that the SuperExecs
+will be launched separately, e.g. by an operator or orchestration system. Next, in order
+for the SuperExecs to establish TLS connections to the AppIo APIs, we need to provide
+the AppIo TLS options when launching the SuperExecs. Below is an example command to
+launch a SuperExec that can establish TLS connections to the ServerAppIo API of the
+SuperLink:
 
 .. code-block:: bash
     :emphasize-lines: 2
