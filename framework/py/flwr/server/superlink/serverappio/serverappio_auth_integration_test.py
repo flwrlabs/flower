@@ -35,8 +35,8 @@ from flwr.supercore.constant import (
     TaskType,
 )
 from flwr.supercore.interceptors import (
-    APP_TOKEN_HEADER,
     AUTHENTICATION_FAILED_MESSAGE,
+    TASK_TOKEN_HEADER,
     AppIoTokenClientInterceptor,
     SuperExecAuthClientInterceptor,
 )
@@ -131,7 +131,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         with self.assertRaises(grpc.RpcError) as err:
             self._get_nodes_no_auth.with_call(
                 request=GetNodesRequest(run_id=self._auth_run_id),
-                metadata=((APP_TOKEN_HEADER, "invalid-token"),),
+                metadata=((TASK_TOKEN_HEADER, "invalid-token"),),
             )
         assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
         assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE
