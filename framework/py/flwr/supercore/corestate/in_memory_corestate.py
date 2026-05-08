@@ -111,9 +111,13 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             if task_id not in self.task_store:
                 raise ValueError(f"Task {task_id} not found")
         with self.log_lock:
-            self.task_logs.setdefault(task_id, []).append(
-                (now().timestamp(), log_message)
-            )
+            timestamp = now().timestamp()
+            task_logs = self.task_logs.setdefault(task_id, [])
+            # Keep timestamps strictly increasing per task so a timestamp-only
+            # polling cursor cannot skip entries created at the same clock time.
+            if task_logs and timestamp <= task_logs[-1][0]:
+                timestamp = task_logs[-1][0] + 1e-6
+            task_logs.append((timestamp, log_message))
 
     def get_task_log(
         self, task_id: int, after_timestamp: float | None
@@ -127,6 +131,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             if after_timestamp is None:
                 after_timestamp = 0.0
             timestamps = [timestamp for timestamp, _ in task_logs]
+            # Polling is strict-after: entries at the checkpoint timestamp have
+            # already been delivered, so resume after the rightmost equal value.
             index = bisect_right(timestamps, after_timestamp)
             latest_timestamp = task_logs[-1][0] if index < len(task_logs) else 0.0
             return "".join(log for _, log in task_logs[index:]), latest_timestamp

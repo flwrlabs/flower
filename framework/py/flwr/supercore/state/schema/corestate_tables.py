@@ -21,7 +21,6 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Index,
-    Integer,
     LargeBinary,
     MetaData,
     String,
@@ -93,7 +92,6 @@ def create_corestate_metadata() -> MetaData:
     task_logs = Table(
         "task_logs",
         metadata,
-        Column("log_id", Integer, primary_key=True, autoincrement=True),
         Column("timestamp", Float, nullable=False),
         Column("task_id", BigInteger, ForeignKey("task.task_id"), nullable=False),
         Column("log", String, nullable=False),

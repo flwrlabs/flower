@@ -113,13 +113,30 @@ class SqlCoreState(CoreState, SqlMixin):
         sint64_task_id = uint64_to_int64(task_id)
 
         try:
+            # Keep timestamps strictly increasing per task so a timestamp-only
+            # polling cursor cannot skip entries created at the same clock time.
             self.query(
                 """
                 INSERT INTO task_logs (timestamp, task_id, log)
-                VALUES (:current_ts, :task_id, :log)
+                VALUES (
+                    max(
+                        :current_ts,
+                        COALESCE(
+                            (
+                                SELECT MAX(timestamp) + :timestamp_increment
+                                FROM task_logs
+                                WHERE task_id = :task_id
+                            ),
+                            :current_ts
+                        )
+                    ),
+                    :task_id,
+                    :log
+                )
                 """,
                 {
                     "current_ts": now().timestamp(),
+                    "timestamp_increment": 1e-6,
                     "task_id": sint64_task_id,
                     "log": log_message,
                 },
@@ -144,6 +161,8 @@ class SqlCoreState(CoreState, SqlMixin):
             if after_timestamp is None:
                 after_timestamp = 0.0
 
+            # Polling is strict-after: entries at the checkpoint timestamp have
+            # already been delivered.
             rows = self.query(
                 """
                 SELECT log, timestamp FROM task_logs

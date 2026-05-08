@@ -136,7 +136,6 @@ erDiagram
   }
 
   task_logs {
-    INTEGER log_id PK
     BIGINT task_id FK
     VARCHAR log
     FLOAT timestamp
