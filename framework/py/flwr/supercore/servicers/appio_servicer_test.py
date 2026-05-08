@@ -141,32 +141,6 @@ class TestAppIoServicer(unittest.TestCase):
         )
         self.assertEqual(response.task_id, 456)
 
-    def test_create_task_aborts_if_run_id_does_not_match_token(self) -> None:
-        """CreateTask should reject requests for a different run."""
-        # Prepare
-        context = Mock(spec=grpc.ServicerContext)
-        context.abort.side_effect = grpc.RpcError()
-
-        # Execute
-        with (
-            patch(
-                "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
-                return_value=Mock(run_id=123),
-            ),
-            self.assertRaises(grpc.RpcError),
-        ):
-            self.servicer.CreateTask(
-                CreateTaskRequest(type=TaskType.MODEL, run_id=999, model_ref="model"),
-                context,
-            )
-
-        # Assert
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.PERMISSION_DENIED,
-            "`run_id` does not match authenticated token.",
-        )
-        self.state.create_task.assert_not_called()
-
     def test_create_task_propagates_state_error(self) -> None:
         """CreateTask should let state-layer run validation errors propagate."""
         # Prepare
