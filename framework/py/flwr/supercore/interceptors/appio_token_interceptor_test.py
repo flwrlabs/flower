@@ -39,8 +39,8 @@ from flwr.supercore.auth import (
     SERVERAPPIO_METHOD_AUTH_POLICY,
 )
 from flwr.supercore.interceptors import (
-    APP_TOKEN_HEADER,
     AUTHENTICATION_FAILED_MESSAGE,
+    TASK_TOKEN_HEADER,
     AppIoTokenClientInterceptor,
     AppIoTokenServerInterceptor,
     create_clientappio_token_auth_server_interceptor,
@@ -101,7 +101,7 @@ def _make_non_unary_handler() -> grpc.RpcMethodHandler:
 class TestAppIoTokenClientInterceptor(TestCase):
     """Unit tests for AppIoTokenClientInterceptor."""
 
-    def test_attach_app_token_header(self) -> None:
+    def test_attach_task_token_header(self) -> None:
         """The interceptor should attach App token metadata."""
         interceptor = AppIoTokenClientInterceptor(token="new-token")
         details = _ClientCallDetails(
@@ -131,17 +131,17 @@ class TestAppIoTokenClientInterceptor(TestCase):
         metadata = captured["metadata"]
         self.assertIn(("x-test", "value"), metadata)
         self.assertEqual(
-            [item for item in metadata if item[0] == APP_TOKEN_HEADER],
-            [(APP_TOKEN_HEADER, "new-token")],
+            [item for item in metadata if item[0] == TASK_TOKEN_HEADER],
+            [(TASK_TOKEN_HEADER, "new-token")],
         )
 
-    def test_raise_if_app_token_header_already_present(self) -> None:
+    def test_raise_if_task_token_header_already_present(self) -> None:
         """The interceptor should reject duplicate App token metadata."""
         interceptor = AppIoTokenClientInterceptor(token="new-token")
         details = _ClientCallDetails(
             method="/flwr.proto.ServerAppIo/GetNodes",
             timeout=None,
-            metadata=(("x-test", "value"), (APP_TOKEN_HEADER, "old-token")),
+            metadata=(("x-test", "value"), (TASK_TOKEN_HEADER, "old-token")),
             credentials=None,
             wait_for_ready=None,
             compression=None,
@@ -227,7 +227,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 method,
-                invocation_metadata=((APP_TOKEN_HEADER, "invalid"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "invalid"),),
             ),
         )
 
@@ -248,7 +248,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 method,
-                invocation_metadata=((APP_TOKEN_HEADER, "valid"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "valid"),),
             ),
         )
 
@@ -279,7 +279,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
             lambda _: grpc.unary_unary_rpc_method_handler(_handler),
             _HandlerCallDetails(
                 method,
-                invocation_metadata=((APP_TOKEN_HEADER, "task-token"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "task-token"),),
             ),
         )
 
@@ -298,7 +298,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 "/flwr.proto.ServerAppIo/PushTaskOutput",
-                invocation_metadata=((APP_TOKEN_HEADER, "metadata-token"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "metadata-token"),),
             ),
         )
 
@@ -318,7 +318,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 "/flwr.proto.ServerAppIo/PushMessages",
-                invocation_metadata=((APP_TOKEN_HEADER, "metadata-token"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "metadata-token"),),
             ),
         )
 
@@ -361,7 +361,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
             continuation,
             _HandlerCallDetails(
                 "/flwr.proto.ServerAppIo/UnknownMethod",
-                invocation_metadata=((APP_TOKEN_HEADER, "valid"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "valid"),),
             ),
         )
 
@@ -385,7 +385,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
             lambda _: _make_non_unary_handler(),
             _HandlerCallDetails(
                 method,
-                invocation_metadata=((APP_TOKEN_HEADER, "valid"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "valid"),),
             ),
         )
 
@@ -462,7 +462,7 @@ class TestFactoryFunctions(TestCase):
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 "/flwr.proto.ServerAppIo/GetNodes",
-                invocation_metadata=((APP_TOKEN_HEADER, "valid-token"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "valid-token"),),
             ),
         )
 
@@ -478,7 +478,7 @@ class TestFactoryFunctions(TestCase):
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 "/flwr.proto.ClientAppIo/PushObject",
-                invocation_metadata=((APP_TOKEN_HEADER, "valid-token"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "valid-token"),),
             ),
         )
 

@@ -32,7 +32,7 @@ from flwr.supercore.auth import (
 )
 from flwr.supercore.utils import find_metadata_keys, get_metadata_str
 
-APP_TOKEN_HEADER = "flwr-app-token"
+TASK_TOKEN_HEADER = "flwr-task-token"
 AUTHENTICATION_FAILED_MESSAGE = "Authentication failed."
 
 
@@ -79,11 +79,11 @@ class AppIoTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ig
     ) -> grpc.Call:
         """Add/replace the App token metadata on outbound unary requests."""
         metadata = tuple(client_call_details.metadata or ())
-        if find_metadata_keys(metadata, (APP_TOKEN_HEADER,)):
+        if find_metadata_keys(metadata, (TASK_TOKEN_HEADER,)):
             raise RuntimeError(
-                f"{APP_TOKEN_HEADER} already present in outbound metadata."
+                f"{TASK_TOKEN_HEADER} already present in outbound metadata."
             )
-        metadata += ((APP_TOKEN_HEADER, self._token),)
+        metadata += ((TASK_TOKEN_HEADER, self._token),)
         details = client_call_details._replace(metadata=metadata)
         return continuation(details, request)
 
@@ -127,7 +127,7 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         )
         token = get_metadata_str(
             handler_call_details.invocation_metadata,
-            APP_TOKEN_HEADER,
+            TASK_TOKEN_HEADER,
         )
 
         def _authenticated_handler(
