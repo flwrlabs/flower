@@ -35,7 +35,7 @@ from flwr.common.constant import (
     Status,
 )
 from flwr.common.message import get_message_to_descendant_id_mapping
-from flwr.common.serde import context_to_proto, message_from_proto
+from flwr.common.serde import message_from_proto
 from flwr.common.typing import Fab, RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
@@ -719,22 +719,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             ]
             # expected a single object id (that of the error message)
             assert list(object_ids_in_response) == [msg_res.object_id]
-
-    def _assert_push_task_output_not_allowed(
-        self, token: str, context: Context
-    ) -> None:
-        """Assert `PushTaskOutput` not allowed."""
-        run_id = self.state.get_run_id_by_token(token)
-        assert run_id is not None, "Invalid token is provided."
-        run_status = self.state.get_run_status({run_id})[run_id]
-        request = PushTaskOutputRequest(
-            token=token, run_id=run_id, context=context_to_proto(context)
-        )
-
-        with self.assertRaises(grpc.RpcError) as e:
-            self._push_task_output.with_call(request=request)
-        assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
-        assert e.exception.details() == self.status_to_msg[run_status.status]
 
     def test_push_object_succesful(self) -> None:
         """Test `PushObject`."""

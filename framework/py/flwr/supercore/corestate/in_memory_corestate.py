@@ -335,38 +335,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             Copies of tasks whose claims expired and were marked FINISHED:FAILED.
         """
 
-    def verify_token(self, run_id: int, token: str) -> bool:
-        """Verify a token for the given run ID."""
-        self._cleanup_expired_tokens()
-        with self.lock_token_store:
-            record = self.token_store.get(run_id)
-            return record is not None and record.token == token
-
-    def get_run_id_by_token(self, token: str) -> int | None:
-        """Get the run ID associated with a given token."""
-        self._cleanup_expired_tokens()
-        with self.lock_token_store:
-            return self.token_to_run_id.get(token)
-
-    def acknowledge_app_heartbeat(self, token: str) -> bool:
-        """Acknowledge an app heartbeat with the provided token."""
-        # Clean up expired tokens
-        self._cleanup_expired_tokens()
-
-        with self.lock_token_store:
-            # Return False if token is not found
-            if token not in self.token_to_run_id:
-                return False
-
-            # Get the run_id and update heartbeat info
-            run_id = self.token_to_run_id[token]
-            record = self.token_store[run_id]
-            current = int(now().timestamp())
-            record.active_until = (
-                current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-            )
-            return True
-
     def _cleanup_expired_tokens(self) -> None:
         """Remove expired tokens and perform additional cleanup.
 

@@ -349,17 +349,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertIsNone(state.get_task_by_token("missing-token"))
 
-    def test_acknowledge_app_heartbeat_nonexistent_token(self) -> None:
-        """Test acknowledging heartbeat with nonexistent token."""
-        # Prepare
-        state = self.state_factory()
-
-        # Execute: acknowledge heartbeat with invalid token
-        result = state.acknowledge_app_heartbeat("nonexistent_token")
-
-        # Assert: should return False
-        self.assertFalse(result)
-
     def test_reserve_nonce_first_reservation_succeeds(self) -> None:
         """A new nonce reservation should succeed."""
         state = self.state_factory()
