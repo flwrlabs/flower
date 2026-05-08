@@ -5,7 +5,7 @@
 set -euo pipefail
 
 missing=0
-for var in PYPI_REPOSITORY_URL PYPI_REPOSITORY_NAME PYPI_REPOSITORY_USERNAME PYPI_REPOSITORY_PASSWORD; do
+for var in PYPI_REPOSITORY_USERNAME PYPI_REPOSITORY_PASSWORD; do
   if [[ -z "${!var:-}" ]]; then
     echo "Missing required configuration: ${var}" >&2
     missing=1
@@ -33,9 +33,4 @@ mkdir -p framework/dist
 curl --fail --location --silent --show-error "${wheel_url}" --output "framework/dist/${wheel_name}"
 curl --fail --location --silent --show-error "${tar_url}" --output "framework/dist/${tar_name}"
 
-if [[ "${PYPI_REPOSITORY_NAME}" == "pypi" ]]; then
-  (cd framework && python -m poetry publish -u "${PYPI_REPOSITORY_USERNAME}" -p "${PYPI_REPOSITORY_PASSWORD}")
-else
-  (cd framework && python -m poetry config "repositories.${PYPI_REPOSITORY_NAME}" "${PYPI_REPOSITORY_URL}")
-  (cd framework && python -m poetry publish -r "${PYPI_REPOSITORY_NAME}" -u "${PYPI_REPOSITORY_USERNAME}" -p "${PYPI_REPOSITORY_PASSWORD}")
-fi
+(cd framework && python -m poetry publish -u "${PYPI_REPOSITORY_USERNAME}" -p "${PYPI_REPOSITORY_PASSWORD}")

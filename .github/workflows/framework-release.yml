@@ -10,14 +10,6 @@ on:
         description: "Framework package version. Leave empty to derive from the release tag."
         required: false
         default: ""
-      pypi-repository-url:
-        description: "Python package repository URL. Defaults to vars.PYPI_REPOSITORY_URL."
-        required: false
-        default: ""
-      pypi-repository-name:
-        description: "Poetry repository alias for the Python package repository. Defaults to vars.PYPI_REPOSITORY_NAME."
-        required: false
-        default: ""
       docker-registry:
         description: "Docker registry host. Defaults to vars.DOCKER_IMAGE_REGISTRY."
         required: false
@@ -63,10 +55,9 @@ jobs:
         uses: ./.github/actions/bootstrap
 
       - id: publish
+        if: ${{ github.repository == 'flwrlabs/flower' }}
         env:
           PACKAGE_VERSION: ${{ inputs.package-version }}
-          PYPI_REPOSITORY_URL: ${{ inputs.pypi-repository-url || vars.PYPI_REPOSITORY_URL }}
-          PYPI_REPOSITORY_NAME: ${{ inputs.pypi-repository-name || vars.PYPI_REPOSITORY_NAME }}
           PYPI_REPOSITORY_USERNAME: ${{ vars.PYPI_REPOSITORY_USERNAME }}
         run: ./framework/dev/release/publish-wheel.sh
 
