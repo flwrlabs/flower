@@ -136,9 +136,10 @@ erDiagram
   }
 
   task_logs {
-    BIGINT task_id FK "nullable"
-    VARCHAR log "nullable"
-    FLOAT timestamp "nullable"
+    INTEGER log_id PK
+    BIGINT task_id FK
+    VARCHAR log
+    FLOAT timestamp
   }
 
   token_store {

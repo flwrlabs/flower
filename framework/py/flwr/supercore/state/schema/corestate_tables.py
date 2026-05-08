@@ -21,11 +21,11 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Index,
+    Integer,
     LargeBinary,
     MetaData,
     String,
     Table,
-    UniqueConstraint,
     text,
 )
 
@@ -90,14 +90,14 @@ def create_corestate_metadata() -> MetaData:
     # --------------------------------------------------------------------------
     #  Table: task_logs
     # --------------------------------------------------------------------------
-    Table(
+    task_logs = Table(
         "task_logs",
         metadata,
-        Column("timestamp", Float),
-        Column("task_id", BigInteger, ForeignKey("task.task_id")),
-        Column("log", String),
-        # Composite PK equivalent
-        UniqueConstraint("timestamp", "task_id"),
+        Column("log_id", Integer, primary_key=True, autoincrement=True),
+        Column("timestamp", Float, nullable=False),
+        Column("task_id", BigInteger, ForeignKey("task.task_id"), nullable=False),
+        Column("log", String, nullable=False),
     )
+    Index("idx_task_logs_task_id_timestamp", task_logs.c.task_id, task_logs.c.timestamp)
 
     return metadata
