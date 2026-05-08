@@ -88,22 +88,6 @@ class Status:
     message: str
 
 
-class ClientAppOutputCode(Enum):
-    """ClientAppIO status codes."""
-
-    SUCCESS = 0
-    DEADLINE_EXCEEDED = 1
-    UNKNOWN_ERROR = 2
-
-
-@dataclass
-class ClientAppOutputStatus:
-    """ClientAppIO status."""
-
-    code: ClientAppOutputCode
-    message: str
-
-
 @dataclass
 class Parameters:
     """Model parameters."""

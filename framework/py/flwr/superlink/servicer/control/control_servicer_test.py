@@ -223,7 +223,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, expected_task_type)
 
-    def test_start_run_aborts_if_create_task_fails(self) -> None:
+    def test_start_run_aborts_if_create_run_fails(self) -> None:
         """Test StartRun aborts with INTERNAL if the initial task cannot be created."""
         fab_content = b"test FAB content task failure"
         request = StartRunRequest()
@@ -240,7 +240,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch(
                 "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
             ) as mock_get_metadata_from_config,
-            patch.object(self.state, "create_task", return_value=None),
+            patch.object(self.state, "create_run", return_value=0),
             self.assertRaises(grpc.RpcError),
         ):
             mock_get_fab_config.return_value = {
@@ -251,7 +251,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         context.abort.assert_called_once_with(
             grpc.StatusCode.INTERNAL,
-            "Failed to create task for the run.",
+            "Failed to create or initialize the run.",
         )
 
     def test_start_run_returns_note_for_remote_app(self) -> None:

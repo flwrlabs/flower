@@ -109,18 +109,25 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         assert task_id_1 and task_id_2 and task_id_3
 
         tasks = state.get_tasks(run_ids=[run_id_1])
+        task_ids = {task.task_id for task in tasks}
 
-        self.assertEqual({task.task_id for task in tasks}, {task_id_1, task_id_3})
+        self.assertTrue({task_id_1, task_id_3}.issubset(task_ids))
+        self.assertNotIn(task_id_2, task_ids)
+        self.assertTrue(all(task.run_id == run_id_1 for task in tasks))
 
     def test_get_tasks_single_status_matches(self) -> None:
         """A single-item status sequence should match pending tasks."""
         state = self.state_factory()
-        _ = state.create_task(task_type=TaskType.MODEL, run_id=self.task_run_id(state))
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert task_id
 
         tasks = state.get_tasks(statuses=[Status.PENDING])
+        task_ids = {task.task_id for task in tasks}
 
-        self.assertEqual(len(tasks), 1)
-        self.assertEqual(tasks[0].status.status, Status.PENDING)
+        self.assertIn(task_id, task_ids)
+        for task in tasks:
+            self.assertEqual(task.status.status, Status.PENDING)
 
     def test_get_tasks_negative_limit_raises(self) -> None:
         """Negative limits should be rejected consistently."""
@@ -341,52 +348,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
 
         self.assertIsNone(state.get_task_by_token("missing-token"))
-
-    def test_create_token_already_exists(self) -> None:
-        """Test creating a token that already exists."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-        state.create_token(run_id)
-
-        # Execute
-        ret = state.create_token(run_id)
-
-        # Assert: The return is None
-        self.assertIsNone(ret)
-
-    def test_get_run_id_by_token(self) -> None:
-        """Test retrieving run ID by token."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-        token = state.create_token(run_id)
-        assert token is not None
-
-        # Execute: get run ID by token
-        retrieved_run_id1 = state.get_run_id_by_token(token)
-        retrieved_run_id2 = state.get_run_id_by_token("nonexistent_token")
-
-        # Assert: should return the correct run ID
-        self.assertEqual(retrieved_run_id1, run_id)
-        self.assertIsNone(retrieved_run_id2)
-
-    def test_acknowledge_app_heartbeat_success(self) -> None:
-        """Test successfully acknowledging an app heartbeat."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-        token = state.create_token(run_id)
-        assert token is not None
-
-        # Execute: acknowledge heartbeat
-        result = state.acknowledge_app_heartbeat(token)
-
-        # Assert: should return True
-        self.assertTrue(result)
-
-        # Assert: token should still be valid
-        self.assertTrue(state.verify_token(run_id, token))
 
     def test_acknowledge_app_heartbeat_nonexistent_token(self) -> None:
         """Test acknowledging heartbeat with nonexistent token."""

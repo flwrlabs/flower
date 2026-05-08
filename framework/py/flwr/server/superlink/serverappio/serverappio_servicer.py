@@ -35,16 +35,14 @@ from flwr.proto import serverappio_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
-    CreateTaskRequest,
-    CreateTaskResponse,
-    PullAppInputsRequest,
-    PullAppInputsResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
+    PullTaskInputRequest,
+    PullTaskInputResponse,
     PushAppMessagesRequest,
     PushAppMessagesResponse,
-    PushAppOutputsRequest,
-    PushAppOutputsResponse,
+    PushTaskOutputRequest,
+    PushTaskOutputResponse,
 )
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
@@ -72,12 +70,6 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.superlink.utils import abort_if
 from flwr.server.utils.validator import validate_message
-from flwr.supercore.constant import (
-    TASK_TYPES_REQUIRING_CONNECTOR_REF,
-    TASK_TYPES_REQUIRING_FAB_HASH,
-    TASK_TYPES_REQUIRING_MODEL_REF,
-    TaskType,
-)
 from flwr.supercore.inflatable.inflatable_object import (
     UnexpectedObjectContentError,
     get_all_nested_objects,
@@ -139,30 +131,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         all_ids: set[int] = state.get_nodes(request.run_id)
         nodes: list[Node] = [Node(node_id=node_id) for node_id in all_ids]
         return GetNodesResponse(nodes=nodes)
-
-    def CreateTask(
-        self, request: CreateTaskRequest, context: grpc.ServicerContext
-    ) -> CreateTaskResponse:
-        """Create a task."""
-        log(DEBUG, "ServerAppIoServicer.CreateTask")
-
-        state = self.state_factory.state()
-        _validate_create_task_request(request, context)
-
-        task_id = state.create_task(
-            task_type=request.type,
-            run_id=request.run_id,
-            fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
-            model_ref=request.model_ref if request.HasField("model_ref") else None,
-            connector_ref=(
-                request.connector_ref if request.HasField("connector_ref") else None
-            ),
-        )
-        if task_id is None:
-            context.abort(grpc.StatusCode.INTERNAL, "Failed to create task")
-            raise RuntimeError("This line should never be reached.")
-
-        return CreateTaskResponse(task_id=task_id)
 
     def PushMessages(
         self, request: PushAppMessagesRequest, context: grpc.ServicerContext
@@ -307,11 +275,11 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
 
         return GetRunResponse(run=run_to_proto(runs[0]))
 
-    def PullAppInputs(
-        self, request: PullAppInputsRequest, context: grpc.ServicerContext
-    ) -> PullAppInputsResponse:
+    def PullTaskInput(
+        self, request: PullTaskInputRequest, context: grpc.ServicerContext
+    ) -> PullTaskInputResponse:
         """Pull ServerApp process inputs."""
-        log(DEBUG, "ServerAppIoServicer.PullAppInputs")
+        log(DEBUG, "ServerAppIoServicer.PullTaskInput")
         # Init access to LinkState
         state = self.state_factory.state()
 
@@ -330,7 +298,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 log(INFO, "Started task %d of run %d", task.task_id, run_id)
                 # Keep run status working
                 state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
-                return PullAppInputsResponse(
+                return PullTaskInputResponse(
                     context=context_to_proto(serverapp_ctxt),
                     run=run_to_proto(run),
                     fab=fab_to_proto(fab),
@@ -346,11 +314,11 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         )
         raise RuntimeError("Unreachable code")  # for mypy
 
-    def PushAppOutputs(
-        self, request: PushAppOutputsRequest, context: grpc.ServicerContext
-    ) -> PushAppOutputsResponse:
+    def PushTaskOutput(
+        self, request: PushTaskOutputRequest, context: grpc.ServicerContext
+    ) -> PushTaskOutputResponse:
         """Push ServerApp process outputs."""
-        log(DEBUG, "ServerAppIoServicer.PushAppOutputs")
+        log(DEBUG, "ServerAppIoServicer.PushTaskOutput")
 
         # Get the authenticated task and associated run ID
         task = get_authenticated_task()
@@ -372,7 +340,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 state.set_serverapp_context(run_id, context_from_proto(request.context))
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
-        return PushAppOutputsResponse()
+        return PushTaskOutputResponse()
 
     def PushLogs(
         self, request: PushLogsRequest, context: grpc.ServicerContext
@@ -492,34 +460,3 @@ def _raise_if(validation_error: bool, request_name: str, detail: str) -> None:
     """Raise a `ValueError` with a detailed message if a validation error occurs."""
     if validation_error:
         raise ValueError(f"Malformed {request_name}: {detail}")
-
-
-def _validate_create_task_request(
-    request: CreateTaskRequest, context: grpc.ServicerContext
-) -> None:
-    """Validate the task creation request."""
-    try:
-        task_type = TaskType(request.type)
-    except ValueError:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Invalid task type: {request.type}",
-        )
-
-    if task_type in TASK_TYPES_REQUIRING_FAB_HASH and not request.fab_hash:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Task type '{request.type}' requires fab_hash.",
-        )
-
-    if task_type in TASK_TYPES_REQUIRING_MODEL_REF and not request.model_ref:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Task type '{request.type}' requires model_ref.",
-        )
-
-    if task_type in TASK_TYPES_REQUIRING_CONNECTOR_REF and not request.connector_ref:
-        context.abort(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            f"Task type '{request.type}' requires connector_ref.",
-        )

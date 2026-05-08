@@ -26,6 +26,7 @@ from flwr.common import ConfigRecord, Context, Message, Metadata, RecordDict, no
 from flwr.common.constant import ErrorCode
 from flwr.common.message import make_message
 from flwr.common.typing import Fab, Run
+from flwr.supercore.constant import TaskType
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.object_store import ObjectStoreFactory
 
@@ -45,6 +46,13 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
     def state_factory(self) -> NodeState:
         """Provide state implementation to test."""
         raise NotImplementedError()
+
+    def _claim_client_task(self, run_id: int) -> int:
+        """Create and claim a ClientApp task for the given run."""
+        task_id = self.state.create_task(task_type=TaskType.CLIENT_APP, run_id=run_id)
+        assert task_id is not None
+        assert self.state.claim_task(task_id) is not None
+        return task_id
 
     def test_get_set_node_id(self) -> None:
         """Test set_node_id."""
@@ -189,13 +197,12 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         self.assertNotIn("msg1", msg_ids)
         self.assertIn("msg2", msg_ids)
 
-    def test_get_error_reply_when_token_expires(self) -> None:
-        """Test that error replies are created when tokens expire."""
-        # Prepare: Create a token for a run
+    def test_get_error_reply_when_task_claim_expires(self) -> None:
+        """Test that error replies are created when task claims expire."""
+        # Prepare: Create a claimed task for a run
         run_id = 110
         created_at = now()
-        token = self.state.create_token(run_id)
-        assert token is not None
+        self._claim_client_task(run_id)
 
         # Prepare: store and retrieve a message for the run
         msg = make_dummy_message(run_id=run_id)
