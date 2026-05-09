@@ -22,7 +22,7 @@ import time
 import traceback
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from logging import DEBUG, ERROR, INFO, WARN
+from logging import DEBUG, ERROR, WARN
 from pathlib import Path
 from queue import Empty, Queue
 from uuid import uuid4
@@ -43,9 +43,6 @@ from flwr.common.constant import (
 from flwr.common.logger import log
 from flwr.common.typing import Run
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
-from flwr.supercore.object_store import ObjectStoreFactory
-from flwr.superlink.federation import NoOpFederationManager
 
 from .backend import Backend, error_messages_backends, supported_backends
 
@@ -271,65 +268,25 @@ def start_vce(
     backend_name: str,
     backend_config_json_stream: str,
     app_dir: str,
-    is_app: bool,
     f_stop: threading.Event,
     run: Run,
-    client_app: ClientApp | None = None,
-    client_app_attr: str | None = None,
-    num_supernodes: int | None = None,
-    state_factory: LinkStateFactory | None = None,
-    existing_nodes_mapping: NodeToPartitionMapping | None = None,
+    client_app_attr: str,
+    num_supernodes: int,
+    state_factory: LinkStateFactory,
 ) -> None:
     """Start Fleet API with the Simulation Engine."""
     nodes_mapping = {}
 
-    if client_app_attr is not None and client_app is not None:
-        raise ValueError(
-            "Both `client_app_attr` and `client_app` are provided, "
-            "but only one is allowed."
-        )
-
-    if num_supernodes is not None and existing_nodes_mapping is not None:
-        raise ValueError(
-            "Both `num_supernodes` and `existing_nodes_mapping` are provided, "
-            "but only one is allowed."
-        )
-    if num_supernodes is None:
-        if state_factory is None or existing_nodes_mapping is None:
-            raise ValueError(
-                "If not passing an existing `state_factory` and associated "
-                "`existing_nodes_mapping` you must supply `num_supernodes` to indicate "
-                "how many nodes to insert into a new StateFactory that will be created."
-            )
-    if existing_nodes_mapping:
-        if state_factory is None:
-            raise ValueError(
-                "`existing_nodes_mapping` was passed, but no `state_factory` was "
-                "passed."
-            )
-        log(INFO, "Using exiting NodeToPartitionMapping and StateFactory.")
-        # Use mapping constructed externally. This also means nodes
-        # have previously being registered.
-        nodes_mapping = existing_nodes_mapping
     app_dir = str(Path(app_dir).absolute())
 
-    if not state_factory:
-        log(INFO, "A StateFactory was not supplied to the SimulationEngine.")
-        # Create an empty in-memory state factory
-        state_factory = LinkStateFactory(
-            FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), ObjectStoreFactory()
-        )
-        log(INFO, "Created new %s.", state_factory.__class__.__name__)
-
-    if num_supernodes:
-        # Register SuperNodes
-        nodes_mapping = _register_nodes(
-            num_nodes=num_supernodes, state_factory=state_factory
-        )
+    # Register SuperNodes
+    nodes_mapping = _register_nodes(
+        num_nodes=num_supernodes, state_factory=state_factory
+    )
 
     # Construct mapping of DeprecatedRunInfoStore
     node_info_stores = _register_node_info_stores(
-        nodes_mapping=nodes_mapping, run=run, app_dir=app_dir if is_app else None
+        nodes_mapping=nodes_mapping, run=run, app_dir=app_dir
     )
 
     # Load backend config
@@ -355,19 +312,14 @@ def start_vce(
         """Instantiate a Backend."""
         return backend_type(backend_config)
 
-    # Load ClientApp if needed
+    # Load ClientApp
     def _load() -> ClientApp:
 
-        if client_app:
-            return client_app
-        if client_app_attr:
-            return get_load_client_app_fn(
-                default_app_ref=client_app_attr,
-                app_path=app_dir,
-                multi_app=False,
-            )(run.fab_id, run.fab_version, run.fab_hash)
-
-        raise ValueError("Either `client_app_attr` or `client_app` must be provided")
+        return get_load_client_app_fn(
+            default_app_ref=client_app_attr,
+            app_path=app_dir,
+            multi_app=False,
+        )(run.fab_id, run.fab_version, run.fab_hash)
 
     app_fn = _load
 
@@ -375,14 +327,12 @@ def start_vce(
         # Test if ClientApp can be loaded
         client_app = app_fn()
 
-        # Cache `ClientApp`
-        if client_app_attr:
-            # Now wrap the loaded ClientApp in a dummy function
-            # this prevent unnecesary low-level loading of ClientApp
-            def _load_client_app() -> ClientApp:
-                return client_app
+        # Now wrap the loaded ClientApp in a dummy function
+        # this prevent unnecesary low-level loading of ClientApp
+        def _load_client_app() -> ClientApp:
+            return client_app
 
-            app_fn = _load_client_app
+        app_fn = _load_client_app
 
         # Run main simulation loop
         run_api(
