@@ -279,8 +279,9 @@ def _main_loop(
         log(DEBUG, "Pre-registering run with id %s", run.run_id)
         state = cast(InMemoryLinkState, state_factory.state())
         state.run_ids[run.run_id] = RunRecord(run=run)
-        state.task_store[cast(int, run.primary_task_id)] = Task(
-            task_id=run.primary_task_id, run_id=run.run_id
+        primary_task_id = cast(int, run.primary_task_id)
+        state.task_store[primary_task_id] = Task(
+            task_id=primary_task_id, run_id=run.run_id
         )
 
         # Initialize Grid
