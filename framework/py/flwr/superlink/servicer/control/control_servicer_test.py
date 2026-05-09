@@ -868,8 +868,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             RunType.SERVER_APP,
         )
         self.state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
-        _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-        _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
 
         with patch.object(
             self.state.federation_manager,
@@ -924,8 +922,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             RunType.SERVER_APP,
         )
         self.state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
-        _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-        _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
 
         with patch.object(
             self.state.federation_manager,

@@ -20,8 +20,7 @@ import unittest
 
 import grpc
 
-from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS, Status
-from flwr.common.typing import RunStatus
+from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS
 from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
@@ -113,8 +112,10 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         run_id = self.state.create_run(
             "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
         )
-        _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-        _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
+        run = self.state.get_run_info(run_ids=[run_id])[0]
+        assert run.primary_task_id is not None
+        assert self.state.claim_task(run.primary_task_id) is not None
+        assert self.state.activate_task(run.primary_task_id)
         return run_id
 
     def test_get_nodes_denied_without_metadata_token(self) -> None:
