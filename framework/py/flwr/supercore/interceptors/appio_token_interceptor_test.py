@@ -32,6 +32,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoServicer
 from flwr.proto.message_pb2 import PushObjectRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoServicer
 from flwr.supercore.auth import (
     CLIENTAPPIO_METHOD_AUTH_POLICY,
@@ -66,8 +67,28 @@ class _HandlerCallDetails:
 
 
 class _TokenState:
-    def __init__(self, token_to_run_id: dict[str, int]) -> None:
+    def __init__(
+        self,
+        token_to_run_id: dict[str, int],
+        token_to_task: dict[str, Task] | None = None,
+    ) -> None:
         self._token_to_run_id = token_to_run_id
+        self._token_to_task = token_to_task or {}
+
+    def get_task_id_by_token(self, token: str) -> int | None:
+        """Return the task ID for a task token, if present."""
+        task = self._token_to_task.get(token)
+        return task.task_id if task is not None else None
+
+    def get_tasks(self, *, task_ids: list[int] | None = None) -> list[Task]:
+        """Return tasks matching the task IDs."""
+        if task_ids is None:
+            return list(self._token_to_task.values())
+        return [
+            task
+            for task in self._token_to_task.values()
+            if task.task_id in task_ids
+        ]
 
     def get_run_id_by_token(self, token: str) -> int | None:
         """Return the run id for a token, if present."""
@@ -97,13 +118,13 @@ def _make_non_unary_handler() -> grpc.RpcMethodHandler:
 class TestAppIoTokenClientInterceptor(TestCase):
     """Unit tests for AppIoTokenClientInterceptor."""
 
-    def test_attach_and_replace_app_token_header(self) -> None:
-        """The interceptor should enforce a single App token header."""
+    def test_attach_app_token_header(self) -> None:
+        """The interceptor should attach App token metadata."""
         interceptor = AppIoTokenClientInterceptor(token="new-token")
         details = _ClientCallDetails(
             method="/flwr.proto.ServerAppIo/GetNodes",
             timeout=None,
-            metadata=(("x-test", "value"), (APP_TOKEN_HEADER, "old-token")),
+            metadata=(("x-test", "value"),),
             credentials=None,
             wait_for_ready=None,
             compression=None,
@@ -131,14 +152,35 @@ class TestAppIoTokenClientInterceptor(TestCase):
             [(APP_TOKEN_HEADER, "new-token")],
         )
 
+    def test_raise_if_app_token_header_already_present(self) -> None:
+        """The interceptor should reject duplicate App token metadata."""
+        interceptor = AppIoTokenClientInterceptor(token="new-token")
+        details = _ClientCallDetails(
+            method="/flwr.proto.ServerAppIo/GetNodes",
+            timeout=None,
+            metadata=(("x-test", "value"), (APP_TOKEN_HEADER, "old-token")),
+            credentials=None,
+            wait_for_ready=None,
+            compression=None,
+        )
+
+        with self.assertRaises(RuntimeError):
+            interceptor.intercept_unary_unary(
+                continuation=Mock(),
+                client_call_details=details,
+                request=GetNodesRequest(run_id=1),
+            )
+
 
 class TestAppIoTokenServerInterceptor(TestCase):
     """Unit tests for AppIoTokenServerInterceptor."""
 
     def _new_interceptor(
-        self, token_to_run_id: dict[str, int]
+        self,
+        token_to_run_id: dict[str, int],
+        token_to_task: dict[str, Task] | None = None,
     ) -> AppIoTokenServerInterceptor:
-        state = _TokenState(token_to_run_id)
+        state = _TokenState(token_to_run_id, token_to_task)
         return create_serverappio_token_auth_server_interceptor(lambda: state)
 
     @staticmethod
@@ -233,6 +275,54 @@ class TestAppIoTokenServerInterceptor(TestCase):
         # cross-run use is expected.
         response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=7), Mock()))
         self.assertEqual(response, "ok")
+
+    def test_valid_task_token_passes_for_matching_run(self) -> None:
+        """Protected methods should pass with a task token for the request run."""
+        task = Task(task_id=123, run_id=7)
+        interceptor = self._new_interceptor(
+            token_to_run_id={}, token_to_task={"task-token": task}
+        )
+        method = self._find_serverappio_method(requires_token=True)
+        if method is None:
+            self.skipTest("No token-required ServerAppIo method found in policy table.")
+
+        intercepted = interceptor.intercept_service(
+            lambda _: _make_unary_handler(),
+            _HandlerCallDetails(
+                method,
+                invocation_metadata=((APP_TOKEN_HEADER, "task-token"),),
+            ),
+        )
+
+        response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=7), Mock()))
+        self.assertEqual(response, "ok")
+
+    def test_task_token_run_id_mismatch_denied_for_protected_method(self) -> None:
+        """Protected methods should deny task tokens for a different run."""
+        task = Task(task_id=123, run_id=7)
+        interceptor = self._new_interceptor(
+            token_to_run_id={}, token_to_task={"task-token": task}
+        )
+        method = self._find_serverappio_method(requires_token=True)
+        if method is None:
+            self.skipTest("No token-required ServerAppIo method found in policy table.")
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        intercepted = interceptor.intercept_service(
+            lambda _: _make_unary_handler(),
+            _HandlerCallDetails(
+                method,
+                invocation_metadata=((APP_TOKEN_HEADER, "task-token"),),
+            ),
+        )
+
+        with self.assertRaises(grpc.RpcError):
+            intercepted.unary_unary(GetNodesRequest(run_id=8), context)
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.PERMISSION_DENIED,
+            RUN_BINDING_FAILED_MESSAGE,
+        )
 
     def test_run_id_mismatch_denied_for_protected_method(self) -> None:
         """Protected methods should deny token use against a different run."""
