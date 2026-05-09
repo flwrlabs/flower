@@ -65,21 +65,12 @@ class _HandlerCallDetails:
 
 
 class _TokenState:
-    def __init__(self, token_to_run_id: dict[str, int]) -> None:
-        self._token_to_run_id = token_to_run_id
+    def __init__(self, token_to_task: dict[str, Task]) -> None:
+        self._token_to_task = token_to_task
 
-    def get_run_id_by_token(self, token: str) -> int | None:
-        """Return the run id for a token, if present."""
-        return self._token_to_run_id.get(token)
-
-    def verify_token(self, run_id: int, token: str) -> bool:
-        """Return whether the token is bound to the given run id."""
-        return self._token_to_run_id.get(token) == run_id
-
-    def get_task_by_token(self, token: str) -> Task | None:  # pylint: disable=R1711
+    def get_task_by_token(self, token: str) -> Task | None:
         """Return the task for a task token, if present."""
-        _ = token
-        return None  # make mypy happy
+        return self._token_to_task.get(token)
 
 
 def _make_unary_handler() -> grpc.RpcMethodHandler:
@@ -159,9 +150,9 @@ class TestAppIoTokenServerInterceptor(TestCase):
     """Unit tests for AppIoTokenServerInterceptor."""
 
     def _new_interceptor(
-        self, token_to_run_id: dict[str, int]
+        self, token_to_task: dict[str, Task]
     ) -> AppIoTokenServerInterceptor:
-        state = _TokenState(token_to_run_id)
+        state = _TokenState(token_to_task)
         return create_serverappio_token_auth_server_interceptor(lambda: state)
 
     @staticmethod
@@ -175,7 +166,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
 
     def test_no_auth_method_allows_call_without_token(self) -> None:
         """No-auth methods should pass through without metadata token."""
-        interceptor = self._new_interceptor(token_to_run_id={})
+        interceptor = self._new_interceptor(token_to_task={})
         method = self._find_serverappio_method(requires_token=False)
         if method is None:
             self.skipTest("No no-auth ServerAppIo method found in policy table.")
@@ -193,7 +184,9 @@ class TestAppIoTokenServerInterceptor(TestCase):
 
     def test_missing_token_denied_for_protected_method(self) -> None:
         """Protected methods should deny requests without token input."""
-        interceptor = self._new_interceptor(token_to_run_id={"valid": 7})
+        interceptor = self._new_interceptor(
+            token_to_task={"valid": Task(task_id=1, run_id=7)}
+        )
         method = self._find_serverappio_method(requires_token=True)
         if method is None:
             self.skipTest("No token-required ServerAppIo method found in policy table.")
@@ -216,7 +209,9 @@ class TestAppIoTokenServerInterceptor(TestCase):
 
     def test_invalid_token_denied_for_protected_method(self) -> None:
         """Protected methods should deny requests with invalid tokens."""
-        interceptor = self._new_interceptor(token_to_run_id={"valid": 7})
+        interceptor = self._new_interceptor(
+            token_to_task={"valid": Task(task_id=1, run_id=7)}
+        )
         method = self._find_serverappio_method(requires_token=True)
         if method is None:
             self.skipTest("No token-required ServerAppIo method found in policy table.")
@@ -238,8 +233,10 @@ class TestAppIoTokenServerInterceptor(TestCase):
         )
 
     def test_valid_token_passes_for_protected_method(self) -> None:
-        """Protected methods should pass with a valid token."""
-        interceptor = self._new_interceptor(token_to_run_id={"valid": 7})
+        """Protected methods should pass with a valid task token."""
+        interceptor = self._new_interceptor(
+            token_to_task={"valid": Task(task_id=1, run_id=7)}
+        )
         method = self._find_serverappio_method(requires_token=True)
         if method is None:
             self.skipTest("No token-required ServerAppIo method found in policy table.")
@@ -252,18 +249,13 @@ class TestAppIoTokenServerInterceptor(TestCase):
             ),
         )
 
-        # Keep success-path test data aligned to avoid implying
-        # cross-run use is expected.
         response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=7), Mock()))
         self.assertEqual(response, "ok")
-        # Run-id mismatch deny coverage belongs to the
-        # follow-up PR that enforces run binding.
 
     def test_valid_task_token_passes_and_sets_task_id(self) -> None:
         """Protected methods should pass with a valid task token."""
         state = Mock()
-        state.get_run_id_by_token.return_value = None
-        state.get_task_by_token.return_value = Mock(task_id=123)
+        state.get_task_by_token.return_value = Task(task_id=123, run_id=7)
         interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
         method = self._find_serverappio_method(requires_token=True)
         if method is None:
@@ -286,13 +278,14 @@ class TestAppIoTokenServerInterceptor(TestCase):
         response = intercepted.unary_unary(GetNodesRequest(run_id=7), Mock())
         self.assertEqual(response, "ok")
         self.assertIsNotNone(captured_task)
-        self.assertEqual(cast(Mock, captured_task).task_id, 123)
-        state.get_run_id_by_token.assert_called_once_with("task-token")
+        self.assertEqual(cast(Task, captured_task).task_id, 123)
         state.get_task_by_token.assert_called_once_with("task-token")
 
     def test_metadata_token_used_even_when_request_has_token(self) -> None:
         """Metadata token should be authoritative when both sources exist."""
-        interceptor = self._new_interceptor(token_to_run_id={"metadata-token": 5})
+        interceptor = self._new_interceptor(
+            token_to_task={"metadata-token": Task(task_id=1, run_id=5)}
+        )
 
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
@@ -312,7 +305,9 @@ class TestAppIoTokenServerInterceptor(TestCase):
 
     def test_metadata_token_used_for_protected_method(self) -> None:
         """Metadata token should be used for protected methods."""
-        interceptor = self._new_interceptor(token_to_run_id={"metadata-token": 5})
+        interceptor = self._new_interceptor(
+            token_to_task={"metadata-token": Task(task_id=1, run_id=5)}
+        )
 
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
@@ -330,7 +325,9 @@ class TestAppIoTokenServerInterceptor(TestCase):
 
     def test_request_token_without_metadata_is_denied(self) -> None:
         """Request-body token alone should not satisfy auth."""
-        interceptor = self._new_interceptor(token_to_run_id={"request-token": 5})
+        interceptor = self._new_interceptor(
+            token_to_task={"request-token": Task(task_id=1, run_id=5)}
+        )
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
 
@@ -352,7 +349,9 @@ class TestAppIoTokenServerInterceptor(TestCase):
 
     def test_unknown_method_fails_closed(self) -> None:
         """Unknown methods should fail closed with UNAUTHENTICATED."""
-        interceptor = self._new_interceptor(token_to_run_id={"valid": 7})
+        interceptor = self._new_interceptor(
+            token_to_task={"valid": Task(task_id=1, run_id=7)}
+        )
         continuation = Mock(return_value=_make_unary_handler())
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
@@ -374,7 +373,9 @@ class TestAppIoTokenServerInterceptor(TestCase):
 
     def test_non_unary_handler_fails_closed_for_protected_method(self) -> None:
         """Protected methods with non-unary handlers should fail closed."""
-        interceptor = self._new_interceptor(token_to_run_id={"valid": 7})
+        interceptor = self._new_interceptor(
+            token_to_task={"valid": Task(task_id=1, run_id=7)}
+        )
         method = self._find_serverappio_method(requires_token=True)
         if method is None:
             self.skipTest("No token-required ServerAppIo method found in policy table.")
@@ -455,7 +456,7 @@ class TestFactoryFunctions(TestCase):
 
     def test_serverappio_factory_uses_server_policy(self) -> None:
         """ServerAppIo factory should enforce ServerAppIo policy semantics."""
-        state = _TokenState({"valid-token": 1})
+        state = _TokenState({"valid-token": Task(task_id=1, run_id=1)})
         interceptor = create_serverappio_token_auth_server_interceptor(lambda: state)
 
         intercepted = interceptor.intercept_service(
@@ -471,7 +472,7 @@ class TestFactoryFunctions(TestCase):
 
     def test_clientappio_factory_uses_client_policy(self) -> None:
         """ClientAppIo factory should enforce ClientAppIo policy semantics."""
-        state = _TokenState({"valid-token": 1})
+        state = _TokenState({"valid-token": Task(task_id=1, run_id=1)})
         interceptor = create_clientappio_token_auth_server_interceptor(lambda: state)
 
         intercepted = interceptor.intercept_service(
