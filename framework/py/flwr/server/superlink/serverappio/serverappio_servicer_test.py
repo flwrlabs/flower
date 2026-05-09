@@ -77,12 +77,7 @@ from flwr.server.superlink.serverappio.serverappio_servicer import (
     _raise_if,
 )
 from flwr.server.superlink.utils import _STATUS_TO_MSG
-from flwr.supercore.constant import (
-    FLWR_IN_MEMORY_DB_NAME,
-    NOOP_FEDERATION,
-    RunType,
-    TaskType,
-)
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
 from flwr.supercore.date import now
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -207,8 +202,9 @@ def _create_shared_runtime(
     state_0.set_serverapp_context(
         run_id, Context(run_id, SUPERLINK_NODE_ID, {}, RecordDict(), {})
     )
-    task_id = state_0.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
-    assert task_id is not None
+    run = state_0.get_run_info(run_ids=[run_id])[0]
+    assert run.primary_task_id is not None
+    task_id = run.primary_task_id
     server_0 = _start_serverappio_with_port_retry(
         state_factory_0,
         objectstore_factory_0,
