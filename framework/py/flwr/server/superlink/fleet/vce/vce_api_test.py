@@ -24,7 +24,6 @@ from unittest.mock import patch
 
 from flwr.clientapp.client_app import LoadClientAppError
 from flwr.common.typing import Run
-from flwr.server.superlink.fleet.vce import vce_api
 from flwr.server.superlink.fleet.vce.vce_api import start_vce
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
@@ -102,7 +101,10 @@ class TestFleetSimulationEngineRayBackend(TestCase):
 
     def test_erroneous_client_app_attr(self) -> None:
         """Tests attempt to load a ClientApp that can't be found."""
-        with patch.object(vce_api.time, "sleep"), self.assertRaises(LoadClientAppError):
+        with (
+            patch("flwr.server.superlink.fleet.vce.vce_api.time.sleep"),
+            self.assertRaises(LoadClientAppError),
+        ):
             start_and_shutdown(
                 client_app_attr="totally_fictitious_app:client",
             )

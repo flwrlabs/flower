@@ -234,6 +234,15 @@ def _run_simulation(
     enable_tf_gpu_growth: bool = False,
 ) -> Context:
     """Launch the Simulation Engine."""
+    if backend_config is None:
+        backend_config = {}
+    if run is None:
+        raise ValueError("`run` must be provided.")
+    if client_app_attr is None:
+        raise ValueError("`client_app_attr` must be provided.")
+    if server_app_attr is None:
+        raise ValueError("`server_app_attr` must be provided.")
+
     # Exit early if the `ray` dependency is missing
     if backend_name == "ray":
         if importlib.util.find_spec("ray") is None:
@@ -260,17 +269,16 @@ def _run_simulation(
     # Convert config to original JSON-stream format
     backend_config_stream = json.dumps(backend_config)
 
-    args = (
-        num_supernodes,
-        backend_name,
-        backend_config_stream,
-        app_dir,
-        enable_tf_gpu_growth,
-        run,
-        exit_event,
-        client_app_attr,
-        server_app_attr,
-        server_app_context,
+    updated_context = _main_loop(
+        num_supernodes=num_supernodes,
+        backend_name=backend_name,
+        backend_config_stream=backend_config_stream,
+        app_dir=app_dir,
+        enable_tf_gpu_growth=enable_tf_gpu_growth,
+        run=run,
+        exit_event=exit_event,
+        client_app_attr=client_app_attr,
+        server_app_attr=server_app_attr,
+        server_app_context=server_app_context,
     )
-    updated_context = _main_loop(*args)
     return updated_context
