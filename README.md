@@ -73,6 +73,20 @@ Stay tuned, more tutorials are coming soon. Topics include **Privacy and Securit
 - [Quickstart (Android [TFLite])](https://flower.ai/docs/framework/tutorial-quickstart-android.html)
 - [Quickstart (iOS [CoreML])](https://flower.ai/docs/framework/tutorial-quickstart-ios.html)
 
+
+## Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/flwrlabs/flower.git
+cd flower
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run
+python main.py
+```
 ## Flower Baselines
 
 Flower Baselines is a collection of community-contributed projects that reproduce the experiments performed in popular federated learning publications. Researchers can build on Flower Baselines to quickly evaluate new ideas. The Flower community loves contributions! Make your work more visible and enable others to build on it by contributing it as a baseline!
