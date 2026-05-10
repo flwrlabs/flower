@@ -17,7 +17,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from contextvars import ContextVar
 from typing import Any, NoReturn, Protocol, cast
 
@@ -41,19 +41,8 @@ _current_task: ContextVar[Task | None] = ContextVar("current_task", default=None
 class _TokenState(Protocol):
     """State methods required by token auth."""
 
-    def get_task_id_by_token(self, token: str) -> int | None:
-        """Return the task ID associated with the task token, if valid."""
-
-    def get_tasks(
-        self, *, task_ids: Sequence[int] | None = None
-    ) -> Sequence[Task]:
-        """Retrieve tasks matching the given task IDs."""
-
-    def get_run_id_by_token(self, token: str) -> int | None:
-        """Return the run id associated with token, if it exists."""
-
-    def verify_token(self, run_id: int, token: str) -> bool:
-        """Return whether token is valid for run_id."""
+    def get_task_by_token(self, token: str) -> Task | None:
+        """Return the task associated with the task token, if valid."""
 
 
 def _abort_auth_denied(context: grpc.ServicerContext) -> NoReturn:
@@ -75,7 +64,8 @@ def _unauthenticated_terminator() -> grpc.RpcMethodHandler:
 
 
 def _get_request_run_id(request: GrpcMessage) -> int | None:
-    return cast(int, getattr(request, "run_id", None))
+    request_run_id = cast(int | None, getattr(request, "run_id", None))
+    return request_run_id or None
 
 
 class AppIoTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ignore
@@ -152,9 +142,8 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
 
             state = self._state_provider()
 
-            # Prefer task tokens. Legacy run tokens are kept temporarily for older
-            # callers until all AppIo request-token RPCs have been removed.
-            task = _get_task_by_token(state, token)
+            # Validate task token and set task context for downstream handlers
+            task = state.get_task_by_token(token)
             if task is not None:
                 _validate_request_run_id(request, task.run_id, context)
                 ctx_token = _current_task.set(task)
@@ -163,32 +152,13 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 finally:
                     _current_task.reset(ctx_token)
 
-            run_id = state.get_run_id_by_token(token)
-            if run_id is None or not state.verify_token(run_id, token):
-                _abort_auth_denied(context)
-
-            _validate_request_run_id(request, run_id, context)
-            return unary_handler(request, context)
+            _abort_auth_denied(context)
 
         return grpc.unary_unary_rpc_method_handler(
             _authenticated_handler,
             request_deserializer=method_handler.request_deserializer,
             response_serializer=method_handler.response_serializer,
         )
-
-
-def _get_task_by_token(state: _TokenState, token: str) -> Task | None:
-    """Return the task associated with the task token, if available."""
-    get_task_by_token = getattr(state, "get_task_by_token", None)
-    if callable(get_task_by_token):
-        return cast(Task | None, get_task_by_token(token))
-
-    task_id = state.get_task_id_by_token(token)
-    if task_id is None:
-        return None
-
-    tasks = state.get_tasks(task_ids=[task_id])
-    return tasks[0] if tasks else None
 
 
 def _validate_request_run_id(

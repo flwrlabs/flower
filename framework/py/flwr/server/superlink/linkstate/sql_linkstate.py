@@ -65,6 +65,7 @@ from .utils import (
     dict_to_message,
     generate_rand_int_from_bytes,
     message_to_dict,
+    primary_task_type_from_run_type,
     verify_found_message_replies,
     verify_message_ids,
 )
@@ -99,6 +100,48 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def federation_manager(self) -> FederationManager:
         """Return the FederationManager instance."""
         return self._federation_manager
+
+    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        task_type: str,
+        run_id: int,
+        fab_hash: str | None = None,
+        model_ref: str | None = None,
+        connector_ref: str | None = None,
+    ) -> int | None:
+        """Create a task and make it the run's primary task if none exists."""
+        with self.session():
+            if not self.query(
+                "SELECT run_id FROM run WHERE run_id = :run_id",
+                {"run_id": uint64_to_int64(run_id)},
+            ):
+                raise RuntimeError(
+                    f"Run {run_id} not found. create_task requires an existing run."
+                )
+
+            task_id = super().create_task(
+                task_type=task_type,
+                run_id=run_id,
+                fab_hash=fab_hash,
+                model_ref=model_ref,
+                connector_ref=connector_ref,
+            )
+            if task_id is None:
+                return None
+
+            self.query(
+                """
+                UPDATE run
+                SET primary_task_id = :task_id
+                WHERE run_id = :run_id AND primary_task_id IS NULL
+                """,
+                {
+                    "run_id": uint64_to_int64(run_id),
+                    "task_id": uint64_to_int64(task_id),
+                },
+            )
+
+            return task_id
 
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
@@ -796,6 +839,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         run_type: str,
     ) -> int:
         """Create a new run."""
+        task_type = primary_task_type_from_run_type(run_type)
+
         # Sample a random int64 as run_id
         uint64_run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
 
@@ -849,6 +894,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     "usage_reported_at": "",
                 }
                 self.query(query, params)
+                if self.create_task(task_type, uint64_run_id, fab_hash) is None:
+                    log(ERROR, "Failed to create task for run ID %s", uint64_run_id)
+                    return 0
                 return uint64_run_id
         log(ERROR, "Unexpected run creation failure.")
         return 0
@@ -1306,6 +1354,41 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
             if not rows:
                 raise ValueError(f"Run {run_id} not found")
+
+    def _cleanup_expired_tokens(self) -> None:
+        """Remove expired tokens and perform additional cleanup.
+
+        Temporary solution until we link run status to the status of its primary task
+        """
+        with self.session():
+            expired_at = now()
+            current = int(expired_at.timestamp())
+            # Expired task claims are terminal failures and lose their token.
+            rows = self.query(
+                """
+                UPDATE task
+                SET token = NULL,
+                    finished_at = :finished_at,
+                    sub_status = :sub_status,
+                    details = :details
+                WHERE token IS NOT NULL AND active_until < :current
+                RETURNING run_id, active_until
+                """,
+                {
+                    "current": current,
+                    "finished_at": expired_at.isoformat(),
+                    "sub_status": SubStatus.FAILED,
+                    "details": "No heartbeat received from the task",
+                },
+            )
+            expired_records = [
+                (int64_to_uint64(row["run_id"]), float(row["active_until"]))
+                for row in rows
+            ]
+
+            # Hook for subclasses
+            if expired_records:
+                self._on_tokens_expired(expired_records)
 
 
 def determine_run_status(row: dict[str, Any]) -> str:

@@ -20,15 +20,25 @@ from logging import DEBUG
 
 import grpc
 
+from flwr.common.constant import Status
 from flwr.common.logger import log
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
+    CreateTaskRequest,
+    CreateTaskResponse,
     PullPendingTasksRequest,
     PullPendingTasksResponse,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
+from flwr.supercore.constant import (
+    TASK_TYPES_REQUIRING_CONNECTOR_REF,
+    TASK_TYPES_REQUIRING_FAB_HASH,
+    TASK_TYPES_REQUIRING_MODEL_REF,
+    TaskType,
+)
+from flwr.supercore.interceptors import get_authenticated_task
 
 from ..corestate import CoreState
 
@@ -47,7 +57,10 @@ class AppIoServicer(ABC):
         """Pull pending tasks."""
         log(DEBUG, "AppIoServicer.PullPendingTasks")
 
-        raise NotImplementedError("PullPendingTasks is not implemented yet.")
+        tasks = self.state().get_tasks(
+            statuses=[Status.PENDING], order_by="pending_at", ascending=True
+        )
+        return PullPendingTasksResponse(tasks=tasks)
 
     def ClaimTask(
         self, request: ClaimTaskRequest, context: grpc.ServicerContext
@@ -55,7 +68,8 @@ class AppIoServicer(ABC):
         """Claim a pending task."""
         log(DEBUG, "AppIoServicer.ClaimTask")
 
-        raise NotImplementedError("ClaimTask is not implemented yet.")
+        token = self.state().claim_task(request.task_id)
+        return ClaimTaskResponse(token=token)
 
     def SendTaskHeartbeat(
         self, request: SendTaskHeartbeatRequest, context: grpc.ServicerContext
@@ -63,4 +77,63 @@ class AppIoServicer(ABC):
         """Handle a heartbeat for a claimed task."""
         log(DEBUG, "AppIoServicer.SendTaskHeartbeat")
 
-        raise NotImplementedError("SendTaskHeartbeat is not implemented yet.")
+        task = get_authenticated_task()
+        success = self.state().acknowledge_task_heartbeat(task.task_id)
+        return SendTaskHeartbeatResponse(success=success)
+
+    def CreateTask(
+        self, request: CreateTaskRequest, context: grpc.ServicerContext
+    ) -> CreateTaskResponse:
+        """Create a task."""
+        log(DEBUG, "AppIoServicer.CreateTask")
+
+        run_id = get_authenticated_task().run_id
+
+        _validate_create_task_request(request, context)
+
+        state = self.state()
+        created_task_id = state.create_task(
+            task_type=request.type,
+            run_id=run_id,
+            fab_hash=request.fab_hash if request.HasField("fab_hash") else None,
+            model_ref=request.model_ref if request.HasField("model_ref") else None,
+            connector_ref=(
+                request.connector_ref if request.HasField("connector_ref") else None
+            ),
+        )
+        if created_task_id is None:
+            context.abort(grpc.StatusCode.INTERNAL, "Failed to create task")
+            raise RuntimeError("This line should never be reached.")
+
+        return CreateTaskResponse(task_id=created_task_id)
+
+
+def _validate_create_task_request(
+    request: CreateTaskRequest, context: grpc.ServicerContext
+) -> None:
+    """Validate the task creation request."""
+    try:
+        task_type = TaskType(request.type)
+    except ValueError:
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Invalid task type: {request.type}",
+        )
+
+    if task_type in TASK_TYPES_REQUIRING_FAB_HASH and not request.fab_hash:
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Task type '{request.type}' requires fab_hash.",
+        )
+
+    if task_type in TASK_TYPES_REQUIRING_MODEL_REF and not request.model_ref:
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Task type '{request.type}' requires model_ref.",
+        )
+
+    if task_type in TASK_TYPES_REQUIRING_CONNECTOR_REF and not request.connector_ref:
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Task type '{request.type}' requires connector_ref.",
+        )

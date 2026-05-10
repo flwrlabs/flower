@@ -55,7 +55,8 @@ from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 
 # pylint: enable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
-from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, RunType
+from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, RunType, TaskType
+from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
@@ -72,6 +73,16 @@ class StateTest(CoreStateTest):
     def state_factory(self) -> LinkState:
         """Provide state implementation to test."""
         raise NotImplementedError()
+
+    def task_run_id(self, state: CoreState) -> int:
+        """Provide an existing run ID for inherited CoreState task tests."""
+        assert isinstance(state, LinkState)
+        return create_dummy_run(state)
+
+    def other_task_run_id(self, state: CoreState) -> int:
+        """Provide a second existing run ID for inherited CoreState task tests."""
+        assert isinstance(state, LinkState)
+        return create_dummy_run(state)
 
     def create_public_key(self) -> bytes:
         """Create a P-384 public key for node creation."""
@@ -150,6 +161,49 @@ class StateTest(CoreStateTest):
         assert run.federation == "health-federation"
         assert run.override_config["test_key"] == "test_value"
         assert run.flwr_aid == "i1r9f"
+
+    def test_create_run_creates_primary_task(self) -> None:
+        """Creating a run should also create its primary task."""
+        # Prepare
+        state = self.state_factory()
+
+        # Execute
+        run_id = create_dummy_run(state)
+
+        # Assert
+        tasks = state.get_tasks(run_ids=[run_id])
+        run = state.get_run_info(run_ids=[run_id])[0]
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
+        self.assertEqual(run.primary_task_id, tasks[0].task_id)
+
+    def test_create_task_sets_primary_task_id_once(self) -> None:
+        """New tasks should not replace the run's primary task."""
+        # Prepare
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        run = state.get_run_info(run_ids=[run_id])[0]
+        primary_task_id = run.primary_task_id
+
+        # Execute
+        second_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+
+        # Assert
+        self.assertIsNotNone(primary_task_id)
+        self.assertIsNotNone(second_task_id)
+        run = state.get_run_info(run_ids=[run_id])[0]
+        self.assertEqual(run.primary_task_id, primary_task_id)
+        self.assertNotEqual(run.primary_task_id, second_task_id)
+
+    def test_create_task_rejects_missing_run(self) -> None:
+        """Creating a task for an unknown run should fail."""
+        state = self.state_factory()
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "Run 42 not found. create_task requires an existing run.",
+        ):
+            state.create_task(task_type="flwr-model", run_id=42)
 
     def test_get_run_info_without_filters_returns_all_runs(self) -> None:
         """Test get_run_info returns all runs when no filter is provided."""
@@ -357,7 +411,9 @@ class StateTest(CoreStateTest):
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
-        assert state.create_token(run_id) is not None
+        task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
+        assert task_id is not None
+        state.claim_task(task_id)
         state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
 
         # Execute
@@ -474,34 +530,39 @@ class StateTest(CoreStateTest):
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
-        assert state.create_token(run_id) is not None
+        task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
+        assert task_id is not None
+        state.claim_task(task_id)
         state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
         state.federation_manager.report_run_usage = Mock()  # type: ignore
         # Execute: advance time past token expiry and trigger cleanup via verify_token
         patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = patched_dt
-            state.verify_token(run_id, "dummy_token")
+            state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
+
         # Assert
         state.federation_manager.report_run_usage.assert_called_once()
 
     def test_usage_report_hook_not_called_when_no_runs_updated(self) -> None:
         """Test report_run_usage is not called when expired tokens match no runs."""
-        # Prepare: create a run already in FINISHED state
+        # Prepare: create a run already in FINISHED state with an active task claim
         state = self.state_factory()
         run_id = create_dummy_run(state)
-        assert state.create_token(run_id) is not None
+        task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
+        assert task_id is not None
+        assert state.claim_task(task_id) is not None
         state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
         state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
         state.update_run_status(
             run_id, RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done")
         )
         state.federation_manager.report_run_usage = Mock()  # type: ignore
-        # Execute: advance time past token expiry and trigger cleanup
+        # Execute: advance time past task claim expiry and trigger cleanup
         patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = patched_dt
-            state.verify_token(run_id, "dummy_token")
+            state.get_run_status({run_id})
         # Assert: hook should NOT be called since the run was already finished
         state.federation_manager.report_run_usage.assert_not_called()
 
@@ -2067,12 +2128,14 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
+        task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
+        assert task_id is not None
+        assert state.claim_task(task_id) is not None
         assert state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
         assert state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
         assert state.update_run_status(
             run_id, RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done")
         )
-        assert state.create_token(run_id) is not None
 
         # Execute: force token expiry and trigger cleanup
         patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)

@@ -45,13 +45,30 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Provide state implementation to test."""
         raise NotImplementedError()
 
+    def task_run_id(self, _state: CoreState) -> int:
+        """Return the run ID to use in task-related tests.
+
+        Subclasses can override this hook when task creation requires an existing run
+        record instead of an arbitrary placeholder ID.
+        """
+        return 42
+
+    def other_task_run_id(self, _state: CoreState) -> int:
+        """Return a second run ID for task tests that need multiple runs.
+
+        Subclasses can override this hook when task creation requires existing run
+        records instead of arbitrary placeholder IDs.
+        """
+        return 123
+
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
         state = self.state_factory()
+        run_id = self.task_run_id(state)
 
         task_id = state.create_task(
             task_type=TaskType.MODEL,
-            run_id=42,
+            run_id=run_id,
             fab_hash=None,
             model_ref="model://test",
             connector_ref=None,
@@ -63,7 +80,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task = tasks[0]
         self.assertEqual(task.task_id, task_id)
         self.assertEqual(task.type, TaskType.MODEL)
-        self.assertEqual(task.run_id, 42)
+        self.assertEqual(task.run_id, run_id)
         self.assertEqual(
             task.status,
             TaskStatus(status=Status.PENDING, sub_status="", details=""),
@@ -81,15 +98,36 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
         self.assertEqual(state.get_tasks(task_ids=[123]), [])
 
+    def test_get_tasks_run_id_matches(self) -> None:
+        """Run ID filters should match only tasks from the requested runs."""
+        state = self.state_factory()
+        run_id_1 = self.task_run_id(state)
+        run_id_2 = self.other_task_run_id(state)
+        task_id_1 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_1)
+        task_id_2 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_2)
+        task_id_3 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_1)
+        assert task_id_1 and task_id_2 and task_id_3
+
+        tasks = state.get_tasks(run_ids=[run_id_1])
+        task_ids = {task.task_id for task in tasks}
+
+        self.assertTrue({task_id_1, task_id_3}.issubset(task_ids))
+        self.assertNotIn(task_id_2, task_ids)
+        self.assertTrue(all(task.run_id == run_id_1 for task in tasks))
+
     def test_get_tasks_single_status_matches(self) -> None:
         """A single-item status sequence should match pending tasks."""
         state = self.state_factory()
-        _ = state.create_task(task_type=TaskType.MODEL, run_id=42)
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert task_id
 
         tasks = state.get_tasks(statuses=[Status.PENDING])
+        task_ids = {task.task_id for task in tasks}
 
-        self.assertEqual(len(tasks), 1)
-        self.assertEqual(tasks[0].status.status, Status.PENDING)
+        self.assertIn(task_id, task_ids)
+        for task in tasks:
+            self.assertEqual(task.status.status, Status.PENDING)
 
     def test_get_tasks_negative_limit_raises(self) -> None:
         """Negative limits should be rejected consistently."""
@@ -108,9 +146,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_get_task_returns_copy(self) -> None:
         """Retrieved task should be a defensive copy."""
         state = self.state_factory()
+        run_id = self.task_run_id(state)
         task_id = state.create_task(
             task_type=TaskType.SERVER_APP,
-            run_id=42,
+            run_id=run_id,
             fab_hash="fab-hash",
             model_ref=None,
             connector_ref=None,
@@ -130,7 +169,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_claim_task_transitions_pending_to_starting(self) -> None:
         """Claiming a task should create a token and move it to starting."""
         state = self.state_factory()
-        task_id = state.create_task(task_type="flwr-model", run_id=42)
+        task_id = state.create_task(
+            task_type="flwr-model", run_id=self.task_run_id(state)
+        )
         assert task_id is not None
 
         # Claim should persist token ownership and move the task to STARTING.
@@ -138,7 +179,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertIsNotNone(token)
         assert token is not None
-        self.assertEqual(state.get_task_id_by_token(token), task_id)
+        assert (task := state.get_task_by_token(token))
+        self.assertEqual(task.task_id, task_id)
         tasks = state.get_tasks(task_ids=[task_id])
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].status.status, Status.STARTING)
@@ -149,12 +191,13 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_claim_task_rejects_missing_claimed_and_non_pending(self) -> None:
         """Only existing pending unclaimed tasks should be claimable."""
         state = self.state_factory()
+        run_id = self.task_run_id(state)
 
         # Missing tasks cannot be claimed.
         self.assertIsNone(state.claim_task(61016))
 
-        claimed_task_id = state.create_task(task_type="flwr-model", run_id=42)
-        finished_task_id = state.create_task(task_type="flwr-model", run_id=42)
+        claimed_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+        finished_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
         assert claimed_task_id is not None and finished_task_id is not None
 
         # Claiming is single-owner and cannot be repeated.
@@ -168,7 +211,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_activate_task_transitions_starting_to_running(self) -> None:
         """Only starting tasks should transition to running."""
         state = self.state_factory()
-        task_id = state.create_task(task_type="flwr-model", run_id=42)
+        task_id = state.create_task(
+            task_type="flwr-model", run_id=self.task_run_id(state)
+        )
         assert task_id is not None
 
         # Task does not exist, so it cannot be activated.
@@ -200,7 +245,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     ) -> None:
         """Finishing a task should store the terminal status details."""
         state = self.state_factory()
-        task_id = state.create_task(task_type="flwr-model", run_id=42)
+        task_id = state.create_task(
+            task_type="flwr-model", run_id=self.task_run_id(state)
+        )
         assert task_id is not None
 
         # Task does not exist.
@@ -236,10 +283,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Task heartbeat should keep a claimed task token valid."""
         state = self.state_factory()
         fixed_now = now()
+        run_id = self.task_run_id(state)
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type="flwr-model", run_id=42)
+            task_id = state.create_task(task_type="flwr-model", run_id=run_id)
             assert task_id is not None
             token = state.claim_task(task_id)
             assert token is not None
@@ -253,23 +301,25 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             mock_dt.now.return_value = fixed_now + timedelta(
                 seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
             )
-            self.assertEqual(state.get_task_id_by_token(token), task_id)
+            assert (task := state.get_task_by_token(token))
+            self.assertEqual(task.task_id, task_id)
 
             # Once the extended deadline passes, the token no longer resolves.
             mock_dt.now.return_value = fixed_now + timedelta(
                 seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
             )
-            self.assertIsNone(state.get_task_id_by_token(token))
+            self.assertIsNone(state.get_task_by_token(token))
             self.assertFalse(state.acknowledge_task_heartbeat(task_id))
 
     def test_expired_task_token_transitions_task_to_finished_failed(self) -> None:
         """Expired task claims should transition tasks to FINISHED:FAILED."""
         state = self.state_factory()
         fixed_now = now()
+        run_id = self.task_run_id(state)
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type="flwr-model", run_id=42)
+            task_id = state.create_task(task_type="flwr-model", run_id=run_id)
             assert task_id is not None
 
             token = state.claim_task(task_id)
@@ -278,7 +328,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             mock_dt.now.return_value = fixed_now + timedelta(
                 seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
             )
-            self.assertIsNone(state.get_task_id_by_token(token))
+            self.assertIsNone(state.get_task_by_token(token))
             self.assertFalse(state.acknowledge_task_heartbeat(task_id))
 
         tasks = state.get_tasks(task_ids=[task_id])
@@ -293,124 +343,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertTrue(tasks[0].finished_at)
 
-    def test_get_task_id_by_token_returns_none_for_unknown_token(self) -> None:
+    def test_get_task_by_token_returns_none_for_unknown_token(self) -> None:
         """Unknown task tokens should not resolve to a task."""
         state = self.state_factory()
 
-        self.assertIsNone(state.get_task_id_by_token("missing-token"))
-
-    def test_create_verify_and_delete_token(self) -> None:
-        """Test creating, verifying, and deleting tokens."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-
-        # Execute: create a token
-        token = state.create_token(run_id)
-        assert token is not None
-
-        # Assert: token should be valid
-        self.assertTrue(state.verify_token(run_id, token))
-
-        # Execute: delete the token
-        state.delete_token(run_id)
-
-        # Assert: token should no longer be valid
-        self.assertFalse(state.verify_token(run_id, token))
-
-    def test_create_token_already_exists(self) -> None:
-        """Test creating a token that already exists."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-        state.create_token(run_id)
-
-        # Execute
-        ret = state.create_token(run_id)
-
-        # Assert: The return is None
-        self.assertIsNone(ret)
-
-    def test_get_run_id_by_token(self) -> None:
-        """Test retrieving run ID by token."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-        token = state.create_token(run_id)
-        assert token is not None
-
-        # Execute: get run ID by token
-        retrieved_run_id1 = state.get_run_id_by_token(token)
-        retrieved_run_id2 = state.get_run_id_by_token("nonexistent_token")
-
-        # Assert: should return the correct run ID
-        self.assertEqual(retrieved_run_id1, run_id)
-        self.assertIsNone(retrieved_run_id2)
-
-    def test_acknowledge_app_heartbeat_success(self) -> None:
-        """Test successfully acknowledging an app heartbeat."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-        token = state.create_token(run_id)
-        assert token is not None
-
-        # Execute: acknowledge heartbeat
-        result = state.acknowledge_app_heartbeat(token)
-
-        # Assert: should return True
-        self.assertTrue(result)
-
-        # Assert: token should still be valid
-        self.assertTrue(state.verify_token(run_id, token))
-
-    def test_acknowledge_app_heartbeat_nonexistent_token(self) -> None:
-        """Test acknowledging heartbeat with nonexistent token."""
-        # Prepare
-        state = self.state_factory()
-
-        # Execute: acknowledge heartbeat with invalid token
-        result = state.acknowledge_app_heartbeat("nonexistent_token")
-
-        # Assert: should return False
-        self.assertFalse(result)
-
-    def test_acknowledge_app_heartbeat_extends_expiration_and_cleanup(self) -> None:
-        """Test that acknowledging app heartbeat extends token expiration and cleanup is
-        performed when expired."""
-        # Prepare
-        state = self.state_factory()
-        created_at = now()
-        run_id1 = 42
-        run_id2 = 123
-        token1 = state.create_token(run_id1)
-        token2 = state.create_token(run_id2)
-        assert token1 is not None and token2 is not None
-
-        # Execute: send heartbeat for token2 to keep it alive
-        state.acknowledge_app_heartbeat(token2)
-
-        # Mock datetime to simulate time passage
-        # token1 should expire in HEARTBEAT_DEFAULT_INTERVAL
-        # token2 should expire in HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-        with patch("datetime.datetime") as mock_dt:
-            # Advance time just before token1 expiration
-            mock_dt.now.return_value = created_at + timedelta(
-                seconds=HEARTBEAT_DEFAULT_INTERVAL - 1
-            )
-
-            # Verify tokens are valid
-            self.assertTrue(state.verify_token(run_id1, token1))
-            self.assertTrue(state.verify_token(run_id2, token2))
-
-            # Advance time past token1 expiration
-            mock_dt.now.return_value = created_at + timedelta(
-                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
-            )
-
-            # Assert: token1 should be cleaned up, token2 should still be valid
-            self.assertFalse(state.verify_token(run_id1, token1))
-            self.assertTrue(state.verify_token(run_id2, token2))
+        self.assertIsNone(state.get_task_by_token("missing-token"))
 
     def test_reserve_nonce_first_reservation_succeeds(self) -> None:
         """A new nonce reservation should succeed."""

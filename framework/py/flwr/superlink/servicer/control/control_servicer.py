@@ -248,6 +248,12 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 run_type,
             )
 
+            if run_id == 0:
+                context.abort(
+                    grpc.StatusCode.INTERNAL,
+                    "Failed to create or initialize the run.",
+                )
+
             # Initialize node config
             node_config = {}
             if self.artifact_provider is not None:
@@ -1063,14 +1069,15 @@ def _check_flwr_aid_in_run(
 
 def _stop_run_in_linkstate(state: LinkState, store: ObjectStore, run_id: int) -> bool:
     """Stop a run and clean it up using LinkState methods."""
-    update_success = state.update_run_status(
-        run_id=run_id,
-        new_status=RunStatus(Status.FINISHED, SubStatus.STOPPED, ""),
-    )
+    # Stop all non-finished tasks of the run
+    update_success = False
+    for task in state.get_tasks(run_ids=[run_id]):
+        update_success |= state.finish_task(task.task_id, SubStatus.STOPPED, "")
 
-    # Always invalidate the run token so no further work can be scheduled.
-    state.delete_token(run_id)
+    # Keep run status working
+    state.update_run_status(run_id, RunStatus(Status.FINISHED, SubStatus.STOPPED, ""))
 
+    # Clean up the run if any task was successfully updated to STOPPED
     if update_success:
         message_ids: set[str] = state.get_message_ids_from_run_id(run_id)
         state.delete_messages(message_ids)
