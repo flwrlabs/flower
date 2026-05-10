@@ -40,6 +40,8 @@ from flwr.common.typing import Fab, RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
+    CreateTaskRequest,
+    CreateTaskResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -401,10 +403,27 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=PullTaskInputRequest.SerializeToString,
             response_deserializer=PullTaskInputResponse.FromString,
         )
+        self._create_task = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/CreateTask",
+            request_serializer=CreateTaskRequest.SerializeToString,
+            response_deserializer=CreateTaskResponse.FromString,
+        )
 
     def tearDown(self) -> None:
         """Clean up grpc server."""
         self._server.stop(None)
+
+    def test_create_task_uses_authenticated_run_id(self) -> None:
+        """CreateTask should create tasks for the authenticated run."""
+        response = self._create_task(
+            CreateTaskRequest(type=TaskType.MODEL, model_ref="models/abc")
+        )
+
+        assert response.HasField("task_id")
+        task = self.state.get_tasks(task_ids=[response.task_id])[0]
+        assert task.run_id == self._auth_run_id
+        assert task.type == TaskType.MODEL
+        assert task.model_ref == "models/abc"
 
     def _transition_run_status(self, run_id: int, num_transitions: int) -> None:
         if num_transitions > 0:
