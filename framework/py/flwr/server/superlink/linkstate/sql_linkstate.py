@@ -1162,63 +1162,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 except IntegrityError:
                     raise ValueError(f"Run {run_id} not found") from None
 
-    def add_serverapp_log(self, run_id: int, log_message: str) -> None:
-        """Add a log entry to the ServerApp logs for the specified `run_id`."""
-        # Convert the uint64 value to sint64 for SQLite
-        sint64_run_id = uint64_to_int64(run_id)
-
-        # Store log
-        try:
-            query = """
-                INSERT INTO logs (timestamp, run_id, node_id, log)
-                VALUES (:current_ts, :run_id, :node_id, :log)
-            """
-            self.query(
-                query,
-                {
-                    "current_ts": now().timestamp(),
-                    "run_id": sint64_run_id,
-                    "node_id": 0,
-                    "log": log_message,
-                },
-            )
-        except IntegrityError:
-            raise ValueError(f"Run {run_id} not found") from None
-
-    def get_serverapp_log(
-        self, run_id: int, after_timestamp: float | None
-    ) -> tuple[str, float]:
-        """Get the ServerApp logs for the specified `run_id`."""
-        # Convert the uint64 value to sint64 for SQLite
-        sint64_run_id = uint64_to_int64(run_id)
-
-        with self.session():
-            # Check if the run_id exists
-            query = "SELECT run_id FROM run WHERE run_id = :run_id"
-            rows = self.query(query, {"run_id": sint64_run_id})
-            if not rows:
-                raise ValueError(f"Run {run_id} not found")
-
-            # Retrieve logs
-            if after_timestamp is None:
-                after_timestamp = 0.0
-            query = """
-                SELECT log, timestamp FROM logs
-                WHERE run_id = :run_id AND node_id = :node_id
-                AND timestamp > :after_timestamp
-                ORDER BY timestamp
-            """
-            rows = self.query(
-                query,
-                {
-                    "run_id": sint64_run_id,
-                    "node_id": 0,
-                    "after_timestamp": after_timestamp,
-                },
-            )
-            latest_timestamp = rows[-1]["timestamp"] if rows else 0.0
-        return "".join(row["log"] for row in rows), latest_timestamp
-
     def get_valid_message_ins(self, message_id: str) -> dict[str, Any] | None:
         """Check if the Message exists and is valid (not expired).
 
