@@ -125,7 +125,9 @@ class _FutureRpcError(grpc.RpcError):
     def __init__(self) -> None:
         self.add_callback = Mock(return_value=True)
         self.trailing_metadata = Mock(return_value=())
-        self.details = Mock(side_effect=AssertionError("details() should not be called"))
+        self.details = Mock(
+            side_effect=AssertionError("details() should not be called")
+        )
 
 
 class TestRuntimeVersionClientInterceptor(TestCase):
