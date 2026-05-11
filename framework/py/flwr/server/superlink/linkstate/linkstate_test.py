@@ -2086,6 +2086,31 @@ def _claim_running_in_separate_process(
         result_queue.put((False, repr(ex)))
 
 
+class SqlLinkStateEdgeCaseTest(unittest.TestCase):
+    """Tests for edge cases in SqlLinkState."""
+
+    def _create_state(self, database_path: str = ":memory:") -> SqlLinkState:
+        return SqlLinkState(
+            database_path=database_path,
+            federation_manager=NoOpFederationManager(),
+            object_store=ObjectStoreFactory().store(),
+        )
+
+    def test_get_message_res_empty_ids_returns_empty_list(self) -> None:
+        """Empty message ID input should not generate SQL."""
+        state = self._create_state()
+
+        self.assertEqual(state.get_message_res(set()), [])
+
+    def test_get_node_info_empty_filters_return_empty_list(self) -> None:
+        """Empty filters should not generate IN () SQL."""
+        state = self._create_state()
+
+        self.assertEqual(state.get_node_info(node_ids=[]), [])
+        self.assertEqual(state.get_node_info(owner_aids=[]), [])
+        self.assertEqual(state.get_node_info(statuses=[]), [])
+
+
 class InMemoryStateTest(StateTest):
     """Test InMemoryState implementation."""
 

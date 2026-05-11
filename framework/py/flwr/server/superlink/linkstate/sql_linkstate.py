@@ -437,6 +437,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def get_message_res(self, message_ids: set[str]) -> list[Message]:
         """Get reply Messages for the given Message IDs."""
         # pylint: disable=too-many-locals
+        if not message_ids:
+            return []
+
         ret: dict[str, Message] = {}
 
         with self.session():
@@ -467,21 +470,26 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             # Check node availability
             dst_node_ids: set[int] = set()
             for message_id in message_ids:
-                in_message = found_message_ins_dict[message_id]
+                in_message = found_message_ins_dict.get(message_id)
+                if in_message is None:
+                    continue
                 sint_node_id = uint64_to_int64(in_message.metadata.dst_node_id)
                 dst_node_ids.add(sint_node_id)
-            placeholders = ",".join([f":nid_{i}" for i in range(len(dst_node_ids))])
-            query = f"""
-                SELECT node_id, online_until
-                FROM node
-                WHERE node_id IN ({placeholders})
-                AND status != :unregistered
-            """
-            node_params: dict[str, int | str] = {
-                f"nid_{i}": nid for i, nid in enumerate(dst_node_ids)
-            }
-            node_params["unregistered"] = NodeStatus.UNREGISTERED
-            rows = self.query(query, node_params)
+            if dst_node_ids:
+                placeholders = ",".join([f":nid_{i}" for i in range(len(dst_node_ids))])
+                query = f"""
+                    SELECT node_id, online_until
+                    FROM node
+                    WHERE node_id IN ({placeholders})
+                    AND status != :unregistered
+                """
+                node_params: dict[str, int | str] = {
+                    f"nid_{i}": nid for i, nid in enumerate(dst_node_ids)
+                }
+                node_params["unregistered"] = NodeStatus.UNREGISTERED
+                rows = self.query(query, node_params)
+            else:
+                rows = []
             tmp_ret_dict = check_node_availability_for_in_message(
                 inquired_in_message_ids=message_ids,
                 found_in_message_dict=found_message_ins_dict,
@@ -493,29 +501,32 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             ret.update(tmp_ret_dict)
 
             # Atomically claim all eligible reply Messages
-            placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
-            delivered_at = now().isoformat()
-            query = f"""
-                UPDATE message_res
-                SET delivered_at = :delivered_at
-                WHERE reply_to_message_id IN ({placeholders})
-                AND delivered_at = ''
-                RETURNING *
-            """
-            params = {"delivered_at": delivered_at}
-            params.update({f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)})
-            rows = self.query(query, params)
-            for row in rows:
-                convert_sint64_values_in_dict_to_uint64(
-                    row, ["run_id", "src_node_id", "dst_node_id"]
+            if message_ids:
+                placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
+                delivered_at = now().isoformat()
+                query = f"""
+                    UPDATE message_res
+                    SET delivered_at = :delivered_at
+                    WHERE reply_to_message_id IN ({placeholders})
+                    AND delivered_at = ''
+                    RETURNING *
+                """
+                params = {"delivered_at": delivered_at}
+                params.update(
+                    {f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)}
                 )
-            tmp_ret_dict = verify_found_message_replies(
-                inquired_message_ids=message_ids,
-                found_message_ins_dict=found_message_ins_dict,
-                found_message_res_list=[dict_to_message(row) for row in rows],
-                current_time=current,
-            )
-            ret.update(tmp_ret_dict)
+                rows = self.query(query, params)
+                for row in rows:
+                    convert_sint64_values_in_dict_to_uint64(
+                        row, ["run_id", "src_node_id", "dst_node_id"]
+                    )
+                tmp_ret_dict = verify_found_message_replies(
+                    inquired_message_ids=message_ids,
+                    found_message_ins_dict=found_message_ins_dict,
+                    found_message_res_list=[dict_to_message(row) for row in rows],
+                    current_time=current,
+                )
+                ret.update(tmp_ret_dict)
 
         return list(ret.values())
 
@@ -621,7 +632,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 },
             )
         except IntegrityError as e:
-            if "node.public_key" in str(e):
+            if "public_key" in str(e).lower():
                 raise ValueError("Public key already in use.") from None
             # Must be node ID conflict, almost impossible unless system is compromised
             log(ERROR, "Unexpected node registration failure.")
@@ -755,6 +766,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             "online": NodeStatus.ONLINE,
         }
         if node_ids is not None:
+            if not node_ids:
+                return
             placeholders = ",".join([f":nid_{i}" for i in range(len(node_ids))])
             query += f" AND node_id IN ({placeholders})"
             params.update(
@@ -770,6 +783,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         statuses: Sequence[str] | None = None,
     ) -> Sequence[NodeInfo]:
         """Retrieve information about nodes based on the specified filters."""
+        if node_ids is not None and len(node_ids) == 0:
+            return []
+        if owner_aids is not None and len(owner_aids) == 0:
+            return []
+        if statuses is not None and len(statuses) == 0:
+            return []
+
         with self.session():
             self._check_and_tag_offline_nodes()
 
