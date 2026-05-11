@@ -22,6 +22,7 @@ from types import SimpleNamespace
 from typing import cast
 from unittest.mock import patch
 
+from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
@@ -38,6 +39,7 @@ from sqlalchemy import (
 from sqlalchemy.engine import URL, Engine
 
 from flwr.common.exit import ExitCode
+from flwr.supercore.constant import RunType, TaskType
 from flwr.supercore.state.alembic.utils import (
     ALEMBIC_DIR,
     ALEMBIC_VERSION_TABLE,
@@ -72,6 +74,10 @@ class TestAlembicRun(unittest.TestCase):
         """Create a SQLAlchemy engine for a test database."""
         db_path = self.temp_path / db_name
         return create_engine(f"sqlite:///{db_path}")
+
+    def upgrade_to_revision(self, engine: Engine, revision: str) -> None:
+        """Upgrade the test database to the specified Alembic revision."""
+        command.upgrade(build_alembic_config(engine), revision)
 
     def test_run_migrations_sets_revision(self) -> None:
         """Ensure migrations advance the database to the latest head."""
@@ -162,6 +168,261 @@ class TestAlembicRun(unittest.TestCase):
             run_migrations(engine)
             inspector = inspect(engine)
             self.assertTrue(inspector.has_table("fab"))
+        finally:
+            engine.dispose()
+
+    def test_primary_task_backfill_populates_historical_runs(self) -> None:
+        """Ensure historical runs get backfilled primary tasks during migration."""
+        engine = self.create_engine("primary_task_backfill.db")
+        try:
+            self.upgrade_to_revision(engine, "dee9b802b5c9")
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO run (
+                            run_id, fab_id, fab_version, fab_hash, override_config,
+                            pending_at, starting_at, running_at, finished_at,
+                            usage_reported_at, sub_status, details, federation,
+                            federation_config, run_type, flwr_aid, bytes_sent,
+                            bytes_recv, clientapp_runtime
+                        ) VALUES (
+                            :run_id, :fab_id, :fab_version, :fab_hash, :override_config,
+                            :pending_at, :starting_at, :running_at, :finished_at,
+                            :usage_reported_at, :sub_status, :details, :federation,
+                            :federation_config, :run_type, :flwr_aid, :bytes_sent,
+                            :bytes_recv, :clientapp_runtime
+                        )
+                        """
+                    ),
+                    [
+                        {
+                            "run_id": 101,
+                            "fab_id": "publisher/pending",
+                            "fab_version": "1.0.0",
+                            "fab_hash": "fab-pending",
+                            "override_config": "{}",
+                            "pending_at": "2026-04-27T10:00:00+00:00",
+                            "starting_at": "",
+                            "running_at": "",
+                            "finished_at": "",
+                            "usage_reported_at": "",
+                            "sub_status": None,
+                            "details": None,
+                            "federation": "fed-a",
+                            "federation_config": None,
+                            "run_type": RunType.SERVER_APP,
+                            "flwr_aid": "aid-a",
+                            "bytes_sent": 0,
+                            "bytes_recv": 0,
+                            "clientapp_runtime": 0.0,
+                        },
+                        {
+                            "run_id": 102,
+                            "fab_id": "publisher/sim",
+                            "fab_version": "2.0.0",
+                            "fab_hash": "fab-sim",
+                            "override_config": "{}",
+                            "pending_at": "2026-04-27T11:00:00+00:00",
+                            "starting_at": "2026-04-27T11:01:00+00:00",
+                            "running_at": "2026-04-27T11:02:00+00:00",
+                            "finished_at": "2026-04-27T11:03:00+00:00",
+                            "usage_reported_at": "",
+                            "sub_status": "completed",
+                            "details": "done",
+                            "federation": "fed-b",
+                            "federation_config": "{}",
+                            "run_type": RunType.SIMULATION,
+                            "flwr_aid": "aid-b",
+                            "bytes_sent": 7,
+                            "bytes_recv": 8,
+                            "clientapp_runtime": 9.5,
+                        },
+                        {
+                            "run_id": 103,
+                            "fab_id": "publisher/failed",
+                            "fab_version": "3.0.0",
+                            "fab_hash": "fab-failed",
+                            "override_config": "{}",
+                            "pending_at": "2026-04-27T12:00:00+00:00",
+                            "starting_at": "",
+                            "running_at": "",
+                            "finished_at": "2026-04-27T12:05:00+00:00",
+                            "usage_reported_at": "",
+                            "sub_status": "failed",
+                            "details": "boom",
+                            "federation": "fed-c",
+                            "federation_config": None,
+                            "run_type": RunType.SERVER_APP,
+                            "flwr_aid": "aid-c",
+                            "bytes_sent": 1,
+                            "bytes_recv": 2,
+                            "clientapp_runtime": 3.0,
+                        },
+                    ],
+                )
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO task (
+                            task_id, type, run_id, fab_hash, model_ref, connector_ref,
+                            token, pending_at, starting_at, running_at, finished_at
+                        ) VALUES (
+                            :task_id, :type, :run_id, :fab_hash, :model_ref,
+                            :connector_ref, :token, :pending_at, :starting_at,
+                            :running_at, :finished_at
+                        )
+                        """
+                    ),
+                    {
+                        "task_id": 1,
+                        "type": TaskType.MODEL,
+                        "run_id": 103,
+                        "fab_hash": None,
+                        "model_ref": "models/existing",
+                        "connector_ref": None,
+                        "token": None,
+                        "pending_at": "2026-04-27T12:01:00+00:00",
+                        "starting_at": None,
+                        "running_at": None,
+                        "finished_at": None,
+                    },
+                )
+
+            run_migrations(engine)
+
+            with engine.connect() as connection:
+                runs = {
+                    row["run_id"]: row
+                    for row in connection.execute(
+                        text(
+                            """
+                            SELECT run_id, primary_task_id, sub_status, details
+                            FROM run
+                            ORDER BY run_id
+                            """
+                        )
+                    ).mappings()
+                }
+                tasks = {
+                    row["task_id"]: row
+                    for row in connection.execute(
+                        text(
+                            """
+                            SELECT task_id, type, run_id, fab_hash, model_ref,
+                                   pending_at, starting_at, running_at, finished_at,
+                                   sub_status, details
+                            FROM task
+                            ORDER BY task_id
+                            """
+                        )
+                    ).mappings()
+                }
+
+            self.assertEqual(set(runs), {101, 102, 103})
+            self.assertEqual(len(tasks), 4)
+
+            pending_primary = tasks[runs[101]["primary_task_id"]]
+            self.assertEqual(pending_primary["type"], TaskType.SERVER_APP)
+            self.assertEqual(pending_primary["run_id"], 101)
+            self.assertEqual(pending_primary["fab_hash"], "fab-pending")
+            self.assertEqual(pending_primary["pending_at"], "2026-04-27T10:00:00+00:00")
+            self.assertIsNone(pending_primary["starting_at"])
+            self.assertIsNone(pending_primary["running_at"])
+            self.assertIsNone(pending_primary["finished_at"])
+            self.assertEqual(pending_primary["sub_status"], "")
+            self.assertEqual(pending_primary["details"], "")
+
+            simulation_primary = tasks[runs[102]["primary_task_id"]]
+            self.assertEqual(simulation_primary["type"], TaskType.SIMULATION)
+            self.assertEqual(simulation_primary["run_id"], 102)
+            self.assertEqual(simulation_primary["fab_hash"], "fab-sim")
+            self.assertEqual(
+                simulation_primary["starting_at"], "2026-04-27T11:01:00+00:00"
+            )
+            self.assertEqual(
+                simulation_primary["running_at"], "2026-04-27T11:02:00+00:00"
+            )
+            self.assertEqual(
+                simulation_primary["finished_at"], "2026-04-27T11:03:00+00:00"
+            )
+            self.assertEqual(simulation_primary["sub_status"], "completed")
+            self.assertEqual(simulation_primary["details"], "done")
+
+            failed_primary = tasks[runs[103]["primary_task_id"]]
+            self.assertNotEqual(runs[103]["primary_task_id"], 1)
+            self.assertEqual(failed_primary["type"], TaskType.SERVER_APP)
+            self.assertEqual(failed_primary["run_id"], 103)
+            self.assertEqual(failed_primary["fab_hash"], "fab-failed")
+            self.assertIsNone(failed_primary["starting_at"])
+            self.assertIsNone(failed_primary["running_at"])
+            self.assertEqual(failed_primary["finished_at"], "2026-04-27T12:05:00+00:00")
+            self.assertEqual(failed_primary["sub_status"], "failed")
+            self.assertEqual(failed_primary["details"], "boom")
+
+            existing_task = tasks[1]
+            self.assertEqual(existing_task["type"], TaskType.MODEL)
+            self.assertEqual(existing_task["run_id"], 103)
+            self.assertEqual(existing_task["model_ref"], "models/existing")
+            self.assertEqual(existing_task["sub_status"], "")
+            self.assertEqual(existing_task["details"], "")
+        finally:
+            engine.dispose()
+
+    def test_primary_task_backfill_rejects_inflight_runs(self) -> None:
+        """Ensure the backfill aborts instead of inventing task claim state."""
+        engine = self.create_engine("primary_task_backfill_inflight.db")
+        try:
+            self.upgrade_to_revision(engine, "dee9b802b5c9")
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO run (
+                            run_id, fab_id, fab_version, fab_hash, override_config,
+                            pending_at, starting_at, running_at, finished_at,
+                            usage_reported_at, sub_status, details, federation,
+                            federation_config, run_type, flwr_aid, bytes_sent,
+                            bytes_recv, clientapp_runtime
+                        ) VALUES (
+                            :run_id, :fab_id, :fab_version, :fab_hash, :override_config,
+                            :pending_at, :starting_at, :running_at, :finished_at,
+                            :usage_reported_at, :sub_status, :details, :federation,
+                            :federation_config, :run_type, :flwr_aid, :bytes_sent,
+                            :bytes_recv, :clientapp_runtime
+                        )
+                        """
+                    ),
+                    {
+                        "run_id": 201,
+                        "fab_id": "publisher/live",
+                        "fab_version": "1.0.0",
+                        "fab_hash": "fab-live",
+                        "override_config": "{}",
+                        "pending_at": "2026-04-27T13:00:00+00:00",
+                        "starting_at": "2026-04-27T13:01:00+00:00",
+                        "running_at": "",
+                        "finished_at": "",
+                        "usage_reported_at": "",
+                        "sub_status": None,
+                        "details": None,
+                        "federation": "fed-live",
+                        "federation_config": None,
+                        "run_type": RunType.SERVER_APP,
+                        "flwr_aid": "aid-live",
+                        "bytes_sent": 0,
+                        "bytes_recv": 0,
+                        "clientapp_runtime": 0.0,
+                    },
+                )
+
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "Cannot backfill primary tasks while runs are STARTING or RUNNING",
+            ):
+                run_migrations(engine)
+
+            self.assertEqual(get_current_revisions(engine), {"dee9b802b5c9"})
         finally:
             engine.dispose()
 
