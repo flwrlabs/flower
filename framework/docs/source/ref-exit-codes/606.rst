@@ -1,0 +1,16 @@
+####################################
+ [606] RUNTIME_VERSION_INCOMPATIBLE
+####################################
+
+*************
+ Description
+*************
+
+The Flower runtime versions are incompatible.
+
+****************
+ How to Resolve
+****************
+
+Use compatible Flower runtime versions for the components that communicate with each
+other. Check the error message for the specific compatibility issue.

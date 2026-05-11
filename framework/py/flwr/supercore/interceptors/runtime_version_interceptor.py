@@ -24,6 +24,7 @@ from typing import Any
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
+from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
 from flwr.supercore.constant import VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY
 from flwr.supercore.error import ApiErrorCode, FlowerError
@@ -60,7 +61,14 @@ class RuntimeVersionClientInterceptor(
             flower_error is not None
             and flower_error.code == ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
         ):
-            log(WARN, flower_error.public_details or flower_error.message)
+            flwr_exit(
+                ExitCode.RUNTIME_VERSION_INCOMPATIBLE,
+                "\n".join(
+                    detail
+                    for detail in (flower_error.message, flower_error.public_details)
+                    if detail
+                ),
+            )
 
     def _intercept_call(
         self,

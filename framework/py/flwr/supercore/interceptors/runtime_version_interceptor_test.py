@@ -24,6 +24,7 @@ from unittest.mock import Mock, patch
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
+from flwr.common.exit import ExitCode
 from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
 from flwr.supercore.constant import (
     FLWR_COMPONENT_NAME_METADATA_KEY,
@@ -192,8 +193,8 @@ class TestRuntimeVersionClientInterceptor(TestCase):
                 grpc.RpcError,
             ),
             patch(
-                "flwr.supercore.interceptors.runtime_version_interceptor.log"
-            ) as log_mock,
+                "flwr.supercore.interceptors.runtime_version_interceptor.flwr_exit"
+            ) as flwr_exit_mock,
         ):
             response = self.interceptor.intercept_unary_unary(
                 continuation=lambda _details, _request: rpc_error,
@@ -206,7 +207,10 @@ class TestRuntimeVersionClientInterceptor(TestCase):
         self.assertIs(response, rpc_error)
         rpc_error.add_callback.assert_not_called()
         rpc_error.trailing_metadata.assert_called_once()
-        log_mock.assert_called_once_with(WARN, "runtime mismatch")
+        flwr_exit_mock.assert_called_once_with(
+            ExitCode.RUNTIME_VERSION_INCOMPATIBLE,
+            "Runtime version compatibility check failed.\nruntime mismatch",
+        )
 
     def test_unary_future_rpc_error_uses_completion_callback(self) -> None:
         """Unary-unary futures should not be inspected before completion."""
@@ -497,8 +501,8 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
         rpc_error = _make_runtime_rpc_error()
 
         with patch(
-            "flwr.supercore.interceptors.runtime_version_interceptor.log"
-        ) as log_mock:
+            "flwr.supercore.interceptors.runtime_version_interceptor.flwr_exit"
+        ) as flwr_exit_mock:
             response = self.interceptor.intercept_unary_stream(
                 continuation=lambda _details, _request: rpc_error,
                 client_call_details=_make_call_details("/flwr.proto.Fleet/PullTaskIns"),
@@ -507,4 +511,7 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
 
         self.assertIs(response, rpc_error)
         rpc_error.add_callback.assert_not_called()
-        log_mock.assert_called_once_with(WARN, "runtime mismatch")
+        flwr_exit_mock.assert_called_once_with(
+            ExitCode.RUNTIME_VERSION_INCOMPATIBLE,
+            "Runtime version compatibility check failed.\nruntime mismatch",
+        )
