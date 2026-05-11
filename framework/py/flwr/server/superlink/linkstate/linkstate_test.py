@@ -2093,7 +2093,7 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         assert status.details == "done"
 
 
-class SqlFileBasedTest(StateTest, unittest.TestCase):
+class SqlFileBasedTest(SqlInMemoryStateTest):
     """Test SqlLinkState implementation with file-based database."""
 
     __test__ = True
