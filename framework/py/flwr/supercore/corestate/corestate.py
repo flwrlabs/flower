@@ -45,11 +45,6 @@ class CoreState(ABC):
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`.
 
-        Implementations must store task-log timestamps as strictly increasing
-        values per task. This keeps the timestamp returned by `get_task_log`
-        usable as a lossless polling cursor, even if multiple log entries are
-        added while the system clock reports the same timestamp.
-
         Parameters
         ----------
         task_id : int

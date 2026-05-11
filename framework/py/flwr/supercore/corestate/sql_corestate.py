@@ -113,8 +113,6 @@ class SqlCoreState(CoreState, SqlMixin):
         sint64_task_id = uint64_to_int64(task_id)
 
         try:
-            # Keep timestamps strictly increasing per task so a timestamp-only
-            # polling cursor cannot skip entries created at the same clock time.
             self.query(
                 """
                 INSERT INTO task_logs (timestamp, task_id, log)

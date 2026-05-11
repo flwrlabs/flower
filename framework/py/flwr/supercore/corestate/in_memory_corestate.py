@@ -113,10 +113,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         with self.log_lock:
             timestamp = now().timestamp()
             task_logs = self.task_logs.setdefault(task_id, [])
-            # Keep timestamps strictly increasing per task so a timestamp-only
-            # polling cursor cannot skip entries created at the same clock time.
-            if task_logs and timestamp <= task_logs[-1][0]:
-                timestamp = task_logs[-1][0] + 1e-6
             task_logs.append((timestamp, log_message))
 
     def get_task_log(
