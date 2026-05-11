@@ -122,7 +122,6 @@ class SqlCoreState(CoreState, SqlMixin):
                 """,
                 {
                     "current_ts": now().timestamp(),
-                    "timestamp_increment": 1e-6,
                     "task_id": sint64_task_id,
                     "log": log_message,
                 },
