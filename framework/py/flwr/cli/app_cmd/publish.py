@@ -20,10 +20,10 @@ from pathlib import Path
 from typing import IO, Annotated, Any, cast
 
 import click
-from packaging.specifiers import InvalidSpecifier, SpecifierSet
-from packaging.version import InvalidVersion, Version
 import requests
 import typer
+from packaging.specifiers import InvalidSpecifier, SpecifierSet
+from packaging.version import InvalidVersion, Version
 from requests import Response
 
 from flwr.cli.config_utils import load_and_validate
