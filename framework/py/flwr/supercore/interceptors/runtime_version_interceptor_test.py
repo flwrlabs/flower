@@ -118,7 +118,7 @@ def _make_runtime_rpc_error() -> grpc.RpcError:
             public_details="runtime mismatch",
         ).to_json("Runtime version compatibility check failed.")
     )
-    rpc_error.add_callback = Mock(side_effect=NotImplementedError)
+    rpc_error.add_callback = Mock(return_value=False)
     return rpc_error
 
 
@@ -182,7 +182,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
             )
 
     def test_log_unary_incompatibility_from_returned_rpc_error(self) -> None:
-        """Unary-unary RpcError outcomes should fall back if callbacks fail."""
+        """Unary-unary RpcError outcomes should fall back if callbacks are late."""
         rpc_error = _make_runtime_rpc_error()
 
         with patch(
@@ -462,7 +462,7 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
         log_mock.assert_called_once()
 
     def test_log_stream_incompatibility_from_returned_rpc_error(self) -> None:
-        """Unary-stream RpcError outcomes should fall back if callbacks fail."""
+        """Unary-stream RpcError outcomes should fall back if callbacks are late."""
         rpc_error = _make_runtime_rpc_error()
 
         with patch(

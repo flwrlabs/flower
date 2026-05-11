@@ -85,12 +85,7 @@ class RuntimeVersionClientInterceptor(
             if isinstance(call, grpc.RpcError):
                 self._maybe_exit_on_incompat_error(call)
 
-        try:
-            callback_registered = call.add_callback(_handle_completion)
-        except NotImplementedError:
-            callback_registered = False
-
-        if not callback_registered:
+        if not call.add_callback(_handle_completion):
             _handle_completion()
 
         return call
