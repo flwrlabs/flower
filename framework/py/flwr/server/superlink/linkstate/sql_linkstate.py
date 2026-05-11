@@ -14,6 +14,7 @@
 # ==============================================================================
 """SQLAlchemy-based implementation of the link state."""
 
+
 # pylint: disable=too-many-lines
 
 import json
