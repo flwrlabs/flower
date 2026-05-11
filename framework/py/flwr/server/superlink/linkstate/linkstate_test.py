@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """Tests all LinkState implemenations have to conform to."""
+
 # pylint: disable=invalid-name, too-many-lines, R0904, R0913
 
 
@@ -2090,40 +2091,34 @@ class SqlLinkStateSqlGenerationTest(unittest.TestCase):
     """Tests for SQL generation in SqlLinkState."""
 
     def _create_state(self, database_path: str = ":memory:") -> SqlLinkState:
-        return SqlLinkState(
+        state = SqlLinkState(
             database_path=database_path,
             federation_manager=NoOpFederationManager(),
             object_store=ObjectStoreFactory().store(),
         )
+        state.initialize()
+        return state
 
-    def test_claim_message_ins_rows_uses_deterministic_ordering(self) -> None:
-        """Message claiming should use deterministic ordering."""
+    @parameterized.expand(
+        [  # type: ignore
+            ("claim", "_claim_message_ins_rows", (1, 3)),
+            ("load", "_load_message_ins_rows", ({"abc"},)),
+        ]
+    )
+    def test_message_ins_rows_uses_deterministic_ordering(
+        self, _name: str, method: str, args: tuple[Any, ...]
+    ) -> None:
+        """Message querying should use deterministic ordering."""
         state = self._create_state()
         captured: list[str] = []
 
-        def fake_query(query: str, _params: Any = None) -> list[dict[str, Any]]:
+        # pylint: disable-next=unused-argument
+        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
             captured.append(query)
             return []
 
         state.query = fake_query  # type: ignore[assignment,method-assign]
-        # pylint: disable-next=protected-access
-        _ = state._claim_message_ins_rows(node_id=1, limit=3)
-
-        self.assertTrue(captured)
-        self.assertIn("ORDER BY created_at, message_id", captured[0])
-        self.assertNotIn("rowid", captured[0])
-
-    def test_load_message_ins_rows_uses_deterministic_ordering(self) -> None:
-        """Message loading should use deterministic ordering."""
-        state = self._create_state()
-        captured: list[str] = []
-
-        def fake_query(query: str, _params: Any = None) -> list[dict[str, Any]]:
-            captured.append(query)
-            return []
-
-        state.query = fake_query  # type: ignore[assignment,method-assign]
-        _ = state._load_message_ins_rows({"abc"})  # pylint: disable=protected-access
+        getattr(state, method)(*args)
 
         self.assertTrue(captured)
         self.assertIn("ORDER BY created_at, message_id", captured[0])
