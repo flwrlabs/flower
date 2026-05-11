@@ -12,5 +12,16 @@ The Flower runtime versions are incompatible.
  How to Resolve
 ****************
 
-Use compatible Flower runtime versions for the components that communicate with each
-other. Check the error message for the specific compatibility issue.
+Check the error message for details. It may tell you which Flower version is required.
+
+If a specific version is shown, install that version:
+
+.. code-block:: shell
+
+    $ pip install flwr==<version>
+
+Otherwise, upgrade Flower:
+
+.. code-block:: shell
+
+    $ pip install -U flwr

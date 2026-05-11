@@ -185,7 +185,8 @@ To use the REST API, install `flwr` with the `rest` extra:
         "TLS server certificate configuration is incomplete or invalid."
     ),
     ExitCode.RUNTIME_VERSION_INCOMPATIBLE: (
-        "The Flower runtime versions are incompatible."
+        "Upgrade your Flower version to the required version, or contact the server "
+        "administrator."
     ),
     # Simulation exit codes (700-799)
     ExitCode.SIMULATION_EXCEPTION: (
