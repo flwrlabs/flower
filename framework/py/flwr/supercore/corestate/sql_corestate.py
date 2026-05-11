@@ -118,21 +118,7 @@ class SqlCoreState(CoreState, SqlMixin):
             self.query(
                 """
                 INSERT INTO task_logs (timestamp, task_id, log)
-                VALUES (
-                    max(
-                        :current_ts,
-                        COALESCE(
-                            (
-                                SELECT MAX(timestamp) + :timestamp_increment
-                                FROM task_logs
-                                WHERE task_id = :task_id
-                            ),
-                            :current_ts
-                        )
-                    ),
-                    :task_id,
-                    :log
-                )
+                VALUES (:current_ts, :task_id, :log)
                 """,
                 {
                     "current_ts": now().timestamp(),

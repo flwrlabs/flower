@@ -62,13 +62,13 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """
         return 123
 
-    def _patch_task_log_datetime_now(self, *timestamps: Any) -> ExitStack:
+    def _patch_task_log_datetime_now(self, *timestamps: datetime) -> ExitStack:
         """Patch the shared datetime source used for task-log timestamps."""
         stack = ExitStack()
         mock_datetime = stack.enter_context(
             patch("flwr.supercore.date.datetime.datetime")
         )
-        mock_datetime.now.side_effect = list(timestamps)
+        mock_datetime.now.side_effect = timestamps
         return stack
 
     def test_create_and_get_task(self) -> None:
