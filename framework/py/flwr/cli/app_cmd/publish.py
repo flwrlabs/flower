@@ -52,6 +52,9 @@ from ..utils import (
 PYTHON_VERSION_MIN = Version("3.10")
 PYTHON_VERSION_MAX = Version("3.14")
 PYTHON_VERSION_NEXT = Version("3.15")
+PYTHON_VERSION_RANGE = f">={PYTHON_VERSION_MIN},<={PYTHON_VERSION_MAX}"
+PYTHON_VERSION_UPPER_BOUND = f"<={PYTHON_VERSION_MAX}"
+PYTHON_VERSION_ALT_UPPER_BOUND = f"<{PYTHON_VERSION_NEXT}"
 
 
 # pylint: disable=too-many-locals
@@ -147,7 +150,7 @@ def _validate_requires_python(config: dict[str, Any]) -> None:
     if not isinstance(requires_python, str) or requires_python.strip() == "":
         raise click.ClickException(
             "Missing or invalid [project].requires-python. "
-            'Please set it to a range within ">=3.10,<=3.14".'
+            f'Please set it to a range within "{PYTHON_VERSION_RANGE}".'
         )
 
     try:
@@ -155,7 +158,7 @@ def _validate_requires_python(config: dict[str, Any]) -> None:
     except InvalidSpecifier as err:
         raise click.ClickException(
             "Invalid [project].requires-python: expected a valid Python version "
-            'specifier within ">=3.10,<=3.14".'
+            f'specifier within "{PYTHON_VERSION_RANGE}".'
         ) from err
 
     lower_bounds: list[Version] = []
@@ -166,7 +169,7 @@ def _validate_requires_python(config: dict[str, Any]) -> None:
         except InvalidVersion as err:
             raise click.ClickException(
                 "Invalid [project].requires-python: expected valid Python versions "
-                'within ">=3.10,<=3.14".'
+                f'within "{PYTHON_VERSION_RANGE}".'
             ) from err
 
         if specifier.operator in {">=", ">", "==", "==="}:
@@ -177,13 +180,14 @@ def _validate_requires_python(config: dict[str, Any]) -> None:
     if not lower_bounds or max(lower_bounds) < PYTHON_VERSION_MIN:
         raise click.ClickException(
             "Invalid [project].requires-python: publishing requires a lower bound "
-            'of ">=3.10" or higher.'
+            f'of ">={PYTHON_VERSION_MIN}" or higher.'
         )
 
     if not upper_bounds:
         raise click.ClickException(
             "Invalid [project].requires-python: publishing requires an upper bound "
-            'of "<=3.14" or "<3.15".'
+            f'of "{PYTHON_VERSION_UPPER_BOUND}" or '
+            f'"{PYTHON_VERSION_ALT_UPPER_BOUND}".'
         )
 
     if not any(
@@ -195,7 +199,8 @@ def _validate_requires_python(config: dict[str, Any]) -> None:
     ):
         raise click.ClickException(
             "Invalid [project].requires-python: publishing requires an upper bound "
-            'of "<=3.14" or "<3.15".'
+            f'of "{PYTHON_VERSION_UPPER_BOUND}" or '
+            f'"{PYTHON_VERSION_ALT_UPPER_BOUND}".'
         )
 
 
