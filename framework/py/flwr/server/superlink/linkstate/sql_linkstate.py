@@ -520,9 +520,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 RETURNING *
             """
             params = {"delivered_at": delivered_at}
-            params.update(
-                {f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)}
-            )
+            params.update({f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)})
             rows = self.query(query, params)
             for row in rows:
                 convert_sint64_values_in_dict_to_uint64(
