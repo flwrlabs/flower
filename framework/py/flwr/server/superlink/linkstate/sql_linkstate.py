@@ -510,32 +510,31 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             ret.update(tmp_ret_dict)
 
             # Atomically claim all eligible reply Messages
-            if message_ids:
-                placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
-                delivered_at = now().isoformat()
-                query = f"""
-                    UPDATE message_res
-                    SET delivered_at = :delivered_at
-                    WHERE reply_to_message_id IN ({placeholders})
-                    AND delivered_at = ''
-                    RETURNING *
-                """
-                params = {"delivered_at": delivered_at}
-                params.update(
-                    {f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)}
+            placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
+            delivered_at = now().isoformat()
+            query = f"""
+                UPDATE message_res
+                SET delivered_at = :delivered_at
+                WHERE reply_to_message_id IN ({placeholders})
+                AND delivered_at = ''
+                RETURNING *
+            """
+            params = {"delivered_at": delivered_at}
+            params.update(
+                {f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)}
+            )
+            rows = self.query(query, params)
+            for row in rows:
+                convert_sint64_values_in_dict_to_uint64(
+                    row, ["run_id", "src_node_id", "dst_node_id"]
                 )
-                rows = self.query(query, params)
-                for row in rows:
-                    convert_sint64_values_in_dict_to_uint64(
-                        row, ["run_id", "src_node_id", "dst_node_id"]
-                    )
-                tmp_ret_dict = verify_found_message_replies(
-                    inquired_message_ids=message_ids,
-                    found_message_ins_dict=found_message_ins_dict,
-                    found_message_res_list=[dict_to_message(row) for row in rows],
-                    current_time=current,
-                )
-                ret.update(tmp_ret_dict)
+            tmp_ret_dict = verify_found_message_replies(
+                inquired_message_ids=message_ids,
+                found_message_ins_dict=found_message_ins_dict,
+                found_message_res_list=[dict_to_message(row) for row in rows],
+                current_time=current,
+            )
+            ret.update(tmp_ret_dict)
 
         return list(ret.values())
 
