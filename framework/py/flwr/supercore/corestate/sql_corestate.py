@@ -133,26 +133,24 @@ class SqlCoreState(CoreState, SqlMixin):
         """Get task logs for the specified `task_id`."""
         sint64_task_id = uint64_to_int64(task_id)
 
-        with self.session():
+        # We don't check if the task exists before querying logs
+        # because the task_id is validated by the authz layer
 
-            # We don't check if the task exists before querying logs
-            # because the task_id is validated by the authz layer
+        if after_timestamp is None:
+            after_timestamp = 0.0
 
-            if after_timestamp is None:
-                after_timestamp = 0.0
-
-            # Polling is strict-after: entries at the checkpoint timestamp have
-            # already been delivered.
-            rows = self.query(
-                """
-                SELECT log, timestamp FROM task_logs
-                WHERE task_id = :task_id AND timestamp > :after_timestamp
-                ORDER BY timestamp
-                """,
-                {"task_id": sint64_task_id, "after_timestamp": after_timestamp},
-            )
-            latest_timestamp = rows[-1]["timestamp"] if rows else 0.0
-            return "".join(row["log"] for row in rows), latest_timestamp
+        # Polling is strict-after: entries at the checkpoint timestamp have
+        # already been delivered.
+        rows = self.query(
+            """
+            SELECT log, timestamp FROM task_logs
+            WHERE task_id = :task_id AND timestamp > :after_timestamp
+            ORDER BY timestamp
+            """,
+            {"task_id": sint64_task_id, "after_timestamp": after_timestamp},
+        )
+        latest_timestamp = rows[-1]["timestamp"] if rows else 0.0
+        return "".join(row["log"] for row in rows), latest_timestamp
 
     def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
