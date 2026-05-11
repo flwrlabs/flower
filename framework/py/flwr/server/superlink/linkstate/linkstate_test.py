@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """Tests all LinkState implemenations have to conform to."""
+
 # pylint: disable=invalid-name, too-many-lines, R0904, R0913
 
 
@@ -952,8 +953,9 @@ class StateTest(CoreStateTest):
         state: LinkState = self.state_factory()
         create_dummy_node(state)
 
-        infos = state.get_node_info(node_ids=[])
-        self.assertEqual(infos, [])
+        self.assertEqual(state.get_node_info(node_ids=[]), [])
+        self.assertEqual(state.get_node_info(owner_aids=[]), [])
+        self.assertEqual(state.get_node_info(statuses=[]), [])
 
     def test_delete_node(self) -> None:
         """Test deleting a client node."""
@@ -1501,6 +1503,12 @@ class StateTest(CoreStateTest):
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 0
 
+    def test_get_message_res_empty_ids_returns_empty_list(self) -> None:
+        """Test that get_message_res returns empty for empty input."""
+        state = self.state_factory()
+
+        self.assertEqual(state.get_message_res(set()), [])
+
     def test_get_message_res_returns_empty_for_missing_message_ins(self) -> None:
         """Test that get_message_res returns an empty result when the corresponding
         Message does not exist."""
@@ -2003,31 +2011,6 @@ def _claim_running_in_separate_process(
         result_queue.put((result, None))
     except Exception as ex:  # pylint: disable=broad-exception-caught
         result_queue.put((False, repr(ex)))
-
-
-class SqlLinkStateEdgeCaseTest(unittest.TestCase):
-    """Tests for edge cases in SqlLinkState."""
-
-    def _create_state(self, database_path: str = ":memory:") -> SqlLinkState:
-        return SqlLinkState(
-            database_path=database_path,
-            federation_manager=NoOpFederationManager(),
-            object_store=ObjectStoreFactory().store(),
-        )
-
-    def test_get_message_res_empty_ids_returns_empty_list(self) -> None:
-        """Empty message ID input should not generate SQL."""
-        state = self._create_state()
-
-        self.assertEqual(state.get_message_res(set()), [])
-
-    def test_get_node_info_empty_filters_return_empty_list(self) -> None:
-        """Empty filters should not generate IN () SQL."""
-        state = self._create_state()
-
-        self.assertEqual(state.get_node_info(node_ids=[]), [])
-        self.assertEqual(state.get_node_info(owner_aids=[]), [])
-        self.assertEqual(state.get_node_info(statuses=[]), [])
 
 
 class InMemoryStateTest(StateTest):
