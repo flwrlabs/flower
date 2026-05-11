@@ -14,7 +14,6 @@
 # ==============================================================================
 """Mixin providing common SQL connection and initialization logic via SQLAlchemy."""
 
-
 import re
 from abc import ABC
 from collections.abc import Iterator, Sequence
@@ -62,7 +61,7 @@ class SqlMixin(ABC):
     """Mixin providing common SQL connection and initialization logic."""
 
     # Subclasses can restrict supported SQLAlchemy dialects.
-    # OSS SQL backends currently allow only the SQLite dialect ("sqlite").
+    # Flower Framework SQL backend currently allow only the SQLite dialect.
     allowed_dialects: set[str] | None = None
 
     def __init__(self, database_path: str) -> None:
@@ -100,14 +99,12 @@ class SqlMixin(ABC):
         self._engine: Engine | None = None
         self._session_factory: sessionmaker[Session] | None = None
 
-    @staticmethod
-    def _extract_database_dialect(database_url: str) -> str:
+    def _extract_database_dialect(self, database_url: str) -> str:
         """Extract SQLAlchemy dialect name from URL."""
         scheme = database_url.split("://", maxsplit=1)[0].strip().lower()
         return scheme.split("+", maxsplit=1)[0]
 
-    @staticmethod
-    def _normalize_database_url(database_path: str) -> str:
+    def _normalize_database_url(self, database_path: str) -> str:
         """Normalize user input to a SQLAlchemy database URL."""
         if database_path == ":memory:":
             return FLWR_IN_MEMORY_SQLITE_DB_URL
@@ -130,7 +127,7 @@ class SqlMixin(ABC):
 
         allowed_str = ", ".join(sorted(allowed))
         hint = (
-            " Flower OSS SQL backends support in-memory and SQLite paths/URLs."
+            " Supported backends are in-memory and SQLite paths/URLs."
             if "sqlite" in allowed
             else ""
         )

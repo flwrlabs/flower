@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for SqlMixin."""
 
+
 import unittest
 
 from sqlalchemy import Column, Integer, MetaData, Table
@@ -266,6 +267,6 @@ class TestSqlMixin(unittest.TestCase):
         """SQLite-only classes should reject non-SQLite URLs."""
         with self.assertRaisesRegex(
             ValueError,
-            "Flower OSS SQL backends support in-memory and SQLite",
+            "Supported backends are in-memory and SQLite paths/URLs.",
         ):
             _ = SqliteOnlyDummyDb("dummysql://localhost/flwr")
