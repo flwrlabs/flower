@@ -855,61 +855,62 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
              :sub_status, :details)
         """
         override_config_json = json.dumps(override_config)
+        uint64_run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
+        uint64_task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
+        pending_at = now().isoformat()
 
-        while True:
-            uint64_run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
-            uint64_task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
-            pending_at = now().isoformat()
-
-            try:
-                with self.session():
-                    self.query(
-                        run_insert_query,
-                        {
-                            "run_id": uint64_to_int64(uint64_run_id),
-                            "fab_id": fab_id or "",
-                            "fab_version": fab_version or "",
-                            "fab_hash": fab_hash or "",
-                            "override_config": override_config_json,
-                            "federation": federation,
-                            "primary_task_id": uint64_to_int64(uint64_task_id),
-                            "federation_config": fed_config_json,
-                            "run_type": run_type,
-                            "pending_at": pending_at,
-                            "starting_at": "",
-                            "running_at": "",
-                            "finished_at": "",
-                            "usage_reported_at": "",
-                            "sub_status": "",
-                            "details": "",
-                            "flwr_aid": flwr_aid or "",
-                            "bytes_sent": 0,
-                            "bytes_recv": 0,
-                            "clientapp_runtime": 0.0,
-                        },
-                    )
-                    self.query(
-                        task_insert_query,
-                        {
-                            "task_id": uint64_to_int64(uint64_task_id),
-                            "type": task_type,
-                            "run_id": uint64_to_int64(uint64_run_id),
-                            "fab_hash": fab_hash,
-                            "model_ref": None,
-                            "connector_ref": None,
-                            "token": None,
-                            "active_until": None,
-                            "pending_at": pending_at,
-                            "starting_at": None,
-                            "running_at": None,
-                            "finished_at": None,
-                            "sub_status": "",
-                            "details": "",
-                        },
-                    )
+        with self.session():
+            query = "SELECT COUNT(*) as cnt FROM run WHERE run_id = :run_id"
+            rows = self.query(query, {"run_id": uint64_to_int64(uint64_run_id)})
+            if rows[0]["cnt"] == 0:
+                self.query(
+                    run_insert_query,
+                    {
+                        "run_id": uint64_to_int64(uint64_run_id),
+                        "fab_id": fab_id or "",
+                        "fab_version": fab_version or "",
+                        "fab_hash": fab_hash or "",
+                        "override_config": override_config_json,
+                        "federation": federation,
+                        "primary_task_id": uint64_to_int64(uint64_task_id),
+                        "federation_config": fed_config_json,
+                        "run_type": run_type,
+                        "pending_at": pending_at,
+                        "starting_at": "",
+                        "running_at": "",
+                        "finished_at": "",
+                        "usage_reported_at": "",
+                        "sub_status": "",
+                        "details": "",
+                        "flwr_aid": flwr_aid or "",
+                        "bytes_sent": 0,
+                        "bytes_recv": 0,
+                        "clientapp_runtime": 0.0,
+                    },
+                )
+                self.query(
+                    task_insert_query,
+                    {
+                        "task_id": uint64_to_int64(uint64_task_id),
+                        "type": task_type,
+                        "run_id": uint64_to_int64(uint64_run_id),
+                        "fab_hash": fab_hash,
+                        "model_ref": None,
+                        "connector_ref": None,
+                        "token": None,
+                        "active_until": None,
+                        "pending_at": pending_at,
+                        "starting_at": None,
+                        "running_at": None,
+                        "finished_at": None,
+                        "sub_status": "",
+                        "details": "",
+                    },
+                )
                 return uint64_run_id
-            except IntegrityError:
-                continue
+
+        log(ERROR, "Unexpected run creation failure.")
+        return 0
 
     def get_run_info(  # pylint: disable=too-many-arguments, too-many-branches
         self,
