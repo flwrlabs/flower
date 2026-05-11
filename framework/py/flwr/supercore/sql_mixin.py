@@ -61,7 +61,7 @@ class SqlMixin(ABC):
     """Mixin providing common SQL connection and initialization logic."""
 
     # Subclasses can restrict supported SQLAlchemy dialects.
-    # Flower Framework SQL backend currently allow only the SQLite dialect.
+    # Flower Framework SQL backend currently allows only the SQLite dialect.
     allowed_dialects: set[str] | None = None
 
     def __init__(self, database_path: str) -> None:
