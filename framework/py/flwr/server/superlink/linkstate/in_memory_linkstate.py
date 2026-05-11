@@ -120,14 +120,13 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     f"Run {run_id} not found. create_task requires an existing run."
                 )
 
-            task_id = super().create_task(
+            return super().create_task(
                 task_type=task_type,
                 run_id=run_id,
                 fab_hash=fab_hash,
                 model_ref=model_ref,
                 connector_ref=connector_ref,
             )
-            return task_id
 
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
