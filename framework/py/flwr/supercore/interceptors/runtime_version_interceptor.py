@@ -83,9 +83,7 @@ class RuntimeVersionClientInterceptor(
         def _handle_completion() -> None:
             self._maybe_log_incompat_warning(call.trailing_metadata())
 
-        if isinstance(call, grpc.RpcError) and (
-            not isinstance(call, grpc.Future) or call.done()
-        ):
+        if isinstance(call, grpc.RpcError):
             self._maybe_exit_on_incompat_error(call)
             self._maybe_log_incompat_warning(
                 call.trailing_metadata() if hasattr(call, "trailing_metadata") else None

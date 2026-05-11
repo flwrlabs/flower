@@ -183,18 +183,11 @@ class TestRuntimeVersionClientInterceptor(TestCase):
     def test_log_unary_incompatibility_from_returned_rpc_error(self) -> None:
         """Unary-unary RpcError outcomes should not register callbacks."""
         rpc_error = _make_runtime_rpc_error()
-        rpc_error.done = Mock(return_value=True)
         rpc_error.trailing_metadata = Mock(return_value=())
 
-        with (
-            patch(
-                "flwr.supercore.interceptors.runtime_version_interceptor.grpc.Future",
-                grpc.RpcError,
-            ),
-            patch(
-                "flwr.supercore.interceptors.runtime_version_interceptor.flwr_exit"
-            ) as flwr_exit_mock,
-        ):
+        with patch(
+            "flwr.supercore.interceptors.runtime_version_interceptor.flwr_exit"
+        ) as flwr_exit_mock:
             response = self.interceptor.intercept_unary_unary(
                 continuation=lambda _details, _request: rpc_error,
                 client_call_details=_make_call_details(
@@ -210,33 +203,6 @@ class TestRuntimeVersionClientInterceptor(TestCase):
             ExitCode.RUNTIME_VERSION_INCOMPATIBLE,
             "Runtime version compatibility check failed.\nruntime mismatch",
         )
-
-    def test_unary_future_rpc_error_uses_completion_callback(self) -> None:
-        """Unary-unary futures should not be inspected before completion."""
-        call = grpc.RpcError()
-        call.add_callback = Mock(return_value=True)
-        call.done = Mock(return_value=False)
-        call.trailing_metadata = Mock(return_value=())
-        call.details = Mock(
-            side_effect=AssertionError("details() should not be called")
-        )
-
-        with patch(
-            "flwr.supercore.interceptors.runtime_version_interceptor.grpc.Future",
-            grpc.RpcError,
-        ):
-            self.interceptor.intercept_unary_unary(
-                continuation=lambda _details, _request: call,
-                client_call_details=_make_call_details(
-                    "/flwr.proto.ServerAppIo/GetNodes"
-                ),
-                request=GetNodesRequest(run_id=1),
-            )
-
-            callback = call.add_callback.call_args.args[0]
-            call.details.assert_not_called()
-            callback()
-            call.trailing_metadata.assert_called_once()
 
 
 class TestRuntimeVersionServerInterceptor(TestCase):
