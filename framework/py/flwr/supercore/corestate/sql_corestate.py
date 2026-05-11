@@ -368,15 +368,15 @@ class SqlCoreState(CoreState, SqlMixin):
         expired_at = now()
         current = int(expired_at.timestamp())
         # Expired task claims are terminal failures and lose their token.
-        self.query(
+        rows = self.query(
             """
             UPDATE task
-            SET token = NULL,
-                active_until = NULL,
-                finished_at = :finished_at,
-                sub_status = :sub_status,
-                details = :details
+            SET token = NULL, active_until = NULL, finished_at = :finished_at,
+                sub_status = :sub_status, details = :details
             WHERE token IS NOT NULL AND active_until < :current
+            RETURNING task_id, type, run_id, fab_hash, model_ref, connector_ref,
+                      pending_at, starting_at, running_at, finished_at,
+                      sub_status, details
             """,
             {
                 "current": current,
@@ -385,6 +385,19 @@ class SqlCoreState(CoreState, SqlMixin):
                 "details": "No heartbeat received from the task",
             },
         )
+        if rows:
+            self._on_task_tokens_expired([task_from_row(row) for row in rows])
+
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+        """Handle cleanup of expired task tokens.
+
+        Override in subclasses to add custom cleanup logic.
+
+        Parameters
+        ----------
+        tasks : list[Task]
+            Tasks whose claims expired and were marked FINISHED:FAILED.
+        """
 
     def _cleanup_expired_tokens(self) -> None:
         """Remove expired tokens and perform additional cleanup.

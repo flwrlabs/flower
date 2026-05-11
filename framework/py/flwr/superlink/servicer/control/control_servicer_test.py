@@ -473,7 +473,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         """Test StopRun method of ControlServicer."""
         # Prepare
         run_id = self._create_dummy_run(self.aid)
-        self.state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
         expected_run_status = RunStatus(Status.FINISHED, SubStatus.STOPPED, "")
 
         # Execute
@@ -867,9 +866,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             self.aid,
             RunType.SERVER_APP,
         )
-        self.state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
-        _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-        _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
 
         with patch.object(
             self.state.federation_manager,
@@ -923,9 +919,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             target_flwr_aid,
             RunType.SERVER_APP,
         )
-        self.state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
-        _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-        _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
 
         with patch.object(
             self.state.federation_manager,
@@ -1218,7 +1211,6 @@ class TestControlServicerAuth(unittest.TestCase):
     def test_stoprun_auth_successful(self) -> None:
         """Test StopRun succeeds for a federation member."""
         run_id = self._create_dummy_run("run-owner")
-        self.state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
         request = StopRunRequest(run_id=run_id)
         ctx = self.make_context()
 

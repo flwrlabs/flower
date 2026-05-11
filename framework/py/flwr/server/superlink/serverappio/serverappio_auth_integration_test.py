@@ -20,20 +20,14 @@ import unittest
 
 import grpc
 
-from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS, Status
-from flwr.common.typing import RunStatus
+from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS
 from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesRequest,
     GetNodesResponse,
 )
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
-from flwr.supercore.constant import (
-    FLWR_IN_MEMORY_DB_NAME,
-    NOOP_FEDERATION,
-    RunType,
-    TaskType,
-)
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
 from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
     TASK_TOKEN_HEADER,
@@ -76,13 +70,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
 
         # Seed one authenticated task token and reuse it for token-protected RPC
         # checks.
-        self._auth_run_id = self._create_running_run()
-        auth_task_id = self.state.create_task(
-            task_type=TaskType.SERVER_APP, run_id=self._auth_run_id
-        )
-        assert auth_task_id is not None
-        auth_token = self.state.claim_task(auth_task_id)
-        assert auth_token is not None
+        self._auth_run_id, auth_token = self._create_running_run()
 
         # Create a single base channel and wrap it for authenticated calls.
         base_channel = grpc.insecure_channel("localhost:9091")
@@ -109,13 +97,16 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         """Stop the gRPC API server."""
         self._server.stop(None)
 
-    def _create_running_run(self) -> int:
+    def _create_running_run(self) -> tuple[int, str]:
         run_id = self.state.create_run(
             "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
         )
-        _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-        _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
-        return run_id
+        run = self.state.get_run_info(run_ids=[run_id])[0]
+        assert run.primary_task_id is not None
+        token = self.state.claim_task(run.primary_task_id)
+        assert token is not None
+        assert self.state.activate_task(run.primary_task_id)
+        return run_id, token
 
     def test_get_nodes_denied_without_metadata_token(self) -> None:
         """Protected RPC should deny requests missing metadata token."""
