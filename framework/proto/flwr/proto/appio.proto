@@ -82,9 +82,8 @@ message PushTaskOutputResponse {}
 // CreateTask messages
 message CreateTaskRequest {
   string type = 1;
-  uint64 run_id = 2;
-  optional string fab_hash = 3;
-  optional string model_ref = 4;
-  optional string connector_ref = 5;
+  optional string fab_hash = 2;
+  optional string model_ref = 3;
+  optional string connector_ref = 4;
 }
 message CreateTaskResponse { optional uint64 task_id = 1; }

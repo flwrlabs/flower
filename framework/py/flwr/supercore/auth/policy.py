@@ -33,7 +33,7 @@ class MethodTokenPolicy:
 
     @staticmethod
     def token_required() -> MethodTokenPolicy:
-        """Return policy for methods protected by App token auth."""
+        """Return policy for methods protected by token auth."""
         return MethodTokenPolicy(requires_token=True)
 
 
