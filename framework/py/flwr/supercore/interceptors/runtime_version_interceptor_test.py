@@ -266,6 +266,12 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_called_once()
+        metadata = dict(context.set_trailing_metadata.call_args.args[0])
+        self.assertEqual(
+            metadata[VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY],
+            "Warning: The installed `flwr` version is 1.30.1, but 1.29.0 "
+            "is recommended.",
+        )
 
     def test_incompatible_metadata_is_rejected(self) -> None:
         """Reject mode should abort with a structured FlowerError."""
@@ -291,9 +297,14 @@ class TestRuntimeVersionServerInterceptor(TestCase):
 
         status, payload = context.abort.call_args.args
         self.assertEqual(status, grpc.StatusCode.FAILED_PRECONDITION)
+        error_payload = json.loads(payload)
         self.assertEqual(
-            json.loads(payload)["code"],
-            ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
+            error_payload["code"], ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
+        )
+        self.assertEqual(
+            error_payload["public_details"],
+            "Error: The installed `flwr` version is 1.30.1, but only 1.29.x "
+            "is supported (recommended: 1.29.0).",
         )
 
     def test_serverappio_factory_observes_by_default(self) -> None:

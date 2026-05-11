@@ -23,6 +23,7 @@ from typing import Any
 
 import grpc
 from google.protobuf.message import Message as GrpcMessage
+from packaging.version import InvalidVersion, Version
 
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
@@ -146,29 +147,39 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
         if incompat_details is None:
             incompat_details = self._local_metadata.check_compatibility(peer_metadata)
 
-        incompat_message = None
+        warning_message = None
+        error_details = None
         if incompat_details:
-            incompat_message = (
-                "Runtime version compatibility check failed for "
-                f"{self._connection_name}. {incompat_details}"
+            warning_message = _format_runtime_version_warning(
+                local_metadata=self._local_metadata,
+                peer_metadata=peer_metadata,
+                fallback_details=incompat_details,
+            )
+            error_details = _format_runtime_version_error(
+                local_metadata=self._local_metadata,
+                peer_metadata=peer_metadata,
+                fallback_details=incompat_details,
             )
 
         # Prepare trailing metadata
         trailing_metadata: tuple[tuple[str, str], ...] = ()
-        if incompat_message and self._send_warning_metadata:
+        if warning_message and self._send_warning_metadata:
             trailing_metadata += (
-                (VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, incompat_message),
+                (VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY, warning_message),
             )
 
         def maybe_reject(context: grpc.ServicerContext) -> None:
-            if not incompat_message or not self._reject_incompatible:
+            if not error_details or not self._reject_incompatible:
                 return
 
             with rpc_error_translator(context, handler_call_details.method):
                 raise FlowerError(
                     ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
-                    incompat_message,
-                    public_details=incompat_message,
+                    (
+                        "Runtime version compatibility check failed for "
+                        f"{self._connection_name}. {incompat_details}"
+                    ),
+                    public_details=error_details,
                 )
 
         def maybe_set_trailing_metadata(
@@ -208,6 +219,63 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
             )
 
         return method_handler
+
+
+def _format_runtime_version_warning(
+    *,
+    local_metadata: RuntimeVersionMetadata,
+    peer_metadata: RuntimeVersionMetadata | None,
+    fallback_details: str,
+) -> str:
+    """Format a client-facing runtime-version compatibility warning."""
+    if not _has_parseable_versions(local_metadata, peer_metadata):
+        return (
+            "Warning: Runtime version compatibility check failed. "
+            f"{fallback_details}"
+        )
+
+    return (
+        f"Warning: The installed `{peer_metadata.package_name}` version is "
+        f"{peer_metadata.package_version}, but {local_metadata.package_version} "
+        "is recommended."
+    )
+
+
+def _format_runtime_version_error(
+    *,
+    local_metadata: RuntimeVersionMetadata,
+    peer_metadata: RuntimeVersionMetadata | None,
+    fallback_details: str,
+) -> str:
+    """Format client-facing details for runtime-version rejection."""
+    if not _has_parseable_versions(local_metadata, peer_metadata):
+        return (
+            f"{fallback_details} Upgrade to `{local_metadata.package_name}` "
+            f"{local_metadata.package_version}."
+        )
+
+    local_version = Version(local_metadata.package_version)
+    supported_minor = f"{local_version.major}.{local_version.minor}.x"
+    return (
+        f"Error: The installed `{peer_metadata.package_name}` version is "
+        f"{peer_metadata.package_version}, but only {supported_minor} is supported "
+        f"(recommended: {local_metadata.package_version})."
+    )
+
+
+def _has_parseable_versions(
+    local_metadata: RuntimeVersionMetadata,
+    peer_metadata: RuntimeVersionMetadata | None,
+) -> bool:
+    """Return whether both runtime versions can be used in client-facing guidance."""
+    if peer_metadata is None:
+        return False
+    try:
+        Version(local_metadata.package_version)
+        Version(peer_metadata.package_version)
+    except InvalidVersion:
+        return False
+    return True
 
 
 def create_serverappio_runtime_version_server_interceptor(
