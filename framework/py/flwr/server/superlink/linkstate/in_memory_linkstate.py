@@ -19,10 +19,10 @@ import threading
 from bisect import bisect_right
 from collections import defaultdict
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from logging import ERROR, WARNING
-from typing import Literal
+from typing import Literal, cast
 
 from flwr.app.user_config import UserConfig
 from flwr.common import Context, Message, log, now
@@ -30,16 +30,14 @@ from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     MESSAGE_TTL_TOLERANCE,
     NODE_ID_NUM_BYTES,
-    RUN_FAILURE_DETAILS_NO_HEARTBEAT,
     RUN_ID_NUM_BYTES,
     SUPERLINK_NODE_ID,
     Status,
-    SubStatus,
 )
 from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
-from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.utils import validate_message
 from flwr.supercore.constant import NodeStatus
@@ -50,8 +48,6 @@ from flwr.superlink.federation import FederationManager
 from .utils import (
     check_node_availability_for_in_message,
     generate_rand_int_from_bytes,
-    has_valid_sub_status,
-    is_valid_transition,
     primary_task_type_from_run_type,
     verify_found_message_replies,
     verify_message_ids,
@@ -134,6 +130,30 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 run_record.run.primary_task_id = task_id
 
             return task_id
+
+    def _get_run(self, run_id: int) -> Run:
+        """Return run metadata with lifecycle fields from its primary task."""
+        run = self.run_ids[run_id].run
+        task = self.task_store[cast(int, run.primary_task_id)]
+        return replace(
+            run,
+            pending_at=task.pending_at,
+            starting_at=task.starting_at,
+            running_at=task.running_at,
+            finished_at=task.finished_at,
+            status=RunStatus(
+                status=task.status.status,
+                sub_status=task.status.sub_status,
+                details=task.status.details,
+            ),
+        )
+
+    def _is_primary_task(self, task_id: int) -> bool:
+        """Return True if the task is the primary task of its run."""
+        task = self.task_store.get(task_id)
+        if task is None:
+            return False
+        return self.run_ids[task.run_id].run.primary_task_id == task_id
 
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
@@ -639,8 +659,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         limit: int | None = None,
     ) -> Sequence[Run]:
         """Retrieve information about runs based on the specified filters."""
-        # Clean up expired tokens; this will flag inactive runs as needed
-        self._cleanup_expired_tokens()
+        with self.lock_task_store:
+            self._cleanup_expired_task_tokens_locked()
 
         with self.lock:
             # Build candidate set and apply each filter as an AND condition.
@@ -660,7 +680,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 matched_run_ids &= {
                     run_id
                     for run_id in matched_run_ids
-                    if self.run_ids[run_id].run.status.status in status_set
+                    if self._get_run(run_id).status.status in status_set
                 }
 
             # Filter by Flower Account IDs
@@ -683,7 +703,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     if self.run_ids[run_id].run.federation in federation_set
                 }
 
-            runs = [self.run_ids[run_id].run for run_id in matched_run_ids]
+            runs = [self._get_run(run_id) for run_id in matched_run_ids]
 
             if order_by is not None:
                 runs = sorted(
@@ -707,64 +727,27 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
     def get_run_status(self, run_ids: set[int]) -> dict[int, RunStatus]:
         """Retrieve the statuses for the specified runs."""
-        # Clean up expired tokens; this will flag inactive runs as needed
-        self._cleanup_expired_tokens()
+        with self.lock_task_store:
+            self._cleanup_expired_task_tokens_locked()
 
         with self.lock:
             return {
-                run_id: self.run_ids[run_id].run.status
+                run_id: self._get_run(run_id).status
                 for run_id in set(run_ids)
                 if run_id in self.run_ids
             }
 
-    def update_run_status(self, run_id: int, new_status: RunStatus) -> bool:
-        """Update the status of the run with the specified `run_id`."""
-        # Clean up expired tokens; this will flag inactive runs as needed
-        self._cleanup_expired_tokens()
-
-        with self.lock:
-            # Check if the run_id exists
-            if run_id not in self.run_ids:
-                log(ERROR, "`run_id` is invalid")
-                return False
-
-        with self.run_ids[run_id].lock:
-            # Check if the status transition is valid
-            current_status = self.run_ids[run_id].run.status
-            if not is_valid_transition(current_status, new_status):
-                log(
-                    ERROR,
-                    'Invalid status transition: from "%s" to "%s"',
-                    current_status.status,
-                    new_status.status,
-                )
-                return False
-
-            # Check if the sub-status is valid
-            if not has_valid_sub_status(current_status):
-                log(
-                    ERROR,
-                    'Invalid sub-status "%s" for status "%s"',
-                    current_status.sub_status,
-                    current_status.status,
-                )
-                return False
-
-            # Update the run status
-            current = now()
-            run_record = self.run_ids[run_id]
-            if new_status.status == Status.STARTING:
-                run_record.run.starting_at = current.isoformat()
-            elif new_status.status == Status.RUNNING:
-                run_record.run.running_at = current.isoformat()
-            elif new_status.status == Status.FINISHED:
-                run_record.run.finished_at = current.isoformat()
-            run_record.run.status = new_status
-
-        # Report usage if the run is marked as finished after the update
-        if new_status.status == Status.FINISHED:
+    def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
+        """Move an unfinished task to finished."""
+        result = super().finish_task(task_id, sub_status, details)
+        if result and self._is_primary_task(task_id):
             self.federation_manager.report_run_usage()
-        return True
+        return result
+
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+        """Report usage when an expired task is the primary task of its run."""
+        if any(self._is_primary_task(task.task_id) for task in tasks):
+            self.federation_manager.report_run_usage()
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
@@ -794,35 +777,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 node.heartbeat_interval = heartbeat_interval
                 return True
             return False
-
-    def _on_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
-        """Transition runs with expired tokens to failed status.
-
-        Parameters
-        ----------
-        expired_records : list[tuple[int, int]]
-            List of tuples containing (run_id, active_until timestamp)
-            for expired tokens.
-        """
-        updated = False
-        for run_id, active_until in expired_records:
-            if not (run_record := self.run_ids.get(run_id)):
-                continue
-            with run_record.lock:
-                if run_record.run.finished_at:
-                    continue
-                run_record.run.status = RunStatus(
-                    status=Status.FINISHED,
-                    sub_status=SubStatus.FAILED,
-                    details=RUN_FAILURE_DETAILS_NO_HEARTBEAT,
-                )
-                active_until_dt = datetime.fromtimestamp(active_until, tz=timezone.utc)
-                run_record.run.finished_at = active_until_dt.isoformat()
-                updated = True
-
-        # Report usage for runs that have been marked as failed due to expired tokens
-        if updated:
-            self.federation_manager.report_run_usage()
 
     def get_serverapp_context(self, run_id: int) -> Context | None:
         """Get the context for the specified `run_id`."""
@@ -887,34 +841,3 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             if run_id not in self.run_ids:
                 raise ValueError(f"Run {run_id} not found")
             self.run_ids[run_id].run.clientapp_runtime += runtime
-
-    def _cleanup_expired_tokens(self) -> None:
-        """Remove expired tokens.
-
-        Temporary solution until we link run status to the status of its primary task
-        """
-        with self.lock_task_store:
-            expired_records = []
-            expired_at = now()
-            current = int(expired_at.timestamp())
-            for task_id, record in list(self.task_token_store.items()):
-                if record.active_until < current:
-                    # The task is considered expired. Mark it as finished with a failed
-                    # status if it's not already finished, and remove the token.
-                    task = self.task_store.get(task_id)
-                    if task and task.status.status != Status.FINISHED:
-                        task.finished_at = expired_at.isoformat()
-                        task.status.CopyFrom(
-                            TaskStatus(
-                                status=Status.FINISHED,
-                                sub_status=SubStatus.FAILED,
-                                details="No heartbeat received from the task",
-                            )
-                        )
-                        expired_records += [(task.run_id, record.active_until)]
-                    del self.task_token_store[task_id]
-                    self.task_token_to_task_id.pop(record.token, None)
-
-            # Hook for subclasses
-            if expired_records:
-                self._on_tokens_expired(expired_records)

@@ -36,7 +36,7 @@ from flwr.common.constant import (
 )
 from flwr.common.message import get_message_to_descendant_id_mapping
 from flwr.common.serde import message_from_proto
-from flwr.common.typing import Fab, RunStatus
+from flwr.common.typing import Fab
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
@@ -209,8 +209,9 @@ def _create_shared_runtime(
     state_0.set_serverapp_context(
         run_id, Context(run_id, SUPERLINK_NODE_ID, {}, RecordDict(), {})
     )
-    task_id = state_0.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
-    assert task_id is not None
+    run = state_0.get_run_info(run_ids=[run_id])[0]
+    assert run.primary_task_id is not None
+    task_id = run.primary_task_id
     server_0 = _start_serverappio_with_port_retry(
         state_factory_0,
         objectstore_factory_0,
@@ -336,20 +337,12 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         self._auth_run_id = self.state.create_run(
             "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
         )
-        auth_task_id = self.state.create_task(
-            task_type=TaskType.SERVER_APP, run_id=self._auth_run_id
-        )
-        assert auth_task_id is not None
+        auth_task_id = self._primary_task_id(self._auth_run_id)
         auth_token = self.state.claim_task(auth_task_id)
         assert auth_token is not None
+        assert self.state.activate_task(auth_task_id)
         self._auth_token = auth_token
         self._appio_auth_interceptor = AppIoTokenClientInterceptor(auth_token)
-        _ = self.state.update_run_status(
-            self._auth_run_id, RunStatus(Status.STARTING, "", "")
-        )
-        _ = self.state.update_run_status(
-            self._auth_run_id, RunStatus(Status.RUNNING, "", "")
-        )
         self._channel = grpc.intercept_channel(
             grpc.insecure_channel("localhost:9091"),
             self._appio_auth_interceptor,
@@ -413,25 +406,19 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         """Clean up grpc server."""
         self._server.stop(None)
 
-    def test_create_task_uses_authenticated_run_id(self) -> None:
-        """CreateTask should create tasks for the authenticated run."""
-        response = self._create_task(
-            CreateTaskRequest(type=TaskType.MODEL, model_ref="models/abc")
-        )
-
-        assert response.HasField("task_id")
-        task = self.state.get_tasks(task_ids=[response.task_id])[0]
-        assert task.run_id == self._auth_run_id
-        assert task.type == TaskType.MODEL
-        assert task.model_ref == "models/abc"
+    def _primary_task_id(self, run_id: int) -> int:
+        run = self.state.get_run_info(run_ids=[run_id])[0]
+        assert run.primary_task_id is not None
+        return run.primary_task_id
 
     def _transition_run_status(self, run_id: int, num_transitions: int) -> None:
+        task_id = self._primary_task_id(run_id)
         if num_transitions > 0:
-            _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
+            assert self.state.claim_task(task_id) is not None
         if num_transitions > 1:
-            _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
+            assert self.state.activate_task(task_id)
         if num_transitions > 2:
-            _ = self.state.update_run_status(run_id, RunStatus(Status.FINISHED, "", ""))
+            assert self.state.finish_task(task_id, "", "")
 
     def _create_dummy_run(self, running: bool = True, *, fab_hash: str = "") -> int:
         run_id = self.state.create_run(
@@ -447,6 +434,18 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         if running:
             self._transition_run_status(run_id, 2)
         return run_id
+
+    def test_create_task_uses_authenticated_run_id(self) -> None:
+        """CreateTask should create tasks for the authenticated run."""
+        response = self._create_task(
+            CreateTaskRequest(type=TaskType.MODEL, model_ref="models/abc")
+        )
+
+        assert response.HasField("task_id")
+        task = self.state.get_tasks(task_ids=[response.task_id])[0]
+        assert task.run_id == self._auth_run_id
+        assert task.type == TaskType.MODEL
+        assert task.model_ref == "models/abc"
 
     def test_successful_get_node_if_running(self) -> None:
         """Test `GetNode` success."""
@@ -911,10 +910,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
         )
         run_id = self._create_dummy_run(running=False, fab_hash=fab_hash)
-        task_id = self.state.create_task(
-            task_type=TaskType.SERVER_APP, run_id=run_id, fab_hash=fab_hash
-        )
-        assert task_id is not None
+        task_id = self._primary_task_id(run_id)
         servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
 
         # Claim task through the servicer to transition the run to STARTING.
