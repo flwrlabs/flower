@@ -509,6 +509,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             )
             ret.update(tmp_ret_dict)
 
+            # Return accumulated replies if no IDs remain to avoid generating `IN ()`
+            if not message_ids:
+                return list(ret.values())
+
             # Atomically claim all eligible reply Messages
             placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
             delivered_at = now().isoformat()
