@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Make node_online_until as float.
+"""Make node.online_until a float.
 
 Revision ID: 8b40f767ddcb
 Revises: 11d1bdac4c8e
