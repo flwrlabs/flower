@@ -23,7 +23,7 @@ from logging import DEBUG, ERROR, WARNING
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Engine, MetaData, create_engine, event, inspect, text
+from sqlalchemy import Engine, MetaData, create_engine, event, inspect, make_url, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -93,16 +93,11 @@ class SqlMixin(ABC):
             database_path = ":memory:"
 
         self.database_url = self._normalize_database_url(database_path)
-        self.database_dialect = self._extract_database_dialect(self.database_url)
-        self._validate_allowed_dialects(self.database_dialect)
+        self.database_backend = make_url(self.database_url).get_backend_name()
+        self._validate_allowed_dialects(self.database_backend)
 
         self._engine: Engine | None = None
         self._session_factory: sessionmaker[Session] | None = None
-
-    def _extract_database_dialect(self, database_url: str) -> str:
-        """Extract SQLAlchemy dialect name from URL."""
-        scheme = database_url.split("://", maxsplit=1)[0].strip().lower()
-        return scheme.split("+", maxsplit=1)[0]
 
     def _normalize_database_url(self, database_path: str) -> str:
         """Normalize user input to a SQLAlchemy database URL."""
@@ -207,13 +202,13 @@ class SqlMixin(ABC):
         """
         # Create engine with dialect-specific settings
         engine_kwargs: dict[str, Any] = {}
-        if self.database_dialect == "sqlite":
+        if self.database_backend == "sqlite":
             # SQLite needs check_same_thread=False for multi-threaded access
             engine_kwargs["connect_args"] = {"check_same_thread": False}
         self._engine = create_engine(self.database_url, **engine_kwargs)
 
         # Set SQLite pragmas via event listener for optimal performance and correctness
-        if self.database_dialect == "sqlite":
+        if self.database_backend == "sqlite":
             event.listen(self._engine, "connect", _set_sqlite_pragmas)
 
         if log_queries:
