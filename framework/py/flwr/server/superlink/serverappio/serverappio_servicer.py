@@ -30,11 +30,8 @@ from flwr.common.serde import (
     message_to_proto,
     run_to_proto,
 )
-from flwr.common.typing import RunStatus
 from flwr.proto import serverappio_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    ClaimTaskRequest,
-    ClaimTaskResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -95,19 +92,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
     def state(self) -> LinkState:
         """Return the LinkState instance."""
         return self.state_factory.state()
-
-    def ClaimTask(
-        self, request: ClaimTaskRequest, context: grpc.ServicerContext
-    ) -> ClaimTaskResponse:
-        """Claim a pending task."""
-        res = super().ClaimTask(request, context)
-
-        # Keep run status working
-        if res.HasField("token"):
-            state = self.state_factory.state()
-            task = state.get_tasks(task_ids=[request.task_id])[0]
-            state.update_run_status(task.run_id, RunStatus(Status.STARTING, "", ""))
-        return res
 
     def GetNodes(
         self, request: GetNodesRequest, context: grpc.ServicerContext
@@ -293,11 +277,8 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         run = runs[0] if runs else None
         fab = state.get_fab(run.fab_hash) if run and run.fab_hash else None
         if run and fab and serverapp_ctxt:
-            # Update run status to RUNNING
             if state.activate_task(task.task_id):
                 log(INFO, "Started task %d of run %d", task.task_id, run_id)
-                # Keep run status working
-                state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
                 return PullTaskInputResponse(
                     context=context_to_proto(serverapp_ctxt),
                     run=run_to_proto(run),
@@ -332,10 +313,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             task.task_id, sub_status=request.sub_status, details=request.details
         ):
             log(INFO, "Finished task %d of run %d", task.task_id, run_id)
-            # Keep run status working
-            state.update_run_status(
-                run_id, RunStatus(Status.FINISHED, request.sub_status, request.details)
-            )
             if request.HasField("context"):
                 state.set_serverapp_context(run_id, context_from_proto(request.context))
         else:

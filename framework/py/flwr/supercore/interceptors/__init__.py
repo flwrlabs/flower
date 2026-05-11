@@ -16,8 +16,8 @@
 
 
 from .appio_token_interceptor import (
-    APP_TOKEN_HEADER,
     AUTHENTICATION_FAILED_MESSAGE,
+    TASK_TOKEN_HEADER,
     AppIoTokenClientInterceptor,
     AppIoTokenServerInterceptor,
     create_clientappio_token_auth_server_interceptor,
@@ -40,7 +40,6 @@ from .superexec_auth_interceptor import (
 )
 
 __all__ = [
-    "APP_TOKEN_HEADER",
     "AUTHENTICATION_FAILED_MESSAGE",
     "AppIoTokenClientInterceptor",
     "AppIoTokenServerInterceptor",
@@ -48,6 +47,7 @@ __all__ = [
     "RuntimeVersionServerInterceptor",
     "SuperExecAuthClientInterceptor",
     "SuperExecAuthServerInterceptor",
+    "TASK_TOKEN_HEADER",
     "create_clientappio_runtime_version_server_interceptor",
     "create_clientappio_superexec_auth_server_interceptor",
     "create_clientappio_token_auth_server_interceptor",
