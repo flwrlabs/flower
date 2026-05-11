@@ -14,6 +14,7 @@
 # ==============================================================================
 """Mixin providing common SQL connection and initialization logic via SQLAlchemy."""
 
+
 import re
 from abc import ABC
 from collections.abc import Iterator, Sequence
