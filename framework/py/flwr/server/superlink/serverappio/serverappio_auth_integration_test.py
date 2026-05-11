@@ -29,8 +29,8 @@ from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
 from flwr.supercore.interceptors import (
-    APP_TOKEN_HEADER,
     AUTHENTICATION_FAILED_MESSAGE,
+    TASK_TOKEN_HEADER,
     AppIoTokenClientInterceptor,
     SuperExecAuthClientInterceptor,
 )
@@ -122,7 +122,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         with self.assertRaises(grpc.RpcError) as err:
             self._get_nodes_no_auth.with_call(
                 request=GetNodesRequest(run_id=self._auth_run_id),
-                metadata=((APP_TOKEN_HEADER, "invalid-token"),),
+                metadata=((TASK_TOKEN_HEADER, "invalid-token"),),
             )
         assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
         assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE

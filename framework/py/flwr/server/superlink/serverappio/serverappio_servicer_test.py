@@ -40,6 +40,8 @@ from flwr.common.typing import Fab
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
+    CreateTaskRequest,
+    CreateTaskResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -77,7 +79,12 @@ from flwr.server.superlink.serverappio.serverappio_servicer import (
     _raise_if,
 )
 from flwr.server.superlink.utils import _STATUS_TO_MSG
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_DB_NAME,
+    NOOP_FEDERATION,
+    RunType,
+    TaskType,
+)
 from flwr.supercore.date import now
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
@@ -86,7 +93,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     iterate_object_tree,
 )
 from flwr.supercore.interceptors import (
-    APP_TOKEN_HEADER,
+    TASK_TOKEN_HEADER,
     AppIoTokenClientInterceptor,
     SuperExecAuthClientInterceptor,
 )
@@ -263,7 +270,7 @@ def _claim_in_parallel(
             barrier.wait(timeout=timeout)
             response, call = pull_fn.with_call(
                 PullTaskInputRequest(),
-                metadata=((APP_TOKEN_HEADER, token),),
+                metadata=((TASK_TOKEN_HEADER, token),),
             )
             del response
             results[idx] = call.code()
@@ -389,6 +396,11 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=PullTaskInputRequest.SerializeToString,
             response_deserializer=PullTaskInputResponse.FromString,
         )
+        self._create_task = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/CreateTask",
+            request_serializer=CreateTaskRequest.SerializeToString,
+            response_deserializer=CreateTaskResponse.FromString,
+        )
 
     def tearDown(self) -> None:
         """Clean up grpc server."""
@@ -422,6 +434,18 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         if running:
             self._transition_run_status(run_id, 2)
         return run_id
+
+    def test_create_task_uses_authenticated_run_id(self) -> None:
+        """CreateTask should create tasks for the authenticated run."""
+        response = self._create_task(
+            CreateTaskRequest(type=TaskType.MODEL, model_ref="models/abc")
+        )
+
+        assert response.HasField("task_id")
+        task = self.state.get_tasks(task_ids=[response.task_id])[0]
+        assert task.run_id == self._auth_run_id
+        assert task.type == TaskType.MODEL
+        assert task.model_ref == "models/abc"
 
     def test_successful_get_node_if_running(self) -> None:
         """Test `GetNode` success."""
