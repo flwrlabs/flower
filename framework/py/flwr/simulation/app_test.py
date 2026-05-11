@@ -45,7 +45,7 @@ class TestRunSimulationProcess(unittest.TestCase):
         """`run_simulation_process` should pass token into SimulationIoConnection."""
         mock_conn = Mock()
         mock_conn.configure_mock(
-            **{"_stub.PullAppInputs.side_effect": RuntimeError("boom")}
+            **{"_stub.PullTaskInput.side_effect": RuntimeError("boom")}
         )
         mock_connection_cls.return_value = mock_conn
 

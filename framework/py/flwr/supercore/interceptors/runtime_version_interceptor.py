@@ -24,6 +24,7 @@ from typing import Any
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
+from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
 from flwr.supercore.constant import VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY
 from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
@@ -40,36 +41,56 @@ class RuntimeVersionClientInterceptor(
 
     def __init__(self, component_name: str) -> None:
         self._metadata = RuntimeVersionMetadata.from_local_component(component_name)
-        self._compatibility_warning_logged = False
 
     def _maybe_log_incompat_warning(
         self,
         grpc_metadata: Any | None,
     ) -> None:
-        if self._compatibility_warning_logged:
-            return
-
         incompat_message = get_metadata_str(
             grpc_metadata,
             VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
         )
         if incompat_message:
-            self._compatibility_warning_logged = True
             log(WARN, incompat_message)
 
-    def _maybe_log_incompat_error(self, grpc_error: Any) -> None:
-        """Log runtime-version rejections encoded as FlowerError JSON."""
-        if self._compatibility_warning_logged:
-            return
-
+    def _maybe_exit_on_incompat_error(self, grpc_error: grpc.RpcError) -> None:
+        """Exit on runtime-version rejections encoded as FlowerError JSON."""
         details = grpc_error.details() if hasattr(grpc_error, "details") else None
         flower_error = FlowerError.from_json(details)
         if (
             flower_error is not None
             and flower_error.code == ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
         ):
-            self._compatibility_warning_logged = True
-            log(WARN, flower_error.public_details or flower_error.message)
+            exit_message = flower_error.message
+            if flower_error.public_details:
+                exit_message += f"\n{flower_error.public_details}"
+            flwr_exit(ExitCode.RUNTIME_VERSION_INCOMPATIBLE, exit_message)
+
+    def _intercept_call(
+        self,
+        continuation: Callable[[Any, Any], Any],
+        client_call_details: grpc.ClientCallDetails,
+        request: GrpcMessage,
+    ) -> grpc.Call:
+        """Add runtime version metadata and inspect RPC completion metadata."""
+        details = client_call_details._replace(
+            metadata=self._metadata.append_to_grpc_metadata(
+                client_call_details.metadata
+            )
+        )
+        call: grpc.Call = continuation(details, request)
+
+        def _handle_completion() -> None:
+            self._maybe_log_incompat_warning(call.trailing_metadata())
+
+        if isinstance(call, grpc.RpcError):
+            self._maybe_exit_on_incompat_error(call)
+            return call
+
+        if not call.add_callback(_handle_completion):
+            _handle_completion()
+
+        return call
 
     def intercept_unary_unary(
         self,
@@ -77,30 +98,8 @@ class RuntimeVersionClientInterceptor(
         client_call_details: grpc.ClientCallDetails,
         request: GrpcMessage,
     ) -> grpc.Call:
-        """Add the runtime version metadata headers."""
-        details = client_call_details._replace(
-            metadata=self._metadata.append_to_grpc_metadata(
-                client_call_details.metadata
-            )
-        )
-        try:
-            call: grpc.Call = continuation(details, request)
-        except grpc.RpcError as err:
-            self._maybe_log_incompat_error(err)
-            raise
-
-        def _log_incompat_warning() -> None:
-            self._maybe_log_incompat_warning(call.trailing_metadata())
-            self._maybe_log_incompat_error(call)
-
-        if isinstance(call, grpc.RpcError):
-            _log_incompat_warning()
-            return call
-
-        if not call.add_callback(_log_incompat_warning):
-            _log_incompat_warning()
-
-        return call
+        """Add the runtime version metadata headers for unary-unary RPCs."""
+        return self._intercept_call(continuation, client_call_details, request)
 
     def intercept_unary_stream(
         self,
@@ -109,25 +108,7 @@ class RuntimeVersionClientInterceptor(
         request: GrpcMessage,
     ) -> grpc.Call:
         """Add the runtime version metadata headers for unary-stream RPCs."""
-        details = client_call_details._replace(
-            metadata=self._metadata.append_to_grpc_metadata(
-                client_call_details.metadata
-            )
-        )
-        try:
-            call: grpc.Call = continuation(details, request)
-        except grpc.RpcError as err:
-            self._maybe_log_incompat_error(err)
-            raise
-
-        def _log_incompat_warning() -> None:
-            self._maybe_log_incompat_warning(call.trailing_metadata())
-            self._maybe_log_incompat_error(call)
-
-        if not call.add_callback(_log_incompat_warning):
-            _log_incompat_warning()
-
-        return call
+        return self._intercept_call(continuation, client_call_details, request)
 
 
 class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[misc]

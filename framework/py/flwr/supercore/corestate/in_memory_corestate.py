@@ -17,6 +17,7 @@
 
 import hashlib
 import secrets
+from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
 from threading import Lock
@@ -24,7 +25,7 @@ from typing import Literal
 
 from flwr.common import now
 from flwr.common.constant import (
-    FLWR_APP_TOKEN_LENGTH,
+    FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
     TASK_ID_NUM_BYTES,
@@ -65,6 +66,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.task_token_store: dict[int, TokenRecord] = {}
         # Store token to task ID mapping
         self.task_token_to_task_id: dict[str, int] = {}
+        self.task_logs: dict[int, list[tuple[float, str]]] = {}
+        self.log_lock = Lock()
         self.lock_task_store = Lock()
 
     @property
@@ -101,6 +104,34 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 content=fab.content,
                 verifications=dict(fab.verifications),
             )
+
+    def add_task_log(self, task_id: int, log_message: str) -> None:
+        """Add a log entry to the task logs for the specified `task_id`."""
+        with self.lock_task_store:
+            if task_id not in self.task_store:
+                raise ValueError(f"Task {task_id} not found")
+        with self.log_lock:
+            timestamp = now().timestamp()
+            task_logs = self.task_logs.setdefault(task_id, [])
+            task_logs.append((timestamp, log_message))
+
+    def get_task_log(
+        self, task_id: int, after_timestamp: float | None
+    ) -> tuple[str, float]:
+        """Get task logs for the specified `task_id`."""
+        # We don't check if the task exists before querying logs
+        # because the task_id is validated by the authz layer
+
+        with self.log_lock:
+            task_logs = self.task_logs.get(task_id, [])
+            if after_timestamp is None:
+                after_timestamp = 0.0
+            timestamps = [timestamp for timestamp, _ in task_logs]
+            # Polling is strict-after: entries at the checkpoint timestamp have
+            # already been delivered, so resume after the rightmost equal value.
+            index = bisect_right(timestamps, after_timestamp)
+            latest_timestamp = task_logs[-1][0] if index < len(task_logs) else 0.0
+            return "".join(log for _, log in task_logs[index:]), latest_timestamp
 
     def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
@@ -197,7 +228,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
 
     def claim_task(self, task_id: int) -> str | None:
         """Atomically claim a pending task."""
-        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
+        token = secrets.token_hex(FLWR_TASK_TOKEN_LENGTH)
         with self.lock_task_store:
             task = self.task_store.get(task_id)
             if task is None or task_id in self.task_token_store:
@@ -300,6 +331,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         """
         expired_at = now()
         current = int(expired_at.timestamp())
+        expired_tasks: list[Task] = []
         for task_id, record in list(self.task_token_store.items()):
             if record.active_until < current:
                 # The task is considered expired. Mark it as finished with a failed
@@ -314,54 +346,25 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                             details="No heartbeat received from the task",
                         )
                     )
+                    expired_task = Task()
+                    expired_task.CopyFrom(task)
+                    expired_tasks.append(expired_task)
                 del self.task_token_store[task_id]
                 self.task_token_to_task_id.pop(record.token, None)
 
-    def create_token(self, run_id: int) -> str | None:
-        """Create a token for the given run ID."""
-        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)  # Generate a random token
-        with self.lock_token_store:
-            if run_id in self.token_store:
-                return None  # Token already created for this run ID
+        if expired_tasks:
+            self._on_task_tokens_expired(expired_tasks)
 
-            active_until = int(now().timestamp()) + HEARTBEAT_DEFAULT_INTERVAL
-            self.token_store[run_id] = TokenRecord(
-                token=token, active_until=active_until
-            )
-            self.token_to_run_id[token] = run_id
-        return token
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+        """Handle cleanup of expired task tokens.
 
-    def verify_token(self, run_id: int, token: str) -> bool:
-        """Verify a token for the given run ID."""
-        self._cleanup_expired_tokens()
-        with self.lock_token_store:
-            record = self.token_store.get(run_id)
-            return record is not None and record.token == token
+        Override in subclasses to add custom cleanup logic.
 
-    def get_run_id_by_token(self, token: str) -> int | None:
-        """Get the run ID associated with a given token."""
-        self._cleanup_expired_tokens()
-        with self.lock_token_store:
-            return self.token_to_run_id.get(token)
-
-    def acknowledge_app_heartbeat(self, token: str) -> bool:
-        """Acknowledge an app heartbeat with the provided token."""
-        # Clean up expired tokens
-        self._cleanup_expired_tokens()
-
-        with self.lock_token_store:
-            # Return False if token is not found
-            if token not in self.token_to_run_id:
-                return False
-
-            # Get the run_id and update heartbeat info
-            run_id = self.token_to_run_id[token]
-            record = self.token_store[run_id]
-            current = int(now().timestamp())
-            record.active_until = (
-                current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-            )
-            return True
+        Parameters
+        ----------
+        tasks : list[Task]
+            Copies of tasks whose claims expired and were marked FINISHED:FAILED.
+        """
 
     def _cleanup_expired_tokens(self) -> None:
         """Remove expired tokens and perform additional cleanup.

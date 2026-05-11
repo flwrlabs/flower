@@ -22,6 +22,7 @@ from threading import Lock, RLock
 from flwr.common import Context, Error, Message, now
 from flwr.common.constant import ErrorCode
 from flwr.common.typing import Run
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.inflatable.inflatable_object import (
@@ -88,8 +89,8 @@ class InMemoryNodeState(
 
     def store_message(self, message: Message) -> str | None:
         """Store a message."""
-        # No need to check for expired tokens here
-        # The ClientAppIo servicer will first verify the token before storing messages
+        # No need to check for expired task claims here. The ClientAppIo servicer
+        # verifies the authenticated task token before storing messages.
         with self.lock_msg_store:
             msg_id = message.metadata.message_id
             if msg_id == "" or msg_id in self.msg_store:
@@ -105,7 +106,8 @@ class InMemoryNodeState(
         limit: int | None = None,
     ) -> Sequence[Message]:
         """Retrieve messages based on the specified filters."""
-        self._cleanup_expired_tokens()
+        with self.lock_task_store:
+            self._cleanup_expired_task_tokens_locked()
 
         selected_messages: list[Message] = []
         with self.lock_msg_store:
@@ -178,31 +180,13 @@ class InMemoryNodeState(
         with self.lock_ctx_store:
             return self.ctx_store.get(run_id)
 
-    def get_run_ids_with_pending_messages(self) -> Sequence[int]:
-        """Retrieve run IDs that have at least one pending message."""
-        # Collect run IDs from messages
+    def _store_error_replies(self, run_ids: set[int]) -> None:
+        """Insert error replies for retrieved messages associated with run IDs."""
         with self.lock_msg_store:
-            ret = {
-                entry.message.metadata.run_id
-                for entry in self.msg_store.values()
-                if entry.message.metadata.reply_to_message_id == ""
-                and not entry.is_retrieved
-            }
-
-        # Remove run IDs that have tokens stored (indicating they are in progress)
-        with self.lock_token_store:
-            ret -= set(self.token_store.keys())
-            return list(ret)
-
-    def _on_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
-        """Insert error replies for messages associated with expired tokens."""
-        with self.lock_msg_store:
-            # Find all retrieved messages associated with expired run IDs
-            expired_run_ids = {run_id for run_id, _ in expired_records}
             messages_to_reply: list[Message] = []
             for entry in self.msg_store.values():
                 msg = entry.message
-                if msg.metadata.run_id in expired_run_ids and entry.is_retrieved:
+                if msg.metadata.run_id in run_ids and entry.is_retrieved:
                     messages_to_reply.append(msg)
 
             # Create and store error replies for each message
@@ -220,6 +204,10 @@ class InMemoryNodeState(
 
                 # Store the error reply message
                 self.store_message(error_reply)
+
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+        """Insert error replies for messages associated with expired task tokens."""
+        self._store_error_replies({task.run_id for task in tasks})
 
     def record_message_processing_start(self, message_id: str) -> None:
         """Record the start time of message processing based on the message ID."""

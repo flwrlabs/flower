@@ -38,14 +38,13 @@ from flwr.app.user_config import UserConfig
 from flwr.common import DEFAULT_TTL, Context, Error, Message, RecordDict, now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
-    RUN_FAILURE_DETAILS_NO_HEARTBEAT,
     SUPERLINK_NODE_ID,
     ErrorCode,
     Status,
     SubStatus,
 )
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.common.typing import Fab, RunStatus
+from flwr.common.typing import Fab
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
@@ -55,7 +54,7 @@ from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 
 # pylint: enable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
-from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, RunType
+from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, RunType, TaskType
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
@@ -162,21 +161,37 @@ class StateTest(CoreStateTest):
         assert run.override_config["test_key"] == "test_value"
         assert run.flwr_aid == "i1r9f"
 
+    def test_create_run_creates_primary_task(self) -> None:
+        """Creating a run should also create its primary task."""
+        # Prepare
+        state = self.state_factory()
+
+        # Execute
+        run_id = create_dummy_run(state)
+
+        # Assert
+        tasks = state.get_tasks(run_ids=[run_id])
+        run = state.get_run_info(run_ids=[run_id])[0]
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
+        self.assertEqual(run.primary_task_id, tasks[0].task_id)
+
     def test_create_task_sets_primary_task_id_once(self) -> None:
-        """The first task created for a run should become its primary task."""
+        """New tasks should not replace the run's primary task."""
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
+        run = state.get_run_info(run_ids=[run_id])[0]
+        primary_task_id = run.primary_task_id
 
         # Execute
-        first_task_id = state.create_task(task_type="flwr-agentapp", run_id=run_id)
         second_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
 
         # Assert
-        self.assertIsNotNone(first_task_id)
+        self.assertIsNotNone(primary_task_id)
         self.assertIsNotNone(second_task_id)
         run = state.get_run_info(run_ids=[run_id])[0]
-        self.assertEqual(run.primary_task_id, first_task_id)
+        self.assertEqual(run.primary_task_id, primary_task_id)
         self.assertNotEqual(run.primary_task_id, second_task_id)
 
     def test_create_task_rejects_missing_run(self) -> None:
@@ -369,14 +384,13 @@ class StateTest(CoreStateTest):
         runs_run_ids_empty = state.get_run_info(run_ids=[])
         self.assertEqual(list(runs_run_ids_empty), [])
 
-    def test_get_and_update_run_status(self) -> None:
-        """Test if get_run_status and update_run_status work correctly."""
+    def test_get_run_status_uses_primary_task_status(self) -> None:
+        """Test if get_run_status derives status from the primary task."""
         # Prepare
         state = self.state_factory()
         run_id1 = create_dummy_run(state)
         run_id2 = create_dummy_run(state)
-        state.update_run_status(run_id2, RunStatus(Status.STARTING, "", ""))
-        state.update_run_status(run_id2, RunStatus(Status.RUNNING, "", ""))
+        transition_run_status(state, run_id2, 2)
 
         # Execute
         run_status_dict = state.get_run_status({run_id1, run_id2})
@@ -387,18 +401,14 @@ class StateTest(CoreStateTest):
         assert status1.status == Status.PENDING
         assert status2.status == Status.RUNNING
 
-    @parameterized.expand(
-        [("get_run_info",), ("get_run_status",), ("update_run_status",)]
-    )  # type: ignore
+    @parameterized.expand([("get_run_info",), ("get_run_status",)])  # type: ignore
     def test_run_failed_due_to_heartbeat(self, test_method: str) -> None:
         """Test methods work correctly when the run has no heartbeat."""
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
-        task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
-        assert task_id is not None
-        state.claim_task(task_id)
-        state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
+        task_id = get_primary_task_id(state, run_id)
+        assert state.claim_task(task_id) is not None
 
         # Execute
         # The run should be marked as failed after HEARTBEAT_DEFAULT_INTERVAL
@@ -412,87 +422,13 @@ class StateTest(CoreStateTest):
                 status = run.status
             elif test_method == "get_run_status":
                 status = state.get_run_status({run_id})[run_id]
-            elif test_method == "update_run_status":
-                # The updation should fail because the run is already finished
-                assert not state.update_run_status(
-                    run_id, RunStatus(Status.FINISHED, SubStatus.FAILED, "")
-                )
-                status = state.get_run_status({run_id})[run_id]
             else:
                 raise AssertionError
 
         # Assert
         assert status.status == Status.FINISHED
         assert status.sub_status == SubStatus.FAILED
-        assert status.details == RUN_FAILURE_DETAILS_NO_HEARTBEAT
-
-    @parameterized.expand([(0,), (1,), (2,)])  # type: ignore
-    def test_status_transition_valid(
-        self, num_transitions_before_finishing: int
-    ) -> None:
-        """Test valid run status transactions."""
-        # Prepare
-        state = self.state_factory()
-        run_id = create_dummy_run(state)
-
-        # Execute and assert
-        status = state.get_run_status({run_id})[run_id]
-        assert status.status == Status.PENDING
-
-        if num_transitions_before_finishing > 0:
-            assert state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-            status = state.get_run_status({run_id})[run_id]
-            assert status.status == Status.STARTING
-
-        if num_transitions_before_finishing > 1:
-            assert state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
-            status = state.get_run_status({run_id})[run_id]
-            assert status.status == Status.RUNNING
-
-        assert state.update_run_status(
-            run_id, RunStatus(Status.FINISHED, SubStatus.FAILED, "mock failure")
-        )
-
-        status = state.get_run_status({run_id})[run_id]
-        assert status.status == Status.FINISHED
-
-    def test_status_transition_invalid(self) -> None:
-        """Test invalid run status transitions."""
-        # Prepare
-        state = self.state_factory()
-        run_id = create_dummy_run(state)
-        run_statuses = [
-            RunStatus(Status.PENDING, "", ""),
-            RunStatus(Status.STARTING, "", ""),
-            RunStatus(Status.PENDING, "", ""),
-            RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
-        ]
-
-        # Execute and assert
-        # Cannot transition from RunStatus.PENDING to RunStatus.PENDING,
-        # RunStatus.RUNNING, or RunStatus.FINISHED with COMPLETED substatus
-        for run_status in [s for s in run_statuses if s.status != Status.STARTING]:
-            assert not state.update_run_status(run_id, run_status)
-        state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-        # Cannot transition from RunStatus.STARTING to RunStatus.PENDING,
-        # RunStatus.STARTING, or RunStatus.FINISHED with COMPLETED substatus
-        for run_status in [s for s in run_statuses if s.status != Status.RUNNING]:
-            assert not state.update_run_status(run_id, run_status)
-        state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
-        # Cannot transition from RunStatus.RUNNING
-        # to RunStatus.PENDING, RunStatus.STARTING, or RunStatus.RUNNING
-        for run_status in [s for s in run_statuses if s.status != Status.FINISHED]:
-            assert not state.update_run_status(run_id, run_status)
-        state.update_run_status(
-            run_id, RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
-        )
-        # Cannot transition to any status from RunStatus.FINISHED
-        run_statuses += [
-            RunStatus(Status.FINISHED, SubStatus.FAILED, ""),
-            RunStatus(Status.FINISHED, SubStatus.STOPPED, ""),
-        ]
-        for run_status in run_statuses:
-            assert not state.update_run_status(run_id, run_status)
+        assert status.details == "No heartbeat received from the task"
 
     @parameterized.expand([(1,), (2,), (3,)])  # type: ignore
     def test_usage_report_hook_called_on_each_successful_transition(
@@ -509,43 +445,39 @@ class StateTest(CoreStateTest):
         expected_calls = 1 if num_transitions == 3 else 0
         assert state.federation_manager.report_run_usage.call_count == expected_calls
 
-    def test_usage_report_hook_called_on_tokens_expired(self) -> None:
-        """Test report_run_usage hook is called when tokens expire."""
+    def test_usage_report_hook_called_on_primary_task_expired(self) -> None:
+        """Test report_run_usage hook is called when the primary task expires."""
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
-        task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
-        assert task_id is not None
-        state.claim_task(task_id)
-        state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-        state.federation_manager.report_run_usage = Mock()  # type: ignore
-        # Execute: advance time past token expiry and trigger cleanup via verify_token
-        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
-        with patch("datetime.datetime") as mock_dt:
-            mock_dt.now.return_value = patched_dt
-            state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
-
-        # Assert
-        state.federation_manager.report_run_usage.assert_called_once()
-
-    def test_usage_report_hook_not_called_when_no_runs_updated(self) -> None:
-        """Test report_run_usage is not called when expired tokens match no runs."""
-        # Prepare: create a run already in FINISHED state
-        state = self.state_factory()
-        run_id = create_dummy_run(state)
-        assert state.create_token(run_id) is not None
-        state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-        state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
-        state.update_run_status(
-            run_id, RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done")
-        )
+        task_id = get_primary_task_id(state, run_id)
+        assert state.claim_task(task_id) is not None
         state.federation_manager.report_run_usage = Mock()  # type: ignore
         # Execute: advance time past token expiry and trigger cleanup
         patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = patched_dt
-            state.verify_token(run_id, "dummy_token")
-        # Assert: hook should NOT be called since the run was already finished
+            state.get_run_status({run_id})
+
+        # Assert
+        state.federation_manager.report_run_usage.assert_called_once()
+
+    def test_usage_report_hook_not_called_on_non_primary_task_expired(self) -> None:
+        """Test report_run_usage is not called when a non-primary task expires."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
+        assert task_id is not None
+        assert state.claim_task(task_id) is not None
+        state.federation_manager.report_run_usage = Mock()  # type: ignore
+
+        # Execute: advance time past task claim expiry and trigger cleanup
+        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = patched_dt
+            status = state.get_run_status({run_id})[run_id]
+
+        assert status.status == Status.PENDING
         state.federation_manager.report_run_usage.assert_not_called()
 
     def test_get_message_ins_empty(self) -> None:
@@ -1817,7 +1749,6 @@ class StateTest(CoreStateTest):
             federation_config=federation_config,
             run_type=RunType.SIMULATION,
         )
-        state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
         second_run_id = create_dummy_run(state)
 
         # Execute
@@ -1992,16 +1923,22 @@ def create_res_message_obj(
     return message_from_proto(proto)
 
 
+def get_primary_task_id(state: LinkState, run_id: int) -> int:
+    """Return the primary task ID for a run."""
+    run = state.get_run_info(run_ids=[run_id])[0]
+    assert run.primary_task_id is not None
+    return run.primary_task_id
+
+
 def transition_run_status(state: LinkState, run_id: int, num_transitions: int) -> None:
-    """Transition run status from PENDING."""
+    """Transition the primary task status from PENDING."""
+    task_id = get_primary_task_id(state, run_id)
     if num_transitions > 0:
-        state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
+        assert state.claim_task(task_id) is not None
     if num_transitions > 1:
-        state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
+        assert state.activate_task(task_id)
     if num_transitions > 2:
-        state.update_run_status(
-            run_id, RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
-        )
+        assert state.finish_task(task_id, SubStatus.COMPLETED, "")
 
 
 def create_dummy_node(
@@ -2046,7 +1983,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
 
 def _claim_running_in_separate_process(
     database_path: str,
-    run_id: int,
+    task_id: int,
     start_event: Any,
     result_queue: Any,
     timeout: float,
@@ -2062,7 +1999,7 @@ def _claim_running_in_separate_process(
         result_queue.put((False, "start-event-timeout"))
         return
     try:
-        result = state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
+        result = state.activate_task(task_id)
         result_queue.put((result, None))
     except Exception as ex:  # pylint: disable=broad-exception-caught
         result_queue.put((False, repr(ex)))
@@ -2110,12 +2047,14 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
-        assert state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-        assert state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
-        assert state.update_run_status(
-            run_id, RunStatus(Status.FINISHED, SubStatus.COMPLETED, "done")
-        )
-        assert state.create_token(run_id) is not None
+        task_id = get_primary_task_id(state, run_id)
+        assert state.claim_task(task_id) is not None
+        assert state.activate_task(task_id)
+        assert state.finish_task(task_id, SubStatus.COMPLETED, "done")
+
+        extra_task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
+        assert extra_task_id is not None
+        assert state.claim_task(extra_task_id) is not None
 
         # Execute: force token expiry and trigger cleanup
         patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
@@ -2292,14 +2231,15 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
             )
 
     # pylint: disable-next=too-many-locals
-    def test_update_run_status_running_claim_is_atomic_across_replicas(self) -> None:
+    def test_activate_task_running_claim_is_atomic_across_replicas(self) -> None:
         """Ensure only one replica can claim STARTING -> RUNNING transition."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Prepare
             db_path = os.path.join(tmpdir, "shared.db")
             state = self._create_shared_sql_states(db_path)[0]
             run_id = create_dummy_run(state)
-            assert state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
+            task_id = get_primary_task_id(state, run_id)
+            assert state.claim_task(task_id) is not None
 
             ctx = multiprocessing.get_context("spawn")
             start_event = ctx.Event()
@@ -2310,11 +2250,11 @@ class SqlFileBasedTest(StateTest, unittest.TestCase):
             processes = [
                 ctx.Process(
                     target=_claim_running_in_separate_process,
-                    args=(db_path, run_id, start_event, result_queue, timeout),
+                    args=(db_path, task_id, start_event, result_queue, timeout),
                 ),
                 ctx.Process(
                     target=_claim_running_in_separate_process,
-                    args=(db_path, run_id, start_event, result_queue, timeout),
+                    args=(db_path, task_id, start_event, result_queue, timeout),
                 ),
             ]
             for proc in processes:
