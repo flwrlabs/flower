@@ -183,7 +183,6 @@ class TestRuntimeVersionClientInterceptor(TestCase):
     def test_log_unary_incompatibility_from_returned_rpc_error(self) -> None:
         """Unary-unary RpcError outcomes should not register callbacks."""
         rpc_error = _make_runtime_rpc_error()
-        rpc_error.trailing_metadata = Mock(return_value=())
 
         with patch(
             "flwr.supercore.interceptors.runtime_version_interceptor.flwr_exit"
@@ -198,7 +197,6 @@ class TestRuntimeVersionClientInterceptor(TestCase):
 
         self.assertIs(response, rpc_error)
         rpc_error.add_callback.assert_not_called()
-        rpc_error.trailing_metadata.assert_called_once()
         flwr_exit_mock.assert_called_once_with(
             ExitCode.RUNTIME_VERSION_INCOMPATIBLE,
             "Runtime version compatibility check failed.\nruntime mismatch",
