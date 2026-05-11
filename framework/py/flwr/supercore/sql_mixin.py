@@ -266,19 +266,27 @@ class SqlMixin(ABC):
         # Multi-statement transaction - query() calls share the same session
         with self.session():
             # Both statements succeed or fail together
-            self.query("DELETE FROM nonce_store WHERE expires_at < :time", {...})
             self.query(
-                "UPDATE task SET active_until = :active_until WHERE task_id = :id",
-                {...},
+                "UPDATE example_records SET status = :status WHERE record_id = :id",
+                {"status": "running", "id": 1},
+            )
+            self.query(
+                "INSERT INTO example_audit_log (record_id, event) "
+                "VALUES (:id, :event)",
+                {"id": 1, "event": "record updated"},
             )
 
         # Nested session() - query() calls share the same session
         with self.session():
-            self.query("DELETE FROM nonce_store WHERE expires_at < :time", {...})
+            self.query(
+                "UPDATE example_records SET status = :status WHERE record_id = :id",
+                {"status": "running", "id": 1},
+            )
             with self.session():
                 self.query(
-                    "UPDATE task SET active_until = :active_until WHERE task_id = :id",
-                    {...},
+                    "INSERT INTO example_audit_log (record_id, event) "
+                    "VALUES (:id, :event)",
+                    {"id": 1, "event": "record updated"},
                 )
         """
         if self._engine is None:
