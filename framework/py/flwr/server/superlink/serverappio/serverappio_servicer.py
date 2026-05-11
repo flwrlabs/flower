@@ -41,10 +41,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushTaskOutputRequest,
     PushTaskOutputResponse,
 )
-from flwr.proto.log_pb2 import (  # pylint: disable=E0611
-    PushLogsRequest,
-    PushLogsResponse,
-)
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
     ConfirmMessageReceivedResponse,
@@ -318,18 +314,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
         return PushTaskOutputResponse()
-
-    def PushLogs(
-        self, request: PushLogsRequest, context: grpc.ServicerContext
-    ) -> PushLogsResponse:
-        """Push logs."""
-        log(DEBUG, "ServerAppIoServicer.PushLogs")
-        state = self.state_factory.state()
-
-        # Add logs to LinkState
-        merged_logs = "".join(request.logs)
-        state.add_serverapp_log(request.run_id, merged_logs)
-        return PushLogsResponse()
 
     def GetFederationOptions(
         self, request: GetFederationOptionsRequest, context: grpc.ServicerContext
