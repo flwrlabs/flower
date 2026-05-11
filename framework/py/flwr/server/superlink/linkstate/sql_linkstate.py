@@ -153,42 +153,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
             return task_id
 
-    def _bind_online_until(self, epoch_seconds: float | None) -> Any:
-        """Convert epoch seconds into a dialect-compatible DB value."""
-        if epoch_seconds is None:
-            return None
-        if self.database_backend == "sqlite":
-            return epoch_seconds
-        return datetime.fromtimestamp(epoch_seconds, tz=timezone.utc)
-
-    def _online_until_to_epoch(self, value: Any) -> float | None:
-        """Convert DB value to Unix epoch seconds."""
-        if value is None:
-            return None
-        if isinstance(value, datetime):
-            if value.tzinfo is None:
-                value = value.replace(tzinfo=timezone.utc)
-            return value.timestamp()
-        if isinstance(value, (int, float)):
-            return float(value)
-        if isinstance(value, str):
-            # SQLite may return float-like strings depending on DBAPI conversion.
-            try:
-                return float(value)
-            except ValueError:
-                ts = value.replace("Z", "+00:00")
-                dt = datetime.fromisoformat(ts)
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-                return dt.timestamp()
-        raise TypeError(f"Unsupported online_until value type: {type(value).__name__}")
-
-    def _online_until_to_utc_iso(self, value: Any) -> str:
-        """Convert DB `online_until` value to UTC ISO-8601 string."""
-        epoch = self._online_until_to_epoch(value)
-        if epoch is None:
-            raise ValueError("`online_until` must not be None for online nodes.")
-        return datetime.fromtimestamp(epoch, tz=timezone.utc).isoformat()
+    def _online_until_to_utc_iso(self, online_until: float) -> str:
+        """Convert epoch seconds to a UTC ISO-8601 string."""
+        return datetime.fromtimestamp(online_until, tz=timezone.utc).isoformat()
 
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
@@ -533,9 +500,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 inquired_in_message_ids=message_ids,
                 found_in_message_dict=found_message_ins_dict,
                 node_id_to_online_until={
-                    int64_to_uint64(row["node_id"]): (
-                        self._online_until_to_epoch(row["online_until"]) or 0.0
-                    )
+                    int64_to_uint64(row["node_id"]): row["online_until"]
                     for row in rows
                 },
                 current_time=current,
@@ -700,7 +665,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         params = {
             "unregistered": NodeStatus.UNREGISTERED,
             "unregistered_at": current.isoformat(),
-            "current": self._bind_online_until(current.timestamp()),
+            "current": current.timestamp(),
             "node_id": sint64_node_id,
             "owner_aid": owner_aid,
         }
@@ -731,9 +696,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         params = {
             "online": NodeStatus.ONLINE,
             "current": current_dt.isoformat(),
-            "online_until": self._bind_online_until(
-                current_dt.timestamp() + HEARTBEAT_PATIENCE * heartbeat_interval
-            ),
+            "online_until": current_dt.timestamp()
+            + HEARTBEAT_PATIENCE * heartbeat_interval,
             "heartbeat_interval": heartbeat_interval,
             "node_id": sint64_node_id,
             "registered": NodeStatus.REGISTERED,
@@ -760,7 +724,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         params = {
             "offline": NodeStatus.OFFLINE,
             "current_iso": current_dt.isoformat(),
-            "current_ts": self._bind_online_until(current_dt.timestamp()),
+            "current_ts": current_dt.timestamp(),
             "node_id": uint64_to_int64(node_id),
             "online": NodeStatus.ONLINE,
         }
@@ -804,7 +768,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
               AND status = :online
         """
         params: dict[str, Any] = {
-            "current_time": self._bind_online_until(now().timestamp()),
+            "current_time": now().timestamp(),
             "online": NodeStatus.ONLINE,
         }
         if node_ids is not None:
@@ -880,9 +844,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             for row in rows:
                 # Convert sint64 node_id to uint64
                 row["node_id"] = int64_to_uint64(row["node_id"])
-                # Normalize `online_until` to epoch seconds as float because different
-                # DB drivers can return different types.
-                row["online_until"] = self._online_until_to_epoch(row["online_until"])
                 result.append(NodeInfo(**row))
 
             return result
@@ -1173,9 +1134,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             "heartbeat_interval = :heartbeat_interval"
         )
         params: dict[str, Any] = {
-            "online_until": self._bind_online_until(
-                current_dt.timestamp() + HEARTBEAT_PATIENCE * heartbeat_interval
-            ),
+            "online_until": current_dt.timestamp()
+            + HEARTBEAT_PATIENCE * heartbeat_interval,
             "heartbeat_interval": heartbeat_interval,
         }
 
