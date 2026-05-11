@@ -156,7 +156,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """Convert epoch seconds into a dialect-compatible DB value."""
         if epoch_seconds is None:
             return None
-        if self.database_dialect == "sqlite":
+        if self.database_backend == "sqlite":
             return epoch_seconds
         return datetime.fromtimestamp(epoch_seconds, tz=timezone.utc)
 
