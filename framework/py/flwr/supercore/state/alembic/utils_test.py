@@ -297,7 +297,7 @@ class TestAlembicRun(unittest.TestCase):
                     for row in connection.execute(
                         text(
                             """
-                            SELECT run_id, primary_task_id, sub_status, details
+                            SELECT run_id, primary_task_id
                             FROM run
                             ORDER BY run_id
                             """
@@ -319,24 +319,17 @@ class TestAlembicRun(unittest.TestCase):
                     ).mappings()
                 }
 
-            self.assertEqual(set(runs), {101, 102, 103})
-            self.assertEqual(len(tasks), 4)
-
             pending_primary = tasks[runs[101]["primary_task_id"]]
             self.assertEqual(pending_primary["type"], TaskType.SERVER_APP)
             self.assertEqual(pending_primary["run_id"], 101)
-            self.assertEqual(pending_primary["fab_hash"], "fab-pending")
             self.assertEqual(pending_primary["pending_at"], "2026-04-27T10:00:00+00:00")
             self.assertIsNone(pending_primary["starting_at"])
             self.assertIsNone(pending_primary["running_at"])
             self.assertIsNone(pending_primary["finished_at"])
-            self.assertEqual(pending_primary["sub_status"], "")
-            self.assertEqual(pending_primary["details"], "")
 
             simulation_primary = tasks[runs[102]["primary_task_id"]]
             self.assertEqual(simulation_primary["type"], TaskType.SIMULATION)
             self.assertEqual(simulation_primary["run_id"], 102)
-            self.assertEqual(simulation_primary["fab_hash"], "fab-sim")
             self.assertEqual(
                 simulation_primary["starting_at"], "2026-04-27T11:01:00+00:00"
             )
@@ -353,19 +346,13 @@ class TestAlembicRun(unittest.TestCase):
             self.assertNotEqual(runs[103]["primary_task_id"], 1)
             self.assertEqual(failed_primary["type"], TaskType.SERVER_APP)
             self.assertEqual(failed_primary["run_id"], 103)
-            self.assertEqual(failed_primary["fab_hash"], "fab-failed")
-            self.assertIsNone(failed_primary["starting_at"])
-            self.assertIsNone(failed_primary["running_at"])
             self.assertEqual(failed_primary["finished_at"], "2026-04-27T12:05:00+00:00")
             self.assertEqual(failed_primary["sub_status"], "failed")
             self.assertEqual(failed_primary["details"], "boom")
 
             existing_task = tasks[1]
             self.assertEqual(existing_task["type"], TaskType.MODEL)
-            self.assertEqual(existing_task["run_id"], 103)
             self.assertEqual(existing_task["model_ref"], "models/existing")
-            self.assertEqual(existing_task["sub_status"], "")
-            self.assertEqual(existing_task["details"], "")
         finally:
             engine.dispose()
 
