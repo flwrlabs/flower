@@ -108,6 +108,50 @@ class SqlCoreState(CoreState, SqlMixin):
             verifications=json.loads(row["verifications"]),
         )
 
+    def add_task_log(self, task_id: int, log_message: str) -> None:
+        """Add a log entry to the task logs for the specified `task_id`."""
+        sint64_task_id = uint64_to_int64(task_id)
+
+        try:
+            self.query(
+                """
+                INSERT INTO task_logs (timestamp, task_id, log)
+                VALUES (:current_ts, :task_id, :log)
+                """,
+                {
+                    "current_ts": now().timestamp(),
+                    "task_id": sint64_task_id,
+                    "log": log_message,
+                },
+            )
+        except IntegrityError:
+            raise ValueError(f"Task {task_id} not found") from None
+
+    def get_task_log(
+        self, task_id: int, after_timestamp: float | None
+    ) -> tuple[str, float]:
+        """Get task logs for the specified `task_id`."""
+        sint64_task_id = uint64_to_int64(task_id)
+
+        # We don't check if the task exists before querying logs
+        # because the task_id is validated by the authz layer
+
+        if after_timestamp is None:
+            after_timestamp = 0.0
+
+        # Polling is strict-after: entries at the checkpoint timestamp have
+        # already been delivered.
+        rows = self.query(
+            """
+            SELECT log, timestamp FROM task_logs
+            WHERE task_id = :task_id AND timestamp > :after_timestamp
+            ORDER BY timestamp
+            """,
+            {"task_id": sint64_task_id, "after_timestamp": after_timestamp},
+        )
+        latest_timestamp = rows[-1]["timestamp"] if rows else 0.0
+        return "".join(row["log"] for row in rows), latest_timestamp
+
     def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         task_type: str,
