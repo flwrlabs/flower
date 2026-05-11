@@ -68,7 +68,6 @@ from .utils import (
     verify_message_ids,
 )
 
-
 # SQL conditions for primary task status filtering.
 # `t` refers to the task table alias in joined run/task queries.
 # Keep this mapping aligned with STATUS_CONDITIONS in sql_corestate.py.
