@@ -70,7 +70,7 @@ service ClientAppIo {
   // Create a task
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {}
 
-  // Push ServerApp logs
+  // Push task logs
   rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
 
   /////////////////////////////////////////////////////////////////////////////
