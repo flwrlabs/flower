@@ -59,12 +59,11 @@ def _log_query(  # pylint: disable=W0613,R0913,R0917
 
 
 class SqlMixin(ABC):
-    """Mixin providing common SQLite connection and initialization logic.
+    """Mixin providing common SQL connection and initialization logic."""
 
-    This mixin uses SQLAlchemy Core API for SQLite database access. It accepts either a
-    database file path or a SQLite URL, automatically converting file paths to SQLite
-    URLs.
-    """
+    # Subclasses can restrict supported SQLAlchemy dialects.
+    # OSS SQL backends currently allow only the SQLite dialect ("sqlite").
+    allowed_dialects: set[str] | None = None
 
     def __init__(self, database_path: str) -> None:
         """Initialize the SqlMixin.
@@ -94,19 +93,53 @@ class SqlMixin(ABC):
             )
             database_path = ":memory:"
 
-        # Auto-convert file path to SQLAlchemy SQLite URL if needed
-        if database_path == ":memory:":
-            self.database_url = FLWR_IN_MEMORY_SQLITE_DB_URL
-        elif not database_path.startswith("sqlite://"):
-            # Treat as file path, convert to absolute and create SQLite URL
-            abs_path = Path(database_path).resolve()
-            self.database_url = f"sqlite:///{abs_path}"
-        else:
-            # Already a SQLite URL
-            self.database_url = database_path
+        self.database_url = self._normalize_database_url(database_path)
+        self.database_dialect = self._extract_database_dialect(self.database_url)
+        self._validate_allowed_dialects(database_path, self.database_dialect)
 
         self._engine: Engine | None = None
         self._session_factory: sessionmaker[Session] | None = None
+
+    @staticmethod
+    def _extract_database_dialect(database_url: str) -> str:
+        """Extract SQLAlchemy dialect name from URL."""
+        scheme = database_url.split("://", maxsplit=1)[0].strip().lower()
+        return scheme.split("+", maxsplit=1)[0]
+
+    @staticmethod
+    def _normalize_database_url(database_path: str) -> str:
+        """Normalize user input to a SQLAlchemy database URL."""
+        if database_path == ":memory:":
+            return FLWR_IN_MEMORY_SQLITE_DB_URL
+
+        # Explicit SQLAlchemy URL, keep as-is for dialect validation.
+        if "://" in database_path:
+            return database_path.strip()
+
+        # Treat as file path and convert to a SQLite URL.
+        abs_path = Path(database_path).resolve()
+        return f"sqlite:///{abs_path}"
+
+    def _validate_allowed_dialects(
+        self, original_database_path: str, dialect: str
+    ) -> None:
+        """Validate configured dialect against class-level restrictions."""
+        allowed = self.allowed_dialects
+        if allowed is None or dialect in allowed:
+            return
+
+        allowed_str = ", ".join(sorted(allowed))
+        hint = (
+            " Flower OSS SQL backends support in-memory and SQLite paths/URLs."
+            if "sqlite" in allowed
+            else ""
+        )
+
+        raise ValueError(
+            f"Unsupported SQL dialect {dialect!r} for {type(self).__name__} "
+            f"(database={original_database_path!r}). Supported dialects: "
+            f"{allowed_str}.{hint}"
+        )
 
     @contextmanager
     def session(self) -> Iterator[Session]:
@@ -177,15 +210,16 @@ class SqlMixin(ABC):
         list[str]
             The list of all tables in the DB.
         """
-        # Create engine with SQLite-specific settings
-        engine_kwargs: dict[str, Any] = {
+        # Create engine with dialect-specific settings
+        engine_kwargs: dict[str, Any] = {}
+        if self.database_dialect == "sqlite":
             # SQLite needs check_same_thread=False for multi-threaded access
-            "connect_args": {"check_same_thread": False}
-        }
+            engine_kwargs["connect_args"] = {"check_same_thread": False}
         self._engine = create_engine(self.database_url, **engine_kwargs)
 
         # Set SQLite pragmas via event listener for optimal performance and correctness
-        event.listen(self._engine, "connect", _set_sqlite_pragmas)
+        if self.database_dialect == "sqlite":
+            event.listen(self._engine, "connect", _set_sqlite_pragmas)
 
         if log_queries:
             # Set up query logging via event listener

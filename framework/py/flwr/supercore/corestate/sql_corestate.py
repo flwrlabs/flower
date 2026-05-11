@@ -56,6 +56,8 @@ STATUS_CONDITIONS = {
 class SqlCoreState(CoreState, SqlMixin):
     """SQLAlchemy-based CoreState implementation."""
 
+    allowed_dialects = {"sqlite"}
+
     def __init__(self, database_path: str, object_store: ObjectStore) -> None:
         super().__init__(database_path)
         self._object_store = object_store
