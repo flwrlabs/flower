@@ -53,7 +53,7 @@ class RuntimeVersionClientInterceptor(
         if incompat_message:
             log(WARN, incompat_message)
 
-    def _maybe_exit_on_incompat_error(self, grpc_error: Any) -> None:
+    def _maybe_exit_on_incompat_error(self, grpc_error: grpc.RpcError) -> None:
         """Exit on runtime-version rejections encoded as FlowerError JSON."""
         details = grpc_error.details() if hasattr(grpc_error, "details") else None
         flower_error = FlowerError.from_json(details)
@@ -61,14 +61,10 @@ class RuntimeVersionClientInterceptor(
             flower_error is not None
             and flower_error.code == ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
         ):
-            flwr_exit(
-                ExitCode.RUNTIME_VERSION_INCOMPATIBLE,
-                "\n".join(
-                    detail
-                    for detail in (flower_error.message, flower_error.public_details)
-                    if detail
-                ),
-            )
+            exit_message = flower_error.message
+            if flower_error.public_details:
+                exit_message += f"\n{flower_error.public_details}"
+            flwr_exit(ExitCode.RUNTIME_VERSION_INCOMPATIBLE, exit_message)
 
     def _intercept_call(
         self,
