@@ -137,12 +137,9 @@ class SqlCoreState(CoreState, SqlMixin):
         sint64_task_id = uint64_to_int64(task_id)
 
         with self.session():
-            rows = self.query(
-                "SELECT task_id FROM task WHERE task_id = :task_id",
-                {"task_id": sint64_task_id},
-            )
-            if not rows:
-                raise ValueError(f"Task {task_id} not found")
+
+            # We don't check if the task exists before querying logs
+            # because the task_id is validated by the authz layer
 
             if after_timestamp is None:
                 after_timestamp = 0.0

@@ -123,9 +123,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self, task_id: int, after_timestamp: float | None
     ) -> tuple[str, float]:
         """Get task logs for the specified `task_id`."""
-        with self.lock_task_store:
-            if task_id not in self.task_store:
-                raise ValueError(f"Task {task_id} not found")
+        # We don't check if the task exists before querying logs
+        # because the task_id is validated by the authz layer
+
         with self.log_lock:
             task_logs = self.task_logs.get(task_id, [])
             if after_timestamp is None:
