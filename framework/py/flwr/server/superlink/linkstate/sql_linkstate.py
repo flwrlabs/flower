@@ -14,7 +14,6 @@
 # ==============================================================================
 """SQLAlchemy-based implementation of the link state."""
 
-
 # pylint: disable=too-many-lines
 
 import json
@@ -638,7 +637,15 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 },
             )
         except IntegrityError as e:
-            if "public_key" in str(e).lower():
+            # Check the underlying DB exception to distinguish constraint types.
+            # - SQLite: str(e.orig) is e.g. "UNIQUE constraint failed: node.public_key"
+            # - psycopg3: e.orig.diag.constraint_name contains the constraint name
+            orig = e.orig
+            constraint = getattr(getattr(orig, "diag", None), "constraint_name", None)
+            is_pk_conflict = (
+                "public_key" in constraint if constraint else "public_key" in str(orig)
+            )
+            if is_pk_conflict:
                 raise ValueError("Public key already in use.") from None
             # Must be node ID conflict, almost impossible unless system is compromised
             log(ERROR, "Unexpected node registration failure.")
