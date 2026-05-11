@@ -2035,7 +2035,7 @@ class SqlLinkStateSqlGenerationTest(unittest.TestCase):
             captured.append(query)
             return []
 
-        state.query = fake_query  # type: ignore[assignment,method-assign]
+        state.query = fake_query  # type: ignore[method-assign]
         getattr(state, method)(*args)
 
         self.assertTrue(captured)
