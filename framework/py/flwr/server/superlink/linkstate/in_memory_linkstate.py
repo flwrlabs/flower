@@ -33,13 +33,14 @@ from flwr.common.constant import (
     RUN_FAILURE_DETAILS_NO_HEARTBEAT,
     RUN_ID_NUM_BYTES,
     SUPERLINK_NODE_ID,
+    TASK_ID_NUM_BYTES,
     Status,
     SubStatus,
 )
 from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
-from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.utils import validate_message
 from flwr.supercore.constant import NodeStatus
@@ -112,7 +113,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         model_ref: str | None = None,
         connector_ref: str | None = None,
     ) -> int | None:
-        """Create a task and make it the run's primary task if none exists."""
+        """Create a task."""
         with self.lock:
             if run_id not in self.run_ids:
                 raise RuntimeError(
@@ -126,13 +127,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 model_ref=model_ref,
                 connector_ref=connector_ref,
             )
-            if task_id is None:
-                return None
-
-            run_record = self.run_ids.get(run_id)
-            if run_record is not None and run_record.run.primary_task_id is None:
-                run_record.run.primary_task_id = task_id
-
             return task_id
 
     def store_message_ins(self, message: Message) -> str | None:
@@ -583,11 +577,17 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """Create a new run."""
         task_type = primary_task_type_from_run_type(run_type)
 
-        # Sample a random int64 as run_id
         with self.lock:
-            run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
-
-            if run_id not in self.run_ids:
+            with self.lock_task_store:
+                run_id = generate_rand_int_from_bytes(
+                    RUN_ID_NUM_BYTES,
+                    exclude=set(self.run_ids),
+                )
+                task_id = generate_rand_int_from_bytes(
+                    TASK_ID_NUM_BYTES,
+                    exclude=set(self.task_store),
+                )
+                pending_at = now().isoformat()
                 run_record = RunRecord(
                     run=Run(
                         run_id=run_id,
@@ -595,7 +595,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         fab_version=fab_version if fab_version else "",
                         fab_hash=fab_hash if fab_hash else "",
                         override_config=override_config,
-                        pending_at=now().isoformat(),
+                        pending_at=pending_at,
                         starting_at="",
                         running_at="",
                         finished_at="",
@@ -606,7 +606,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                         ),
                         flwr_aid=flwr_aid if flwr_aid else "",
                         federation=federation,
-                        primary_task_id=None,
+                        primary_task_id=task_id,
                         bytes_sent=0,
                         bytes_recv=0,
                         clientapp_runtime=0.0,
@@ -619,13 +619,22 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 if flwr_aid:
                     self.flwr_aid_to_run_ids[flwr_aid].add(run_id)
 
-                if self.create_task(task_type, run_id, fab_hash) is None:
-                    log(ERROR, "Failed to create task for run ID %s", run_id)
-                    return 0
+                self.task_store[task_id] = Task(
+                    task_id=task_id,
+                    type=task_type,
+                    run_id=run_id,
+                    status=TaskStatus(
+                        status=Status.PENDING,
+                        sub_status="",
+                        details="",
+                    ),
+                    pending_at=pending_at,
+                    fab_hash=fab_hash,
+                    model_ref=None,
+                    connector_ref=None,
+                )
 
                 return run_id
-        log(ERROR, "Unexpected run creation failure.")
-        return 0
 
     def get_run_info(
         self,

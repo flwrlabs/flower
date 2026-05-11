@@ -177,7 +177,7 @@ class StateTest(CoreStateTest):
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
 
-    def test_create_task_sets_primary_task_id_once(self) -> None:
+    def test_create_task_does_not_replace_primary_task_id(self) -> None:
         """New tasks should not replace the run's primary task."""
         # Prepare
         state = self.state_factory()
