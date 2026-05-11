@@ -184,6 +184,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
         """Unary-unary RpcError outcomes should not register callbacks."""
         rpc_error = _make_runtime_rpc_error()
         rpc_error.done = Mock(return_value=True)
+        rpc_error.trailing_metadata = Mock(return_value=())
 
         with (
             patch(
@@ -204,6 +205,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
 
         self.assertIs(response, rpc_error)
         rpc_error.add_callback.assert_not_called()
+        rpc_error.trailing_metadata.assert_called_once()
         log_mock.assert_called_once_with(WARN, "runtime mismatch")
 
     def test_unary_future_rpc_error_uses_completion_callback(self) -> None:
