@@ -22,6 +22,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.engine import Connection
 
 from flwr.common.constant import TASK_ID_NUM_BYTES
 from flwr.supercore.constant import RunType, TaskType
@@ -48,7 +49,7 @@ def _primary_task_type_from_run_type(run_type: str) -> str:
     )
 
 
-def _generate_unique_task_id(bind, reserved_task_ids: set[int]) -> int:
+def _generate_unique_task_id(bind: Connection, reserved_task_ids: set[int]) -> int:
     """Generate a task ID that does not collide with persisted or reserved tasks."""
     while True:
         task_id = generate_rand_int_from_bytes(
