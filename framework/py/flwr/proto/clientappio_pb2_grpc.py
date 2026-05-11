@@ -190,7 +190,7 @@ class ClientAppIoServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def PushLogs(self, request, context):
-        """Push ServerApp logs
+        """Push task logs
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')

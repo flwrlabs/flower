@@ -115,7 +115,7 @@ class ClientAppIoStub:
         flwr.proto.log_pb2.PushLogsRequest,
         flwr.proto.log_pb2.PushLogsResponse,
     ]
-    """Push ServerApp logs"""
+    """Push task logs"""
 
     PushMessage: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushAppMessagesRequest,
@@ -214,7 +214,7 @@ class ClientAppIoAsyncStub:
         flwr.proto.log_pb2.PushLogsRequest,
         flwr.proto.log_pb2.PushLogsResponse,
     ]
-    """Push ServerApp logs"""
+    """Push task logs"""
 
     PushMessage: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushAppMessagesRequest,
@@ -335,7 +335,7 @@ class ClientAppIoServicer(metaclass=abc.ABCMeta):
         request: flwr.proto.log_pb2.PushLogsRequest,
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.log_pb2.PushLogsResponse, collections.abc.Awaitable[flwr.proto.log_pb2.PushLogsResponse]]:
-        """Push ServerApp logs"""
+        """Push task logs"""
 
     @abc.abstractmethod
     def PushMessage(

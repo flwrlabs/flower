@@ -116,7 +116,7 @@ class ServerAppIoStub:
         flwr.proto.log_pb2.PushLogsRequest,
         flwr.proto.log_pb2.PushLogsResponse,
     ]
-    """Push ServerApp logs"""
+    """Push task logs"""
 
     GetFederationOptions: grpc.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetFederationOptionsRequest,
@@ -227,7 +227,7 @@ class ServerAppIoAsyncStub:
         flwr.proto.log_pb2.PushLogsRequest,
         flwr.proto.log_pb2.PushLogsResponse,
     ]
-    """Push ServerApp logs"""
+    """Push task logs"""
 
     GetFederationOptions: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetFederationOptionsRequest,
@@ -360,7 +360,7 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         request: flwr.proto.log_pb2.PushLogsRequest,
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.log_pb2.PushLogsResponse, collections.abc.Awaitable[flwr.proto.log_pb2.PushLogsResponse]]:
-        """Push ServerApp logs"""
+        """Push task logs"""
 
     @abc.abstractmethod
     def GetFederationOptions(
