@@ -30,8 +30,8 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 )
 from flwr.supercore.constant import TaskType
 from flwr.supercore.interceptors import (
-    APP_TOKEN_HEADER,
     AUTHENTICATION_FAILED_MESSAGE,
+    TASK_TOKEN_HEADER,
     AppIoTokenClientInterceptor,
     SuperExecAuthClientInterceptor,
 )
@@ -112,7 +112,7 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         with self.assertRaises(grpc.RpcError) as err:
             self._pull_object.with_call(
                 request=PullObjectRequest(object_id="obj-2"),
-                metadata=((APP_TOKEN_HEADER, "invalid-token"),),
+                metadata=((TASK_TOKEN_HEADER, "invalid-token"),),
             )
         assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
         assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE
@@ -121,7 +121,7 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         """Protected RPC should allow requests with valid metadata token."""
         response, call = self._pull_object.with_call(
             request=PullObjectRequest(object_id="obj-3"),
-            metadata=((APP_TOKEN_HEADER, self.valid_token),),
+            metadata=((TASK_TOKEN_HEADER, self.valid_token),),
         )
 
         assert isinstance(response, PullObjectResponse)

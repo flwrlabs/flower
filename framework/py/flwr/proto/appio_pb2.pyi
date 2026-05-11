@@ -312,12 +312,10 @@ class CreateTaskRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     TYPE_FIELD_NUMBER: builtins.int
-    RUN_ID_FIELD_NUMBER: builtins.int
     FAB_HASH_FIELD_NUMBER: builtins.int
     MODEL_REF_FIELD_NUMBER: builtins.int
     CONNECTOR_REF_FIELD_NUMBER: builtins.int
     type: builtins.str
-    run_id: builtins.int
     fab_hash: builtins.str
     model_ref: builtins.str
     connector_ref: builtins.str
@@ -325,13 +323,12 @@ class CreateTaskRequest(google.protobuf.message.Message):
         self,
         *,
         type: builtins.str = ...,
-        run_id: builtins.int = ...,
         fab_hash: builtins.str | None = ...,
         model_ref: builtins.str | None = ...,
         connector_ref: builtins.str | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref", "run_id", b"run_id", "type", b"type"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref", "type", b"type"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_connector_ref", b"_connector_ref"]) -> typing.Literal["connector_ref"] | None: ...
     @typing.overload

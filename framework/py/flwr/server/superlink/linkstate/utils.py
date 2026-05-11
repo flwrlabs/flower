@@ -18,17 +18,10 @@
 from typing import Any
 
 from flwr.common import ConfigRecord, Context, Error, Message, Metadata, now, serde
-from flwr.common.constant import (
-    HEARTBEAT_PATIENCE,
-    SUPERLINK_NODE_ID,
-    ErrorCode,
-    Status,
-    SubStatus,
-)
+from flwr.common.constant import HEARTBEAT_PATIENCE, SUPERLINK_NODE_ID, ErrorCode
 from flwr.common.message import make_message
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
-from flwr.common.typing import RunStatus
 
 # pylint: disable=E0611
 from flwr.proto.error_pb2 import Error as ProtoError
@@ -42,19 +35,6 @@ from flwr.supercore.corestate.utils import (
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 # pylint: enable=E0611
-VALID_RUN_STATUS_TRANSITIONS = {
-    (Status.PENDING, Status.STARTING),
-    (Status.STARTING, Status.RUNNING),
-    (Status.RUNNING, Status.FINISHED),
-    # Any non-FINISHED status can transition to FINISHED
-    (Status.PENDING, Status.FINISHED),
-    (Status.STARTING, Status.FINISHED),
-}
-VALID_RUN_SUB_STATUSES = {
-    SubStatus.COMPLETED,
-    SubStatus.FAILED,
-    SubStatus.STOPPED,
-}
 MESSAGE_UNAVAILABLE_ERROR_REASON = (
     "Error: Message Unavailable - The requested message could not be found in the "
     "database. It may have expired due to its TTL, been deleted because the "
@@ -139,58 +119,6 @@ def configrecord_from_bytes(configrecord_bytes: bytes) -> ConfigRecord:
     return serde.config_record_from_proto(
         ProtoConfigRecord.FromString(configrecord_bytes)
     )
-
-
-def is_valid_transition(current_status: RunStatus, new_status: RunStatus) -> bool:
-    """Check if a transition between two run statuses is valid.
-
-    Parameters
-    ----------
-    current_status : RunStatus
-        The current status of the run.
-    new_status : RunStatus
-        The new status to transition to.
-
-    Returns
-    -------
-    bool
-        True if the transition is valid, False otherwise.
-    """
-    # Transition to FINISHED from a non-RUNNING status is only allowed
-    # if the sub-status is not COMPLETED
-    if (
-        current_status.status in [Status.PENDING, Status.STARTING]
-        and new_status.status == Status.FINISHED
-    ):
-        return new_status.sub_status != SubStatus.COMPLETED
-
-    return (
-        current_status.status,
-        new_status.status,
-    ) in VALID_RUN_STATUS_TRANSITIONS
-
-
-def has_valid_sub_status(status: RunStatus) -> bool:
-    """Check if the 'sub_status' field of the given status is valid.
-
-    Parameters
-    ----------
-    status : RunStatus
-        The status object to be checked.
-
-    Returns
-    -------
-    bool
-        True if the status object has a valid sub-status, False otherwise.
-
-    Notes
-    -----
-    Only an empty string (i.e., "") is considered a valid sub-status for
-    non-finished statuses. The sub-status of a finished status cannot be empty.
-    """
-    if status.status == Status.FINISHED:
-        return status.sub_status in VALID_RUN_SUB_STATUSES
-    return status.sub_status == ""
 
 
 def create_message_error_unavailable_res_message(

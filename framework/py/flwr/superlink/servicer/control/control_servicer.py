@@ -54,7 +54,7 @@ from flwr.common.constant import (
 )
 from flwr.common.logger import log
 from flwr.common.serde import run_to_proto, user_config_from_proto
-from flwr.common.typing import AccountInfo, Fab, Run, RunStatus
+from flwr.common.typing import AccountInfo, Fab, Run
 from flwr.proto import control_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
@@ -1073,9 +1073,6 @@ def _stop_run_in_linkstate(state: LinkState, store: ObjectStore, run_id: int) ->
     update_success = False
     for task in state.get_tasks(run_ids=[run_id]):
         update_success |= state.finish_task(task.task_id, SubStatus.STOPPED, "")
-
-    # Keep run status working
-    state.update_run_status(run_id, RunStatus(Status.FINISHED, SubStatus.STOPPED, ""))
 
     # Clean up the run if any task was successfully updated to STOPPED
     if update_success:

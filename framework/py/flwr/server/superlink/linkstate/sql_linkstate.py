@@ -19,11 +19,10 @@
 
 import json
 from collections.abc import Sequence
-from datetime import datetime, timezone
 from logging import ERROR, WARNING
 from typing import Any, Literal
 
-from sqlalchemy import MetaData, text
+from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
 
 from flwr.app.user_config import UserConfig
@@ -32,18 +31,17 @@ from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     MESSAGE_TTL_TOLERANCE,
     NODE_ID_NUM_BYTES,
-    RUN_FAILURE_DETAILS_NO_HEARTBEAT,
     RUN_ID_NUM_BYTES,
     SUPERLINK_NODE_ID,
     Status,
-    SubStatus,
 )
 from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.utils.validator import validate_message
 from flwr.supercore.constant import NodeStatus
-from flwr.supercore.corestate.sql_corestate import SqlCoreState
+from flwr.supercore.corestate.sql_corestate import SqlCoreState, determine_task_status
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
@@ -69,6 +67,17 @@ from .utils import (
     verify_found_message_replies,
     verify_message_ids,
 )
+
+# SQL conditions for primary task status filtering.
+# `t` refers to the task table alias in joined run/task queries.
+# Keep this mapping aligned with STATUS_CONDITIONS in sql_corestate.py.
+PRIMARY_TASK_STATUS_CONDITIONS = {
+    Status.PENDING: "(t.starting_at IS NULL AND t.finished_at IS NULL)",
+    Status.STARTING: "(t.starting_at IS NOT NULL AND t.running_at IS NULL "
+    "AND t.finished_at IS NULL)",
+    Status.RUNNING: "(t.running_at IS NOT NULL AND t.finished_at IS NULL)",
+    Status.FINISHED: "(t.finished_at IS NOT NULL)",
+}
 
 
 class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
@@ -913,8 +922,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         limit: int | None = None,
     ) -> Sequence[Run]:
         """Retrieve information about runs based on the specified filters."""
-        # Clean up expired tokens; this will flag inactive runs as needed
-        self._cleanup_expired_tokens()
+        self._cleanup_expired_task_tokens()
 
         # Build dynamic SQL filters:
         # - OR within each individual filter
@@ -928,28 +936,20 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 return []
             sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
             placeholders = ",".join([f":rid_{i}" for i in range(len(sint64_run_ids))])
-            conditions.append(f"run_id IN ({placeholders})")
+            conditions.append(f"r.run_id IN ({placeholders})")
             params.update(
                 {f"rid_{i}": run_id for i, run_id in enumerate(sint64_run_ids)}
             )
 
         # Filter by statuses
-        # (maybe we should add a derived `status` column in the DB to simplify this?)
         if statuses is not None:
             if not statuses:
                 return []
-            status_conditions = []
-            # Map logical run status to persisted timestamp state.
-            if Status.PENDING in statuses:
-                status_conditions.append("starting_at = '' AND finished_at = ''")
-            if Status.STARTING in statuses:
-                status_conditions.append(
-                    "starting_at != '' AND running_at = '' AND finished_at = ''"
-                )
-            if Status.RUNNING in statuses:
-                status_conditions.append("running_at != '' AND finished_at = ''")
-            if Status.FINISHED in statuses:
-                status_conditions.append("finished_at != ''")
+            status_conditions = [
+                condition
+                for status, condition in PRIMARY_TASK_STATUS_CONDITIONS.items()
+                if status in statuses
+            ]
             if not status_conditions:
                 return []
             # SQL precedence: AND > OR, so A AND B OR C AND D == (A AND B) OR (C AND D)
@@ -960,7 +960,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             if not flwr_aids:
                 return []
             placeholders = ",".join([f":aid_{i}" for i in range(len(flwr_aids))])
-            conditions.append(f"flwr_aid IN ({placeholders})")
+            conditions.append(f"r.flwr_aid IN ({placeholders})")
             params.update({f"aid_{i}": aid for i, aid in enumerate(flwr_aids)})
 
         # Filter by federations
@@ -968,73 +968,66 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             if not federations:
                 return []
             placeholders = ",".join([f":fed_{i}" for i in range(len(federations))])
-            conditions.append(f"federation IN ({placeholders})")
+            conditions.append(f"r.federation IN ({placeholders})")
             params.update({f"fed_{i}": fed for i, fed in enumerate(federations)})
 
         # Construct the final query
-        query = "SELECT * FROM run"
+        query = """
+            SELECT
+                r.run_id, r.fab_id, r.fab_version, r.fab_hash, r.override_config,
+                r.federation, r.primary_task_id, r.federation_config, r.run_type,
+                r.flwr_aid, r.bytes_sent, r.bytes_recv, r.clientapp_runtime,
+                t.pending_at AS pending_at,
+                t.starting_at AS starting_at,
+                t.running_at AS running_at,
+                t.finished_at AS finished_at,
+                t.sub_status AS sub_status,
+                t.details AS details
+            FROM run AS r
+            JOIN task AS t ON t.task_id = r.primary_task_id
+        """
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
         if order_by is not None:
             # `order_by` is a constrained Literal; safe to interpolate here.
             # ISO format(YYYY-MM-DDTHH:MM:SS[.ffffff]+00:00) can be sorted
             # lexicographically to achieve correct chronological order.
-            query += f" ORDER BY {order_by} {'ASC' if ascending else 'DESC'}"
+            query += f" ORDER BY t.{order_by} {'ASC' if ascending else 'DESC'}"
         if limit is not None:
             query += " LIMIT :limit"
             params["limit"] = limit
 
         rows = self.query(query, params)
         # Convert DB rows into domain-level `Run` objects.
-        return [
-            Run(
-                run_id=int64_to_uint64(row["run_id"]),
-                fab_id=row["fab_id"],
-                fab_version=row["fab_version"],
-                fab_hash=row["fab_hash"],
-                override_config=json.loads(row["override_config"]),
-                pending_at=row["pending_at"],
-                starting_at=row["starting_at"],
-                running_at=row["running_at"],
-                finished_at=row["finished_at"],
-                status=RunStatus(
-                    status=determine_run_status(row),
-                    sub_status=row["sub_status"],
-                    details=row["details"],
-                ),
-                flwr_aid=row["flwr_aid"],
-                federation=row["federation"],
-                primary_task_id=(
-                    int64_to_uint64(row["primary_task_id"])
-                    if row["primary_task_id"] is not None
-                    else None
-                ),
-                bytes_sent=row["bytes_sent"],
-                bytes_recv=row["bytes_recv"],
-                clientapp_runtime=row["clientapp_runtime"],
-                run_type=row["run_type"],
-            )
-            for row in rows
-        ]
+        return [_run_from_row(row) for row in rows]
 
     def get_run_status(self, run_ids: set[int]) -> dict[int, RunStatus]:
         """Retrieve the statuses for the specified runs."""
-        # Clean up expired tokens; this will flag inactive runs as needed
-        self._cleanup_expired_tokens()
+        self._cleanup_expired_task_tokens()
+        if not run_ids:
+            return {}
 
         # Convert the uint64 value to sint64 for SQLite
         placeholders = ",".join([f":rid_{i}" for i in range(len(run_ids))])
-        query = f"SELECT * FROM run WHERE run_id IN ({placeholders})"
+        query = f"""
+            SELECT
+                r.run_id,
+                t.pending_at AS pending_at,
+                t.starting_at AS starting_at,
+                t.running_at AS running_at,
+                t.finished_at AS finished_at,
+                t.sub_status AS sub_status,
+                t.details AS details
+            FROM run AS r
+            JOIN task AS t ON t.task_id = r.primary_task_id
+            WHERE r.run_id IN ({placeholders})
+        """
         params = {f"rid_{i}": uint64_to_int64(rid) for i, rid in enumerate(run_ids)}
         rows = self.query(query, params)
 
         return {
             # Restore uint64 run IDs
-            int64_to_uint64(row["run_id"]): RunStatus(
-                status=determine_run_status(row),
-                sub_status=row["sub_status"],
-                details=row["details"],
-            )
+            int64_to_uint64(row["run_id"]): _run_status_from_row(row)
             for row in rows
         }
 
@@ -1053,52 +1046,35 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         return simulation_config_from_json(json.loads(fed_config_json))
 
-    def update_run_status(self, run_id: int, new_status: RunStatus) -> bool:
-        """Update the status of the run with the specified `run_id`."""
-        # Clean up expired tokens; this will flag inactive runs as needed
-        self._cleanup_expired_tokens()
+    def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
+        """Move an unfinished task to finished."""
+        result = super().finish_task(task_id, sub_status, details)
+        if result:
+            # Check whether this task is referenced as a run's primary task
+            rows = self.query(
+                "SELECT 1 FROM run WHERE primary_task_id = :task_id",
+                {"task_id": uint64_to_int64(task_id)},
+            )
+            # If yes, report usage for the run
+            if rows:
+                self.federation_manager.report_run_usage()
+        return result
 
-        # Determine the timestamp field and conditions based on the new status
-        ts_fld = ""
-        ts_con = ""
-        if new_status.status == Status.STARTING:
-            ts_fld = "starting_at"
-            # Condition: current status is PENDING
-            ts_con = "starting_at = '' AND finished_at = ''"
-        elif new_status.status == Status.RUNNING:
-            ts_fld = "running_at"
-            # Condition: current status is STARTING
-            ts_con = "starting_at != '' AND running_at = '' AND finished_at = ''"
-        elif new_status.status == Status.FINISHED:
-            ts_fld = "finished_at"
-            # Condition: current status is not FINISHED
-            ts_con = "finished_at = ''"
-            if new_status.sub_status == SubStatus.COMPLETED:
-                # For COMPLETED runs, ensure they are currently RUNNING
-                ts_con += " AND running_at != ''"
-        else:
-            return False  # Cannot update to PENDING
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+        """Report usage when an expired task is the primary task of its run."""
+        if not tasks:
+            return
 
-        # Prepare the query and parameters
-        query = f"""
-            UPDATE run SET {ts_fld} = :timestamp,
-            sub_status = :sub_status, details = :details
-            WHERE run_id = :run_id AND {ts_con}
-            RETURNING run_id
-        """
-        params = {
-            "timestamp": now().isoformat(),
-            "sub_status": new_status.sub_status,
-            "details": new_status.details,
-            "run_id": uint64_to_int64(run_id),
-        }
-
-        # Update the status
-        rows = self.query(query, params)
-        # Report usage if the run is marked as finished after the update
-        if rows and new_status.status == Status.FINISHED:
+        # Check if any of the expired tasks is referenced as a run's primary task
+        task_ids = [uint64_to_int64(task.task_id) for task in tasks]
+        placeholders = ",".join([f":task_id_{i}" for i in range(len(task_ids))])
+        rows = self.query(
+            f"SELECT 1 FROM run WHERE primary_task_id IN ({placeholders}) LIMIT 1",
+            {f"task_id_{i}": task_id for i, task_id in enumerate(task_ids)},
+        )
+        # If yes, report usage for the run
+        if rows:
             self.federation_manager.report_run_usage()
-        return len(rows) > 0
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
@@ -1145,44 +1121,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         params["node_id"] = sint64_node_id
         self.query(query, params)
         return True
-
-    def _on_tokens_expired(self, expired_records: list[tuple[int, float]]) -> None:
-        """Handle cleanup of expired tokens.
-
-        Override in subclasses to add custom cleanup logic.
-
-        Parameters
-        ----------
-        expired_records : list[tuple[int, float]]
-            List of tuples containing (run_id, active_until timestamp)
-            for expired tokens.
-        """
-        if not expired_records:
-            return
-
-        with self.session() as session:
-            query = """
-                UPDATE run
-                SET sub_status = :failed, details = :details, finished_at = :finished_at
-                WHERE run_id = :run_id AND finished_at = ''
-            """
-            data = [
-                {
-                    "failed": SubStatus.FAILED,
-                    "details": RUN_FAILURE_DETAILS_NO_HEARTBEAT,
-                    "finished_at": datetime.fromtimestamp(
-                        active_until, tz=timezone.utc
-                    ).isoformat(),
-                    "run_id": uint64_to_int64(run_id),
-                }
-                for run_id, active_until in expired_records
-            ]
-            result = session.execute(text(query), data)
-            updated_rows = result.rowcount or 0  # type: ignore[attr-defined]
-
-        # Report usage for runs that have been marked as failed due to expired tokens
-        if updated_rows > 0:
-            self.federation_manager.report_run_usage()
 
     def get_serverapp_context(self, run_id: int) -> Context | None:
         """Get the context for the specified `run_id`."""
@@ -1355,51 +1293,35 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             if not rows:
                 raise ValueError(f"Run {run_id} not found")
 
-    def _cleanup_expired_tokens(self) -> None:
-        """Remove expired tokens and perform additional cleanup.
 
-        Temporary solution until we link run status to the status of its primary task
-        """
-        with self.session():
-            expired_at = now()
-            current = int(expired_at.timestamp())
-            # Expired task claims are terminal failures and lose their token.
-            rows = self.query(
-                """
-                UPDATE task
-                SET token = NULL,
-                    finished_at = :finished_at,
-                    sub_status = :sub_status,
-                    details = :details
-                WHERE token IS NOT NULL AND active_until < :current
-                RETURNING run_id, active_until
-                """,
-                {
-                    "current": current,
-                    "finished_at": expired_at.isoformat(),
-                    "sub_status": SubStatus.FAILED,
-                    "details": "No heartbeat received from the task",
-                },
-            )
-            expired_records = [
-                (int64_to_uint64(row["run_id"]), float(row["active_until"]))
-                for row in rows
-            ]
-
-            # Hook for subclasses
-            if expired_records:
-                self._on_tokens_expired(expired_records)
+def _run_status_from_row(row: dict[str, Any]) -> RunStatus:
+    """Determine run status from the primary task fields in a query row."""
+    task_status = determine_task_status(row)
+    return RunStatus(
+        status=task_status.status,
+        sub_status=task_status.sub_status,
+        details=task_status.details,
+    )
 
 
-def determine_run_status(row: dict[str, Any]) -> str:
-    """Determine the status of the run based on timestamp fields."""
-    if row["pending_at"]:
-        if row["finished_at"]:
-            return Status.FINISHED
-        if row["starting_at"]:
-            if row["running_at"]:
-                return Status.RUNNING
-            return Status.STARTING
-        return Status.PENDING
-    run_id = int64_to_uint64(row["run_id"])
-    raise ValueError(f"The run {run_id} does not have a valid status.")
+def _run_from_row(row: dict[str, Any]) -> Run:
+    """Convert a run joined with its primary task to a Run object."""
+    return Run(
+        run_id=int64_to_uint64(row["run_id"]),
+        fab_id=row["fab_id"],
+        fab_version=row["fab_version"],
+        fab_hash=row["fab_hash"],
+        override_config=json.loads(row["override_config"]),
+        pending_at=row["pending_at"],
+        starting_at=row["starting_at"] or "",
+        running_at=row["running_at"] or "",
+        finished_at=row["finished_at"] or "",
+        status=_run_status_from_row(row),
+        flwr_aid=row["flwr_aid"],
+        federation=row["federation"],
+        primary_task_id=int64_to_uint64(row["primary_task_id"]),
+        bytes_sent=row["bytes_sent"],
+        bytes_recv=row["bytes_recv"],
+        clientapp_runtime=row["clientapp_runtime"],
+        run_type=row["run_type"],
+    )

@@ -26,7 +26,7 @@ from sqlalchemy.exc import IntegrityError
 
 from flwr.common import now
 from flwr.common.constant import (
-    FLWR_APP_TOKEN_LENGTH,
+    FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
     TASK_ID_NUM_BYTES,
@@ -107,6 +107,50 @@ class SqlCoreState(CoreState, SqlMixin):
             content=row["content"],
             verifications=json.loads(row["verifications"]),
         )
+
+    def add_task_log(self, task_id: int, log_message: str) -> None:
+        """Add a log entry to the task logs for the specified `task_id`."""
+        sint64_task_id = uint64_to_int64(task_id)
+
+        try:
+            self.query(
+                """
+                INSERT INTO task_logs (timestamp, task_id, log)
+                VALUES (:current_ts, :task_id, :log)
+                """,
+                {
+                    "current_ts": now().timestamp(),
+                    "task_id": sint64_task_id,
+                    "log": log_message,
+                },
+            )
+        except IntegrityError:
+            raise ValueError(f"Task {task_id} not found") from None
+
+    def get_task_log(
+        self, task_id: int, after_timestamp: float | None
+    ) -> tuple[str, float]:
+        """Get task logs for the specified `task_id`."""
+        sint64_task_id = uint64_to_int64(task_id)
+
+        # We don't check if the task exists before querying logs
+        # because the task_id is validated by the authz layer
+
+        if after_timestamp is None:
+            after_timestamp = 0.0
+
+        # Polling is strict-after: entries at the checkpoint timestamp have
+        # already been delivered.
+        rows = self.query(
+            """
+            SELECT log, timestamp FROM task_logs
+            WHERE task_id = :task_id AND timestamp > :after_timestamp
+            ORDER BY timestamp
+            """,
+            {"task_id": sint64_task_id, "after_timestamp": after_timestamp},
+        )
+        latest_timestamp = rows[-1]["timestamp"] if rows else 0.0
+        return "".join(row["log"] for row in rows), latest_timestamp
 
     def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
@@ -236,7 +280,7 @@ class SqlCoreState(CoreState, SqlMixin):
 
     def claim_task(self, task_id: int) -> str | None:
         """Atomically claim a pending task."""
-        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
+        token = secrets.token_hex(FLWR_TASK_TOKEN_LENGTH)
         claimed_at = now()
         active_until = int(claimed_at.timestamp()) + HEARTBEAT_DEFAULT_INTERVAL
         sint64_task_id = uint64_to_int64(task_id)
@@ -368,15 +412,15 @@ class SqlCoreState(CoreState, SqlMixin):
         expired_at = now()
         current = int(expired_at.timestamp())
         # Expired task claims are terminal failures and lose their token.
-        self.query(
+        rows = self.query(
             """
             UPDATE task
-            SET token = NULL,
-                active_until = NULL,
-                finished_at = :finished_at,
-                sub_status = :sub_status,
-                details = :details
+            SET token = NULL, active_until = NULL, finished_at = :finished_at,
+                sub_status = :sub_status, details = :details
             WHERE token IS NOT NULL AND active_until < :current
+            RETURNING task_id, type, run_id, fab_hash, model_ref, connector_ref,
+                      pending_at, starting_at, running_at, finished_at,
+                      sub_status, details
             """,
             {
                 "current": current,
@@ -385,6 +429,19 @@ class SqlCoreState(CoreState, SqlMixin):
                 "details": "No heartbeat received from the task",
             },
         )
+        if rows:
+            self._on_task_tokens_expired([task_from_row(row) for row in rows])
+
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+        """Handle cleanup of expired task tokens.
+
+        Override in subclasses to add custom cleanup logic.
+
+        Parameters
+        ----------
+        tasks : list[Task]
+            Tasks whose claims expired and were marked FINISHED:FAILED.
+        """
 
     def _cleanup_expired_tokens(self) -> None:
         """Remove expired tokens and perform additional cleanup.
