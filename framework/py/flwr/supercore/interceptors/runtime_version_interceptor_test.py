@@ -121,15 +121,6 @@ def _make_runtime_rpc_error() -> grpc.RpcError:
     return rpc_error
 
 
-class _FutureRpcError(grpc.RpcError):
-    def __init__(self) -> None:
-        self.add_callback = Mock(return_value=True)
-        self.trailing_metadata = Mock(return_value=())
-        self.details = Mock(
-            side_effect=AssertionError("details() should not be called")
-        )
-
-
 class TestRuntimeVersionClientInterceptor(TestCase):
     """Unit tests for RuntimeVersionClientInterceptor."""
 
@@ -210,9 +201,17 @@ class TestRuntimeVersionClientInterceptor(TestCase):
 
     def test_unary_future_rpc_error_uses_completion_callback(self) -> None:
         """Unary-unary futures should not be inspected before completion."""
-        call = _FutureRpcError()
+        call = grpc.RpcError()
+        call.add_callback = Mock(return_value=True)
+        call.trailing_metadata = Mock(return_value=())
+        call.details = Mock(
+            side_effect=AssertionError("details() should not be called")
+        )
 
-        with patch("grpc.Future", _FutureRpcError):
+        with patch(
+            "flwr.supercore.interceptors.runtime_version_interceptor.grpc.Future",
+            grpc.RpcError,
+        ):
             response = self.interceptor.intercept_unary_unary(
                 continuation=lambda _details, _request: call,
                 client_call_details=_make_call_details(
