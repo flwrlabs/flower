@@ -68,6 +68,10 @@ from .utils import (
     verify_message_ids,
 )
 
+
+# SQL conditions for primary task status filtering.
+# `t` refers to the task table alias in joined run/task queries.
+# Keep this mapping aligned with STATUS_CONDITIONS in sql_corestate.py.
 PRIMARY_TASK_STATUS_CONDITIONS = {
     Status.PENDING: "(t.starting_at IS NULL AND t.finished_at IS NULL)",
     Status.STARTING: "(t.starting_at IS NOT NULL AND t.running_at IS NULL "
@@ -996,7 +1000,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         rows = self.query(query, params)
         # Convert DB rows into domain-level `Run` objects.
-        return [run_from_row(row) for row in rows]
+        return [_run_from_row(row) for row in rows]
 
     def get_run_status(self, run_ids: set[int]) -> dict[int, RunStatus]:
         """Retrieve the statuses for the specified runs."""
@@ -1024,7 +1028,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         return {
             # Restore uint64 run IDs
-            int64_to_uint64(row["run_id"]): run_status_from_row(row)
+            int64_to_uint64(row["run_id"]): _run_status_from_row(row)
             for row in rows
         }
 
@@ -1291,7 +1295,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 raise ValueError(f"Run {run_id} not found")
 
 
-def run_status_from_row(row: dict[str, Any]) -> RunStatus:
+def _run_status_from_row(row: dict[str, Any]) -> RunStatus:
     """Determine run status from the primary task fields in a query row."""
     task_status = determine_task_status(row)
     return RunStatus(
@@ -1301,7 +1305,7 @@ def run_status_from_row(row: dict[str, Any]) -> RunStatus:
     )
 
 
-def run_from_row(row: dict[str, Any]) -> Run:
+def _run_from_row(row: dict[str, Any]) -> Run:
     """Convert a run joined with its primary task to a Run object."""
     return Run(
         run_id=int64_to_uint64(row["run_id"]),
@@ -1313,7 +1317,7 @@ def run_from_row(row: dict[str, Any]) -> Run:
         starting_at=row["starting_at"] or "",
         running_at=row["running_at"] or "",
         finished_at=row["finished_at"] or "",
-        status=run_status_from_row(row),
+        status=_run_status_from_row(row),
         flwr_aid=row["flwr_aid"],
         federation=row["federation"],
         primary_task_id=int64_to_uint64(row["primary_task_id"]),
