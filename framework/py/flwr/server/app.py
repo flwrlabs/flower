@@ -105,6 +105,7 @@ try:
         get_control_event_log_writer_plugins,
         get_ee_artifact_provider,
         get_ee_federation_manager,
+        get_ee_state_backend_factories,
         get_fleet_event_log_writer_plugins,
     )
 except ImportError:
@@ -141,6 +142,12 @@ except ImportError:
         """Return the EE FederationManager."""
         raise NotImplementedError("No federation manager is currently supported.")
 
+    def get_ee_state_backend_factories(
+        database: str, federation_manager: FederationManager
+    ) -> tuple[ObjectStoreFactory, LinkStateFactory]:
+        """Return EE state backend factories for unsupported DB URLs."""
+        raise NotImplementedError("No additional state backends are supported.")
+
 
 def get_control_authn_plugins() -> dict[str, type[ControlAuthnPlugin]]:
     """Return all Control API authentication plugins."""
@@ -161,6 +168,35 @@ def get_federation_manager(is_simulation: bool = False) -> FederationManager:
         return federation_manager
     except NotImplementedError:
         return NoOpFederationManager(simulation=is_simulation)
+
+
+def _is_non_sqlite_database_url(database: str) -> bool:
+    """Return whether the database argument is a non-SQLite URL."""
+    normalized = database.strip().lower()
+    return "://" in normalized and not normalized.startswith("sqlite://")
+
+
+def _get_state_backend_factories(
+    database: str,
+    federation_manager: FederationManager,
+) -> tuple[ObjectStoreFactory, LinkStateFactory]:
+    """Return ObjectStore and LinkState factories for the selected DB backend."""
+    if _is_non_sqlite_database_url(database):
+        try:
+            result: tuple[ObjectStoreFactory, LinkStateFactory] = (
+                get_ee_state_backend_factories(database, federation_manager)
+            )
+            return result
+        except NotImplementedError as exc:
+            raise ValueError(
+                "Unsupported value for `--database`: "
+                f"{database!r}. Flower OSS supports `:flwr-in-memory:`, "
+                "SQLite file paths, and `sqlite://` URLs."
+            ) from exc
+
+    objectstore_factory = ObjectStoreFactory(database)
+    state_factory = LinkStateFactory(database, federation_manager, objectstore_factory)
+    return objectstore_factory, state_factory
 
 
 # pylint: disable=too-many-branches, too-many-locals, too-many-statements
@@ -334,13 +370,14 @@ def run_superlink() -> None:
     # Load Federation Manager
     federation_manager = get_federation_manager(is_simulation=args.simulation)
 
-    # Initialize ObjectStoreFactory
-    objectstore_factory = ObjectStoreFactory(args.database)
+    # Initialize backend ObjectStoreFactory and StateFactory
+    try:
+        objectstore_factory, state_factory = _get_state_backend_factories(
+            args.database, federation_manager
+        )
+    except ValueError as err:
+        flwr_exit(ExitCode.SUPERLINK_INVALID_ARGS, str(err))
 
-    # Initialize StateFactory
-    state_factory = LinkStateFactory(
-        args.database, federation_manager, objectstore_factory
-    )
     state_factory.state()  # Force initialization before starting servers
 
     # Start Control API
