@@ -93,7 +93,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     iterate_object_tree,
 )
 from flwr.supercore.interceptors import (
-    APP_TOKEN_HEADER,
+    TASK_TOKEN_HEADER,
     AppIoTokenClientInterceptor,
     SuperExecAuthClientInterceptor,
 )
@@ -269,7 +269,7 @@ def _claim_in_parallel(
             barrier.wait(timeout=timeout)
             response, call = pull_fn.with_call(
                 PullTaskInputRequest(),
-                metadata=((APP_TOKEN_HEADER, token),),
+                metadata=((TASK_TOKEN_HEADER, token),),
             )
             del response
             results[idx] = call.code()
