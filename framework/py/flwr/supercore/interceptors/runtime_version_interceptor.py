@@ -82,12 +82,15 @@ class RuntimeVersionClientInterceptor(
 
         def _handle_completion() -> None:
             self._maybe_log_incompat_warning(call.trailing_metadata())
+            if isinstance(call, grpc.RpcError):
+                self._maybe_exit_on_incompat_error(call)
 
-        if isinstance(call, grpc.RpcError):
-            self._maybe_exit_on_incompat_error(call)
-            return call
+        try:
+            callback_registered = call.add_callback(_handle_completion)
+        except NotImplementedError:
+            callback_registered = False
 
-        if not call.add_callback(_handle_completion):
+        if not callback_registered:
             _handle_completion()
 
         return call

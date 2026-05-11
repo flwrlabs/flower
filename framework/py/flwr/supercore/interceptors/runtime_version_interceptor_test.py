@@ -110,6 +110,7 @@ def _make_stream_call(
 
 def _make_runtime_rpc_error() -> grpc.RpcError:
     rpc_error = grpc.RpcError()
+    rpc_error.trailing_metadata = Mock(return_value=())
     rpc_error.details = Mock(
         return_value=FlowerError(
             ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
@@ -181,7 +182,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
             )
 
     def test_log_unary_incompatibility_from_returned_rpc_error(self) -> None:
-        """Unary-unary RpcError outcomes should not register callbacks."""
+        """Unary-unary RpcError outcomes should fall back if callbacks fail."""
         rpc_error = _make_runtime_rpc_error()
 
         with patch(
@@ -196,7 +197,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
             )
 
         self.assertIs(response, rpc_error)
-        rpc_error.add_callback.assert_not_called()
+        rpc_error.add_callback.assert_called_once()
         flwr_exit_mock.assert_called_once_with(
             ExitCode.RUNTIME_VERSION_INCOMPATIBLE,
             "Runtime version compatibility check failed.\nruntime mismatch",
@@ -461,7 +462,7 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
         log_mock.assert_called_once()
 
     def test_log_stream_incompatibility_from_returned_rpc_error(self) -> None:
-        """Unary-stream RpcError outcomes should not register callbacks."""
+        """Unary-stream RpcError outcomes should fall back if callbacks fail."""
         rpc_error = _make_runtime_rpc_error()
 
         with patch(
@@ -474,7 +475,7 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
             )
 
         self.assertIs(response, rpc_error)
-        rpc_error.add_callback.assert_not_called()
+        rpc_error.add_callback.assert_called_once()
         flwr_exit_mock.assert_called_once_with(
             ExitCode.RUNTIME_VERSION_INCOMPATIBLE,
             "Runtime version compatibility check failed.\nruntime mismatch",
