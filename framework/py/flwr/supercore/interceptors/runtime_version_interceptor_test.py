@@ -81,6 +81,17 @@ def _make_runtime_metadata(version: str) -> tuple[tuple[str, str], ...]:
     )
 
 
+def _make_runtime_metadata_with_package(
+    package_name: str,
+    version: str,
+) -> tuple[tuple[str, str], ...]:
+    return (
+        (FLWR_PACKAGE_NAME_METADATA_KEY, package_name),
+        (FLWR_PACKAGE_VERSION_METADATA_KEY, version),
+        (FLWR_COMPONENT_NAME_METADATA_KEY, "simulation"),
+    )
+
+
 def _make_unary_handler() -> grpc.RpcMethodHandler:
     def _handler(_request: GrpcMessage, _context: grpc.ServicerContext) -> str:
         return "ok"
@@ -271,6 +282,24 @@ class TestRuntimeVersionServerInterceptor(TestCase):
             metadata[VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY],
             "Warning: The installed `flwr` version is 1.30.1, but 1.29.0 "
             "is recommended.",
+        )
+
+    def test_package_name_mismatch_preserves_warning_details(self) -> None:
+        """Non-version incompatibilities should preserve diagnostic details."""
+        intercepted = self._intercept(
+            "/flwr.proto.ServerAppIo/GetNodes",
+            _make_runtime_metadata_with_package("custom-flwr", "1.29.0"),
+        )
+
+        context = Mock()
+        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        self.assertEqual(response, "ok")
+        context.set_trailing_metadata.assert_called_once()
+        metadata = dict(context.set_trailing_metadata.call_args.args[0])
+        self.assertEqual(
+            metadata[VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY],
+            "Warning: Runtime version compatibility check failed. "
+            "Peer Flower package name is not recognized: 'custom-flwr'.",
         )
 
     def test_incompatible_metadata_is_rejected(self) -> None:

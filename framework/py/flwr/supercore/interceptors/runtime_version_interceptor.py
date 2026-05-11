@@ -32,6 +32,8 @@ from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
 from flwr.supercore.utils import get_metadata_str
 
+_SUPPORTED_FLOWER_PACKAGE_NAMES = frozenset({"flwr", "flwr-nightly"})
+
 
 class RuntimeVersionClientInterceptor(
     grpc.UnaryUnaryClientInterceptor,  # type: ignore[misc]
@@ -228,7 +230,7 @@ def _format_runtime_version_warning(
     fallback_details: str,
 ) -> str:
     """Format a client-facing runtime-version compatibility warning."""
-    if not _has_parseable_versions(local_metadata, peer_metadata):
+    if not _is_version_mismatch(local_metadata, peer_metadata):
         return (
             "Warning: Runtime version compatibility check failed. "
             f"{fallback_details}"
@@ -248,7 +250,7 @@ def _format_runtime_version_error(
     fallback_details: str,
 ) -> str:
     """Format client-facing details for runtime-version rejection."""
-    if not _has_parseable_versions(local_metadata, peer_metadata):
+    if not _is_version_mismatch(local_metadata, peer_metadata):
         return (
             f"{fallback_details} Upgrade to `{local_metadata.package_name}` "
             f"{local_metadata.package_version}."
@@ -263,19 +265,29 @@ def _format_runtime_version_error(
     )
 
 
-def _has_parseable_versions(
+def _is_version_mismatch(
     local_metadata: RuntimeVersionMetadata,
     peer_metadata: RuntimeVersionMetadata | None,
 ) -> bool:
-    """Return whether both runtime versions can be used in client-facing guidance."""
+    """Return whether incompatibility is caused by a major/minor version mismatch."""
     if peer_metadata is None:
         return False
+    if (
+        local_metadata.package_name.strip() not in _SUPPORTED_FLOWER_PACKAGE_NAMES
+        or peer_metadata.package_name.strip() not in _SUPPORTED_FLOWER_PACKAGE_NAMES
+    ):
+        return False
+
     try:
-        Version(local_metadata.package_version)
-        Version(peer_metadata.package_version)
+        local_version = Version(local_metadata.package_version)
+        peer_version = Version(peer_metadata.package_version)
     except InvalidVersion:
         return False
-    return True
+
+    return (
+        local_version.major != peer_version.major
+        or local_version.minor != peer_version.minor
+    )
 
 
 def create_serverappio_runtime_version_server_interceptor(
