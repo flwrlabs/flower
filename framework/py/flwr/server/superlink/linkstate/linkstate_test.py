@@ -13,7 +13,6 @@
 # limitations under the License.
 # ==============================================================================
 """Tests all LinkState implemenations have to conform to."""
-
 # pylint: disable=invalid-name, too-many-lines, R0904, R0913
 
 
