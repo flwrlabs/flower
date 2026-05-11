@@ -20,6 +20,8 @@ from pathlib import Path
 from typing import IO, Annotated, Any, cast
 
 import click
+from packaging.specifiers import InvalidSpecifier, SpecifierSet
+from packaging.version import InvalidVersion, Version
 import requests
 import typer
 from requests import Response
@@ -46,6 +48,10 @@ from ..utils import (
     load_cli_auth_plugin_from_connection,
     validate_project_name,
 )
+
+PYTHON_VERSION_MIN = Version("3.10")
+PYTHON_VERSION_MAX = Version("3.14")
+PYTHON_VERSION_NEXT = Version("3.15")
 
 
 # pylint: disable=too-many-locals
@@ -77,6 +83,7 @@ def publish(
     config, _ = load_and_validate(app / FAB_CONFIG_FILE, check_module=False)
     _validate_app_name(app.name, "Flower App directory name")
     _validate_description(config["project"].get("description", ""))
+    _validate_requires_python(config)
 
     # Collect & validate app files
     file_paths = _collect_file_paths(app)
@@ -132,6 +139,64 @@ def _validate_app_name(name: str, target: str) -> None:
         validate_project_name(name, target)
     except ValueError as err:
         raise click.ClickException(str(err)) from None
+
+
+def _validate_requires_python(config: dict[str, Any]) -> None:
+    """Validate [project].requires-python for Flower Hub publishing."""
+    requires_python = config["project"].get("requires-python")
+    if not isinstance(requires_python, str) or requires_python.strip() == "":
+        raise click.ClickException(
+            "Missing or invalid [project].requires-python. "
+            'Please set it to a range within ">=3.10,<=3.14".'
+        )
+
+    try:
+        specifier_set = SpecifierSet(requires_python)
+    except InvalidSpecifier as err:
+        raise click.ClickException(
+            "Invalid [project].requires-python: expected a valid Python version "
+            'specifier within ">=3.10,<=3.14".'
+        ) from err
+
+    lower_bounds: list[Version] = []
+    upper_bounds: list[Version] = []
+    for specifier in specifier_set:
+        try:
+            version = Version(specifier.version)
+        except InvalidVersion as err:
+            raise click.ClickException(
+                "Invalid [project].requires-python: expected valid Python versions "
+                'within ">=3.10,<=3.14".'
+            ) from err
+
+        if specifier.operator in {">=", ">", "==", "==="}:
+            lower_bounds.append(version)
+        if specifier.operator in {"<=", "<", "==", "==="}:
+            upper_bounds.append(version)
+
+    if not lower_bounds or max(lower_bounds) < PYTHON_VERSION_MIN:
+        raise click.ClickException(
+            "Invalid [project].requires-python: publishing requires a lower bound "
+            'of ">=3.10" or higher.'
+        )
+
+    if not upper_bounds:
+        raise click.ClickException(
+            "Invalid [project].requires-python: publishing requires an upper bound "
+            'of "<=3.14" or "<3.15".'
+        )
+
+    if not any(
+        specifier.operator == "<"
+        and Version(specifier.version) == PYTHON_VERSION_NEXT
+        or specifier.operator in {"<=", "==", "==="}
+        and Version(specifier.version) <= PYTHON_VERSION_MAX
+        for specifier in specifier_set
+    ):
+        raise click.ClickException(
+            "Invalid [project].requires-python: publishing requires an upper bound "
+            'of "<=3.14" or "<3.15".'
+        )
 
 
 def _detect_mime(path: Path) -> str:

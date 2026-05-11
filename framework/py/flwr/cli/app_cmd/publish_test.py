@@ -35,6 +35,7 @@ from .publish import (
     _validate_app_name,
     _validate_description,
     _validate_files,
+    _validate_requires_python,
 )
 
 TEXT_EXT = ".py"
@@ -261,6 +262,42 @@ def test_validate_description_empty_raises() -> None:
 def test_validate_description_valid() -> None:
     """Test valid description passes validation."""
     _validate_description("A simple Flower federated learning app.")
+
+
+@pytest.mark.parametrize(
+    "requires_python",
+    [">=3.10,<=3.14", ">=3.10,<3.15", ">=3.11,<=3.14", "==3.12"],
+)
+def test_validate_requires_python_accepts_supported_ranges(
+    requires_python: str,
+) -> None:
+    """Test supported Python version ranges pass validation."""
+    _validate_requires_python({"project": {"requires-python": requires_python}})
+
+
+@pytest.mark.parametrize(
+    ("requires_python", "match"),
+    [
+        (None, "Missing or invalid"),
+        ("", "Missing or invalid"),
+        (">=3.9,<=3.14", "lower bound"),
+        (">=3.10,<4.0", "upper bound"),
+        (">=3.10", "upper bound"),
+        (">=3.10,<=3.15", "upper bound"),
+        ("not-a-specifier", "valid Python version specifier"),
+    ],
+)
+def test_validate_requires_python_rejects_unsupported_ranges(
+    requires_python: str | None,
+    match: str,
+) -> None:
+    """Test unsupported Python version ranges fail validation."""
+    project = {}
+    if requires_python is not None:
+        project["requires-python"] = requires_python
+
+    with pytest.raises(click.ClickException, match=match):
+        _validate_requires_python({"project": project})
 
 
 @pytest.mark.parametrize("value", ["app-numpy33", "App-NumPy33"])
