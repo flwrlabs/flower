@@ -36,9 +36,8 @@ from flwr.common.constant import (
     SYSTEM_TIME_TOLERANCE,
     TIMESTAMP_HEADER,
     TIMESTAMP_TOLERANCE,
-    Status,
 )
-from flwr.common.typing import Fab, RunStatus
+from flwr.common.typing import Fab
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -260,8 +259,10 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
             RunType.SERVER_APP,
         )
         if running:
-            self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-            self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
+            run = self.state.get_run_info(run_ids=[run_id])[0]
+            assert run.primary_task_id is not None
+            assert self.state.claim_task(run.primary_task_id) is not None
+            assert self.state.activate_task(run.primary_task_id)
         return run_id
 
     def _test_push_messages(self, metadata: list[Any]) -> Any:
