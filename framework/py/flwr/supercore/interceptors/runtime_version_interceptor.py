@@ -84,7 +84,9 @@ class RuntimeVersionClientInterceptor(
         )
         call: grpc.Call = continuation(details, request)
 
-        def _log_on_completion() -> None:
+        def _handle_completion() -> None:
+            if isinstance(call, grpc.RpcError):
+                self._maybe_log_incompat_error(call)
             self._maybe_log_incompat_warning(call.trailing_metadata())
 
         if isinstance(call, grpc.RpcError) and (
@@ -96,8 +98,8 @@ class RuntimeVersionClientInterceptor(
             )
             return call
 
-        if not call.add_callback(_log_on_completion):
-            _log_on_completion()
+        if not call.add_callback(_handle_completion):
+            _handle_completion()
 
         return call
 

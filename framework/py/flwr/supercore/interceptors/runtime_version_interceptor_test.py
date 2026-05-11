@@ -211,8 +211,8 @@ class TestRuntimeVersionClientInterceptor(TestCase):
             "Runtime version compatibility check failed.\nruntime mismatch",
         )
 
-    def test_unary_future_rpc_error_uses_completion_callback(self) -> None:
-        """Unary-unary futures should not be inspected before completion."""
+    def test_unary_future_rpc_error_checks_details_on_completion(self) -> None:
+        """Unary-unary futures should inspect details only after completion."""
         call = grpc.RpcError()
         call.add_callback = Mock(return_value=True)
         call.done = Mock(return_value=False)
@@ -221,11 +221,16 @@ class TestRuntimeVersionClientInterceptor(TestCase):
             side_effect=AssertionError("details() should not be called")
         )
 
-        with patch(
-            "flwr.supercore.interceptors.runtime_version_interceptor.grpc.Future",
-            grpc.RpcError,
+        with (
+            patch(
+                "flwr.supercore.interceptors.runtime_version_interceptor.grpc.Future",
+                grpc.RpcError,
+            ),
+            patch(
+                "flwr.supercore.interceptors.runtime_version_interceptor.flwr_exit"
+            ) as flwr_exit_mock,
         ):
-            response = self.interceptor.intercept_unary_unary(
+            self.interceptor.intercept_unary_unary(
                 continuation=lambda _details, _request: call,
                 client_call_details=_make_call_details(
                     "/flwr.proto.ServerAppIo/GetNodes"
@@ -233,9 +238,11 @@ class TestRuntimeVersionClientInterceptor(TestCase):
                 request=GetNodesRequest(run_id=1),
             )
 
-        self.assertIs(response, call)
-        call.add_callback.assert_called_once()
-        call.details.assert_not_called()
+            callback = call.add_callback.call_args.args[0]
+            call.details.assert_not_called()
+            call.details = _make_runtime_rpc_error().details
+            callback()
+            flwr_exit_mock.assert_called_once()
 
 
 class TestRuntimeVersionServerInterceptor(TestCase):
