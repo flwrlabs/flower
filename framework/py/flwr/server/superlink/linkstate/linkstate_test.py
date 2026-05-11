@@ -2086,6 +2086,50 @@ def _claim_running_in_separate_process(
         result_queue.put((False, repr(ex)))
 
 
+class SqlLinkStateSqlGenerationTest(unittest.TestCase):
+    """Tests for SQL generation in SqlLinkState."""
+
+    def _create_state(self, database_path: str = ":memory:") -> SqlLinkState:
+        return SqlLinkState(
+            database_path=database_path,
+            federation_manager=NoOpFederationManager(),
+            object_store=ObjectStoreFactory().store(),
+        )
+
+    def test_claim_message_ins_rows_uses_deterministic_ordering(self) -> None:
+        """Message claiming should use deterministic ordering."""
+        state = self._create_state()
+        captured: list[str] = []
+
+        def fake_query(query: str, _params: Any = None) -> list[dict[str, Any]]:
+            captured.append(query)
+            return []
+
+        state.query = fake_query  # type: ignore[assignment,method-assign]
+        # pylint: disable-next=protected-access
+        _ = state._claim_message_ins_rows(node_id=1, limit=3)
+
+        self.assertTrue(captured)
+        self.assertIn("ORDER BY created_at, message_id", captured[0])
+        self.assertNotIn("rowid", captured[0])
+
+    def test_load_message_ins_rows_uses_deterministic_ordering(self) -> None:
+        """Message loading should use deterministic ordering."""
+        state = self._create_state()
+        captured: list[str] = []
+
+        def fake_query(query: str, _params: Any = None) -> list[dict[str, Any]]:
+            captured.append(query)
+            return []
+
+        state.query = fake_query  # type: ignore[assignment,method-assign]
+        _ = state._load_message_ins_rows({"abc"})  # pylint: disable=protected-access
+
+        self.assertTrue(captured)
+        self.assertIn("ORDER BY created_at, message_id", captured[0])
+        self.assertNotIn("rowid", captured[0])
+
+
 class InMemoryStateTest(StateTest):
     """Test InMemoryState implementation."""
 
