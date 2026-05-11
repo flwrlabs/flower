@@ -118,9 +118,11 @@ class AppIoServicer(ABC):
         log(DEBUG, "AppIoServicer.PushLogs")
         state = self.state()
 
+        task = get_authenticated_task()
+
         # Add logs to LinkState
         merged_logs = "".join(request.logs)
-        state.add_task_log(request.run_id, merged_logs)
+        state.add_task_log(task.task_id, merged_logs)
         return PushLogsResponse()
 
 
