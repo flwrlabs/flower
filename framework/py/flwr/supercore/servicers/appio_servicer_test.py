@@ -248,5 +248,5 @@ class TestAppIoServicer(unittest.TestCase):
         )
 
         # Assert
-        self.state.add_serverapp_log.assert_called_once_with(123, "hello world")
+        self.state.add_task_log.assert_called_once_with(123, "hello world")
         self.assertEqual(response.__class__.__name__, "PushLogsResponse")

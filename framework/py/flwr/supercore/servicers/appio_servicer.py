@@ -120,7 +120,7 @@ class AppIoServicer(ABC):
 
         # Add logs to LinkState
         merged_logs = "".join(request.logs)
-        state.add_serverapp_log(request.run_id, merged_logs)
+        state.add_task_log(request.run_id, merged_logs)
         return PushLogsResponse()
 
 
