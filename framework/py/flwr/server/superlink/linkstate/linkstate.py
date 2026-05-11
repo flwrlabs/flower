@@ -357,23 +357,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
-    def update_run_status(self, run_id: int, new_status: RunStatus) -> bool:
-        """Update the status of the run with the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run.
-        new_status : RunStatus
-            The new status to be assigned to the run.
-
-        Returns
-        -------
-        bool
-            True if the status update is successful; False otherwise.
-        """
-
-    @abc.abstractmethod
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
     ) -> bool:

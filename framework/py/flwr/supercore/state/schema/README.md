@@ -135,6 +135,12 @@ erDiagram
     VARCHAR type
   }
 
+  task_logs {
+    BIGINT task_id FK
+    VARCHAR log
+    FLOAT timestamp
+  }
+
   token_store {
     BIGINT run_id PK "nullable"
     FLOAT active_until "nullable"
@@ -148,6 +154,7 @@ erDiagram
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
   objects ||--o| run_objects : object_id
+  task ||--o{ task_logs : task_id
 
 ```
 <!-- END_SQLALCHEMY_DOCS -->
