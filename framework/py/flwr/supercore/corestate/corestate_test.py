@@ -62,21 +62,13 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """
         return 123
 
-    def _patch_task_log_now(self, *timestamps: Any) -> ExitStack:
-        """Patch task-log timestamp generation in all CoreState implementations."""
+    def _patch_task_log_datetime_now(self, *timestamps: Any) -> ExitStack:
+        """Patch the shared datetime source used for task-log timestamps."""
         stack = ExitStack()
-        stack.enter_context(
-            patch(
-                "flwr.supercore.corestate.in_memory_corestate.now",
-                side_effect=list(timestamps),
-            )
+        mock_datetime = stack.enter_context(
+            patch("flwr.supercore.date.datetime.datetime")
         )
-        stack.enter_context(
-            patch(
-                "flwr.supercore.corestate.sql_corestate.now",
-                side_effect=list(timestamps),
-            )
-        )
+        mock_datetime.now.side_effect = list(timestamps)
         return stack
 
     def test_create_and_get_task(self) -> None:
@@ -211,7 +203,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         fixed_now = now()
         timestamp = (fixed_now - timedelta(microseconds=1)).timestamp()
 
-        with self._patch_task_log_now(
+        with self._patch_task_log_datetime_now(
             fixed_now,
             fixed_now + timedelta(microseconds=1),
         ):
@@ -238,7 +230,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         # Both inserts observe the same clock timestamp, but the second stored
         # timestamp must advance so the timestamp-only cursor remains lossless.
-        with self._patch_task_log_now(fixed_now, fixed_now):
+        with self._patch_task_log_datetime_now(fixed_now, fixed_now):
             state.add_task_log(task_id, "Log entry 1")
             state.add_task_log(task_id, "Log entry 2")
 
@@ -269,7 +261,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         fixed_now = now()
         timestamp = (fixed_now + timedelta(microseconds=1)).timestamp()
 
-        with self._patch_task_log_now(
+        with self._patch_task_log_datetime_now(
             fixed_now,
             fixed_now + timedelta(microseconds=2),
         ):
@@ -293,7 +285,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         assert task_id is not None
         fixed_now = now()
-        with self._patch_task_log_now(fixed_now):
+        with self._patch_task_log_datetime_now(fixed_now):
             state.add_task_log(task_id, "Log entry")
         timestamp = (fixed_now + timedelta(microseconds=1)).timestamp()
 
@@ -314,7 +306,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         assert task_id is not None
         fixed_now = now()
 
-        with self._patch_task_log_now(fixed_now):
+        with self._patch_task_log_datetime_now(fixed_now):
             state.add_task_log(task_id, "Log entry 1")
         retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=None)
 
