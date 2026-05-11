@@ -2042,6 +2042,31 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state.initialize()
         return state
 
+    @parameterized.expand(
+        [  # type: ignore
+            ("claim", "_claim_message_ins_rows", (1, 3)),
+            ("load", "_load_message_ins_rows", ({"abc"},)),
+        ]
+    )
+    def test_message_ins_rows_uses_deterministic_ordering(
+        self, _name: str, method: str, args: tuple[Any, ...]
+    ) -> None:
+        """Message querying should use deterministic ordering."""
+        state = self.state_factory()
+        captured: list[str] = []
+
+        # pylint: disable-next=unused-argument
+        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
+            captured.append(query)
+            return []
+
+        state.query = fake_query  # type: ignore[method-assign]
+        getattr(state, method)(*args)
+
+        self.assertTrue(captured)
+        self.assertIn("ORDER BY created_at, message_id", captured[0])
+        self.assertNotIn("rowid", captured[0])
+
     def test_token_expiry_does_not_overwrite_finished_completed_run(self) -> None:
         """Ensure token cleanup doesn't mutate terminal COMPLETED status."""
         # Prepare
@@ -2068,7 +2093,7 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         assert status.details == "done"
 
 
-class SqlFileBasedTest(StateTest, unittest.TestCase):
+class SqlFileBasedTest(SqlInMemoryStateTest):
     """Test SqlLinkState implementation with file-based database."""
 
     __test__ = True
