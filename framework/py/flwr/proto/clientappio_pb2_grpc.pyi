@@ -20,6 +20,7 @@ limitations under the License.
 import abc
 import collections.abc
 import flwr.proto.appio_pb2
+import flwr.proto.log_pb2
 import flwr.proto.message_pb2
 import flwr.proto.run_pb2
 import grpc
@@ -109,6 +110,12 @@ class ClientAppIoStub:
         flwr.proto.appio_pb2.CreateTaskResponse,
     ]
     """Create a task"""
+
+    PushLogs: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.log_pb2.PushLogsRequest,
+        flwr.proto.log_pb2.PushLogsResponse,
+    ]
+    """Push task logs"""
 
     PushMessage: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushAppMessagesRequest,
@@ -202,6 +209,12 @@ class ClientAppIoAsyncStub:
         flwr.proto.appio_pb2.CreateTaskResponse,
     ]
     """Create a task"""
+
+    PushLogs: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.log_pb2.PushLogsRequest,
+        flwr.proto.log_pb2.PushLogsResponse,
+    ]
+    """Push task logs"""
 
     PushMessage: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushAppMessagesRequest,
@@ -315,6 +328,14 @@ class ClientAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.appio_pb2.CreateTaskResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.CreateTaskResponse]]:
         """Create a task"""
+
+    @abc.abstractmethod
+    def PushLogs(
+        self,
+        request: flwr.proto.log_pb2.PushLogsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.log_pb2.PushLogsResponse, collections.abc.Awaitable[flwr.proto.log_pb2.PushLogsResponse]]:
+        """Push task logs"""
 
     @abc.abstractmethod
     def PushMessage(

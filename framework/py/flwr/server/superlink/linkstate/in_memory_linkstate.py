@@ -16,7 +16,6 @@
 
 
 import threading
-from bisect import bisect_right
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
@@ -787,29 +786,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         if run_id not in self.run_ids:
             raise ValueError(f"Run {run_id} not found")
         self.contexts[run_id] = context
-
-    def add_serverapp_log(self, run_id: int, log_message: str) -> None:
-        """Add a log entry to the serverapp logs for the specified `run_id`."""
-        if run_id not in self.run_ids:
-            raise ValueError(f"Run {run_id} not found")
-        run = self.run_ids[run_id]
-        with run.log_lock:
-            run.logs.append((now().timestamp(), log_message))
-
-    def get_serverapp_log(
-        self, run_id: int, after_timestamp: float | None
-    ) -> tuple[str, float]:
-        """Get the serverapp logs for the specified `run_id`."""
-        if run_id not in self.run_ids:
-            raise ValueError(f"Run {run_id} not found")
-        run = self.run_ids[run_id]
-        if after_timestamp is None:
-            after_timestamp = 0.0
-        with run.log_lock:
-            # Find the index where the timestamp would be inserted
-            index = bisect_right(run.logs, (after_timestamp, ""))
-            latest_timestamp = run.logs[-1][0] if index < len(run.logs) else 0.0
-            return "".join(log for _, log in run.logs[index:]), latest_timestamp
 
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`."""

@@ -1655,90 +1655,6 @@ class StateTest(CoreStateTest):
         with self.assertRaises(ValueError):
             state.set_serverapp_context(61016, context)  # Invalid run_id
 
-    def test_add_serverapp_log_invalid_run_id(self) -> None:
-        """Test adding serverapp log with invalid run_id."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        invalid_run_id = 99999
-        log_entry = "Invalid log entry"
-
-        # Execute and assert
-        with self.assertRaises(ValueError):
-            state.add_serverapp_log(invalid_run_id, log_entry)
-
-    def test_get_serverapp_log_invalid_run_id(self) -> None:
-        """Test retrieving serverapp log with invalid run_id."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        invalid_run_id = 99999
-
-        # Execute and assert
-        with self.assertRaises(ValueError):
-            state.get_serverapp_log(invalid_run_id, after_timestamp=None)
-
-    def test_add_and_get_serverapp_log(self) -> None:
-        """Test adding and retrieving serverapp logs."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state)
-        log_entry_1 = "Log entry 1"
-        log_entry_2 = "Log entry 2"
-        timestamp = now().timestamp()
-
-        # Execute
-        state.add_serverapp_log(run_id, log_entry_1)
-        state.add_serverapp_log(run_id, log_entry_2)
-        retrieved_logs, latest = state.get_serverapp_log(
-            run_id, after_timestamp=timestamp
-        )
-
-        # Assert
-        assert latest > timestamp
-        assert log_entry_1 + log_entry_2 == retrieved_logs
-
-    def test_get_serverapp_log_after_timestamp(self) -> None:
-        """Test retrieving serverapp logs after a specific timestamp."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state)
-        log_entry_1 = "Log entry 1"
-        log_entry_2 = "Log entry 2"
-        state.add_serverapp_log(run_id, log_entry_1)
-        # Add trivial delays to avoid random failure due to same timestamp
-        time.sleep(1e-6)
-        timestamp = now().timestamp()
-        time.sleep(1e-6)
-        state.add_serverapp_log(run_id, log_entry_2)
-
-        # Execute
-        retrieved_logs, latest = state.get_serverapp_log(
-            run_id, after_timestamp=timestamp
-        )
-
-        # Assert
-        assert latest > timestamp
-        assert log_entry_1 not in retrieved_logs
-        assert log_entry_2 == retrieved_logs
-
-    def test_get_serverapp_log_after_timestamp_no_logs(self) -> None:
-        """Test retrieving serverapp logs after a specific timestamp but no logs are
-        found."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state)
-        log_entry = "Log entry"
-        state.add_serverapp_log(run_id, log_entry)
-        timestamp = now().timestamp() + 0.001  # Ensure timestamp is after the log entry
-
-        # Execute
-        retrieved_logs, latest = state.get_serverapp_log(
-            run_id, after_timestamp=timestamp
-        )
-
-        # Assert
-        assert latest == 0
-        assert retrieved_logs == ""
-
     def test_create_run_with_and_without_federation_config(self) -> None:
         """Test that run federation config is stored on the run."""
         # Prepare
@@ -2042,6 +1958,31 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state.initialize()
         return state
 
+    @parameterized.expand(
+        [  # type: ignore
+            ("claim", "_claim_message_ins_rows", (1, 3)),
+            ("load", "_load_message_ins_rows", ({"abc"},)),
+        ]
+    )
+    def test_message_ins_rows_uses_deterministic_ordering(
+        self, _name: str, method: str, args: tuple[Any, ...]
+    ) -> None:
+        """Message querying should use deterministic ordering."""
+        state = self.state_factory()
+        captured: list[str] = []
+
+        # pylint: disable-next=unused-argument
+        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
+            captured.append(query)
+            return []
+
+        state.query = fake_query  # type: ignore[method-assign]
+        getattr(state, method)(*args)
+
+        self.assertTrue(captured)
+        self.assertIn("ORDER BY created_at, message_id", captured[0])
+        self.assertNotIn("rowid", captured[0])
+
     def test_token_expiry_does_not_overwrite_finished_completed_run(self) -> None:
         """Ensure token cleanup doesn't mutate terminal COMPLETED status."""
         # Prepare
@@ -2068,7 +2009,7 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         assert status.details == "done"
 
 
-class SqlFileBasedTest(StateTest, unittest.TestCase):
+class SqlFileBasedTest(SqlInMemoryStateTest):
     """Test SqlLinkState implementation with file-based database."""
 
     __test__ = True
