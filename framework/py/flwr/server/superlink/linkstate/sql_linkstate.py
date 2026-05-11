@@ -331,7 +331,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     SELECT message_id
                     FROM message_ins
                     WHERE {common_condition}
-                    ORDER BY rowid
+                    ORDER BY created_at, message_id
                     LIMIT :limit
                 )
                 AND delivered_at = ''
@@ -353,7 +353,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             SELECT *
             FROM message_ins
             WHERE message_id IN ({placeholders})
-            ORDER BY rowid
+            ORDER BY created_at, message_id
         """
         params = {f"mid_{i}": msg_id for i, msg_id in enumerate(message_ids)}
         return self.query(query, params)
