@@ -14,7 +14,6 @@
 # ==============================================================================
 """Mixin providing common SQL connection and initialization logic via SQLAlchemy."""
 
-
 import re
 from abc import ABC
 from collections.abc import Iterator, Sequence
@@ -95,7 +94,7 @@ class SqlMixin(ABC):
 
         self.database_url = self._normalize_database_url(database_path)
         self.database_dialect = self._extract_database_dialect(self.database_url)
-        self._validate_allowed_dialects(database_path, self.database_dialect)
+        self._validate_allowed_dialects(self.database_dialect)
 
         self._engine: Engine | None = None
         self._session_factory: sessionmaker[Session] | None = None
@@ -118,9 +117,7 @@ class SqlMixin(ABC):
         abs_path = Path(database_path).resolve()
         return f"sqlite:///{abs_path}"
 
-    def _validate_allowed_dialects(
-        self, original_database_path: str, dialect: str
-    ) -> None:
+    def _validate_allowed_dialects(self, dialect: str) -> None:
         """Validate configured dialect against class-level restrictions."""
         allowed = self.allowed_dialects
         if allowed is None or dialect in allowed:
@@ -135,7 +132,7 @@ class SqlMixin(ABC):
 
         raise ValueError(
             f"Unsupported SQL dialect {dialect!r} for {type(self).__name__} "
-            f"(database={original_database_path!r}). Supported dialects: "
+            f"(database={self.database_url!r}). Supported dialects: "
             f"{allowed_str}.{hint}"
         )
 
