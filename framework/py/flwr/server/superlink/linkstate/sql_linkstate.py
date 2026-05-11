@@ -500,8 +500,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 inquired_in_message_ids=message_ids,
                 found_in_message_dict=found_message_ins_dict,
                 node_id_to_online_until={
-                    int64_to_uint64(row["node_id"]): row["online_until"]
-                    for row in rows
+                    int64_to_uint64(row["node_id"]): row["online_until"] for row in rows
                 },
                 current_time=current,
             )
