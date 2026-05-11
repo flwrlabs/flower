@@ -1168,9 +1168,7 @@ class TestControlServicerAuth(unittest.TestCase):
 
         # Execute & Assert
         with (
-            patch.object(
-                self.state, "get_serverapp_log", new=lambda rid, ts: ("log1", 1.0)
-            ),
+            patch.object(self.state, "get_task_log", new=lambda rid, ts: ("log1", 1.0)),
             patch.object(self.state, "get_run_info", new=mock_get_run_info),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=True
