@@ -66,29 +66,25 @@ class RuntimeVersionClientInterceptor(
                 exit_message += f"\n{flower_error.public_details}"
             flwr_exit(ExitCode.RUNTIME_VERSION_INCOMPATIBLE, exit_message)
 
-    def _intercept_call(
+    def _handle_completion(self, call: grpc.Call) -> None:
+        """Inspect RPC completion metadata and runtime-version error details."""
+        self._maybe_log_incompat_warning(call.trailing_metadata())
+        if isinstance(call, grpc.RpcError):
+            self._maybe_exit_on_incompat_error(call)
+
+    def _call_with_runtime_version_metadata(
         self,
         continuation: Callable[[Any, Any], Any],
         client_call_details: grpc.ClientCallDetails,
         request: GrpcMessage,
     ) -> grpc.Call:
-        """Add runtime version metadata and inspect RPC completion metadata."""
+        """Add runtime version metadata to an outbound RPC call."""
         details = client_call_details._replace(
             metadata=self._metadata.append_to_grpc_metadata(
                 client_call_details.metadata
             )
         )
-        call: grpc.Call = continuation(details, request)
-
-        def _handle_completion() -> None:
-            self._maybe_log_incompat_warning(call.trailing_metadata())
-            if isinstance(call, grpc.RpcError):
-                self._maybe_exit_on_incompat_error(call)
-
-        if not call.add_callback(_handle_completion):
-            _handle_completion()
-
-        return call
+        return continuation(details, request)
 
     def intercept_unary_unary(
         self,
@@ -97,7 +93,11 @@ class RuntimeVersionClientInterceptor(
         request: GrpcMessage,
     ) -> grpc.Call:
         """Add the runtime version metadata headers for unary-unary RPCs."""
-        return self._intercept_call(continuation, client_call_details, request)
+        call = self._call_with_runtime_version_metadata(
+            continuation, client_call_details, request
+        )
+        self._handle_completion(call)
+        return call
 
     def intercept_unary_stream(
         self,
@@ -106,7 +106,12 @@ class RuntimeVersionClientInterceptor(
         request: GrpcMessage,
     ) -> grpc.Call:
         """Add the runtime version metadata headers for unary-stream RPCs."""
-        return self._intercept_call(continuation, client_call_details, request)
+        call = self._call_with_runtime_version_metadata(
+            continuation, client_call_details, request
+        )
+        if not call.add_callback(lambda: self._handle_completion(call)):
+            self._handle_completion(call)
+        return call
 
 
 class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[misc]
