@@ -275,7 +275,7 @@ def _main_loop(
         )
     updated_context = server_app_context
     try:
-        # Hack InMemoryLinkState to pre-register the run with its primary task
+        # Use InMemoryLinkState to pre-register the run with its primary task
         log(DEBUG, "Pre-registering run with id %s", run.run_id)
         state = cast(InMemoryLinkState, state_factory.state())
         state.run_ids[run.run_id] = RunRecord(run=run)
