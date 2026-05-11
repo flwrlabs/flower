@@ -299,6 +299,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         if not runs:
             context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
         run = runs[0]
+        task_id = cast(int, run.primary_task_id)
 
         with rpc_error_translator(context, rpc_name):
             flwr_aid = _get_flwr_aid(context)
@@ -308,7 +309,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         after_timestamp = request.after_timestamp + 1e-6
         while context.is_active():
-            log_msg, latest_timestamp = state.get_serverapp_log(run_id, after_timestamp)
+            log_msg, latest_timestamp = state.get_task_log(task_id, after_timestamp)
             if log_msg:
                 yield StreamLogsResponse(
                     log_output=log_msg,

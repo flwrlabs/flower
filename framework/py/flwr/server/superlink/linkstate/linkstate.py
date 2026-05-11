@@ -411,41 +411,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
-    def add_serverapp_log(self, run_id: int, log_message: str) -> None:
-        """Add a log entry to the ServerApp logs for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run for which to add a log entry.
-        log_message : str
-            The log entry to be added to the ServerApp logs.
-        """
-
-    @abc.abstractmethod
-    def get_serverapp_log(
-        self, run_id: int, after_timestamp: float | None
-    ) -> tuple[str, float]:
-        """Get the ServerApp logs for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run for which to retrieve the ServerApp logs.
-
-        after_timestamp : Optional[float]
-            Retrieve logs after this timestamp. If set to `None`, retrieve all logs.
-
-        Returns
-        -------
-        tuple[str, float]
-            A tuple containing:
-            - The ServerApp logs associated with the specified `run_id`.
-            - The timestamp of the latest log entry in the returned logs.
-              Returns `0` if no logs are returned.
-        """
-
-    @abc.abstractmethod
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`.
 
