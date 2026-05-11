@@ -216,8 +216,8 @@ class PullAppMessagesResponse(google.protobuf.message.Message):
 global___PullAppMessagesResponse = PullAppMessagesResponse
 
 @typing.final
-class PullAppInputsRequest(google.protobuf.message.Message):
-    """PullAppInputs messages"""
+class PullTaskInputRequest(google.protobuf.message.Message):
+    """PullTaskInput messages"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -230,10 +230,10 @@ class PullAppInputsRequest(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["token", b"token"]) -> None: ...
 
-global___PullAppInputsRequest = PullAppInputsRequest
+global___PullTaskInputRequest = PullTaskInputRequest
 
 @typing.final
-class PullAppInputsResponse(google.protobuf.message.Message):
+class PullTaskInputResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     CONTEXT_FIELD_NUMBER: builtins.int
@@ -262,11 +262,11 @@ class PullAppInputsResponse(google.protobuf.message.Message):
     def HasField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing.Literal["context", b"context", "fab", b"fab", "federation_config", b"federation_config", "run", b"run", "task_id", b"task_id"]) -> None: ...
 
-global___PullAppInputsResponse = PullAppInputsResponse
+global___PullTaskInputResponse = PullTaskInputResponse
 
 @typing.final
-class PushAppOutputsRequest(google.protobuf.message.Message):
-    """PushAppInputs messages"""
+class PushTaskOutputRequest(google.protobuf.message.Message):
+    """PushTaskOutput messages"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -293,17 +293,17 @@ class PushAppOutputsRequest(google.protobuf.message.Message):
     def HasField(self, field_name: typing.Literal["context", b"context"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing.Literal["context", b"context", "details", b"details", "run_id", b"run_id", "sub_status", b"sub_status", "token", b"token"]) -> None: ...
 
-global___PushAppOutputsRequest = PushAppOutputsRequest
+global___PushTaskOutputRequest = PushTaskOutputRequest
 
 @typing.final
-class PushAppOutputsResponse(google.protobuf.message.Message):
+class PushTaskOutputResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     def __init__(
         self,
     ) -> None: ...
 
-global___PushAppOutputsResponse = PushAppOutputsResponse
+global___PushTaskOutputResponse = PushTaskOutputResponse
 
 @typing.final
 class CreateTaskRequest(google.protobuf.message.Message):
@@ -312,12 +312,10 @@ class CreateTaskRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     TYPE_FIELD_NUMBER: builtins.int
-    RUN_ID_FIELD_NUMBER: builtins.int
     FAB_HASH_FIELD_NUMBER: builtins.int
     MODEL_REF_FIELD_NUMBER: builtins.int
     CONNECTOR_REF_FIELD_NUMBER: builtins.int
     type: builtins.str
-    run_id: builtins.int
     fab_hash: builtins.str
     model_ref: builtins.str
     connector_ref: builtins.str
@@ -325,13 +323,12 @@ class CreateTaskRequest(google.protobuf.message.Message):
         self,
         *,
         type: builtins.str = ...,
-        run_id: builtins.int = ...,
         fab_hash: builtins.str | None = ...,
         model_ref: builtins.str | None = ...,
         connector_ref: builtins.str | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref", "run_id", b"run_id", "type", b"type"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["_connector_ref", b"_connector_ref", "_fab_hash", b"_fab_hash", "_model_ref", b"_model_ref", "connector_ref", b"connector_ref", "fab_hash", b"fab_hash", "model_ref", b"model_ref", "type", b"type"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_connector_ref", b"_connector_ref"]) -> typing.Literal["connector_ref"] | None: ...
     @typing.overload

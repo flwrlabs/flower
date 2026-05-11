@@ -19,14 +19,14 @@ import hashlib
 import json
 import secrets
 from collections.abc import Sequence
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 from sqlalchemy import MetaData, text
 from sqlalchemy.exc import IntegrityError
 
 from flwr.common import now
 from flwr.common.constant import (
-    FLWR_APP_TOKEN_LENGTH,
+    FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
     TASK_ID_NUM_BYTES,
@@ -236,7 +236,7 @@ class SqlCoreState(CoreState, SqlMixin):
 
     def claim_task(self, task_id: int) -> str | None:
         """Atomically claim a pending task."""
-        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
+        token = secrets.token_hex(FLWR_TASK_TOKEN_LENGTH)
         claimed_at = now()
         active_until = int(claimed_at.timestamp()) + HEARTBEAT_DEFAULT_INTERVAL
         sint64_task_id = uint64_to_int64(task_id)
@@ -385,65 +385,6 @@ class SqlCoreState(CoreState, SqlMixin):
                 "details": "No heartbeat received from the task",
             },
         )
-
-    def create_token(self, run_id: int) -> str | None:
-        """Create a token for the given run ID."""
-        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)  # Generate a random token
-        current = now().timestamp()
-        active_until = current + HEARTBEAT_DEFAULT_INTERVAL
-        query = """
-            INSERT INTO token_store (run_id, token, active_until)
-            VALUES (:run_id, :token, :active_until)
-            RETURNING token;
-        """
-        data = {
-            "run_id": uint64_to_int64(run_id),
-            "token": token,
-            "active_until": active_until,
-        }
-        try:
-            rows = self.query(query, data)
-            return cast(str, rows[0]["token"])
-        except IntegrityError:
-            return None  # Token already created for this run ID
-
-    def verify_token(self, run_id: int, token: str) -> bool:
-        """Verify a token for the given run ID."""
-        self._cleanup_expired_tokens()
-        query = "SELECT token FROM token_store WHERE run_id = :run_id;"
-        data = {"run_id": uint64_to_int64(run_id)}
-        rows = self.query(query, data)
-        if not rows:
-            return False
-        return cast(str, rows[0]["token"]) == token
-
-    def get_run_id_by_token(self, token: str) -> int | None:
-        """Get the run ID associated with a given token."""
-        self._cleanup_expired_tokens()
-        query = "SELECT run_id FROM token_store WHERE token = :token;"
-        data = {"token": token}
-        rows = self.query(query, data)
-        if not rows:
-            return None
-        return int64_to_uint64(rows[0]["run_id"])
-
-    def acknowledge_app_heartbeat(self, token: str) -> bool:
-        """Acknowledge an app heartbeat with the provided token."""
-        # Clean up expired tokens
-        self._cleanup_expired_tokens()
-
-        # Update the active_until field
-        current = now().timestamp()
-        active_until = current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-        query = """
-            UPDATE token_store
-            SET active_until = :active_until
-            WHERE token = :token
-            RETURNING run_id;
-        """
-        data = {"active_until": active_until, "token": token}
-        rows = self.query(query, data)
-        return len(rows) > 0
 
     def _cleanup_expired_tokens(self) -> None:
         """Remove expired tokens and perform additional cleanup.
