@@ -183,10 +183,17 @@ class TestRuntimeVersionClientInterceptor(TestCase):
     def test_log_unary_incompatibility_from_returned_rpc_error(self) -> None:
         """Unary-unary RpcError outcomes should not register callbacks."""
         rpc_error = _make_runtime_rpc_error()
+        rpc_error.done = Mock(return_value=True)
 
-        with patch(
-            "flwr.supercore.interceptors.runtime_version_interceptor.log"
-        ) as log_mock:
+        with (
+            patch(
+                "flwr.supercore.interceptors.runtime_version_interceptor.grpc.Future",
+                grpc.RpcError,
+            ),
+            patch(
+                "flwr.supercore.interceptors.runtime_version_interceptor.log"
+            ) as log_mock,
+        ):
             response = self.interceptor.intercept_unary_unary(
                 continuation=lambda _details, _request: rpc_error,
                 client_call_details=_make_call_details(
@@ -203,6 +210,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
         """Unary-unary futures should not be inspected before completion."""
         call = grpc.RpcError()
         call.add_callback = Mock(return_value=True)
+        call.done = Mock(return_value=False)
         call.trailing_metadata = Mock(return_value=())
         call.details = Mock(
             side_effect=AssertionError("details() should not be called")
