@@ -67,6 +67,7 @@ class RuntimeVersionClientInterceptor(
         client_call_details: grpc.ClientCallDetails,
         request: GrpcMessage,
     ) -> grpc.Call:
+        """Add runtime version metadata and inspect RPC completion metadata."""
         details = client_call_details._replace(
             metadata=self._metadata.append_to_grpc_metadata(
                 client_call_details.metadata
