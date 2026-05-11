@@ -16,7 +16,6 @@
 
 from collections import namedtuple
 from collections.abc import Iterable, Iterator
-from logging import WARN
 from typing import cast
 from unittest import TestCase
 from unittest.mock import Mock, patch
