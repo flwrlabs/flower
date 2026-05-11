@@ -66,9 +66,10 @@ def _generate_unique_task_id(bind, reserved_task_ids: set[int]) -> int:
 def _backfill_primary_tasks() -> None:
     """Create one primary task per historical run and link it from the run row."""
     bind = op.get_bind()
-    in_flight_run_ids = bind.execute(
-        sa.text(
-            """
+    in_flight_run_ids = (
+        bind.execute(
+            sa.text(
+                """
             SELECT run_id
             FROM run
             WHERE COALESCE(finished_at, '') = ''
@@ -79,8 +80,11 @@ def _backfill_primary_tasks() -> None:
             ORDER BY run_id
             LIMIT 10
             """
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     if in_flight_run_ids:
         run_id_examples = ", ".join(str(run_id) for run_id in in_flight_run_ids)
         raise RuntimeError(
@@ -89,17 +93,21 @@ def _backfill_primary_tasks() -> None:
             f"{run_id_examples}"
         )
 
-    runs = bind.execute(
-        sa.text(
-            """
+    runs = (
+        bind.execute(
+            sa.text(
+                """
             SELECT run_id, fab_hash, pending_at, starting_at, running_at, finished_at,
                    sub_status, details, run_type
             FROM run
             WHERE primary_task_id IS NULL
             ORDER BY run_id
             """
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
     insert_task_query = sa.text(
         """
