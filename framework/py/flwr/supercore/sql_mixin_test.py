@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for SqlMixin."""
 
-
 import unittest
 
 from sqlalchemy import Column, Integer, MetaData, Table
@@ -255,13 +254,13 @@ class TestSqlMixin(unittest.TestCase):
         """Explicit URLs should be preserved and dialect should be extracted."""
         db = DummyDbSqlAlchemy("dummysql://localhost/flwr")
         self.assertEqual(db.database_url, "dummysql://localhost/flwr")
-        self.assertEqual(db.database_dialect, "dummysql")
+        self.assertEqual(db.database_backend, "dummysql")
 
     def test_init_normalizes_file_path_to_sqlite_url(self) -> None:
         """File paths should be normalized to SQLite URLs."""
         db = DummyDbSqlAlchemy("state.db")
         self.assertTrue(db.database_url.startswith("sqlite:///"))
-        self.assertEqual(db.database_dialect, "sqlite")
+        self.assertEqual(db.database_backend, "sqlite")
 
     def test_sqlite_allowlist_rejects_non_sqlite_url(self) -> None:
         """SQLite-only classes should reject non-SQLite URLs."""
