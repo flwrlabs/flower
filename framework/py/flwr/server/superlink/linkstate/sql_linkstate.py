@@ -855,24 +855,24 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
              :sub_status, :details)
         """
         override_config_json = json.dumps(override_config)
-        uint64_run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
-        uint64_task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
+        run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
+        task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
         pending_at = now().isoformat()
 
         with self.session():
             query = "SELECT COUNT(*) as cnt FROM run WHERE run_id = :run_id"
-            rows = self.query(query, {"run_id": uint64_to_int64(uint64_run_id)})
+            rows = self.query(query, {"run_id": uint64_to_int64(run_id)})
             if rows[0]["cnt"] == 0:
                 self.query(
                     run_insert_query,
                     {
-                        "run_id": uint64_to_int64(uint64_run_id),
+                        "run_id": uint64_to_int64(run_id),
                         "fab_id": fab_id or "",
                         "fab_version": fab_version or "",
                         "fab_hash": fab_hash or "",
                         "override_config": override_config_json,
                         "federation": federation,
-                        "primary_task_id": uint64_to_int64(uint64_task_id),
+                        "primary_task_id": uint64_to_int64(task_id),
                         "federation_config": fed_config_json,
                         "run_type": run_type,
                         "pending_at": pending_at,
@@ -891,9 +891,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 self.query(
                     task_insert_query,
                     {
-                        "task_id": uint64_to_int64(uint64_task_id),
+                        "task_id": uint64_to_int64(task_id),
                         "type": task_type,
-                        "run_id": uint64_to_int64(uint64_run_id),
+                        "run_id": uint64_to_int64(run_id),
                         "fab_hash": fab_hash,
                         "model_ref": None,
                         "connector_ref": None,
@@ -907,7 +907,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         "details": "",
                     },
                 )
-                return uint64_run_id
+                return run_id
 
         log(ERROR, "Unexpected run creation failure.")
         return 0
