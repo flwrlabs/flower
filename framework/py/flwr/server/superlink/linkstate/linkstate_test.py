@@ -2005,44 +2005,6 @@ def _claim_running_in_separate_process(
         result_queue.put((False, repr(ex)))
 
 
-class SqlLinkStateSqlGenerationTest(unittest.TestCase):
-    """Tests for SQL generation in SqlLinkState."""
-
-    def _create_state(self, database_path: str = ":memory:") -> SqlLinkState:
-        state = SqlLinkState(
-            database_path=database_path,
-            federation_manager=NoOpFederationManager(),
-            object_store=ObjectStoreFactory().store(),
-        )
-        state.initialize()
-        return state
-
-    @parameterized.expand(
-        [  # type: ignore
-            ("claim", "_claim_message_ins_rows", (1, 3)),
-            ("load", "_load_message_ins_rows", ({"abc"},)),
-        ]
-    )
-    def test_message_ins_rows_uses_deterministic_ordering(
-        self, _name: str, method: str, args: tuple[Any, ...]
-    ) -> None:
-        """Message querying should use deterministic ordering."""
-        state = self._create_state()
-        captured: list[str] = []
-
-        # pylint: disable-next=unused-argument
-        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
-            captured.append(query)
-            return []
-
-        state.query = fake_query  # type: ignore[method-assign]
-        getattr(state, method)(*args)
-
-        self.assertTrue(captured)
-        self.assertIn("ORDER BY created_at, message_id", captured[0])
-        self.assertNotIn("rowid", captured[0])
-
-
 class InMemoryStateTest(StateTest):
     """Test InMemoryState implementation."""
 
@@ -2079,6 +2041,31 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         )
         state.initialize()
         return state
+
+    @parameterized.expand(
+        [  # type: ignore
+            ("claim", "_claim_message_ins_rows", (1, 3)),
+            ("load", "_load_message_ins_rows", ({"abc"},)),
+        ]
+    )
+    def test_message_ins_rows_uses_deterministic_ordering(
+        self, _name: str, method: str, args: tuple[Any, ...]
+    ) -> None:
+        """Message querying should use deterministic ordering."""
+        state = self.state_factory()
+        captured: list[str] = []
+
+        # pylint: disable-next=unused-argument
+        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
+            captured.append(query)
+            return []
+
+        state.query = fake_query  # type: ignore[method-assign]
+        getattr(state, method)(*args)
+
+        self.assertTrue(captured)
+        self.assertIn("ORDER BY created_at, message_id", captured[0])
+        self.assertNotIn("rowid", captured[0])
 
     def test_token_expiry_does_not_overwrite_finished_completed_run(self) -> None:
         """Ensure token cleanup doesn't mutate terminal COMPLETED status."""
