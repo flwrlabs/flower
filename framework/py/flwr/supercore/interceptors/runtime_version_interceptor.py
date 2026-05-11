@@ -53,8 +53,8 @@ class RuntimeVersionClientInterceptor(
         if incompat_message:
             log(WARN, incompat_message)
 
-    def _maybe_log_incompat_error(self, grpc_error: Any) -> None:
-        """Log runtime-version rejections encoded as FlowerError JSON."""
+    def _maybe_exit_on_incompat_error(self, grpc_error: Any) -> None:
+        """Exit on runtime-version rejections encoded as FlowerError JSON."""
         details = grpc_error.details() if hasattr(grpc_error, "details") else None
         flower_error = FlowerError.from_json(details)
         if (
@@ -85,14 +85,12 @@ class RuntimeVersionClientInterceptor(
         call: grpc.Call = continuation(details, request)
 
         def _handle_completion() -> None:
-            if isinstance(call, grpc.RpcError):
-                self._maybe_log_incompat_error(call)
             self._maybe_log_incompat_warning(call.trailing_metadata())
 
         if isinstance(call, grpc.RpcError) and (
             not isinstance(call, grpc.Future) or call.done()
         ):
-            self._maybe_log_incompat_error(call)
+            self._maybe_exit_on_incompat_error(call)
             self._maybe_log_incompat_warning(
                 call.trailing_metadata() if hasattr(call, "trailing_metadata") else None
             )
