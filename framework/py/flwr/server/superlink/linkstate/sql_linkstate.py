@@ -14,11 +14,11 @@
 # ==============================================================================
 """SQLAlchemy-based implementation of the link state."""
 
-
 # pylint: disable=too-many-lines
 
 import json
 from collections.abc import Sequence
+from datetime import datetime, timezone
 from logging import ERROR, WARNING
 from typing import Any, Literal
 
@@ -666,7 +666,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         query = """
             UPDATE node
             SET status = :unregistered, unregistered_at = :unregistered_at,
-            online_until = IIF(online_until > :current, :current, online_until)
+            online_until = CASE
+                WHEN online_until > :current
+                    THEN :current
+                ELSE online_until
+            END
             WHERE node_id = :node_id AND status != :unregistered
             AND owner_aid = :owner_aid
             RETURNING node_id
@@ -771,15 +775,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
     def _check_and_tag_offline_nodes(self, node_ids: list[int] | None = None) -> None:
         """Check and tag offline nodes."""
-        # strftime will convert POSIX timestamp to ISO format
         query = """
-            UPDATE node SET status = :offline,
-            last_deactivated_at =
-            strftime('%Y-%m-%dT%H:%M:%f+00:00', online_until, 'unixepoch')
-            WHERE online_until <= :current_time AND status = :online
+            SELECT node_id, online_until
+            FROM node
+            WHERE online_until <= :current_time
+              AND status = :online
         """
         params: dict[str, Any] = {
-            "offline": NodeStatus.OFFLINE,
             "current_time": now().timestamp(),
             "online": NodeStatus.ONLINE,
         }
@@ -791,7 +793,36 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             params.update(
                 {f"nid_{i}": uint64_to_int64(nid) for i, nid in enumerate(node_ids)}
             )
-        self.query(query, params)
+
+        # Select candidate node_ids first so `last_deactivated_at` can preserve the
+        # expiry time without relying on database-specific epoch formatting functions
+        rows = self.query(query, params)
+        if not rows:
+            return
+
+        update_query = """
+            UPDATE node
+            SET status = :offline, last_deactivated_at = :last_deactivated_at
+            WHERE node_id = :node_id
+              AND status = :online
+              AND online_until <= :current_time
+        """
+        update_data = [
+            {
+                "offline": NodeStatus.OFFLINE,
+                # Convert epoch seconds to a UTC ISO-8601 string
+                "last_deactivated_at": datetime.fromtimestamp(
+                    row["online_until"], tz=timezone.utc
+                ).isoformat(),
+                "node_id": row["node_id"],
+                "online": NodeStatus.ONLINE,
+                # Re-check expiry to avoid marking a node offline after a concurrent
+                # heartbeat extended its `online_until`
+                "current_time": params["current_time"],
+            }
+            for row in rows
+        ]
+        self.query(update_query, update_data)
 
     def get_node_info(  # pylint: disable=too-many-locals
         self,
