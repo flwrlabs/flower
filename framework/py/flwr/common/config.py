@@ -103,10 +103,17 @@ def fuse_dicts(
             if isinstance(value, dict):
                 fused_dict[key] = fuse_dicts(main_dict[key], value)
             fused_dict[key] = value
+        elif _is_sandbox_runtime_key(key):
+            fused_dict[key] = value
         elif check_keys:
             raise ValueError(f"Key '{key}' is not present in the main dictionary")
 
     return fused_dict
+
+
+def _is_sandbox_runtime_key(key: str) -> bool:
+    """Return whether a run-config key controls Flower's app sandbox."""
+    return key.startswith("sandbox.") or key.startswith("sandbox_")
 
 
 def get_fused_config_from_dir(

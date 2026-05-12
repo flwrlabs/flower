@@ -55,7 +55,8 @@ class BaseEphemeralExecPlugin(ExecPlugin):
             cmds += ["--parent-pid", str(os.getpid())]
         if self.runtime_dependency_install:
             cmds += ["--allow-runtime-dependency-installation"]
-        cmds = self.sandbox_config.wrap_command(cmds)
+        run = self.get_run(run_id) if self.sandbox_config.enabled else None
+        cmds = self.sandbox_config.wrap_command(cmds, run=run)
         # Perform any cleanup before launching the app
         if self.cleanup_before_launch is not None:
             self.cleanup_before_launch()

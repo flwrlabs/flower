@@ -62,7 +62,8 @@ class BaseExecPlugin(ExecPlugin):
             cmds += ["--parent-pid", str(os.getpid())]
         if self.runtime_dependency_install:
             cmds += ["--allow-runtime-dependency-installation"]
-        cmds = self.sandbox_config.wrap_command(cmds)
+        run = self.get_run(run_id) if self.sandbox_config.enabled else None
+        cmds = self.sandbox_config.wrap_command(cmds, run=run)
         popen_kwargs = self.get_popen_kwargs()
         log_path = self._prepare_launch_logging(
             popen_kwargs=popen_kwargs, run_id=run_id

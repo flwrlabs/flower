@@ -85,6 +85,14 @@ def test_fuse_dicts_key_mismatch() -> None:
         fuse_dicts(dict1, dict2)
 
 
+def test_fuse_dicts_allows_sandbox_runtime_keys() -> None:
+    """Test that sandbox runtime keys do not have to be app defaults."""
+    dict1 = {"a": 1}
+    dict2 = {"sandbox.resources": "ondri"}
+
+    assert fuse_dicts(dict1, dict2) == {"a": 1, "sandbox.resources": "ondri"}
+
+
 def test_get_fused_config_valid(tmp_path: Path) -> None:
     """Test get_project_config when the configuration file is not found."""
     pyproject_toml_content = """

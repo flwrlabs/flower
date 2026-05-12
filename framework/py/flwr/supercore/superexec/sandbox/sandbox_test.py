@@ -16,7 +16,9 @@
 
 
 import os
+import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -62,6 +64,180 @@ def test_nsjail_sandbox_wraps_command_with_user_config(
         "--",
         serverapp,
     ]
+
+
+def test_nsjail_sandbox_scopes_single_configured_resource(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A single configured resource should be the only path mounted into nsjail."""
+    nsjail = _make_executable(tmp_path / "nsjail")
+    clientapp = _make_executable(tmp_path / "flwr-clientapp")
+    config = tmp_path / "nsjail.cfg"
+    config.write_text("mode: ONCE\n", encoding="utf-8")
+    data_root = tmp_path / "data"
+    ondri_path = data_root / "ondri"
+    other_path = data_root / "other"
+    ondri_path.mkdir(parents=True)
+    other_path.mkdir()
+    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.setenv("FLWR_SUPEREXEC_SANDBOX_RESOURCE_ROOT", str(data_root))
+    monkeypatch.setenv(
+        "FLWR_SUPEREXEC_SANDBOX_RESOURCES_JSON", json.dumps({"ondri": str(ondri_path)})
+    )
+
+    sandbox = resolve_sandbox_config(
+        mode="nsjail",
+        nsjail_config_path=str(config),
+        nsjail_binary=nsjail,
+    )
+
+    assert sandbox.wrap_command(["flwr-clientapp"]) == [
+        nsjail,
+        "--config",
+        str(config),
+        "--tmpfsmount",
+        str(data_root),
+        "--bindmount_ro",
+        f"{ondri_path}:{ondri_path}",
+        "--",
+        clientapp,
+    ]
+
+
+def test_nsjail_sandbox_uses_run_resource_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Run config should select the resource exposed to the app sandbox."""
+    nsjail = _make_executable(tmp_path / "nsjail")
+    clientapp = _make_executable(tmp_path / "flwr-clientapp")
+    config = tmp_path / "nsjail.cfg"
+    config.write_text("mode: ONCE\n", encoding="utf-8")
+    data_root = tmp_path / "data"
+    ondri_path = data_root / "ondri"
+    adni_path = data_root / "adni"
+    ondri_path.mkdir(parents=True)
+    adni_path.mkdir()
+    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.setenv("FLWR_SUPEREXEC_SANDBOX_RESOURCE_ROOT", str(data_root))
+    monkeypatch.setenv(
+        "FLWR_SUPEREXEC_SANDBOX_RESOURCES_JSON",
+        json.dumps({"ondri": str(ondri_path), "adni": str(adni_path)}),
+    )
+    run = SimpleNamespace(override_config={"sandbox.resources": "adni"})
+
+    sandbox = resolve_sandbox_config(
+        mode="nsjail",
+        nsjail_config_path=str(config),
+        nsjail_binary=nsjail,
+    )
+
+    wrapped = sandbox.wrap_command(["flwr-clientapp"], run=run)
+
+    assert "--bindmount_ro" in wrapped
+    assert f"{adni_path}:{adni_path}" in wrapped
+    assert f"{ondri_path}:{ondri_path}" not in wrapped
+
+
+def test_nsjail_sandbox_rereads_resource_file_per_launch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A resource catalog file should be re-read for each ClientApp launch."""
+    nsjail = _make_executable(tmp_path / "nsjail")
+    clientapp = _make_executable(tmp_path / "flwr-clientapp")
+    config = tmp_path / "nsjail.cfg"
+    config.write_text("mode: ONCE\n", encoding="utf-8")
+    data_root = tmp_path / "data"
+    ondri_path = data_root / "ondri"
+    adni_path = data_root / "adni"
+    ondri_path.mkdir(parents=True)
+    adni_path.mkdir()
+    dataset_map = tmp_path / "sandbox_resources.json"
+    dataset_map.write_text(json.dumps({"ondri": str(ondri_path)}), encoding="utf-8")
+    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.setenv("FLWR_SUPEREXEC_SANDBOX_RESOURCE_ROOT", str(data_root))
+    monkeypatch.setenv("FLWR_SUPEREXEC_SANDBOX_RESOURCES_FILE", str(dataset_map))
+
+    sandbox = resolve_sandbox_config(
+        mode="nsjail",
+        nsjail_config_path=str(config),
+        nsjail_binary=nsjail,
+    )
+
+    first_wrapped = sandbox.wrap_command(
+        ["flwr-clientapp"],
+        run=SimpleNamespace(override_config={"sandbox.resources": "ondri"}),
+    )
+    dataset_map.write_text(json.dumps({"adni": str(adni_path)}), encoding="utf-8")
+    second_wrapped = sandbox.wrap_command(
+        ["flwr-clientapp"],
+        run=SimpleNamespace(override_config={"sandbox.resources": "adni"}),
+    )
+
+    assert f"{ondri_path}:{ondri_path}" in first_wrapped
+    assert f"{adni_path}:{adni_path}" not in first_wrapped
+    assert f"{adni_path}:{adni_path}" in second_wrapped
+    assert f"{ondri_path}:{ondri_path}" not in second_wrapped
+
+
+def test_nsjail_sandbox_uses_node_resource_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """NODE_CONFIG should provide a fallback resource selection for SuperNode sites."""
+    nsjail = _make_executable(tmp_path / "nsjail")
+    clientapp = _make_executable(tmp_path / "flwr-clientapp")
+    config = tmp_path / "nsjail.cfg"
+    config.write_text("mode: ONCE\n", encoding="utf-8")
+    data_root = tmp_path / "data"
+    ondri_path = data_root / "ondri"
+    adni_path = data_root / "adni"
+    ondri_path.mkdir(parents=True)
+    adni_path.mkdir()
+    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.setenv("FLWR_SUPEREXEC_SANDBOX_RESOURCE_ROOT", str(data_root))
+    monkeypatch.setenv("NODE_CONFIG", 'site="site-a" sandbox.resources="ondri"')
+    monkeypatch.setenv(
+        "FLWR_SUPEREXEC_SANDBOX_RESOURCES_JSON",
+        json.dumps({"ondri": str(ondri_path), "adni": str(adni_path)}),
+    )
+
+    sandbox = resolve_sandbox_config(
+        mode="nsjail",
+        nsjail_config_path=str(config),
+        nsjail_binary=nsjail,
+    )
+
+    wrapped = sandbox.wrap_command(["flwr-clientapp"])
+
+    assert f"{ondri_path}:{ondri_path}" in wrapped
+    assert f"{adni_path}:{adni_path}" not in wrapped
+
+
+def test_nsjail_sandbox_fails_closed_when_resource_selection_is_ambiguous(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Multiple configured resources require an explicit run or node selection."""
+    nsjail = _make_executable(tmp_path / "nsjail")
+    config = tmp_path / "nsjail.cfg"
+    config.write_text("mode: ONCE\n", encoding="utf-8")
+    data_root = tmp_path / "data"
+    ondri_path = data_root / "ondri"
+    adni_path = data_root / "adni"
+    ondri_path.mkdir(parents=True)
+    adni_path.mkdir()
+    monkeypatch.setenv("FLWR_SUPEREXEC_SANDBOX_RESOURCE_ROOT", str(data_root))
+    monkeypatch.setenv(
+        "FLWR_SUPEREXEC_SANDBOX_RESOURCES_JSON",
+        json.dumps({"ondri": str(ondri_path), "adni": str(adni_path)}),
+    )
+
+    sandbox = resolve_sandbox_config(
+        mode="nsjail",
+        nsjail_config_path=str(config),
+        nsjail_binary=nsjail,
+    )
+
+    with pytest.raises(ValueError, match="multiple resources"):
+        sandbox.wrap_command(["flwr-clientapp"])
 
 
 def test_nsjail_sandbox_fails_when_app_executable_is_missing(
