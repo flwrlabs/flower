@@ -131,6 +131,14 @@ uv run --no-sync --python=3.10.19 ./dev/protoc.sh
 - Wire-format changes need serialization/deserialization tests, usually near
   `py/flwr/common/serde_test.py` or the module-specific test.
 
+## SQL portability
+
+Runtime SQL in `SqlMixin.query()` callers must use standard SQL only. Avoid
+dialect-specific constructs such as `IIF`, `strftime`, `julianday`, `datetime()`,
+`NOW()`, `EXTRACT(EPOCH …)`, `to_timestamp()`, and `IFNULL`. Use standard
+alternatives (`CASE WHEN`, `COALESCE`) and pass timestamps as bind parameters
+computed in Python. Alembic migrations may use dialect-specific SQL when needed.
+
 ## Database schema and migrations
 
 Use the Alembic generator for schema diffs. Do not hand-write a new migration for
