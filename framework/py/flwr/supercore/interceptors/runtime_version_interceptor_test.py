@@ -336,28 +336,64 @@ class TestRuntimeVersionServerInterceptor(TestCase):
             "release, but received simulation version 1.30.1.",
         )
 
-    def test_serverappio_factory_observes_by_default(self) -> None:
-        """ServerAppIo factory should not return warning metadata by default."""
+    def test_serverappio_factory_rejects_incompatible_by_default(self) -> None:
+        """ServerAppIo factory should reject different major.minor by default."""
         self.interceptor = create_serverappio_runtime_version_server_interceptor()
         intercepted = self._intercept(
             "/flwr.proto.ServerAppIo/GetNodes",
-            _make_runtime_metadata("1.30.1"),
+            _make_runtime_metadata("1.31.1"),
         )
 
-        context = Mock()
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+        context.code.return_value = None
+
+        with self.assertRaises(grpc.RpcError):
+            intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+
+        status, _payload = context.abort.call_args.args
+        self.assertEqual(status, grpc.StatusCode.FAILED_PRECONDITION)
+
+    def test_serverappio_factory_accepts_same_major_minor_by_default(self) -> None:
+        """ServerAppIo factory should accept patch-level version differences."""
+        self.interceptor = create_serverappio_runtime_version_server_interceptor()
+        intercepted = self._intercept(
+            "/flwr.proto.ServerAppIo/GetNodes",
+            _make_runtime_metadata("1.30.7"),
+        )
+
+        context = Mock(spec=grpc.ServicerContext)
         response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_not_called()
 
-    def test_clientappio_factory_observes_by_default(self) -> None:
-        """ClientAppIo factory should not return warning metadata by default."""
+    def test_clientappio_factory_rejects_incompatible_by_default(self) -> None:
+        """ClientAppIo factory should reject different major.minor by default."""
         self.interceptor = create_clientappio_runtime_version_server_interceptor()
         intercepted = self._intercept(
             "/flwr.proto.ClientAppIo/GetRun",
-            _make_runtime_metadata("1.30.1"),
+            _make_runtime_metadata("1.31.1"),
         )
 
-        context = Mock()
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+        context.code.return_value = None
+
+        with self.assertRaises(grpc.RpcError):
+            intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+
+        status, _payload = context.abort.call_args.args
+        self.assertEqual(status, grpc.StatusCode.FAILED_PRECONDITION)
+
+    def test_clientappio_factory_accepts_same_major_minor_by_default(self) -> None:
+        """ClientAppIo factory should accept patch-level version differences."""
+        self.interceptor = create_clientappio_runtime_version_server_interceptor()
+        intercepted = self._intercept(
+            "/flwr.proto.ClientAppIo/GetRun",
+            _make_runtime_metadata("1.30.7"),
+        )
+
+        context = Mock(spec=grpc.ServicerContext)
         response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_not_called()
