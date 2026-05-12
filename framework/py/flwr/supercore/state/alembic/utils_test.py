@@ -263,7 +263,7 @@ class TestAlembicRun(unittest.TestCase):
                     connection,
                     [
                         self.build_run_row(
-                            101,
+                            run_id=101,
                             fab_id="publisher/pending",
                             fab_version="1.0.0",
                             fab_hash="fab-pending",
