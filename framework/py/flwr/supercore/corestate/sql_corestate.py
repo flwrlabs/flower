@@ -35,6 +35,7 @@ from flwr.common.constant import (
 )
 from flwr.common.typing import Fab
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
+from flwr.supercore.constant import SQL_ALLOWED_DIALECTS
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
@@ -56,7 +57,7 @@ STATUS_CONDITIONS = {
 class SqlCoreState(CoreState, SqlMixin):
     """SQLAlchemy-based CoreState implementation."""
 
-    allowed_dialects = {"sqlite"}
+    allowed_dialects = {SQL_ALLOWED_DIALECTS}
 
     def __init__(self, database_path: str, object_store: ObjectStore) -> None:
         super().__init__(database_path)

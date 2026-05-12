@@ -18,6 +18,7 @@
 from sqlalchemy import MetaData
 
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.supercore.constant import SQL_ALLOWED_DIALECTS
 from flwr.supercore.inflatable.inflatable_object import (
     get_object_id,
     is_valid_sha256_hash,
@@ -34,7 +35,7 @@ from .object_store import NoObjectInStoreError, ObjectStore
 class SqlObjectStore(ObjectStore, SqlMixin):
     """SQLAlchemy-based implementation of the ObjectStore interface."""
 
-    allowed_dialects = {"sqlite"}
+    allowed_dialects = {SQL_ALLOWED_DIALECTS}
 
     def __init__(self, database_path: str, verify: bool = True) -> None:
         super().__init__(database_path)

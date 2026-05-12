@@ -169,6 +169,9 @@ SQLITE_PRAGMAS = (
     ("mmap_size", "268435456"),  # 256MB memory-mapped I/O
 )
 
+# Constants for SQL LinkState
+SQL_ALLOWED_DIALECTS = "sqlite"
+
 
 class NodeStatus:
     """Event log writer types."""

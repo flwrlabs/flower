@@ -20,6 +20,8 @@ import unittest
 from sqlalchemy import Column, Integer, MetaData, Table
 from sqlalchemy.exc import IntegrityError
 
+from flwr.supercore.constant import SQL_ALLOWED_DIALECTS
+
 from .sql_mixin import SqlMixin
 
 
@@ -56,7 +58,7 @@ class DummyDbSqlAlchemy(SqlMixin):
 class SqliteOnlyDummyDb(DummyDbSqlAlchemy):
     """SQLite-only SqlMixin subclass used for dialect allowlist tests."""
 
-    allowed_dialects = {"sqlite"}
+    allowed_dialects = {SQL_ALLOWED_DIALECTS}
 
 
 class TestSqlMixin(unittest.TestCase):
