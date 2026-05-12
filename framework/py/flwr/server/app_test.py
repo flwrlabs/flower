@@ -245,13 +245,13 @@ def test_run_fleet_api_grpc_rere_adds_runtime_version_interceptor(
         "state.db",
     ],
 )
-def test_get_state_backend_factories_uses_oss_defaults(
+def test_get_state_backend_factories_uses_defaults(
     database: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """In-memory and SQLite databases should stay on OSS backend factories."""
+    """In-memory and SQLite databases should stay on default backend factories."""
 
     def _unexpected(*_args: object, **_kwargs: object) -> tuple[object, object]:
-        raise AssertionError("EE resolver should not be called for OSS databases")
+        raise AssertionError("EE resolver should not be called for default databases")
 
     monkeypatch.setattr(app_module, "get_ee_state_backend_factories", _unexpected)
 
