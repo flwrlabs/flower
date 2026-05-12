@@ -50,16 +50,18 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.release-nightly.outputs.matrix).base }}
     with:
-      namespace-repository: ${{ matrix.images.namespace_repository }}
+      registry: ${{ vars.DOCKER_IMAGE_REGISTRY }}
+      # Keep base image repository aligned with BASE_REPOSITORY for nightly builds.
+      image-repository: ${{ format('{0}/{1}/base', vars.DOCKER_IMAGE_REGISTRY, vars.DOCKER_IMAGE_NAMESPACE) }}
       file-dir: ${{ matrix.images.file_dir }}
       build-args: |
         PIP_VERSION=${{ needs.release-nightly.outputs.pip-version }}
         SETUPTOOLS_VERSION=${{ needs.release-nightly.outputs.setuptools-version }}
         ${{ matrix.images.build_args_encoded }}
       tags: ${{ matrix.images.tags_encoded }}
+      docker-registry-user: ${{ vars.DOCKER_IMAGE_REGISTRY_USER }}
     secrets:
-      dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
-      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+      docker-registry-token: ${{ secrets.DOCKER_IMAGE_REGISTRY_PASSWORD }}
 
   build-docker-binary-images:
     name: Build nightly binary images
@@ -70,10 +72,15 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.release-nightly.outputs.matrix).binary }}
     with:
-      namespace-repository: ${{ matrix.images.namespace_repository }}
+      registry: ${{ vars.DOCKER_IMAGE_REGISTRY }}
+      # Compose a fully qualified repository from host + namespace/repository for binary images.
+      image-repository: ${{ format('{0}/{1}', vars.DOCKER_IMAGE_REGISTRY, matrix.images.namespace_repository) }}
       file-dir: ${{ matrix.images.file_dir }}
-      build-args: BASE_IMAGE=${{ matrix.images.base_image }}
+      # Keep BASE_REPOSITORY fully qualified so binary builds pull from the same registry.
+      build-args: |
+        BASE_REPOSITORY=${{ format('{0}/{1}/base', vars.DOCKER_IMAGE_REGISTRY, vars.DOCKER_IMAGE_NAMESPACE) }}
+        BASE_IMAGE=${{ matrix.images.base_image }}
       tags: ${{ matrix.images.tags_encoded }}
+      docker-registry-user: ${{ vars.DOCKER_IMAGE_REGISTRY_USER }}
     secrets:
-      dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
-      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+      docker-registry-token: ${{ secrets.DOCKER_IMAGE_REGISTRY_PASSWORD }}
