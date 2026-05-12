@@ -22,6 +22,20 @@ jobs:
       - name: Bootstrap
         id: bootstrap
         uses: ./.github/actions/bootstrap
+      - name: Validate Docker publishing configuration
+        run: |
+          if [ -z "${{ vars.DOCKER_IMAGE_REGISTRY }}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_REGISTRY" >&2
+            exit 1
+          fi
+          if [ -z "${{ vars.DOCKER_IMAGE_REGISTRY_USER }}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_REGISTRY_USER" >&2
+            exit 1
+          fi
+          if [ -z "${{ vars.DOCKER_IMAGE_NAMESPACE }}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_NAMESPACE" >&2
+            exit 1
+          fi
       - name: Release nightly
         id: release
         env:
@@ -38,7 +52,11 @@ jobs:
 
           NAME=$(poetry version | awk {'print $1'})
           VERSION=$(poetry version -s)
-          python dev/build-docker-image-matrix.py --flwr-version "${VERSION}" --matrix nightly --flwr-package "${NAME}" > matrix.json
+          python dev/build-docker-image-matrix.py --flwr-version "${VERSION}" --matrix nightly --flwr-package "${NAME}" > matrix.raw.json
+          python dev/release/resolve-docker-matrix.py \
+            --input matrix.raw.json \
+            --output matrix.json \
+            --docker-image-namespace "${{ vars.DOCKER_IMAGE_NAMESPACE }}"
           echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
 
   build-docker-base-images:
