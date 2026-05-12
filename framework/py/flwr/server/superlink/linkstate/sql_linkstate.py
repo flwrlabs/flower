@@ -773,10 +773,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # Filter node IDs by federation
         return self.federation_manager.filter_nodes(node_ids, federation)
 
-    def _online_until_to_utc_iso(self, online_until: float) -> str:
-        """Convert epoch seconds to a UTC ISO-8601 string."""
-        return datetime.fromtimestamp(online_until, tz=timezone.utc).isoformat()
-
     def _check_and_tag_offline_nodes(self, node_ids: list[int] | None = None) -> None:
         """Check and tag offline nodes."""
         query = """
