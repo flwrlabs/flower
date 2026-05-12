@@ -34,16 +34,8 @@ def create_corestate_metadata() -> MetaData:
     metadata = MetaData()
 
     # --------------------------------------------------------------------------
-    #  Table: token_store
+    #  Table: nonce_store
     # --------------------------------------------------------------------------
-    Table(
-        "token_store",
-        metadata,
-        Column("run_id", BigInteger, primary_key=True, nullable=True),
-        Column("token", String, unique=True, nullable=False),
-        Column("active_until", Float),
-    )
-
     nonce_store = Table(
         "nonce_store",
         metadata,
