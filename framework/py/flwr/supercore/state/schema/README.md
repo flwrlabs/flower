@@ -63,7 +63,7 @@ erDiagram
     VARCHAR last_activated_at "nullable"
     VARCHAR last_deactivated_at "nullable"
     BIGINT node_id UK "nullable"
-    TIMESTAMP online_until "nullable"
+    FLOAT online_until "nullable"
     VARCHAR owner_aid "nullable"
     VARCHAR owner_name "nullable"
     BLOB public_key UK "nullable"
