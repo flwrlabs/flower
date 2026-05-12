@@ -64,6 +64,8 @@ new``).
     SuperLink Fleet API, the SuperLink ServerAppIo API, and each SuperNode ClientAppIo
     API.
 
+.. _launching-the-superlink-with-tls:
+
 **********************************
  Launching the SuperLink with TLS
 **********************************
@@ -98,6 +100,8 @@ API.
         SuperExec. When using an IP address such as ``127.0.0.1``, the certificate must include a
         matching IP SAN.
     * | ``--appio-ssl-keyfile``: Specify the location of the ServerAppIo API server TLS private key file.
+
+.. _connecting-the-supernodes-with-tls:
 
 ************************************
  Connecting the SuperNodes with TLS
