@@ -119,7 +119,7 @@ class TestAlembicRun(unittest.TestCase):
             engine.dispose()
 
     def test_migrated_node_online_until_is_float(self) -> None:
-        """Verify that node online_until is stored as epoch seconds."""
+        """Verify that reflected node online_until column type is Float."""
         engine = self.create_engine()
         try:
             run_migrations(engine)
