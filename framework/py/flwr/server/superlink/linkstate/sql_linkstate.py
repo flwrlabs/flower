@@ -153,10 +153,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
             return task_id
 
-    def _online_until_to_utc_iso(self, online_until: float) -> str:
-        """Convert epoch seconds to a UTC ISO-8601 string."""
-        return datetime.fromtimestamp(online_until, tz=timezone.utc).isoformat()
-
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
         # Validate message
@@ -778,6 +774,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # Filter node IDs by federation
         return self.federation_manager.filter_nodes(node_ids, federation)
 
+    def _online_until_to_utc_iso(self, online_until: float) -> str:
+        """Convert epoch seconds to a UTC ISO-8601 string."""
+        return datetime.fromtimestamp(online_until, tz=timezone.utc).isoformat()
+
     def _check_and_tag_offline_nodes(self, node_ids: list[int] | None = None) -> None:
         """Check and tag offline nodes."""
         query = """
@@ -799,6 +799,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 {f"nid_{i}": uint64_to_int64(nid) for i, nid in enumerate(node_ids)}
             )
 
+        # Select candidate node_ids first so `last_deactivated_at` can preserve the
+        # expiry time without relying on database-specific epoch formatting functions.
         rows = self.query(query, params)
         if not rows:
             return
@@ -806,7 +808,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         update_query = """
             UPDATE node
             SET status = :offline, last_deactivated_at = :last_deactivated_at
-            WHERE node_id = :node_id AND status = :online
+            WHERE node_id = :node_id
+              AND status = :online
+              AND online_until = :online_until
+              AND online_until <= :current_time
         """
         update_data = [
             {
@@ -816,6 +821,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 ),
                 "node_id": row["node_id"],
                 "online": NodeStatus.ONLINE,
+                # Re-check `online_until` to avoid marking a node offline after a
+                # concurrent heartbeat extended its expiry.
+                "online_until": row["online_until"],
+                "current_time": params["current_time"],
             }
             for row in rows
         ]
