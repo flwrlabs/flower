@@ -98,7 +98,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # Start with linkstate tables
         metadata = create_linkstate_metadata()
 
-        # Add corestate tables (for example token_store and fab)
+        # Add corestate tables (for example fab)
         corestate_metadata = create_corestate_metadata()
         for table in corestate_metadata.tables.values():
             table.to_metadata(metadata)

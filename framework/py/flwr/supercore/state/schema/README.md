@@ -141,12 +141,6 @@ erDiagram
     FLOAT timestamp
   }
 
-  token_store {
-    BIGINT run_id PK "nullable"
-    FLOAT active_until "nullable"
-    VARCHAR token UK
-  }
-
   run ||--o| context : run_id
   run ||--o{ logs : run_id
   run ||--o{ message_ins : run_id
