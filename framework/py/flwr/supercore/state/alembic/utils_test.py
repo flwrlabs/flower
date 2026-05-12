@@ -331,15 +331,9 @@ class TestAlembicRun(unittest.TestCase):
             task = tasks[runs[102]["primary_task_id"]]
             self.assertEqual(task["type"], TaskType.SIMULATION)
             self.assertEqual(task["run_id"], 102)
-            self.assertEqual(
-                task["starting_at"], "2026-04-27T11:01:00+00:00"
-            )
-            self.assertEqual(
-                task["running_at"], "2026-04-27T11:02:00+00:00"
-            )
-            self.assertEqual(
-                task["finished_at"], "2026-04-27T11:03:00+00:00"
-            )
+            self.assertEqual(task["starting_at"], "2026-04-27T11:01:00+00:00")
+            self.assertEqual(task["running_at"], "2026-04-27T11:02:00+00:00")
+            self.assertEqual(task["finished_at"], "2026-04-27T11:03:00+00:00")
             self.assertEqual(task["sub_status"], "completed")
             self.assertEqual(task["details"], "done")
 
@@ -384,9 +378,10 @@ class TestAlembicRun(unittest.TestCase):
             self.assertFalse(check_migrations_pending(engine))
 
             with engine.connect() as connection:
-                primary_task = connection.execute(
-                    text(
-                        """
+                primary_task = (
+                    connection.execute(
+                        text(
+                            """
                         SELECT
                             r.primary_task_id,
                             r.finished_at AS run_finished_at,
@@ -402,18 +397,17 @@ class TestAlembicRun(unittest.TestCase):
                         JOIN task AS t ON t.task_id = r.primary_task_id
                         WHERE r.run_id = :run_id
                         """
-                    ),
-                    {"run_id": 201},
-                ).mappings().one()
+                        ),
+                        {"run_id": 201},
+                    )
+                    .mappings()
+                    .one()
+                )
 
             self.assertIsNotNone(primary_task["primary_task_id"])
             self.assertEqual(primary_task["type"], TaskType.SERVER_APP)
-            self.assertEqual(
-                primary_task["starting_at"], "2026-04-27T13:01:00+00:00"
-            )
-            self.assertEqual(
-                primary_task["running_at"], "2026-04-27T13:02:00+00:00"
-            )
+            self.assertEqual(primary_task["starting_at"], "2026-04-27T13:01:00+00:00")
+            self.assertEqual(primary_task["running_at"], "2026-04-27T13:02:00+00:00")
             self.assertTrue(primary_task["finished_at"])
             self.assertEqual(primary_task["sub_status"], SubStatus.STOPPED)
             self.assertEqual(primary_task["details"], "")
