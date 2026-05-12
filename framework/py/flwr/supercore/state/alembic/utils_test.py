@@ -356,6 +356,7 @@ class TestAlembicRun(unittest.TestCase):
                     ).mappings()
                 }
 
+            # Assert: Primary task inserted for run 101
             pending_primary = tasks[runs[101]["primary_task_id"]]
             self.assertEqual(pending_primary["type"], TaskType.SERVER_APP)
             self.assertEqual(pending_primary["run_id"], 101)
