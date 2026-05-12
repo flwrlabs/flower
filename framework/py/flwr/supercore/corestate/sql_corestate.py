@@ -21,7 +21,7 @@ import secrets
 from collections.abc import Sequence
 from typing import Any, Literal
 
-from sqlalchemy import MetaData, text
+from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
 
 from flwr.common import now
@@ -441,42 +441,6 @@ class SqlCoreState(CoreState, SqlMixin):
         ----------
         tasks : list[Task]
             Tasks whose claims expired and were marked FINISHED:FAILED.
-        """
-
-    def _cleanup_expired_tokens(self) -> None:
-        """Remove expired tokens and perform additional cleanup.
-
-        This method is called before token operations to ensure integrity.
-        Subclasses can override `_on_tokens_expired` to add custom cleanup logic.
-        """
-        current = now().timestamp()
-
-        with self.session() as session:
-            # Delete expired tokens and get their run_ids and active_until timestamps
-            query = """
-                DELETE FROM token_store
-                WHERE active_until < :current
-                RETURNING run_id, active_until;
-            """
-            rows = session.execute(text(query), {"current": current}).mappings().all()
-            expired_records = [
-                (int64_to_uint64(row["run_id"]), row["active_until"]) for row in rows
-            ]
-
-            # Hook for subclasses
-            if expired_records:
-                self._on_tokens_expired(expired_records)
-
-    def _on_tokens_expired(self, expired_records: list[tuple[int, float]]) -> None:
-        """Handle cleanup of expired tokens.
-
-        Override in subclasses to add custom cleanup logic.
-
-        Parameters
-        ----------
-        expired_records : list[tuple[int, float]]
-            List of tuples containing (run_id, active_until timestamp)
-            for expired tokens.
         """
 
     def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:

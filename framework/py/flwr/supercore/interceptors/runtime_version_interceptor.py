@@ -82,6 +82,9 @@ class RuntimeVersionClientInterceptor(
 
         def _handle_completion() -> None:
             self._maybe_log_incompat_warning(call.trailing_metadata())
+            # Some successful call objects (e.g., unary-stream) can also be
+            # subclasses of grpc.RpcError. Do not treat RpcError alone as failure;
+            # _maybe_exit_on_incompat_error checks the actual RPC details.
             if isinstance(call, grpc.RpcError):
                 self._maybe_exit_on_incompat_error(call)
 

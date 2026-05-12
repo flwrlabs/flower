@@ -27,6 +27,7 @@ from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy import (
     Column,
+    Float,
     Integer,
     MetaData,
     String,
@@ -114,6 +115,19 @@ class TestAlembicRun(unittest.TestCase):
                 diffs = compare_metadata(context, metadata)
             # Assert
             self.assertEqual(diffs, [])
+        finally:
+            engine.dispose()
+
+    def test_migrated_node_online_until_is_float(self) -> None:
+        """Verify that reflected node online_until column type is Float."""
+        engine = self.create_engine()
+        try:
+            run_migrations(engine)
+            columns = {
+                column["name"]: column["type"]
+                for column in inspect(engine).get_columns("node")
+            }
+            self.assertIsInstance(columns["online_until"], Float)
         finally:
             engine.dispose()
 
