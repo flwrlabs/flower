@@ -494,23 +494,25 @@ class TestAlembicRun(unittest.TestCase):
             self.assertFalse(check_migrations_pending(engine))
 
             with engine.connect() as connection:
-                primary_task = connection.execute(
-                    text(
-                        """
+                primary_task = (
+                    connection.execute(
+                        text(
+                            """
                         SELECT r.primary_task_id, t.type, t.finished_at
                         FROM run AS r
                         JOIN task AS t ON t.task_id = r.primary_task_id
                         WHERE r.run_id = :run_id
                         """
-                    ),
-                    {"run_id": 202},
-                ).mappings().one()
+                        ),
+                        {"run_id": 202},
+                    )
+                    .mappings()
+                    .one()
+                )
 
             self.assertIsNotNone(primary_task["primary_task_id"])
             self.assertEqual(primary_task["type"], TaskType.SERVER_APP)
-            self.assertEqual(
-                primary_task["finished_at"], "2026-04-27T14:05:00+00:00"
-            )
+            self.assertEqual(primary_task["finished_at"], "2026-04-27T14:05:00+00:00")
         finally:
             engine.dispose()
 
