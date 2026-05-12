@@ -20,7 +20,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
-from typing import cast
+from typing import Any, cast
 from unittest.mock import patch
 
 from alembic import command
@@ -39,6 +39,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.engine import URL, Connection, Engine
 
+from flwr.common.constant import SubStatus
 from flwr.common.exit import ExitCode
 from flwr.supercore.constant import RunType, TaskType
 from flwr.supercore.state.alembic.utils import (
@@ -88,10 +89,10 @@ class TestAlembicRun(unittest.TestCase):
         fab_version: str,
         fab_hash: str,
         pending_at: str,
-        **overrides: object,
-    ) -> dict[str, object]:
+        **overrides: Any,
+    ) -> dict[str, Any]:
         """Build a run row with defaults suited for migration backfill tests."""
-        row: dict[str, object] = {
+        row: dict[str, Any] = {
             "run_id": run_id,
             "fab_id": fab_id,
             "fab_version": fab_version,
@@ -116,7 +117,7 @@ class TestAlembicRun(unittest.TestCase):
         return row
 
     def insert_runs(
-        self, connection: Connection, runs: Sequence[dict[str, object]]
+        self, connection: Connection, runs: Sequence[dict[str, Any]]
     ) -> None:
         """Insert run rows into the test database."""
         connection.execute(
@@ -141,7 +142,7 @@ class TestAlembicRun(unittest.TestCase):
         )
 
     def insert_tasks(
-        self, connection: Connection, tasks: Sequence[dict[str, object]]
+        self, connection: Connection, tasks: Sequence[dict[str, Any]]
     ) -> None:
         """Insert task rows into the test database."""
         connection.execute(
@@ -392,9 +393,9 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
-    def test_primary_task_backfill_rejects_inflight_runs(self) -> None:
-        """Ensure the backfill aborts instead of inventing task claim state."""
-        engine = self.create_engine("primary_task_backfill_inflight.db")
+    def test_primary_task_backfill_stops_running_runs(self) -> None:
+        """Ensure STARTING/RUNNING runs are migrated to FINISHED:STOPPED."""
+        engine = self.create_engine("primary_task_backfill_stopped.db")
         try:
             self.upgrade_to_revision(engine, "dee9b802b5c9")
             with engine.begin() as connection:
@@ -408,82 +409,11 @@ class TestAlembicRun(unittest.TestCase):
                             fab_hash="fab-live",
                             pending_at="2026-04-27T13:00:00+00:00",
                             starting_at="2026-04-27T13:01:00+00:00",
+                            running_at="2026-04-27T13:02:00+00:00",
                             federation="fed-live",
                             flwr_aid="aid-live",
                         )
                     ],
-                )
-
-            with self.assertRaisesRegex(
-                RuntimeError,
-                "Cannot backfill primary tasks while runs are STARTING or RUNNING",
-            ):
-                run_migrations(engine)
-
-            self.assertEqual(get_current_revisions(engine), {"dee9b802b5c9"})
-        finally:
-            engine.dispose()
-
-    def test_primary_task_backfill_retry_succeeds_after_inflight_run_is_fixed(
-        self,
-    ) -> None:
-        """Ensure failed backfill preflight leaves SQLite clean enough for retry."""
-        engine = self.create_engine("primary_task_backfill_retry.db")
-        try:
-            self.upgrade_to_revision(engine, "dee9b802b5c9")
-            with engine.begin() as connection:
-                self.insert_runs(
-                    connection,
-                    [
-                        self.build_run_row(
-                            202,
-                            fab_id="publisher/retry",
-                            fab_version="1.0.0",
-                            fab_hash="fab-retry",
-                            pending_at="2026-04-27T14:00:00+00:00",
-                            starting_at="2026-04-27T14:01:00+00:00",
-                            federation="fed-retry",
-                            flwr_aid="aid-retry",
-                        )
-                    ],
-                )
-
-            with self.assertRaisesRegex(
-                RuntimeError,
-                "Cannot backfill primary tasks while runs are STARTING or RUNNING",
-            ):
-                run_migrations(engine)
-
-            inspector = inspect(engine)
-            self.assertFalse(inspector.has_table("_alembic_tmp_task"))
-            self.assertNotIn(
-                "primary_task_id",
-                {column["name"] for column in inspector.get_columns("run")},
-            )
-            self.assertNotIn(
-                "sub_status",
-                {column["name"] for column in inspector.get_columns("task")},
-            )
-            self.assertNotIn(
-                "details",
-                {column["name"] for column in inspector.get_columns("task")},
-            )
-            self.assertEqual(get_current_revisions(engine), {"dee9b802b5c9"})
-
-            with engine.begin() as connection:
-                connection.execute(
-                    text(
-                        """
-                        UPDATE run
-                        SET starting_at = :starting_at, finished_at = :finished_at
-                        WHERE run_id = :run_id
-                        """
-                    ),
-                    {
-                        "run_id": 202,
-                        "starting_at": "",
-                        "finished_at": "2026-04-27T14:05:00+00:00",
-                    },
                 )
 
             run_migrations(engine)
@@ -494,25 +424,44 @@ class TestAlembicRun(unittest.TestCase):
             self.assertFalse(check_migrations_pending(engine))
 
             with engine.connect() as connection:
-                primary_task = (
-                    connection.execute(
-                        text(
-                            """
-                        SELECT r.primary_task_id, t.type, t.finished_at
+                primary_task = connection.execute(
+                    text(
+                        """
+                        SELECT
+                            r.primary_task_id,
+                            r.finished_at AS run_finished_at,
+                            r.sub_status AS run_sub_status,
+                            r.details AS run_details,
+                            t.type,
+                            t.starting_at,
+                            t.running_at,
+                            t.finished_at,
+                            t.sub_status,
+                            t.details
                         FROM run AS r
                         JOIN task AS t ON t.task_id = r.primary_task_id
                         WHERE r.run_id = :run_id
                         """
-                        ),
-                        {"run_id": 202},
-                    )
-                    .mappings()
-                    .one()
-                )
+                    ),
+                    {"run_id": 201},
+                ).mappings().one()
 
             self.assertIsNotNone(primary_task["primary_task_id"])
             self.assertEqual(primary_task["type"], TaskType.SERVER_APP)
-            self.assertEqual(primary_task["finished_at"], "2026-04-27T14:05:00+00:00")
+            self.assertEqual(
+                primary_task["starting_at"], "2026-04-27T13:01:00+00:00"
+            )
+            self.assertEqual(
+                primary_task["running_at"], "2026-04-27T13:02:00+00:00"
+            )
+            self.assertTrue(primary_task["finished_at"])
+            self.assertEqual(primary_task["sub_status"], SubStatus.STOPPED)
+            self.assertEqual(primary_task["details"], "")
+            self.assertEqual(
+                primary_task["run_finished_at"], primary_task["finished_at"]
+            )
+            self.assertEqual(primary_task["run_sub_status"], SubStatus.STOPPED)
+            self.assertEqual(primary_task["run_details"], "")
         finally:
             engine.dispose()
 

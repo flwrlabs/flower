@@ -24,9 +24,10 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.engine import Connection, RowMapping
 
-from flwr.common.constant import TASK_ID_NUM_BYTES
+from flwr.common.constant import TASK_ID_NUM_BYTES, SubStatus
 from flwr.supercore.constant import RunType, TaskType
 from flwr.supercore.corestate.utils import generate_rand_int_from_bytes
+from flwr.supercore.date import now
 from flwr.supercore.utils import uint64_to_int64
 
 # pylint: disable=no-member
@@ -83,19 +84,6 @@ def _load_runs_for_primary_task_backfill(bind: Connection) -> list[RowMapping]:
 
 def _validate_primary_task_backfill_runs(runs: Sequence[RowMapping]) -> None:
     """Validate that historical runs can be backfilled before mutating schema."""
-    in_flight_run_ids = sorted(
-        run["run_id"]
-        for run in runs
-        if not run["finished_at"] and (run["starting_at"] or run["running_at"])
-    )[:10]
-    if in_flight_run_ids:
-        run_id_examples = ", ".join(str(run_id) for run_id in in_flight_run_ids)
-        raise RuntimeError(
-            "Cannot backfill primary tasks while runs are STARTING or RUNNING. "
-            "Stop SuperLink and retry the migration. Example run_ids: "
-            f"{run_id_examples}"
-        )
-
     for run in runs:
         if not run["pending_at"]:
             raise RuntimeError(
@@ -105,9 +93,24 @@ def _validate_primary_task_backfill_runs(runs: Sequence[RowMapping]) -> None:
         _primary_task_type_from_run_type(run["run_type"])
 
 
+def _is_in_flight_run(run: RowMapping) -> bool:
+    """Return True if the historical run was STARTING or RUNNING."""
+    return not run["finished_at"] and (run["starting_at"] or run["running_at"])
+
+
+def _backfilled_primary_task_status(
+    run: RowMapping, stopped_at: str
+) -> tuple[str | None, str, str]:
+    """Return the backfilled finished_at, sub_status, and details for a run."""
+    if _is_in_flight_run(run):
+        return stopped_at, SubStatus.STOPPED, ""
+    return run["finished_at"] or None, run["sub_status"] or "", run["details"] or ""
+
+
 def _backfill_primary_tasks(runs: Sequence[RowMapping]) -> None:
     """Create one primary task per historical run and link it from the run row."""
     bind = op.get_bind()
+    stopped_at = now().isoformat()
 
     insert_task_query = sa.text(
         """
@@ -122,9 +125,19 @@ def _backfill_primary_tasks(runs: Sequence[RowMapping]) -> None:
     update_run_query = sa.text(
         "UPDATE run SET primary_task_id = :primary_task_id WHERE run_id = :run_id"
     )
+    mark_run_stopped_query = sa.text(
+        """
+        UPDATE run
+        SET finished_at = :finished_at, sub_status = :sub_status, details = :details
+        WHERE run_id = :run_id
+        """
+    )
     reserved_task_ids: set[int] = set()
 
     for run in runs:
+        finished_at, sub_status, details = _backfilled_primary_task_status(
+            run, stopped_at
+        )
         task_id = _generate_unique_task_id(bind, reserved_task_ids)
         bind.execute(
             insert_task_query,
@@ -139,15 +152,25 @@ def _backfill_primary_tasks(runs: Sequence[RowMapping]) -> None:
                 "pending_at": run["pending_at"],
                 "starting_at": run["starting_at"] or None,
                 "running_at": run["running_at"] or None,
-                "finished_at": run["finished_at"] or None,
-                "sub_status": run["sub_status"] or "",
-                "details": run["details"] or "",
+                "finished_at": finished_at,
+                "sub_status": sub_status,
+                "details": details,
             },
         )
         bind.execute(
             update_run_query,
             {"primary_task_id": uint64_to_int64(task_id), "run_id": run["run_id"]},
         )
+        if _is_in_flight_run(run):
+            bind.execute(
+                mark_run_stopped_query,
+                {
+                    "run_id": run["run_id"],
+                    "finished_at": finished_at,
+                    "sub_status": sub_status,
+                    "details": details,
+                },
+            )
 
 
 def upgrade() -> None:
