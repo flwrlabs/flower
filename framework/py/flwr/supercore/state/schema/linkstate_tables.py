@@ -16,7 +16,6 @@
 
 
 from sqlalchemy import (
-    TIMESTAMP,
     BigInteger,
     Column,
     Float,
@@ -51,7 +50,7 @@ def create_linkstate_metadata() -> MetaData:
         Column("last_activated_at", String, nullable=True),
         Column("last_deactivated_at", String, nullable=True),
         Column("unregistered_at", String, nullable=True),
-        Column("online_until", TIMESTAMP, nullable=True),
+        Column("online_until", Float, nullable=True),
         Column("heartbeat_interval", Float),
         Column("public_key", LargeBinary, unique=True),
         # Indexes
