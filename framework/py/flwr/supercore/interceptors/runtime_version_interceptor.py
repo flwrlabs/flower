@@ -14,7 +14,6 @@
 # ==============================================================================
 """Runtime version metadata interceptors."""
 
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -88,7 +87,12 @@ class RuntimeVersionClientInterceptor(
             if isinstance(call, grpc.RpcError):
                 self._maybe_exit_on_incompat_error(call)
 
-        if not call.add_callback(_handle_completion):
+        try:
+            callback_added = call.add_callback(_handle_completion)
+        except NotImplementedError:
+            return call
+
+        if not callback_added:
             _handle_completion()
 
         return call
