@@ -381,6 +381,7 @@ class TestAlembicRun(unittest.TestCase):
             self.assertEqual(simulation_primary["sub_status"], "completed")
             self.assertEqual(simulation_primary["details"], "done")
 
+            # Assert: Primary task inserted for run 103
             failed_primary = tasks[runs[103]["primary_task_id"]]
             self.assertNotEqual(runs[103]["primary_task_id"], 1)
             self.assertEqual(failed_primary["type"], TaskType.SERVER_APP)
