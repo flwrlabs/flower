@@ -410,7 +410,9 @@ class TestAlembicRun(unittest.TestCase):
             self.assertEqual(primary_task["running_at"], "2026-04-27T13:02:00+00:00")
             self.assertTrue(primary_task["finished_at"])
             self.assertEqual(primary_task["sub_status"], SubStatus.STOPPED)
-            self.assertEqual(primary_task["details"], "Run stopped during server upgrade.")
+            self.assertEqual(
+                primary_task["details"], "Run stopped during server upgrade."
+            )
             self.assertEqual(
                 primary_task["run_finished_at"], primary_task["finished_at"]
             )
