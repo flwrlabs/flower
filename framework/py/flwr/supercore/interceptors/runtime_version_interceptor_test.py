@@ -16,14 +16,13 @@
 
 import json
 from collections import namedtuple
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from typing import cast
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
 import grpc
 from google.protobuf.message import Message as GrpcMessage
-from packaging.version import InvalidVersion, Version
 
 from flwr.common.exit import ExitCode
 from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
@@ -43,7 +42,6 @@ from flwr.supercore.interceptors import (
     create_serverappio_runtime_version_server_interceptor,
 )
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
-from flwr.supercore.version import package_version
 
 _ClientCallDetails = namedtuple(
     "_ClientCallDetails",
@@ -94,21 +92,23 @@ def _make_runtime_metadata_with_package(
     )
 
 
-def _local_version() -> Version:
-    try:
-        return Version(package_version)
-    except InvalidVersion:
-        return Version("1.30.0")
+def _make_local_runtime_metadata(component_name: str) -> RuntimeVersionMetadata:
+    return RuntimeVersionMetadata(
+        package_name="flwr",
+        package_version="1.30.0",
+        component_name=component_name,
+    )
 
 
-def _make_same_major_minor_peer_version() -> str:
-    local_version = _local_version()
-    return f"{local_version.major}.{local_version.minor}.{local_version.micro + 1}"
-
-
-def _make_different_minor_peer_version() -> str:
-    local_version = _local_version()
-    return f"{local_version.major}.{local_version.minor + 1}.0"
+def _create_interceptor_with_local_runtime_metadata(
+    create_interceptor: Callable[[], RuntimeVersionServerInterceptor],
+) -> RuntimeVersionServerInterceptor:
+    with patch(
+        "flwr.supercore.interceptors.runtime_version_interceptor."
+        "RuntimeVersionMetadata.from_local_component",
+        side_effect=_make_local_runtime_metadata,
+    ):
+        return create_interceptor()
 
 
 def _make_unary_handler() -> grpc.RpcMethodHandler:
@@ -357,10 +357,12 @@ class TestRuntimeVersionServerInterceptor(TestCase):
 
     def test_serverappio_factory_rejects_incompatible_by_default(self) -> None:
         """ServerAppIo factory should reject different major.minor by default."""
-        self.interceptor = create_serverappio_runtime_version_server_interceptor()
+        self.interceptor = _create_interceptor_with_local_runtime_metadata(
+            create_serverappio_runtime_version_server_interceptor
+        )
         intercepted = self._intercept(
             "/flwr.proto.ServerAppIo/GetNodes",
-            _make_runtime_metadata(_make_different_minor_peer_version()),
+            _make_runtime_metadata("1.31.1"),
         )
 
         context = Mock(spec=grpc.ServicerContext)
@@ -375,10 +377,12 @@ class TestRuntimeVersionServerInterceptor(TestCase):
 
     def test_serverappio_factory_accepts_same_major_minor_by_default(self) -> None:
         """ServerAppIo factory should accept patch-level version differences."""
-        self.interceptor = create_serverappio_runtime_version_server_interceptor()
+        self.interceptor = _create_interceptor_with_local_runtime_metadata(
+            create_serverappio_runtime_version_server_interceptor
+        )
         intercepted = self._intercept(
             "/flwr.proto.ServerAppIo/GetNodes",
-            _make_runtime_metadata(_make_same_major_minor_peer_version()),
+            _make_runtime_metadata("1.30.7"),
         )
 
         context = Mock(spec=grpc.ServicerContext)
@@ -388,10 +392,12 @@ class TestRuntimeVersionServerInterceptor(TestCase):
 
     def test_clientappio_factory_rejects_incompatible_by_default(self) -> None:
         """ClientAppIo factory should reject different major.minor by default."""
-        self.interceptor = create_clientappio_runtime_version_server_interceptor()
+        self.interceptor = _create_interceptor_with_local_runtime_metadata(
+            create_clientappio_runtime_version_server_interceptor
+        )
         intercepted = self._intercept(
             "/flwr.proto.ClientAppIo/GetRun",
-            _make_runtime_metadata(_make_different_minor_peer_version()),
+            _make_runtime_metadata("1.31.1"),
         )
 
         context = Mock(spec=grpc.ServicerContext)
@@ -406,10 +412,12 @@ class TestRuntimeVersionServerInterceptor(TestCase):
 
     def test_clientappio_factory_accepts_same_major_minor_by_default(self) -> None:
         """ClientAppIo factory should accept patch-level version differences."""
-        self.interceptor = create_clientappio_runtime_version_server_interceptor()
+        self.interceptor = _create_interceptor_with_local_runtime_metadata(
+            create_clientappio_runtime_version_server_interceptor
+        )
         intercepted = self._intercept(
             "/flwr.proto.ClientAppIo/GetRun",
-            _make_runtime_metadata(_make_same_major_minor_peer_version()),
+            _make_runtime_metadata("1.30.7"),
         )
 
         context = Mock(spec=grpc.ServicerContext)
