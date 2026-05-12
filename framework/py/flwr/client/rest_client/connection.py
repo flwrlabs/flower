@@ -208,7 +208,7 @@ def http_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         # Send the request
         def post() -> requests.Response:
             return requests.post(
-                f"{base_url}/{api_path}",
+                f"{base_url.rstrip('/')}/{api_path.lstrip('/')}",
                 data=req_bytes,
                 headers={
                     "Accept": "application/protobuf",
