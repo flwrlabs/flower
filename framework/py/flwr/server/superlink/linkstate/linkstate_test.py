@@ -2048,7 +2048,6 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         self.assertTrue(captured)
         self.assertEqual(len(captured), 2)
         self.assertNotIn("strftime", "".join(captured))
-        self.assertIn("online_until = :online_until", captured[1])
         self.assertIn("online_until <= :current_time", captured[1])
 
 

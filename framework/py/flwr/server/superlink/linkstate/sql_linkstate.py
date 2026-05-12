@@ -810,7 +810,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             SET status = :offline, last_deactivated_at = :last_deactivated_at
             WHERE node_id = :node_id
               AND status = :online
-              AND online_until = :online_until
               AND online_until <= :current_time
         """
         update_data = [
@@ -821,9 +820,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 ),
                 "node_id": row["node_id"],
                 "online": NodeStatus.ONLINE,
-                # Re-check `online_until` to avoid marking a node offline after a
-                # concurrent heartbeat extended its expiry.
-                "online_until": row["online_until"],
+                # Re-check expiry to avoid marking a node offline after a concurrent
+                # heartbeat extended its `online_until`.
                 "current_time": params["current_time"],
             }
             for row in rows
