@@ -307,6 +307,8 @@ class TestAlembicRun(unittest.TestCase):
                         ),
                     ],
                 )
+                # Pre-existing non-primary task to ensure the migration preserves
+                # historical task rows and allocates a distinct primary_task_id.
                 self.insert_tasks(
                     connection,
                     [
@@ -357,38 +359,38 @@ class TestAlembicRun(unittest.TestCase):
                 }
 
             # Assert: Primary task inserted for run 101
-            pending_primary = tasks[runs[101]["primary_task_id"]]
-            self.assertEqual(pending_primary["type"], TaskType.SERVER_APP)
-            self.assertEqual(pending_primary["run_id"], 101)
-            self.assertEqual(pending_primary["pending_at"], "2026-04-27T10:00:00+00:00")
-            self.assertIsNone(pending_primary["starting_at"])
-            self.assertIsNone(pending_primary["running_at"])
-            self.assertIsNone(pending_primary["finished_at"])
+            task = tasks[runs[101]["primary_task_id"]]
+            self.assertEqual(task["type"], TaskType.SERVER_APP)
+            self.assertEqual(task["run_id"], 101)
+            self.assertEqual(task["pending_at"], "2026-04-27T10:00:00+00:00")
+            self.assertIsNone(task["starting_at"])
+            self.assertIsNone(task["running_at"])
+            self.assertIsNone(task["finished_at"])
 
             # Assert: Primary task inserted for run 102
-            simulation_primary = tasks[runs[102]["primary_task_id"]]
-            self.assertEqual(simulation_primary["type"], TaskType.SIMULATION)
-            self.assertEqual(simulation_primary["run_id"], 102)
+            task = tasks[runs[102]["primary_task_id"]]
+            self.assertEqual(task["type"], TaskType.SIMULATION)
+            self.assertEqual(task["run_id"], 102)
             self.assertEqual(
-                simulation_primary["starting_at"], "2026-04-27T11:01:00+00:00"
+                task["starting_at"], "2026-04-27T11:01:00+00:00"
             )
             self.assertEqual(
-                simulation_primary["running_at"], "2026-04-27T11:02:00+00:00"
+                task["running_at"], "2026-04-27T11:02:00+00:00"
             )
             self.assertEqual(
-                simulation_primary["finished_at"], "2026-04-27T11:03:00+00:00"
+                task["finished_at"], "2026-04-27T11:03:00+00:00"
             )
-            self.assertEqual(simulation_primary["sub_status"], "completed")
-            self.assertEqual(simulation_primary["details"], "done")
+            self.assertEqual(task["sub_status"], "completed")
+            self.assertEqual(task["details"], "done")
 
             # Assert: Primary task inserted for run 103
-            failed_primary = tasks[runs[103]["primary_task_id"]]
+            task = tasks[runs[103]["primary_task_id"]]
             self.assertNotEqual(runs[103]["primary_task_id"], 1)
-            self.assertEqual(failed_primary["type"], TaskType.SERVER_APP)
-            self.assertEqual(failed_primary["run_id"], 103)
-            self.assertEqual(failed_primary["finished_at"], "2026-04-27T12:05:00+00:00")
-            self.assertEqual(failed_primary["sub_status"], "failed")
-            self.assertEqual(failed_primary["details"], "boom")
+            self.assertEqual(task["type"], TaskType.SERVER_APP)
+            self.assertEqual(task["run_id"], 103)
+            self.assertEqual(task["finished_at"], "2026-04-27T12:05:00+00:00")
+            self.assertEqual(task["sub_status"], "failed")
+            self.assertEqual(task["details"], "boom")
 
             existing_task = tasks[1]
             self.assertEqual(existing_task["type"], TaskType.MODEL)
