@@ -91,7 +91,7 @@ class RuntimeVersionClientInterceptor(
         try:
             callback_added = call.add_callback(_handle_completion)
         except NotImplementedError:
-            callback_added = False
+            return call
 
         if not callback_added:
             _handle_completion()
