@@ -15,16 +15,21 @@ python -m ruff check --fix py/flwr
 # Protos
 find proto/flwr/proto -name *.proto | grep "\.proto" | xargs clang-format -i
 
-# E2E
-python -m isort e2e
-python -m black -q e2e
-python -m docformatter -i -r e2e
+if [ -d e2e ]; then
+  # E2E
+  python -m isort e2e
+  python -m black -q e2e
+  python -m docformatter -i -r e2e
+fi
 
-# Markdown
-python -m mdformat --number docs/source
+if [ -d docs/source ]; then
+  # Markdown
+  python -m devtool.check_copyright docs/source
+  python -m mdformat --number docs/source
 
-# RST
-docstrfmt docs/source
+  # RST
+  docstrfmt docs/source
+fi
 
 # Core SQLAlchemy schema
 paracelsus inject py/flwr/supercore/state/schema/README.md dev.get_schema_base:Base \
