@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for Control API gRPC server wiring."""
 
+
 from pathlib import Path
 from unittest.mock import Mock, patch
 
