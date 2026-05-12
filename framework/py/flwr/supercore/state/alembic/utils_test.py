@@ -431,7 +431,9 @@ class TestAlembicRun(unittest.TestCase):
                 primary_task["run_finished_at"], primary_task["finished_at"]
             )
             self.assertEqual(primary_task["run_sub_status"], SubStatus.STOPPED)
-            self.assertEqual(primary_task["run_details"], "")
+            self.assertEqual(
+                primary_task["run_details"], "Run stopped during server upgrade."
+            )
         finally:
             engine.dispose()
 
