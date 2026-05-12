@@ -658,7 +658,7 @@ requires-dist = [
 dev = [
     { name = "beautysh", specifier = "==6.4.2" },
     { name = "clang-format", specifier = "==17.0.6" },
-    { name = "docformatter", specifier = "==1.7.5" },
+    { name = "docformatter", specifier = "==1.7.8" },
     { name = "docstrfmt", git = "https://github.com/charlesbvll/docstrfmt.git?branch=patch-2" },
     { name = "furo", specifier = "==2024.8.6" },
     { name = "gitpython", specifier = "==3.1.41" },
@@ -701,17 +701,15 @@ wheels = [
 
 [[package]]
 name = "docformatter"
-version = "1.7.5"
+version = "1.7.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "charset-normalizer" },
-    { name = "untokenize" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f4/44/aba2c40cf796121b35835ea8c00bc5d93f2f70730eca53b36b8bbbfaefe1/docformatter-1.7.5.tar.gz", hash = "sha256:ffed3da0daffa2e77f80ccba4f0e50bfa2755e1c10e130102571c890a61b246e", size = 25893, upload-time = "2023-07-12T01:45:43.959Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6a/e1/f6fb315205e0a8f62ddbd52029b3d39cb5bada768af317193460f0454f6b/docformatter-1.7.8.tar.gz", hash = "sha256:6589b62a8f38c62c4c8c84cb1afa296af007c88c959e4c9d25c74c1f933c4dbf", size = 37754, upload-time = "2026-04-28T20:34:49.390578Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8b/95/568a2fca29df365b82012b09b64964a05f4f20ac83c2137b262f3fa3188f/docformatter-1.7.5-py3-none-any.whl", hash = "sha256:a24f5545ed1f30af00d106f5d85dc2fce4959295687c24c8f39f5263afaf9186", size = 32798, upload-time = "2023-07-12T01:45:42.458Z" },
+    { url = "https://files.pythonhosted.org/packages/09/9b/9d2f60e967243aa0d1c6366f4f5feb0740393b5da7dbc66802034afc6331/docformatter-1.7.8-py3-none-any.whl", hash = "sha256:8e518948bacb8d8df5d5f625060e214a200f0a908d8e6797c9ebbdd2cdd17467", size = 59445, upload-time = "2026-04-28T20:34:50.393692Z" },
 ]
-
 [[package]]
 name = "exceptiongroup"
 version = "1.3.1"
@@ -800,7 +798,7 @@ provides-extras = ["vision", "audio"]
 dev = [
     { name = "black", extras = ["jupyter"], specifier = "==25.11.0" },
     { name = "devtool", editable = "../dev" },
-    { name = "docformatter", specifier = "==1.7.5" },
+    { name = "docformatter", specifier = "==1.7.8" },
     { name = "isort", specifier = "==5.13.2" },
     { name = "mypy", specifier = "==1.8.0" },
     { name = "parameterized", specifier = "==0.9.0" },
@@ -3322,12 +3320,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/5e/a7/c202b344c5ca7daf3
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/b0/003792df09decd6849a5e39c28b513c06e84436a54440380862b5aeff25d/tzdata-2025.3-py2.py3-none-any.whl", hash = "sha256:06a47e5700f3081aab02b2e513160914ff0694bce9947d6b76ebd6bf57cfc5d1", size = 348521, upload-time = "2025-12-13T17:45:33.889Z" },
 ]
-
-[[package]]
-name = "untokenize"
-version = "0.1.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f7/46/e7cea8159199096e1df52da20a57a6665da80c37fb8aeb848a3e47442c32/untokenize-0.1.1.tar.gz", hash = "sha256:3865dbbbb8efb4bb5eaa72f1be7f3e0be00ea8b7f125c69cbd1f5fda926f37a2", size = 3099, upload-time = "2014-02-08T16:30:40.631Z" }
 
 [[package]]
 name = "urllib3"
