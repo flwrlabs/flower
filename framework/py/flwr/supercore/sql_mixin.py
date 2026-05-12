@@ -181,7 +181,7 @@ class SqlMixin(ABC):
         # Create engine with SQLite-specific settings
         engine_kwargs: dict[str, Any] = {
             # SQLite needs check_same_thread=False for multi-threaded access
-            "connect_args": {"check_same_thread": False},
+            "connect_args": {"check_same_thread": False}
         }
         # In-memory SQLite databases are per-connection; use StaticPool to ensure
         # all threads share the same database instance.
