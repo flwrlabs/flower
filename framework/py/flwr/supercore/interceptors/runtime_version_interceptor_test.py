@@ -281,8 +281,8 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         metadata = dict(context.set_trailing_metadata.call_args.args[0])
         self.assertEqual(
             metadata[VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY],
-            "Warning: The installed `flwr` version is 1.30.1, but 1.29.0 "
-            "is recommended.",
+            "superlink version 1.29.0 only accepts peers from the same major.minor "
+            "release, but received simulation version 1.30.1.",
         )
 
     def test_package_name_mismatch_preserves_warning_details(self) -> None:
@@ -299,7 +299,6 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         metadata = dict(context.set_trailing_metadata.call_args.args[0])
         self.assertEqual(
             metadata[VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY],
-            "Warning: Runtime version compatibility check failed. "
             "Peer Flower package name is not recognized: 'custom-flwr'.",
         )
 
@@ -333,8 +332,8 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
         self.assertEqual(
             error_payload["public_details"],
-            "Error: The installed `flwr` version is 1.30.1, but only 1.29.x "
-            "is supported (recommended: 1.29.0).",
+            "superlink version 1.29.0 only accepts peers from the same major.minor "
+            "release, but received simulation version 1.30.1.",
         )
 
     def test_serverappio_factory_observes_by_default(self) -> None:

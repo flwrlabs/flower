@@ -23,7 +23,6 @@ from typing import Any
 
 import grpc
 from google.protobuf.message import Message as GrpcMessage
-from packaging.version import InvalidVersion, Version
 
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
@@ -31,8 +30,6 @@ from flwr.supercore.constant import VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY
 from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
 from flwr.supercore.utils import get_metadata_str
-
-_SUPPORTED_FLOWER_PACKAGE_NAMES = frozenset({"flwr", "flwr-nightly"})
 
 
 class RuntimeVersionClientInterceptor(
@@ -155,16 +152,8 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
         warning_message = None
         error_details = None
         if incompat_details:
-            warning_message = _format_runtime_version_warning(
-                local_metadata=self._local_metadata,
-                peer_metadata=peer_metadata,
-                fallback_details=incompat_details,
-            )
-            error_details = _format_runtime_version_error(
-                local_metadata=self._local_metadata,
-                peer_metadata=peer_metadata,
-                fallback_details=incompat_details,
-            )
+            warning_message = incompat_details
+            error_details = incompat_details
 
         # Prepare trailing metadata
         trailing_metadata: tuple[tuple[str, str], ...] = ()
@@ -224,73 +213,6 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
             )
 
         return method_handler
-
-
-def _format_runtime_version_warning(
-    *,
-    local_metadata: RuntimeVersionMetadata,
-    peer_metadata: RuntimeVersionMetadata | None,
-    fallback_details: str,
-) -> str:
-    """Format a client-facing runtime-version compatibility warning."""
-    if not _is_version_mismatch(local_metadata, peer_metadata):
-        return (
-            "Warning: Runtime version compatibility check failed. "
-            f"{fallback_details}"
-        )
-
-    return (
-        f"Warning: The installed `{peer_metadata.package_name}` version is "
-        f"{peer_metadata.package_version}, but {local_metadata.package_version} "
-        "is recommended."
-    )
-
-
-def _format_runtime_version_error(
-    *,
-    local_metadata: RuntimeVersionMetadata,
-    peer_metadata: RuntimeVersionMetadata | None,
-    fallback_details: str,
-) -> str:
-    """Format client-facing details for runtime-version rejection."""
-    if not _is_version_mismatch(local_metadata, peer_metadata):
-        return (
-            f"{fallback_details} Upgrade to `{local_metadata.package_name}` "
-            f"{local_metadata.package_version}."
-        )
-
-    local_version = Version(local_metadata.package_version)
-    supported_minor = f"{local_version.major}.{local_version.minor}.x"
-    return (
-        f"Error: The installed `{peer_metadata.package_name}` version is "
-        f"{peer_metadata.package_version}, but only {supported_minor} is supported "
-        f"(recommended: {local_metadata.package_version})."
-    )
-
-
-def _is_version_mismatch(
-    local_metadata: RuntimeVersionMetadata,
-    peer_metadata: RuntimeVersionMetadata | None,
-) -> bool:
-    """Return whether incompatibility is caused by a major/minor version mismatch."""
-    if peer_metadata is None:
-        return False
-    if (
-        local_metadata.package_name.strip() not in _SUPPORTED_FLOWER_PACKAGE_NAMES
-        or peer_metadata.package_name.strip() not in _SUPPORTED_FLOWER_PACKAGE_NAMES
-    ):
-        return False
-
-    try:
-        local_version = Version(local_metadata.package_version)
-        peer_version = Version(peer_metadata.package_version)
-    except InvalidVersion:
-        return False
-
-    return (
-        local_version.major != peer_version.major
-        or local_version.minor != peer_version.minor
-    )
 
 
 def create_serverappio_runtime_version_server_interceptor(
