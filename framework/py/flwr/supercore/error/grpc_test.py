@@ -69,7 +69,11 @@ def test_flower_error_from_json() -> None:
 
 def test_flower_error_from_json_returns_base_error_for_subclass_call() -> None:
     """Deserialize public payloads into a base FlowerError."""
-    err = EntitlementError("internal diagnostic message", entitlement_code=123)
+    err = EntitlementError(
+        "internal diagnostic message",
+        public_details="public details",
+        entitlement_code=123,
+    )
 
     parsed = EntitlementError.from_json(err.to_json("public message"))
 
@@ -77,7 +81,7 @@ def test_flower_error_from_json_returns_base_error_for_subclass_call() -> None:
     assert not isinstance(parsed, EntitlementError)
     assert parsed.code == ApiErrorCode.ENTITLEMENT_ERROR
     assert parsed.message == "public message"
-    assert parsed.public_details == "internal diagnostic message"
+    assert parsed.public_details == "public details"
 
 
 @pytest.mark.parametrize(
@@ -144,7 +148,11 @@ def test_rpc_error_translator_entitlement_error_preserves_error_message() -> Non
 
     with pytest.raises(grpc.RpcError):
         with rpc_error_translator(context, "MockApi.MockRpc"):
-            raise EntitlementError(error_message, entitlement_code)
+            raise EntitlementError(
+                "internal diagnostic message",
+                public_details=error_message,
+                entitlement_code=entitlement_code,
+            )
 
     context.abort.assert_called_once()
     grpc_status, payload = context.abort.call_args.args
