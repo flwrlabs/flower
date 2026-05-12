@@ -1,16 +1,32 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 name: Reusable Docker image build workflow
 
 on:
   workflow_call:
     inputs:
-      namespace-repository:
-        description: "The namespace and repository in the following format `namespace/repository` e.g. (flwr/base)."
+      image-repository:
+        description: "Fully qualified image repository, including registry host and path (for example, docker.io/flwr/base)."
         required: true
         type: string
+      registry:
+        description: "Docker registry host supplied by the caller."
+        required: false
+        type: string
+        default: ""
       file-dir:
         description: "Path of the directory that contains the Dockerfile."
         required: true
         type: string
+      dockerfile:
+        description: "Dockerfile path relative to the repository root."
+        required: false
+        type: string
+        default: ""
+      context:
+        description: "Docker build context."
+        required: false
+        type: string
+        default: ""
       build-args:
         description: "List of build-time variables."
         required: false
@@ -19,11 +35,34 @@ on:
         description: "List of tags."
         required: true
         type: string
+      prepare-framework:
+        description: "Run repository-specific framework preparation before building."
+        required: false
+        type: boolean
+        default: false
+      patch-base-dockerfiles:
+        description: "Run repository-specific base Dockerfile patching before building."
+        required: false
+        type: boolean
+        default: false
+      build-local-wheel:
+        description: "Build the local framework wheel and let scripts substitute it into build args."
+        required: false
+        type: boolean
+        default: false
+      flower-repo-ref:
+        description: "Flower repository ref used by repository-specific preparation."
+        required: false
+        type: string
+        default: main
+      docker-registry-user:
+        description: "Docker registry username."
+        required: false
+        default: ""
+        type: string
     secrets:
-      dockerhub-user:
-        required: true
-      dockerhub-token:
-        required: true
+      docker-registry-token:
+        required: false
     outputs:
       metadata:
         description: "Metadata of the Docker image."
@@ -43,11 +82,47 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        platform: [
+        platform:
+          [
             { name: "amd64", docker: "linux/amd64", runner-os: "ubuntu-22.04" },
-            { name: "arm64", docker: "linux/arm64", runner-os: "ubuntu-4-core-arm64" },
+            {
+              name: "arm64",
+              docker: "linux/arm64",
+              runner-os: "ubuntu-4-core-arm64",
+            },
           ]
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Bootstrap
+        if: ${{ inputs.prepare-framework || inputs.build-local-wheel }}
+        uses: ./.github/actions/bootstrap
+
+      - name: Install system dependencies
+        if: ${{ inputs.prepare-framework || inputs.patch-base-dockerfiles || inputs.build-local-wheel }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y patch rsync
+
+      - name: Prepare Docker build context
+        if: ${{ inputs.prepare-framework || inputs.patch-base-dockerfiles || inputs.build-local-wheel }}
+        env:
+          FLOWER_REPO_REF: ${{ inputs.flower-repo-ref }}
+          PREPARE_FRAMEWORK: ${{ inputs.prepare-framework }}
+          PATCH_BASE_DOCKERFILES: ${{ inputs.patch-base-dockerfiles }}
+          BUILD_LOCAL_WHEEL: ${{ inputs.build-local-wheel }}
+        run: ./framework/dev/release/prepare-docker-build-context.sh
+
+      - name: Resolve build args
+        id: resolved-build-args
+        env:
+          INPUT_BUILD_ARGS: ${{ inputs.build-args }}
+          BUILD_LOCAL_WHEEL: ${{ inputs.build-local-wheel }}
+        run: ./framework/dev/release/resolve-docker-build-args.sh
+
       - name: Create build id
         id: build-id
         shell: python
@@ -55,42 +130,43 @@ jobs:
           import hashlib
           import os
 
-          hash = hashlib.sha256('''${{ inputs.namespace-repository }}
+          hash = hashlib.sha256('''${{ inputs.image-repository }}
           ${{ inputs.file-dir }}
-          ${{ inputs.build-args }}'''.encode())
-          # Adds two spaces to the line breaks to ensure proper indentation
-          # when passing the multi-line string to the wretry.action.
-          # Without it, the multi-line string is passed like this:
-          #
-          # build-args: |
-          #   ARG1=
-          # ARG2=
-          # ARG3=
-          #
-          # This causes the Docker action to interpret ARG2 and ARG3 as keys instead
-          # of values ​​of the multi-line string.
-          build_args = '''${{ inputs.build-args }}'''.replace("\n", "\n  ")
+          ${{ steps.resolved-build-args.outputs.build-args }}'''.encode())
 
           with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
               print(f"id={hash.hexdigest()}", file=fh)
-              print("build-args<<EOF", file=fh)
-              print(build_args, file=fh)
-              print("EOF", file=fh)
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
         with:
-          images: ${{ inputs.namespace-repository }}
+          images: ${{ inputs.image-repository }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
 
-      - name: Login to Docker Hub
+      - name: Validate Docker registry credentials
+        env:
+          DOCKER_REGISTRY_USER: ${{ inputs.docker-registry-user }}
+          DOCKER_REGISTRY_TOKEN: ${{ secrets.docker-registry-token }}
+        run: |
+          if [[ -z "${DOCKER_REGISTRY_USER}" ]]; then
+            echo "::error::docker-registry-user input is required for Docker login."
+            exit 1
+          fi
+
+          if [[ -z "${DOCKER_REGISTRY_TOKEN}" ]]; then
+            echo "::error::docker-registry-token secret is required and was not provided."
+            exit 1
+          fi
+
+      - name: Login to Docker registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
-          username: ${{ secrets.dockerhub-user }}
-          password: ${{ secrets.dockerhub-token }}
+          registry: ${{ inputs.registry }}
+          username: ${{ inputs.docker-registry-user }}
+          password: ${{ secrets.docker-registry-token }}
 
       - name: Build and push
         uses: Wandalen/wretry.action@e68c23e6309f2871ca8ae4763e7629b9c258e1ea # v3.8.0
@@ -103,10 +179,11 @@ jobs:
             pull: true
             sbom: true
             platforms: ${{ matrix.platform.docker }}
-            context: "{{defaultContext}}:${{ inputs.file-dir }}"
-            outputs: type=image,name=${{ inputs.namespace-repository }},push-by-digest=true,name-canonical=true,push=true
+            context: ${{ inputs.context != '' && inputs.context || format('{{defaultContext}}:{0}', inputs.file-dir) }}
+            file: ${{ inputs.dockerfile != '' && inputs.dockerfile || (inputs.context != '' && format('{0}/Dockerfile', inputs.file-dir) || 'Dockerfile') }}
+            outputs: type=image,name=${{ inputs.image-repository }},push-by-digest=true,name-canonical=true,push=true
             build-args: |
-              ${{ steps.build-id.outputs.build-args }}
+              ${{ steps.resolved-build-args.outputs.build-args }}
 
       - name: Export digest
         run: |
@@ -141,22 +218,48 @@ jobs:
         id: meta
         uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5.8.0
         with:
-          images: ${{ inputs.namespace-repository }}
+          images: ${{ inputs.image-repository }}
           tags: ${{ inputs.tags }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
 
-      - name: Login to Docker Hub
+      - name: Validate Docker registry credentials
+        env:
+          DOCKER_REGISTRY_USER: ${{ inputs.docker-registry-user }}
+          DOCKER_REGISTRY_TOKEN: ${{ secrets.docker-registry-token }}
+        run: |
+          if [[ -z "${DOCKER_REGISTRY_USER}" ]]; then
+            echo "::error::docker-registry-user input is required for Docker login."
+            exit 1
+          fi
+
+          if [[ -z "${DOCKER_REGISTRY_TOKEN}" ]]; then
+            echo "::error::docker-registry-token secret is required and was not provided."
+            exit 1
+          fi
+
+      - name: Login to Docker registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
-          username: ${{ secrets.dockerhub-user }}
-          password: ${{ secrets.dockerhub-token }}
+          registry: ${{ inputs.registry }}
+          username: ${{ inputs.docker-registry-user }}
+          password: ${{ secrets.docker-registry-token }}
 
       - name: Create Docker manifest list and push
         working-directory: /tmp/digests
         run: |
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-              $(printf '${{ inputs.namespace-repository }}@sha256:%s ' *)
+          tag_args=()
+          while IFS= read -r tag; do
+            tag_args+=("-t" "${tag}")
+          done < <(jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+
+          digest_args=()
+          for digest in *; do
+            digest_args+=("${{ inputs.image-repository }}@sha256:${digest}")
+          done
+
+          docker buildx imagetools create "${tag_args[@]}" "${digest_args[@]}"
+
       - name: Inspect Docker image
-        run: docker buildx imagetools inspect ${{ inputs.namespace-repository }}:${{ steps.meta.outputs.version }}
+        run: docker buildx imagetools inspect ${{ inputs.image-repository }}:${{ steps.meta.outputs.version }}

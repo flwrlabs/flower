@@ -16,12 +16,14 @@
 
 
 import unittest
+from collections.abc import Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
-from typing import cast
+from typing import Any, cast
 from unittest.mock import patch
 
+from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
@@ -36,9 +38,11 @@ from sqlalchemy import (
     inspect,
     text,
 )
-from sqlalchemy.engine import URL, Engine
+from sqlalchemy.engine import URL, Connection, Engine
 
+from flwr.common.constant import SubStatus
 from flwr.common.exit import ExitCode
+from flwr.supercore.constant import RunType, TaskType
 from flwr.supercore.state.alembic.utils import (
     ALEMBIC_DIR,
     ALEMBIC_VERSION_TABLE,
@@ -73,6 +77,70 @@ class TestAlembicRun(unittest.TestCase):
         """Create a SQLAlchemy engine for a test database."""
         db_path = self.temp_path / db_name
         return create_engine(f"sqlite:///{db_path}")
+
+    def upgrade_to_revision(self, engine: Engine, revision: str) -> None:
+        """Upgrade the test database to the specified Alembic revision."""
+        command.upgrade(build_alembic_config(engine), revision)
+
+    def build_run_row(  # pylint: disable=too-many-arguments
+        self,
+        run_id: int,
+        *,
+        fab_id: str,
+        fab_version: str,
+        fab_hash: str,
+        pending_at: str,
+        **overrides: Any,
+    ) -> dict[str, Any]:
+        """Build a run row with defaults suited for migration backfill tests."""
+        row: dict[str, Any] = {
+            "run_id": run_id,
+            "fab_id": fab_id,
+            "fab_version": fab_version,
+            "fab_hash": fab_hash,
+            "override_config": "{}",
+            "pending_at": pending_at,
+            "starting_at": "",
+            "running_at": "",
+            "finished_at": "",
+            "usage_reported_at": "",
+            "sub_status": None,
+            "details": None,
+            "federation": "fed",
+            "federation_config": None,
+            "run_type": RunType.SERVER_APP,
+            "flwr_aid": "aid",
+            "bytes_sent": 0,
+            "bytes_recv": 0,
+            "clientapp_runtime": 0.0,
+        }
+        row.update(overrides)
+        return row
+
+    def insert_runs(
+        self, connection: Connection, runs: Sequence[dict[str, Any]]
+    ) -> None:
+        """Insert run rows into the test database."""
+        connection.execute(
+            text(
+                """
+                INSERT INTO run (
+                    run_id, fab_id, fab_version, fab_hash, override_config,
+                    pending_at, starting_at, running_at, finished_at,
+                    usage_reported_at, sub_status, details, federation,
+                    federation_config, run_type, flwr_aid, bytes_sent,
+                    bytes_recv, clientapp_runtime
+                ) VALUES (
+                    :run_id, :fab_id, :fab_version, :fab_hash, :override_config,
+                    :pending_at, :starting_at, :running_at, :finished_at,
+                    :usage_reported_at, :sub_status, :details, :federation,
+                    :federation_config, :run_type, :flwr_aid, :bytes_sent,
+                    :bytes_recv, :clientapp_runtime
+                )
+                """
+            ),
+            list(runs),
+        )
 
     def test_run_migrations_sets_revision(self) -> None:
         """Ensure migrations advance the database to the latest head."""
@@ -176,6 +244,196 @@ class TestAlembicRun(unittest.TestCase):
             run_migrations(engine)
             inspector = inspect(engine)
             self.assertTrue(inspector.has_table("fab"))
+        finally:
+            engine.dispose()
+
+    def test_primary_task_backfill_populates_historical_runs(self) -> None:
+        """Ensure historical runs get backfilled primary tasks during migration."""
+        engine = self.create_engine("primary_task_backfill.db")
+        try:
+            self.upgrade_to_revision(engine, "dee9b802b5c9")
+            with engine.begin() as connection:
+                self.insert_runs(
+                    connection,
+                    [
+                        self.build_run_row(
+                            run_id=101,
+                            fab_id="publisher/pending",
+                            fab_version="1.0.0",
+                            fab_hash="fab-pending",
+                            pending_at="2026-04-27T10:00:00+00:00",
+                            federation="fed-a",
+                            flwr_aid="aid-a",
+                        ),
+                        self.build_run_row(
+                            run_id=102,
+                            fab_id="publisher/sim",
+                            fab_version="2.0.0",
+                            fab_hash="fab-sim",
+                            pending_at="2026-04-27T11:00:00+00:00",
+                            starting_at="2026-04-27T11:01:00+00:00",
+                            running_at="2026-04-27T11:02:00+00:00",
+                            finished_at="2026-04-27T11:03:00+00:00",
+                            sub_status="completed",
+                            details="done",
+                            federation="fed-b",
+                            federation_config="{}",
+                            run_type=RunType.SIMULATION,
+                            flwr_aid="aid-b",
+                            bytes_sent=7,
+                            bytes_recv=8,
+                            clientapp_runtime=9.5,
+                        ),
+                        self.build_run_row(
+                            run_id=103,
+                            fab_id="publisher/failed",
+                            fab_version="3.0.0",
+                            fab_hash="fab-failed",
+                            pending_at="2026-04-27T12:00:00+00:00",
+                            finished_at="2026-04-27T12:05:00+00:00",
+                            sub_status="failed",
+                            details="boom",
+                            federation="fed-c",
+                            flwr_aid="aid-c",
+                            bytes_sent=1,
+                            bytes_recv=2,
+                            clientapp_runtime=3.0,
+                        ),
+                    ],
+                )
+
+            run_migrations(engine)
+
+            with engine.connect() as connection:
+                runs = {
+                    row["run_id"]: row
+                    for row in connection.execute(
+                        text(
+                            """
+                            SELECT run_id, primary_task_id
+                            FROM run
+                            ORDER BY run_id
+                            """
+                        )
+                    ).mappings()
+                }
+                tasks = {
+                    row["task_id"]: row
+                    for row in connection.execute(
+                        text(
+                            """
+                            SELECT task_id, type, run_id, fab_hash, model_ref,
+                                   pending_at, starting_at, running_at, finished_at,
+                                   sub_status, details
+                            FROM task
+                            ORDER BY task_id
+                            """
+                        )
+                    ).mappings()
+                }
+
+            # Assert: Primary task inserted for run 101
+            task = tasks[runs[101]["primary_task_id"]]
+            self.assertEqual(task["type"], TaskType.SERVER_APP)
+            self.assertEqual(task["run_id"], 101)
+            self.assertEqual(task["pending_at"], "2026-04-27T10:00:00+00:00")
+            self.assertIsNone(task["starting_at"])
+            self.assertIsNone(task["running_at"])
+            self.assertIsNone(task["finished_at"])
+
+            # Assert: Primary task inserted for run 102
+            task = tasks[runs[102]["primary_task_id"]]
+            self.assertEqual(task["type"], TaskType.SIMULATION)
+            self.assertEqual(task["run_id"], 102)
+            self.assertEqual(task["starting_at"], "2026-04-27T11:01:00+00:00")
+            self.assertEqual(task["running_at"], "2026-04-27T11:02:00+00:00")
+            self.assertEqual(task["finished_at"], "2026-04-27T11:03:00+00:00")
+            self.assertEqual(task["sub_status"], "completed")
+            self.assertEqual(task["details"], "done")
+
+            # Assert: Primary task inserted for run 103
+            task = tasks[runs[103]["primary_task_id"]]
+            self.assertEqual(task["type"], TaskType.SERVER_APP)
+            self.assertEqual(task["run_id"], 103)
+            self.assertEqual(task["finished_at"], "2026-04-27T12:05:00+00:00")
+            self.assertEqual(task["sub_status"], "failed")
+            self.assertEqual(task["details"], "boom")
+        finally:
+            engine.dispose()
+
+    def test_primary_task_backfill_stops_running_runs(self) -> None:
+        """Ensure STARTING/RUNNING runs are migrated to FINISHED:STOPPED."""
+        engine = self.create_engine("primary_task_backfill_stopped.db")
+        try:
+            self.upgrade_to_revision(engine, "dee9b802b5c9")
+            with engine.begin() as connection:
+                self.insert_runs(
+                    connection,
+                    [
+                        self.build_run_row(
+                            201,
+                            fab_id="publisher/live",
+                            fab_version="1.0.0",
+                            fab_hash="fab-live",
+                            pending_at="2026-04-27T13:00:00+00:00",
+                            starting_at="2026-04-27T13:01:00+00:00",
+                            running_at="2026-04-27T13:02:00+00:00",
+                            federation="fed-live",
+                            flwr_aid="aid-live",
+                        )
+                    ],
+                )
+
+            run_migrations(engine)
+
+            current = get_current_revisions(engine)
+            script = ScriptDirectory.from_config(build_alembic_config(engine))
+            self.assertEqual(current, set(script.get_heads()))
+            self.assertFalse(check_migrations_pending(engine))
+
+            with engine.connect() as connection:
+                primary_task = (
+                    connection.execute(
+                        text(
+                            """
+                        SELECT
+                            r.primary_task_id,
+                            r.finished_at AS run_finished_at,
+                            r.sub_status AS run_sub_status,
+                            r.details AS run_details,
+                            t.type,
+                            t.starting_at,
+                            t.running_at,
+                            t.finished_at,
+                            t.sub_status,
+                            t.details
+                        FROM run AS r
+                        JOIN task AS t ON t.task_id = r.primary_task_id
+                        WHERE r.run_id = :run_id
+                        """
+                        ),
+                        {"run_id": 201},
+                    )
+                    .mappings()
+                    .one()
+                )
+
+            self.assertIsNotNone(primary_task["primary_task_id"])
+            self.assertEqual(primary_task["type"], TaskType.SERVER_APP)
+            self.assertEqual(primary_task["starting_at"], "2026-04-27T13:01:00+00:00")
+            self.assertEqual(primary_task["running_at"], "2026-04-27T13:02:00+00:00")
+            self.assertTrue(primary_task["finished_at"])
+            self.assertEqual(primary_task["sub_status"], SubStatus.STOPPED)
+            self.assertEqual(
+                primary_task["details"], "Run stopped during server upgrade."
+            )
+            self.assertEqual(
+                primary_task["run_finished_at"], primary_task["finished_at"]
+            )
+            self.assertEqual(primary_task["run_sub_status"], SubStatus.STOPPED)
+            self.assertEqual(
+                primary_task["run_details"], "Run stopped during server upgrade."
+            )
         finally:
             engine.dispose()
 
