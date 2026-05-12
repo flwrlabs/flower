@@ -40,6 +40,7 @@ def upgrade() -> None:
         SELECT logs.timestamp, run.primary_task_id, logs.log
         FROM logs
         JOIN run ON run.run_id = logs.run_id
+        JOIN task ON task.task_id = run.primary_task_id
         WHERE logs.timestamp IS NOT NULL
           AND logs.log IS NOT NULL
         """
@@ -57,6 +58,7 @@ def downgrade() -> None:
             SELECT 1
             FROM logs
             JOIN run ON run.run_id = logs.run_id
+            JOIN task ON task.task_id = run.primary_task_id
             WHERE logs.timestamp = task_logs.timestamp
               AND run.primary_task_id = task_logs.task_id
               AND logs.log = task_logs.log
