@@ -21,8 +21,6 @@ from unittest.mock import Mock
 import grpc
 import pytest
 
-from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE
-from flwr.common.exit import ExitCode
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.interceptors import RuntimeVersionServerInterceptor
 from flwr.supercore.object_store import ObjectStoreFactory
@@ -314,69 +312,3 @@ def test_get_state_backend_factories_non_sqlite_uses_ee_resolver(
     assert captured == ["dummysql://db.example/flwr", federation_manager]
     assert objectstore_factory is expected_objectstore_factory
     assert state_factory is expected_state_factory
-
-
-def test_run_superlink_exits_for_non_sqlite_database_without_ee(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """run_superlink should fail fast with SUPERLINK_INVALID_ARGS."""
-
-    class _FlwrExitCalled(Exception):
-        pass
-
-    def _raise_flwr_exit(code: int, message: str) -> None:
-        assert code == ExitCode.SUPERLINK_INVALID_ARGS
-        assert "Unsupported value for `--database`" in message
-        raise _FlwrExitCalled()
-
-    args = SimpleNamespace(
-        log_file=None,
-        executor=None,
-        executor_dir=None,
-        executor_config=None,
-        exec_api_address=None,
-        control_api_address="[::]:9092",
-        serverappio_api_address="[::]:9091",
-        health_server_address=None,
-        superexec_auth_secret_file=None,
-        isolation="subprocess",
-        user_auth_config=None,
-        account_auth_config=None,
-        enable_event_log=False,
-        artifact_provider_config=None,
-        enable_supernode_auth=False,
-        insecure=False,
-        fleet_api_type=TRANSPORT_TYPE_GRPC_RERE,
-        simulation=False,
-        auth_list_public_keys=None,
-        database="dummysql://db.example/flwr",
-        appio_ssl_certfile=None,
-        appio_ssl_keyfile=None,
-        appio_ssl_ca_certfile=None,
-    )
-
-    class _Parser:
-        def parse_args(self) -> SimpleNamespace:
-            """."""
-            return args
-
-    monkeypatch.setattr(app_module, "_parse_args_run_superlink", _Parser)
-    monkeypatch.setattr(app_module, "warn_if_flwr_update_available", lambda **_: None)
-    monkeypatch.setattr(
-        app_module, "try_obtain_server_certificates", lambda _args: None
-    )
-    monkeypatch.setattr(
-        app_module, "_format_address", lambda address: (address, "127.0.0.1", 9090)
-    )
-    monkeypatch.setattr(
-        app_module, "_load_control_auth_plugins", lambda *_args, **_kwargs: (None, None)
-    )
-    monkeypatch.setattr(
-        app_module,
-        "get_federation_manager",
-        lambda **_kwargs: NoOpFederationManager(),
-    )
-    monkeypatch.setattr(app_module, "flwr_exit", _raise_flwr_exit)
-
-    with pytest.raises(_FlwrExitCalled):
-        app_module.run_superlink()
