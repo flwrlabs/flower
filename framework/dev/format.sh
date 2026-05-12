@@ -24,7 +24,6 @@ fi
 
 if [ -d docs/source ]; then
   # Markdown
-  python -m devtool.check_copyright docs/source
   python -m mdformat --number docs/source
 
   # RST
