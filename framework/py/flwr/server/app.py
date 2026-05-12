@@ -14,7 +14,6 @@
 # ==============================================================================
 """Flower server app."""
 
-
 import argparse
 import importlib.util
 import os
@@ -189,9 +188,9 @@ def _get_state_backend_factories(
             return result
         except NotImplementedError as exc:
             raise ValueError(
-                "Unsupported value for `--database`: "
-                f"{database!r}. The Flower framework supports `:flwr-in-memory:`, "
-                "SQLite file paths, and `sqlite://` URLs."
+                "Unsupported value for `--database`. The Flower framework supports "
+                "`:flwr-in-memory:`, `:memory`, SQLite file paths, and `sqlite://` "
+                "URLs (including `sqlite:///:memory:`)."
             ) from exc
 
     objectstore_factory = ObjectStoreFactory(database)
