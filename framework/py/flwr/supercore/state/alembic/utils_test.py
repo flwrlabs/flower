@@ -80,7 +80,7 @@ class TestAlembicRun(unittest.TestCase):
         """Upgrade the test database to the specified Alembic revision."""
         command.upgrade(build_alembic_config(engine), revision)
 
-    def build_run_row(
+    def build_run_row(  # pylint: disable=too-many-arguments
         self,
         run_id: int,
         *,
