@@ -6,9 +6,9 @@ on:
     branches:
       - main
     paths:
-      - 'framework/**'
-      - '.github/workflows/_docker-build.yml'
-      - '.github/workflows/framework-docker-build-main.yml'
+      - "framework/**"
+      - ".github/workflows/_docker-build.yml"
+      - ".github/workflows/framework-docker-build-main.yml"
   workflow_dispatch:
     inputs:
       flower-repo-ref:
@@ -44,7 +44,7 @@ env:
   DOCKER_IMAGE_TAG: ${{ inputs.docker-image-tag || 'unstable' }}
 
 jobs:
-  parameters:
+  prepare-docker-build-matrix:
     name: Collect docker build parameters
     runs-on: ubuntu-22.04
     timeout-minutes: 20
@@ -102,10 +102,10 @@ jobs:
   build-docker-base-images:
     name: Build base images
     uses: ./.github/workflows/_docker-build.yml
-    needs: parameters
+    needs: prepare-docker-build-matrix
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.parameters.outputs.matrix).base }}
+      matrix: ${{ fromJson(needs.prepare-docker-build-matrix.outputs.matrix).base }}
     with:
       registry: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY }}
       namespace-repository: ${{ matrix.images.namespace_repository }}
@@ -116,8 +116,8 @@ jobs:
       patch-base-dockerfiles: true
       flower-repo-ref: ${{ inputs.flower-repo-ref || 'main' }}
       build-args: |
-        PIP_VERSION=${{ needs.parameters.outputs.pip-version }}
-        SETUPTOOLS_VERSION=${{ needs.parameters.outputs.setuptools-version }}
+        PIP_VERSION=${{ needs.prepare-docker-build-matrix.outputs.pip-version }}
+        SETUPTOOLS_VERSION=${{ needs.prepare-docker-build-matrix.outputs.setuptools-version }}
         ${{ matrix.images.build_args_encoded }}
       tags: ${{ matrix.images.tags_encoded }}
       docker-registry-user: ${{ inputs.docker-registry-user || vars.DOCKER_IMAGE_REGISTRY_USER }}
@@ -127,10 +127,10 @@ jobs:
   build-docker-binary-images:
     name: Build binary images
     uses: ./.github/workflows/_docker-build.yml
-    needs: [parameters, build-docker-base-images]
+    needs: [prepare-docker-build-matrix, build-docker-base-images]
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.parameters.outputs.matrix).binary }}
+      matrix: ${{ fromJson(needs.prepare-docker-build-matrix.outputs.matrix).binary }}
     with:
       registry: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY }}
       namespace-repository: ${{ matrix.images.namespace_repository }}
