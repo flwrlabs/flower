@@ -23,7 +23,7 @@ from unittest.mock import Mock, patch
 
 import grpc
 from google.protobuf.message import Message as GrpcMessage
-from packaging.version import Version
+from packaging.version import InvalidVersion, Version
 
 from flwr.common.exit import ExitCode
 from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
@@ -44,8 +44,6 @@ from flwr.supercore.interceptors import (
 )
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
 from flwr.supercore.version import package_version
-
-_LOCAL_VERSION = Version(package_version)
 
 _ClientCallDetails = namedtuple(
     "_ClientCallDetails",
@@ -96,12 +94,21 @@ def _make_runtime_metadata_with_package(
     )
 
 
+def _local_version() -> Version:
+    try:
+        return Version(package_version)
+    except InvalidVersion:
+        return Version("1.30.0")
+
+
 def _make_same_major_minor_peer_version() -> str:
-    return f"{_LOCAL_VERSION.major}.{_LOCAL_VERSION.minor}.{_LOCAL_VERSION.micro + 1}"
+    local_version = _local_version()
+    return f"{local_version.major}.{local_version.minor}.{local_version.micro + 1}"
 
 
 def _make_different_minor_peer_version() -> str:
-    return f"{_LOCAL_VERSION.major}.{_LOCAL_VERSION.minor + 1}.0"
+    local_version = _local_version()
+    return f"{local_version.major}.{local_version.minor + 1}.0"
 
 
 def _make_unary_handler() -> grpc.RpcMethodHandler:
