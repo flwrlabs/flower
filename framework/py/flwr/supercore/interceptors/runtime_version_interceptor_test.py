@@ -194,7 +194,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
             )
 
     def test_log_unary_incompatibility_from_returned_rpc_error(self) -> None:
-        """Unary-unary RpcError outcomes should be inspected immediately."""
+        """Unary-unary RpcError outcomes should fall back if callbacks are late."""
         rpc_error = _make_runtime_rpc_error()
 
         with patch(
@@ -209,7 +209,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
             )
 
         self.assertIs(response, rpc_error)
-        rpc_error.add_callback.assert_not_called()
+        rpc_error.add_callback.assert_called_once()
         flwr_exit_mock.assert_called_once_with(
             ExitCode.RUNTIME_VERSION_INCOMPATIBLE,
             "Runtime version compatibility check failed.\nruntime mismatch",
