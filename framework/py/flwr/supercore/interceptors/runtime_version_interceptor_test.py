@@ -336,31 +336,15 @@ class TestRuntimeVersionServerInterceptor(TestCase):
             "release, but received simulation version 1.30.1.",
         )
 
-    def test_serverappio_factory_observes_by_default(self) -> None:
-        """ServerAppIo factory should not return warning metadata by default."""
-        self.interceptor = create_serverappio_runtime_version_server_interceptor()
-        intercepted = self._intercept(
-            "/flwr.proto.ServerAppIo/GetNodes",
-            _make_runtime_metadata("1.30.1"),
-        )
+    def test_serverappio_factory_rejects_incompatible_by_default(self) -> None:
+        """ServerAppIo factory should reject different major.minor by default."""
+        interceptor = create_serverappio_runtime_version_server_interceptor()
+        self.assertTrue(interceptor._reject_incompatible)  # pylint: disable=W0212
 
-        context = Mock()
-        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
-        self.assertEqual(response, "ok")
-        context.set_trailing_metadata.assert_not_called()
-
-    def test_clientappio_factory_observes_by_default(self) -> None:
-        """ClientAppIo factory should not return warning metadata by default."""
-        self.interceptor = create_clientappio_runtime_version_server_interceptor()
-        intercepted = self._intercept(
-            "/flwr.proto.ClientAppIo/GetRun",
-            _make_runtime_metadata("1.30.1"),
-        )
-
-        context = Mock()
-        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
-        self.assertEqual(response, "ok")
-        context.set_trailing_metadata.assert_not_called()
+    def test_clientappio_factory_rejects_incompatible_by_default(self) -> None:
+        """ClientAppIo factory should reject different major.minor by default."""
+        interceptor = create_clientappio_runtime_version_server_interceptor()
+        self.assertTrue(interceptor._reject_incompatible)  # pylint: disable=W0212
 
     def test_fleet_factory_observes_by_default(self) -> None:
         """Fleet factory should not return warning metadata by default."""
