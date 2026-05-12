@@ -291,7 +291,7 @@ class TestAlembicRun(unittest.TestCase):
                             clientapp_runtime=9.5,
                         ),
                         self.build_run_row(
-                            103,
+                            run_id=103,
                             fab_id="publisher/failed",
                             fab_version="3.0.0",
                             fab_hash="fab-failed",
