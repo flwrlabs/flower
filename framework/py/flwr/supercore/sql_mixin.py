@@ -126,9 +126,8 @@ class SqlMixin(ABC):
         )
 
         raise ValueError(
-            f"Unsupported SQL dialect {dialect!r} for {type(self).__name__} "
-            f"(database={self.database_url!r}). Supported dialects: "
-            f"{allowed_str}.{hint}"
+            f"Unsupported SQL dialect {dialect!r} for {type(self).__name__}."
+            f" Supported dialects: {allowed_str}.{hint}"
         )
 
     @contextmanager
