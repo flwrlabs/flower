@@ -96,7 +96,7 @@ def _backfilled_primary_task_status(
 ) -> tuple[str | None, str, str]:
     """Return the backfilled finished_at, sub_status, and details for a run."""
     if _is_in_flight_run(run):
-        return stopped_at, SubStatus.STOPPED, ""
+        return stopped_at, SubStatus.STOPPED, "Run stopped during server upgrade."
     return run["finished_at"] or None, run["sub_status"] or "", run["details"] or ""
 
 
