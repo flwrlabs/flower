@@ -58,7 +58,7 @@ class DummyDbSqlAlchemy(SqlMixin):
 class SqliteOnlyDummyDb(DummyDbSqlAlchemy):
     """SQLite-only SqlMixin subclass used for dialect allowlist tests."""
 
-    allowed_dialects = {SQL_ALLOWED_DIALECTS}
+    allowed_dialects = SQL_ALLOWED_DIALECTS
 
 
 class TestSqlMixin(unittest.TestCase):
