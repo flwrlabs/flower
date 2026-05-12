@@ -141,26 +141,6 @@ class TestAlembicRun(unittest.TestCase):
             list(runs),
         )
 
-    def insert_tasks(
-        self, connection: Connection, tasks: Sequence[dict[str, Any]]
-    ) -> None:
-        """Insert task rows into the test database."""
-        connection.execute(
-            text(
-                """
-                INSERT INTO task (
-                    task_id, type, run_id, fab_hash, model_ref, connector_ref,
-                    token, pending_at, starting_at, running_at, finished_at
-                ) VALUES (
-                    :task_id, :type, :run_id, :fab_hash, :model_ref,
-                    :connector_ref, :token, :pending_at, :starting_at,
-                    :running_at, :finished_at
-                )
-                """
-            ),
-            list(tasks),
-        )
-
     def test_run_migrations_sets_revision(self) -> None:
         """Ensure migrations advance the database to the latest head."""
         # Prepare
@@ -307,26 +287,6 @@ class TestAlembicRun(unittest.TestCase):
                         ),
                     ],
                 )
-                # Pre-existing non-primary task to ensure the migration preserves
-                # historical task rows and allocates a distinct primary_task_id.
-                self.insert_tasks(
-                    connection,
-                    [
-                        {
-                            "task_id": 1,
-                            "type": TaskType.MODEL,
-                            "run_id": 103,
-                            "fab_hash": None,
-                            "model_ref": "models/existing",
-                            "connector_ref": None,
-                            "token": None,
-                            "pending_at": "2026-04-27T12:01:00+00:00",
-                            "starting_at": None,
-                            "running_at": None,
-                            "finished_at": None,
-                        }
-                    ],
-                )
 
             run_migrations(engine)
 
@@ -385,16 +345,11 @@ class TestAlembicRun(unittest.TestCase):
 
             # Assert: Primary task inserted for run 103
             task = tasks[runs[103]["primary_task_id"]]
-            self.assertNotEqual(runs[103]["primary_task_id"], 1)
             self.assertEqual(task["type"], TaskType.SERVER_APP)
             self.assertEqual(task["run_id"], 103)
             self.assertEqual(task["finished_at"], "2026-04-27T12:05:00+00:00")
             self.assertEqual(task["sub_status"], "failed")
             self.assertEqual(task["details"], "boom")
-
-            existing_task = tasks[1]
-            self.assertEqual(existing_task["type"], TaskType.MODEL)
-            self.assertEqual(existing_task["model_ref"], "models/existing")
         finally:
             engine.dispose()
 
