@@ -51,8 +51,8 @@ jobs:
       matrix: ${{ fromJson(needs.release-nightly.outputs.matrix).base }}
     with:
       registry: ${{ vars.DOCKER_IMAGE_REGISTRY }}
-      # Compose a fully qualified repository from host + namespace/repository.
-      image-repository: ${{ format('{0}/{1}', vars.DOCKER_IMAGE_REGISTRY, matrix.images.namespace_repository) }}
+      # Keep base image repository aligned with BASE_REPOSITORY for nightly builds.
+      image-repository: ${{ format('{0}/{1}/base', vars.DOCKER_IMAGE_REGISTRY, vars.DOCKER_IMAGE_NAMESPACE) }}
       file-dir: ${{ matrix.images.file_dir }}
       build-args: |
         PIP_VERSION=${{ needs.release-nightly.outputs.pip-version }}
@@ -73,7 +73,7 @@ jobs:
       matrix: ${{ fromJson(needs.release-nightly.outputs.matrix).binary }}
     with:
       registry: ${{ vars.DOCKER_IMAGE_REGISTRY }}
-      # Compose a fully qualified repository from host + namespace/repository.
+      # Compose a fully qualified repository from host + namespace/repository for binary images.
       image-repository: ${{ format('{0}/{1}', vars.DOCKER_IMAGE_REGISTRY, matrix.images.namespace_repository) }}
       file-dir: ${{ matrix.images.file_dir }}
       # Keep BASE_REPOSITORY fully qualified so binary builds pull from the same registry.
