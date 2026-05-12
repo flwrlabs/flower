@@ -14,7 +14,6 @@
 # ==============================================================================
 """SQLAlchemy-based implementation of the link state."""
 
-
 # pylint: disable=too-many-lines
 
 import json
@@ -800,7 +799,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             )
 
         # Select candidate node_ids first so `last_deactivated_at` can preserve the
-        # expiry time without relying on database-specific epoch formatting functions.
+        # expiry time without relying on database-specific epoch formatting functions
         rows = self.query(query, params)
         if not rows:
             return
@@ -815,13 +814,14 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         update_data = [
             {
                 "offline": NodeStatus.OFFLINE,
-                "last_deactivated_at": self._online_until_to_utc_iso(
-                    row["online_until"]
-                ),
+                # Convert epoch seconds to a UTC ISO-8601 string
+                "last_deactivated_at": datetime.fromtimestamp(
+                    row["online_until"], tz=timezone.utc
+                ).isoformat(),
                 "node_id": row["node_id"],
                 "online": NodeStatus.ONLINE,
                 # Re-check expiry to avoid marking a node offline after a concurrent
-                # heartbeat extended its `online_until`.
+                # heartbeat extended its `online_until`
                 "current_time": params["current_time"],
             }
             for row in rows

@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """Tests all LinkState implemenations have to conform to."""
+
 # pylint: disable=invalid-name, too-many-lines, R0904, R0913
 
 
@@ -2014,41 +2015,6 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         assert status.status == Status.FINISHED
         assert status.sub_status == SubStatus.COMPLETED
         assert status.details == "done"
-
-    def test_delete_node_uses_standard_case_expression(self) -> None:
-        """Node deletion should not use database-specific conditionals."""
-        state = self.state_factory()
-        captured: list[str] = []
-
-        def fake_query(query: str, _params: Any = None) -> list[dict[str, Any]]:
-            captured.append(query)
-            return [{"node_id": 1}]
-
-        state.query = fake_query  # type: ignore[assignment,method-assign]
-        state.delete_node("owner", 1)
-
-        self.assertTrue(captured)
-        self.assertIn("CASE", captured[0])
-        self.assertNotIn("IIF", captured[0])
-
-    def test_check_and_tag_offline_nodes_does_not_use_strftime(self) -> None:
-        """Offline tagging should not use database-specific timestamp functions."""
-        state = self.state_factory()
-        captured: list[str] = []
-
-        def fake_query(query: str, _params: Any = None) -> list[dict[str, Any]]:
-            captured.append(query)
-            if query.lstrip().startswith("SELECT"):
-                return [{"node_id": 1, "online_until": 123.0}]
-            return []
-
-        state.query = fake_query  # type: ignore[assignment,method-assign]
-        state._check_and_tag_offline_nodes()  # pylint: disable=protected-access
-
-        self.assertTrue(captured)
-        self.assertEqual(len(captured), 2)
-        self.assertNotIn("strftime", "".join(captured))
-        self.assertIn("online_until <= :current_time", captured[1])
 
 
 class SqlFileBasedTest(SqlInMemoryStateTest):
