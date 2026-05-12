@@ -38,7 +38,11 @@ jobs:
 
           NAME=$(poetry version | awk {'print $1'})
           VERSION=$(poetry version -s)
-          python dev/build-docker-image-matrix.py --flwr-version "${VERSION}" --matrix nightly --flwr-package "${NAME}" > matrix.json
+          python dev/build-docker-image-matrix.py --flwr-version "${VERSION}" --matrix nightly --flwr-package "${NAME}" > matrix.raw.json
+          python dev/release/resolve-docker-matrix.py \
+            --input matrix.raw.json \
+            --output matrix.json \
+            --docker-image-namespace "${{ vars.DOCKER_IMAGE_NAMESPACE }}"
           echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
 
   build-docker-base-images:
