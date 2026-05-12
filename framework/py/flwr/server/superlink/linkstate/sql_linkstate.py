@@ -99,7 +99,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # Start with linkstate tables
         metadata = create_linkstate_metadata()
 
-        # Add corestate tables (for example token_store and fab)
+        # Add corestate tables (for example fab)
         corestate_metadata = create_corestate_metadata()
         for table in corestate_metadata.tables.values():
             table.to_metadata(metadata)
@@ -432,6 +432,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def get_message_res(self, message_ids: set[str]) -> list[Message]:
         """Get reply Messages for the given Message IDs."""
         # pylint: disable=too-many-locals
+        if not message_ids:
+            return []
+
         ret: dict[str, Message] = {}
 
         with self.session():
@@ -462,21 +465,26 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             # Check node availability
             dst_node_ids: set[int] = set()
             for message_id in message_ids:
-                in_message = found_message_ins_dict[message_id]
+                in_message = found_message_ins_dict.get(message_id)
+                if in_message is None:
+                    continue
                 sint_node_id = uint64_to_int64(in_message.metadata.dst_node_id)
                 dst_node_ids.add(sint_node_id)
-            placeholders = ",".join([f":nid_{i}" for i in range(len(dst_node_ids))])
-            query = f"""
-                SELECT node_id, online_until
-                FROM node
-                WHERE node_id IN ({placeholders})
-                AND status != :unregistered
-            """
-            node_params: dict[str, int | str] = {
-                f"nid_{i}": nid for i, nid in enumerate(dst_node_ids)
-            }
-            node_params["unregistered"] = NodeStatus.UNREGISTERED
-            rows = self.query(query, node_params)
+            if dst_node_ids:
+                placeholders = ",".join([f":nid_{i}" for i in range(len(dst_node_ids))])
+                query = f"""
+                    SELECT node_id, online_until
+                    FROM node
+                    WHERE node_id IN ({placeholders})
+                    AND status != :unregistered
+                """
+                node_params: dict[str, int | str] = {
+                    f"nid_{i}": nid for i, nid in enumerate(dst_node_ids)
+                }
+                node_params["unregistered"] = NodeStatus.UNREGISTERED
+                rows = self.query(query, node_params)
+            else:
+                rows = []
             tmp_ret_dict = check_node_availability_for_in_message(
                 inquired_in_message_ids=message_ids,
                 found_in_message_dict=found_message_ins_dict,
@@ -486,6 +494,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 current_time=current,
             )
             ret.update(tmp_ret_dict)
+
+            # Return accumulated replies if no IDs remain to avoid generating `IN ()`
+            if not message_ids:
+                return list(ret.values())
 
             # Atomically claim all eligible reply Messages
             placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
@@ -616,7 +628,15 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 },
             )
         except IntegrityError as e:
-            if "node.public_key" in str(e):
+            # Check the underlying DB exception to distinguish constraint types.
+            # - SQLite: str(e.orig) is e.g. "UNIQUE constraint failed: node.public_key"
+            # - psycopg3: e.orig.diag.constraint_name contains the constraint name
+            orig = e.orig
+            constraint = getattr(getattr(orig, "diag", None), "constraint_name", None)
+            is_pk_conflict = (
+                "public_key" in constraint if constraint else "public_key" in str(orig)
+            )
+            if is_pk_conflict:
                 raise ValueError("Public key already in use.") from None
             # Must be node ID conflict, almost impossible unless system is compromised
             log(ERROR, "Unexpected node registration failure.")
@@ -750,6 +770,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             "online": NodeStatus.ONLINE,
         }
         if node_ids is not None:
+            if not node_ids:
+                return
             placeholders = ",".join([f":nid_{i}" for i in range(len(node_ids))])
             query += f" AND node_id IN ({placeholders})"
             params.update(
@@ -765,6 +787,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         statuses: Sequence[str] | None = None,
     ) -> Sequence[NodeInfo]:
         """Retrieve information about nodes based on the specified filters."""
+        if node_ids is not None and len(node_ids) == 0:
+            return []
+        if owner_aids is not None and len(owner_aids) == 0:
+            return []
+        if statuses is not None and len(statuses) == 0:
+            return []
+
         with self.session():
             self._check_and_tag_offline_nodes()
 
@@ -1172,63 +1201,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     )
                 except IntegrityError:
                     raise ValueError(f"Run {run_id} not found") from None
-
-    def add_serverapp_log(self, run_id: int, log_message: str) -> None:
-        """Add a log entry to the ServerApp logs for the specified `run_id`."""
-        # Convert the uint64 value to sint64 for SQLite
-        sint64_run_id = uint64_to_int64(run_id)
-
-        # Store log
-        try:
-            query = """
-                INSERT INTO logs (timestamp, run_id, node_id, log)
-                VALUES (:current_ts, :run_id, :node_id, :log)
-            """
-            self.query(
-                query,
-                {
-                    "current_ts": now().timestamp(),
-                    "run_id": sint64_run_id,
-                    "node_id": 0,
-                    "log": log_message,
-                },
-            )
-        except IntegrityError:
-            raise ValueError(f"Run {run_id} not found") from None
-
-    def get_serverapp_log(
-        self, run_id: int, after_timestamp: float | None
-    ) -> tuple[str, float]:
-        """Get the ServerApp logs for the specified `run_id`."""
-        # Convert the uint64 value to sint64 for SQLite
-        sint64_run_id = uint64_to_int64(run_id)
-
-        with self.session():
-            # Check if the run_id exists
-            query = "SELECT run_id FROM run WHERE run_id = :run_id"
-            rows = self.query(query, {"run_id": sint64_run_id})
-            if not rows:
-                raise ValueError(f"Run {run_id} not found")
-
-            # Retrieve logs
-            if after_timestamp is None:
-                after_timestamp = 0.0
-            query = """
-                SELECT log, timestamp FROM logs
-                WHERE run_id = :run_id AND node_id = :node_id
-                AND timestamp > :after_timestamp
-                ORDER BY timestamp
-            """
-            rows = self.query(
-                query,
-                {
-                    "run_id": sint64_run_id,
-                    "node_id": 0,
-                    "after_timestamp": after_timestamp,
-                },
-            )
-            latest_timestamp = rows[-1]["timestamp"] if rows else 0.0
-        return "".join(row["log"] for row in rows), latest_timestamp
 
     def get_valid_message_ins(self, message_id: str) -> dict[str, Any] | None:
         """Check if the Message exists and is valid (not expired).

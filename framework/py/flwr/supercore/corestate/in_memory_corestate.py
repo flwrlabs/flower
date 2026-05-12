@@ -55,10 +55,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self._object_store = object_store
         self.fab_store: dict[str, Fab] = {}
         self.lock_fab_store = Lock()
-        # Store run ID to token mapping and token to run ID mapping
-        self.token_store: dict[int, TokenRecord] = {}
-        self.token_to_run_id: dict[str, int] = {}
-        self.lock_token_store = Lock()
         self.nonce_store: dict[tuple[str, str], float] = {}
         self.lock_nonce_store = Lock()
         self.task_store: dict[int, Task] = {}
@@ -364,38 +360,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         ----------
         tasks : list[Task]
             Copies of tasks whose claims expired and were marked FINISHED:FAILED.
-        """
-
-    def _cleanup_expired_tokens(self) -> None:
-        """Remove expired tokens and perform additional cleanup.
-
-        This method is called before token operations to ensure integrity.
-        Subclasses can override `_on_tokens_expired` to add custom cleanup logic.
-        """
-        with self.lock_token_store:
-            current = int(now().timestamp())
-            expired_records: list[tuple[int, int]] = []
-            for run_id, record in list(self.token_store.items()):
-                if record.active_until < current:
-                    expired_records.append((run_id, record.active_until))
-                    # Remove from both stores
-                    del self.token_store[run_id]
-                    self.token_to_run_id.pop(record.token, None)
-
-            # Hook for subclasses
-            if expired_records:
-                self._on_tokens_expired(expired_records)
-
-    def _on_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
-        """Handle cleanup of expired tokens.
-
-        Override in subclasses to add custom cleanup logic.
-
-        Parameters
-        ----------
-        expired_records : list[tuple[int, int]]
-            List of tuples containing (run_id, active_until timestamp)
-            for expired tokens.
         """
 
     def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:

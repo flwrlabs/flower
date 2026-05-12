@@ -373,7 +373,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 self.state.federation_manager,
                 "can_execute",
                 side_effect=EntitlementError(
-                    details="Start run not permitted.",
+                    "Start run denied for this account.",
+                    public_details="Start run not permitted.",
                     entitlement_code=101,
                 ),
             ),
@@ -544,7 +545,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 self.state.federation_manager,
                 "can_execute",
                 side_effect=EntitlementError(
-                    details="Register node not permitted.",
+                    "Register node denied for this account.",
+                    public_details="Register node not permitted.",
                     entitlement_code=102,
                 ),
             ),
@@ -785,7 +787,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 self.state.federation_manager,
                 "can_execute",
                 side_effect=EntitlementError(
-                    details="Create federation not permitted.",
+                    "Create federation denied for this account.",
+                    public_details="Create federation not permitted.",
                     entitlement_code=103,
                 ),
             ),
@@ -992,7 +995,8 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
         self.state.federation_manager.can_execute.side_effect = EntitlementError(
-            details="Create invitation not permitted.",
+            "Create invitation denied for this account.",
+            public_details="Create invitation not permitted.",
             entitlement_code=104,
         )
 
@@ -1051,7 +1055,8 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
         self.state.federation_manager.can_execute.side_effect = EntitlementError(
-            details="Accept invitation not permitted.",
+            "Accept invitation denied for this account.",
+            public_details="Accept invitation not permitted.",
             entitlement_code=105,
         )
 
@@ -1162,15 +1167,15 @@ class TestControlServicerAuth(unittest.TestCase):
         mock_get_run_info = Mock()
         mock_run = Mock(
             federation=NOOP_FEDERATION,
+            primary_task_id=456,
             status=RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
         )
         mock_get_run_info.return_value = [mock_run]
+        mock_get_task_log = Mock(return_value=("log1", 1.0))
 
         # Execute & Assert
         with (
-            patch.object(
-                self.state, "get_serverapp_log", new=lambda rid, ts: ("log1", 1.0)
-            ),
+            patch.object(self.state, "get_task_log", new=mock_get_task_log),
             patch.object(self.state, "get_run_info", new=mock_get_run_info),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=True
@@ -1180,10 +1185,10 @@ class TestControlServicerAuth(unittest.TestCase):
                 return_value=SimpleNamespace(flwr_aid="user-123"),
             ),
         ):
-            msgs = list(self.servicer.StreamLogs(request, ctx))
             gen = self.servicer.StreamLogs(request, ctx)
             msgs = list(gen)
             mock_get_run_info.assert_called_with(run_ids=[run_id])
+            mock_get_task_log.assert_called_once_with(456, 1e-06)
             self.assertEqual(len(msgs), 1)
             self.assertIsInstance(msgs[0], StreamLogsResponse)
             self.assertEqual(msgs[0].log_output, "log1")

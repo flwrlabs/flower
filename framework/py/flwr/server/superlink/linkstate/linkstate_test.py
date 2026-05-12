@@ -934,8 +934,9 @@ class StateTest(CoreStateTest):
         state: LinkState = self.state_factory()
         create_dummy_node(state)
 
-        infos = state.get_node_info(node_ids=[])
-        self.assertEqual(infos, [])
+        self.assertEqual(state.get_node_info(node_ids=[]), [])
+        self.assertEqual(state.get_node_info(owner_aids=[]), [])
+        self.assertEqual(state.get_node_info(statuses=[]), [])
 
     def test_delete_node(self) -> None:
         """Test deleting a client node."""
@@ -1483,6 +1484,12 @@ class StateTest(CoreStateTest):
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 0
 
+    def test_get_message_res_empty_ids_returns_empty_list(self) -> None:
+        """Test that get_message_res returns empty for empty input."""
+        state = self.state_factory()
+
+        self.assertEqual(state.get_message_res(set()), [])
+
     def test_get_message_res_returns_empty_for_missing_message_ins(self) -> None:
         """Test that get_message_res returns an empty result when the corresponding
         Message does not exist."""
@@ -1636,90 +1643,6 @@ class StateTest(CoreStateTest):
         # Execute and assert
         with self.assertRaises(ValueError):
             state.set_serverapp_context(61016, context)  # Invalid run_id
-
-    def test_add_serverapp_log_invalid_run_id(self) -> None:
-        """Test adding serverapp log with invalid run_id."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        invalid_run_id = 99999
-        log_entry = "Invalid log entry"
-
-        # Execute and assert
-        with self.assertRaises(ValueError):
-            state.add_serverapp_log(invalid_run_id, log_entry)
-
-    def test_get_serverapp_log_invalid_run_id(self) -> None:
-        """Test retrieving serverapp log with invalid run_id."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        invalid_run_id = 99999
-
-        # Execute and assert
-        with self.assertRaises(ValueError):
-            state.get_serverapp_log(invalid_run_id, after_timestamp=None)
-
-    def test_add_and_get_serverapp_log(self) -> None:
-        """Test adding and retrieving serverapp logs."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state)
-        log_entry_1 = "Log entry 1"
-        log_entry_2 = "Log entry 2"
-        timestamp = now().timestamp()
-
-        # Execute
-        state.add_serverapp_log(run_id, log_entry_1)
-        state.add_serverapp_log(run_id, log_entry_2)
-        retrieved_logs, latest = state.get_serverapp_log(
-            run_id, after_timestamp=timestamp
-        )
-
-        # Assert
-        assert latest > timestamp
-        assert log_entry_1 + log_entry_2 == retrieved_logs
-
-    def test_get_serverapp_log_after_timestamp(self) -> None:
-        """Test retrieving serverapp logs after a specific timestamp."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state)
-        log_entry_1 = "Log entry 1"
-        log_entry_2 = "Log entry 2"
-        state.add_serverapp_log(run_id, log_entry_1)
-        # Add trivial delays to avoid random failure due to same timestamp
-        time.sleep(1e-6)
-        timestamp = now().timestamp()
-        time.sleep(1e-6)
-        state.add_serverapp_log(run_id, log_entry_2)
-
-        # Execute
-        retrieved_logs, latest = state.get_serverapp_log(
-            run_id, after_timestamp=timestamp
-        )
-
-        # Assert
-        assert latest > timestamp
-        assert log_entry_1 not in retrieved_logs
-        assert log_entry_2 == retrieved_logs
-
-    def test_get_serverapp_log_after_timestamp_no_logs(self) -> None:
-        """Test retrieving serverapp logs after a specific timestamp but no logs are
-        found."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state)
-        log_entry = "Log entry"
-        state.add_serverapp_log(run_id, log_entry)
-        timestamp = now().timestamp() + 0.001  # Ensure timestamp is after the log entry
-
-        # Execute
-        retrieved_logs, latest = state.get_serverapp_log(
-            run_id, after_timestamp=timestamp
-        )
-
-        # Assert
-        assert latest == 0
-        assert retrieved_logs == ""
 
     def test_create_run_with_and_without_federation_config(self) -> None:
         """Test that run federation config is stored on the run."""
