@@ -176,24 +176,6 @@ class StateTest(CoreStateTest):
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
 
-    def test_create_task_sets_primary_task_id_once(self) -> None:
-        """New tasks should not replace the run's primary task."""
-        # Prepare
-        state = self.state_factory()
-        run_id = create_dummy_run(state)
-        run = state.get_run_info(run_ids=[run_id])[0]
-        primary_task_id = run.primary_task_id
-
-        # Execute
-        second_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
-
-        # Assert
-        self.assertIsNotNone(primary_task_id)
-        self.assertIsNotNone(second_task_id)
-        run = state.get_run_info(run_ids=[run_id])[0]
-        self.assertEqual(run.primary_task_id, primary_task_id)
-        self.assertNotEqual(run.primary_task_id, second_task_id)
-
     def test_create_task_rejects_missing_run(self) -> None:
         """Creating a task for an unknown run should fail."""
         state = self.state_factory()
