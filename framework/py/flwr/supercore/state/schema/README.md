@@ -63,7 +63,7 @@ erDiagram
     VARCHAR last_activated_at "nullable"
     VARCHAR last_deactivated_at "nullable"
     BIGINT node_id UK "nullable"
-    TIMESTAMP online_until "nullable"
+    FLOAT online_until "nullable"
     VARCHAR owner_aid "nullable"
     VARCHAR owner_name "nullable"
     BLOB public_key UK "nullable"
@@ -135,10 +135,10 @@ erDiagram
     VARCHAR type
   }
 
-  token_store {
-    BIGINT run_id PK "nullable"
-    FLOAT active_until "nullable"
-    VARCHAR token UK
+  task_logs {
+    BIGINT task_id FK
+    VARCHAR log
+    FLOAT timestamp
   }
 
   run ||--o| context : run_id
@@ -148,6 +148,7 @@ erDiagram
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
   objects ||--o| run_objects : object_id
+  task ||--o{ task_logs : task_id
 
 ```
 <!-- END_SQLALCHEMY_DOCS -->

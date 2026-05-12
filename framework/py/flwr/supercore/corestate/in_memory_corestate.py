@@ -17,6 +17,7 @@
 
 import hashlib
 import secrets
+from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
 from threading import Lock
@@ -24,7 +25,7 @@ from typing import Literal
 
 from flwr.common import now
 from flwr.common.constant import (
-    FLWR_APP_TOKEN_LENGTH,
+    FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
     TASK_ID_NUM_BYTES,
@@ -54,10 +55,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self._object_store = object_store
         self.fab_store: dict[str, Fab] = {}
         self.lock_fab_store = Lock()
-        # Store run ID to token mapping and token to run ID mapping
-        self.token_store: dict[int, TokenRecord] = {}
-        self.token_to_run_id: dict[str, int] = {}
-        self.lock_token_store = Lock()
         self.nonce_store: dict[tuple[str, str], float] = {}
         self.lock_nonce_store = Lock()
         self.task_store: dict[int, Task] = {}
@@ -65,6 +62,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.task_token_store: dict[int, TokenRecord] = {}
         # Store token to task ID mapping
         self.task_token_to_task_id: dict[str, int] = {}
+        self.task_logs: dict[int, list[tuple[float, str]]] = {}
+        self.log_lock = Lock()
         self.lock_task_store = Lock()
 
     @property
@@ -101,6 +100,34 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 content=fab.content,
                 verifications=dict(fab.verifications),
             )
+
+    def add_task_log(self, task_id: int, log_message: str) -> None:
+        """Add a log entry to the task logs for the specified `task_id`."""
+        with self.lock_task_store:
+            if task_id not in self.task_store:
+                raise ValueError(f"Task {task_id} not found")
+        with self.log_lock:
+            timestamp = now().timestamp()
+            task_logs = self.task_logs.setdefault(task_id, [])
+            task_logs.append((timestamp, log_message))
+
+    def get_task_log(
+        self, task_id: int, after_timestamp: float | None
+    ) -> tuple[str, float]:
+        """Get task logs for the specified `task_id`."""
+        # We don't check if the task exists before querying logs
+        # because the task_id is validated by the authz layer
+
+        with self.log_lock:
+            task_logs = self.task_logs.get(task_id, [])
+            if after_timestamp is None:
+                after_timestamp = 0.0
+            timestamps = [timestamp for timestamp, _ in task_logs]
+            # Polling is strict-after: entries at the checkpoint timestamp have
+            # already been delivered, so resume after the rightmost equal value.
+            index = bisect_right(timestamps, after_timestamp)
+            latest_timestamp = task_logs[-1][0] if index < len(task_logs) else 0.0
+            return "".join(log for _, log in task_logs[index:]), latest_timestamp
 
     def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
@@ -197,7 +224,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
 
     def claim_task(self, task_id: int) -> str | None:
         """Atomically claim a pending task."""
-        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
+        token = secrets.token_hex(FLWR_TASK_TOKEN_LENGTH)
         with self.lock_task_store:
             task = self.task_store.get(task_id)
             if task is None or task_id in self.task_token_store:
@@ -333,38 +360,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         ----------
         tasks : list[Task]
             Copies of tasks whose claims expired and were marked FINISHED:FAILED.
-        """
-
-    def _cleanup_expired_tokens(self) -> None:
-        """Remove expired tokens and perform additional cleanup.
-
-        This method is called before token operations to ensure integrity.
-        Subclasses can override `_on_tokens_expired` to add custom cleanup logic.
-        """
-        with self.lock_token_store:
-            current = int(now().timestamp())
-            expired_records: list[tuple[int, int]] = []
-            for run_id, record in list(self.token_store.items()):
-                if record.active_until < current:
-                    expired_records.append((run_id, record.active_until))
-                    # Remove from both stores
-                    del self.token_store[run_id]
-                    self.token_to_run_id.pop(record.token, None)
-
-            # Hook for subclasses
-            if expired_records:
-                self._on_tokens_expired(expired_records)
-
-    def _on_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
-        """Handle cleanup of expired tokens.
-
-        Override in subclasses to add custom cleanup logic.
-
-        Parameters
-        ----------
-        expired_records : list[tuple[int, int]]
-            List of tuples containing (run_id, active_until timestamp)
-            for expired tokens.
         """
 
     def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:

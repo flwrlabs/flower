@@ -71,6 +71,9 @@ service ServerAppIo {
   // Create a task
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {}
 
+  // Push task logs
+  rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
+
   /////////////////////////////////////////////////////////////////////////////
   // Specific endpoints for ServerAppIo
   /////////////////////////////////////////////////////////////////////////////
@@ -78,9 +81,6 @@ service ServerAppIo {
   // Get Federation Options (only used by flwr-simulation)
   rpc GetFederationOptions(GetFederationOptionsRequest)
       returns (GetFederationOptionsResponse) {}
-
-  // Push ServerApp logs
-  rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
 
   // Create one or more messages
   rpc PushMessages(PushAppMessagesRequest) returns (PushAppMessagesResponse) {}

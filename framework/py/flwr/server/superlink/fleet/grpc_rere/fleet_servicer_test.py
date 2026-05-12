@@ -28,11 +28,11 @@ from flwr.common.constant import (
     NOOP_ACCOUNT_NAME,
     NOOP_FLWR_AID,
     SUPERLINK_NODE_ID,
-    Status,
+    SubStatus,
 )
 from flwr.common.message import get_message_to_descendant_id_mapping
 from flwr.common.serde import message_from_proto
-from flwr.common.typing import Fab, RunStatus
+from flwr.common.typing import Fab
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -206,12 +206,15 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         return run_id
 
     def _transition_run_status(self, run_id: int, num_transitions: int) -> None:
+        run = self.state.get_run_info(run_ids=[run_id])[0]
+        assert run.primary_task_id is not None
+        task_id = run.primary_task_id
         if num_transitions > 0:
-            _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
+            assert self.state.claim_task(task_id) is not None
         if num_transitions > 1:
-            _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
+            assert self.state.activate_task(task_id)
         if num_transitions > 2:
-            _ = self.state.update_run_status(run_id, RunStatus(Status.FINISHED, "", ""))
+            assert self.state.finish_task(task_id, SubStatus.COMPLETED, "")
 
     def test_register_node_success(self) -> None:
         """Test `RegisterNode` success."""

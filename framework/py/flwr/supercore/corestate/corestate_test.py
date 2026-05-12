@@ -16,7 +16,8 @@
 
 
 import unittest
-from datetime import timedelta
+from contextlib import ExitStack
+from datetime import datetime, timedelta
 from typing import Any, cast
 from unittest.mock import patch
 
@@ -60,6 +61,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         records instead of arbitrary placeholder IDs.
         """
         return 123
+
+    def _patch_task_log_datetime_now(self, *timestamps: datetime) -> ExitStack:
+        """Patch the shared datetime source used for task-log timestamps."""
+        stack = ExitStack()
+        mock_datetime = stack.enter_context(
+            patch("flwr.supercore.date.datetime.datetime")
+        )
+        mock_datetime.now.side_effect = timestamps
+        return stack
 
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
@@ -165,6 +175,105 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(reloaded_tasks), 1)
         reloaded = reloaded_tasks[0]
         self.assertEqual(reloaded.fab_hash, "fab-hash")
+
+    def test_add_and_get_task_log(self) -> None:
+        """Adding and retrieving task logs should preserve concatenation order."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        log_entry_1 = "Log entry 1"
+        log_entry_2 = "Log entry 2"
+        fixed_now = now()
+        timestamp = (fixed_now - timedelta(microseconds=1)).timestamp()
+
+        with self._patch_task_log_datetime_now(
+            fixed_now,
+            fixed_now + timedelta(microseconds=1),
+        ):
+            state.add_task_log(task_id, log_entry_1)
+            state.add_task_log(task_id, log_entry_2)
+
+        # Reading from before the first log should return both entries and the
+        # timestamp of the newest returned entry.
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=timestamp)
+
+        assert latest > timestamp
+        assert log_entry_1 + log_entry_2 == retrieved_logs
+
+    def test_get_task_log_after_timestamp(self) -> None:
+        """Retrieving task logs after a specific timestamp should filter old logs."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        log_entry_1 = "Log entry 1"
+        log_entry_2 = "Log entry 2"
+        fixed_now = now()
+        timestamp = (fixed_now + timedelta(microseconds=1)).timestamp()
+
+        with self._patch_task_log_datetime_now(
+            fixed_now,
+            fixed_now + timedelta(microseconds=2),
+        ):
+            state.add_task_log(task_id, log_entry_1)
+            state.add_task_log(task_id, log_entry_2)
+
+        # A timestamp between the two entries should filter out only the older
+        # log and advance the checkpoint to the returned entry.
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=timestamp)
+
+        assert latest > timestamp
+        assert log_entry_1 not in retrieved_logs
+        assert log_entry_2 == retrieved_logs
+
+    def test_get_task_log_after_timestamp_no_logs(self) -> None:
+        """Retrieving task logs after the last entry should return an empty result."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        fixed_now = now()
+        with self._patch_task_log_datetime_now(fixed_now):
+            state.add_task_log(task_id, "Log entry")
+        timestamp = (fixed_now + timedelta(microseconds=1)).timestamp()
+
+        # Polling after the latest known entry should return no logs and no new
+        # checkpoint.
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=timestamp)
+
+        assert latest == 0
+        assert retrieved_logs == ""
+
+    def test_get_task_log_does_not_repeat_logs_at_checkpoint_timestamp(self) -> None:
+        """Polling with the last returned timestamp should not repeat old logs."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        fixed_now = now()
+
+        with self._patch_task_log_datetime_now(fixed_now):
+            state.add_task_log(task_id, "Log entry 1")
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=None)
+
+        assert retrieved_logs == "Log entry 1"
+        assert latest == fixed_now.timestamp()
+
+        # Reusing the returned timestamp as the next checkpoint must not replay
+        # the log that produced that checkpoint.
+        next_logs, next_latest = state.get_task_log(task_id, after_timestamp=latest)
+
+        assert next_logs == ""
+        assert next_latest == 0
 
     def test_claim_task_transitions_pending_to_starting(self) -> None:
         """Claiming a task should create a token and move it to starting."""

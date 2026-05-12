@@ -19,6 +19,7 @@ from sqlalchemy import (
     BigInteger,
     Column,
     Float,
+    ForeignKey,
     Index,
     LargeBinary,
     MetaData,
@@ -33,16 +34,8 @@ def create_corestate_metadata() -> MetaData:
     metadata = MetaData()
 
     # --------------------------------------------------------------------------
-    #  Table: token_store
+    #  Table: nonce_store
     # --------------------------------------------------------------------------
-    Table(
-        "token_store",
-        metadata,
-        Column("run_id", BigInteger, primary_key=True, nullable=True),
-        Column("token", String, unique=True, nullable=False),
-        Column("active_until", Float),
-    )
-
     nonce_store = Table(
         "nonce_store",
         metadata,
@@ -84,5 +77,17 @@ def create_corestate_metadata() -> MetaData:
         Column("sub_status", String, nullable=False, server_default=text("''")),
         Column("details", String, nullable=False, server_default=text("''")),
     )
+
+    # --------------------------------------------------------------------------
+    #  Table: task_logs
+    # --------------------------------------------------------------------------
+    task_logs = Table(
+        "task_logs",
+        metadata,
+        Column("timestamp", Float, nullable=False),
+        Column("task_id", BigInteger, ForeignKey("task.task_id"), nullable=False),
+        Column("log", String, nullable=False),
+    )
+    Index("idx_task_logs_task_id_timestamp", task_logs.c.task_id, task_logs.c.timestamp)
 
     return metadata
