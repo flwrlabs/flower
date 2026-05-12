@@ -119,7 +119,7 @@ jobs:
     with:
       registry: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY }}
       # Compose a fully qualified repository from host + namespace/repository.
-      namespace-repository: ${{ format('{0}/{1}', inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY, matrix.images.namespace_repository) }}
+      image-repository: ${{ format('{0}/{1}', inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY, matrix.images.namespace_repository) }}
       file-dir: ${{ matrix.images.file_dir }}
       build-args: |
         PIP_VERSION=${{ needs.prepare-docker-build-matrix.outputs.pip-version }}
@@ -140,7 +140,7 @@ jobs:
     with:
       registry: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY }}
       # Compose a fully qualified repository from host + namespace/repository.
-      namespace-repository: ${{ format('{0}/{1}', inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY, matrix.images.namespace_repository) }}
+      image-repository: ${{ format('{0}/{1}', inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY, matrix.images.namespace_repository) }}
       file-dir: ${{ matrix.images.file_dir }}
       # Keep BASE_REPOSITORY fully qualified so binary builds pull from the same registry.
       build-args: |

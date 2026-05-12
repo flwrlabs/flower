@@ -109,7 +109,7 @@ jobs:
     with:
       registry: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY }}
       # Compose a fully qualified repository from host + namespace/repository.
-      namespace-repository: ${{ format('{0}/{1}', inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY, matrix.images.namespace_repository) }}
+      image-repository: ${{ format('{0}/{1}', inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY, matrix.images.namespace_repository) }}
       file-dir: ${{ matrix.images.file_dir }}
       context: .
       dockerfile: ${{ matrix.images.file_dir }}/Dockerfile
@@ -135,7 +135,7 @@ jobs:
     with:
       registry: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY }}
       # Compose a fully qualified repository from host + namespace/repository.
-      namespace-repository: ${{ format('{0}/{1}', inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY, matrix.images.namespace_repository) }}
+      image-repository: ${{ format('{0}/{1}', inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY, matrix.images.namespace_repository) }}
       file-dir: ${{ matrix.images.file_dir }}
       context: .
       dockerfile: ${{ matrix.images.file_dir }}/Dockerfile
