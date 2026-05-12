@@ -952,8 +952,9 @@ class StateTest(CoreStateTest):
         state: LinkState = self.state_factory()
         create_dummy_node(state)
 
-        infos = state.get_node_info(node_ids=[])
-        self.assertEqual(infos, [])
+        self.assertEqual(state.get_node_info(node_ids=[]), [])
+        self.assertEqual(state.get_node_info(owner_aids=[]), [])
+        self.assertEqual(state.get_node_info(statuses=[]), [])
 
     def test_delete_node(self) -> None:
         """Test deleting a client node."""
@@ -1500,6 +1501,12 @@ class StateTest(CoreStateTest):
         # Check message contains error informing reply message hasn't arrived
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 0
+
+    def test_get_message_res_empty_ids_returns_empty_list(self) -> None:
+        """Test that get_message_res returns empty for empty input."""
+        state = self.state_factory()
+
+        self.assertEqual(state.get_message_res(set()), [])
 
     def test_get_message_res_returns_empty_for_missing_message_ins(self) -> None:
         """Test that get_message_res returns an empty result when the corresponding
