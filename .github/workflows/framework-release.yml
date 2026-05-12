@@ -37,6 +37,7 @@ env:
 
 jobs:
   publish-wheel:
+    if: ${{ github.repository == 'flwrlabs/flower' }}
     name: Publish wheel
     runs-on: ubuntu-22.04
     timeout-minutes: 30
@@ -55,7 +56,6 @@ jobs:
         uses: ./.github/actions/bootstrap
 
       - id: publish
-        if: ${{ github.repository == 'flwrlabs/flower' }}
         env:
           PACKAGE_VERSION: ${{ inputs.package-version }}
           PYPI_REPOSITORY_USERNAME: ${{ vars.PYPI_REPOSITORY_USERNAME }}

@@ -45,6 +45,7 @@ env:
 
 jobs:
   prepare-docker-build-matrix:
+    if: ${{ github.repository_owner == 'flwrlabs' }}
     name: Collect docker build parameters
     runs-on: ubuntu-22.04
     timeout-minutes: 20
