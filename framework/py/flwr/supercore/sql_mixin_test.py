@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for SqlMixin."""
 
+
 import unittest
 
 from sqlalchemy import Column, Integer, MetaData, Table
