@@ -272,7 +272,7 @@ class TestAlembicRun(unittest.TestCase):
                             flwr_aid="aid-a",
                         ),
                         self.build_run_row(
-                            102,
+                            run_id=102,
                             fab_id="publisher/sim",
                             fab_version="2.0.0",
                             fab_hash="fab-sim",
