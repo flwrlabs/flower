@@ -365,6 +365,7 @@ class TestAlembicRun(unittest.TestCase):
             self.assertIsNone(pending_primary["running_at"])
             self.assertIsNone(pending_primary["finished_at"])
 
+            # Assert: Primary task inserted for run 102
             simulation_primary = tasks[runs[102]["primary_task_id"]]
             self.assertEqual(simulation_primary["type"], TaskType.SIMULATION)
             self.assertEqual(simulation_primary["run_id"], 102)
