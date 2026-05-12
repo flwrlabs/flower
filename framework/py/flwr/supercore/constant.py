@@ -170,7 +170,7 @@ SQLITE_PRAGMAS = (
 )
 
 # Constants for SQL LinkState
-SQL_ALLOWED_DIALECTS = "sqlite"
+SQL_ALLOWED_DIALECTS: frozenset[str] = frozenset({"sqlite"})
 
 
 class NodeStatus:

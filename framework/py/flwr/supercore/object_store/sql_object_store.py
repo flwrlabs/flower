@@ -35,7 +35,7 @@ from .object_store import NoObjectInStoreError, ObjectStore
 class SqlObjectStore(ObjectStore, SqlMixin):
     """SQLAlchemy-based implementation of the ObjectStore interface."""
 
-    allowed_dialects = {SQL_ALLOWED_DIALECTS}
+    allowed_dialects = SQL_ALLOWED_DIALECTS
 
     def __init__(self, database_path: str, verify: bool = True) -> None:
         super().__init__(database_path)
