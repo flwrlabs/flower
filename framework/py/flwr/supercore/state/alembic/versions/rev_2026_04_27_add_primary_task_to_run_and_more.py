@@ -67,19 +67,12 @@ def _generate_unique_task_id(bind: Connection, reserved_task_ids: set[int]) -> i
 
 def _load_runs_for_primary_task_backfill(bind: Connection) -> list[RowMapping]:
     """Load historical runs that need a primary task backfill."""
-    return list(
-        bind.execute(
-            sa.text(
-                """
-            SELECT run_id, fab_hash, pending_at, starting_at, running_at, finished_at,
-                   sub_status, details, run_type
-            FROM run
-            """
-            )
-        )
-        .mappings()
-        .all()
-    )
+    query = """
+        SELECT run_id, fab_hash, pending_at, starting_at, running_at, finished_at,
+            sub_status, details, run_type
+        FROM run
+    """
+    return list(bind.execute(sa.text(query)).mappings().all())
 
 
 def _validate_primary_task_backfill_runs(runs: Sequence[RowMapping]) -> None:
