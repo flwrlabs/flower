@@ -104,7 +104,7 @@ erDiagram
     VARCHAR flwr_aid "nullable"
     VARCHAR override_config "nullable"
     VARCHAR pending_at "nullable"
-    BIGINT primary_task_id "nullable"
+    BIGINT primary_task_id
     BIGINT run_id UK "nullable"
     VARCHAR run_type
     VARCHAR running_at "nullable"

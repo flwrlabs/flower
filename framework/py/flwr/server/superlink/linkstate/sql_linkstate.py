@@ -33,6 +33,7 @@ from flwr.common.constant import (
     NODE_ID_NUM_BYTES,
     RUN_ID_NUM_BYTES,
     SUPERLINK_NODE_ID,
+    TASK_ID_NUM_BYTES,
     Status,
 )
 from flwr.common.typing import Run, RunStatus
@@ -118,7 +119,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         model_ref: str | None = None,
         connector_ref: str | None = None,
     ) -> int | None:
-        """Create a task and make it the run's primary task if none exists."""
+        """Create a task."""
         with self.session():
             if not self.query(
                 "SELECT run_id FROM run WHERE run_id = :run_id",
@@ -135,21 +136,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 model_ref=model_ref,
                 connector_ref=connector_ref,
             )
-            if task_id is None:
-                return None
-
-            self.query(
-                """
-                UPDATE run
-                SET primary_task_id = :task_id
-                WHERE run_id = :run_id AND primary_task_id IS NULL
-                """,
-                {
-                    "run_id": uint64_to_int64(run_id),
-                    "task_id": uint64_to_int64(task_id),
-                },
-            )
-
             return task_id
 
     def store_message_ins(self, message: Message) -> str | None:
@@ -910,63 +896,88 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """Create a new run."""
         task_type = primary_task_type_from_run_type(run_type)
 
-        # Sample a random int64 as run_id
-        uint64_run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
-
-        # Convert the uint64 value to sint64 for SQLite
-        sint64_run_id = uint64_to_int64(uint64_run_id)
-
         # Convert federation_config to JSON string for storage
         fed_config_json = None
         if federation_config:
             fed_config_json = json.dumps(simulation_config_to_json(federation_config))
 
+        run_insert_query = """
+            INSERT INTO run
+            (run_id, fab_id, fab_version, fab_hash, override_config, federation,
+            primary_task_id, federation_config, run_type, pending_at, starting_at,
+            running_at, finished_at, usage_reported_at, sub_status, details,
+            flwr_aid, bytes_sent, bytes_recv, clientapp_runtime)
+            VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
+            :federation, :primary_task_id, :federation_config, :run_type,
+            :pending_at, :starting_at, :running_at, :finished_at,
+            :usage_reported_at, :sub_status, :details, :flwr_aid,
+            :bytes_sent, :bytes_recv, :clientapp_runtime)
+        """
+        task_insert_query = """
+            INSERT INTO task
+            (task_id, type, run_id, fab_hash, model_ref, connector_ref, token,
+             active_until, pending_at, starting_at, running_at, finished_at,
+             sub_status, details)
+            VALUES
+            (:task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
+             :active_until, :pending_at, :starting_at, :running_at, :finished_at,
+             :sub_status, :details)
+        """
+        override_config_json = json.dumps(override_config)
+        run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
+        task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
+        pending_at = now().isoformat()
+
         with self.session():
-            # Check conflicts
             query = "SELECT COUNT(*) as cnt FROM run WHERE run_id = :run_id"
-            rows = self.query(query, {"run_id": sint64_run_id})
+            rows = self.query(query, {"run_id": uint64_to_int64(run_id)})
             if rows[0]["cnt"] == 0:
-                query = """
-                    INSERT INTO run
-                    (run_id, fab_id, fab_version, fab_hash, override_config, federation,
-                    primary_task_id, federation_config, run_type, pending_at,
-                    starting_at, running_at, finished_at, usage_reported_at,
-                    sub_status, details, flwr_aid, bytes_sent, bytes_recv,
-                    clientapp_runtime)
-                    VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
-                    :federation, :primary_task_id, :federation_config, :run_type,
-                    :pending_at, :starting_at, :running_at, :finished_at,
-                    :usage_reported_at, :sub_status, :details, :flwr_aid,
-                    :bytes_sent, :bytes_recv, :clientapp_runtime)
-                """
-                override_config_json = json.dumps(override_config)
-                params = {
-                    "run_id": sint64_run_id,
-                    "fab_id": fab_id or "",
-                    "fab_version": fab_version or "",
-                    "fab_hash": fab_hash or "",
-                    "override_config": override_config_json,
-                    "federation": federation,
-                    "primary_task_id": None,
-                    "federation_config": fed_config_json,
-                    "run_type": run_type,
-                    "pending_at": now().isoformat(),
-                    "starting_at": "",
-                    "running_at": "",
-                    "finished_at": "",
-                    "sub_status": "",
-                    "details": "",
-                    "flwr_aid": flwr_aid or "",
-                    "bytes_sent": 0,
-                    "bytes_recv": 0,
-                    "clientapp_runtime": 0.0,
-                    "usage_reported_at": "",
-                }
-                self.query(query, params)
-                if self.create_task(task_type, uint64_run_id, fab_hash) is None:
-                    log(ERROR, "Failed to create task for run ID %s", uint64_run_id)
-                    return 0
-                return uint64_run_id
+                self.query(
+                    run_insert_query,
+                    {
+                        "run_id": uint64_to_int64(run_id),
+                        "fab_id": fab_id or "",
+                        "fab_version": fab_version or "",
+                        "fab_hash": fab_hash or "",
+                        "override_config": override_config_json,
+                        "federation": federation,
+                        "primary_task_id": uint64_to_int64(task_id),
+                        "federation_config": fed_config_json,
+                        "run_type": run_type,
+                        "pending_at": pending_at,
+                        "starting_at": "",
+                        "running_at": "",
+                        "finished_at": "",
+                        "usage_reported_at": "",
+                        "sub_status": "",
+                        "details": "",
+                        "flwr_aid": flwr_aid or "",
+                        "bytes_sent": 0,
+                        "bytes_recv": 0,
+                        "clientapp_runtime": 0.0,
+                    },
+                )
+                self.query(
+                    task_insert_query,
+                    {
+                        "task_id": uint64_to_int64(task_id),
+                        "type": task_type,
+                        "run_id": uint64_to_int64(run_id),
+                        "fab_hash": fab_hash,
+                        "model_ref": None,
+                        "connector_ref": None,
+                        "token": None,
+                        "active_until": None,
+                        "pending_at": pending_at,
+                        "starting_at": None,
+                        "running_at": None,
+                        "finished_at": None,
+                        "sub_status": "",
+                        "details": "",
+                    },
+                )
+                return run_id
+
         log(ERROR, "Unexpected run creation failure.")
         return 0
 
