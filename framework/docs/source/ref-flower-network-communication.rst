@@ -135,6 +135,14 @@ runtime, as summarized in the table below.
       - ClientAppIo API
       - Used by the SuperExec and the ``ClientApp`` processes
 
+.. note::
+
+    AppIo APIs enforce runtime version compatibility between the API server and
+    its callers. Requests from callers using a mismatched runtime version are
+    rejected before AppIo communication proceeds. Keep the SuperLink, SuperNode,
+    SuperExec, ``ServerApp``, and ``ClientApp`` runtime components on compatible
+    Flower versions.
+
 Isolation Mode
 ==============
 
