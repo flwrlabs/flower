@@ -72,7 +72,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         mock_datetime.now.side_effect = timestamps
         return stack
 
-    def _create_task_message(
+    def _create_task_message(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         src_task_id: int,
         dst_task_id: int,
