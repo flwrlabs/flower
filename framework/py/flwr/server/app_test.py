@@ -258,8 +258,8 @@ def test_get_objectstore_linkstate_factories_uses_defaults(
     monkeypatch.setattr(app_module, "get_ee_linkstate_factory", _unexpected)
 
     federation_manager = NoOpFederationManager()
-    # pylint: disable-next=protected-access
     objectstore_factory, state_factory = (
+        # pylint: disable-next=protected-access
         app_module._get_objectstore_linkstate_factories(database, federation_manager)
     )
 
@@ -311,8 +311,8 @@ def test_get_objectstore_linkstate_factories_non_sqlite_uses_ee_resolver(
     monkeypatch.setattr(app_module, "get_ee_objectstore_factory", _objectstore_resolver)
     monkeypatch.setattr(app_module, "get_ee_linkstate_factory", _linkstate_resolver)
 
-    # pylint: disable-next=protected-access
     objectstore_factory, state_factory = (
+        # pylint: disable-next=protected-access
         app_module._get_objectstore_linkstate_factories(
             "dummysql://db.example/flwr", federation_manager
         )
