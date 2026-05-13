@@ -39,7 +39,7 @@ jobs:
       - name: Release nightly
         id: release
         env:
-          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+          PYPI_REPOSITORY_PASSWORD: ${{ secrets.PYPI_REPOSITORY_PASSWORD }}
         working-directory: framework
         run: |
           RESULT=$(./dev/publish-nightly.sh)
