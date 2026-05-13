@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/../../
 
 # --- CONFIG ---
-REPO="adap/flower"
+REPO="flwrlabs/flower"
 TS_PATH="intelligence/ts/package.json"
 KT_PATH="intelligence/kt/gradle.properties"
 RELEASE_PREFIX="intelligence/v"

@@ -33,7 +33,7 @@ Before you start, make sure that:
    .. code-block:: bash
        :substitutions:
 
-       $ git clone --depth=1 --branch v|stable_flwr_version| https://github.com/adap/flower.git _tmp \
+       $ git clone --depth=1 --branch v|stable_flwr_version| https://github.com/flwrlabs/flower.git _tmp \
                    && mv _tmp/framework/docker/complete . \
                    && rm -rf _tmp && cd complete
 

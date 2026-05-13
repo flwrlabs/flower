@@ -14,8 +14,8 @@ from custom_mods.task import train as train_fn
 # Flower ClientApp
 app = ClientApp(
     mods=[
-        # get_tensorboard_mod(".runs_history/"),
-        get_wandb_mod("Custom mods example"),
+        get_tensorboard_mod(".runs_history/"),
+        # get_wandb_mod("Custom mods example"),
     ],
 )
 

@@ -14,9 +14,9 @@ Only a basic understanding of data science and Python programming is assumed.
 
 .. tip::
 
-    `Star Flower on GitHub <https://github.com/adap/flower>`__ ⭐️ and join the Flower
-    community on Flower Discuss and the Flower Slack to connect, ask questions, and get
-    help:
+    `Star Flower on GitHub <https://github.com/flwrlabs/flower>`__ ⭐️ and join the
+    Flower community on Flower Discuss and the Flower Slack to connect, ask questions,
+    and get help:
 
     - `Join Flower Discuss <https://discuss.flower.ai/>`__ We'd love to hear from you in
       the ``Introduction`` topic! If anything is unclear, post in ``Flower Help -

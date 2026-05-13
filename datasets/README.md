@@ -1,8 +1,8 @@
 # Flower Datasets
 
-[![GitHub license](https://img.shields.io/github/license/adap/flower)](https://github.com/adap/flower/blob/main/LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/adap/flower/blob/main/CONTRIBUTING.md)
-![Build](https://github.com/adap/flower/actions/workflows/framework.yml/badge.svg)
+[![GitHub license](https://img.shields.io/github/license/flwrlabs/flower)](https://github.com/flwrlabs/flower/blob/main/LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/flwrlabs/flower/blob/main/CONTRIBUTING.md)
+![Build](https://github.com/flwrlabs/flower/actions/workflows/framework.yml/badge.svg)
 ![Downloads](https://pepy.tech/badge/flwr-datasets)
 [![Slack](https://img.shields.io/badge/Chat-Slack-red)](https://flower.ai/join-slack)
 
@@ -10,7 +10,7 @@ Flower Datasets (`flwr-datasets`) is a library to quickly and easily create data
 
 
 > [!TIP]
-> For complete documentation that includes API docs, how-to guides and tutorials, please visit the [Flower Datasets Documentation](https://flower.ai/docs/datasets/) and for full FL example see the [Flower Examples page](https://github.com/adap/flower/tree/main/examples).
+> For complete documentation that includes API docs, how-to guides and tutorials, please visit the [Flower Datasets Documentation](https://flower.ai/docs/datasets/) and for full FL example see the [Flower Examples page](https://github.com/flwrlabs/flower/tree/main/examples).
 
 ## Installation
 

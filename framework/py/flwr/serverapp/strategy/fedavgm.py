@@ -21,6 +21,8 @@ Paper: arxiv.org/pdf/1909.06335.pdf
 from collections.abc import Callable, Iterable
 from logging import INFO
 
+import numpy as np
+
 from flwr.common import (
     Array,
     ArrayRecord,
@@ -186,7 +188,7 @@ class FedAvgM(FedAvg):
 
             # SGD and convert back to ArrayRecord
             updated_array_list = [
-                Array(old - self.server_learning_rate * pg)
+                Array(np.asarray(old - self.server_learning_rate * pg))
                 for old, pg in zip(ndarrays, pseudo_gradient, strict=True)
             ]
             aggregated_arrays = ArrayRecord(

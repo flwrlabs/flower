@@ -114,6 +114,46 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.RemoveNodeFromFederationRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.RemoveNodeFromFederationResponse.FromString,
                 _registered_method=True)
+        self.RemoveAccountFromFederation = channel.unary_unary(
+                '/flwr.proto.Control/RemoveAccountFromFederation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.RemoveAccountFromFederationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.RemoveAccountFromFederationResponse.FromString,
+                _registered_method=True)
+        self.CreateInvitation = channel.unary_unary(
+                '/flwr.proto.Control/CreateInvitation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.CreateInvitationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.CreateInvitationResponse.FromString,
+                _registered_method=True)
+        self.ListInvitations = channel.unary_unary(
+                '/flwr.proto.Control/ListInvitations',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ListInvitationsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ListInvitationsResponse.FromString,
+                _registered_method=True)
+        self.AcceptInvitation = channel.unary_unary(
+                '/flwr.proto.Control/AcceptInvitation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.AcceptInvitationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.AcceptInvitationResponse.FromString,
+                _registered_method=True)
+        self.RejectInvitation = channel.unary_unary(
+                '/flwr.proto.Control/RejectInvitation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.RejectInvitationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.RejectInvitationResponse.FromString,
+                _registered_method=True)
+        self.RevokeInvitation = channel.unary_unary(
+                '/flwr.proto.Control/RevokeInvitation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.RevokeInvitationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.RevokeInvitationResponse.FromString,
+                _registered_method=True)
+        self.ConfigureSimulationFederation = channel.unary_unary(
+                '/flwr.proto.Control/ConfigureSimulationFederation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ConfigureSimulationFederationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ConfigureSimulationFederationResponse.FromString,
+                _registered_method=True)
+        self.StreamRunEvents = channel.unary_stream(
+                '/flwr.proto.Control/StreamRunEvents',
+                request_serializer=flwr_dot_proto_dot_control__pb2.StreamRunEventsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.StreamRunEventsResponse.FromString,
+                _registered_method=True)
 
 
 class ControlServicer(object):
@@ -231,6 +271,66 @@ class ControlServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RemoveAccountFromFederation(self, request, context):
+        """Remove Account from Federation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateInvitation(self, request, context):
+        """Create Invitation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListInvitations(self, request, context):
+        """List Invitations
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def AcceptInvitation(self, request, context):
+        """Accept Invitation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RejectInvitation(self, request, context):
+        """Reject Invitation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RevokeInvitation(self, request, context):
+        """Revoke Invitation
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ConfigureSimulationFederation(self, request, context):
+        """Set Simulation Configuration
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def StreamRunEvents(self, request, context):
+        """##############
+        Unused for now
+        ##############
+
+        Start run event stream
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ControlServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -313,6 +413,46 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.RemoveNodeFromFederation,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.RemoveNodeFromFederationRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.RemoveNodeFromFederationResponse.SerializeToString,
+            ),
+            'RemoveAccountFromFederation': grpc.unary_unary_rpc_method_handler(
+                    servicer.RemoveAccountFromFederation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.RemoveAccountFromFederationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.RemoveAccountFromFederationResponse.SerializeToString,
+            ),
+            'CreateInvitation': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateInvitation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.CreateInvitationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.CreateInvitationResponse.SerializeToString,
+            ),
+            'ListInvitations': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListInvitations,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ListInvitationsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ListInvitationsResponse.SerializeToString,
+            ),
+            'AcceptInvitation': grpc.unary_unary_rpc_method_handler(
+                    servicer.AcceptInvitation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.AcceptInvitationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.AcceptInvitationResponse.SerializeToString,
+            ),
+            'RejectInvitation': grpc.unary_unary_rpc_method_handler(
+                    servicer.RejectInvitation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.RejectInvitationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.RejectInvitationResponse.SerializeToString,
+            ),
+            'RevokeInvitation': grpc.unary_unary_rpc_method_handler(
+                    servicer.RevokeInvitation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.RevokeInvitationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.RevokeInvitationResponse.SerializeToString,
+            ),
+            'ConfigureSimulationFederation': grpc.unary_unary_rpc_method_handler(
+                    servicer.ConfigureSimulationFederation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ConfigureSimulationFederationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ConfigureSimulationFederationResponse.SerializeToString,
+            ),
+            'StreamRunEvents': grpc.unary_stream_rpc_method_handler(
+                    servicer.StreamRunEvents,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.StreamRunEventsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.StreamRunEventsResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -747,6 +887,222 @@ class Control(object):
             '/flwr.proto.Control/RemoveNodeFromFederation',
             flwr_dot_proto_dot_control__pb2.RemoveNodeFromFederationRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.RemoveNodeFromFederationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RemoveAccountFromFederation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/RemoveAccountFromFederation',
+            flwr_dot_proto_dot_control__pb2.RemoveAccountFromFederationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.RemoveAccountFromFederationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateInvitation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/CreateInvitation',
+            flwr_dot_proto_dot_control__pb2.CreateInvitationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.CreateInvitationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListInvitations(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ListInvitations',
+            flwr_dot_proto_dot_control__pb2.ListInvitationsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ListInvitationsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def AcceptInvitation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/AcceptInvitation',
+            flwr_dot_proto_dot_control__pb2.AcceptInvitationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.AcceptInvitationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RejectInvitation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/RejectInvitation',
+            flwr_dot_proto_dot_control__pb2.RejectInvitationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.RejectInvitationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RevokeInvitation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/RevokeInvitation',
+            flwr_dot_proto_dot_control__pb2.RevokeInvitationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.RevokeInvitationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ConfigureSimulationFederation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ConfigureSimulationFederation',
+            flwr_dot_proto_dot_control__pb2.ConfigureSimulationFederationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ConfigureSimulationFederationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StreamRunEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/flwr.proto.Control/StreamRunEvents',
+            flwr_dot_proto_dot_control__pb2.StreamRunEventsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.StreamRunEventsResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -89,7 +89,7 @@ PATH_PULL_MESSAGES: str = "/api/v0/fleet/pull-messages"
 PATH_PUSH_MESSAGES: str = "/api/v0/fleet/push-messages"
 PATH_PULL_OBJECT: str = "/api/v0/fleet/pull-object"
 PATH_PUSH_OBJECT: str = "/api/v0/fleet/push-object"
-PATH_SEND_NODE_HEARTBEAT: str = "api/v0/fleet/send-node-heartbeat"
+PATH_SEND_NODE_HEARTBEAT: str = "/api/v0/fleet/send-node-heartbeat"
 PATH_GET_RUN: str = "/api/v0/fleet/get-run"
 PATH_GET_FAB: str = "/api/v0/fleet/get-fab"
 PATH_CONFIRM_MESSAGE_RECEIVED: str = "/api/v0/fleet/confirm-message-received"
@@ -208,7 +208,7 @@ def http_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
         # Send the request
         def post() -> requests.Response:
             return requests.post(
-                f"{base_url}/{api_path}",
+                f"{base_url}{api_path}",
                 data=req_bytes,
                 headers={
                     "Accept": "application/protobuf",

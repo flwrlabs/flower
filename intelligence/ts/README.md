@@ -71,10 +71,10 @@ await main().then().catch();
 
 ## Demo
 
-You can also quickly try out the library with the [`examples/hello-world-ts`](https://github.com/adap/flower/tree/main/intelligence/ts/examples/hello-world-ts) example (which is a minimal TypeScript project):
+You can also quickly try out the library with the [`examples/hello-world-ts`](https://github.com/flwrlabs/flower/tree/main/intelligence/ts/examples/hello-world-ts) example (which is a minimal TypeScript project):
 
 ```sh
-git clone --depth=1 https://github.com/adap/flower.git _tmp && \
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp && \
 mv _tmp/intelligence/ts/examples/hello-world-ts . && \
 rm -rf _tmp && \
 cd hello-world-ts
@@ -84,4 +84,4 @@ npm run build
 npm run start
 ```
 
-You'll find a list of other examples [here](https://github.com/adap/flower/tree/main/intelligence/ts/examples).
+You'll find a list of other examples [here](https://github.com/flwrlabs/flower/tree/main/intelligence/ts/examples).

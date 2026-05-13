@@ -47,7 +47,7 @@ Before you begin, make sure you have the following prerequisites:
    .. code-block:: bash
        :substitutions:
 
-       $ git clone --depth=1 --branch v|stable_flwr_version| https://github.com/adap/flower.git
+       $ git clone --depth=1 --branch v|stable_flwr_version| https://github.com/flwrlabs/flower.git
        $ cd flower/framework/docker/distributed
 
 2. Get the IP address from the remote machine and save it for later.
@@ -202,4 +202,4 @@ Shut down the Flower server components and delete the SuperLink state:
 
 .. |quickstart_sklearn_tabular| replace:: ``examples/quickstart-sklearn``
 
-.. _quickstart_sklearn_tabular: https://github.com/adap/flower/tree/main/examples/quickstart-sklearn
+.. _quickstart_sklearn_tabular: https://github.com/flwrlabs/flower/tree/main/examples/quickstart-sklearn

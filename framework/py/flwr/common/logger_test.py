@@ -16,9 +16,17 @@
 
 
 import sys
+from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
 from queue import Queue
 
-from .logger import mirror_output_to_queue, restore_output
+from .logger import (
+    FLOWER_LOGGER,
+    configure_superlink_log_file,
+    console_handler,
+    mirror_output_to_queue,
+    restore_output,
+)
 
 
 def test_mirror_output_to_queue() -> None:
@@ -54,3 +62,77 @@ def test_restore_output() -> None:
     assert log_queue.get() == "Test message before restore"
     assert log_queue.get() == "\n"
     assert log_queue.empty()
+
+
+def test_configure_superlink_log_file(tmp_path: Path) -> None:
+    """Test configuring timed file rotation for SuperLink logs."""
+    # Prepare
+    file_name = tmp_path / "test-superlink.log"
+    path = file_name.resolve()
+    before = list(FLOWER_LOGGER.handlers)
+
+    try:
+        # Execute
+        configure_superlink_log_file(
+            filename=str(file_name),
+            interval_hours=24,
+            backup_count=7,
+        )
+
+        # Assert
+        rotating_handler = next(
+            (
+                h
+                for h in FLOWER_LOGGER.handlers
+                if isinstance(h, TimedRotatingFileHandler)
+                and Path(h.baseFilename).resolve() == path
+            ),
+            None,
+        )
+        assert rotating_handler is not None
+        assert rotating_handler.level == console_handler.level
+        assert rotating_handler.backupCount == 7
+        assert rotating_handler.interval == 24 * 60 * 60
+    finally:
+        # Clean up any handlers introduced by this test
+        for cleanup_handler in list(FLOWER_LOGGER.handlers):
+            if cleanup_handler in before:
+                continue
+            FLOWER_LOGGER.removeHandler(cleanup_handler)
+            cleanup_handler.close()
+
+
+def test_configure_superlink_log_file_idempotent(tmp_path: Path) -> None:
+    """Test configuring SuperLink rotation twice does not duplicate handlers."""
+    # Prepare
+    file_name = tmp_path / "test-superlink-idempotent.log"
+    path = file_name.resolve()
+    before = list(FLOWER_LOGGER.handlers)
+
+    try:
+        # Execute
+        configure_superlink_log_file(
+            filename=str(file_name),
+            interval_hours=24,
+            backup_count=7,
+        )
+        configure_superlink_log_file(
+            filename=str(file_name),
+            interval_hours=24,
+            backup_count=7,
+        )
+
+        # Assert
+        handlers = [
+            h
+            for h in FLOWER_LOGGER.handlers
+            if isinstance(h, TimedRotatingFileHandler)
+            and Path(h.baseFilename).resolve() == path
+        ]
+        assert len(handlers) == 1
+    finally:
+        for handler in list(FLOWER_LOGGER.handlers):
+            if handler in before:
+                continue
+            FLOWER_LOGGER.removeHandler(handler)
+            handler.close()

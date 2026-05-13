@@ -17,17 +17,17 @@
 
 from contextlib import ExitStack
 from pathlib import Path
-from typing import IO, Annotated
+from typing import IO, Annotated, Any, cast
 
 import click
 import requests
 import typer
 from requests import Response
 
+from flwr.cli.config_utils import load_and_validate
+from flwr.common.constant import FAB_CONFIG_FILE
 from flwr.supercore.constant import (
-    APP_PUBLISH_EXCLUDE_PATTERNS,
-    APP_PUBLISH_INCLUDE_PATTERNS,
-    MAX_DIR_DEPTH,
+    APP_PUBLISH_ALLOWED_LICENSE_FILES,
     MAX_FILE_BYTES,
     MAX_FILE_COUNT,
     MAX_TOTAL_BYTES,
@@ -39,10 +39,12 @@ from flwr.supercore.constant import (
 from flwr.supercore.version import package_version as flwr_version
 
 from ..auth_plugin.oidc_cli_plugin import OidcCliPlugin
+from ..config_utils import load as load_toml
 from ..utils import (
-    build_pathspec,
+    collect_files,
+    filter_paths_for_publish,
     load_cli_auth_plugin_from_connection,
-    load_gitignore_patterns,
+    validate_project_name,
 )
 
 
@@ -55,10 +57,10 @@ def publish(
         ),
     ] = Path("."),
 ) -> None:
-    """Publish a Flower App to the Flower Platform.
+    """Publish a Flower App to Flower Hub.
 
-    This command uploads your app project to the Flower Platform. Files are filtered
-    based on .gitignore patterns and allowed file extensions.
+    This command uploads your app project to Flower Hub. Files are filtered based on
+    .gitignore patterns and allowed file extensions.
     """
     auth_plugin = load_cli_auth_plugin_from_connection(SUPERGRID_ADDRESS)
     auth_plugin.load_tokens()
@@ -67,6 +69,14 @@ def publish(
 
     # Load token from the plugin
     token = auth_plugin.access_token
+
+    # Resolve app path
+    app = app.expanduser().resolve()
+
+    # Validate app description from config
+    config, _ = load_and_validate(app / FAB_CONFIG_FILE, check_module=False)
+    _validate_app_name(app.name, "Flower App directory name")
+    _validate_description(config["project"].get("description", ""))
 
     # Collect & validate app files
     file_paths = _collect_file_paths(app)
@@ -91,14 +101,37 @@ def publish(
     raise click.ClickException(msg)
 
 
-def _depth_of(relative_path_to_root: Path) -> int:
-    """Return depth that is number of parts (directories) in the relative path
-    (excluding filename).
+def _validate_description(description: Any) -> None:
+    """Validate app description before publishing."""
+    if not isinstance(description, str):
+        raise click.ClickException(
+            "Missing or invalid app description. "
+            "Please set `description` in [project] of pyproject.toml."
+        )
 
-    Example: "a/b/c.py" -> depth 2
-    Interpret "directory depth" as number of directories: len(parts) - 1
-    """
-    return max(0, len(relative_path_to_root.parts) - 1)
+    if description.strip() == "":
+        raise click.ClickException(
+            "App description can't be empty. "
+            "Please provide one with fewer than 200 characters."
+        )
+
+    if len(description) > 200:
+        typer.secho(
+            "Warning: the app description is more than 200 characters.",
+            fg=typer.colors.YELLOW,
+            bold=True,
+        )
+        should_continue = typer.confirm("Do you want to continue publishing anyway?")
+        if not should_continue:
+            raise click.ClickException("Publishing cancelled by user.")
+
+
+def _validate_app_name(name: str, target: str) -> None:
+    """Validate app and directory names used during publish."""
+    try:
+        validate_project_name(name, target)
+    except ValueError as err:
+        raise click.ClickException(str(err)) from None
 
 
 def _detect_mime(path: Path) -> str:
@@ -106,40 +139,70 @@ def _detect_mime(path: Path) -> str:
     return MIME_MAP.get(path.suffix.lower(), "text/plain; charset=utf-8")
 
 
+def _get_declared_license_file(root: Path) -> Path | None:
+    """Return validated absolute path from `[project].license.file`, else None."""
+    # Read optional [project].license.file from pyproject.toml
+    config = load_toml(root / "pyproject.toml")
+    if config is None:
+        return None
+    project = config.get("project")
+    if not isinstance(project, dict):
+        return None
+    license_entry = project.get("license")
+    if not isinstance(license_entry, dict):
+        return None
+    if "file" not in license_entry:
+        return None
+
+    # Validate [project].license.file:
+    # cannot be combined with `text`, must be a string,
+    # must be an allowed filename, and must exist.
+    license_file = license_entry["file"]
+    if "file" in license_entry and "text" in license_entry:
+        raise click.ClickException(
+            "Invalid [project].license: `file` and `text` cannot be set together."
+        )
+    if not isinstance(license_file, str):
+        raise click.ClickException(
+            "Invalid [project].license.file: expected a string path."
+        )
+    if license_file not in APP_PUBLISH_ALLOWED_LICENSE_FILES:
+        raise click.ClickException(
+            "Invalid [project].license.file: only `LICENSE` or `LICENSE.md` "
+            "are supported."
+        )
+    if not (root / license_file).is_file():
+        raise click.ClickException(
+            f"Invalid [project].license.file: `{license_file}` was declared "
+            "but does not exist."
+        )
+    return (root / license_file).expanduser().resolve()
+
+
 def _collect_file_paths(root: Path) -> list[Path]:
     """Return list of file paths that match include/exclude patterns."""
-    # Build include/exclude pathspecs
-    # Note: This should be a temporary solution until we have a complete mechanism
-    # for configurable inclusion and exclusion rules.
-    # Note: Unlike Git, we do not support nested .gitignore files in subdirectories.
-    gitignore_patterns = tuple(load_gitignore_patterns(root / ".gitignore"))
-    exclude_pathspec = build_pathspec(gitignore_patterns + APP_PUBLISH_EXCLUDE_PATTERNS)
-    include_pathspec = build_pathspec(APP_PUBLISH_INCLUDE_PATTERNS)
+    declared_license_file = _get_declared_license_file(root)
 
-    # Walk the directory tree
-    file_paths: list[Path] = []
-    for path in root.rglob("*"):
-        if not path.is_file():
-            continue
+    try:
+        # Collect all files
+        all_files = collect_files(root)
+        # Filter files based on .gitignore and include/exclude patterns
+        files = cast(dict[str, Path], filter_paths_for_publish(all_files))
+        # Warn about skipped files (sorted for deterministic output)
+        skipped_paths = sorted(set(all_files.keys()) - set(files.keys()))
+        for path in skipped_paths:
+            typer.secho(f"Skip: {path}", fg=typer.colors.YELLOW)
+        # Build list of absolute file paths (sorted by relative path for stability)
+        file_paths = [files[key].expanduser().resolve() for key in sorted(files.keys())]
+    except ValueError as err:
+        raise click.ClickException(str(err)) from err
 
-        # Skip excluded or not included files
-        # Note: pathspec requires POSIX style relative paths
-        relative_path = path.relative_to(root)
-        posix = relative_path.as_posix()
-        if exclude_pathspec.match_file(posix) or not include_pathspec.match_file(posix):
-            typer.echo(typer.style(f"Skip: {path}", fg=typer.colors.YELLOW))
-            continue
+    if declared_license_file and declared_license_file not in file_paths:
+        raise click.ClickException(
+            f"Invalid [project].license.file: `{declared_license_file.name}` is "
+            "excluded by `.gitignore` or publish exclude rules."
+        )
 
-        # Check max depth
-        if _depth_of(relative_path) > MAX_DIR_DEPTH:
-            raise click.ClickException(
-                f"'{path}' exceeds the maximum directory depth of {MAX_DIR_DEPTH}."
-            )
-
-        file_paths.append(path)
-
-    # Sort for deterministic ordering
-    file_paths.sort(key=lambda path: path.as_posix())
     return file_paths
 
 

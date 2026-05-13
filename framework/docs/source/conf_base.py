@@ -283,7 +283,7 @@ html_theme_options = {
     # Sphinx Book Theme
     #
     # https://sphinx-book-theme.readthedocs.io/en/latest/configure.html
-    # "repository_url": "https://github.com/adap/flower",
+    # "repository_url": "https://github.com/flwrlabs/flower",
     # "repository_branch": "main",
     # "path_to_docs": "framework/docs/source/",
     # "home_page_in_toc": True,

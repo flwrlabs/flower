@@ -37,7 +37,7 @@ def run_health_server_grpc_no_tls(address: str) -> grpc.Server:
         server_address=address,
         certificates=None,
     )
-    log(INFO, "Starting gRPC health server on %s", address)
+    log(INFO, "Starting gRPC health server on %s", health_server.bound_address)
     health_server.start()
     return health_server
 

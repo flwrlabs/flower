@@ -15,7 +15,7 @@
 """Flower command line interface `federation list` command."""
 
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import typer
 from rich.console import Console
@@ -34,9 +34,10 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     ShowFederationResponse,
 )
 from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation, Member  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
-from flwr.supercore.utils import humanize_duration
+from flwr.supercore.utils import humanize_duration, simulation_config_to_json
 
 from ..run_utils import RunRow, format_runs
 from ..utils import (
@@ -54,7 +55,7 @@ def ls(  # pylint: disable=R0914, R0913, R0917, R0912
         typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,
@@ -69,6 +70,13 @@ def ls(  # pylint: disable=R0914, R0913, R0917, R0912
             help="Name of the federation to display",
         ),
     ] = None,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            help="Show additional details, including archived federations.",
+        ),
+    ] = False,
 ) -> None:
     """List available federations or details of a specific federation (alias: ls)."""
     with cli_output_handler(output_format=output_format) as is_json:
@@ -85,26 +93,50 @@ def ls(  # pylint: disable=R0914, R0913, R0917, R0912
 
             if federation:
                 # Show specific federation details
-                typer.echo(f"📄 Showing '{federation}' federation ...")
-                members, nodes, runs = _show_federation(stub, federation)
-
+                members, nodes, runs, archived, simulation, config = _show_federation(
+                    stub, federation
+                )
+                archived_str = (
+                    "[bold yellow]ARCHIVED[/bold yellow] " if archived else ""
+                )
+                Console().print(
+                    f"📄 Showing {archived_str}federation "
+                    f"[bold]'{federation}'[/bold]...\n",
+                    highlight=False,
+                )
                 if is_json:
                     print_json_to_stdout(
-                        _to_json(members=members, nodes=nodes, runs=runs)
+                        _to_json(
+                            members=members,
+                            nodes=nodes,
+                            runs=runs,
+                            archived=archived,
+                            simulation=simulation,
+                            config=config,
+                        )
                     )
                 else:
+
                     Console().print(_to_members_table(members))
-                    Console().print(_to_nodes_table(nodes))
+                    if simulation:
+                        Console().print(_to_simulation_config_table(config))
+                    else:
+                        Console().print(_to_nodes_table(nodes, archived))
                     Console().print(_to_runs_table(runs))
             else:
                 # List federations
                 typer.echo("📄 Listing federations...")
                 federations = _list_federations(stub)
 
+                active = [f for f in federations if not f.archived]
+                archived_feds = [f for f in federations if f.archived]
+
                 if is_json:
                     print_json_to_stdout(_to_json(federations=federations))
                 else:
-                    Console().print(_to_table(federations))
+                    # If verbose, show archived federations after active ones
+                    shown = active + archived_feds if verbose else active
+                    Console().print(_to_table(shown))
         finally:
             if channel:
                 channel.close()
@@ -129,25 +161,57 @@ def _to_table(federations: list[Federation]) -> Table:
     table.add_column(
         Text("Description", justify="center"), style="bright_black", no_wrap=True
     )
+    table.add_column(
+        Text("Runtime", justify="center"), style="bright_black", no_wrap=True
+    )
+    table.add_column(
+        Text("Status", justify="center"), style="bright_black", no_wrap=True
+    )
 
     for federation in federations:
-        table.add_row(federation.name, federation.description)
+        if federation.archived:
+            style = "dim"
+            status = "archived"
+        else:
+            style = ""
+            status = "[green]active[/green]"
+        runtime = "simulation" if federation.simulation else "deployment"
+        table.add_row(
+            federation.name,
+            federation.description,
+            runtime,
+            status,
+            style=style,
+        )
 
     return table
 
 
-def _to_json(
+def _to_json(  # pylint: disable=R0913,R0917
     federations: list[Federation] | None = None,
     members: list[Member] | None = None,
     nodes: list[NodeInfo] | None = None,
     runs: list[RunRow] | None = None,
-) -> list[dict[str, str]] | list[list[dict[str, Any]]]:
+    archived: bool | None = None,
+    simulation: bool | None = None,
+    config: SimulationConfig | None = None,
+) -> dict[str, Any]:
     """Format the provided federations list to JSON serializable format."""
     if federations is not None:
-        return [{"name": federation.name} for federation in federations]
+        return {
+            "federations": [
+                {
+                    "name": federation.name,
+                    "description": federation.description,
+                    "archived": federation.archived,
+                    "simulation": federation.simulation,
+                }
+                for federation in federations
+            ]
+        }
 
     if members is None or nodes is None or runs is None:
-        return []
+        return {"federation": {}}
 
     members_list: list[dict[str, Any]] = []
     nodes_list: list[dict[str, Any]] = []
@@ -157,13 +221,13 @@ def _to_json(
         members_list.append({"member_id": member.account.name, "role": member.role})
 
     for node in nodes:
-        nodes_list.append(
-            {
-                "node_id": f"{node.node_id}",
-                "owner": node.owner_name,
-                "status": node.status,
-            }
-        )
+        node_json: dict[str, Any] = {
+            "node_id": f"{node.node_id}",
+            "owner": node.owner_name,
+        }
+        if not archived:
+            node_json["status"] = node.status
+        nodes_list.append(node_json)
 
     for run in runs:
         runs_list.append(
@@ -175,12 +239,21 @@ def _to_json(
             }
         )
 
-    return [members_list, nodes_list, runs_list]
+    return {
+        "federation": {
+            "members": members_list,
+            "nodes": nodes_list,
+            "runs": runs_list,
+            "archived": archived,
+            "simulation": simulation,
+            "simulation-config": simulation_config_to_json(config) if config else None,
+        }
+    }
 
 
 def _show_federation(
     stub: ControlStub, federation: str
-) -> tuple[list[Member], list[NodeInfo], list[RunRow]]:
+) -> tuple[list[Member], list[NodeInfo], list[RunRow], bool, bool, SimulationConfig]:
     """Show federation details.
 
     Parameters
@@ -192,8 +265,8 @@ def _show_federation(
 
     Returns
     -------
-    tuple[list[Member], list[NodeInfo], list[RunRow]]
-        A tuple containing (members, nodes, runs).
+    tuple[list[Member], list[NodeInfo], list[RunRow], bool, bool, SimulationConfig]
+        A tuple containing (members, nodes, runs, archived, simulation, config).
     """
     with flwr_cli_grpc_exc_handler():
         res: ShowFederationResponse = stub.ShowFederation(
@@ -208,6 +281,9 @@ def _show_federation(
         list(fed_proto.members),
         list(fed_proto.nodes),
         formatted_runs,
+        fed_proto.archived,
+        fed_proto.simulation,
+        fed_proto.config,
     )
 
 
@@ -226,10 +302,8 @@ def _to_members_table(members: list[Member]) -> Table:
     """
     table = Table(title="Federation Members", header_style="bold cyan", show_lines=True)
 
-    table.add_column(
-        Text("Account Name", justify="center"), style="bright_black", no_wrap=True
-    )
-    table.add_column(Text("Role", justify="center"), style="bright_black", no_wrap=True)
+    table.add_column(Text("Account Name", justify="center"), no_wrap=True)
+    table.add_column(Text("Role", justify="center"), no_wrap=True)
 
     for member in members:
         table.add_row(member.account.name, member.role)
@@ -237,13 +311,17 @@ def _to_members_table(members: list[Member]) -> Table:
     return table
 
 
-def _to_nodes_table(nodes: list[NodeInfo]) -> Table:
+def _to_nodes_table(nodes: list[NodeInfo], archived: bool) -> Table:
     """Format the provided list of federation nodes as a rich Table.
 
     Parameters
     ----------
     nodes : list[NodeInfo]
         List of NodeInfo objects containing node details.
+
+    archived : bool
+        Whether the federation is archived. If True, the status
+        column for nodes will not be rendered.
 
     Returns
     -------
@@ -264,7 +342,8 @@ def _to_nodes_table(nodes: list[NodeInfo]) -> Table:
         Text("Node ID", justify="center"), style="bright_black", no_wrap=True
     )
     table.add_column(Text("Owner", justify="center"))
-    table.add_column(Text("Status", justify="center"))
+    if not archived:
+        table.add_column(Text("Status", justify="center"))
 
     for row in nodes:
         owner_name = row.owner_name
@@ -281,16 +360,46 @@ def _to_nodes_table(nodes: list[NodeInfo]) -> Table:
         else:
             raise ValueError(f"Unexpected node status '{status}'")
 
-        formatted_row = (
+        formatted_row: list[str] = [
             f"[bold]{row.node_id}[/bold]",
             (
                 f"{owner_name}"
                 if owner_name != NOOP_ACCOUNT_NAME
                 else f"[dim]{owner_name}[/dim]"
             ),
-            f"[{status_style}]{status}",
-        )
+        ]
+        if not archived:
+            formatted_row.append(f"[{status_style}]{status}[/{status_style}]")
         table.add_row(*formatted_row)
+
+    return table
+
+
+def _to_simulation_config_table(config: SimulationConfig) -> Table:
+    """Format the simulation configuration as a rich Table."""
+    table = Table(
+        title="Simulation Configuration",
+        header_style="bold cyan",
+        show_lines=True,
+    )
+
+    table.add_column(Text("Setting", justify="center"), style="bright_black")
+    table.add_column(Text("Key", justify="center"), style="bright_black")
+    table.add_column(Text("Value"), justify="right")
+
+    rows = [
+        ("Number of Simulated SuperNodes", "num_supernodes"),
+        ("ClientApp Resources (CPUs)", "client_resources_num_cpus"),
+        ("ClientApp Resources (GPUs)", "client_resources_num_gpus"),
+        ("Backend Name", "backend"),
+    ]
+
+    for name, key in rows:
+        table.add_row(
+            name,
+            Text(key.replace("_", "-"), style="bold magenta"),
+            str(getattr(config, key)),
+        )
 
     return table
 

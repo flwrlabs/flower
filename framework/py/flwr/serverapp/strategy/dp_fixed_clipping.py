@@ -114,7 +114,7 @@ class DifferentialPrivacyFixedClippingBase(Strategy, ABC):
 
         return ArrayRecord(
             {
-                k: Array(v)
+                k: Array(np.asarray(v))
                 for k, v in zip(
                     aggregated_arrays.keys(), aggregated_ndarrays, strict=True
                 )

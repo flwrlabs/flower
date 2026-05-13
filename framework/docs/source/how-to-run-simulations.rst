@@ -1,6 +1,6 @@
-:og:description: Run federated learning simulations in Flower using the VirtualClientEngine for scalable, resource-aware, and multi-node simulations on any system configuration.
+:og:description: Run federated learning simulations in Flower using the Simulation Runtime for scalable, resource-aware, and multi-node simulations on any system configuration.
 .. meta::
-    :description: Run federated learning simulations in Flower using the VirtualClientEngine for scalable, resource-aware, and multi-node simulations on any system configuration.
+    :description: Run federated learning simulations in Flower using the Simulation Runtime for scalable, resource-aware, and multi-node simulations on any system configuration.
 
 .. |clientapp_link| replace:: ``ClientApp``
 
@@ -12,9 +12,13 @@
 
 .. |flwr_new_link| replace:: ``flwr new``
 
+.. |flwr_fed_sim_config_link| replace:: ``flwr federation simulation-config``
+
 .. _clientapp_link: ref-api/flwr.client.ClientApp.html
 
 .. _context_link: ref-api/flwr.common.Context.html
+
+.. _flwr_fed_sim_config_link: ref-api-cli.html#flwr-federation-simulation-config
 
 .. _flwr_new_link: ref-api-cli.html#flwr-new
 
@@ -37,7 +41,7 @@ workloads makes sense.
 
 .. note::
 
-    Flower's ``Simulation Engine`` is built on top of `Ray <https://www.ray.io/>`_, an
+    Flower's ``Simulation Runtime`` is built on top of `Ray <https://www.ray.io/>`_, an
     open-source framework for scalable Python workloads. Flower fully supports Linux and
     macOS. On Windows, Ray support remains experimental, and while you can run
     simulations directly from the `PowerShell
@@ -49,13 +53,13 @@ workloads makes sense.
     If you're on Windows and see unexpected terminal output (e.g.: ``� □[32m□[1m``),
     check :ref:`this FAQ entry <faq-windows-unexpected-output>`.
 
-Flower's ``Simulation Engine`` schedules, launches, and manages |clientapp_link|_
+Flower's ``Simulation Runtime`` schedules, launches, and manages |clientapp_link|_
 instances. It does so through a ``Backend``, which contains several workers (i.e.,
 Python processes) that can execute a ``ClientApp`` by passing it a |context_link|_ and a
 |message_link|_. These ``ClientApp`` objects are identical to those used by Flower's
-`Deployment Engine <contributor-explanation-architecture.html>`_, making alternating
+`Deployment Runtime <contributor-explanation-architecture.html>`_, making alternating
 between *simulation* and *deployment* an effortless process. The execution of
-``ClientApp`` objects through Flower's ``Simulation Engine`` is:
+``ClientApp`` objects through Flower's ``Simulation Runtime`` is:
 
 - **Resource-aware**: Each backend worker executing ``ClientApp``\s gets assigned a
   portion of the compute and memory on your system. You can define these at the
@@ -67,12 +71,13 @@ between *simulation* and *deployment* an effortless process. The execution of
   ``ClientApps`` are typically executed in batches of N, where N is the number of
   backend workers.
 - **Self-managed**: This means that you, as a user, do not need to launch ``ClientApps``
-  manually; instead, the ``Simulation Engine``'s internals orchestrates the execution of
-  all ``ClientApp``\s.
+  manually; instead, the ``Simulation Runtime`` orchestrates the execution of all
+  ``ClientApp``\s.
 - **Ephemeral**: This means that a ``ClientApp`` is only materialized when it is
-  required by the application (e.g., to do `fit()
-  <ref-api-flwr.html#flwr.client.Client.fit>`_). The object is destroyed afterward,
-  releasing the resources it was assigned and allowing other clients to participate.
+  required by the application (e.g., to do `@app.train()
+  <ref-api/flwr.clientapp.ClientApp.html#flwr.clientapp.ClientApp.train>`_). The object
+  is destroyed afterward, releasing the resources it was assigned and allowing other
+  clients to participate.
 
 .. note::
 
@@ -81,7 +86,7 @@ between *simulation* and *deployment* an effortless process. The execution of
     `Designing Stateful Clients <how-to-design-stateful-clients.rst>`_ guide for a
     complete walkthrough.
 
-The ``Simulation Engine`` delegates to a ``Backend`` the role of spawning and managing
+The ``Simulation Runtime`` delegates to a ``Backend`` the role of spawning and managing
 ``ClientApps``. The default backend is the ``RayBackend``, which uses `Ray
 <https://www.ray.io/>`_, an open-source framework for scalable Python workloads. In
 particular, each worker is an `Actor
@@ -92,16 +97,16 @@ particular, each worker is an `Actor
  Launch your Flower simulation
 *******************************
 
-Running a simulation is straightforward; in fact, it is the default mode of operation
-for |flwr_run_link|_. Therefore, running Flower simulations primarily requires you to
-first define a ``ClientApp`` and a ``ServerApp``. A convenient way to generate a minimal
-but fully functional Flower app is by means of the |flwr_new_link|_ command. There are
-multiple apps to choose from. The example below uses the ``PyTorch`` quickstart app.
-
 .. tip::
 
-    If you haven't already, install Flower via ``pip install -U flwr`` in a Python
-    environment.
+    If you haven't already, install Flower via ``pip install -U "flwr[simulation]"`` in
+    a Python environment.
+
+Running a simulation is straightforward; in fact, it is the default mode of operation
+for |flwr_run_link|_. Therefore, the only requirement for running Flower simulations is
+to have a Flower app. A convenient way to generate a minimal but fully functional Flower
+app is by means of the |flwr_new_link|_ command. There are multiple apps to choose from.
+The example below uses the ``PyTorch`` quickstart app.
 
 .. code-block:: shell
 
@@ -109,11 +114,20 @@ multiple apps to choose from. The example below uses the ``PyTorch`` quickstart 
     flwr new @flwrlabs/quickstart-pytorch
 
 Then, follow the instructions shown after completing the |flwr_new_link|_ command. When
-you execute |flwr_run_link|_, you'll be using the ``Simulation Engine``.
+you execute |flwr_run_link|_, the run will execute with the ``Simulation Runtime``.
 
-For local simulation profiles, ``flwr run`` submits the run to a local SuperLink via the
-Control API. If the profile has ``options.*`` and no explicit ``address``, Flower starts
-a local SuperLink automatically when needed.
+For local simulation profiles, ``flwr run`` submits the run to a managed local SuperLink
+via the Control API. If the profile uses ``address = ":local:"``, Flower starts a local
+SuperLink automatically when needed, keeps it running in the background, and reuses it
+for ``flwr list``, ``flwr log``, and ``flwr stop``. See :doc:`how-to-run-flower-locally`
+for the full local workflow and runtime lifecycle.
+
+.. tip::
+
+    If you run your simulations on a server using a networked filesystem (e.g.,
+    NFS-mounted home directory) you might encounter SQL database errors if your network
+    is slow. If you do, check :ref:`this FAQ entry <faq-local-superlink-db-error>` to
+    learn how to run simulations with a SuperLink using an in-memory database.
 
 Simulation examples
 ===================
@@ -124,30 +138,31 @@ Tutorial <tutorial-quickstart-pytorch.html>`_, `quickstart JAX Tutorial
 simulation-ready.
 
 - `Quickstart TensorFlow/Keras
-  <https://github.com/adap/flower/tree/main/examples/quickstart-tensorflow>`_.
+  <https://github.com/flwrlabs/flower/tree/main/examples/quickstart-tensorflow>`_.
 - `Quickstart PyTorch
-  <https://github.com/adap/flower/tree/main/examples/quickstart-pytorch>`_
+  <https://github.com/flwrlabs/flower/tree/main/examples/quickstart-pytorch>`_
 - `Advanced PyTorch
-  <https://github.com/adap/flower/tree/main/examples/advanced-pytorch>`_
-- `Quickstart MLX <https://github.com/adap/flower/tree/main/examples/quickstart-mlx>`_
-- `ViT fine-tuning <https://github.com/adap/flower/tree/main/examples/flowertune-vit>`_
+  <https://github.com/flwrlabs/flower/tree/main/examples/advanced-pytorch>`_
+- `Quickstart MLX
+  <https://github.com/flwrlabs/flower/tree/main/examples/quickstart-mlx>`_
+- `ViT fine-tuning
+  <https://github.com/flwrlabs/flower/tree/main/examples/flowertune-vit>`_
 
 The complete list of examples can be found in `the Flower GitHub
-<https://github.com/adap/flower/tree/main/examples>`_.
-
-.. _clientappresources:
+<https://github.com/flwrlabs/flower/tree/main/examples>`_.
 
 **********************************
- Defining ``ClientApp`` resources
+ Customize the Simulation Runtime
 **********************************
 
-By default, the ``Simulation Engine`` assigns two CPU cores to each backend worker. This
-means that if your system has 10 CPU cores, five backend workers can be running in
-parallel, each executing a different ``ClientApp`` instance.
+By default, the Simulation Runtime simulates a cohort of 10 SuperNodes and assigns two
+CPU cores to each backend worker. This means that if your system has 12 CPU cores, six
+backend workers can be running in parallel, each executing a different ``ClientApp``
+instance.
 
 More often than not, you would probably like to adjust the resources your ``ClientApp``
 gets assigned based on the complexity (i.e., compute and memory footprint) of your
-workload. You can do so by adjusting the backend resources for your federation.
+Flower app. You can do so by adjusting the backend resources for your federation.
 
 .. caution::
 
@@ -159,42 +174,56 @@ workload. You can do so by adjusting the backend resources for your federation.
     make use of 25% of the available VRAM but it ends up using 50%, it might cause other
     ``ClientApp`` instances to crash throwing an out-of-memory (OOM) error.
 
-Customizing resources can be done directly in the :doc:`Flower Configuration
-<ref-flower-configuration>`. Setting the ``options.backend.client-resources`` variable
-allows you to define how many CPU cores and what fraction of GPU memory each backend
-worker (and hence each ``ClientApp``) gets. For example, to run a simulation with 10
-clients where each ``ClientApp`` assumes to use 1 CPU core and no GPU access, you would
-set:
+Customizing resources can be done in two ways: either by changing the default simulation
+configuration used by your local SuperLink; or by overriding the simulation
+configuration on a per-run basis. Let's see how to do both.
 
-.. code-block:: toml
+Permanently set Simulation Runtime configuration
+================================================
 
-    [superlink.local]
-    options.num-supernodes = 10
-    options.backend.client-resources.num-cpus = 1 # each ClientApp assumes to use 1 CPU (default is 2)
-    options.backend.client-resources.num-gpus = 0.0 # no GPU access to the ClientApp (default is 0.0)
+The |flwr_fed_sim_config_link|_ command allows you to permanently set the default
+simulation configuration for your local SuperLink. This is useful when you want to have
+a default configuration that is different from the one provided by Flower out of the
+box. For example, if you'd like to set the configuration to 100 ``SuperNodes``, where
+each ``ClientApp`` is assigned 4 CPUs and 25% of a GPU, you would run:
 
-With the above backend settings, your simulation will run as many ``ClientApps`` in
-parallel as CPUs you have in your system. GPU resources for your ``ClientApp`` can be
-assigned by specifying the **ratio** of VRAM each should make use of.
+.. code-block:: shell
 
-.. code-block:: toml
+    flwr federation simulation-config \
+            --num-supernodes 100 \
+            --client-resources-num-cpus 4 \
+            --client-resources-num-gpus 0.25
 
-    [superlink.local-gpu]
-    options.num-supernodes = 10
-    options.backend.client-resources.num-cpus = 1 # each ClientApp assumes to use 1 CPU (default is 2)
-    options.backend.client-resources.num-gpus = 0.25 # each ClientApp uses 25% of VRAM (default is 0.0)
+Then, for every subsequent runs, the SuperLink will use the above configuration by
+default. Use ``flwr federation simulation-config --help`` to see all the options you can
+set.
 
-.. note::
+Per-run override of Simulation Runtime configuration
+====================================================
 
-    If you are using TensorFlow, you need to `enable memory growth
-    <https://www.tensorflow.org/guide/gpu#limiting_gpu_memory_growth>`_ so multiple
-    ``ClientApp`` instances can share a GPU. This needs to be done before launching the
-    simulation. To do so, set the environment variable
-    ``TF_FORCE_GPU_ALLOW_GROWTH="1"``.
+Sometimes, you might want to override the default simulation configuration for a
+specific run. You can do so by passing the same options as above to |flwr_run_link|_ but
+using the `--federation-config` flag, and expressed as a single string. For example,
+let's say you want to run a single simulation with 256 ``SuperNodes`` instead of the now
+default 100, reduce the number of CPUs per ``ClientApp`` to 1 and leave the GPU
+allocation unchanged. You would run:
 
-Let's see how the above configuration results in a different number of ``ClientApps``
-running in parallel depending on the resources available in your system. If your system
-has:
+.. code-block:: shell
+
+    flwr run . --federation-config="num-supernodes=256 client-resources-num-cpus=1"
+
+.. tip::
+
+    The `--federation-config` flag accepts any of the options that can be set with
+    ``flwr federation simulation-config`` using the same syntax but expressed as a
+    single string and without the ``--`` prefix.
+
+Understanding Simulation Runtime resource assignment
+====================================================
+
+Let's see how the above configuration, i.e. 1x CPU and 25% of a GPU per ``ClientApp``,
+results in a different number of ``ClientApps`` running in parallel depending on the
+resources available in your system. If your system has:
 
 - 10x CPUs and 1x GPU: at most 4 ``ClientApps`` will run in parallel since each requires
   25% of the available VRAM.
@@ -216,34 +245,28 @@ number) should be set on a per ``ClientApp`` basis. If, for example, you want on
 single ``ClientApp`` to run on each GPU, then set ``num_gpus=1.0``. If, for example, a
 ``ClientApp`` requires access to two whole GPUs, you'd set ``num_gpus=2``.
 
-While the ``options.backend.client-resources`` can be used to control the degree of
+While the ``client-resources-{num-cpus,num-gpus}`` can be used to control the degree of
 concurrency in your simulations, this does not stop you from running hundreds or even
 thousands of clients in the same round and having orders of magnitude more *dormant*
 (i.e., not participating in a round) clients. Let's say you want to have 100 clients per
 round but your system can only accommodate 8 clients concurrently. The ``Simulation
-Engine`` will schedule 100 ``ClientApps`` to run and then will execute them in a
+Runtime`` will schedule 100 ``ClientApps`` to run and then will execute them in a
 resource-aware manner in batches of 8.
 
-*****************************
- Simulation Engine resources
-*****************************
+******************************
+ Simulation Runtime resources
+******************************
 
-By default, the ``Simulation Engine`` has **access to all system resources** (i.e., all
+By default, the ``Simulation Runtime`` has **access to all system resources** (i.e., all
 CPUs, all GPUs). However, in some settings, you might want to limit how many of your
 system resources are used for simulation. You can do this in the :doc:`Flower
-Configuration <ref-flower-configuration>` by setting the ``options.backend.init-args``
-variable.
+Configuration <ref-flower-configuration>` by passing a value to the ``init-args`` flags.
 
-.. code-block:: toml
+.. code-block:: shell
 
-    [superlink.local-gpu-limited]
-    options.num-supernodes = 10
-    options.backend.client-resources.num-cpus = 1 # Each ClientApp will get assigned 1 CPU core
-    options.backend.client-resources.num-gpus = 0.5 # Each ClientApp will get 50% of each available GPU
-    options.backend.init-args.num-cpus = 1 # Only expose 1 CPU to the simulation
-    options.backend.init-args.num-gpus = 1 # Expose a single GPU to the simulation
+    flwr federation simulation-config --init-args-num-cpus 1 --init-args-num-gpus 0
 
-With the above setup, the Backend will be initialized with a single CPU and GPU.
+With the above setup, the Backend will be initialized with a single CPU and no GPUs.
 Therefore, even if more CPUs and GPUs are available in your system, they will not be
 used for the simulation. The example above results in a single ``ClientApp`` running at
 any given point.
@@ -251,47 +274,7 @@ any given point.
 For a complete list of settings you can configure, check the `ray.init
 <https://docs.ray.io/en/latest/ray-core/api/doc/ray.init.html#ray-init>`_ documentation.
 
-For the highest performance, do not set ``options.backend.init-args``.
-
-*****************************
- Simulation in Colab/Jupyter
-*****************************
-
-The preferred way of running simulations should always be |flwr_run_link|_. However, the
-core functionality of the ``Simulation Engine`` can be used from within a Google Colab
-or Jupyter environment by means of `run_simulation
-<ref-api-flwr.html#flwr.simulation.run_simulation>`_.
-
-.. code-block:: python
-
-    from flwr.simulation import run_simulation
-
-    # Construct the ClientApp passing the client generation function
-    client_app = ClientApp(client_fn=client_fn)
-
-    # Create your ServerApp passing the server generation function
-    server_app = ServerApp(server_fn=server_fn)
-
-    run_simulation(
-        server_app=server_app,
-        client_app=client_app,
-        num_supernodes=10,  # equivalent to setting `num-supernodes` in the Flower Configuration
-    )
-
-With ``run_simulation``, you can also control the amount of resources for your
-``ClientApp`` instances. Do so by setting ``backend_config``. If unset, the default
-resources are assigned (i.e., 2xCPUs per ``ClientApp`` and no GPU).
-
-.. code-block:: python
-
-    run_simulation(
-        # ...
-        backend_config={"client_resources": {"num_cpus": 2, "num_gpus": 0.25}}
-    )
-
-Refer to the `30 minutes Federated AI Tutorial
-<https://colab.research.google.com/github/adap/flower/blob/main/examples/flower-in-30-minutes/tutorial.ipynb>`_
-for a complete example on how to run Flower Simulations in Colab.
+For the highest performance, do not set ``--init-args-{...}`` flags.
 
 .. _multinodesimulations:
 
@@ -299,7 +282,7 @@ for a complete example on how to run Flower Simulations in Colab.
  Multi-node Flower simulations
 *******************************
 
-Flower's ``Simulation Engine`` allows you to run FL simulations across multiple compute
+Flower's ``Simulation Runtime`` allows you to run FL simulations across multiple compute
 nodes so that you're not restricted to running simulations on a _single_ machine. Before
 starting your multi-node simulation, ensure that you:
 
@@ -331,7 +314,7 @@ need to run the command ``ray stop`` in each node's terminal (including the head
 .. note::
 
     When attaching a new node to the head, all its resources (i.e., all CPUs, all GPUs)
-    will be visible by the head node. This means that the ``Simulation Engine`` can
+    will be visible by the head node. This means that the ``Simulation Runtime`` can
     schedule as many ``ClientApp`` instances as that node can possibly run. In some
     settings, you might want to exclude certain resources from the simulation. You can
     do this by appending ``--num-cpus=<NUM_CPUS_FROM_NODE>`` and/or
@@ -380,9 +363,9 @@ need to run the command ``ray stop`` in each node's terminal (including the head
 
     Yes. If you are using the ``RayBackend`` (the *default* backend) you can first interconnect your nodes through Ray's cli and then launch the simulation. Refer to :ref:`multinodesimulations` for a step-by-step guide.
 
-.. dropdown:: My ``ServerApp`` also needs to make use of the GPU (e.g., to do evaluation of the *global model* after aggregation). Is this GPU usage taken into account by the ``Simulation Engine``?
+.. dropdown:: My ``ServerApp`` also needs to make use of the GPU (e.g., to do evaluation of the *global model* after aggregation). Is this GPU usage taken into account by the ``Simulation Runtime``?
 
-    No. The ``Simulation Engine`` only manages ``ClientApps`` and therefore is only aware of the system resources they require. If your ``ServerApp`` makes use of substantial compute or memory resources, factor that into account when setting ``num_cpus`` and ``num_gpus``.
+    No. The ``Simulation Runtime`` only manages ``ClientApps`` and therefore is only aware of the system resources they require. If your ``ServerApp`` makes use of substantial compute or memory resources, factor that into account when setting ``num_cpus`` and ``num_gpus``.
 
 .. dropdown:: Can I indicate on what resource a specific instance of a ``ClientApp`` should run? Can I do resource placement?
 

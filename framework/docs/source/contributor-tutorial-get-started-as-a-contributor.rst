@@ -49,11 +49,11 @@ Ensure you system (Ubuntu 22.04+) is up-to-date, and you have all necessary pack
 Create Flower Dev Environment
 =============================
 
-1. Clone the `Flower repository <https://github.com/adap/flower>`_ from GitHub:
+1. Clone the `Flower repository <https://github.com/flwrlabs/flower>`_ from GitHub:
 
        ::
 
-           $ git clone git@github.com:adap/flower.git
+           $ git clone git@github.com:flwrlabs/flower.git
            $ cd flower
 
 2. Create and activate a Python virtual environment for development. See `Set up a
@@ -98,7 +98,7 @@ Compile ProtoBuf Definitions
 
 ::
 
-    $ python -m flwr_tool.protoc
+    $ ./framework/dev/protoc.sh
 
 Auto-Format Code
 ================

@@ -4,6 +4,7 @@
 type = ["ci", "docs", "feat", "fix", "refactor", "break"]
 
 project = [
+    "devtool",
     "framework",
     "baselines",
     "datasets",

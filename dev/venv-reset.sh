@@ -1,14 +1,17 @@
 #!/bin/bash
 set -e
-cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/../
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -P)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." >/dev/null 2>&1 && pwd -P)"
+FRAMEWORK_ROOT="${REPO_ROOT}/framework"
 
 version=${1:-3.10.19}
 
 # Delete caches, venv, and lock file
-./dev/rm-caches.sh
-./devtool/venv-delete.sh $version
-[ ! -e poetry.lock ] || rm poetry.lock
+"${FRAMEWORK_ROOT}/dev/rm-caches.sh"
+"${SCRIPT_DIR}/venv-delete.sh" "$version"
+[ ! -e "${FRAMEWORK_ROOT}/poetry.lock" ] || rm "${FRAMEWORK_ROOT}/poetry.lock"
 
 # Recreate
-./devtool/venv-create.sh $version
-./devtool/bootstrap.sh
+"${SCRIPT_DIR}/venv-create.sh" "$version"
+"${SCRIPT_DIR}/bootstrap.sh"

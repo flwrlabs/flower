@@ -20,10 +20,12 @@ import shutil
 import subprocess
 from pathlib import Path
 
+CategoryContent = dict[str, str]
+
 ROOT = Path(__file__).resolve().parents[2]
 INDEX = ROOT / "examples" / "docs" / "source" / "index.rst"
 
-initial_text = """
+INITIAL_TEXT = """
 Flower Examples Documentation
 -----------------------------
 
@@ -50,18 +52,18 @@ can use Flower in combination with other existing frameworks or technologies.
 
 """
 
-table_headers = (
+TABLE_HEADERS = (
     "\n.. list-table::\n   :widths: 50 15 15 15\n   "
     ":header-rows: 1\n\n   * - Title\n     - Framework\n     - Dataset\n     - Tags\n\n"
 )
 
-categories = {
-    "quickstart": {"table": table_headers, "list": ""},
-    "advanced": {"table": table_headers, "list": ""},
-    "other": {"table": table_headers, "list": ""},
+CATEGORIES: dict[str, CategoryContent] = {
+    "quickstart": {"table": TABLE_HEADERS, "list": ""},
+    "advanced": {"table": TABLE_HEADERS, "list": ""},
+    "other": {"table": TABLE_HEADERS, "list": ""},
 }
 
-urls = {
+URLS: dict[str, str] = {
     # Frameworks
     "Android": "https://www.android.com/",
     "catboost": "https://catboost.ai/docs/en/",
@@ -103,27 +105,29 @@ urls = {
     "Oxford Flower-102": "https://www.robots.ox.ac.uk/~vgg/data/flowers/102/",
     "SpeechCommands": "https://huggingface.co/datasets/google/speech_commands",
     "Titanic": "https://www.kaggle.com/competitions/titanic",
-    "Waltons": "https://lifelines.readthedocs.io/en/latest/lifelines.datasets.html#lifelines.datasets.load_waltons",
+    "Waltons": (
+        "https://lifelines.readthedocs.io/en/latest/"
+        "lifelines.datasets.html#lifelines.datasets.load_waltons"
+    ),
 }
 
 
-def _convert_to_link(search_result):
+def _convert_to_link(search_result: str) -> str:
     if "," in search_result:
         result = ""
         for part in search_result.split(","):
             result += f"{_convert_to_link(part)}, "
         return result[:-2]
-    else:
-        search_result = search_result.strip()
-        name, url = search_result, urls.get(search_result, None)
-        if url:
-            return f"`{name.strip()} <{url.strip()}>`_"
-        else:
-            return search_result
+
+    search_result = search_result.strip()
+    name, url = search_result, URLS.get(search_result, None)
+    if url:
+        return f"`{name.strip()} <{url.strip()}>`_"
+    return search_result
 
 
-def _read_metadata(example):
-    with open(os.path.join(example, "README.md")) as f:
+def _read_metadata(example: str) -> tuple[str, str, str, str]:
+    with open(os.path.join(example, "README.md"), encoding="utf-8") as f:
         content = f.read()
 
     metadata_match = re.search(r"^---(.*?)^---", content, re.DOTALL | re.MULTILINE)
@@ -160,7 +164,7 @@ def _read_metadata(example):
     return title, tags, dataset, framework
 
 
-def _add_table_entry(example, tag, table_var):
+def _add_table_entry(example: str, tag: str, table_var: str) -> bool:
     title, tags, dataset, framework = _read_metadata(example)
     example_name = Path(example).stem
     table_entry = (
@@ -168,26 +172,33 @@ def _add_table_entry(example, tag, table_var):
         f"- {framework} \n     - {dataset} \n     - {tags}\n\n"
     )
     if tag in tags:
-        categories[table_var]["table"] += table_entry
-        categories[table_var]["list"] += f"  {example_name}\n"
+        CATEGORIES[table_var]["table"] += table_entry
+        CATEGORIES[table_var]["list"] += f"  {example_name}\n"
         return True
     return False
 
 
-def _copy_markdown_files(example):
+def _copy_markdown_files(example: str) -> None:
     for file in os.listdir(example):
         if file.endswith(".md"):
             src = os.path.join(example, file)
             dest = os.path.join(
-                str(ROOT), "examples", "docs", "source", os.path.basename(example) + ".md"
+                str(ROOT),
+                "examples",
+                "docs",
+                "source",
+                os.path.basename(example) + ".md",
             )
             shutil.copyfile(src, dest)
 
 
-def _add_gh_button(example):
-    gh_text = f'[<img src="_static/view-gh.png" alt="View on GitHub" width="200"/>](https://github.com/adap/flower/blob/main/examples/{example})'
+def _add_gh_button(example: str) -> None:
+    gh_text = (
+        '[<img src="_static/view-gh.png" alt="View on GitHub" width="200"/>]'
+        f"(https://github.com/flwrlabs/flower/blob/main/examples/{example})"
+    )
     readme_file = os.path.join(str(ROOT), "examples", "docs", "source", example + ".md")
-    with open(readme_file, "r+") as f:
+    with open(readme_file, "r+", encoding="utf-8") as f:
         content = f.read()
         if gh_text not in content:
             content = re.sub(
@@ -198,7 +209,7 @@ def _add_gh_button(example):
             f.truncate()
 
 
-def _copy_images(example):
+def _copy_images(example: str) -> None:
     static_dir = os.path.join(example, "_static")
     dest_dir = os.path.join(str(ROOT), "examples", "docs", "source", "_static")
     if os.path.isdir(static_dir):
@@ -209,7 +220,7 @@ def _copy_images(example):
                 )
 
 
-def _add_all_entries():
+def _add_all_entries() -> None:
     examples_dir = os.path.join(ROOT, "examples")
     for example in sorted(os.listdir(examples_dir)):
         example_path = os.path.join(examples_dir, example)
@@ -219,12 +230,12 @@ def _add_all_entries():
             _copy_images(example)
 
 
-def _main():
+def _main() -> None:
     if INDEX.exists():
         INDEX.unlink()
 
     with INDEX.open("w", encoding="utf-8") as index_file:
-        index_file.write(initial_text)
+        index_file.write(INITIAL_TEXT)
 
     examples_dir = os.path.join(ROOT, "examples")
     for example in sorted(os.listdir(examples_dir)):
@@ -239,7 +250,7 @@ def _main():
                         _add_table_entry(example_path, "", "other")
 
     with INDEX.open("a", encoding="utf-8") as index_file:
-        index_file.write(categories["quickstart"]["table"])
+        index_file.write(CATEGORIES["quickstart"]["table"])
 
         index_file.write("\nAdvanced Examples\n-----------------\n")
         index_file.write(
@@ -247,7 +258,7 @@ def _main():
             "Federated Learning but also somewhat familiar with Flower's main "
             "features.\n"
         )
-        index_file.write(categories["advanced"]["table"])
+        index_file.write(CATEGORIES["advanced"]["table"])
 
         index_file.write("\nOther Examples\n--------------\n")
         index_file.write(
@@ -255,24 +266,24 @@ def _main():
             "Flower that explore different domains and features. You can check "
             "which examples already exist and/or contribute your own example.\n"
         )
-        index_file.write(categories["other"]["table"])
+        index_file.write(CATEGORIES["other"]["table"])
 
         _add_all_entries()
 
         index_file.write(
             "\n.. toctree::\n  :maxdepth: 1\n  :caption: Quickstart\n  :hidden:\n\n"
         )
-        index_file.write(categories["quickstart"]["list"])
+        index_file.write(CATEGORIES["quickstart"]["list"])
 
         index_file.write(
             "\n.. toctree::\n  :maxdepth: 1\n  :caption: Advanced\n  :hidden:\n\n"
         )
-        index_file.write(categories["advanced"]["list"])
+        index_file.write(CATEGORIES["advanced"]["list"])
 
         index_file.write(
             "\n.. toctree::\n  :maxdepth: 1\n  :caption: Others\n  :hidden:\n\n"
         )
-        index_file.write(categories["other"]["list"])
+        index_file.write(CATEGORIES["other"]["list"])
 
         index_file.write("\n")
 

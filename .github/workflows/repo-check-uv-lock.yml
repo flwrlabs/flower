@@ -1,0 +1,75 @@
+name: Check UV Lockfiles
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "**/uv.lock"
+      - "**/pyproject.toml"
+      - ".github/actions/bootstrap/**"
+      - ".github/workflows/repo-check-uv-lock.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "**/uv.lock"
+      - "**/pyproject.toml"
+      - ".github/actions/bootstrap/**"
+      - ".github/workflows/repo-check-uv-lock.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_NO_MANAGED_PYTHON: 1
+  UV_PYTHON_DOWNLOADS: never
+
+jobs:
+  check-uv-lock:
+    runs-on: ubuntu-22.04
+    name: Check uv.lock files
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - name: Bootstrap
+        uses: ./.github/actions/bootstrap
+        with:
+          uv-skip: "false"
+          poetry-skip: "true"
+      - name: Verify lockfiles are up-to-date
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Look for all uv.lock files in the repository
+          lockfiles="$(find . -type f -name "uv.lock" -print | sed 's|^\./||' | sort)"
+
+          if [[ -z "$lockfiles" ]]; then
+            echo "::error::No uv.lock files found."
+            exit 1
+          fi
+
+          echo "Discovered uv.lock files:"
+          while IFS= read -r lockfile; do
+            printf ' - %s\n' "$lockfile"
+          done <<< "$lockfiles"
+
+          while IFS= read -r lockfile; do
+            project_dir="$(dirname "$lockfile")"
+            pyproject_path="$project_dir/pyproject.toml"
+
+            if [[ ! -f "$pyproject_path" ]]; then
+              echo "::error file=$lockfile::Missing $pyproject_path for discovered lockfile."
+              exit 1
+            fi
+
+            echo "::group::uv lock --check ($project_dir)"
+            uv lock --check --project "$project_dir"
+            echo "::endgroup::"
+          done <<< "$lockfiles"

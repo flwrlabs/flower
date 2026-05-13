@@ -139,7 +139,7 @@ that just became possible:
 **************
 
 Most official `Flower code examples
-<https://github.com/adap/flower/tree/main/examples>`_ are already updated to Flower 1.0,
-they can serve as a reference for using the Flower 1.0 API. If there are further
+<https://github.com/flwrlabs/flower/tree/main/examples>`_ are already updated to Flower
+1.0, they can serve as a reference for using the Flower 1.0 API. If there are further
 questions, `join the Flower Slack <https://flower.ai/join-slack/>`_ and use the channel
 ``#questions``.

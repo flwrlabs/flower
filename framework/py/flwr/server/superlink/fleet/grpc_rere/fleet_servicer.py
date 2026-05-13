@@ -56,7 +56,6 @@ from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=
 from flwr.server.superlink.fleet.message_handler import message_handler
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.server.superlink.utils import abort_grpc_context
-from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
 from flwr.supercore.object_store import ObjectStoreFactory
 
@@ -67,12 +66,10 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
     def __init__(
         self,
         state_factory: LinkStateFactory,
-        ffs_factory: FfsFactory,
         objectstore_factory: ObjectStoreFactory,
         enable_supernode_auth: bool,
     ) -> None:
         self.state_factory = state_factory
-        self.ffs_factory = ffs_factory
         self.objectstore_factory = objectstore_factory
         self.enable_supernode_auth = enable_supernode_auth
         self.lock = threading.Lock()
@@ -262,7 +259,6 @@ class FleetServicer(fleet_pb2_grpc.FleetServicer):
         try:
             res = message_handler.get_fab(
                 request=request,
-                ffs=self.ffs_factory.ffs(),
                 state=self.state_factory.state(),
                 store=self.objectstore_factory.store(),
             )

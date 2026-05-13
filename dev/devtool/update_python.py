@@ -3,9 +3,13 @@
 import argparse
 import re
 from pathlib import Path
+from typing import Callable
+
+Replacement = str | Callable[[re.Match[str]], str]
+ReplacementsByPattern = dict[str, list[tuple[str, Replacement]]]
 
 
-def _compute_old_version(new_version):
+def _compute_old_version(new_version: str) -> str:
     """Compute the old version as the immediate previous minor version."""
     major_str, minor_str = new_version.split(".")
     major = int(major_str)
@@ -20,12 +24,13 @@ def _compute_old_version(new_version):
 
 
 def _update_python_versions(
-    new_full_version,
-    patch_only=False,
-    dry_run=False,
-):
+    new_full_version: str,
+    patch_only: bool = False,
+    dry_run: bool = False,
+) -> None:
     """Update Python version strings in the specified files."""
     new_major_minor = ".".join(new_full_version.split(".")[:2])
+    replacements: ReplacementsByPattern
 
     if patch_only:
         print(f"Updating patch version for {new_major_minor} to {new_full_version}")

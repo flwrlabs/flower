@@ -35,6 +35,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.supercore.credential_store import get_credential_store
+from flwr.supercore.utils import get_metadata_str
 
 from .auth_plugin import CliAuthPlugin, LoginError
 
@@ -151,11 +152,10 @@ class OidcCliPlugin(CliAuthPlugin):
         self, metadata: Sequence[tuple[str, str | bytes]]
     ) -> AccountAuthCredentials | None:
         """Read authentication tokens from the provided metadata."""
-        metadata_dict = dict(metadata)
-        access_token = metadata_dict.get(ACCESS_TOKEN_KEY)
-        refresh_token = metadata_dict.get(REFRESH_TOKEN_KEY)
+        access_token = get_metadata_str(metadata, ACCESS_TOKEN_KEY)
+        refresh_token = get_metadata_str(metadata, REFRESH_TOKEN_KEY)
 
-        if isinstance(access_token, str) and isinstance(refresh_token, str):
+        if access_token is not None and refresh_token is not None:
             return AccountAuthCredentials(
                 access_token=access_token,
                 refresh_token=refresh_token,

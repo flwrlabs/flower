@@ -5,15 +5,9 @@
 This page collects answers to commonly asked questions about Federated Learning with
 Flower.
 
-.. dropdown:: :fa:`eye,mr-1` Can Flower run on Jupyter Notebooks / Google Colab?
-
-    Yes, it can! Flower even comes with a few under-the-hood optimizations to make it work even better on Colab. Here's a quickstart example:
-
-    * `Flower 30-minute tutorial <https://colab.research.google.com/github/adap/flower/blob/main/examples/flower-in-30-minutes/tutorial.ipynb>`_
-
 .. dropdown:: :fa:`eye,mr-1` How can I run Federated Learning on a Raspberry Pi?
 
-    Find the `blog post about federated learning on embedded device here <https://flower.ai/blog/2020-12-16-running_federated_learning_applications_on_embedded_devices_with_flower>`_ and the corresponding `GitHub code example <https://github.com/adap/flower/tree/main/examples/embedded-devices>`_.
+    Find the `blog post about federated learning on embedded device here <https://flower.ai/blog/2020-12-16-running_federated_learning_applications_on_embedded_devices_with_flower>`_ and the corresponding `GitHub code example <https://github.com/flwrlabs/flower/tree/main/examples/embedded-devices>`_.
 
 .. dropdown:: :fa:`eye,mr-1` Does Flower support federated learning on Android devices?
 
@@ -55,3 +49,31 @@ Flower.
 
     If this prints a value (for example, ``b4c5f2c8-...``), you are in Windows Terminal.
     If it prints nothing, you are likely running in a non-Windows-Terminal host (for example, conhost), which can show raw ANSI escape codes or incorrect emoji rendering.
+
+.. dropdown:: :fa:`eye,mr-1` I got SQL database errors (like ``Exception calling application: database is locked``) when running local simulations. What should I do?
+
+    .. _faq-local-superlink-db-error:
+
+    Local simulations run through a managed local SuperLink. By default, that local
+    SuperLink stores its state in a SQLite database under ``$FLWR_HOME``. SQLite is reliable
+    on a local file system, but it can perform poorly on networked filesystems such
+    as NFS-mounted home directories or HPC cluster storage. In those environments, you
+    might see errors such as ``database is locked`` or other SQLite-related failures.
+
+    To avoid these issues, stop the background local SuperLink and switch the local
+    connection to the in-memory mode in your Flower configuration:
+
+    .. code-block:: toml
+
+        [superlink.local]
+        address = ":local-in-memory:"
+
+    After that, start your local simulation again with ``flwr run``. Flower will launch
+    the managed local SuperLink with an in-memory database instead of an on-disk SQLite
+    database, which avoids filesystem locking issues. See
+    :ref:`Flower Configuration <flower-config-local-in-memory>` for details.
+
+    The tradeoff is that this mode is not persistent. When the managed local SuperLink
+    stops, it loses its state, including run history and stored logs for previous runs.
+    If you need persistence, prefer keeping ``$FLWR_HOME`` on a local disk instead of a
+    network drive.

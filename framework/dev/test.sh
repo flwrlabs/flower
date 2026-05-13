@@ -32,7 +32,7 @@ fi
 echo "- black: done"
 
 echo "- init_py_check: start"
-python -m devtool.init_py_check py/flwr py/flwr_tool
+python -m devtool.init_py_check py/flwr
 echo "- init_py_check: done"
 
 echo "- docformatter: start"
@@ -60,7 +60,8 @@ python -m pylint --ignore=py/flwr/proto py/flwr
 echo "- pylint: done"
 
 echo "- pytest: start"
-python -m pytest --cov=py/flwr
+# Ray's uv runtime-env hook can stall under `uv run` during pytest.
+RAY_ENABLE_UV_RUN_RUNTIME_ENV=0 python -m pytest --cov=py/flwr
 echo "- pytest: done"
 
 echo "- All Python checks passed"

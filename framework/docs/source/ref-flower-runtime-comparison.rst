@@ -49,9 +49,10 @@ deployment runtime.
       - In-memory communication.
       - TLS-enabled gRPC.
     - - **Server-side Infrastructure**
-      - Simulation runtime coordinates the spawning of multiple workers (Python process)
-        which act as `simulated` SuperNodes. The simulation runtime can be started with
-        or without the `SuperLink <ref-api-cli.html#flower-superlink>`_.
+      - In the standard local CLI workflow, ``flwr run`` submits the run to a managed
+        local SuperLink, which then coordinates the simulation runtime and the workers
+        acting as `simulated` SuperNodes. The simulation runtime itself can still be
+        started with or without the `SuperLink <ref-api-cli.html#flower-superlink>`_.
       - The SuperLink awaits for SuperNodes to connect. User interface with the
         SuperLink using the `Flower CLI <ref-api-cli.html>`_.
     - - **Server-side App execution**
@@ -61,7 +62,8 @@ deployment runtime.
         runs independently from the SuperLink and communicates with it over gRPC via the
         ServerAppIO API.
     - - **Client-side Infrastructure**
-      - None. The simulation runtime is self-contained.
+      - No user-managed client-side infrastructure is required. For local CLI workflows,
+        the managed local SuperLink and simulation runtime remain self-contained.
       - SuperNodes connect to the SuperLink via TLS-enabled gRPC using the Fleet API.
         Node authentication can be enabled.
     - - **Client-side App execution**

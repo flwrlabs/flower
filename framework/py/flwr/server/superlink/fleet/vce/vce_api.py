@@ -274,7 +274,6 @@ def start_vce(
     is_app: bool,
     f_stop: threading.Event,
     run: Run,
-    flwr_dir: str | None = None,
     client_app: ClientApp | None = None,
     client_app_attr: str | None = None,
     num_supernodes: int | None = None,
@@ -365,7 +364,6 @@ def start_vce(
             return get_load_client_app_fn(
                 default_app_ref=client_app_attr,
                 app_path=app_dir,
-                flwr_dir=flwr_dir,
                 multi_app=False,
             )(run.fab_id, run.fab_version, run.fab_hash)
 

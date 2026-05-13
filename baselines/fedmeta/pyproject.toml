@@ -10,7 +10,7 @@ license = "Apache-2.0"
 authors = ["Jinsoo Kim <wlstn25092303@gmail.com>", "Kangyoon Lee <keylee@gachon.ac.kr>"]
 readme = "README.md"
 homepage = "https://flower.ai"
-repository = "https://github.com/adap/flower"
+repository = "https://github.com/flwrlabs/flower"
 documentation = "https://flower.ai"
 classifiers = [
     "Development Status :: 3 - Alpha",

@@ -637,7 +637,10 @@ def run_to_proto(run: typing.Run) -> ProtoRun:
         bytes_sent=run.bytes_sent,
         bytes_recv=run.bytes_recv,
         clientapp_runtime=run.clientapp_runtime,
+        run_type=run.run_type,
     )
+    if run.primary_task_id is not None:
+        proto.primary_task_id = run.primary_task_id
     return proto
 
 
@@ -656,9 +659,13 @@ def run_from_proto(run_proto: ProtoRun) -> typing.Run:
         status=run_status_from_proto(run_proto.status),
         flwr_aid=run_proto.flwr_aid,
         federation=run_proto.federation,
+        primary_task_id=(
+            run_proto.primary_task_id if run_proto.HasField("primary_task_id") else None
+        ),
         bytes_sent=run_proto.bytes_sent,
         bytes_recv=run_proto.bytes_recv,
         clientapp_runtime=run_proto.clientapp_runtime,
+        run_type=run_proto.run_type,
     )
     return run
 

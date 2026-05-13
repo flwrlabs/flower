@@ -101,7 +101,7 @@ def format_runs(runs: list[Run], now_isoformat: str) -> list[RunRow]:
     run_list: list[RunRow] = []
 
     # Add rows
-    for run in sorted(runs, key=lambda x: datetime.fromisoformat(x.pending_at)):
+    for run in sorted(runs, key=lambda r: r.pending_at, reverse=True):
         # Combine status and sub-status into a single string
         if run.status.sub_status == "":
             status_text = run.status.status
