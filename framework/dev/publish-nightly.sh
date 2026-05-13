@@ -15,7 +15,19 @@
 # limitations under the License.
 # ==============================================================================
 
-set -e
+set -euo pipefail
+
+missing=0
+for var in PYPI_REPOSITORY_PASSWORD; do
+    if [[ -z "${!var:-}" ]]; then
+        echo "Missing required configuration: ${var}" >&2
+        missing=1
+    fi
+done
+if [[ "${missing}" -ne 0 ]]; then
+    exit 1
+fi
+
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../
 
 # This script will build and publish a nightly release of Flower under the condition
