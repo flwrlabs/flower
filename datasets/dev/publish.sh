@@ -17,14 +17,8 @@
 
 set -euo pipefail
 
-missing=0
-for var in PYPI_REPOSITORY_PASSWORD; do
-  if [[ -z "${!var:-}" ]]; then
-    echo "Missing required configuration: ${var}" >&2
-    missing=1
-  fi
-done
-if [[ "${missing}" -ne 0 ]]; then
+if [[ -z "${PYPI_REPOSITORY_PASSWORD:-}" ]]; then
+  echo "Missing required configuration: PYPI_REPOSITORY_PASSWORD" >&2
   exit 1
 fi
 
