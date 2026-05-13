@@ -328,10 +328,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """
         condition = common_condition
         if limit is not None:
-            select_lock_clause = self._claim_message_ins_select_lock_clause
+            # Optional clause appended to the limited candidate SELECT.
             select_lock_sql = (
-                f"\n                    {select_lock_clause}"
-                if select_lock_clause
+                f" {self._claim_message_ins_select_lock_clause}"
+                if self._claim_message_ins_select_lock_clause
                 else ""
             )
             condition = f"""

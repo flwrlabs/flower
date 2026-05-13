@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """Tests all LinkState implemenations have to conform to."""
+
 # pylint: disable=invalid-name, too-many-lines, R0904, R0913
 
 
@@ -1974,23 +1975,28 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
 
     def test_message_ins_claim_can_append_select_lock_clause(self) -> None:
         """Message claiming can append a subclass-provided row-locking clause."""
+        # Prepare
         state = self.state_factory()
-        captured: list[str] = []
+        last_query = ""
 
         # pylint: disable-next=unused-argument
         def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
-            captured.append(query)
+            nonlocal last_query
+            last_query = query
             return []
 
         state.query = fake_query  # type: ignore[method-assign]
-        state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
-        self.assertNotIn("FOR TEST LOCK", captured[0])
 
+        # Execute & assert - without lock clause
+        state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
+        self.assertNotIn("FOR TEST LOCK", last_query)
+
+        # Execute & assert - with lock clause
         state._claim_message_ins_select_lock_clause = (  # pylint: disable=protected-access
             "FOR TEST LOCK"
         )
         state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
-        self.assertIn("FOR TEST LOCK", captured[1])
+        self.assertIn("FOR TEST LOCK", last_query)
 
     def test_token_expiry_does_not_overwrite_finished_completed_run(self) -> None:
         """Ensure token cleanup doesn't mutate terminal COMPLETED status."""
