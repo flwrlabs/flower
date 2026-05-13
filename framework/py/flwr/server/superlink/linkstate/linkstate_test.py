@@ -2127,6 +2127,35 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             # Assert
             assert sum(len(res) for res in results if res is not None) == 1
 
+    def test_pull_task_messages_claim_is_unique_across_replicas(self) -> None:
+        """Ensure concurrent replicas cannot both claim the same task Message."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Prepare
+            db_path = os.path.join(tmpdir, "shared.db")
+            state = self._create_shared_sql_states(db_path)[0]
+            run_id = create_dummy_run(state)
+            src_task_id = get_primary_task_id(state, run_id)
+            dst_task_id = state.create_task(
+                task_type=TaskType.CLIENT_APP, run_id=run_id
+            )
+            assert dst_task_id is not None
+            msg = create_ins_message_obj(
+                src_node_id=src_task_id, dst_node_id=dst_task_id, run_id=run_id
+            )
+            assert state.push_task_message(msg)
+
+            # Execute
+            results = self._query_states_in_parallel(
+                lambda state: state.pull_task_messages(
+                    dst_task_ids=[dst_task_id], limit=1
+                )
+            )
+            claimed = [msgs for msgs in results if msgs]
+
+            # Assert
+            assert len(claimed) == 1
+            assert len(claimed[0]) == 1
+
     # pylint: disable-next=too-many-locals
     def test_get_message_ins_distributes_available_work_under_contention(self) -> None:
         """Ensure two replicas can each claim work when two Messages are available."""

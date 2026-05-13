@@ -32,12 +32,18 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.common.message import Message
 from flwr.common.typing import Fab
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import generate_rand_int_from_bytes
+from .utils import (
+    generate_rand_int_from_bytes,
+    has_valid_task_message_payload,
+    task_message_from_dict,
+    task_message_to_dict,
+)
 
 
 @dataclass
@@ -65,6 +71,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.task_logs: dict[int, list[tuple[float, str]]] = {}
         self.log_lock = Lock()
         self.lock_task_store = Lock()
+        self.task_message_store: dict[str, Message] = {}
+        self.lock_task_message_store = Lock()
 
     @property
     def object_store(self) -> ObjectStore:
@@ -317,6 +325,82 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             task = Task()
             task.CopyFrom(self.task_store[task_id])
             return task
+
+    def push_task_message(self, message: Message) -> str | None:
+        """Store one task-addressed Message."""
+        message_id = message.metadata.message_id
+        if not has_valid_task_message_payload(message):
+            return None
+
+        src_task_id = message.metadata.src_node_id
+        dst_task_id = message.metadata.dst_node_id
+        with self.lock_task_store:
+            self._cleanup_expired_task_tokens_locked()
+            src_task = self.task_store.get(src_task_id)
+            dst_task = self.task_store.get(dst_task_id)
+            if src_task is None or dst_task is None:
+                return None
+            if src_task.run_id != dst_task.run_id:
+                return None
+            if dst_task.status.status == Status.FINISHED:
+                return None
+            run_id = src_task.run_id
+
+        message_dict = task_message_to_dict(message, run_id)
+        message_copy = task_message_from_dict(dict(message_dict))
+
+        with self.lock_task_message_store:
+            if message_id in self.task_message_store:
+                return None
+            self.task_message_store[message_id] = message_copy
+            return message_id
+
+    def pull_task_messages(
+        self,
+        *,
+        dst_task_ids: Sequence[int] | None = None,
+        limit: int | None = None,
+    ) -> Sequence[Message]:
+        """Retrieve undelivered task-addressed Messages."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if limit == 0:
+            return []
+        if dst_task_ids is not None and not dst_task_ids:
+            return []
+
+        with self.lock_task_store:
+            self._cleanup_expired_task_tokens_locked()
+
+        dst_task_id_set = set(dst_task_ids) if dst_task_ids is not None else None
+        selected_messages: list[Message] = []
+        current = now().timestamp()
+        with self.lock_task_message_store:
+            message_ids = sorted(
+                self.task_message_store.keys(),
+                key=lambda msg_id: (
+                    self.task_message_store[msg_id].metadata.created_at,
+                    msg_id,
+                ),
+            )
+            for message_id in message_ids:
+                message = self.task_message_store[message_id]
+                if dst_task_id_set is not None:
+                    if message.metadata.dst_node_id not in dst_task_id_set:
+                        continue
+                if message.metadata.created_at + message.metadata.ttl <= current:
+                    continue
+
+                del self.task_message_store[message_id]
+                selected_messages.append(
+                    task_message_from_dict(
+                        task_message_to_dict(message, message.metadata.run_id)
+                    )
+                )
+                if limit is not None and len(selected_messages) >= limit:
+                    break
+
+        return selected_messages
 
     def _cleanup_expired_task_tokens_locked(self) -> None:
         """Remove expired task tokens.

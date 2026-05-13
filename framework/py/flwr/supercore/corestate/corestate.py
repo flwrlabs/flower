@@ -19,6 +19,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Literal
 
+from flwr.common import Message
 from flwr.common.typing import Fab
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 
@@ -237,6 +238,49 @@ class CoreState(ABC):
         -------
         Task | None
             The task if the token is valid, otherwise None.
+        """
+
+    @abstractmethod
+    def push_task_message(self, message: Message) -> str | None:
+        """Store one task-addressed Message.
+
+        The source and destination task IDs are read from
+        `message.metadata.src_node_id` and `message.metadata.dst_node_id`.
+
+        Parameters
+        ----------
+        message : Message
+            The task-addressed message to store.
+
+        Returns
+        -------
+        str | None
+            The message ID if the message was stored, otherwise None.
+        """
+
+    @abstractmethod
+    def pull_task_messages(
+        self,
+        *,
+        dst_task_ids: Sequence[int] | None = None,
+        limit: int | None = None,
+    ) -> Sequence[Message]:
+        """Retrieve undelivered task-addressed Messages.
+
+        Returned messages are atomically consumed so later calls will not return
+        them again.
+
+        Parameters
+        ----------
+        dst_task_ids : Optional[Sequence[int]] (default: None)
+            Sequence of destination task IDs to filter by.
+        limit : Optional[int] (default: None)
+            Maximum number of messages to return. If `None`, no limit is applied.
+
+        Returns
+        -------
+        Sequence[Message]
+            A sequence of matching messages.
         """
 
     @abstractmethod

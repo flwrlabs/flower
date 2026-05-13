@@ -24,7 +24,7 @@ from typing import Any, Literal
 from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
 
-from flwr.common import now
+from flwr.common import Message, now
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -41,7 +41,12 @@ from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import generate_rand_int_from_bytes
+from .utils import (
+    generate_rand_int_from_bytes,
+    has_valid_task_message_payload,
+    task_message_from_dict,
+    task_message_to_dict,
+)
 
 # Define SQL conditions for task statuses to ensure consistency across queries
 STATUS_CONDITIONS = {
@@ -402,6 +407,130 @@ class SqlCoreState(CoreState, SqlMixin):
         if not rows:
             return None
         return task_from_row(rows[0])
+
+    def push_task_message(self, message: Message) -> str | None:
+        """Store one task-addressed Message."""
+        if not has_valid_task_message_payload(message):
+            return None
+
+        message_id = message.metadata.message_id
+        src_task_id = uint64_to_int64(message.metadata.src_node_id)
+        dst_task_id = uint64_to_int64(message.metadata.dst_node_id)
+
+        with self.session():
+            self._cleanup_expired_task_tokens()
+            rows = self.query(
+                """
+                SELECT task_id, run_id, finished_at
+                FROM task
+                WHERE task_id IN (:src_task_id, :dst_task_id)
+                """,
+                {"src_task_id": src_task_id, "dst_task_id": dst_task_id},
+            )
+            tasks = {row["task_id"]: row for row in rows}
+            src_task = tasks.get(src_task_id)
+            dst_task = tasks.get(dst_task_id)
+            if src_task is None or dst_task is None:
+                return None
+            if src_task["run_id"] != dst_task["run_id"]:
+                return None
+            if dst_task["finished_at"] is not None:
+                return None
+
+            message_dict = task_message_to_dict(
+                message, int64_to_uint64(src_task["run_id"])
+            )
+            message_dict.update(
+                {
+                    "run_id": src_task["run_id"],
+                    "src_task_id": src_task_id,
+                    "dst_task_id": dst_task_id,
+                }
+            )
+            columns = ", ".join(message_dict.keys())
+            values = ", ".join(f":{key}" for key in message_dict)
+            try:
+                self.query(
+                    f"""
+                    INSERT INTO task_message ({columns})
+                    VALUES ({values})
+                    """,
+                    message_dict,
+                )
+            except IntegrityError:
+                return None
+
+        return message_id
+
+    def pull_task_messages(
+        self,
+        *,
+        dst_task_ids: Sequence[int] | None = None,
+        limit: int | None = None,
+    ) -> Sequence[Message]:
+        """Retrieve undelivered task-addressed Messages."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if limit == 0:
+            return []
+        if dst_task_ids is not None and not dst_task_ids:
+            return []
+
+        with self.session():
+            self._cleanup_expired_task_tokens()
+            rows = self._claim_task_message_rows(dst_task_ids, limit)
+            for row in rows:
+                row["run_id"] = int64_to_uint64(row["run_id"])
+                row["src_task_id"] = int64_to_uint64(row["src_task_id"])
+                row["dst_task_id"] = int64_to_uint64(row["dst_task_id"])
+
+        rows.sort(key=lambda row: (row["created_at"], row["message_id"]))
+        return [task_message_from_dict(row) for row in rows]
+
+    def _claim_task_message_rows(
+        self, dst_task_ids: Sequence[int] | None, limit: int | None
+    ) -> list[dict[str, Any]]:
+        """Atomically claim eligible task Messages."""
+        current = now()
+        params: dict[str, str | int | float] = {
+            "current": current.timestamp(),
+        }
+        conditions = [
+            "(created_at + ttl) > :current",
+        ]
+        if dst_task_ids is not None:
+            sint64_dst_task_ids = [uint64_to_int64(task_id) for task_id in dst_task_ids]
+            placeholders = ",".join(
+                [f":dst_tid_{i}" for i in range(len(sint64_dst_task_ids))]
+            )
+            conditions.append(f"dst_task_id IN ({placeholders})")
+            params.update(
+                {
+                    f"dst_tid_{i}": task_id
+                    for i, task_id in enumerate(sint64_dst_task_ids)
+                }
+            )
+
+        common_condition = " AND ".join(conditions)
+        condition = common_condition
+        if limit is not None:
+            condition = f"""
+                message_id IN (
+                SELECT message_id
+                FROM task_message
+                WHERE {common_condition}
+                ORDER BY created_at, message_id
+                LIMIT :limit
+            )
+            """
+            params["limit"] = limit
+
+        query = f"""
+            DELETE FROM task_message
+            WHERE {condition}
+            RETURNING *
+        """
+        return self.query(query, params)
 
     def _cleanup_expired_task_tokens(self) -> None:
         """Remove expired task heartbeat records.
