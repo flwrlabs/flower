@@ -20,7 +20,7 @@ from logging import DEBUG, ERROR, INFO
 import grpc
 
 from flwr.common import Message
-from flwr.common.constant import SUPERLINK_NODE_ID, Status
+from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -61,7 +61,6 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
 )
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
-from flwr.server.superlink.utils import abort_if
 from flwr.server.utils.validator import validate_message
 from flwr.supercore.inflatable.inflatable_object import (
     UnexpectedObjectContentError,
@@ -95,20 +94,14 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         """Get available nodes."""
         log(DEBUG, "ServerAppIoServicer.GetNodes")
 
-        # Init state and store
+        # Init state
         state = self.state_factory.state()
-        store = self.objectstore_factory.store()
 
-        # Abort if the run is not running
-        abort_if(
-            request.run_id,
-            [Status.PENDING, Status.STARTING, Status.FINISHED],
-            state,
-            store,
-            context,
-        )
+        # Get authenticated task and associated run ID
+        task = get_authenticated_task()
+        run_id = task.run_id
 
-        all_ids: set[int] = state.get_nodes(request.run_id)
+        all_ids: set[int] = state.get_nodes(run_id)
         nodes: list[Node] = [Node(node_id=node_id) for node_id in all_ids]
         return GetNodesResponse(nodes=nodes)
 
@@ -122,14 +115,9 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
-        # Abort if the run is not running
-        abort_if(
-            request.run_id,
-            [Status.PENDING, Status.STARTING, Status.FINISHED],
-            state,
-            store,
-            context,
-        )
+        # Get authenticated task and associated run ID
+        task = get_authenticated_task()
+        run_id = task.run_id
 
         # Validate request and insert in State
         _raise_if(
@@ -150,12 +138,12 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 detail=", ".join(validation_errors),
             )
             _raise_if(
-                validation_error=request.run_id != message.metadata.run_id,
+                validation_error=run_id != message.metadata.run_id,
                 request_name="PushMessages",
                 detail="`Message.metadata` has mismatched `run_id`",
             )
             # Store objects
-            objects_to_push |= set(store.preregister(request.run_id, object_tree))
+            objects_to_push |= set(store.preregister(run_id, object_tree))
             # Store message
             message_id: str | None = state.store_message_ins(message=message)
             message_ids.append(message_id)
@@ -177,14 +165,9 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
-        # Abort if the run is not running
-        abort_if(
-            request.run_id,
-            [Status.PENDING, Status.STARTING, Status.FINISHED],
-            state,
-            store,
-            context,
-        )
+        # Get authenticated task and associated run ID
+        task = get_authenticated_task()
+        run_id = task.run_id
 
         # Read from state
         messages_res: list[Message] = state.get_message_res(
@@ -197,7 +180,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 with no_object_id_recompute():
                     all_objects = get_all_nested_objects(msg_res)
                     # Preregister
-                    store.preregister(request.run_id, get_object_tree(msg_res))
+                    store.preregister(run_id, get_object_tree(msg_res))
                     # Store objects
                     for obj_id, obj in all_objects.items():
                         store.put(obj_id, obj.deflate())
@@ -218,7 +201,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             # Skip `run_id` check for SuperLink generated replies
             if msg.metadata.src_node_id != SUPERLINK_NODE_ID:
                 _raise_if(
-                    validation_error=request.run_id != msg.metadata.run_id,
+                    validation_error=run_id != msg.metadata.run_id,
                     request_name="PullMessages",
                     detail="`message.metadata` has mismatched `run_id`",
                 )
@@ -329,17 +312,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         log(DEBUG, "ServerAppIoServicer.PushObject")
 
         # Init state and store
-        state = self.state_factory.state()
         store = self.objectstore_factory.store()
-
-        # Abort if the run is not running
-        abort_if(
-            request.run_id,
-            [Status.PENDING, Status.STARTING, Status.FINISHED],
-            state,
-            store,
-            context,
-        )
 
         if request.node.node_id != SUPERLINK_NODE_ID:
             # Cancel insertion in ObjectStore
@@ -365,17 +338,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         log(DEBUG, "ServerAppIoServicer.PullObject")
 
         # Init state and store
-        state = self.state_factory.state()
         store = self.objectstore_factory.store()
-
-        # Abort if the run is not running
-        abort_if(
-            request.run_id,
-            [Status.PENDING, Status.STARTING, Status.FINISHED],
-            state,
-            store,
-            context,
-        )
 
         if request.node.node_id != SUPERLINK_NODE_ID:
             # Cancel insertion in ObjectStore
@@ -399,17 +362,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         log(DEBUG, "ServerAppIoServicer.ConfirmMessageReceived")
 
         # Init state and store
-        state = self.state_factory.state()
         store = self.objectstore_factory.store()
-
-        # Abort if the run is not running
-        abort_if(
-            request.run_id,
-            [Status.PENDING, Status.STARTING, Status.FINISHED],
-            state,
-            store,
-            context,
-        )
 
         # Delete the message object
         store.delete(request.message_object_id)

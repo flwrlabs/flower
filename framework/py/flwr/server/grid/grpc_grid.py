@@ -235,9 +235,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
     def get_node_ids(self) -> Iterable[int]:
         """Get node IDs."""
         # Call GrpcServerAppIoStub method
-        res: GetNodesResponse = self._stub.GetNodes(
-            GetNodesRequest(run_id=cast(Run, self._run).run_id)
-        )
+        res: GetNodesResponse = self._stub.GetNodes(GetNodesRequest())
         return [node.node_id for node in res.nodes]
 
     def _try_push_messages(self, run_id: int, messages: Iterable[Message]) -> list[str]:
@@ -256,7 +254,6 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
         res: PushAppMessagesResponse = self._stub.PushMessages(
             PushAppMessagesRequest(
                 messages_list=proto_messages,
-                run_id=run_id,
                 message_object_trees=object_trees,
             )
         )
@@ -325,7 +322,6 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
             res: PullAppMessagesResponse = self._stub.PullMessages(
                 PullAppMessagesRequest(
                     message_ids=message_ids,
-                    run_id=run_id,
                 )
             )
             # Pull Messages from store

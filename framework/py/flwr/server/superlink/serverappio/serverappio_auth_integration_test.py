@@ -111,9 +111,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
     def test_get_nodes_denied_without_metadata_token(self) -> None:
         """Protected RPC should deny requests missing metadata token."""
         with self.assertRaises(grpc.RpcError) as err:
-            self._get_nodes_no_auth.with_call(
-                request=GetNodesRequest(run_id=self._auth_run_id)
-            )
+            self._get_nodes_no_auth.with_call(request=GetNodesRequest())
         assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
         assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE
 
@@ -121,7 +119,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         """Protected RPC should deny requests with invalid metadata token."""
         with self.assertRaises(grpc.RpcError) as err:
             self._get_nodes_no_auth.with_call(
-                request=GetNodesRequest(run_id=self._auth_run_id),
+                request=GetNodesRequest(),
                 metadata=((TASK_TOKEN_HEADER, "invalid-token"),),
             )
         assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
@@ -129,9 +127,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
 
     def test_get_nodes_allows_with_valid_metadata_token(self) -> None:
         """Protected RPC should allow requests with a valid metadata token."""
-        response, call = self._get_nodes.with_call(
-            request=GetNodesRequest(run_id=self._auth_run_id)
-        )
+        response, call = self._get_nodes.with_call(request=GetNodesRequest())
 
         assert isinstance(response, GetNodesResponse)
         assert call.code() == grpc.StatusCode.OK

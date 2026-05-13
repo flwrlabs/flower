@@ -87,6 +87,16 @@ class ClientAppIoStub(object):
                 request_serializer=flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.FromString,
                 _registered_method=True)
+        self.PushTaskMessage = channel.unary_unary(
+                '/flwr.proto.ClientAppIo/PushTaskMessage',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskMessageRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskMessageResponse.FromString,
+                _registered_method=True)
+        self.PullTaskMessage = channel.unary_unary(
+                '/flwr.proto.ClientAppIo/PullTaskMessage',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageResponse.FromString,
+                _registered_method=True)
         self.PushLogs = channel.unary_unary(
                 '/flwr.proto.ClientAppIo/PushLogs',
                 request_serializer=flwr_dot_proto_dot_log__pb2.PushLogsRequest.SerializeToString,
@@ -189,6 +199,20 @@ class ClientAppIoServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def PushTaskMessage(self, request, context):
+        """Push task message
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def PullTaskMessage(self, request, context):
+        """Pull task messages
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def PushLogs(self, request, context):
         """Push task logs
         """
@@ -266,6 +290,16 @@ def add_ClientAppIoServicer_to_server(servicer, server):
                     servicer.CreateTask,
                     request_deserializer=flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.SerializeToString,
+            ),
+            'PushTaskMessage': grpc.unary_unary_rpc_method_handler(
+                    servicer.PushTaskMessage,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskMessageRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskMessageResponse.SerializeToString,
+            ),
+            'PullTaskMessage': grpc.unary_unary_rpc_method_handler(
+                    servicer.PullTaskMessage,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PullTaskMessageResponse.SerializeToString,
             ),
             'PushLogs': grpc.unary_unary_rpc_method_handler(
                     servicer.PushLogs,
@@ -553,6 +587,60 @@ class ClientAppIo(object):
             '/flwr.proto.ClientAppIo/CreateTask',
             flwr_dot_proto_dot_appio__pb2.CreateTaskRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.CreateTaskResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PushTaskMessage(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ClientAppIo/PushTaskMessage',
+            flwr_dot_proto_dot_appio__pb2.PushTaskMessageRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PushTaskMessageResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PullTaskMessage(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ClientAppIo/PullTaskMessage',
+            flwr_dot_proto_dot_appio__pb2.PullTaskMessageRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PullTaskMessageResponse.FromString,
             options,
             channel_credentials,
             insecure,
