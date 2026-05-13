@@ -141,6 +141,19 @@ erDiagram
     FLOAT timestamp
   }
 
+  task_message {
+    VARCHAR message_id PK
+    BIGINT dst_task_id FK
+    BIGINT src_task_id FK
+    BLOB content "nullable"
+    FLOAT created_at
+    BLOB error "nullable"
+    VARCHAR message_type
+    VARCHAR reply_to_message_id "nullable"
+    BIGINT run_id
+    FLOAT ttl
+  }
+
   run ||--o| context : run_id
   run ||--o{ logs : run_id
   run ||--o{ message_ins : run_id
@@ -149,6 +162,8 @@ erDiagram
   objects ||--o| object_children : child_id
   objects ||--o| run_objects : object_id
   task ||--o{ task_logs : task_id
+  task ||--o{ task_message : src_task_id
+  task ||--o{ task_message : dst_task_id
 
 ```
 <!-- END_SQLALCHEMY_DOCS -->
