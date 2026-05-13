@@ -221,6 +221,13 @@ class TaskType(StrEnum):
     CONNECTOR = "flwr-connector"
 
 
+TASK_TYPES_ALLOWED_TO_CREATE_TASKS: frozenset[TaskType] = frozenset(
+    {
+        TaskType.AGENT_APP,
+        TaskType.SERVER_APP,
+        TaskType.CLIENT_APP,
+    }
+)
 TASK_TYPES_REQUIRING_FAB_HASH: frozenset[TaskType] = frozenset(
     {
         TaskType.SERVER_APP,

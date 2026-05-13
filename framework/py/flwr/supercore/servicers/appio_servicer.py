@@ -41,6 +41,7 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsResponse,
 )
 from flwr.supercore.constant import (
+    TASK_TYPES_ALLOWED_TO_CREATE_TASKS,
     TASK_TYPES_REQUIRING_CONNECTOR_REF,
     TASK_TYPES_REQUIRING_FAB_HASH,
     TASK_TYPES_REQUIRING_MODEL_REF,
@@ -49,15 +50,6 @@ from flwr.supercore.constant import (
 from flwr.supercore.interceptors import get_authenticated_task
 
 from ..corestate import CoreState
-
-
-TASK_TYPES_ALLOWED_TO_CREATE_TASKS: frozenset[TaskType] = frozenset(
-    {
-        TaskType.AGENT_APP,
-        TaskType.SERVER_APP,
-        TaskType.CLIENT_APP,
-    }
-)
 
 
 # pylint: disable=invalid-name, unused-argument

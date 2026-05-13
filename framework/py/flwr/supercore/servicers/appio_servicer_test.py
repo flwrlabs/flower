@@ -159,12 +159,14 @@ class TestAppIoServicer(unittest.TestCase):
             self.state.create_task.reset_mock()
 
             with self.subTest(parent_task_type=parent_task_type):
+                # Execute
                 with patch(
                     "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
                     return_value=Mock(run_id=123, type=parent_task_type),
                 ):
                     response = self.servicer.CreateTask(request, Mock())
 
+                # Assert
                 self.state.create_task.assert_called_once_with(
                     task_type=TaskType.MODEL,
                     run_id=123,
@@ -288,6 +290,7 @@ class TestAppIoServicer(unittest.TestCase):
             self.state.create_task.reset_mock()
 
             with self.subTest(parent_task_type=parent_task_type):
+                # Execute
                 with (
                     patch(
                         "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
@@ -300,6 +303,7 @@ class TestAppIoServicer(unittest.TestCase):
                         context,
                     )
 
+                # Assert
                 context.abort.assert_called_once_with(
                     grpc.StatusCode.PERMISSION_DENIED,
                     f"Task type '{parent_task_type}' is not allowed to create tasks.",
