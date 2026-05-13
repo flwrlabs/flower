@@ -147,7 +147,6 @@ erDiagram
     BIGINT src_task_id FK
     BLOB content "nullable"
     FLOAT created_at
-    VARCHAR delivered_at
     BLOB error "nullable"
     VARCHAR message_type
     VARCHAR reply_to_message_id "nullable"

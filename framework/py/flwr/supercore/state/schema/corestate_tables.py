@@ -90,16 +90,14 @@ def create_corestate_metadata() -> MetaData:
         Column("dst_task_id", BigInteger, ForeignKey("task.task_id"), nullable=False),
         Column("reply_to_message_id", String, nullable=True),
         Column("created_at", Float, nullable=False),
-        Column("delivered_at", String, nullable=False, server_default=text("''")),
         Column("ttl", Float, nullable=False),
         Column("message_type", String, nullable=False),
         Column("content", LargeBinary, nullable=True),
         Column("error", LargeBinary, nullable=True),
     )
     Index(
-        "idx_task_message_dst_task_id_delivered_at_created_at",
+        "idx_task_message_dst_task_id_created_at",
         task_message.c.dst_task_id,
-        task_message.c.delivered_at,
         task_message.c.created_at,
     )
     Index("idx_task_message_run_id", task_message.c.run_id)
