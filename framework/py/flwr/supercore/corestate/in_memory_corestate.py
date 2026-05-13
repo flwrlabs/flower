@@ -33,17 +33,13 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.message import Message
+from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.common.typing import Fab
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import (
-    generate_rand_int_from_bytes,
-    has_valid_task_message_payload,
-    task_message_from_dict,
-    task_message_to_dict,
-)
+from .utils import generate_rand_int_from_bytes
 
 
 @dataclass
@@ -329,7 +325,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
     def push_task_message(self, message: Message) -> str | None:
         """Store one task-addressed Message."""
         message_id = message.metadata.message_id
-        if not has_valid_task_message_payload(message):
+        if not _is_valid_task_message(message):
             return None
 
         src_task_id = message.metadata.src_node_id
@@ -346,8 +342,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 return None
             run_id = src_task.run_id
 
-        message_dict = task_message_to_dict(message, run_id)
-        message_copy = task_message_from_dict(dict(message_dict))
+        message_copy = message_from_proto(message_to_proto(message))
+        message_copy.metadata.__dict__["_run_id"] = run_id
 
         with self.lock_task_message_store:
             if message_id in self.task_message_store:
@@ -392,11 +388,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                     continue
 
                 del self.task_message_store[message_id]
-                selected_messages.append(
-                    task_message_from_dict(
-                        task_message_to_dict(message, message.metadata.run_id)
-                    )
-                )
+                selected_messages.append(message)
                 if limit is not None and len(selected_messages) >= limit:
                     break
 
@@ -464,3 +456,15 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         for key, expires_at in list(self.nonce_store.items()):
             if expires_at < current:
                 del self.nonce_store[key]
+
+
+def _is_valid_task_message(message: Message) -> bool:
+    """Return True if the task message carries the required payload fields."""
+    return (
+        message.metadata.message_id != ""
+        and message.metadata.src_node_id != 0
+        and message.metadata.dst_node_id != 0
+        and message.metadata.ttl > 0
+        and message.metadata.message_type != ""
+        and message.has_content() != message.has_error()
+    )

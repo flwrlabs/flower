@@ -24,6 +24,7 @@ from typing import Any, Literal
 from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
 
+from flwr.app.metadata import Metadata
 from flwr.common import Message, now
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
@@ -33,7 +34,14 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.common.message import make_message
+from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
+from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.common.typing import Fab
+from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
+from flwr.proto.recorddict_pb2 import (
+    RecordDict as ProtoRecordDict,  # pylint: disable=E0611
+)
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
@@ -41,12 +49,7 @@ from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import (
-    generate_rand_int_from_bytes,
-    has_valid_task_message_payload,
-    task_message_from_dict,
-    task_message_to_dict,
-)
+from .utils import generate_rand_int_from_bytes
 
 # Define SQL conditions for task statuses to ensure consistency across queries
 STATUS_CONDITIONS = {
@@ -410,7 +413,7 @@ class SqlCoreState(CoreState, SqlMixin):
 
     def push_task_message(self, message: Message) -> str | None:
         """Store one task-addressed Message."""
-        if not has_valid_task_message_payload(message):
+        if not _is_valid_task_message(message):
             return None
 
         message_id = message.metadata.message_id
@@ -437,16 +440,26 @@ class SqlCoreState(CoreState, SqlMixin):
             if dst_task["finished_at"] is not None:
                 return None
 
-            message_dict = task_message_to_dict(
-                message, int64_to_uint64(src_task["run_id"])
-            )
-            message_dict.update(
-                {
-                    "run_id": src_task["run_id"],
-                    "src_task_id": src_task_id,
-                    "dst_task_id": dst_task_id,
-                }
-            )
+            message_dict = {
+                "message_id": message.metadata.message_id,
+                "run_id": src_task["run_id"],
+                "src_task_id": src_task_id,
+                "dst_task_id": dst_task_id,
+                "reply_to_message_id": message.metadata.reply_to_message_id,
+                "created_at": message.metadata.created_at,
+                "ttl": message.metadata.ttl,
+                "message_type": message.metadata.message_type,
+                "content": (
+                    recorddict_to_proto(message.content).SerializeToString()
+                    if message.has_content()
+                    else None
+                ),
+                "error": (
+                    error_to_proto(message.error).SerializeToString()
+                    if message.has_error()
+                    else None
+                ),
+            }
             columns = ", ".join(message_dict.keys())
             values = ", ".join(f":{key}" for key in message_dict)
             try:
@@ -485,7 +498,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 row["dst_task_id"] = int64_to_uint64(row["dst_task_id"])
 
         rows.sort(key=lambda row: (row["created_at"], row["message_id"]))
-        return [task_message_from_dict(row) for row in rows]
+        return [_task_message_from_row(row) for row in rows]
 
     def _claim_task_message_rows(
         self, dst_task_ids: Sequence[int] | None, limit: int | None
@@ -629,4 +642,38 @@ def task_from_row(row: dict[str, Any]) -> Task:
         fab_hash=row["fab_hash"],
         model_ref=row["model_ref"],
         connector_ref=row["connector_ref"],
+    )
+
+
+def _task_message_from_row(row: dict[str, Any]) -> Message:
+    """Convert a task_message row to a Message."""
+    content, error = None, None
+    if row["content"] is not None:
+        content = recorddict_from_proto(ProtoRecordDict.FromString(row["content"]))
+    if row["error"] is not None:
+        error = error_from_proto(ProtoError.FromString(row["error"]))
+
+    metadata = Metadata(
+        run_id=row["run_id"],
+        message_id=row["message_id"],
+        src_node_id=row["src_task_id"],
+        dst_node_id=row["dst_task_id"],
+        reply_to_message_id=row["reply_to_message_id"] or "",
+        group_id="",
+        created_at=row["created_at"],
+        ttl=row["ttl"],
+        message_type=row["message_type"],
+    )
+    return make_message(metadata=metadata, content=content, error=error)
+
+
+def _is_valid_task_message(message: Message) -> bool:
+    """Return True if the task message carries the required payload fields."""
+    return (
+        message.metadata.message_id != ""
+        and message.metadata.src_node_id != 0
+        and message.metadata.dst_node_id != 0
+        and message.metadata.ttl > 0
+        and message.metadata.message_type != ""
+        and message.has_content() != message.has_error()
     )
