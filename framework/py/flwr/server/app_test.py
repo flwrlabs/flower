@@ -246,7 +246,7 @@ def test_run_fleet_api_grpc_rere_adds_runtime_version_interceptor(
         "state.db",
     ],
 )
-def test_get_state_backend_factories_uses_defaults(
+def test_get_objectstore_linkstate_factories_uses_defaults(
     database: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """In-memory and SQLite databases should stay on default backend factories."""
@@ -259,8 +259,8 @@ def test_get_state_backend_factories_uses_defaults(
 
     federation_manager = NoOpFederationManager()
     # pylint: disable-next=protected-access
-    objectstore_factory, state_factory = app_module._get_state_backend_factories(
-        database, federation_manager
+    objectstore_factory, state_factory = (
+        app_module._get_objectstore_linkstate_factories(database, federation_manager)
     )
 
     assert isinstance(objectstore_factory, ObjectStoreFactory)
@@ -269,7 +269,7 @@ def test_get_state_backend_factories_uses_defaults(
     assert state_factory.database == database
 
 
-def test_get_state_backend_factories_non_sqlite_without_ee_raises(
+def test_get_objectstore_linkstate_factories_non_sqlite_without_ee_raises(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Non-SQLite URL should fail if EE does not provide a backend resolver."""
@@ -280,12 +280,12 @@ def test_get_state_backend_factories_non_sqlite_without_ee_raises(
     monkeypatch.setattr(app_module, "get_ee_objectstore_factory", _not_implemented)
 
     with pytest.raises(ValueError, match="Unsupported value for `--database`"):
-        app_module._get_state_backend_factories(  # pylint: disable=protected-access
+        app_module._get_objectstore_linkstate_factories(  # pylint: disable=protected-access
             "dummysql://user:pw@localhost/flwr", NoOpFederationManager()
         )
 
 
-def test_get_state_backend_factories_non_sqlite_uses_ee_resolver(
+def test_get_objectstore_linkstate_factories_non_sqlite_uses_ee_resolver(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Non-SQLite URL should delegate backend factory creation to EE."""
@@ -312,8 +312,10 @@ def test_get_state_backend_factories_non_sqlite_uses_ee_resolver(
     monkeypatch.setattr(app_module, "get_ee_linkstate_factory", _linkstate_resolver)
 
     # pylint: disable-next=protected-access
-    objectstore_factory, state_factory = app_module._get_state_backend_factories(
-        "dummysql://db.example/flwr", federation_manager
+    objectstore_factory, state_factory = (
+        app_module._get_objectstore_linkstate_factories(
+            "dummysql://db.example/flwr", federation_manager
+        )
     )
 
     assert captured == [
