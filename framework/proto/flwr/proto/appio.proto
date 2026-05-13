@@ -39,10 +39,8 @@ message SendTaskHeartbeatResponse { bool success = 1; }
 
 // PushAppMessages messages
 message PushAppMessagesRequest {
-  string token = 1 [ deprecated = true ];
   repeated Message messages_list = 2;
-  uint64 run_id = 3;
-  repeated ObjectTree message_object_trees = 4;
+  repeated ObjectTree message_object_trees = 3;
 }
 message PushAppMessagesResponse {
   repeated string message_ids = 1;
@@ -50,11 +48,7 @@ message PushAppMessagesResponse {
 }
 
 // PullAppMessages messages
-message PullAppMessagesRequest {
-  string token = 1 [ deprecated = true ];
-  repeated string message_ids = 2;
-  uint64 run_id = 3;
-}
+message PullAppMessagesRequest { repeated string message_ids = 2; }
 message PullAppMessagesResponse {
   repeated Message messages_list = 1;
   repeated ObjectTree message_object_trees = 2;
@@ -69,7 +63,7 @@ message PullTaskMessageRequest { optional uint64 limit = 1; }
 message PullTaskMessageResponse { repeated Message messages = 1; }
 
 // PullTaskInput messages
-message PullTaskInputRequest { string token = 1 [ deprecated = true ]; }
+message PullTaskInputRequest {}
 message PullTaskInputResponse {
   Context context = 1;
   Run run = 2;
@@ -80,11 +74,9 @@ message PullTaskInputResponse {
 
 // PushTaskOutput messages
 message PushTaskOutputRequest {
-  string token = 1 [ deprecated = true ];
-  uint64 run_id = 2;
-  Context context = 3;
-  string sub_status = 4;
-  string details = 5;
+  Context context = 1;
+  string sub_status = 2;
+  string details = 3;
 }
 message PushTaskOutputResponse {}
 

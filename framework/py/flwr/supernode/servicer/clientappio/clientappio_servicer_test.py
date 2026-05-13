@@ -214,7 +214,6 @@ class TestClientAppIoServicer(unittest.TestCase):
 
     def test_servicer_push_task_output_finishes_task(self) -> None:
         """PushTaskOutput should finish the authenticated task."""
-        token = "test-token"
         run_id = 61016
         task_id = 123
         app_context = Context(
@@ -225,7 +224,6 @@ class TestClientAppIoServicer(unittest.TestCase):
             run_config={"runconfig1": 6.1},
         )
         request = PushTaskOutputRequest(
-            token=token,
             context=context_to_proto(app_context),
             sub_status=SubStatus.COMPLETED,
         )
