@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - main
-      - 'release/framework-*'
+      - "release/framework-*"
   pull_request:
     branches:
       - main
-      - 'release/framework-*'
+      - "release/framework-*"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
@@ -88,12 +88,7 @@ jobs:
         exclude:
           - connection: insecure
             authentication: client-auth
-    name: |
-      Control API / 
-      Python ${{ matrix.python-version }} /
-      ${{ matrix.connection }} / 
-      ${{ matrix.authentication }} / 
-      ${{ matrix.engine }} 
+    name: Control API / Python ${{ matrix.python-version }} / ${{ matrix.connection }} / ${{ matrix.authentication }} / ${{ matrix.engine }}
     defaults:
       run:
         working-directory: framework/e2e/${{ matrix.directory }}
@@ -104,7 +99,7 @@ jobs:
         uses: ./.github/actions/bootstrap
         with:
           python-version: ${{ matrix.python-version }}
-          poetry-skip: 'true'
+          poetry-skip: "true"
       - name: Install Flower from repo
         if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'flwrlabs/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
         working-directory: ./framework
@@ -125,10 +120,10 @@ jobs:
             python -m pip install "${WHEEL_URL}"
           fi
       - name: >
-          Run Control API test / 
-          ${{ matrix.connection }} / 
-          ${{ matrix.authentication }} / 
-          ${{ matrix.engine }} 
+          Run Control API test /
+          ${{ matrix.connection }} /
+          ${{ matrix.authentication }} /
+          ${{ matrix.engine }}
         if: ${{ needs.changes.outputs.framework == 'true' }}
         working-directory: framework/e2e/${{ matrix.directory }}
         run: ./../test_control_api.sh "${{ matrix.connection }}" "${{ matrix.authentication}}" "${{ matrix.engine }}"
@@ -204,11 +199,11 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' }}
         uses: actions/setup-python@v6
         with:
-          python-version: '3.10'
+          python-version: "3.10"
       - name: Install build tools
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: |
-            python -m pip install -U pip==26.0.1
+          python -m pip install -U pip==26.0.1
         shell: bash
       # Using approach described here for Python location caching:
       # https://blog.allenai.org/python-caching-in-github-actions-e9452698e98d
@@ -269,7 +264,17 @@ jobs:
     needs: [changes, wheel]
     strategy:
       matrix:
-        strat: ["FedMedian", "FedTrimmedAvg", "QFedAvg", "FaultTolerantFedAvg", "FedAvgM", "FedAdam", "FedAdagrad", "FedYogi"]
+        strat:
+          [
+            "FedMedian",
+            "FedTrimmedAvg",
+            "QFedAvg",
+            "FaultTolerantFedAvg",
+            "FedAvgM",
+            "FedAdam",
+            "FedAdagrad",
+            "FedYogi"
+          ]
 
     name: Strategy / ${{ matrix.strat }}
 
@@ -283,7 +288,7 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' }}
         uses: ./.github/actions/bootstrap
         with:
-          poetry-skip: 'true'
+          poetry-skip: "true"
       - name: Install dependencies
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: |
@@ -359,14 +364,13 @@ jobs:
             exit 1
           fi
 
-
   pull-app:
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     needs: [changes, wheel]
     env:
-      ACCOUNT: 'flwrlabs'
-      APP_NAME: 'numpy-ci'
+      ACCOUNT: "flwrlabs"
+      APP_NAME: "numpy-ci"
 
     name: flwr new @
 
@@ -411,12 +415,7 @@ jobs:
       matrix:
         framework: ["numpy"]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-
-    name: |
-      Build & Install /
-      Python ${{ matrix.python-version }} /
-      ${{ matrix.framework }}
-
+    name: Build & Install / Python ${{ matrix.python-version }} / ${{ matrix.framework }}
     steps:
       - uses: actions/checkout@v5
       - name: Bootstrap
@@ -424,7 +423,7 @@ jobs:
         uses: ./.github/actions/bootstrap
         with:
           python-version: ${{ matrix.python-version }}
-          poetry-skip: 'true'
+          poetry-skip: "true"
       - name: Install Flower from repo
         if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'flwrlabs/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
         run: |
@@ -456,12 +455,7 @@ jobs:
         connection: [insecure]
         engine: [deployment-engine, simulation-engine]
         authentication: [no-auth]
-    name: |
-      NumPy ${{ matrix.numpy-version }} / 
-      Python ${{ matrix.python-version }} /
-      ${{ matrix.connection }} / 
-      ${{ matrix.authentication }} / 
-      ${{ matrix.engine }} 
+    name: NumPy ${{ matrix.numpy-version }} / Python ${{ matrix.python-version }} / ${{ matrix.connection }} / ${{ matrix.authentication }} / ${{ matrix.engine }}
     defaults:
       run:
         working-directory: framework/e2e/${{ matrix.directory }}
@@ -472,7 +466,7 @@ jobs:
         uses: ./.github/actions/bootstrap
         with:
           python-version: ${{ matrix.python-version }}
-          poetry-skip: 'true'
+          poetry-skip: "true"
       - name: Install Flower from repo
         if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'flwrlabs/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
         working-directory: ./framework
@@ -493,10 +487,10 @@ jobs:
             python -m pip install "${WHEEL_URL}" "numpy>=${{ matrix.numpy-version }},<2.0"
           fi
       - name: >
-          Run Flower - NumPy 1.26 test / 
-          ${{ matrix.connection }} / 
-          ${{ matrix.authentication }} / 
-          ${{ matrix.engine }} 
+          Run Flower - NumPy 1.26 test /
+          ${{ matrix.connection }} /
+          ${{ matrix.authentication }} /
+          ${{ matrix.engine }}
         if: ${{ needs.changes.outputs.framework == 'true' }}
         working-directory: framework/e2e/${{ matrix.directory }}
         run: ./../test_control_api.sh "${{ matrix.connection }}" "${{ matrix.authentication}}" "${{ matrix.engine }}"
@@ -507,7 +501,7 @@ jobs:
       PYTHONIOENCODING: utf-8
     timeout-minutes: 10
     needs: [changes, wheel]
-  
+
     name: Windows compatibility test
 
     steps:
@@ -516,7 +510,7 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' }}
         uses: actions/setup-python@v6
         with:
-          python-version: '3.10'
+          python-version: "3.10"
       - name: Install build tools
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: python -m pip install -U pip==26.0.1
@@ -541,11 +535,7 @@ jobs:
         python-version: ["3.10"]
 
     if: ${{ needs.changes.outputs.framework == 'true' }}
-
-    name: |
-      ServerApp/run heartbeat test with ${{ matrix.engine }} runtime /
-      Python ${{ matrix.python-version }}
-
+    name: ServerApp/run heartbeat test with ${{ matrix.engine }} runtime / Python ${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@v5
       - name: Set up Python
