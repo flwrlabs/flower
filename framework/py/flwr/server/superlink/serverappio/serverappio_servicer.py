@@ -94,7 +94,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         """Get available nodes."""
         log(DEBUG, "ServerAppIoServicer.GetNodes")
 
-        # Init state and store
+        # Init state
         state = self.state_factory.state()
 
         # Get authenticated task and associated run ID
