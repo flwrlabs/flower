@@ -105,7 +105,8 @@ try:
         get_control_event_log_writer_plugins,
         get_ee_artifact_provider,
         get_ee_federation_manager,
-        get_ee_state_backend_factories,
+        get_ee_linkstate_factory,
+        get_ee_objectstore_factory,
         get_fleet_event_log_writer_plugins,
     )
 except ImportError:
@@ -142,10 +143,16 @@ except ImportError:
         """Return the EE FederationManager."""
         raise NotImplementedError("No federation manager is currently supported.")
 
-    def get_ee_state_backend_factories(
-        database: str, federation_manager: FederationManager
-    ) -> tuple[ObjectStoreFactory, LinkStateFactory]:
-        """Return EE state backend factories for unsupported DB URLs."""
+    def get_ee_objectstore_factory(database: str) -> ObjectStoreFactory:
+        """Return an EE ObjectStoreFactory for supported non-SQLite database URLs."""
+        raise NotImplementedError("No additional state backends are supported.")
+
+    def get_ee_linkstate_factory(
+        database: str,
+        federation_manager: FederationManager,
+        objectstore_factory: ObjectStoreFactory,
+    ) -> LinkStateFactory:
+        """Return an EE LinkStateFactory for supported non-SQLite database URLs."""
         raise NotImplementedError("No additional state backends are supported.")
 
 
@@ -183,10 +190,11 @@ def _get_state_backend_factories(
     """Return ObjectStore and LinkState factories for the selected DB backend."""
     if _is_non_sqlite_database_url(database):
         try:
-            result: tuple[ObjectStoreFactory, LinkStateFactory] = (
-                get_ee_state_backend_factories(database, federation_manager)
+            objectstore_factory = get_ee_objectstore_factory(database)
+            state_factory = get_ee_linkstate_factory(
+                database, federation_manager, objectstore_factory
             )
-            return result
+            return objectstore_factory, state_factory
         except NotImplementedError as exc:
             raise ValueError(
                 "Unsupported value for `--database`. The Flower framework supports "
