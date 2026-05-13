@@ -88,7 +88,8 @@ class RuntimeVersionClientInterceptor(
             if isinstance(call, grpc.RpcError):
                 self._maybe_exit_on_incompat_error(call)
 
-        # NOTE: Some gRPC call objects expose callback registration without implementing it.
+        # NOTE: Some gRPC call objects expose callback registration without
+        # implementing it.
         try:
             if not call.add_callback(_handle_completion):
                 _handle_completion()
