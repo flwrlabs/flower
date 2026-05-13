@@ -273,7 +273,7 @@ jobs:
             "FedAvgM",
             "FedAdam",
             "FedAdagrad",
-            "FedYogi",
+            "FedYogi"
           ]
 
     name: Strategy / ${{ matrix.strat }}
