@@ -91,8 +91,6 @@ class RuntimeVersionClientInterceptor(
         try:
             callback_added = call.add_callback(_handle_completion)
         except NotImplementedError:
-            if isinstance(call, grpc.RpcError):
-                _handle_completion()
             return call
 
         if not callback_added:
