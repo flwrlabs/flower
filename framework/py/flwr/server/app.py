@@ -183,7 +183,7 @@ def _is_non_sqlite_database_url(database: str) -> bool:
     return "://" in normalized and not normalized.startswith("sqlite://")
 
 
-def _get_state_backend_factories(
+def _get_objectstore_linkstate_factories(
     database: str,
     federation_manager: FederationManager,
 ) -> tuple[ObjectStoreFactory, LinkStateFactory]:
@@ -380,7 +380,7 @@ def run_superlink() -> None:
 
     # Initialize backend ObjectStoreFactory and StateFactory
     try:
-        objectstore_factory, state_factory = _get_state_backend_factories(
+        objectstore_factory, state_factory = _get_objectstore_linkstate_factories(
             args.database, federation_manager
         )
     except ValueError as err:
