@@ -60,7 +60,8 @@ message ObjectTree {
 // PushObject messages
 message PushObjectRequest {
   Node node = 1;
-  uint64 run_id = 2;
+  reserved 2;
+  reserved "run_id";
   string object_id = 3;
   bytes object_content = 4;
 }
@@ -69,7 +70,8 @@ message PushObjectResponse { bool stored = 1; }
 // PullObject messages
 message PullObjectRequest {
   Node node = 1;
-  uint64 run_id = 2;
+  reserved 2;
+  reserved "run_id";
   string object_id = 3;
 }
 message PullObjectResponse {
@@ -81,7 +83,8 @@ message PullObjectResponse {
 // ConfirmMessageReceived messages
 message ConfirmMessageReceivedRequest {
   Node node = 1;
-  uint64 run_id = 2;
+  reserved 2;
+  reserved "run_id";
   string message_object_id = 3;
 }
 message ConfirmMessageReceivedResponse {}
