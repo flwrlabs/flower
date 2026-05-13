@@ -326,27 +326,39 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             AND delivered_at = ''
             AND (created_at + ttl) > :current
         """
+        candidate_cte = ""
         condition = common_condition
         if limit is not None:
-            # Optional clause appended to the limited candidate SELECT.
+            # Optional clause for backends that support row-locking while selecting
+            # candidates. Keep it before LIMIT so locked rows are skipped before
+            # limiting the result set.
             select_lock_sql = (
                 f" {self._claim_message_ins_select_lock_clause}"
                 if self._claim_message_ins_select_lock_clause
                 else ""
             )
-            condition = f"""
-                message_id IN (
+            # Materialize limited candidates before updating. Some backends can
+            # otherwise re-evaluate same-table subqueries while UPDATE scans rows.
+            candidate_cte = f"""
+                WITH candidate_message_ins AS (
                     SELECT message_id
                     FROM message_ins
                     WHERE {common_condition}
                     ORDER BY created_at, message_id
-                    LIMIT :limit{select_lock_sql}
+                    {select_lock_sql}
+                    LIMIT :limit
+                )
+            """
+            condition = """
+                message_id IN (
+                    SELECT message_id FROM candidate_message_ins
                 )
                 AND delivered_at = ''
             """
             params["limit"] = limit
 
         query = f"""
+            {candidate_cte}
             UPDATE message_ins
             SET delivered_at = :delivered_at
             WHERE {condition}
