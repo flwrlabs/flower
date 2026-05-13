@@ -130,7 +130,7 @@ class TestAppIoServicer(unittest.TestCase):
         # Execute
         with patch(
             "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
-            return_value=Mock(run_id=123),
+            return_value=Mock(run_id=123, type=TaskType.SERVER_APP),
         ):
             response = self.servicer.CreateTask(request, Mock())
 
@@ -144,6 +144,36 @@ class TestAppIoServicer(unittest.TestCase):
         )
         self.assertEqual(response.task_id, 456)
 
+    def test_create_task_allows_app_parent_task_types(self) -> None:
+        """CreateTask should allow app parent tasks to create child tasks."""
+        # Prepare
+        allowed_parent_task_types = [
+            TaskType.AGENT_APP,
+            TaskType.SERVER_APP,
+            TaskType.CLIENT_APP,
+        ]
+        self.state.create_task.return_value = 456
+        request = CreateTaskRequest(type=TaskType.MODEL, model_ref="model")
+
+        for parent_task_type in allowed_parent_task_types:
+            self.state.create_task.reset_mock()
+
+            with self.subTest(parent_task_type=parent_task_type):
+                with patch(
+                    "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+                    return_value=Mock(run_id=123, type=parent_task_type),
+                ):
+                    response = self.servicer.CreateTask(request, Mock())
+
+                self.state.create_task.assert_called_once_with(
+                    task_type=TaskType.MODEL,
+                    run_id=123,
+                    fab_hash=None,
+                    model_ref="model",
+                    connector_ref=None,
+                )
+                self.assertEqual(response.task_id, 456)
+
     def test_create_task_propagates_state_error(self) -> None:
         """CreateTask should let state-layer run validation errors propagate."""
         # Prepare
@@ -155,7 +185,7 @@ class TestAppIoServicer(unittest.TestCase):
         with (
             patch(
                 "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
-                return_value=Mock(run_id=123),
+                return_value=Mock(run_id=123, type=TaskType.SERVER_APP),
             ),
             self.assertRaises(RuntimeError) as err,
         ):
@@ -203,7 +233,7 @@ class TestAppIoServicer(unittest.TestCase):
                 with (
                     patch(
                         "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
-                        return_value=Mock(run_id=123),
+                        return_value=Mock(run_id=123, type=TaskType.SERVER_APP),
                     ),
                     self.assertRaises(grpc.RpcError),
                 ):
@@ -230,7 +260,7 @@ class TestAppIoServicer(unittest.TestCase):
         with (
             patch(
                 "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
-                return_value=Mock(run_id=123),
+                return_value=Mock(run_id=123, type=TaskType.SERVER_APP),
             ),
             self.assertRaises(grpc.RpcError),
         ):
@@ -241,6 +271,40 @@ class TestAppIoServicer(unittest.TestCase):
             grpc.StatusCode.INTERNAL,
             "Failed to create task",
         )
+
+    def test_create_task_aborts_if_parent_task_type_is_not_allowed(self) -> None:
+        """CreateTask should only allow app parent tasks to create child tasks."""
+        # Prepare
+        disallowed_parent_task_types = [
+            TaskType.MODEL,
+            TaskType.CONNECTOR,
+            TaskType.SIMULATION,
+            "unknown",
+        ]
+
+        for parent_task_type in disallowed_parent_task_types:
+            context = Mock(spec=grpc.ServicerContext)
+            context.abort.side_effect = grpc.RpcError()
+            self.state.create_task.reset_mock()
+
+            with self.subTest(parent_task_type=parent_task_type):
+                with (
+                    patch(
+                        "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+                        return_value=Mock(run_id=123, type=parent_task_type),
+                    ),
+                    self.assertRaises(grpc.RpcError),
+                ):
+                    self.servicer.CreateTask(
+                        CreateTaskRequest(type=TaskType.MODEL, model_ref="model"),
+                        context,
+                    )
+
+                context.abort.assert_called_once_with(
+                    grpc.StatusCode.PERMISSION_DENIED,
+                    f"Task type '{parent_task_type}' is not allowed to create tasks.",
+                )
+                self.state.create_task.assert_not_called()
 
     def test_push_logs_merges_logs_and_stores_them(self) -> None:
         """PushLogs should concatenate fragments and store them via state."""

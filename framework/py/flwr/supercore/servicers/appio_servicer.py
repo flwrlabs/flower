@@ -51,6 +51,15 @@ from flwr.supercore.interceptors import get_authenticated_task
 from ..corestate import CoreState
 
 
+TASK_TYPES_ALLOWED_TO_CREATE_TASKS: frozenset[TaskType] = frozenset(
+    {
+        TaskType.AGENT_APP,
+        TaskType.SERVER_APP,
+        TaskType.CLIENT_APP,
+    }
+)
+
+
 # pylint: disable=invalid-name, unused-argument
 class AppIoServicer(ABC):
     """Shared scaffolding for task-based AppIo RPCs."""
@@ -95,8 +104,10 @@ class AppIoServicer(ABC):
         """Create a task."""
         log(DEBUG, "AppIoServicer.CreateTask")
 
-        run_id = get_authenticated_task().run_id
+        authenticated_task = get_authenticated_task()
+        run_id = authenticated_task.run_id
 
+        _validate_task_creator(authenticated_task.type, context)
         _validate_create_task_request(request, context)
 
         state = self.state()
@@ -148,6 +159,27 @@ class AppIoServicer(ABC):
         merged_logs = "".join(request.logs)
         state.add_task_log(task.task_id, merged_logs)
         return PushLogsResponse()
+
+
+def _validate_task_creator(
+    parent_task_type: str, context: grpc.ServicerContext
+) -> None:
+    """Validate that the parent task is allowed to create child tasks."""
+    try:
+        task_type = TaskType(parent_task_type)
+    except ValueError:
+        context.abort(
+            grpc.StatusCode.PERMISSION_DENIED,
+            f"Task type '{parent_task_type}' is not allowed to create tasks.",
+        )
+        raise RuntimeError("This line should never be reached.") from None
+
+    if task_type not in TASK_TYPES_ALLOWED_TO_CREATE_TASKS:
+        context.abort(
+            grpc.StatusCode.PERMISSION_DENIED,
+            f"Task type '{parent_task_type}' is not allowed to create tasks.",
+        )
+        raise RuntimeError("This line should never be reached.")
 
 
 def _validate_create_task_request(
