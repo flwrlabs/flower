@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for Flower SuperLink app CLI argument parsing."""
 
+
 import argparse
 from types import SimpleNamespace
 from unittest.mock import Mock
