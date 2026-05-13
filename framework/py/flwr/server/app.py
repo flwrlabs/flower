@@ -198,7 +198,7 @@ def _get_state_backend_factories(
         except NotImplementedError as exc:
             raise ValueError(
                 "Unsupported value for `--database`. The Flower framework supports "
-                "`:flwr-in-memory:`, `:memory`, SQLite file paths, and `sqlite://` "
+                "`:flwr-in-memory:`, `:memory:`, SQLite file paths, and `sqlite://` "
                 "URLs (including `sqlite:///:memory:`)."
             ) from exc
 
