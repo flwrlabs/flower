@@ -71,10 +71,12 @@ service ClientAppIo {
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {}
 
   // Push task message
-  rpc PushTaskMessage(PushTaskMessageRequest) returns (PushTaskMessageResponse) {}
+  rpc PushTaskMessage(PushTaskMessageRequest)
+      returns (PushTaskMessageResponse) {}
 
   // Pull task messages
-  rpc PullTaskMessage(PullTaskMessageRequest) returns (PullTaskMessageResponse) {}
+  rpc PullTaskMessage(PullTaskMessageRequest)
+      returns (PullTaskMessageResponse) {}
 
   // Push task logs
   rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
