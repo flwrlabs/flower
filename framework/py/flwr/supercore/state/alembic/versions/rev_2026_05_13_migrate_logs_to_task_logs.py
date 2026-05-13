@@ -15,8 +15,8 @@
 """Migrate logs to task logs.
 
 Revision ID: aac61834ee69
-Revises: 8b40f767ddcb
-Create Date: 2026-05-11 17:21:20.602486
+Revises: dd6b78efd1f6
+Create Date: 2026-05-13 11:43:20.602486
 """
 from collections.abc import Sequence
 
@@ -26,7 +26,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "aac61834ee69"
-down_revision: str | Sequence[str] | None = "8b40f767ddcb"
+down_revision: str | Sequence[str] | None = "dd6b78efd1f6"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
