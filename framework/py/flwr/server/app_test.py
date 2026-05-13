@@ -22,11 +22,15 @@ from unittest.mock import Mock
 import grpc
 import pytest
 
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.interceptors import RuntimeVersionServerInterceptor
+from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.version import package_version
+from flwr.superlink.federation import NoOpFederationManager
 
 from . import app as app_module
 from .app import _obtain_superlink_certificates, _parse_args_run_superlink
+from .superlink.linkstate import LinkStateFactory
 
 
 def test_parse_superlink_log_rotation_args_defaults() -> None:
@@ -231,3 +235,97 @@ def test_run_fleet_api_grpc_rere_adds_runtime_version_interceptor(
     interceptors = create_grpc_server.call_args.kwargs["interceptors"]
     assert interceptors[0] is existing_interceptor
     assert isinstance(interceptors[1], RuntimeVersionServerInterceptor)
+
+
+@pytest.mark.parametrize(
+    "database",
+    [
+        FLWR_IN_MEMORY_DB_NAME,
+        ":memory:",
+        "sqlite:///:memory:",
+        "state.db",
+    ],
+)
+def test_get_objectstore_linkstate_factories_uses_defaults(
+    database: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """In-memory and SQLite databases should stay on default backend factories."""
+
+    def _unexpected(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("EE resolver should not be called for default databases")
+
+    monkeypatch.setattr(app_module, "get_ee_objectstore_factory", _unexpected)
+    monkeypatch.setattr(app_module, "get_ee_linkstate_factory", _unexpected)
+
+    federation_manager = NoOpFederationManager()
+    objectstore_factory, state_factory = (
+        # pylint: disable-next=protected-access
+        app_module._get_objectstore_linkstate_factories(database, federation_manager)
+    )
+
+    assert isinstance(objectstore_factory, ObjectStoreFactory)
+    assert isinstance(state_factory, LinkStateFactory)
+    assert objectstore_factory.database == database
+    assert state_factory.database == database
+
+
+def test_get_objectstore_linkstate_factories_non_sqlite_without_ee_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Non-SQLite URL should fail if EE does not provide a backend resolver."""
+
+    def _not_implemented(_database: str) -> object:
+        raise NotImplementedError()
+
+    monkeypatch.setattr(app_module, "get_ee_objectstore_factory", _not_implemented)
+
+    with pytest.raises(ValueError, match="Unsupported value for `--database`"):
+        app_module._get_objectstore_linkstate_factories(  # pylint: disable=protected-access
+            "dummysql://user:pw@localhost/flwr", NoOpFederationManager()
+        )
+
+
+def test_get_objectstore_linkstate_factories_non_sqlite_uses_ee_resolver(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Non-SQLite URL should delegate backend factory creation to EE."""
+    federation_manager = NoOpFederationManager()
+    expected_objectstore_factory = ObjectStoreFactory(FLWR_IN_MEMORY_DB_NAME)
+    expected_state_factory = LinkStateFactory(
+        FLWR_IN_MEMORY_DB_NAME, federation_manager, expected_objectstore_factory
+    )
+    captured: list[object] = []
+
+    def _objectstore_resolver(database: str) -> ObjectStoreFactory:
+        captured.append(("objectstore", database))
+        return expected_objectstore_factory
+
+    def _linkstate_resolver(
+        database: str,
+        manager: NoOpFederationManager,
+        objectstore_factory: ObjectStoreFactory,
+    ) -> LinkStateFactory:
+        captured.append(("linkstate", database, manager, objectstore_factory))
+        return expected_state_factory
+
+    monkeypatch.setattr(app_module, "get_ee_objectstore_factory", _objectstore_resolver)
+    monkeypatch.setattr(app_module, "get_ee_linkstate_factory", _linkstate_resolver)
+
+    objectstore_factory, state_factory = (
+        # pylint: disable-next=protected-access
+        app_module._get_objectstore_linkstate_factories(
+            "dummysql://db.example/flwr", federation_manager
+        )
+    )
+
+    assert captured == [
+        ("objectstore", "dummysql://db.example/flwr"),
+        (
+            "linkstate",
+            "dummysql://db.example/flwr",
+            federation_manager,
+            expected_objectstore_factory,
+        ),
+    ]
+    assert objectstore_factory is expected_objectstore_factory
+    assert state_factory is expected_state_factory
