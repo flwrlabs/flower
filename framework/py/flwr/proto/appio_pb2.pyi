@@ -216,6 +216,75 @@ class PullAppMessagesResponse(google.protobuf.message.Message):
 global___PullAppMessagesResponse = PullAppMessagesResponse
 
 @typing.final
+class PushTaskMessageRequest(google.protobuf.message.Message):
+    """PushTaskMessage messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    MESSAGE_FIELD_NUMBER: builtins.int
+    @property
+    def message(self) -> flwr.proto.message_pb2.Message: ...
+    def __init__(
+        self,
+        *,
+        message: flwr.proto.message_pb2.Message | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["message", b"message"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["message", b"message"]) -> None: ...
+
+global___PushTaskMessageRequest = PushTaskMessageRequest
+
+@typing.final
+class PushTaskMessageResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    MESSAGE_ID_FIELD_NUMBER: builtins.int
+    message_id: builtins.str
+    def __init__(
+        self,
+        *,
+        message_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["message_id", b"message_id"]) -> None: ...
+
+global___PushTaskMessageResponse = PushTaskMessageResponse
+
+@typing.final
+class PullTaskMessageRequest(google.protobuf.message.Message):
+    """PullTaskMessage messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    LIMIT_FIELD_NUMBER: builtins.int
+    limit: builtins.int
+    def __init__(
+        self,
+        *,
+        limit: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_limit", b"_limit", "limit", b"limit"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_limit", b"_limit", "limit", b"limit"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
+
+global___PullTaskMessageRequest = PullTaskMessageRequest
+
+@typing.final
+class PullTaskMessageResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    MESSAGES_FIELD_NUMBER: builtins.int
+    @property
+    def messages(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.message_pb2.Message]: ...
+    def __init__(
+        self,
+        *,
+        messages: collections.abc.Iterable[flwr.proto.message_pb2.Message] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["messages", b"messages"]) -> None: ...
+
+global___PullTaskMessageResponse = PullTaskMessageResponse
+
+@typing.final
 class PullTaskInputRequest(google.protobuf.message.Message):
     """PullTaskInput messages"""
 
