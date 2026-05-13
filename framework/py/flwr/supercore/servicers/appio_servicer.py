@@ -97,10 +97,11 @@ class AppIoServicer(ABC):
         """Create a task."""
         log(DEBUG, "AppIoServicer.CreateTask")
 
-        authenticated_task = get_authenticated_task()
-        run_id = authenticated_task.run_id
+        # Get authenticated task and associated run ID
+        task = get_authenticated_task()
+        run_id = task.run_id
 
-        _validate_create_task_request(request, authenticated_task, context)
+        _validate_create_task_request(request, task, context)
 
         state = self.state()
         created_task_id = state.create_task(
@@ -154,27 +155,18 @@ class AppIoServicer(ABC):
 
 
 def _validate_create_task_request(
-    request: CreateTaskRequest, parent_task: Task, context: grpc.ServicerContext
+    request: CreateTaskRequest, requesting_task: Task, context: grpc.ServicerContext
 ) -> None:
     """Validate the task creation request."""
-    try:
-        parent_task_type = TaskType(parent_task.type)
-    except ValueError:
+    if requesting_task.type not in TASK_TYPES_ALLOWED_TO_CREATE_TASKS:
         context.abort(
             grpc.StatusCode.PERMISSION_DENIED,
-            f"Task type '{parent_task.type}' is not allowed to create tasks.",
-        )
-        raise RuntimeError("This line should never be reached.") from None
-
-    if parent_task_type not in TASK_TYPES_ALLOWED_TO_CREATE_TASKS:
-        context.abort(
-            grpc.StatusCode.PERMISSION_DENIED,
-            f"Task type '{parent_task.type}' is not allowed to create tasks.",
+            f"Task type '{requesting_task.type}' is not allowed to create tasks.",
         )
         raise RuntimeError("This line should never be reached.")
 
     try:
-        child_task_type = TaskType(request.type)
+        new_task_type = TaskType(request.type)
     except ValueError:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
@@ -182,20 +174,20 @@ def _validate_create_task_request(
         )
         raise RuntimeError("This line should never be reached.") from None
 
-    if child_task_type in TASK_TYPES_REQUIRING_FAB_HASH and not request.fab_hash:
+    if new_task_type in TASK_TYPES_REQUIRING_FAB_HASH and not request.fab_hash:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires fab_hash.",
         )
 
-    if child_task_type in TASK_TYPES_REQUIRING_MODEL_REF and not request.model_ref:
+    if new_task_type in TASK_TYPES_REQUIRING_MODEL_REF and not request.model_ref:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires model_ref.",
         )
 
     if (
-        child_task_type in TASK_TYPES_REQUIRING_CONNECTOR_REF
+        new_task_type in TASK_TYPES_REQUIRING_CONNECTOR_REF
         and not request.connector_ref
     ):
         context.abort(
