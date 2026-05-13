@@ -28,7 +28,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from flwr.common.logger import log
-from flwr.supercore.constant import FLWR_IN_MEMORY_SQLITE_DB_URL, SQLITE_PRAGMAS
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_SQLITE_DB_URL,
+    SQL_ALLOWED_DIALECTS,
+    SQLITE_PRAGMAS,
+)
 from flwr.supercore.state.alembic.utils import run_migrations
 
 _current_session: ContextVar[Session | None] = ContextVar(
@@ -62,7 +66,7 @@ class SqlMixin(ABC):
 
     # Subclasses can restrict supported SQLAlchemy dialects.
     # Flower Framework SQL backend currently allows only the SQLite dialect.
-    allowed_dialects: frozenset[str] | None = None
+    allowed_dialects: frozenset[str] = SQL_ALLOWED_DIALECTS
 
     def __init__(self, database_path: str) -> None:
         """Initialize the SqlMixin.
