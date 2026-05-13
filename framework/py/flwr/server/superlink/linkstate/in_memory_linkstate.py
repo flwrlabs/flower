@@ -32,6 +32,7 @@ from flwr.common.constant import (
     RUN_ID_NUM_BYTES,
     SUPERLINK_NODE_ID,
     Status,
+    SubStatus,
 )
 from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
@@ -745,8 +746,26 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
         """Report usage when an expired task is the primary task of its run."""
-        if any(self._is_primary_task(task.task_id) for task in tasks):
-            self.federation_manager.report_run_usage()
+        expired_run_ids = {
+            task.run_id for task in tasks if self._is_primary_task(task.task_id)
+        }
+        if not expired_run_ids:
+            return
+
+        finished_at = now().isoformat()
+        for task in self.task_store.values():
+            if task.run_id in expired_run_ids and task.status.status != Status.FINISHED:
+                # Transition to finished with FAILED status due to expired run
+                task.finished_at = finished_at
+                task.status.status = Status.FINISHED
+                task.status.sub_status = SubStatus.FAILED
+                task.status.details = "Task failed due to expired run"
+
+                # Clean up task tokens
+                if record := self.task_token_store.pop(task.task_id, None):
+                    self.task_token_to_task_id.pop(record.token, None)
+
+        self.federation_manager.report_run_usage()
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float

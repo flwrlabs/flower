@@ -430,6 +430,30 @@ class StateTest(CoreStateTest):
         assert status.sub_status == SubStatus.FAILED
         assert status.details == "No heartbeat received from the task"
 
+    def test_primary_task_expiry_fails_unfinished_run_tasks(self) -> None:
+        """Test unfinished tasks fail when their run's primary task expires."""
+        # Prepare
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        primary_task_id = get_primary_task_id(state, run_id)
+        extra_task_id = state.create_task(task_type="flwr-connector", run_id=run_id)
+        assert extra_task_id is not None
+        assert state.claim_task(primary_task_id) is not None
+
+        # Execute: advance time past task claim expiry and trigger cleanup
+        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = patched_dt
+            state.get_run_status({run_id})
+
+        # Assert
+        tasks = {task.task_id: task for task in state.get_tasks(run_ids=[run_id])}
+        assert tasks[primary_task_id].status.status == Status.FINISHED
+        assert tasks[primary_task_id].status.sub_status == SubStatus.FAILED
+        assert tasks[extra_task_id].status.status == Status.FINISHED
+        assert tasks[extra_task_id].status.sub_status == SubStatus.FAILED
+        assert tasks[extra_task_id].status.details == "Task failed due to expired run"
+
     @parameterized.expand([(1,), (2,), (3,)])  # type: ignore
     def test_usage_report_hook_called_on_each_successful_transition(
         self, num_transitions: int

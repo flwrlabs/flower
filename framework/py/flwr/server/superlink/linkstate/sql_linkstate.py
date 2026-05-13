@@ -34,6 +34,7 @@ from flwr.common.constant import (
     RUN_ID_NUM_BYTES,
     SUPERLINK_NODE_ID,
     Status,
+    SubStatus,
 )
 from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
@@ -1129,12 +1130,35 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         task_ids = [uint64_to_int64(task.task_id) for task in tasks]
         placeholders = ",".join([f":task_id_{i}" for i in range(len(task_ids))])
         rows = self.query(
-            f"SELECT 1 FROM run WHERE primary_task_id IN ({placeholders}) LIMIT 1",
+            f"SELECT run_id FROM run WHERE primary_task_id IN ({placeholders})",
             {f"task_id_{i}": task_id for i, task_id in enumerate(task_ids)},
         )
-        # If yes, report usage for the run
-        if rows:
-            self.federation_manager.report_run_usage()
+        if not rows:
+            return
+
+        # Fail non-finished tasks for expired runs
+        run_id_params = {f"run_id_{i}": row["run_id"] for i, row in enumerate(rows)}
+        self.query(
+            f"""
+            UPDATE task
+            SET finished_at = :finished_at,
+                sub_status = :sub_status,
+                details = :details,
+                active_until = NULL,
+                token = NULL
+            WHERE run_id IN ({','.join([f':run_id_{i}' for i in range(len(rows))])})
+                AND finished_at IS NULL
+            """,
+            {
+                "finished_at": now().isoformat(),
+                "sub_status": SubStatus.FAILED,
+                "details": "Task failed due to expired run",
+                **run_id_params,
+            },
+        )
+
+        # Report usage for the run
+        self.federation_manager.report_run_usage()
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
