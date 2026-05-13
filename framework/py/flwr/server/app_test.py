@@ -251,10 +251,11 @@ def test_get_state_backend_factories_uses_defaults(
 ) -> None:
     """In-memory and SQLite databases should stay on default backend factories."""
 
-    def _unexpected(*_args: object, **_kwargs: object) -> tuple[object, object]:
+    def _unexpected(*_args: object, **_kwargs: object) -> object:
         raise AssertionError("EE resolver should not be called for default databases")
 
-    monkeypatch.setattr(app_module, "get_ee_state_backend_factories", _unexpected)
+    monkeypatch.setattr(app_module, "get_ee_objectstore_factory", _unexpected)
+    monkeypatch.setattr(app_module, "get_ee_linkstate_factory", _unexpected)
 
     federation_manager = NoOpFederationManager()
     # pylint: disable-next=protected-access
@@ -273,12 +274,10 @@ def test_get_state_backend_factories_non_sqlite_without_ee_raises(
 ) -> None:
     """Non-SQLite URL should fail if EE does not provide a backend resolver."""
 
-    def _not_implemented(
-        _database: str, _federation_manager: NoOpFederationManager
-    ) -> tuple[object, object]:
+    def _not_implemented(_database: str) -> object:
         raise NotImplementedError()
 
-    monkeypatch.setattr(app_module, "get_ee_state_backend_factories", _not_implemented)
+    monkeypatch.setattr(app_module, "get_ee_objectstore_factory", _not_implemented)
 
     with pytest.raises(ValueError, match="Unsupported value for `--database`"):
         app_module._get_state_backend_factories(  # pylint: disable=protected-access
@@ -297,19 +296,34 @@ def test_get_state_backend_factories_non_sqlite_uses_ee_resolver(
     )
     captured: list[object] = []
 
-    def _resolver(
-        database: str, manager: NoOpFederationManager
-    ) -> tuple[ObjectStoreFactory, LinkStateFactory]:
-        captured.extend([database, manager])
-        return expected_objectstore_factory, expected_state_factory
+    def _objectstore_resolver(database: str) -> ObjectStoreFactory:
+        captured.append(("objectstore", database))
+        return expected_objectstore_factory
 
-    monkeypatch.setattr(app_module, "get_ee_state_backend_factories", _resolver)
+    def _linkstate_resolver(
+        database: str,
+        manager: NoOpFederationManager,
+        objectstore_factory: ObjectStoreFactory,
+    ) -> LinkStateFactory:
+        captured.append(("linkstate", database, manager, objectstore_factory))
+        return expected_state_factory
+
+    monkeypatch.setattr(app_module, "get_ee_objectstore_factory", _objectstore_resolver)
+    monkeypatch.setattr(app_module, "get_ee_linkstate_factory", _linkstate_resolver)
 
     # pylint: disable-next=protected-access
     objectstore_factory, state_factory = app_module._get_state_backend_factories(
         "dummysql://db.example/flwr", federation_manager
     )
 
-    assert captured == ["dummysql://db.example/flwr", federation_manager]
+    assert captured == [
+        ("objectstore", "dummysql://db.example/flwr"),
+        (
+            "linkstate",
+            "dummysql://db.example/flwr",
+            federation_manager,
+            expected_objectstore_factory,
+        ),
+    ]
     assert objectstore_factory is expected_objectstore_factory
     assert state_factory is expected_state_factory
