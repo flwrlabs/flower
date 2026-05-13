@@ -1163,7 +1163,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             {
                 "finished_at": now().isoformat(),
                 "sub_status": SubStatus.FAILED,
-                "details": "Task failed due to expired run",
+                "details": "Task failed because the run expired",
                 **run_id_params,
             },
         )

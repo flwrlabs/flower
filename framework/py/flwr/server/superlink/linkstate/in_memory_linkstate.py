@@ -767,7 +767,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 task.finished_at = finished_at
                 task.status.status = Status.FINISHED
                 task.status.sub_status = SubStatus.FAILED
-                task.status.details = "Task failed due to expired run"
+                task.status.details = "Task failed because the run expired"
 
                 # Clean up task tokens
                 if record := self.task_token_store.pop(task.task_id, None):

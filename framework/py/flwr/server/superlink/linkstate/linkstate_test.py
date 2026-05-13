@@ -430,11 +430,13 @@ class StateTest(CoreStateTest):
 
         # Assert
         tasks = {task.task_id: task for task in state.get_tasks(run_ids=[run_id])}
-        assert tasks[primary_task_id].status.status == Status.FINISHED
-        assert tasks[primary_task_id].status.sub_status == SubStatus.FAILED
-        assert tasks[extra_task_id].status.status == Status.FINISHED
-        assert tasks[extra_task_id].status.sub_status == SubStatus.FAILED
-        assert tasks[extra_task_id].status.details == "Task failed due to expired run"
+        primary_task = tasks[primary_task_id]
+        extra_task = tasks[extra_task_id]
+        assert primary_task.status.status == Status.FINISHED
+        assert primary_task.status.sub_status == SubStatus.FAILED
+        assert extra_task.status.status == Status.FINISHED
+        assert extra_task.status.sub_status == SubStatus.FAILED
+        assert extra_task.status.details == "Task failed because the run expired"
 
     @parameterized.expand([(1,), (2,), (3,)])  # type: ignore
     def test_usage_report_hook_called_on_each_successful_transition(
