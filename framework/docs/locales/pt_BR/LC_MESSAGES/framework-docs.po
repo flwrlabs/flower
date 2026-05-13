@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-13 01:48+0000\n"
+"POT-Creation-Date: 2026-05-13 00:27+0000\n"
 "PO-Revision-Date: 2024-05-25 11:09+0000\n"
 "Last-Translator: Gustavo Bertoli <gubertoli@gmail.com>\n"
 "Language: pt_BR\n"
@@ -382,13 +382,16 @@ msgstr "Argumento de compilação"
 #: ../../source/ref-exit-codes/104.rst:7 ../../source/ref-exit-codes/105.rst:7
 #: ../../source/ref-exit-codes/2.rst:7 ../../source/ref-exit-codes/200.rst:23
 #: ../../source/ref-exit-codes/201.rst:7 ../../source/ref-exit-codes/202.rst:7
-#: ../../source/ref-exit-codes/203.rst:7 ../../source/ref-exit-codes/3.rst:7
-#: ../../source/ref-exit-codes/300.rst:7 ../../source/ref-exit-codes/302.rst:7
-#: ../../source/ref-exit-codes/303.rst:7 ../../source/ref-exit-codes/304.rst:7
-#: ../../source/ref-exit-codes/400.rst:7 ../../source/ref-exit-codes/401.rst:7
-#: ../../source/ref-exit-codes/500.rst:7 ../../source/ref-exit-codes/600.rst:7
-#: ../../source/ref-exit-codes/601.rst:7 ../../source/ref-exit-codes/602.rst:7
-#: ../../source/ref-exit-codes/700.rst:7 ../../source/ref-exit-codes/701.rst:7
+#: ../../source/ref-exit-codes/203.rst:7 ../../source/ref-exit-codes/250.rst:7
+#: ../../source/ref-exit-codes/3.rst:7 ../../source/ref-exit-codes/300.rst:7
+#: ../../source/ref-exit-codes/302.rst:7 ../../source/ref-exit-codes/303.rst:7
+#: ../../source/ref-exit-codes/304.rst:7 ../../source/ref-exit-codes/400.rst:7
+#: ../../source/ref-exit-codes/401.rst:7 ../../source/ref-exit-codes/500.rst:7
+#: ../../source/ref-exit-codes/600.rst:7 ../../source/ref-exit-codes/601.rst:7
+#: ../../source/ref-exit-codes/602.rst:7 ../../source/ref-exit-codes/603.rst:7
+#: ../../source/ref-exit-codes/604.rst:7 ../../source/ref-exit-codes/605.rst:7
+#: ../../source/ref-exit-codes/606.rst:7 ../../source/ref-exit-codes/700.rst:7
+#: ../../source/ref-exit-codes/701.rst:7
 msgid "Description"
 msgstr "Descrição"
 
@@ -2795,8 +2798,8 @@ msgstr ""
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:250
 #: ../../source/docker/tutorial-quickstart-docker.rst:326
 #: ../../source/how-to-authenticate-accounts.rst:96
-#: ../../source/how-to-authenticate-supernodes.rst:116
-#: ../../source/how-to-enable-tls-connections.rst:128
+#: ../../source/how-to-authenticate-supernodes.rst:121
+#: ../../source/how-to-enable-tls-connections.rst:220
 #: ../../source/how-to-run-flower-on-azure.rst:230
 #: ../../source/how-to-run-flower-on-gcp.rst:624
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:678
@@ -7021,6 +7024,16 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #, fuzzy
+msgid "`superlink.superexecAuthSecretFile`"
+msgstr "Construindo a imagem do servidor"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+msgid "Path to a file containing the SuperExec shared secret."
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
 msgid "`superlink.nodeSelector`"
 msgstr "Construindo a imagem do servidor"
 
@@ -7504,7 +7517,7 @@ msgstr "Construindo a imagem do servidor"
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
-msgid "`1.28.0-ubuntu`"
+msgid "`1.29.0-ubuntu`"
 msgstr "``UBUNTU_VERSION``"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
@@ -7624,8 +7637,8 @@ msgstr ""
 msgid "`superlink.networkPolicy.control.ingressNSPodMatchLabels`"
 msgstr ""
 
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:846
-#: ../../source/helm/how-to-deploy-supernode-using-helm.md:347
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:847
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:348
 #, fuzzy
 msgid "Component SuperExec"
 msgstr "Construindo a imagem do servidor"
@@ -7680,6 +7693,21 @@ msgstr "Construindo a imagem do servidor"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
 msgid "Address of the SuperLink the SuperExec should connect to"
+msgstr ""
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`superexec.superexecAuthSecretFile`"
+msgstr "Construindo a imagem do servidor"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+#, fuzzy
+msgid "`superexec.allowRuntimeDependencyInstallation`"
+msgstr "Construindo a imagem do servidor"
+
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
+msgid "Allow SuperExec to install runtime dependencies for ServerApps."
 msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:275
@@ -8084,7 +8112,7 @@ msgstr ""
 msgid "`superexec.networkPolicy.extraEgress`"
 msgstr ""
 
-#: ../../source/helm/how-to-deploy-superlink-using-helm.md:900
+#: ../../source/helm/how-to-deploy-superlink-using-helm.md:903
 msgid "Component OpenFGA"
 msgstr ""
 
@@ -8485,6 +8513,11 @@ msgstr "Construindo a imagem do servidor"
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 msgid "Add extra arguments to the default arguments for the SuperNode"
 msgstr ""
+
+#: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
+#, fuzzy
+msgid "`supernode.superexecAuthSecretFile`"
+msgstr "Construindo a imagem do servidor"
 
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:10
 #, fuzzy
@@ -9177,19 +9210,26 @@ msgid ""
 "enabled in the presence of TLS."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:101
+#: ../../source/how-to-authenticate-supernodes.rst:92
+msgid ""
+"To enable TLS also for the AppIo API on SuperLink, please refer to "
+":ref:`Launching the SuperLink with TLS <launching-the-superlink-with-"
+"tls>`."
+msgstr ""
+
+#: ../../source/how-to-authenticate-supernodes.rst:106
 msgid ""
 "``--enable-supernode-auth``: Enables SuperNode authentication therefore "
 "only Supernodes that are first register on the SuperLink will be able to "
 "establish a connection."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:105
+#: ../../source/how-to-authenticate-supernodes.rst:110
 #, fuzzy
 msgid "Register SuperNodes"
 msgstr "Construindo a imagem do servidor"
 
-#: ../../source/how-to-authenticate-supernodes.rst:107
+#: ../../source/how-to-authenticate-supernodes.rst:112
 msgid ""
 "Once your SuperLink is running, the next step is to register the "
 "SuperNodes that will be allowed to connect to it. This process is handled"
@@ -9198,7 +9238,7 @@ msgid ""
 "SuperLink."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:112
+#: ../../source/how-to-authenticate-supernodes.rst:117
 msgid ""
 "First, ensure your Flower configuration file has a SuperLink connection "
 "profile that points to your running SuperLink and that includes a ``root-"
@@ -9206,14 +9246,14 @@ msgid ""
 "the SuperLink. For example:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:124
+#: ../../source/how-to-authenticate-supernodes.rst:129
 msgid ""
 "You can verify that your connection is correctly configured by running a "
 "``flwr ls`` command:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:139
-#: ../../source/how-to-enable-tls-connections.rst:145
+#: ../../source/how-to-authenticate-supernodes.rst:144
+#: ../../source/how-to-enable-tls-connections.rst:237
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:230
 msgid ""
 "You can setup your ``local-deployment`` profile as the default so you "
@@ -9223,72 +9263,79 @@ msgid ""
 "configuration>` guide."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:144
+#: ../../source/how-to-authenticate-supernodes.rst:149
 msgid ""
 "With a correctly configured Flower CLI, let's proceed to register two "
 "SuperNodes:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:151
+#: ../../source/how-to-authenticate-supernodes.rst:156
 msgid "Next, let's register the second SuperNode as well:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:157
+#: ../../source/how-to-authenticate-supernodes.rst:162
 msgid "You can list the registered SuperNodes using the following command:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:164
+#: ../../source/how-to-authenticate-supernodes.rst:169
 msgid ""
 "This will display the IDs of the SuperNodes you just registered as well "
 "as their status. You should see a table similar to the following:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:177
+#: ../../source/how-to-authenticate-supernodes.rst:182
 msgid ""
 "The status of the SuperNodes will change after they connect to the "
 "SuperLink. Let's proceed and laucnh the SuperNodes."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:182
+#: ../../source/how-to-authenticate-supernodes.rst:187
 msgid "Enable node authentication in SuperNode"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:184
+#: ../../source/how-to-authenticate-supernodes.rst:189
 msgid ""
 "Connecting a SuperNode to a SuperLink that has node authentication "
 "enabled requires passing one additional argument (i.e. the private key of"
 " the SuperNode) in addition to the TLS certificate."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:200
+#: ../../source/how-to-authenticate-supernodes.rst:195
+msgid ""
+"To enable TLS also for the AppIo API on SuperNodes, please refer to "
+":ref:`Launching the SuperNodes with TLS <connecting-the-supernodes-with-"
+"tls>`."
+msgstr ""
+
+#: ../../source/how-to-authenticate-supernodes.rst:210
 msgid "``--auth-supernode-private-key``: the private key of this SuperNode."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:202
+#: ../../source/how-to-authenticate-supernodes.rst:212
 msgid ""
 "Follow the same procedure to launch the second SuperNode by passing its "
 "corresponding private key:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:215
+#: ../../source/how-to-authenticate-supernodes.rst:225
 msgid ""
 "After connecting both SuperNodes, you can check the status of the "
 "SuperNodes again. You will notice their status is now ``online``:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:232
+#: ../../source/how-to-authenticate-supernodes.rst:242
 #, fuzzy
 msgid "Unregister SuperNodes"
 msgstr "Construindo a imagem do servidor"
 
-#: ../../source/how-to-authenticate-supernodes.rst:236
+#: ../../source/how-to-authenticate-supernodes.rst:246
 msgid ""
 "This is a destructive operation. Unregistering a SuperNode is permanent "
 "and cannot be undone. If you wish to connect a SuperNode again, a new key"
 " pair is needed."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:239
+#: ../../source/how-to-authenticate-supernodes.rst:249
 msgid ""
 "At anypoint you can unregister a SuperNode from the SuperLink (even if it"
 " has never connected). This will prevent the SuperNode from making future"
@@ -9298,13 +9345,13 @@ msgid ""
 "|flower_cli_supernode_link|_ as follows:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:250
+#: ../../source/how-to-authenticate-supernodes.rst:260
 msgid ""
 "The above command unregisters the first SuperNode. You can verify this by"
 " listing the SuperNodes again:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:264
+#: ../../source/how-to-authenticate-supernodes.rst:274
 msgid ""
 "If you pass the ``--verbose`` flag to the previous command you'll see "
 "that the status of the unregistered SuperNode has changed to "
@@ -9313,11 +9360,11 @@ msgid ""
 "wish to connect a second SuperNode a new EC key pair is needed.**"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:284
+#: ../../source/how-to-authenticate-supernodes.rst:294
 msgid "Security notice"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:286
+#: ../../source/how-to-authenticate-supernodes.rst:296
 msgid ""
 "The system's security relies on the credentials of the SuperLink and each"
 " SuperNode. Therefore, it is imperative to safeguard and safely store the"
@@ -9328,22 +9375,22 @@ msgid ""
 "methods."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:294
-#: ../../source/how-to-enable-tls-connections.rst:152
+#: ../../source/how-to-authenticate-supernodes.rst:304
+#: ../../source/how-to-enable-tls-connections.rst:244
 #: ../../source/how-to-use-built-in-mods.rst:175
 #: ../../source/tutorial-series-what-is-federated-learning.rst:297
 msgid "Conclusion"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:296
+#: ../../source/how-to-authenticate-supernodes.rst:306
 msgid ""
 "You should now have learned how to start a long-running Flower SuperLink "
 "and SuperNode with node authentication enabled. You should also know the "
 "significance of the private key and store it securely to minimize risks."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:302
-#: ../../source/how-to-enable-tls-connections.rst:162
+#: ../../source/how-to-authenticate-supernodes.rst:312
+#: ../../source/how-to-enable-tls-connections.rst:254
 msgid ""
 "Refer to the :doc:`docker/index` documentation to learn how to setup a "
 "federation where each component runs in its own Docker container. You can"
@@ -10192,17 +10239,19 @@ msgstr ""
 msgid ""
 "Transport Layer Security (TLS) ensures the communication between "
 "endpoints is encrypted. This guide describes how to establish secure TLS "
-"Superlink ↔ SuperNodes as well as User ↔ SuperLink connections."
+"SuperLink ↔ SuperNodes as well as User ↔ SuperLink connections. It also "
+"explains how to enable TLS on the internal AppIo connections used by "
+"SuperExec, ``ServerApp`` processes, and ``ClientApp`` processes."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:15
+#: ../../source/how-to-enable-tls-connections.rst:16
 msgid ""
 "This guide builds on the Flower App setup presented in :doc:`how-to-run-"
 "flower-with-deployment-engine` guide and extends it to replace the use of"
 " ``--insecure`` in favour of TLS."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:21
+#: ../../source/how-to-enable-tls-connections.rst:22
 msgid ""
 "Checkout the `Flower Authentication "
 "<https://github.com/flwrlabs/flower/tree/main/examples/supernode-"
@@ -10212,36 +10261,38 @@ msgid ""
 "authentication layer to SuperLink ↔ SuperNode connections."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:30
+#: ../../source/how-to-enable-tls-connections.rst:31
 msgid "Certificates"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:32
+#: ../../source/how-to-enable-tls-connections.rst:33
 msgid ""
 "Using TLS-enabled connections expects some certificates generated and "
 "passed when launching the SuperLink, the SuperNodes and when a user (e.g."
 " a data scientist that wants to submit a ``Run``) interacts with the "
-"federation via the `flwr CLI <ref-api-cli.html>`_."
+"federation via the `flwr CLI <ref-api-cli.html>`_. The same certificates "
+"can be used for local prototyping when enabling TLS on internal AppIo "
+"connections."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:37
+#: ../../source/how-to-enable-tls-connections.rst:39
 msgid ""
 "We have prepared a script that can be used to generate such set of "
-"certificates. While using these are fine for prototyping, we advice you "
-"to follow the standards set in your team/organization and generated the "
+"certificates. While using these is fine for prototyping, we advise you to"
+" follow the standards set in your team/organization and to generate the "
 "certificates and share them with the corresponding parties. Refer to the "
 "**Generate TLS certificates** section in the example linked at the top of"
 " this guide."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:48
+#: ../../source/how-to-enable-tls-connections.rst:50
 msgid ""
 "This will generate the TLS certificates in a new ``certificates/`` "
 "directory. Copy this directory into the directory of your app (e.g. a "
 "directory generated earlier via ``flwr new``)."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:52
+#: ../../source/how-to-enable-tls-connections.rst:56
 msgid ""
 "The approach for generating TLS certificates in the context of this "
 "example can serve as an inspiration and starting point, but it should not"
@@ -10249,24 +10300,30 @@ msgid ""
 "other sources regarding the issue of correctly generating certificates "
 "for production environments. For non-critical prototyping or research "
 "projects, it might be sufficient to use the self-signed certificates "
-"generated using the scripts mentioned in this guide."
+"generated using the scripts mentioned in this guide. In production, do "
+"not reuse the same server certificate and private key for multiple "
+"services. A better practice is to use a unique key pair for each service,"
+" for example the SuperLink Fleet API, the SuperLink ServerAppIo API, and "
+"each SuperNode ClientAppIo API."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:61
+#: ../../source/how-to-enable-tls-connections.rst:71
 msgid "Launching the SuperLink with TLS"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:63
+#: ../../source/how-to-enable-tls-connections.rst:73
 msgid ""
 "This section describes how to launch a SuperLink that works on TLS-"
 "enabled connections. The code snippet below assumes the `certificates/` "
 "directory is in the same directory where you execute the command from. "
-"Edit the paths accordingtly if that is not the case. When providing "
-"certificates, the SuperLink expects a tuple of three certificates paths: "
-"CA certificate, server certificate and server private key."
+"Edit the paths accordingly if that is not the case. When providing "
+"certificates for the Fleet API and Control API, the SuperLink expects a "
+"tuple of three certificates paths: CA certificate, server certificate and"
+" server private key. The same command can also provide AppIo certificates"
+" for the internal ServerAppIo API."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:79
+#: ../../source/how-to-enable-tls-connections.rst:94
 msgid ""
 "``--ssl-ca-certfile``: Specify the location of the CA certificate file in"
 " your file. This file is a certificate that is used to verify the "
@@ -10287,37 +10344,168 @@ msgid ""
 "over the network."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:85
+#: ../../source/how-to-enable-tls-connections.rst
+msgid ""
+"``--appio-ssl-ca-certfile``: Specify the location of the CA certificate "
+"file used by SuperExec to verify the SuperLink's ServerAppIo API server "
+"certificate."
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst
+msgid ""
+"``--appio-ssl-certfile``: Specify the location of the ServerAppIo API "
+"server TLS certificate file. The certificate must include Subject "
+"Alternative Names (SANs) for the AppIo API address used by SuperExec. "
+"When using an IP address such as ``127.0.0.1``, the certificate must "
+"include a matching IP SAN."
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst
+msgid ""
+"``--appio-ssl-keyfile``: Specify the location of the ServerAppIo API "
+"server TLS private key file."
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst:108
 msgid "Connecting the SuperNodes with TLS"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:87
+#: ../../source/how-to-enable-tls-connections.rst:110
 msgid ""
 "This section describes how to launch a SuperNode that works on TLS-"
 "enabled connections. The code snippet below assumes the `certificates/` "
 "directory is in the same directory where you execute the command from. To"
-" enable TLS, the only change required when launching the SuperNode is "
-"replacing ``--insecure`` with ``--root-certificates``"
+" secure the SuperNode ↔ SuperLink connection, replace ``--insecure`` with"
+" ``--root-certificates``. The same command can also provide AppIo "
+"certificates for the internal ClientAppIo API."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:103
+#: ../../source/how-to-enable-tls-connections.rst:130
 msgid ""
-"``--root-certificates``:This specifies the location of the CA certificate"
-" file. The ``ca.crt`` file is used to verify the identity of the "
-"SuperLink."
+"``--root-certificates``: This specifies the location of the CA "
+"certificate file. The ``ca.crt`` file is used to verify the identity of "
+"the SuperLink."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:105
+#: ../../source/how-to-enable-tls-connections.rst
+msgid ""
+"``--appio-ssl-ca-certfile``: Specify the location of the CA certificate "
+"file used by SuperExec to verify the SuperNode's ClientAppIo API server "
+"certificate."
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst
+msgid ""
+"``--appio-ssl-certfile``: Specify the location of the ClientAppIo API "
+"server TLS certificate file. The certificate must include Subject "
+"Alternative Names (SANs) for the AppIo API address used by SuperExec. "
+"When using an IP address such as ``127.0.0.1``, the certificate must "
+"include a matching IP SAN."
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst
+msgid ""
+"``--appio-ssl-keyfile``: Specify the location of the ClientAppIo API "
+"server TLS private key file."
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst:138
 msgid ""
 "Follow the same procedure, i.e. replacing ``--insecure`` with ``--root-"
 "certificates``, to launch the second SuperNode."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:119
+#: ../../source/how-to-enable-tls-connections.rst:153
+msgid ""
+"At this point, you have successfully launched a SuperLink and two "
+"SuperNodes with TLS-enabled connections."
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst:158
+msgid ""
+"The AppIo TLS options configure server-authenticated TLS. They do not "
+"configure mutual TLS. The ``--appio-ssl-ca-certfile`` file is used by "
+"SuperExec and app processes to verify the AppIo server certificate, not "
+"as a client certificate. If AppIo TLS is not configured, internal AppIo "
+"connections remain unencrypted and should stay inside a trusted network."
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst:166
+msgid "TLS for AppIo Connections in \"Process\" Isolation Mode"
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst:168
+msgid ""
+"For details about SuperExec, \"process\" isolation mode, and "
+"\"subprocess\" isolation mode, see :doc:`ref-flower-network-"
+"communication`."
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst:171
+msgid ""
+"So far, we've been showing you how to enable TLS for AppIo connections "
+"when using the default \"subprocess\" isolation mode. In this mode, "
+"SuperLink and SuperNode automatically start their SuperExecs with the "
+"correct AppIo TLS options. However, if you want to run SuperExec "
+"separately in \"process\" isolation mode, you need to do a few things "
+"differently to enable TLS for the AppIo connections."
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst:177
+msgid ""
+"First, we need to launch the SuperLink and SuperNode with "
+"``--isolation=process`` and with the AppIo TLS options. This tells the "
+"SuperLink and SuperNode that the SuperExecs will be launched separately, "
+"e.g. by an operator or orchestration system. Next, in order for the "
+"SuperExecs to establish TLS connections to the AppIo APIs, we need to "
+"provide the AppIo TLS options when launching the SuperExecs. Below is an "
+"example command to launch a SuperExec that can establish TLS connections "
+"to the ServerAppIo API of the SuperLink:"
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst:195
+msgid ""
+"``--root-certificates``: Specify the location of the CA certificate file."
+" The ``ca.crt`` file is used by SuperExec to verify the AppIo API server "
+"certificate."
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst
+msgid ""
+"``--appio-api-address``: Specify the address of the AppIo API that "
+"SuperExec should connect to. In this example, ``127.0.0.1:9091`` is the "
+"SuperLink's ServerAppIo API."
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst
+msgid ""
+"``--plugin-type``: Specify the type of app process SuperExec should "
+"launch. Use ``serverapp`` for a ``ServerApp`` SuperExec."
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst:199
+msgid ""
+"Next, use the same procedure for a ``ClientApp`` SuperExec, but pass the "
+"SuperNode's ClientAppIo API address, e.g. ``127.0.0.1:9094``, and set "
+"``--plugin-type clientapp``."
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst:202
+msgid ""
+"Now your SuperLink-side SuperExec and SuperNode-side SuperExec can "
+"establish TLS connections to their respective AppIo APIs. When using "
+"\"process\" isolation mode, it is the responsibility of the process "
+"launcher (e.g. user or orchestrator) to launch the SuperExecs with the "
+"correct AppIo TLS options. If you use an orchestration system to launch "
+"the SuperExecs, make sure to include the AppIo TLS options in the "
+"commands or configuration used by your orchestration system."
+msgstr ""
+
+#: ../../source/how-to-enable-tls-connections.rst:211
 msgid "TLS-enabled Flower CLI"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:121
+#: ../../source/how-to-enable-tls-connections.rst:213
 msgid ""
 "The `Flower CLI <ref-api-cli.html>`_ (e.g. ``flwr run`` command) is the "
 "way a user (e.g. a data scientist) can interact with a deployed "
@@ -10329,37 +10517,37 @@ msgid ""
 "certificate:"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:136
+#: ../../source/how-to-enable-tls-connections.rst:228
 msgid ""
 "Note that the path to the ``root-certificates`` is relative to the root "
 "of the project. Now, you can run the example by executing ``flwr run``:"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:154
+#: ../../source/how-to-enable-tls-connections.rst:246
 msgid ""
 "You should now have learned how to generate self-signed certificates "
-"using the given script, start an TLS-enabled server and have two clients "
+"using the given script, start a TLS-enabled server and have two clients "
 "establish secure connections to it. You should also have learned how to "
-"run your Flower project using ``flwr run`` with TLS enabled. All other "
-"commands in the `Flower CLI <ref-api-cli.html>`_ will also be TLS-"
-"enabled."
+"run your Flower project using ``flwr run`` with TLS enabled and how to "
+"secure internal AppIo connections. All other commands in the `Flower CLI "
+"<ref-api-cli.html>`_ will also be TLS-enabled."
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:169
+#: ../../source/how-to-enable-tls-connections.rst:261
 msgid "Additional resources"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:171
+#: ../../source/how-to-enable-tls-connections.rst:263
 msgid ""
 "These additional sources might be relevant if you would like to dive "
 "deeper into the topic of certificates:"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:174
+#: ../../source/how-to-enable-tls-connections.rst:266
 msgid "`Let's Encrypt <https://letsencrypt.org/docs/>`_"
 msgstr ""
 
-#: ../../source/how-to-enable-tls-connections.rst:175
+#: ../../source/how-to-enable-tls-connections.rst:267
 msgid "`certbot <https://certbot.eff.org/>`_"
 msgstr ""
 
@@ -31425,6 +31613,7 @@ msgstr ""
 #: ../../source/ref-exit-codes/201.rst:13
 #: ../../source/ref-exit-codes/202.rst:13
 #: ../../source/ref-exit-codes/203.rst:15
+#: ../../source/ref-exit-codes/250.rst:14
 #: ../../source/ref-exit-codes/300.rst:14
 #: ../../source/ref-exit-codes/302.rst:15
 #: ../../source/ref-exit-codes/303.rst:14
@@ -31435,6 +31624,10 @@ msgstr ""
 #: ../../source/ref-exit-codes/600.rst:14
 #: ../../source/ref-exit-codes/601.rst:13
 #: ../../source/ref-exit-codes/602.rst:17
+#: ../../source/ref-exit-codes/603.rst:14
+#: ../../source/ref-exit-codes/604.rst:13
+#: ../../source/ref-exit-codes/605.rst:13
+#: ../../source/ref-exit-codes/606.rst:13
 #: ../../source/ref-exit-codes/700.rst:13
 #: ../../source/ref-exit-codes/701.rst:13
 msgid "How to Resolve"
@@ -31690,6 +31883,32 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/203.rst:20
 msgid "Ensure the SuperLink database is in the correct state and not corrupted."
+msgstr ""
+
+#: ../../source/ref-exit-codes/250.rst:3
+msgid "[250] CLIENTAPP_COMMUNICATION_ERROR"
+msgstr ""
+
+#: ../../source/ref-exit-codes/250.rst:9
+msgid ""
+"During a run, the internal ClientApp process could not communicate with "
+"the SuperNode ClientAppIo API."
+msgstr ""
+
+#: ../../source/ref-exit-codes/250.rst:16
+msgid ""
+"Check the run output and the surrounding SuperNode and SuperExec process "
+"logs for the underlying gRPC error. By default, these processes log to "
+"stdout/stderr; in containerized deployments, inspect the relevant "
+"SuperNode and SuperExec pod/container logs."
+msgstr ""
+
+#: ../../source/ref-exit-codes/250.rst:21
+msgid ""
+"A likely cause is that the ClientApp process took too long to start, for "
+"example on a very slow or overloaded system, causing a timeout error. If "
+"the logs are not enough to diagnose the issue, contact the Flower team "
+"and include the relevant run, SuperNode, and SuperExec/ClientApp logs."
 msgstr ""
 
 #: ../../source/ref-exit-codes/3.rst:3
@@ -32004,6 +32223,81 @@ msgstr ""
 
 #: ../../source/ref-exit-codes/602.rst:19
 msgid "Use the ``--insecure`` flag to proceed without TLS."
+msgstr ""
+
+#: ../../source/ref-exit-codes/603.rst:3
+msgid "[603] COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE"
+msgstr ""
+
+#: ../../source/ref-exit-codes/603.rst:9
+msgid ""
+"The ``--root-certificates`` option was provided together with "
+"``--insecure``. These options are mutually exclusive because "
+"``--insecure`` disables TLS."
+msgstr ""
+
+#: ../../source/ref-exit-codes/603.rst:16
+msgid "Choose one of the following:"
+msgstr ""
+
+#: ../../source/ref-exit-codes/603.rst:17
+msgid "Remove ``--insecure`` to use TLS with ``--root-certificates``"
+msgstr ""
+
+#: ../../source/ref-exit-codes/603.rst:18
+msgid "Remove ``--root-certificates`` to run without TLS"
+msgstr ""
+
+#: ../../source/ref-exit-codes/604.rst:3
+msgid "[604] COMMON_PATH_INVALID"
+msgstr ""
+
+#: ../../source/ref-exit-codes/604.rst:9
+msgid "The provided path is invalid or does not point to the expected file."
+msgstr ""
+
+#: ../../source/ref-exit-codes/604.rst:15
+msgid ""
+"Verify that the path exists, points to the expected file type, and is "
+"readable by the current process. Check the error message for the specific"
+" option or file path that caused the failure."
+msgstr ""
+
+#: ../../source/ref-exit-codes/605.rst:3
+msgid "[605] COMMON_TLS_SERVER_CERTIFICATES_INVALID"
+msgstr ""
+
+#: ../../source/ref-exit-codes/605.rst:9
+msgid "TLS server certificate configuration is incomplete or invalid."
+msgstr ""
+
+#: ../../source/ref-exit-codes/605.rst:15
+msgid ""
+"Provide all required TLS server certificate options for the server being "
+"started, or remove the partial TLS configuration. Check the error message"
+" for the specific certificate options required by that server."
+msgstr ""
+
+#: ../../source/ref-exit-codes/606.rst:3
+msgid "[606] RUNTIME_VERSION_INCOMPATIBLE"
+msgstr ""
+
+#: ../../source/ref-exit-codes/606.rst:9
+msgid "The Flower runtime versions are incompatible."
+msgstr ""
+
+#: ../../source/ref-exit-codes/606.rst:15
+msgid ""
+"Check the error message for details. It may tell you which Flower version"
+" is required."
+msgstr ""
+
+#: ../../source/ref-exit-codes/606.rst:17
+msgid "If a specific version is shown, install that version:"
+msgstr ""
+
+#: ../../source/ref-exit-codes/606.rst:23
+msgid "Otherwise, upgrade Flower:"
 msgstr ""
 
 #: ../../source/ref-exit-codes/700.rst:3
@@ -32822,9 +33116,9 @@ msgstr ""
 
 #: ../../source/ref-flower-network-communication.rst:172
 msgid ""
-"In the current version of Flower, both of the connections above are "
-"insecure because Flower assumes that the following groups of processes "
-"run within the same trusted network:"
+"The AppIo links above can run with plaintext communication or with "
+"server-authenticated TLS. Without the ``--appio-ssl-*`` options, these "
+"links remain unencrypted and should stay inside a trusted network:"
 msgstr ""
 
 #: ../../source/ref-flower-network-communication.rst:176
@@ -32837,33 +33131,44 @@ msgstr ""
 
 #: ../../source/ref-flower-network-communication.rst:179
 msgid ""
-"Each group must remain inside a single trusted network. They should never"
-" communicate with each other over untrusted networks (e.g., the public "
-"internet)."
+"To secure these links, configure the ServerAppIo and ClientAppIo API "
+"servers with ``--appio-ssl-certfile``, ``--appio-ssl-keyfile``, and "
+"``--appio-ssl-ca-certfile``. AppIo clients verify server certificates "
+"with ``--root-certificates``. In ``subprocess`` isolation mode, the "
+"SuperLink and SuperNode pass the CA path to the SuperExec processes they "
+"launch. This is not mTLS. See :doc:`how-to-enable-tls-connections` for "
+"concrete commands."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:183
+#: ../../source/ref-flower-network-communication.rst:188
+msgid ""
+"When running without TLS, each group must remain inside a single trusted "
+"network. They should never communicate with each other over untrusted "
+"networks (e.g., the public internet)."
+msgstr ""
+
+#: ../../source/ref-flower-network-communication.rst:193
 msgid "Account Authentication"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:185
+#: ../../source/ref-flower-network-communication.rst:195
 msgid ""
 "When account authentication is enabled, Flower uses an OIDC-compatible "
 "server to authenticate requests:"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:188
+#: ../../source/ref-flower-network-communication.rst:198
 msgid ""
 "**SuperLink to OIDC server**: A SuperLink can optionally be configured to"
 " only allow authenticated users to interact with it. In this setting, the"
 " Flower SuperLink acts as a REST client to the OIDC-compatible server."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:193
+#: ../../source/ref-flower-network-communication.rst:203
 msgid "Application-specific Connections"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:195
+#: ../../source/ref-flower-network-communication.rst:205
 msgid ""
 "Users who write Flower Apps (``ServerApp`` and ``ClientApp``) can also "
 "make additional network requests. This is, strictly speaking, not part of"
@@ -32873,12 +33178,12 @@ msgid ""
 "want to allow."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:201
+#: ../../source/ref-flower-network-communication.rst:211
 #, fuzzy
 msgid "Typical examples include:"
 msgstr "Exemplo"
 
-#: ../../source/ref-flower-network-communication.rst:203
+#: ../../source/ref-flower-network-communication.rst:213
 msgid ""
 "**ClientApp to Database**: ``ClientApp`` instances typically need to be "
 "able to access the data to perform the action they have been designed for"
@@ -32889,7 +33194,7 @@ msgid ""
 "likely be different to the illustration above."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:209
+#: ../../source/ref-flower-network-communication.rst:219
 msgid ""
 "**ServerApp to Database**: ``ServerApp`` instances might want to access "
 "the data to perform the action they have been designed for (e.g. evaluate"
@@ -32899,7 +33204,7 @@ msgid ""
 "the ``ServerApp`` components."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:214
+#: ../../source/ref-flower-network-communication.rst:224
 msgid ""
 "**ServerApp to metric logging service**: Metric logging services like "
 "TensorBoard, MLFlow and Weights & Biases are often used to track the "
@@ -32907,11 +33212,11 @@ msgid ""
 "acts as a client to the metric logging service."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:220
+#: ../../source/ref-flower-network-communication.rst:230
 msgid "Communication Model"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:222
+#: ../../source/ref-flower-network-communication.rst:232
 msgid ""
 "During real-world deployment, the push/pull communication model adopted "
 "by each component can influence decisions related to resource "
@@ -32920,14 +33225,14 @@ msgid ""
 "the Flower components:"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:227
+#: ../../source/ref-flower-network-communication.rst:237
 msgid ""
 "**SuperLink ↔ SuperNode (Fleet API)**: The SuperNode pulls/pushes "
 "Messages from/to the SuperLink via the Fleet API. The SuperNode also "
 "pulls the FAB if a new run is being executed."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:230
+#: ../../source/ref-flower-network-communication.rst:240
 msgid ""
 "**SuperLink ↔ ServerApp (ServerAppIo API)**: The ``ServerApp`` process "
 "pulls/pushes Messages from/to the SuperLink via the ServerAppIo API. The "
@@ -32936,7 +33241,7 @@ msgid ""
 " to the SuperLink."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:234
+#: ../../source/ref-flower-network-communication.rst:244
 msgid ""
 "**SuperNode ↔ ClientApp (ClientAppIo API)**: The ``ClientApp`` process "
 "pulls/pushes Messages from/to the SuperNode via the ClientAppIo API. The "
@@ -75563,5 +75868,120 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "``ffs/`` stores SuperLink file artifacts"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Transport Layer Security (TLS) ensures "
+#~ "the communication between endpoints is "
+#~ "encrypted. This guide describes how to"
+#~ " establish secure TLS Superlink ↔ "
+#~ "SuperNodes as well as User ↔ "
+#~ "SuperLink connections."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Using TLS-enabled connections expects "
+#~ "some certificates generated and passed "
+#~ "when launching the SuperLink, the "
+#~ "SuperNodes and when a user (e.g. a"
+#~ " data scientist that wants to submit"
+#~ " a ``Run``) interacts with the "
+#~ "federation via the `flwr CLI <ref-"
+#~ "api-cli.html>`_."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "We have prepared a script that can"
+#~ " be used to generate such set "
+#~ "of certificates. While using these are"
+#~ " fine for prototyping, we advice you"
+#~ " to follow the standards set in "
+#~ "your team/organization and generated the "
+#~ "certificates and share them with the "
+#~ "corresponding parties. Refer to the "
+#~ "**Generate TLS certificates** section in "
+#~ "the example linked at the top of"
+#~ " this guide."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The approach for generating TLS "
+#~ "certificates in the context of this "
+#~ "example can serve as an inspiration "
+#~ "and starting point, but it should "
+#~ "not be used as a reference for "
+#~ "production environments. Please refer to "
+#~ "other sources regarding the issue of "
+#~ "correctly generating certificates for "
+#~ "production environments. For non-critical "
+#~ "prototyping or research projects, it "
+#~ "might be sufficient to use the "
+#~ "self-signed certificates generated using "
+#~ "the scripts mentioned in this guide."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "This section describes how to launch "
+#~ "a SuperLink that works on TLS-"
+#~ "enabled connections. The code snippet "
+#~ "below assumes the `certificates/` directory"
+#~ " is in the same directory where "
+#~ "you execute the command from. Edit "
+#~ "the paths accordingtly if that is "
+#~ "not the case. When providing "
+#~ "certificates, the SuperLink expects a "
+#~ "tuple of three certificates paths: CA"
+#~ " certificate, server certificate and server"
+#~ " private key."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "This section describes how to launch "
+#~ "a SuperNode that works on TLS-"
+#~ "enabled connections. The code snippet "
+#~ "below assumes the `certificates/` directory"
+#~ " is in the same directory where "
+#~ "you execute the command from. To "
+#~ "enable TLS, the only change required "
+#~ "when launching the SuperNode is "
+#~ "replacing ``--insecure`` with ``--root-"
+#~ "certificates``"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``--root-certificates``:This specifies the "
+#~ "location of the CA certificate file. "
+#~ "The ``ca.crt`` file is used to "
+#~ "verify the identity of the SuperLink."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "You should now have learned how to"
+#~ " generate self-signed certificates using"
+#~ " the given script, start an TLS-"
+#~ "enabled server and have two clients "
+#~ "establish secure connections to it. You"
+#~ " should also have learned how to "
+#~ "run your Flower project using ``flwr "
+#~ "run`` with TLS enabled. All other "
+#~ "commands in the `Flower CLI <ref-"
+#~ "api-cli.html>`_ will also be TLS-"
+#~ "enabled."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "In the current version of Flower, "
+#~ "both of the connections above are "
+#~ "insecure because Flower assumes that the"
+#~ " following groups of processes run "
+#~ "within the same trusted network:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Each group must remain inside a "
+#~ "single trusted network. They should "
+#~ "never communicate with each other over"
+#~ " untrusted networks (e.g., the public "
+#~ "internet)."
 #~ msgstr ""
 
