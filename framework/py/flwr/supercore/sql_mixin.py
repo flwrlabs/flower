@@ -24,13 +24,17 @@ from logging import DEBUG, ERROR, WARNING
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Engine, MetaData, create_engine, event, inspect, text
+from sqlalchemy import Engine, MetaData, create_engine, event, inspect, make_url, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from flwr.common.logger import log
-from flwr.supercore.constant import FLWR_IN_MEMORY_SQLITE_DB_URL, SQLITE_PRAGMAS
+from flwr.supercore.constant import (
+    FLWR_IN_MEMORY_SQLITE_DB_URL,
+    SQL_ALLOWED_DIALECTS,
+    SQLITE_PRAGMAS,
+)
 from flwr.supercore.state.alembic.utils import run_migrations
 
 _current_session: ContextVar[Session | None] = ContextVar(
@@ -60,12 +64,11 @@ def _log_query(  # pylint: disable=W0613,R0913,R0917
 
 
 class SqlMixin(ABC):
-    """Mixin providing common SQLite connection and initialization logic.
+    """Mixin providing common SQL connection and initialization logic."""
 
-    This mixin uses SQLAlchemy Core API for SQLite database access. It accepts either a
-    database file path or a SQLite URL, automatically converting file paths to SQLite
-    URLs.
-    """
+    # Subclasses can restrict supported SQLAlchemy dialects.
+    # Flower Framework SQL backend currently allows only the SQLite dialect.
+    allowed_dialects: frozenset[str] = SQL_ALLOWED_DIALECTS
 
     def __init__(self, database_path: str) -> None:
         """Initialize the SqlMixin.
@@ -95,19 +98,43 @@ class SqlMixin(ABC):
             )
             database_path = ":memory:"
 
-        # Auto-convert file path to SQLAlchemy SQLite URL if needed
-        if database_path == ":memory:":
-            self.database_url = FLWR_IN_MEMORY_SQLITE_DB_URL
-        elif not database_path.startswith("sqlite://"):
-            # Treat as file path, convert to absolute and create SQLite URL
-            abs_path = Path(database_path).resolve()
-            self.database_url = f"sqlite:///{abs_path}"
-        else:
-            # Already a SQLite URL
-            self.database_url = database_path
+        self.database_url = self._normalize_database_url(database_path)
+        self.database_backend = make_url(self.database_url).get_backend_name()
+        self._validate_allowed_dialects(self.database_backend)
 
         self._engine: Engine | None = None
         self._session_factory: sessionmaker[Session] | None = None
+
+    def _normalize_database_url(self, database_path: str) -> str:
+        """Normalize user input to a SQLAlchemy database URL."""
+        if database_path == ":memory:":
+            return FLWR_IN_MEMORY_SQLITE_DB_URL
+
+        # Explicit SQLAlchemy URL, keep as-is for dialect validation.
+        if "://" in database_path:
+            return database_path.strip()
+
+        # Treat as file path and convert to a SQLite URL.
+        abs_path = Path(database_path).resolve()
+        return f"sqlite:///{abs_path}"
+
+    def _validate_allowed_dialects(self, dialect: str) -> None:
+        """Validate configured dialect against class-level restrictions."""
+        allowed = self.allowed_dialects
+        if allowed is None or dialect in allowed:
+            return
+
+        allowed_str = ", ".join(sorted(allowed))
+        hint = (
+            " Supported backends are in-memory and SQLite paths/URLs."
+            if "sqlite" in allowed
+            else ""
+        )
+
+        raise ValueError(
+            f"Unsupported SQL dialect {dialect!r} for {type(self).__name__}."
+            f" Supported dialects: {allowed_str}.{hint}"
+        )
 
     @contextmanager
     def session(self) -> Iterator[Session]:
@@ -178,11 +205,11 @@ class SqlMixin(ABC):
         list[str]
             The list of all tables in the DB.
         """
-        # Create engine with SQLite-specific settings
-        engine_kwargs: dict[str, Any] = {
+        # Create engine with dialect-specific settings
+        engine_kwargs: dict[str, Any] = {}
+        if self.database_backend == "sqlite":
             # SQLite needs check_same_thread=False for multi-threaded access
-            "connect_args": {"check_same_thread": False}
-        }
+            engine_kwargs["connect_args"] = {"check_same_thread": False}
         # In-memory SQLite databases are per-connection; use StaticPool to ensure
         # all threads share the same database instance.
         if self.database_url == FLWR_IN_MEMORY_SQLITE_DB_URL:
@@ -190,7 +217,8 @@ class SqlMixin(ABC):
         self._engine = create_engine(self.database_url, **engine_kwargs)
 
         # Set SQLite pragmas via event listener for optimal performance and correctness
-        event.listen(self._engine, "connect", _set_sqlite_pragmas)
+        if self.database_backend == "sqlite":
+            event.listen(self._engine, "connect", _set_sqlite_pragmas)
 
         if log_queries:
             # Set up query logging via event listener
