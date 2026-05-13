@@ -88,8 +88,13 @@ class RuntimeVersionClientInterceptor(
             if isinstance(call, grpc.RpcError):
                 self._maybe_exit_on_incompat_error(call)
 
-        if not call.add_callback(_handle_completion):
-            _handle_completion()
+        # NOTE: Some gRPC call objects expose callback registration without
+        # implementing it.
+        try:
+            if not call.add_callback(_handle_completion):
+                _handle_completion()
+        except (NotImplementedError, AttributeError):
+            pass
 
         return call
 
@@ -210,7 +215,7 @@ class RuntimeVersionServerInterceptor(grpc.ServerInterceptor):  # type: ignore[m
 def create_serverappio_runtime_version_server_interceptor(
     connection_name: str = "Caller <-> SuperLink ServerAppIo API",
     send_warning_metadata: bool = False,
-    reject_incompatible: bool = False,
+    reject_incompatible: bool = True,
 ) -> RuntimeVersionServerInterceptor:
     """Create the default runtime version interceptor for ServerAppIo."""
     return RuntimeVersionServerInterceptor(
@@ -224,7 +229,7 @@ def create_serverappio_runtime_version_server_interceptor(
 def create_clientappio_runtime_version_server_interceptor(
     connection_name: str = "Caller <-> SuperNode ClientAppIo API",
     send_warning_metadata: bool = False,
-    reject_incompatible: bool = False,
+    reject_incompatible: bool = True,
 ) -> RuntimeVersionServerInterceptor:
     """Create the default runtime version interceptor for ClientAppIo."""
     return RuntimeVersionServerInterceptor(
