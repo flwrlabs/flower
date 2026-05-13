@@ -137,13 +137,12 @@ runtime, as summarized in the table below.
 
 .. note::
 
-    AppIo APIs enforce runtime version compatibility between the API server and
-    its callers. By default, requests from callers using an incompatible
-    major.minor runtime version are rejected before AppIo communication proceeds.
-    Older callers without runtime metadata are currently accepted by this
-    compatibility check for backward compatibility. Keep the SuperLink,
-    SuperNode, SuperExec, ``ServerApp``, and ``ClientApp`` runtime components on
-    compatible Flower versions.
+    AppIo APIs enforce runtime version compatibility between the API server and its
+    callers. By default, requests from callers using an incompatible major.minor runtime
+    version are rejected before AppIo communication proceeds. Older callers without
+    runtime metadata are currently accepted by this compatibility check for backward
+    compatibility. Keep the SuperLink, SuperNode, SuperExec, ``ServerApp``, and
+    ``ClientApp`` runtime components on compatible Flower versions.
 
 Isolation Mode
 ==============
