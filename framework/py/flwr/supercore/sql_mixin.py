@@ -27,6 +27,7 @@ from typing import Any
 from sqlalchemy import Engine, MetaData, create_engine, event, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from flwr.common.logger import log
 from flwr.supercore.constant import FLWR_IN_MEMORY_SQLITE_DB_URL, SQLITE_PRAGMAS
@@ -182,6 +183,10 @@ class SqlMixin(ABC):
             # SQLite needs check_same_thread=False for multi-threaded access
             "connect_args": {"check_same_thread": False}
         }
+        # In-memory SQLite databases are per-connection; use StaticPool to ensure
+        # all threads share the same database instance.
+        if self.database_url == FLWR_IN_MEMORY_SQLITE_DB_URL:
+            engine_kwargs["poolclass"] = StaticPool
         self._engine = create_engine(self.database_url, **engine_kwargs)
 
         # Set SQLite pragmas via event listener for optimal performance and correctness
