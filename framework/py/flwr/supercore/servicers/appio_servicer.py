@@ -29,6 +29,10 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     CreateTaskResponse,
     PullPendingTasksRequest,
     PullPendingTasksResponse,
+    PullTaskMessageRequest,
+    PullTaskMessageResponse,
+    PushTaskMessageRequest,
+    PushTaskMessageResponse,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
@@ -110,6 +114,26 @@ class AppIoServicer(ABC):
             raise RuntimeError("This line should never be reached.")
 
         return CreateTaskResponse(task_id=created_task_id)
+
+    def PushTaskMessage(
+        self, request: PushTaskMessageRequest, context: grpc.ServicerContext
+    ) -> PushTaskMessageResponse:
+        """Push a task message."""
+        log(DEBUG, "AppIoServicer.PushTaskMessage")
+        context.abort(
+            grpc.StatusCode.UNIMPLEMENTED, "PushTaskMessage is not implemented"
+        )
+        raise RuntimeError("This line should never be reached.")
+
+    def PullTaskMessage(
+        self, request: PullTaskMessageRequest, context: grpc.ServicerContext
+    ) -> PullTaskMessageResponse:
+        """Pull task messages."""
+        log(DEBUG, "AppIoServicer.PullTaskMessage")
+        context.abort(
+            grpc.StatusCode.UNIMPLEMENTED, "PullTaskMessage is not implemented"
+        )
+        raise RuntimeError("This line should never be reached.")
 
     def PushLogs(
         self, request: PushLogsRequest, context: grpc.ServicerContext
