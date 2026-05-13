@@ -40,6 +40,7 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
     PushLogsResponse,
 )
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import (
     TASK_TYPES_ALLOWED_TO_CREATE_TASKS,
     TASK_TYPES_REQUIRING_CONNECTOR_REF,
@@ -99,8 +100,7 @@ class AppIoServicer(ABC):
         authenticated_task = get_authenticated_task()
         run_id = authenticated_task.run_id
 
-        _validate_task_creator(authenticated_task.type, context)
-        _validate_create_task_request(request, context)
+        _validate_create_task_request(request, authenticated_task, context)
 
         state = self.state()
         created_task_id = state.create_task(
@@ -153,52 +153,51 @@ class AppIoServicer(ABC):
         return PushLogsResponse()
 
 
-def _validate_task_creator(
-    parent_task_type: str, context: grpc.ServicerContext
-) -> None:
-    """Validate that the parent task is allowed to create child tasks."""
-    try:
-        task_type = TaskType(parent_task_type)
-    except ValueError:
-        context.abort(
-            grpc.StatusCode.PERMISSION_DENIED,
-            f"Task type '{parent_task_type}' is not allowed to create tasks.",
-        )
-        raise RuntimeError("This line should never be reached.") from None
-
-    if task_type not in TASK_TYPES_ALLOWED_TO_CREATE_TASKS:
-        context.abort(
-            grpc.StatusCode.PERMISSION_DENIED,
-            f"Task type '{parent_task_type}' is not allowed to create tasks.",
-        )
-        raise RuntimeError("This line should never be reached.")
-
-
 def _validate_create_task_request(
-    request: CreateTaskRequest, context: grpc.ServicerContext
+    request: CreateTaskRequest, parent_task: Task, context: grpc.ServicerContext
 ) -> None:
     """Validate the task creation request."""
     try:
-        task_type = TaskType(request.type)
+        parent_task_type = TaskType(parent_task.type)
+    except ValueError:
+        context.abort(
+            grpc.StatusCode.PERMISSION_DENIED,
+            f"Task type '{parent_task.type}' is not allowed to create tasks.",
+        )
+        raise RuntimeError("This line should never be reached.") from None
+
+    if parent_task_type not in TASK_TYPES_ALLOWED_TO_CREATE_TASKS:
+        context.abort(
+            grpc.StatusCode.PERMISSION_DENIED,
+            f"Task type '{parent_task.type}' is not allowed to create tasks.",
+        )
+        raise RuntimeError("This line should never be reached.")
+
+    try:
+        child_task_type = TaskType(request.type)
     except ValueError:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Invalid task type: {request.type}",
         )
+        raise RuntimeError("This line should never be reached.") from None
 
-    if task_type in TASK_TYPES_REQUIRING_FAB_HASH and not request.fab_hash:
+    if child_task_type in TASK_TYPES_REQUIRING_FAB_HASH and not request.fab_hash:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires fab_hash.",
         )
 
-    if task_type in TASK_TYPES_REQUIRING_MODEL_REF and not request.model_ref:
+    if child_task_type in TASK_TYPES_REQUIRING_MODEL_REF and not request.model_ref:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires model_ref.",
         )
 
-    if task_type in TASK_TYPES_REQUIRING_CONNECTOR_REF and not request.connector_ref:
+    if (
+        child_task_type in TASK_TYPES_REQUIRING_CONNECTOR_REF
+        and not request.connector_ref
+    ):
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires connector_ref.",
