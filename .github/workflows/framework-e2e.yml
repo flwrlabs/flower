@@ -88,7 +88,7 @@ jobs:
         exclude:
           - connection: insecure
             authentication: client-auth
-    name: Control API / Python ${{ matrix.python-version }} / ${{ matrix.connection }} /  ${{ matrix.authentication }} /  ${{ matrix.engine }}
+    name: Control API / Python ${{ matrix.python-version }} / ${{ matrix.connection }} / ${{ matrix.authentication }} / ${{ matrix.engine }}
     defaults:
       run:
         working-directory: framework/e2e/${{ matrix.directory }}
@@ -120,9 +120,9 @@ jobs:
             python -m pip install "${WHEEL_URL}"
           fi
       - name: >
-          Run Control API test / 
-          ${{ matrix.connection }} / 
-          ${{ matrix.authentication }} / 
+          Run Control API test /
+          ${{ matrix.connection }} /
+          ${{ matrix.authentication }} /
           ${{ matrix.engine }}
         if: ${{ needs.changes.outputs.framework == 'true' }}
         working-directory: framework/e2e/${{ matrix.directory }}
@@ -487,9 +487,9 @@ jobs:
             python -m pip install "${WHEEL_URL}" "numpy>=${{ matrix.numpy-version }},<2.0"
           fi
       - name: >
-          Run Flower - NumPy 1.26 test / 
-          ${{ matrix.connection }} / 
-          ${{ matrix.authentication }} / 
+          Run Flower - NumPy 1.26 test /
+          ${{ matrix.connection }} /
+          ${{ matrix.authentication }} /
           ${{ matrix.engine }}
         if: ${{ needs.changes.outputs.framework == 'true' }}
         working-directory: framework/e2e/${{ matrix.directory }}
