@@ -745,10 +745,38 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 if run_id in self.run_ids
             }
 
+    def _fail_sibling_tasks(
+        self, run_primary_pairs: list[tuple[int, int]], details: str
+    ) -> None:
+        """Fail all unfinished sibling tasks for the given run/primary-task pairs.
+
+        Each sibling task's ``finished_at`` is copied from its run's primary task.
+        """
+        for run_id, primary_task_id in run_primary_pairs:
+            primary_task = self.task_store.get(primary_task_id)
+            if primary_task is None:
+                continue
+            finished_at = primary_task.finished_at
+            for task in self.task_store.values():
+                if task.run_id == run_id and task.status.status != Status.FINISHED:
+                    task.finished_at = finished_at
+                    task.status.status = Status.FINISHED
+                    task.status.sub_status = SubStatus.FAILED
+                    task.status.details = details
+                    if record := self.task_token_store.pop(task.task_id, None):
+                        self.task_token_to_task_id.pop(record.token, None)
+
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
         result = super().finish_task(task_id, sub_status, details)
         if result and self._is_primary_task(task_id):
+            with self.lock_task_store:
+                task = self.task_store.get(task_id)
+                if task is not None:
+                    self._fail_sibling_tasks(
+                        [(task.run_id, task_id)],
+                        details="Task failed because the primary task finished",
+                    )
             self.federation_manager.report_run_usage()
         return result
 
@@ -759,25 +787,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         unfinished tasks in that run as finished with FAILED status, removes any
         associated task tokens, and reports run usage.
         """
-        expired_run_ids = {
-            task.run_id for task in tasks if self._is_primary_task(task.task_id)
-        }
-        if not expired_run_ids:
+        pairs = [
+            (task.run_id, task.task_id)
+            for task in tasks
+            if self._is_primary_task(task.task_id)
+        ]
+        if not pairs:
             return
 
-        finished_at = now().isoformat()
-        for task in self.task_store.values():
-            if task.run_id in expired_run_ids and task.status.status != Status.FINISHED:
-                # Transition to finished with FAILED status due to expired run
-                task.finished_at = finished_at
-                task.status.status = Status.FINISHED
-                task.status.sub_status = SubStatus.FAILED
-                task.status.details = "Task failed because the run expired"
-
-                # Clean up task tokens
-                if record := self.task_token_store.pop(task.task_id, None):
-                    self.task_token_to_task_id.pop(record.token, None)
-
+        self._fail_sibling_tasks(pairs, details="Task failed because the run expired")
         self.federation_manager.report_run_usage()
 
     def acknowledge_node_heartbeat(

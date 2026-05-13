@@ -57,6 +57,7 @@ from flwr.superlink.federation import FederationManager
 
 from .linkstate import LinkState
 from .utils import (
+    build_params,
     check_node_availability_for_in_message,
     context_from_bytes,
     context_to_bytes,
@@ -1118,17 +1119,59 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         return simulation_config_from_json(json.loads(fed_config_json))
 
+    def _fail_sibling_tasks(
+        self, run_primary_pairs: list[tuple[int, int]], details: str
+    ) -> None:
+        """Fail all unfinished sibling tasks for the given run/primary-task pairs.
+
+        The IDs must be sint64 DB values. Each sibling task's ``finished_at`` is
+        copied from its run's primary task.
+        """
+        if not run_primary_pairs:
+            return
+
+        sint_run_ids = [pair[0] for pair in run_primary_pairs]
+        sint_task_ids = [pair[1] for pair in run_primary_pairs]
+        run_id_ph, run_id_params = build_params(sint_run_ids, "run_id")
+        pt_id_ph, pt_id_params = build_params(sint_task_ids, "pt_id")
+
+        self.query(
+            f"""
+            UPDATE task
+            SET finished_at = (
+                    SELECT pt.finished_at FROM task pt
+                    WHERE pt.task_id IN ({pt_id_ph}) AND pt.run_id = task.run_id
+                ),
+                sub_status = :sub_status,
+                details = :details,
+                active_until = NULL,
+                token = NULL
+            WHERE run_id IN ({run_id_ph}) AND finished_at IS NULL
+            """,
+            {
+                **run_id_params,
+                **pt_id_params,
+                "sub_status": SubStatus.FAILED,
+                "details": details,
+            },
+        )
+
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
         result = super().finish_task(task_id, sub_status, details)
         if result:
+            sint64_task_id = uint64_to_int64(task_id)
             # Check whether this task is referenced as a run's primary task
             rows = self.query(
-                "SELECT 1 FROM run WHERE primary_task_id = :task_id",
-                {"task_id": uint64_to_int64(task_id)},
+                "SELECT run_id FROM run WHERE primary_task_id = :task_id",
+                {"task_id": sint64_task_id},
             )
-            # If yes, report usage for the run
             if rows:
+                # Fail any remaining sibling tasks and report usage
+                self._fail_sibling_tasks(
+                    [(rows[0]["run_id"], sint64_task_id)],
+                    details="Task failed because the run finished",
+                )
                 self.federation_manager.report_run_usage()
         return result
 
@@ -1142,35 +1185,22 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         if not tasks:
             return
 
-        # Check if any of the expired tasks is referenced as a run's primary task
-        task_ids = [uint64_to_int64(task.task_id) for task in tasks]
-        placeholders = ",".join([f":task_id_{i}" for i in range(len(task_ids))])
+        # Check if any of the expired tasks is referenced as a run's primary task.
+        task_id_ph, task_id_params = build_params(
+            [uint64_to_int64(task.task_id) for task in tasks], "task_id"
+        )
         rows = self.query(
-            f"SELECT run_id FROM run WHERE primary_task_id IN ({placeholders})",
-            {f"task_id_{i}": task_id for i, task_id in enumerate(task_ids)},
+            f"SELECT run_id, primary_task_id FROM run"
+            f" WHERE primary_task_id IN ({task_id_ph})",
+            task_id_params,
         )
         if not rows:
             return
 
-        # Fail non-finished tasks for expired runs
-        run_id_params = {f"run_id_{i}": row["run_id"] for i, row in enumerate(rows)}
-        self.query(
-            f"""
-            UPDATE task
-            SET finished_at = :finished_at,
-                sub_status = :sub_status,
-                details = :details,
-                active_until = NULL,
-                token = NULL
-            WHERE run_id IN ({','.join([f':run_id_{i}' for i in range(len(rows))])})
-                AND finished_at IS NULL
-            """,
-            {
-                "finished_at": now().isoformat(),
-                "sub_status": SubStatus.FAILED,
-                "details": "Task failed because the run expired",
-                **run_id_params,
-            },
+        # Fail any remaining sibling tasks for expired runs
+        self._fail_sibling_tasks(
+            [(row["run_id"], row["primary_task_id"]) for row in rows],
+            details="Task failed because the run expired",
         )
 
         # Report usage for the run
