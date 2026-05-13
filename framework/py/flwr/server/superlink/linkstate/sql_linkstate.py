@@ -84,6 +84,8 @@ PRIMARY_TASK_STATUS_CONDITIONS = {
 class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     """SQLAlchemy-based LinkState implementation."""
 
+    _claim_message_ins_select_lock_clause = ""
+
     def __init__(
         self,
         database_path: str,
@@ -326,13 +328,19 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """
         condition = common_condition
         if limit is not None:
+            select_lock_clause = self._claim_message_ins_select_lock_clause
+            select_lock_sql = (
+                f"\n                    {select_lock_clause}"
+                if select_lock_clause
+                else ""
+            )
             condition = f"""
                 message_id IN (
                     SELECT message_id
                     FROM message_ins
                     WHERE {common_condition}
                     ORDER BY created_at, message_id
-                    LIMIT :limit
+                    LIMIT :limit{select_lock_sql}
                 )
                 AND delivered_at = ''
             """

@@ -1972,6 +1972,26 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         self.assertIn("ORDER BY created_at, message_id", captured[0])
         self.assertNotIn("rowid", captured[0])
 
+    def test_message_ins_claim_can_append_select_lock_clause(self) -> None:
+        """Message claiming can append a subclass-provided row-locking clause."""
+        state = self.state_factory()
+        captured: list[str] = []
+
+        # pylint: disable-next=unused-argument
+        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
+            captured.append(query)
+            return []
+
+        state.query = fake_query  # type: ignore[method-assign]
+        state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
+        self.assertNotIn("FOR TEST LOCK", captured[0])
+
+        state._claim_message_ins_select_lock_clause = (  # pylint: disable=protected-access
+            "FOR TEST LOCK"
+        )
+        state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
+        self.assertIn("FOR TEST LOCK", captured[1])
+
     def test_token_expiry_does_not_overwrite_finished_completed_run(self) -> None:
         """Ensure token cleanup doesn't mutate terminal COMPLETED status."""
         # Prepare
