@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """VerticalSizePartitioner class tests."""
+
 # mypy: disable-error-code=arg-type
 # pylint: disable=R0902, R0913
 import unittest

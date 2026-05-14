@@ -14,7 +14,6 @@
 # ==============================================================================
 """Label distribution bar plotting."""
 
-
 from typing import Any
 
 import numpy as np

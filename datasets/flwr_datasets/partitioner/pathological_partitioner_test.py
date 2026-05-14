@@ -14,7 +14,6 @@
 # ==============================================================================
 """Test cases for PathologicalPartitioner."""
 
-
 import unittest
 
 import numpy as np

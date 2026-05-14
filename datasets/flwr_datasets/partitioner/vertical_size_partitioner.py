@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """VerticalSizePartitioner class."""
+
 # noqa: E501
 # pylint: disable=C0301, R0902, R0913
 from math import floor

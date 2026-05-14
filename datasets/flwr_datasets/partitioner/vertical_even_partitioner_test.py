@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """VerticalEvenPartitioner class tests."""
+
 # mypy: disable-error-code=list-item
 import unittest
 

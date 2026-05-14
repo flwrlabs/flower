@@ -14,7 +14,6 @@
 # ==============================================================================
 """NaturalIdPartitioner partitioner tests."""
 
-
 import itertools
 import math
 import unittest

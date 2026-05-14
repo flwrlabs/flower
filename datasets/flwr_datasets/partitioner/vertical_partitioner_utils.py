@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """VerticalPartitioner utils.py."""
+
 # noqa: E501
 # pylint: disable=C0301
 from typing import Any, Literal

@@ -14,7 +14,6 @@
 # ==============================================================================
 """Test ShardPartitioner."""
 
-
 # pylint: disable=W0212, R0913
 import unittest
 

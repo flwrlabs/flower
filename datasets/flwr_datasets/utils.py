@@ -14,7 +14,6 @@
 # ==============================================================================
 """Utils for FederatedDataset."""
 
-
 import warnings
 from typing import cast
 

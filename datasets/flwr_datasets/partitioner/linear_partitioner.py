@@ -14,7 +14,6 @@
 # ==============================================================================
 """LinearPartitioner class."""
 
-
 from flwr_datasets.partitioner.id_to_size_fnc_partitioner import IdToSizeFncPartitioner
 
 

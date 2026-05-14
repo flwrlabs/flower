@@ -14,7 +14,6 @@
 # ==============================================================================
 """Flower Datasets command line interface `create` command."""
 
-
 from pathlib import Path
 from typing import Annotated
 
@@ -50,9 +49,8 @@ def create(
 ) -> None:
     """Create a federated dataset and save each partition in a sub-directory.
 
-    This command is used to generate federated datasets
-    for demo purposes and currently supports only IID
-    partitioning `IidPartitioner`.
+    This command is used to generate federated datasets for demo purposes and currently
+    supports only IID partitioning `IidPartitioner`.
     """
     # Validate number of partitions
     if num_partitions <= 0:

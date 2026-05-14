@@ -14,7 +14,6 @@
 # ==============================================================================
 """Merger class for Flower Datasets."""
 
-
 import collections
 import warnings
 from functools import reduce

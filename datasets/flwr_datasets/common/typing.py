@@ -14,7 +14,6 @@
 # ==============================================================================
 """Flower Datasets type definitions."""
 
-
 from typing import Any
 
 import numpy as np

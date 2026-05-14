@@ -14,7 +14,6 @@
 # ==============================================================================
 """Label distribution plotting."""
 
-
 from typing import Any
 
 import matplotlib.colors as mcolors

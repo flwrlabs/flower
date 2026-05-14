@@ -14,7 +14,6 @@
 # ==============================================================================
 """Comparison of label distribution plotting."""
 
-
 from typing import Any, Literal
 
 import matplotlib.colors as mcolors

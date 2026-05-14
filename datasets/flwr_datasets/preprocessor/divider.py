@@ -14,7 +14,6 @@
 # ==============================================================================
 """Divider class for Flower Datasets."""
 
-
 import collections
 import warnings
 from typing import cast

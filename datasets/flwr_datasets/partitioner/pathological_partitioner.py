@@ -14,7 +14,6 @@
 # ==============================================================================
 """Pathological partitioner class that works with Hugging Face Datasets."""
 
-
 import warnings
 from typing import Any, Literal
 

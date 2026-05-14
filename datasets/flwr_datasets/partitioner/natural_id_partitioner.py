@@ -14,7 +14,6 @@
 # ==============================================================================
 """Natural id partitioner class that works with Hugging Face Datasets."""
 
-
 import numpy as np
 from tqdm import tqdm
 

@@ -14,7 +14,6 @@
 # ==============================================================================
 """SizePartitioner class."""
 
-
 import warnings
 from collections.abc import Sequence
 

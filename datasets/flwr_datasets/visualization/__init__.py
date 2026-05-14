@@ -14,7 +14,6 @@
 # ==============================================================================
 """Visualization package."""
 
-
 from .comparison_label_distribution import plot_comparison_label_distribution
 from .label_distribution import plot_label_distributions
 

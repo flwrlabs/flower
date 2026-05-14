@@ -17,7 +17,6 @@
 The code is an exact copy from flwr.
 """
 
-
 import importlib.metadata as importlib_metadata
 
 

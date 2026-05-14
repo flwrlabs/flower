@@ -14,7 +14,6 @@
 # ==============================================================================
 """Test GroupedNaturalIdPartitioner."""
 
-
 import unittest
 from typing import Literal
 

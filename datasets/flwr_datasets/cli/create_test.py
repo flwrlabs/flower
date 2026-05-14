@@ -14,7 +14,6 @@
 # ==============================================================================
 """Test for Flower Datasets command line interface `create` command."""
 
-
 import re
 from dataclasses import dataclass
 from pathlib import Path

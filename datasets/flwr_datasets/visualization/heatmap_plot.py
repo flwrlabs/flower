@@ -14,7 +14,6 @@
 # ==============================================================================
 """Label distribution heatmap plotting."""
 
-
 from typing import Any
 
 import numpy as np

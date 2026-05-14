@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """VerticalEvenPartitioner class."""
+
 # noqa: E501
 # pylint: disable=C0301, R0902, R0913
 from typing import Literal

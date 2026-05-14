@@ -14,7 +14,6 @@
 # ==============================================================================
 """Continuous partitioner class that works with Hugging Face Datasets."""
 
-
 # pylint: disable=R0913, R0917
 
 import numpy as np

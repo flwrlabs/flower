@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for metrics utils."""
 
-
 import unittest
 
 import pandas as pd

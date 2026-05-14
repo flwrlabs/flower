@@ -14,7 +14,6 @@
 # ==============================================================================
 """Plotting utils."""
 
-
 from flwr_datasets.visualization.constants import AXIS_TYPES, PLOT_TYPES, SIZE_UNITS
 
 

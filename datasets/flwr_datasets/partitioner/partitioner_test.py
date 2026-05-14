@@ -14,7 +14,6 @@
 # ==============================================================================
 """Abstract partitioner tests."""
 
-
 import unittest
 
 import datasets

@@ -14,7 +14,6 @@
 # ==============================================================================
 """Dirichlet partitioner class that works with Hugging Face Datasets."""
 
-
 import warnings
 
 import numpy as np

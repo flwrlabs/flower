@@ -14,7 +14,6 @@
 # ==============================================================================
 """IID partitioner class that works with Hugging Face Datasets."""
 
-
 import datasets
 from flwr_datasets.partitioner.partitioner import Partitioner
 

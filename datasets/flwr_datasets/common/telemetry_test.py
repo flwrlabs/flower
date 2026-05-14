@@ -14,7 +14,6 @@
 # ==============================================================================
 """Telemetry tests."""
 
-
 import time
 import unittest
 from collections.abc import Callable

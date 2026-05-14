@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """InnerDirichlet partitioner."""
+
 import warnings
 from typing import cast
 

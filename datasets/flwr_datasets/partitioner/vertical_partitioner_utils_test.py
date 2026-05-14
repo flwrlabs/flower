@@ -13,6 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """Tests for vertical partitioner utilities."""
+
 import unittest
 from typing import Any, Literal
 

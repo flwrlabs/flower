@@ -14,7 +14,6 @@
 # ==============================================================================
 """Flower telemetry."""
 
-
 import datetime
 import json
 import logging

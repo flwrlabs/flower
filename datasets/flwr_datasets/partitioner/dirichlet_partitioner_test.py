@@ -14,7 +14,6 @@
 # ==============================================================================
 """Test DirichletPartitioner."""
 
-
 # pylint: disable=W0212
 import unittest
 

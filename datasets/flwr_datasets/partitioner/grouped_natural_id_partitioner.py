@@ -14,7 +14,6 @@
 # ==============================================================================
 """Grouped natural id partitioner class that works with Hugging Face Datasets."""
 
-
 from typing import Any, Literal
 
 import numpy as np

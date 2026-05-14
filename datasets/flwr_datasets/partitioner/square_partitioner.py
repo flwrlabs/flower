@@ -14,7 +14,6 @@
 # ==============================================================================
 """SquarePartitioner class."""
 
-
 import numpy as np
 
 from flwr_datasets.partitioner.id_to_size_fnc_partitioner import IdToSizeFncPartitioner
