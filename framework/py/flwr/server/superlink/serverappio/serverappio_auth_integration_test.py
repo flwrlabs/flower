@@ -20,6 +20,7 @@ import unittest
 from collections.abc import Callable
 
 import grpc
+from google.protobuf.message import Message as GrpcMessage
 
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
@@ -139,12 +140,12 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         self,
         *,
         method: str,
-        request: object,
+        request: GrpcMessage,
         response_deserializer: Callable[[bytes], object],
     ) -> None:
         rpc = self._base_channel.unary_unary(
             method,
-            request_serializer=request.__class__.SerializeToString,
+            request_serializer=type(request).SerializeToString,
             response_deserializer=response_deserializer,
         )
         with self.assertRaises(grpc.RpcError) as err:
@@ -180,7 +181,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
 
     def test_serverapp_only_endpoints_denied_for_simulation_run(self) -> None:
         """ServerApp-only RPCs should deny simulation-run tokens."""
-        cases: list[tuple[str, object, Callable[[bytes], object]]] = [
+        cases: list[tuple[str, GrpcMessage, Callable[[bytes], object]]] = [
             (
                 "/flwr.proto.ServerAppIo/GetNodes",
                 GetNodesRequest(),
@@ -223,7 +224,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
 
     def test_shared_task_endpoints_allow_simulation_run(self) -> None:
         """Shared task RPCs should still allow simulation-run tokens."""
-        cases: list[tuple[str, object, Callable[[bytes], object]]] = [
+        cases: list[tuple[str, GrpcMessage, Callable[[bytes], object]]] = [
             (
                 "/flwr.proto.ServerAppIo/SendTaskHeartbeat",
                 SendTaskHeartbeatRequest(),
@@ -240,7 +241,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
             with self.subTest(method=method):
                 rpc = self._base_channel.unary_unary(
                     method,
-                    request_serializer=request.__class__.SerializeToString,
+                    request_serializer=type(request).SerializeToString,
                     response_deserializer=response_deserializer,
                 )
                 response, call = rpc.with_call(
