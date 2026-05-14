@@ -29,7 +29,7 @@ from abc import abstractmethod
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, PropertyMock, patch
 from uuid import uuid4
 
 from parameterized import parameterized
@@ -1971,6 +1971,34 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         self.assertTrue(captured)
         self.assertIn("ORDER BY created_at, message_id", captured[0])
         self.assertNotIn("rowid", captured[0])
+
+    def test_message_ins_claim_can_append_select_lock_clause(self) -> None:
+        """Message claiming can append a subclass-provided row-locking clause."""
+        # Prepare
+        state = self.state_factory()
+        last_query = ""
+
+        # pylint: disable-next=unused-argument
+        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
+            nonlocal last_query
+            last_query = query
+            return []
+
+        state.query = fake_query  # type: ignore[method-assign]
+
+        # Execute & assert - without lock clause
+        state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
+        self.assertNotIn("FOR TEST LOCK", last_query)
+
+        # Execute & assert - with lock clause
+        with patch.object(
+            type(state),
+            "select_lock_sql",
+            new_callable=PropertyMock,
+            return_value="FOR TEST LOCK",
+        ):
+            state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
+        self.assertIn("FOR TEST LOCK", last_query)
 
     def test_token_expiry_does_not_overwrite_finished_completed_run(self) -> None:
         """Ensure token cleanup doesn't mutate terminal COMPLETED status."""
