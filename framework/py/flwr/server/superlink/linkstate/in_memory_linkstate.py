@@ -100,29 +100,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """Get the FederationManager instance."""
         return self._federation_manager
 
-    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        self,
-        task_type: str,
-        run_id: int,
-        fab_hash: str | None = None,
-        model_ref: str | None = None,
-        connector_ref: str | None = None,
-    ) -> int | None:
-        """Create a task."""
-        with self.lock:
-            if run_id not in self.run_ids:
-                raise RuntimeError(
-                    f"Run {run_id} not found. create_task requires an existing run."
-                )
-
-            return super().create_task(
-                task_type=task_type,
-                run_id=run_id,
-                fab_hash=fab_hash,
-                model_ref=model_ref,
-                connector_ref=connector_ref,
-            )
-
     def _get_run(self, run_id: int) -> Run:
         """Return run metadata with lifecycle fields from its primary task."""
         run = self.run_ids[run_id].run

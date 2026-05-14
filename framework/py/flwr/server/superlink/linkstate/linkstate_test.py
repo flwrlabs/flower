@@ -176,16 +176,6 @@ class StateTest(CoreStateTest):
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
 
-    def test_create_task_rejects_missing_run(self) -> None:
-        """Creating a task for an unknown run should fail."""
-        state = self.state_factory()
-
-        with self.assertRaisesRegex(
-            RuntimeError,
-            "Run 42 not found. create_task requires an existing run.",
-        ):
-            state.create_task(task_type="flwr-model", run_id=42)
-
     def test_get_run_info_without_filters_returns_all_runs(self) -> None:
         """Test get_run_info returns all runs when no filter is provided."""
         # Prepare
