@@ -14,7 +14,6 @@
 # ==============================================================================
 """In-memory LinkState implementation."""
 
-
 import threading
 from collections import defaultdict
 from collections.abc import Sequence
@@ -115,9 +114,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 raise RuntimeError(
                     f"Run {run_id} not found. create_task requires an existing run."
                 )
-            if self._get_run(run_id).status.status == Status.FINISHED:
-                raise RuntimeError(f"Run {run_id} is finished.")
-
             return super().create_task(
                 task_type=task_type,
                 run_id=run_id,
@@ -160,9 +156,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         # Validate run_id
         if message.metadata.run_id not in self.run_ids:
             log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
-            return None
-        if self._get_run(message.metadata.run_id).status.status == Status.FINISHED:
-            log(ERROR, "Run %s is finished.", message.metadata.run_id)
             return None
         federation = self.run_ids[message.metadata.run_id].run.federation
         # Validate source node ID
@@ -312,9 +305,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         # Validate run_id
         if res_metadata.run_id != ins_metadata.run_id:
             log(ERROR, "`metadata.run_id` is invalid")
-            return None
-        if self._get_run(res_metadata.run_id).status.status == Status.FINISHED:
-            log(ERROR, "Run %s is finished.", res_metadata.run_id)
             return None
 
         message_id = message.metadata.message_id
@@ -828,8 +818,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """Set the context for the specified `run_id`."""
         if run_id not in self.run_ids:
             raise ValueError(f"Run {run_id} not found")
-        if self._get_run(run_id).status.status == Status.FINISHED:
-            raise ValueError(f"Run {run_id} is finished")
         self.contexts[run_id] = context
 
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
