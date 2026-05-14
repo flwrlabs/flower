@@ -21,6 +21,7 @@ from collections.abc import Callable
 
 import grpc
 from google.protobuf.message import Message as GrpcMessage
+from parameterized import parameterized
 
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
@@ -92,8 +93,8 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
 
         # Seed one authenticated task token and reuse it for token-protected RPC
         # checks.
-        self._auth_run_id, self._auth_token = self._create_running_run()
-        self._simulation_run_id, self._simulation_token = self._create_running_run(
+        _, auth_token = self._create_running_run()
+        _, self._simulation_token = self._create_running_run(
             run_type=RunType.SIMULATION
         )
 
@@ -106,7 +107,7 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         )
         auth_channel = grpc.intercept_channel(
             self._base_channel,
-            AppIoTokenClientInterceptor(token=self._auth_token),
+            AppIoTokenClientInterceptor(token=auth_token),
             SuperExecAuthClientInterceptor(
                 master_secret=_SUPEREXEC_SECRET,
                 protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
@@ -136,25 +137,6 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         assert self.state.activate_task(run.primary_task_id)
         return run_id, token
 
-    def _assert_serverapp_only_endpoint_denied(
-        self,
-        *,
-        method: str,
-        request: GrpcMessage,
-        response_deserializer: Callable[[bytes], object],
-    ) -> None:
-        rpc = self._base_channel.unary_unary(
-            method,
-            request_serializer=type(request).SerializeToString,
-            response_deserializer=response_deserializer,
-        )
-        with self.assertRaises(grpc.RpcError) as err:
-            rpc.with_call(
-                request=request,
-                metadata=((TASK_TOKEN_HEADER, self._simulation_token),),
-            )
-        assert err.exception.code() == grpc.StatusCode.PERMISSION_DENIED
-
     def test_get_nodes_denied_without_metadata_token(self) -> None:
         """Protected RPC should deny requests missing metadata token."""
         with self.assertRaises(grpc.RpcError) as err:
@@ -179,74 +161,98 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         assert isinstance(response, GetNodesResponse)
         assert call.code() == grpc.StatusCode.OK
 
-    def test_serverapp_only_endpoints_denied_for_simulation_run(self) -> None:
-        """ServerApp-only RPCs should deny simulation-run tokens."""
-        cases: list[tuple[str, GrpcMessage, Callable[[bytes], object]]] = [
+    @parameterized.expand(
+        [
             (
+                "get_nodes",
                 "/flwr.proto.ServerAppIo/GetNodes",
                 GetNodesRequest(),
                 GetNodesResponse.FromString,
             ),
             (
+                "push_messages",
                 "/flwr.proto.ServerAppIo/PushMessages",
                 PushAppMessagesRequest(),
                 PushAppMessagesResponse.FromString,
             ),
             (
+                "pull_messages",
                 "/flwr.proto.ServerAppIo/PullMessages",
                 PullAppMessagesRequest(),
                 PullAppMessagesResponse.FromString,
             ),
             (
+                "push_object",
                 "/flwr.proto.ServerAppIo/PushObject",
-                PushObjectRequest(run_id=self._simulation_run_id),
+                PushObjectRequest(),
                 PushObjectResponse.FromString,
             ),
             (
+                "pull_object",
                 "/flwr.proto.ServerAppIo/PullObject",
-                PullObjectRequest(run_id=self._simulation_run_id),
+                PullObjectRequest(),
                 PullObjectResponse.FromString,
             ),
             (
+                "confirm_message_received",
                 "/flwr.proto.ServerAppIo/ConfirmMessageReceived",
-                ConfirmMessageReceivedRequest(run_id=self._simulation_run_id),
+                ConfirmMessageReceivedRequest(),
                 ConfirmMessageReceivedResponse.FromString,
             ),
         ]
+    )  # type: ignore
+    def test_serverapp_only_endpoint_denied_for_simulation_run(
+        self,
+        _case_name: str,
+        method: str,
+        request: GrpcMessage,
+        response_deserializer: Callable[[bytes], object],
+    ) -> None:
+        """ServerApp-only RPCs should deny simulation-run tokens."""
+        rpc = self._base_channel.unary_unary(
+            method,
+            request_serializer=type(request).SerializeToString,
+            response_deserializer=response_deserializer,
+        )
+        with self.assertRaises(grpc.RpcError) as err:
+            rpc.with_call(
+                request=request,
+                metadata=((TASK_TOKEN_HEADER, self._simulation_token),),
+            )
+        assert err.exception.code() == grpc.StatusCode.PERMISSION_DENIED
 
-        for method, request, response_deserializer in cases:
-            with self.subTest(method=method):
-                self._assert_serverapp_only_endpoint_denied(
-                    method=method,
-                    request=request,
-                    response_deserializer=response_deserializer,
-                )
-
-    def test_shared_task_endpoints_allow_simulation_run(self) -> None:
-        """Shared task RPCs should still allow simulation-run tokens."""
-        cases: list[tuple[str, GrpcMessage, Callable[[bytes], object]]] = [
+    @parameterized.expand(
+        [
             (
+                "send_task_heartbeat",
                 "/flwr.proto.ServerAppIo/SendTaskHeartbeat",
                 SendTaskHeartbeatRequest(),
                 SendTaskHeartbeatResponse.FromString,
             ),
             (
+                "push_logs",
                 "/flwr.proto.ServerAppIo/PushLogs",
-                PushLogsRequest(run_id=self._simulation_run_id, logs=["hello"]),
+                PushLogsRequest(logs=["hello"]),
                 PushLogsResponse.FromString,
             ),
         ]
-
-        for method, request, response_deserializer in cases:
-            with self.subTest(method=method):
-                rpc = self._base_channel.unary_unary(
-                    method,
-                    request_serializer=type(request).SerializeToString,
-                    response_deserializer=response_deserializer,
-                )
-                response, call = rpc.with_call(
-                    request=request,
-                    metadata=((TASK_TOKEN_HEADER, self._simulation_token),),
-                )
-                assert response is not None
-                assert call.code() == grpc.StatusCode.OK
+    )  # type: ignore
+    def test_shared_task_endpoint_allows_simulation_run(
+        self,
+        _case_name: str,
+        method: str,
+        request: GrpcMessage,
+        response_deserializer: Callable[[bytes], object],
+    ) -> None:
+        """Shared task RPCs should still allow simulation-run tokens."""
+        rpc = self._base_channel.unary_unary(
+            method,
+            request_serializer=type(request).SerializeToString,
+            response_deserializer=response_deserializer,
+        )
+        response, call = rpc.with_call(
+            request=request,
+            metadata=((TASK_TOKEN_HEADER, self._simulation_token),),
+        )
+        assert response is not None
+        assert call.code() == grpc.StatusCode.OK
