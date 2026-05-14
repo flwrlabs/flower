@@ -2035,6 +2035,16 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         state.initialize()
         return state
 
+    def _shared_sql_database(self, tmpdir: str) -> str:
+        """Return database location shared by concurrent SqlLinkState replicas."""
+        return os.path.join(tmpdir, "shared.db")
+
+    def _claim_running_process_target(
+        self,
+    ) -> Callable[[str, int, Any, Any, float], None]:
+        """Return process target for STARTING -> RUNNING claim tests."""
+        return _claim_running_in_separate_process
+
     def _create_shared_sql_states(
         self, database_path: str, num_replicas: int = 2
     ) -> list[SqlLinkState]:
@@ -2096,7 +2106,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         """Ensure concurrent replicas cannot both claim the same instruction."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Prepare
-            db_path = os.path.join(tmpdir, "shared.db")
+            db_path = self._shared_sql_database(tmpdir)
             state = self._create_shared_sql_states(db_path)[0]
             node_id = create_dummy_node(state)
             run_id = create_dummy_run(state)
@@ -2119,7 +2129,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         """Ensure concurrent replicas cannot both claim the same reply Message."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Prepare
-            db_path = os.path.join(tmpdir, "shared.db")
+            db_path = self._shared_sql_database(tmpdir)
             state = self._create_shared_sql_states(db_path)[0]
 
             node_id = create_dummy_node(state)
@@ -2150,7 +2160,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         """Ensure two replicas can each claim work when two Messages are available."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Prepare
-            db_path = os.path.join(tmpdir, "shared.db")
+            db_path = self._shared_sql_database(tmpdir)
             state = self._create_shared_sql_states(db_path)[0]
 
             node_id = create_dummy_node(state)
@@ -2183,7 +2193,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         """Ensure only one replica can claim STARTING -> RUNNING transition."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Prepare
-            db_path = os.path.join(tmpdir, "shared.db")
+            db_path = self._shared_sql_database(tmpdir)
             state = self._create_shared_sql_states(db_path)[0]
             run_id = create_dummy_run(state)
             task_id = get_primary_task_id(state, run_id)
@@ -2195,13 +2205,14 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             timeout = self._CONCURRENT_TEST_TIMEOUT
 
             # Execute
+            claim_target = self._claim_running_process_target()
             processes = [
                 ctx.Process(
-                    target=_claim_running_in_separate_process,
+                    target=claim_target,
                     args=(db_path, task_id, start_event, result_queue, timeout),
                 ),
                 ctx.Process(
-                    target=_claim_running_in_separate_process,
+                    target=claim_target,
                     args=(db_path, task_id, start_event, result_queue, timeout),
                 ),
             ]
