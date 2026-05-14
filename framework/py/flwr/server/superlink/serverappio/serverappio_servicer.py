@@ -20,7 +20,7 @@ from logging import DEBUG, ERROR, INFO
 import grpc
 
 from flwr.common import Message
-from flwr.common.constant import SUPERLINK_NODE_ID, Status
+from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -61,7 +61,6 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
 )
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
-from flwr.server.superlink.utils import abort_grpc_context, check_abort
 from flwr.server.utils.validator import validate_message
 from flwr.supercore.constant import RunType
 from flwr.supercore.inflatable.inflatable_object import (
@@ -71,11 +70,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     no_object_id_recompute,
 )
 from flwr.supercore.interceptors import get_authenticated_task
-from flwr.supercore.object_store import (
-    NoObjectInStoreError,
-    ObjectStore,
-    ObjectStoreFactory,
-)
+from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
 from flwr.supercore.servicers import AppIoServicer
 
 SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE = (
@@ -104,11 +99,10 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         """Get available nodes."""
         log(DEBUG, "ServerAppIoServicer.GetNodes")
 
-        # Init state and store
+        # Init state
         state = self.state_factory.state()
-        store = self.objectstore_factory.store()
 
-        run_id = _get_authenticated_serverapp_run_id(state, store, context)
+        run_id = _get_authenticated_serverapp_run_id(state, context)
 
         all_ids: set[int] = state.get_nodes(run_id)
         nodes: list[Node] = [Node(node_id=node_id) for node_id in all_ids]
@@ -124,7 +118,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
-        run_id = _get_authenticated_serverapp_run_id(state, store, context)
+        run_id = _get_authenticated_serverapp_run_id(state, context)
 
         # Validate request and insert in State
         _raise_if(
@@ -172,7 +166,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
-        run_id = _get_authenticated_serverapp_run_id(state, store, context)
+        run_id = _get_authenticated_serverapp_run_id(state, context)
 
         # Read from state
         messages_res: list[Message] = state.get_message_res(
@@ -320,7 +314,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
-        _get_authenticated_serverapp_run_id(state, store, context)
+        _get_authenticated_serverapp_run_id(state, context)
 
         if request.node.node_id != SUPERLINK_NODE_ID:
             # Cancel insertion in ObjectStore
@@ -349,7 +343,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
-        _get_authenticated_serverapp_run_id(state, store, context)
+        _get_authenticated_serverapp_run_id(state, context)
 
         if request.node.node_id != SUPERLINK_NODE_ID:
             # Cancel insertion in ObjectStore
@@ -376,7 +370,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
-        _get_authenticated_serverapp_run_id(state, store, context)
+        _get_authenticated_serverapp_run_id(state, context)
 
         # Delete the message object
         store.delete(request.message_object_id)
@@ -396,20 +390,11 @@ def _abort_if_not_serverapp_run(
 
 
 def _get_authenticated_serverapp_run_id(
-    state: LinkState, store: ObjectStore, context: grpc.ServicerContext
+    state: LinkState, context: grpc.ServicerContext
 ) -> int:
     """Return the authenticated run ID if it can use ServerAppIo endpoints."""
     run_id = get_authenticated_task().run_id
     _abort_if_not_serverapp_run(run_id, state, context)
-    abort_grpc_context(
-        check_abort(
-            run_id,
-            [Status.PENDING, Status.STARTING, Status.FINISHED],
-            state,
-            store,
-        ),
-        context,
-    )
     return run_id
 
 

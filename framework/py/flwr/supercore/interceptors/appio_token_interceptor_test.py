@@ -47,9 +47,6 @@ from flwr.supercore.interceptors import (
     create_serverappio_token_auth_server_interceptor,
     get_authenticated_task,
 )
-from flwr.supercore.interceptors.appio_token_interceptor import (
-    RUN_BINDING_FAILED_MESSAGE,
-)
 
 _ClientCallDetails = namedtuple(
     "_ClientCallDetails",
@@ -284,48 +281,6 @@ class TestAppIoTokenServerInterceptor(TestCase):
         self.assertEqual(cast(Task, captured_task).task_id, 123)
         state.get_task_by_token.assert_called_once_with("task-token")
 
-    def test_task_token_run_id_mismatch_denied_for_protected_method(self) -> None:
-        """Protected methods should deny task tokens for a different run."""
-        task = Task(task_id=123, run_id=7)
-        interceptor = self._new_interceptor(token_to_task={"task-token": task})
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
-
-        intercepted = interceptor.intercept_service(
-            lambda _: _make_unary_handler(),
-            _HandlerCallDetails(
-                "/flwr.proto.ServerAppIo/PushObject",
-                invocation_metadata=((TASK_TOKEN_HEADER, "task-token"),),
-            ),
-        )
-
-        with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(PushObjectRequest(run_id=8), context)
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.PERMISSION_DENIED,
-            RUN_BINDING_FAILED_MESSAGE,
-        )
-
-    def test_task_token_allows_request_without_run_id(self) -> None:
-        """Protected methods should allow task-token requests without run_id."""
-        interceptor = self._new_interceptor(
-            token_to_task={"task-token": Task(task_id=123, run_id=7)}
-        )
-        method = self._find_serverappio_method(requires_token=True)
-        if method is None:
-            self.skipTest("No token-required ServerAppIo method found in policy table.")
-
-        intercepted = interceptor.intercept_service(
-            lambda _: _make_unary_handler(),
-            _HandlerCallDetails(
-                method,
-                invocation_metadata=((TASK_TOKEN_HEADER, "task-token"),),
-            ),
-        )
-
-        response = intercepted.unary_unary(PushTaskOutputRequest(), Mock())
-        self.assertEqual(response, "ok")
-
     def test_metadata_token_used_for_task_output(self) -> None:
         """Metadata token should authorize task output requests."""
         interceptor = self._new_interceptor(
@@ -521,7 +476,7 @@ class TestFactoryFunctions(TestCase):
         response = cast(
             str,
             intercepted.unary_unary(
-                PushObjectRequest(run_id=1, object_id="obj", object_content=b"x"),
+                PushObjectRequest(object_id="obj", object_content=b"x"),
                 Mock(),
             ),
         )

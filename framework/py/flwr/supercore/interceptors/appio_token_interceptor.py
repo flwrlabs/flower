@@ -34,7 +34,8 @@ from flwr.supercore.utils import find_metadata_keys, get_metadata_str
 
 TASK_TOKEN_HEADER = "flwr-task-token"
 AUTHENTICATION_FAILED_MESSAGE = "Authentication failed."
-RUN_BINDING_FAILED_MESSAGE = "Token is not valid for requested run."
+
+
 _current_task: ContextVar[Task | None] = ContextVar("current_task", default=None)
 
 
@@ -50,22 +51,12 @@ def _abort_auth_denied(context: grpc.ServicerContext) -> NoReturn:
     raise RuntimeError("Should not reach this point")
 
 
-def _abort_run_denied(context: grpc.ServicerContext) -> NoReturn:
-    context.abort(grpc.StatusCode.PERMISSION_DENIED, RUN_BINDING_FAILED_MESSAGE)
-    raise RuntimeError("Should not reach this point")
-
-
 def _unauthenticated_terminator() -> grpc.RpcMethodHandler:
     def _terminate(_request: GrpcMessage, context: grpc.ServicerContext) -> GrpcMessage:
         context.abort(grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE)
         raise RuntimeError("Should not reach this point")
 
     return grpc.unary_unary_rpc_method_handler(_terminate)
-
-
-def _get_request_run_id(request: GrpcMessage) -> int | None:
-    request_run_id = cast(int | None, getattr(request, "run_id", None))
-    return request_run_id or None
 
 
 class AppIoTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ignore
@@ -145,7 +136,6 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
             # Validate task token and set task context for downstream handlers
             task = state.get_task_by_token(token)
             if task is not None:
-                _validate_request_run_id(request, task.run_id, context)
                 ctx_token = _current_task.set(task)
                 try:
                     return unary_handler(request, context)
@@ -161,20 +151,11 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         )
 
 
-def _validate_request_run_id(
-    request: GrpcMessage, authenticated_run_id: int, context: grpc.ServicerContext
-) -> None:
-    """Abort if request.run_id conflicts with the authenticated run ID."""
-    request_run_id = _get_request_run_id(request)
-    if request_run_id is not None and request_run_id != authenticated_run_id:
-        _abort_run_denied(context)
-
-
 def get_authenticated_task() -> Task:
     """Return the task identity authenticated for the current RPC.
 
-    The task is available only while handling an RPC authenticated with an AppIo
-    task token.
+    The task is available only while handling an RPC authenticated with an AppIo task
+    token.
     """
     ret = _current_task.get()
     if ret is None:

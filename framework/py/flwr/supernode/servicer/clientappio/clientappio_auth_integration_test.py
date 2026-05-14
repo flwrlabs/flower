@@ -57,10 +57,7 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         state_factory = NodeStateFactory(objectstore_factory=objectstore_factory)
 
         state = state_factory.state()
-        self.valid_run_id = 99
-        task_id = state.create_task(
-            task_type=TaskType.CLIENT_APP, run_id=self.valid_run_id
-        )
+        task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99)
         assert task_id is not None
         token = state.claim_task(task_id)
         assert token is not None
@@ -106,9 +103,7 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
     def test_pull_object_denied_without_metadata_token(self) -> None:
         """Protected RPC should deny requests missing metadata token."""
         with self.assertRaises(grpc.RpcError) as err:
-            self._pull_object.with_call(
-                request=PullObjectRequest(run_id=self.valid_run_id, object_id="obj-1")
-            )
+            self._pull_object.with_call(request=PullObjectRequest(object_id="obj-1"))
         assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
         assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE
 
@@ -116,7 +111,7 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         """Protected RPC should deny requests with invalid metadata token."""
         with self.assertRaises(grpc.RpcError) as err:
             self._pull_object.with_call(
-                request=PullObjectRequest(run_id=self.valid_run_id, object_id="obj-2"),
+                request=PullObjectRequest(object_id="obj-2"),
                 metadata=((TASK_TOKEN_HEADER, "invalid-token"),),
             )
         assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
@@ -125,7 +120,7 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
     def test_pull_object_allows_with_valid_metadata_token(self) -> None:
         """Protected RPC should allow requests with valid metadata token."""
         response, call = self._pull_object.with_call(
-            request=PullObjectRequest(run_id=self.valid_run_id, object_id="obj-3"),
+            request=PullObjectRequest(object_id="obj-3"),
             metadata=((TASK_TOKEN_HEADER, self.valid_token),),
         )
 

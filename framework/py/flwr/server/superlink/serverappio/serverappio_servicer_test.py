@@ -427,21 +427,9 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             "",
             RunType.SERVER_APP,
         )
-        task_id = self.state.create_task(
-            task_type=TaskType.SERVER_APP, run_id=run_id, fab_hash=fab_hash
-        )
-        assert task_id is not None
-        token = self.state.claim_task(task_id)
-        assert token is not None
-        self._set_token(token)
-
-        # Transition run status if required
         if running:
             self._transition_run_status(run_id, 2)
         return run_id
-
-    def _set_token(self, token: str) -> None:
-        self._appio_auth_interceptor._token = token  # pylint: disable=W0212
 
     def test_create_task_uses_authenticated_run_id(self) -> None:
         """CreateTask should create tasks for the authenticated run."""

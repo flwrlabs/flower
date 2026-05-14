@@ -25,10 +25,14 @@ from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppMessagesRequest,
     PullAppMessagesResponse,
-    PullPendingTasksRequest,
-    PullPendingTasksResponse,
     PushAppMessagesRequest,
     PushAppMessagesResponse,
+    SendTaskHeartbeatRequest,
+    SendTaskHeartbeatResponse,
+)
+from flwr.proto.log_pb2 import (  # pylint: disable=E0611
+    PushLogsRequest,
+    PushLogsResponse,
 )
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
@@ -99,11 +103,6 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
             request_serializer=GetNodesRequest.SerializeToString,
             response_deserializer=GetNodesResponse.FromString,
         )
-        self._pull_pending_tasks_no_auth = self._base_channel.unary_unary(
-            "/flwr.proto.ServerAppIo/PullPendingTasks",
-            request_serializer=PullPendingTasksRequest.SerializeToString,
-            response_deserializer=PullPendingTasksResponse.FromString,
-        )
         auth_channel = grpc.intercept_channel(
             self._base_channel,
             AppIoTokenClientInterceptor(token=self._auth_token),
@@ -116,11 +115,6 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
             "/flwr.proto.ServerAppIo/GetNodes",
             request_serializer=GetNodesRequest.SerializeToString,
             response_deserializer=GetNodesResponse.FromString,
-        )
-        self._pull_pending_tasks = auth_channel.unary_unary(
-            "/flwr.proto.ServerAppIo/PullPendingTasks",
-            request_serializer=PullPendingTasksRequest.SerializeToString,
-            response_deserializer=PullPendingTasksResponse.FromString,
         )
 
     def tearDown(self) -> None:
@@ -184,20 +178,6 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         assert isinstance(response, GetNodesResponse)
         assert call.code() == grpc.StatusCode.OK
 
-    def test_run_bound_endpoint_denied_when_token_targets_different_run(self) -> None:
-        """Run-bound RPCs should deny valid tokens used against another run."""
-        rpc = self._base_channel.unary_unary(
-            "/flwr.proto.ServerAppIo/PushObject",
-            request_serializer=PushObjectRequest.SerializeToString,
-            response_deserializer=PushObjectResponse.FromString,
-        )
-        with self.assertRaises(grpc.RpcError) as err:
-            rpc.with_call(
-                request=PushObjectRequest(run_id=self._auth_run_id),
-                metadata=((TASK_TOKEN_HEADER, self._simulation_token),),
-            )
-        assert err.exception.code() == grpc.StatusCode.PERMISSION_DENIED
-
     def test_serverapp_only_endpoints_denied_for_simulation_run(self) -> None:
         """ServerApp-only RPCs should deny simulation-run tokens."""
         cases: list[tuple[str, object, Callable[[bytes], object]]] = [
@@ -241,19 +221,31 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
                     response_deserializer=response_deserializer,
                 )
 
-    def test_pull_pending_tasks_denied_without_superexec_metadata(self) -> None:
-        """SuperExec RPC should deny requests missing signed metadata."""
-        with self.assertRaises(grpc.RpcError) as err:
-            self._pull_pending_tasks_no_auth.with_call(
-                request=PullPendingTasksRequest()
-            )
-        assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
-        assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE
+    def test_shared_task_endpoints_allow_simulation_run(self) -> None:
+        """Shared task RPCs should still allow simulation-run tokens."""
+        cases: list[tuple[str, object, Callable[[bytes], object]]] = [
+            (
+                "/flwr.proto.ServerAppIo/SendTaskHeartbeat",
+                SendTaskHeartbeatRequest(),
+                SendTaskHeartbeatResponse.FromString,
+            ),
+            (
+                "/flwr.proto.ServerAppIo/PushLogs",
+                PushLogsRequest(run_id=self._simulation_run_id, logs=["hello"]),
+                PushLogsResponse.FromString,
+            ),
+        ]
 
-    def test_pull_pending_tasks_allows_with_superexec_metadata(self) -> None:
-        """SuperExec RPC should allow requests with valid signed metadata."""
-        response, call = self._pull_pending_tasks.with_call(
-            request=PullPendingTasksRequest()
-        )
-        assert isinstance(response, PullPendingTasksResponse)
-        assert call.code() == grpc.StatusCode.OK
+        for method, request, response_deserializer in cases:
+            with self.subTest(method=method):
+                rpc = self._base_channel.unary_unary(
+                    method,
+                    request_serializer=request.__class__.SerializeToString,
+                    response_deserializer=response_deserializer,
+                )
+                response, call = rpc.with_call(
+                    request=request,
+                    metadata=((TASK_TOKEN_HEADER, self._simulation_token),),
+                )
+                assert response is not None
+                assert call.code() == grpc.StatusCode.OK
