@@ -34,7 +34,7 @@ def generate_rand_int_from_bytes(
     return num
 
 
-def to_isoformat(value: datetime | str | None) -> str:
+def timestamp_to_iso(value: datetime | str | None) -> str:
     """Return a timestamp row value as an ISO-formatted string.
 
     A TIMESTAMP column in the database can be represented as a `datetime` object or an

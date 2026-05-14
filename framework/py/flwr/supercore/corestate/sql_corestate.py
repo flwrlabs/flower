@@ -42,7 +42,7 @@ from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import generate_rand_int_from_bytes, to_isoformat
+from .utils import generate_rand_int_from_bytes, timestamp_to_iso
 
 # Define SQL conditions for task statuses to ensure consistency across queries
 STATUS_CONDITIONS = {
@@ -371,6 +371,7 @@ class SqlCoreState(CoreState, SqlMixin):
         # Heartbeats are accepted only for active, unexpired task claims.
         with self.session():
             current = now()
+            ttl = timedelta(seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL)
             self._cleanup_expired_task_tokens()
             rows = self.query(
                 """
@@ -384,12 +385,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 {
                     "task_id": uint64_to_int64(task_id),
                     "current": current,
-                    "active_until": (
-                        current
-                        + timedelta(
-                            seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-                        )
-                    ),
+                    "active_until": current + ttl,
                 },
             )
         return len(rows) > 0
@@ -495,10 +491,10 @@ def task_from_row(row: dict[str, Any]) -> Task:
         task_id=int64_to_uint64(row["task_id"]),
         type=row["type"],
         run_id=int64_to_uint64(row["run_id"]),
-        pending_at=to_isoformat(row["pending_at"]),
-        starting_at=to_isoformat(row["starting_at"]),
-        running_at=to_isoformat(row["running_at"]),
-        finished_at=to_isoformat(row["finished_at"]),
+        pending_at=timestamp_to_iso(row["pending_at"]),
+        starting_at=timestamp_to_iso(row["starting_at"]),
+        running_at=timestamp_to_iso(row["running_at"]),
+        finished_at=timestamp_to_iso(row["finished_at"]),
         status=determine_task_status(row),
         fab_hash=row["fab_hash"],
         model_ref=row["model_ref"],
