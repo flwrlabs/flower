@@ -167,8 +167,7 @@ def test_clientapp_launch_forwards_root_certificate() -> None:
 
 
 def test_clientapp_launch_omits_tls_flags_when_using_system_certificates() -> None:
-    """ClientApp launch should omit TLS inputs when relying on system
-    certificates."""
+    """ClientApp launch should omit TLS inputs when relying on system certificates."""
     backend = Mock()
     plugin = ClientAppExecPlugin(
         appio_api_address="127.0.0.1:9094",

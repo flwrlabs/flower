@@ -34,8 +34,7 @@ class ServerAppExecPlugin(BaseExecPlugin):
     suppress_output = True
 
     def launch_task(self, token: str, task: Task) -> None:
-        """Launch the process to execute the given task using the given
-        token."""
+        """Launch the process to execute the given task using the given token."""
         # Determine the command to launch based on the task type
         if task.type == TaskType.SERVER_APP:
             self.command = "flwr-serverapp"

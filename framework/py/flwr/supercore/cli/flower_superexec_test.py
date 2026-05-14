@@ -46,8 +46,7 @@ def test_parse_superexec_version_flag(
 def test_flower_superexec_checks_for_update(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """SuperExec should run the startup update check before parsing
-    arguments."""
+    """SuperExec should run the startup update check before parsing arguments."""
 
     class _SentinelError(Exception):
         pass
@@ -131,8 +130,7 @@ def test_flower_superexec_clientapp_allows_missing_secret(
 def test_flower_superexec_serverapp_allows_missing_secret(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """ServerApp plugin should allow missing secret in subprocess-mode
-    flows."""
+    """ServerApp plugin should allow missing secret in subprocess-mode flows."""
     args = SimpleNamespace(
         insecure=True,
         plugin_type=ExecPluginType.SERVER_APP,
