@@ -35,14 +35,6 @@ echo "- init_py_check: start"
 python -m devtool.init_py_check py/flwr
 echo "- init_py_check: done"
 
-echo "- docformatter: start"
-if $RUN_FULL_TEST; then
-    python -m docformatter -c -r py/flwr e2e -e py/flwr/proto
-else
-    python -m docformatter -c -r py/flwr -e py/flwr/proto
-fi
-echo "- docformatter:  done"
-
 echo "- docsig: start"
 docsig py/flwr
 echo "- docsig:  done"

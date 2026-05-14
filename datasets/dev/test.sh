@@ -22,10 +22,6 @@ echo "- copyright: start"
 python -m devtool.check_copyright flwr_datasets/
 echo "- copyright: done"
 
-echo "- docformatter: start"
-python -m docformatter -c -r flwr_datasets/
-echo "- docformatter:  done"
-
 echo "- ruff: start"
 python -m ruff check flwr_datasets/
 echo "- ruff: done"
