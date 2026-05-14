@@ -50,6 +50,7 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 # pylint: disable=E0611
 from flwr.proto.message_pb2 import Message as ProtoMessage
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata
+from flwr.proto.message_pb2 import ObjectTree
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 
 # pylint: enable=E0611
@@ -175,6 +176,26 @@ class StateTest(CoreStateTest):
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
+
+    def test_create_task_rejects_missing_run(self) -> None:
+        """Creating a task for an unknown run should fail."""
+        state = self.state_factory()
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "Run 42 not found. create_task requires an existing run.",
+        ):
+            state.create_task(task_type="flwr-model", run_id=42)
+
+    def test_create_task_rejects_stopped_run(self) -> None:
+        """Creating a task for a stopped run should fail."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+
+        self.assertTrue(state.stop_run(run_id))
+
+        with self.assertRaisesRegex(RuntimeError, f"Run {run_id} is finished."):
+            state.create_task(task_type="flwr-model", run_id=run_id)
 
     def test_get_run_info_without_filters_returns_all_runs(self) -> None:
         """Test get_run_info returns all runs when no filter is provided."""
@@ -497,6 +518,41 @@ class StateTest(CoreStateTest):
 
         assert datetime.fromisoformat(actual_message_ins.metadata.delivered_at) > dt
         assert actual_message_ins.metadata.ttl > 0
+
+    def test_store_message_ins_rejects_stopped_run(self) -> None:
+        """Instruction messages cannot be stored after a run is stopped."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
+        )
+
+        self.assertTrue(state.stop_run(run_id))
+
+        self.assertIsNone(state.store_message_ins(message=msg))
+        self.assertEqual(state.num_message_ins(), 0)
+
+    def test_store_message_res_rejects_stopped_run(self) -> None:
+        """Reply messages cannot be stored after a run is stopped."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
+        )
+        self.assertIsNotNone(state.store_message_ins(message=msg))
+        pulled = state.get_message_ins(node_id=node_id, limit=1)[0]
+        reply_msg = Message(RecordDict(), reply_to=pulled)
+
+        self.assertTrue(state.stop_run(run_id))
+
+        self.assertIsNone(state.store_message_res(message=reply_msg))
+        self.assertEqual(state.num_message_res(), 0)
 
     def test_store_message_ins_invalid_node_id(self) -> None:
         """Test store_message_ins with invalid node_id."""
@@ -1996,13 +2052,13 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state = self.state_factory()
         run_id = create_dummy_run(state)
         task_id = get_primary_task_id(state, run_id)
-        assert state.claim_task(task_id) is not None
-        assert state.activate_task(task_id)
-        assert state.finish_task(task_id, SubStatus.COMPLETED, "done")
-
         extra_task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
         assert extra_task_id is not None
         assert state.claim_task(extra_task_id) is not None
+
+        assert state.claim_task(task_id) is not None
+        assert state.activate_task(task_id)
+        assert state.finish_task(task_id, SubStatus.COMPLETED, "done")
 
         # Execute: force token expiry and trigger cleanup
         patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
@@ -2044,6 +2100,32 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
     ) -> Callable[[str, int, Any, Any, float], None]:
         """Return process target for STARTING -> RUNNING claim tests."""
         return _claim_running_in_separate_process
+
+    def test_sql_object_preregister_rejects_stopped_run(self) -> None:
+        """SQL ObjectStore rejects preregistration after a run is stopped."""
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir, True)
+        database_path = os.path.join(tmp_dir, "state.db")
+        object_store = ObjectStoreFactory(database_path).store()
+        state = SqlLinkState(
+            database_path=database_path,
+            federation_manager=NoOpFederationManager(),
+            object_store=object_store,
+        )
+        state.initialize()
+        run_id = create_dummy_run(state)
+        object_id = hashlib.sha256(b"run-object").hexdigest()
+
+        self.assertEqual(
+            object_store.preregister(run_id, ObjectTree(object_id=object_id)),
+            [object_id],
+        )
+        self.assertTrue(state.stop_run(run_id))
+
+        with self.assertRaisesRegex(
+            ValueError, f"Run {run_id} not found or already finished"
+        ):
+            object_store.preregister(run_id, ObjectTree(object_id=object_id))
 
     def _create_shared_sql_states(
         self, database_path: str, num_replicas: int = 2

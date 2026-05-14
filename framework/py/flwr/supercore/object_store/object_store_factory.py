@@ -65,7 +65,7 @@ class ObjectStoreFactory:
                 self.store_instance = InMemoryObjectStore()
             # SqlObjectStore
             else:
-                store = SqlObjectStore(self.database)
+                store = SqlObjectStore(self.database, enforce_run_state=True)
                 store.initialize()
                 self.store_instance = store
 

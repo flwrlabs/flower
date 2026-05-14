@@ -33,6 +33,7 @@ from flwr.common.constant import (
     SUPERLINK_NODE_ID,
     TASK_ID_NUM_BYTES,
     Status,
+    SubStatus,
 )
 from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
@@ -100,6 +101,31 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """Get the FederationManager instance."""
         return self._federation_manager
 
+    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        task_type: str,
+        run_id: int,
+        fab_hash: str | None = None,
+        model_ref: str | None = None,
+        connector_ref: str | None = None,
+    ) -> int | None:
+        """Create a task."""
+        with self.lock:
+            if run_id not in self.run_ids:
+                raise RuntimeError(
+                    f"Run {run_id} not found. create_task requires an existing run."
+                )
+            if self._get_run(run_id).status.status == Status.FINISHED:
+                raise RuntimeError(f"Run {run_id} is finished.")
+
+            return super().create_task(
+                task_type=task_type,
+                run_id=run_id,
+                fab_hash=fab_hash,
+                model_ref=model_ref,
+                connector_ref=connector_ref,
+            )
+
     def _get_run(self, run_id: int) -> Run:
         """Return run metadata with lifecycle fields from its primary task."""
         run = self.run_ids[run_id].run
@@ -134,6 +160,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         # Validate run_id
         if message.metadata.run_id not in self.run_ids:
             log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
+            return None
+        if self._get_run(message.metadata.run_id).status.status == Status.FINISHED:
+            log(ERROR, "Run %s is finished.", message.metadata.run_id)
             return None
         federation = self.run_ids[message.metadata.run_id].run.federation
         # Validate source node ID
@@ -284,6 +313,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         if res_metadata.run_id != ins_metadata.run_id:
             log(ERROR, "`metadata.run_id` is invalid")
             return None
+        if self._get_run(res_metadata.run_id).status.status == Status.FINISHED:
+            log(ERROR, "Run %s is finished.", res_metadata.run_id)
+            return None
 
         message_id = message.metadata.message_id
         with self.lock:
@@ -377,6 +409,32 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     message_id_list.add(message_id)
 
         return message_id_list
+
+    def stop_run(self, run_id: int) -> bool:
+        """Stop a run and clean up its messages and objects."""
+        update_success = False
+        for task in self.get_tasks(run_ids=[run_id]):
+            update_success |= self.finish_task(task.task_id, SubStatus.STOPPED, "")
+
+        if not update_success:
+            return False
+
+        with self.lock:
+            message_ids = {
+                message_id
+                for message_id, message in self.message_ins_store.items()
+                if message.metadata.run_id == run_id
+            }
+            for message_id in message_ids:
+                self.message_ins_store.pop(message_id, None)
+                if message_id in self.message_ins_id_to_message_res_id:
+                    message_res_id = self.message_ins_id_to_message_res_id.pop(
+                        message_id
+                    )
+                    self.message_res_store.pop(message_res_id, None)
+
+        self.object_store.delete_objects_in_run(run_id)
+        return True
 
     def num_message_ins(self) -> int:
         """Calculate the number of instruction Messages in store.
@@ -770,6 +828,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """Set the context for the specified `run_id`."""
         if run_id not in self.run_ids:
             raise ValueError(f"Run {run_id} not found")
+        if self._get_run(run_id).status.status == Status.FINISHED:
+            raise ValueError(f"Run {run_id} is finished")
         self.contexts[run_id] = context
 
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:

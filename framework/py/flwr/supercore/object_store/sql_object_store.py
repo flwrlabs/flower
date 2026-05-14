@@ -34,24 +34,51 @@ from .object_store import NoObjectInStoreError, ObjectStore
 class SqlObjectStore(ObjectStore, SqlMixin):
     """SQLAlchemy-based implementation of the ObjectStore interface."""
 
-    def __init__(self, database_path: str, verify: bool = True) -> None:
+    def __init__(
+        self,
+        database_path: str,
+        verify: bool = True,
+        enforce_run_state: bool = False,
+    ) -> None:
         super().__init__(database_path)
         self.verify = verify
+        self.enforce_run_state = enforce_run_state
 
     def get_metadata(self) -> MetaData:
         """Return SQLAlchemy MetaData for ObjectStore tables."""
         return create_objectstore_metadata()
 
+    def _lock_unfinished_run(self, run_id: int) -> None:
+        """Lock the run's primary task if run-state enforcement is enabled."""
+        if not self.enforce_run_state:
+            return
+
+        rows = self.query(
+            """
+            UPDATE task
+            SET task_id = task_id
+            WHERE task_id = (
+                SELECT primary_task_id FROM run WHERE run_id = :run_id
+            )
+            AND finished_at IS NULL
+            RETURNING task_id
+            """,
+            {"run_id": uint64_to_int64(run_id)},
+        )
+        if not rows:
+            raise ValueError(f"Run {run_id} not found or already finished")
+
     def preregister(self, run_id: int, object_tree: ObjectTree) -> list[str]:
         """Identify and preregister missing objects in the `ObjectStore`."""
         new_objects = []
-        for tree_node in iterate_object_tree(object_tree):
-            obj_id = tree_node.object_id
-            if not is_valid_sha256_hash(obj_id):
-                raise ValueError(f"Invalid object ID format: {obj_id}")
+        with self.session():
+            self._lock_unfinished_run(run_id)
+            for tree_node in iterate_object_tree(object_tree):
+                obj_id = tree_node.object_id
+                if not is_valid_sha256_hash(obj_id):
+                    raise ValueError(f"Invalid object ID format: {obj_id}")
 
-            child_ids = [child.object_id for child in tree_node.children]
-            with self.session():
+                child_ids = [child.object_id for child in tree_node.children]
                 # Insert new object if it doesn't exist (race-condition safe)
                 # RETURNING returns a row only if the insert succeeded
                 rows = self.query(
