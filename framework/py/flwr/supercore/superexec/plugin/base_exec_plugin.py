@@ -16,11 +16,14 @@
 
 
 import os
-import subprocess
 from collections.abc import Sequence
-from typing import Any
 
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore.superexec.launch import (
+    AppIoKind,
+    LaunchSpec,
+    SubprocessLaunchBackend,
+)
 
 from .exec_plugin import ExecPlugin
 
@@ -33,7 +36,8 @@ class BaseExecPlugin(ExecPlugin):
 
     # Placeholders to be defined in subclasses
     command = ""
-    appio_api_address_arg = ""
+    appio_api_kind: AppIoKind = "clientappio"
+    suppress_output = False
 
     def select_run_id(self, candidate_run_ids: Sequence[int]) -> int | None:
         """Select a run ID to execute from a sequence of candidates."""
@@ -48,23 +52,23 @@ class BaseExecPlugin(ExecPlugin):
         return candidate_tasks[0]
 
     def launch_task(self, token: str, task: Task) -> None:
-        """Launch the process to execute the given task using the given token."""
-        cmds = [self.command]
-        if self.insecure:
-            cmds.append("--insecure")
-        elif self.root_certificates_path:
-            cmds += ["--root-certificates", self.root_certificates_path]
-        cmds += [self.appio_api_address_arg, self.appio_api_address]
-        cmds += ["--token", token]
-        cmds += ["--parent-pid", str(os.getpid())]
-        if self.runtime_dependency_install:
-            cmds += ["--allow-runtime-dependency-installation"]
-        # Launch the client app without waiting for it to complete.
-        # Since we don't need to manage the process, we intentionally avoid using
-        # a `with` statement. Suppress the pylint warning for it in this case.
-        # pylint: disable-next=consider-using-with
-        subprocess.Popen(cmds, **self.get_popen_kwargs())
+        """Launch the process to execute the given task using the given
+        token."""
+        backend = self.launch_backend or SubprocessLaunchBackend()
+        backend.launch(self._build_launch_spec(token=token, task=task))
 
-    def get_popen_kwargs(self) -> dict[str, Any]:
-        """Return subprocess keyword arguments when launching app processes."""
-        return {}
+    def _build_launch_spec(  # pylint: disable=unused-argument
+        self, token: str, task: Task
+    ) -> LaunchSpec:
+        """Build the launch spec for the selected task."""
+        return LaunchSpec(
+            command=self.command,
+            appio_api_address=self.appio_api_address,
+            appio_api_kind=self.appio_api_kind,
+            token=token,
+            insecure=self.insecure,
+            root_certificates_path=self.root_certificates_path,
+            runtime_dependency_install=self.runtime_dependency_install,
+            parent_pid=os.getpid(),
+            suppress_output=self.suppress_output,
+        )

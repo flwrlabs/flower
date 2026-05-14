@@ -15,9 +15,7 @@
 """Simple Flower SuperExec plugin for ServerApp."""
 
 
-import subprocess
 from logging import ERROR
-from typing import Any
 
 from flwr.common.logger import log
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
@@ -32,17 +30,12 @@ class ServerAppExecPlugin(BaseExecPlugin):
     The plugin always selects the first candidate task.
     """
 
-    appio_api_address_arg = "--serverappio-api-address"
-
-    def get_popen_kwargs(self) -> dict[str, Any]:
-        """Isolate ServerApp stdio from the parent SuperLink process streams."""
-        return {
-            "stdout": subprocess.DEVNULL,
-            "stderr": subprocess.DEVNULL,
-        }
+    appio_api_kind = "serverappio"
+    suppress_output = True
 
     def launch_task(self, token: str, task: Task) -> None:
-        """Launch the process to execute the given task using the given token."""
+        """Launch the process to execute the given task using the given
+        token."""
         # Determine the command to launch based on the task type
         if task.type == TaskType.SERVER_APP:
             self.command = "flwr-serverapp"

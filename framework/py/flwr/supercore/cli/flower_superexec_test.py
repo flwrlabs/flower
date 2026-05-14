@@ -46,7 +46,8 @@ def test_parse_superexec_version_flag(
 def test_flower_superexec_checks_for_update(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """SuperExec should run the startup update check before parsing arguments."""
+    """SuperExec should run the startup update check before parsing
+    arguments."""
 
     class _SentinelError(Exception):
         pass
@@ -96,6 +97,7 @@ def test_flower_superexec_clientapp_allows_missing_secret(
         parent_pid=None,
         health_server_address=None,
         runtime_dependency_install=False,
+        backend="subprocess",
     )
     captured: dict[str, object] = {}
 
@@ -123,12 +125,14 @@ def test_flower_superexec_clientapp_allows_missing_secret(
     flower_superexec_module.flower_superexec()
 
     assert captured["superexec_auth_secret"] is None
+    assert captured["launch_backend_name"] == "subprocess"
 
 
 def test_flower_superexec_serverapp_allows_missing_secret(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """ServerApp plugin should allow missing secret in subprocess-mode flows."""
+    """ServerApp plugin should allow missing secret in subprocess-mode
+    flows."""
     args = SimpleNamespace(
         insecure=True,
         plugin_type=ExecPluginType.SERVER_APP,
@@ -139,6 +143,7 @@ def test_flower_superexec_serverapp_allows_missing_secret(
         parent_pid=None,
         health_server_address=None,
         runtime_dependency_install=False,
+        backend="subprocess",
     )
 
     class _Parser:
@@ -167,3 +172,33 @@ def test_flower_superexec_serverapp_allows_missing_secret(
     flower_superexec_module.flower_superexec()
 
     assert captured["superexec_auth_secret"] is None
+    assert captured["launch_backend_name"] == "subprocess"
+
+
+def test_parse_superexec_backend_defaults_to_subprocess() -> None:
+    """SuperExec should default to the subprocess launch backend."""
+    args = _parse_args().parse_args(
+        [
+            "--appio-api-address",
+            "127.0.0.1:9091",
+            "--plugin-type",
+            ExecPluginType.CLIENT_APP,
+        ]
+    )
+
+    assert args.backend == "subprocess"
+
+
+def test_parse_superexec_backend_rejects_unsupported_value() -> None:
+    """SuperExec should reject unsupported launch backend names."""
+    with pytest.raises(SystemExit):
+        _parse_args().parse_args(
+            [
+                "--appio-api-address",
+                "127.0.0.1:9091",
+                "--plugin-type",
+                ExecPluginType.CLIENT_APP,
+                "--backend",
+                "kubernetes",
+            ]
+        )

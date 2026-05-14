@@ -35,6 +35,10 @@ from flwr.supercore.auth import (
 )
 from flwr.supercore.constant import EXEC_PLUGIN_SECTION
 from flwr.supercore.grpc_health import add_args_health
+from flwr.supercore.superexec.launch import (
+    SUBPROCESS_BACKEND,
+    SUPPORTED_BACKENDS,
+)
 from flwr.supercore.superexec.plugin import (
     ClientAppExecPlugin,
     ExecPlugin,
@@ -127,6 +131,7 @@ def flower_superexec() -> None:
         parent_pid=args.parent_pid,
         health_server_address=args.health_server_address,
         runtime_dependency_install=args.runtime_dependency_install,
+        launch_backend_name=args.backend,
     )
 
 
@@ -171,6 +176,13 @@ def _parse_args() -> argparse.ArgumentParser:
         default=None,
         help="The PID of the parent process. When set, the process will terminate "
         "when the parent process exits.",
+    )
+    parser.add_argument(
+        "--backend",
+        type=str,
+        choices=SUPPORTED_BACKENDS,
+        default=SUBPROCESS_BACKEND,
+        help="The launch backend to use.",
     )
     add_superexec_auth_secret_args(parser)
     add_args_health(parser)

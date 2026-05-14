@@ -22,6 +22,7 @@ from typing import Any
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.typing import Run
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore.superexec.launch import LaunchBackend
 
 
 class ExecPlugin(ABC):
@@ -34,12 +35,14 @@ class ExecPlugin(ABC):
         root_certificates_path: str | None,
         get_run: Callable[[int], Run],
         runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
+        launch_backend: LaunchBackend | None = None,
     ) -> None:
         self.appio_api_address = appio_api_address
         self.insecure = insecure
         self.root_certificates_path = root_certificates_path
         self.get_run = get_run
         self.runtime_dependency_install = runtime_dependency_install
+        self.launch_backend = launch_backend
 
     @abstractmethod
     def select_run_id(self, candidate_run_ids: Sequence[int]) -> int | None:

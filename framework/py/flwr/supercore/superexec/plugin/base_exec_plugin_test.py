@@ -15,11 +15,11 @@
 """Tests for SuperExec base plugin launch behavior."""
 
 
-import subprocess
 from unittest.mock import Mock, patch
 
 from flwr.common.typing import Run
 from flwr.supercore.constant import TaskType
+from flwr.supercore.superexec.launch import LaunchSpec
 from flwr.supercore.superexec.plugin.base_exec_plugin import BaseExecPlugin
 from flwr.supercore.superexec.plugin.clientapp_exec_plugin import ClientAppExecPlugin
 
@@ -39,128 +39,147 @@ def _get_task(*, task_id: int = 1, task_type: str = TaskType.SERVER_APP) -> Mock
     return task
 
 
-def test_clientapp_launch_inherits_default_stdio() -> None:
-    """ClientApp launch should use default stdio behavior."""
+def _launched_spec(backend: Mock) -> LaunchSpec:
+    """Return the LaunchSpec passed to a mock launch backend."""
+    return backend.launch.call_args.args[0]
+
+
+def test_clientapp_launch_delegates_default_stdio_spec() -> None:
+    """ClientApp launch should delegate a spec with default stdio behavior."""
+    backend = Mock()
     plugin = ClientAppExecPlugin(
         appio_api_address="127.0.0.1:9094",
         insecure=True,
         root_certificates_path=None,
         get_run=_get_run,
+        launch_backend=backend,
     )
 
-    with patch("subprocess.Popen") as popen:
-        plugin.launch_task(token="token", task=_get_task())
+    plugin.launch_task(token="token", task=_get_task())
 
-    assert "stdout" not in popen.call_args.kwargs
-    assert "stderr" not in popen.call_args.kwargs
+    spec = _launched_spec(backend)
+    assert spec.command == "flwr-clientapp"
+    assert spec.appio_api_kind == "clientappio"
+    assert spec.suppress_output is False
 
 
-def test_serverapp_launch_isolates_stdio() -> None:
-    """ServerApp launch should not inherit parent stdio streams."""
+def test_serverapp_launch_delegates_suppressed_stdio_spec() -> None:
+    """ServerApp launch should delegate a spec that suppresses output."""
+    backend = Mock()
     plugin = ServerAppExecPlugin(
         appio_api_address="127.0.0.1:9092",
         insecure=True,
         root_certificates_path=None,
         get_run=_get_run,
+        launch_backend=backend,
     )
 
-    with patch("subprocess.Popen") as popen:
-        plugin.launch_task(
-            token="token", task=_get_task(task_id=5, task_type=TaskType.SERVER_APP)
-        )
+    plugin.launch_task(
+        token="token", task=_get_task(task_id=5, task_type=TaskType.SERVER_APP)
+    )
 
-    assert popen.call_args.kwargs["stdout"] is subprocess.DEVNULL
-    assert popen.call_args.kwargs["stderr"] is subprocess.DEVNULL
+    spec = _launched_spec(backend)
+    assert spec.command == "flwr-serverapp"
+    assert spec.appio_api_kind == "serverappio"
+    assert spec.suppress_output is True
+
+
+def test_simulation_launch_delegates_simulation_command_spec() -> None:
+    """Simulation launch should delegate the simulation command."""
+    backend = Mock()
+    plugin = ServerAppExecPlugin(
+        appio_api_address="127.0.0.1:9092",
+        insecure=True,
+        root_certificates_path=None,
+        get_run=_get_run,
+        launch_backend=backend,
+    )
+
+    plugin.launch_task(
+        token="token", task=_get_task(task_id=5, task_type=TaskType.SIMULATION)
+    )
+
+    assert _launched_spec(backend).command == "flwr-simulation"
 
 
 class DummyExecPlugin(BaseExecPlugin):
-    """Minimal plugin for testing command construction."""
+    """Minimal plugin for testing launch spec construction."""
 
     command = "dummy-app"
-    appio_api_address_arg = "--appio-api-address"
+    appio_api_kind = "clientappio"
 
 
 def test_launch_task_forwards_runtime_dependency_install_flag() -> None:
-    """Ensure app launch forwards runtime install flag."""
+    """Ensure launch spec forwards runtime install flag."""
+    backend = Mock()
     plugin = DummyExecPlugin(
         appio_api_address="127.0.0.1:9091",
         insecure=True,
         root_certificates_path=None,
         get_run=Mock(),
         runtime_dependency_install=True,
+        launch_backend=backend,
     )
 
-    with (
-        patch(
-            "flwr.supercore.superexec.plugin.base_exec_plugin.os.getpid",
-            return_value=1234,
-        ),
-        patch(
-            "flwr.supercore.superexec.plugin.base_exec_plugin.subprocess.Popen"
-        ) as popen,
+    with patch(
+        "flwr.supercore.superexec.plugin.base_exec_plugin.os.getpid",
+        return_value=1234,
     ):
         plugin.launch_task(token="token-123", task=_get_task(task_id=7))
 
-    assert popen.call_args.args[0] == [
-        "dummy-app",
-        "--insecure",
-        "--appio-api-address",
-        "127.0.0.1:9091",
-        "--token",
-        "token-123",
-        "--parent-pid",
-        "1234",
-        "--allow-runtime-dependency-installation",
-    ]
+    spec = _launched_spec(backend)
+    assert spec.runtime_dependency_install is True
+    assert spec.parent_pid == 1234
 
 
 def test_launch_task_skips_optional_runtime_flags_by_default() -> None:
-    """Ensure app launch omits optional runtime install flags by default."""
+    """Ensure launch spec omits optional runtime install flags by default."""
+    backend = Mock()
     plugin = DummyExecPlugin(
         appio_api_address="127.0.0.1:9091",
         insecure=True,
         root_certificates_path=None,
         get_run=Mock(),
+        launch_backend=backend,
     )
 
-    with patch(
-        "flwr.supercore.superexec.plugin.base_exec_plugin.subprocess.Popen"
-    ) as popen:
-        plugin.launch_task(token="token-123", task=_get_task(task_id=7))
+    plugin.launch_task(token="token-123", task=_get_task(task_id=7))
 
-    assert "--allow-runtime-dependency-installation" not in popen.call_args.args[0]
+    assert _launched_spec(backend).runtime_dependency_install is False
 
 
 def test_clientapp_launch_forwards_root_certificate() -> None:
     """ClientApp launch should forward the configured root certificate path."""
+    backend = Mock()
     plugin = ClientAppExecPlugin(
         appio_api_address="127.0.0.1:9094",
         insecure=False,
         root_certificates_path="/tmp/root.pem",
         get_run=_get_run,
+        launch_backend=backend,
     )
 
-    with patch("subprocess.Popen") as mock_popen:
-        plugin.launch_task(token="token", task=_get_task(task_id=7))
+    plugin.launch_task(token="token", task=_get_task(task_id=7))
 
-    assert mock_popen.call_args.args[0][:3] == [
-        "flwr-clientapp",
-        "--root-certificates",
-        "/tmp/root.pem",
-    ]
+    spec = _launched_spec(backend)
+    assert spec.insecure is False
+    assert spec.root_certificates_path == "/tmp/root.pem"
 
 
 def test_clientapp_launch_omits_tls_flags_when_using_system_certificates() -> None:
-    """ClientApp launch should omit TLS flags when relying on system certificates."""
+    """ClientApp launch should omit TLS inputs when relying on system
+    certificates."""
+    backend = Mock()
     plugin = ClientAppExecPlugin(
         appio_api_address="127.0.0.1:9094",
         insecure=False,
         root_certificates_path=None,
         get_run=_get_run,
+        launch_backend=backend,
     )
 
-    with patch("subprocess.Popen") as mock_popen:
-        plugin.launch_task(token="token", task=_get_task(task_id=7))
+    plugin.launch_task(token="token", task=_get_task(task_id=7))
 
-    assert "--insecure" not in mock_popen.call_args.args[0]
-    assert "--root-certificates" not in mock_popen.call_args.args[0]
+    spec = _launched_spec(backend)
+    assert spec.insecure is False
+    assert spec.root_certificates_path is None
