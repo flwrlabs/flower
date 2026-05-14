@@ -35,10 +35,7 @@ from flwr.supercore.auth import (
 )
 from flwr.supercore.constant import EXEC_PLUGIN_SECTION
 from flwr.supercore.grpc_health import add_args_health
-from flwr.supercore.superexec.launch import (
-    SUBPROCESS_BACKEND,
-    SUPPORTED_BACKENDS,
-)
+from flwr.supercore.superexec.launch import SUBPROCESS_BACKEND, SUPPORTED_BACKENDS
 from flwr.supercore.superexec.plugin import (
     ClientAppExecPlugin,
     ExecPlugin,
