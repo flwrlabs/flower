@@ -15,7 +15,6 @@
 """Tests all LinkState implemenations have to conform to."""
 # pylint: disable=invalid-name, too-many-lines, R0904, R0913
 
-
 import hashlib
 import multiprocessing
 import os
@@ -519,24 +518,8 @@ class StateTest(CoreStateTest):
         assert datetime.fromisoformat(actual_message_ins.metadata.delivered_at) > dt
         assert actual_message_ins.metadata.ttl > 0
 
-    def test_store_message_ins_rejects_stopped_run(self) -> None:
-        """Instruction messages cannot be stored after a run is stopped."""
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-        )
-
-        self.assertTrue(state.stop_run(run_id))
-
-        self.assertIsNone(state.store_message_ins(message=msg))
-        self.assertEqual(state.num_message_ins(), 0)
-
-    def test_store_message_res_rejects_stopped_run(self) -> None:
-        """Reply messages cannot be stored after a run is stopped."""
+    def test_store_messages_rejects_stopped_run(self) -> None:
+        """Messages cannot be stored after a run is stopped."""
         state = self.state_factory()
         node_id = create_dummy_node(state)
         run_id = create_dummy_run(state)
@@ -551,7 +534,9 @@ class StateTest(CoreStateTest):
 
         self.assertTrue(state.stop_run(run_id))
 
+        self.assertIsNone(state.store_message_ins(message=msg))
         self.assertIsNone(state.store_message_res(message=reply_msg))
+        self.assertEqual(state.num_message_ins(), 0)
         self.assertEqual(state.num_message_res(), 0)
 
     def test_store_message_ins_invalid_node_id(self) -> None:
@@ -1367,7 +1352,6 @@ class StateTest(CoreStateTest):
             msg_res_ttl,
             expected_store_result,
         ) in test_cases:
-
             # Prepare
             state: LinkState = self.state_factory()
             run_id = create_dummy_run(state)

@@ -16,7 +16,6 @@
 
 # pylint: disable=too-many-lines
 
-
 import hashlib
 import json
 import time
@@ -412,12 +411,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 f"Run ID {run_id} is already finished",
             )
 
-        update_success = _stop_run_in_linkstate(
-            state=state,
-            run_id=run_id,
-        )
-
-        return StopRunResponse(success=update_success)
+        return StopRunResponse(success=state.stop_run(run_id))
 
     def GetLoginDetails(
         self, request: GetLoginDetailsRequest, context: grpc.ServicerContext
@@ -732,10 +726,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             )
             for run in state.get_run_info(federations=[request.federation_name]):
                 if run.status.status != Status.FINISHED:
-                    _stop_run_in_linkstate(
-                        state=state,
-                        run_id=run.run_id,
-                    )
+                    state.stop_run(run.run_id)
 
         return ArchiveFederationResponse()
 
@@ -812,7 +803,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 flwr_aids=[removed_flwr_aid],
                 statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
             ):
-                _stop_run_in_linkstate(state=state, run_id=run.run_id)
+                state.stop_run(run.run_id)
         return RemoveAccountFromFederationResponse()
 
     def CreateInvitation(
@@ -1061,11 +1052,6 @@ def _check_flwr_aid_in_run(
             grpc.StatusCode.PERMISSION_DENIED,
             "⛔️ Run ID does not belong to the account",
         )
-
-
-def _stop_run_in_linkstate(state: LinkState, run_id: int) -> bool:
-    """Stop a run and clean it up using LinkState methods."""
-    return state.stop_run(run_id)
 
 
 def _format_verification(verifications: list[dict[str, str]]) -> dict[str, str]:
