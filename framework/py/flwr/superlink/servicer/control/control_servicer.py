@@ -54,7 +54,7 @@ from flwr.common.constant import (
 )
 from flwr.common.logger import log
 from flwr.common.serde import run_to_proto, user_config_from_proto
-from flwr.common.typing import AccountInfo, Fab, Run, RunStatus
+from flwr.common.typing import AccountInfo, Fab, Run
 from flwr.proto import control_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
@@ -299,6 +299,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         if not runs:
             context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
         run = runs[0]
+        task_id = cast(int, run.primary_task_id)
 
         with rpc_error_translator(context, rpc_name):
             flwr_aid = _get_flwr_aid(context)
@@ -308,7 +309,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         after_timestamp = request.after_timestamp + 1e-6
         while context.is_active():
-            log_msg, latest_timestamp = state.get_serverapp_log(run_id, after_timestamp)
+            log_msg, latest_timestamp = state.get_task_log(task_id, after_timestamp)
             if log_msg:
                 yield StreamLogsResponse(
                     log_output=log_msg,
@@ -1073,9 +1074,6 @@ def _stop_run_in_linkstate(state: LinkState, store: ObjectStore, run_id: int) ->
     update_success = False
     for task in state.get_tasks(run_ids=[run_id]):
         update_success |= state.finish_task(task.task_id, SubStatus.STOPPED, "")
-
-    # Keep run status working
-    state.update_run_status(run_id, RunStatus(Status.FINISHED, SubStatus.STOPPED, ""))
 
     # Clean up the run if any task was successfully updated to STOPPED
     if update_success:

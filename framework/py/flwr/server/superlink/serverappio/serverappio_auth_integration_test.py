@@ -21,8 +21,7 @@ from collections.abc import Callable
 
 import grpc
 
-from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS, Status
-from flwr.common.typing import RunStatus
+from flwr.common.constant import SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppMessagesRequest,
     PullAppMessagesResponse,
@@ -45,15 +44,10 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
-from flwr.supercore.constant import (
-    FLWR_IN_MEMORY_DB_NAME,
-    NOOP_FEDERATION,
-    RunType,
-    TaskType,
-)
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
 from flwr.supercore.interceptors import (
-    APP_TOKEN_HEADER,
     AUTHENTICATION_FAILED_MESSAGE,
+    TASK_TOKEN_HEADER,
     AppIoTokenClientInterceptor,
     SuperExecAuthClientInterceptor,
 )
@@ -93,23 +87,10 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
 
         # Seed one authenticated task token and reuse it for token-protected RPC
         # checks.
-        self._auth_run_id = self._create_running_run()
-        auth_task_id = self.state.create_task(
-            task_type=TaskType.SERVER_APP, run_id=self._auth_run_id
+        self._auth_run_id, self._auth_token = self._create_running_run()
+        self._simulation_run_id, self._simulation_token = self._create_running_run(
+            run_type=RunType.SIMULATION
         )
-        assert auth_task_id is not None
-        auth_token = self.state.claim_task(auth_task_id)
-        assert auth_token is not None
-        self._auth_token = auth_token
-
-        self._simulation_run_id = self._create_running_run(run_type=RunType.SIMULATION)
-        simulation_task_id = self.state.create_task(
-            task_type=TaskType.SERVER_APP, run_id=self._simulation_run_id
-        )
-        assert simulation_task_id is not None
-        simulation_token = self.state.claim_task(simulation_task_id)
-        assert simulation_token is not None
-        self._simulation_token = simulation_token
 
         # Create a single base channel and wrap it for authenticated calls.
         self._base_channel = grpc.insecure_channel("localhost:9091")
@@ -147,13 +128,18 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         self._base_channel.close()
         self._server.stop(None)
 
-    def _create_running_run(self, run_type: str = RunType.SERVER_APP) -> int:
+    def _create_running_run(
+        self, run_type: str = RunType.SERVER_APP
+    ) -> tuple[int, str]:
         run_id = self.state.create_run(
             "", "", "", {}, NOOP_FEDERATION, None, "", run_type
         )
-        _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-        _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
-        return run_id
+        run = self.state.get_run_info(run_ids=[run_id])[0]
+        assert run.primary_task_id is not None
+        token = self.state.claim_task(run.primary_task_id)
+        assert token is not None
+        assert self.state.activate_task(run.primary_task_id)
+        return run_id, token
 
     def _assert_serverapp_only_endpoint_denied(
         self,
@@ -170,16 +156,14 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         with self.assertRaises(grpc.RpcError) as err:
             rpc.with_call(
                 request=request,
-                metadata=((APP_TOKEN_HEADER, self._simulation_token),),
+                metadata=((TASK_TOKEN_HEADER, self._simulation_token),),
             )
         assert err.exception.code() == grpc.StatusCode.PERMISSION_DENIED
 
     def test_get_nodes_denied_without_metadata_token(self) -> None:
         """Protected RPC should deny requests missing metadata token."""
         with self.assertRaises(grpc.RpcError) as err:
-            self._get_nodes_no_auth.with_call(
-                request=GetNodesRequest(run_id=self._auth_run_id)
-            )
+            self._get_nodes_no_auth.with_call(request=GetNodesRequest())
         assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
         assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE
 
@@ -187,27 +171,30 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         """Protected RPC should deny requests with invalid metadata token."""
         with self.assertRaises(grpc.RpcError) as err:
             self._get_nodes_no_auth.with_call(
-                request=GetNodesRequest(run_id=self._auth_run_id),
-                metadata=((APP_TOKEN_HEADER, "invalid-token"),),
+                request=GetNodesRequest(),
+                metadata=((TASK_TOKEN_HEADER, "invalid-token"),),
             )
         assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
         assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE
 
     def test_get_nodes_allows_with_valid_metadata_token(self) -> None:
         """Protected RPC should allow requests with a valid metadata token."""
-        response, call = self._get_nodes.with_call(
-            request=GetNodesRequest(run_id=self._auth_run_id)
-        )
+        response, call = self._get_nodes.with_call(request=GetNodesRequest())
 
         assert isinstance(response, GetNodesResponse)
         assert call.code() == grpc.StatusCode.OK
 
-    def test_get_nodes_denied_when_token_targets_different_run(self) -> None:
-        """Protected RPC should deny valid tokens used against another run."""
+    def test_run_bound_endpoint_denied_when_token_targets_different_run(self) -> None:
+        """Run-bound RPCs should deny valid tokens used against another run."""
+        rpc = self._base_channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PushObject",
+            request_serializer=PushObjectRequest.SerializeToString,
+            response_deserializer=PushObjectResponse.FromString,
+        )
         with self.assertRaises(grpc.RpcError) as err:
-            self._get_nodes_no_auth.with_call(
-                request=GetNodesRequest(run_id=self._auth_run_id),
-                metadata=((APP_TOKEN_HEADER, self._simulation_token),),
+            rpc.with_call(
+                request=PushObjectRequest(run_id=self._auth_run_id),
+                metadata=((TASK_TOKEN_HEADER, self._simulation_token),),
             )
         assert err.exception.code() == grpc.StatusCode.PERMISSION_DENIED
 
@@ -216,17 +203,17 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         cases: list[tuple[str, object, Callable[[bytes], object]]] = [
             (
                 "/flwr.proto.ServerAppIo/GetNodes",
-                GetNodesRequest(run_id=self._simulation_run_id),
+                GetNodesRequest(),
                 GetNodesResponse.FromString,
             ),
             (
                 "/flwr.proto.ServerAppIo/PushMessages",
-                PushAppMessagesRequest(run_id=self._simulation_run_id),
+                PushAppMessagesRequest(),
                 PushAppMessagesResponse.FromString,
             ),
             (
                 "/flwr.proto.ServerAppIo/PullMessages",
-                PullAppMessagesRequest(run_id=self._simulation_run_id),
+                PullAppMessagesRequest(),
                 PullAppMessagesResponse.FromString,
             ),
             (

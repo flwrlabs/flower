@@ -112,6 +112,24 @@ class ServerAppIoStub:
     ]
     """Create a task"""
 
+    PushTaskMessage: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushTaskMessageRequest,
+        flwr.proto.appio_pb2.PushTaskMessageResponse,
+    ]
+    """Push task message"""
+
+    PullTaskMessage: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PullTaskMessageRequest,
+        flwr.proto.appio_pb2.PullTaskMessageResponse,
+    ]
+    """Pull task messages"""
+
+    PushLogs: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.log_pb2.PushLogsRequest,
+        flwr.proto.log_pb2.PushLogsResponse,
+    ]
+    """Push task logs"""
+
     GetFederationOptions: grpc.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetFederationOptionsRequest,
         flwr.proto.run_pb2.GetFederationOptionsResponse,
@@ -122,12 +140,6 @@ class ServerAppIoStub:
 
     Get Federation Options (only used by flwr-simulation)
     """
-
-    PushLogs: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.log_pb2.PushLogsRequest,
-        flwr.proto.log_pb2.PushLogsResponse,
-    ]
-    """Push ServerApp logs"""
 
     PushMessages: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushAppMessagesRequest,
@@ -223,6 +235,24 @@ class ServerAppIoAsyncStub:
     ]
     """Create a task"""
 
+    PushTaskMessage: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushTaskMessageRequest,
+        flwr.proto.appio_pb2.PushTaskMessageResponse,
+    ]
+    """Push task message"""
+
+    PullTaskMessage: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PullTaskMessageRequest,
+        flwr.proto.appio_pb2.PullTaskMessageResponse,
+    ]
+    """Pull task messages"""
+
+    PushLogs: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.log_pb2.PushLogsRequest,
+        flwr.proto.log_pb2.PushLogsResponse,
+    ]
+    """Push task logs"""
+
     GetFederationOptions: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetFederationOptionsRequest,
         flwr.proto.run_pb2.GetFederationOptionsResponse,
@@ -233,12 +263,6 @@ class ServerAppIoAsyncStub:
 
     Get Federation Options (only used by flwr-simulation)
     """
-
-    PushLogs: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.log_pb2.PushLogsRequest,
-        flwr.proto.log_pb2.PushLogsResponse,
-    ]
-    """Push ServerApp logs"""
 
     PushMessages: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushAppMessagesRequest,
@@ -355,6 +379,30 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         """Create a task"""
 
     @abc.abstractmethod
+    def PushTaskMessage(
+        self,
+        request: flwr.proto.appio_pb2.PushTaskMessageRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.PushTaskMessageResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushTaskMessageResponse]]:
+        """Push task message"""
+
+    @abc.abstractmethod
+    def PullTaskMessage(
+        self,
+        request: flwr.proto.appio_pb2.PullTaskMessageRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.PullTaskMessageResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PullTaskMessageResponse]]:
+        """Pull task messages"""
+
+    @abc.abstractmethod
+    def PushLogs(
+        self,
+        request: flwr.proto.log_pb2.PushLogsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.log_pb2.PushLogsResponse, collections.abc.Awaitable[flwr.proto.log_pb2.PushLogsResponse]]:
+        """Push task logs"""
+
+    @abc.abstractmethod
     def GetFederationOptions(
         self,
         request: flwr.proto.run_pb2.GetFederationOptionsRequest,
@@ -366,14 +414,6 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
 
         Get Federation Options (only used by flwr-simulation)
         """
-
-    @abc.abstractmethod
-    def PushLogs(
-        self,
-        request: flwr.proto.log_pb2.PushLogsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.log_pb2.PushLogsResponse, collections.abc.Awaitable[flwr.proto.log_pb2.PushLogsResponse]]:
-        """Push ServerApp logs"""
 
     @abc.abstractmethod
     def PushMessages(

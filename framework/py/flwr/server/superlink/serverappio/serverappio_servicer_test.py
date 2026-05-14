@@ -34,9 +34,8 @@ from flwr.common.constant import (
     SUPERLINK_NODE_ID,
     Status,
 )
-from flwr.common.message import get_message_to_descendant_id_mapping
 from flwr.common.serde import message_from_proto
-from flwr.common.typing import Fab, RunStatus
+from flwr.common.typing import Fab
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
@@ -56,9 +55,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
     ConfirmMessageReceivedResponse,
-)
-from flwr.proto.message_pb2 import Message as ProtoMessage  # pylint: disable=E0611
-from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ObjectTree,
     PullObjectRequest,
     PullObjectResponse,
@@ -93,7 +89,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     iterate_object_tree,
 )
 from flwr.supercore.interceptors import (
-    APP_TOKEN_HEADER,
+    TASK_TOKEN_HEADER,
     AppIoTokenClientInterceptor,
     SuperExecAuthClientInterceptor,
 )
@@ -209,8 +205,9 @@ def _create_shared_runtime(
     state_0.set_serverapp_context(
         run_id, Context(run_id, SUPERLINK_NODE_ID, {}, RecordDict(), {})
     )
-    task_id = state_0.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
-    assert task_id is not None
+    run = state_0.get_run_info(run_ids=[run_id])[0]
+    assert run.primary_task_id is not None
+    task_id = run.primary_task_id
     server_0 = _start_serverappio_with_port_retry(
         state_factory_0,
         objectstore_factory_0,
@@ -269,7 +266,7 @@ def _claim_in_parallel(
             barrier.wait(timeout=timeout)
             response, call = pull_fn.with_call(
                 PullTaskInputRequest(),
-                metadata=((APP_TOKEN_HEADER, token),),
+                metadata=((TASK_TOKEN_HEADER, token),),
             )
             del response
             results[idx] = call.code()
@@ -336,20 +333,12 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         self._auth_run_id = self.state.create_run(
             "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
         )
-        auth_task_id = self.state.create_task(
-            task_type=TaskType.SERVER_APP, run_id=self._auth_run_id
-        )
-        assert auth_task_id is not None
+        auth_task_id = self._primary_task_id(self._auth_run_id)
         auth_token = self.state.claim_task(auth_task_id)
         assert auth_token is not None
+        assert self.state.activate_task(auth_task_id)
         self._auth_token = auth_token
         self._appio_auth_interceptor = AppIoTokenClientInterceptor(auth_token)
-        _ = self.state.update_run_status(
-            self._auth_run_id, RunStatus(Status.STARTING, "", "")
-        )
-        _ = self.state.update_run_status(
-            self._auth_run_id, RunStatus(Status.RUNNING, "", "")
-        )
         self._channel = grpc.intercept_channel(
             grpc.insecure_channel("localhost:9091"),
             self._appio_auth_interceptor,
@@ -413,25 +402,19 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         """Clean up grpc server."""
         self._server.stop(None)
 
-    def test_create_task_uses_authenticated_run_id(self) -> None:
-        """CreateTask should create tasks for the authenticated run."""
-        response = self._create_task(
-            CreateTaskRequest(type=TaskType.MODEL, model_ref="models/abc")
-        )
-
-        assert response.HasField("task_id")
-        task = self.state.get_tasks(task_ids=[response.task_id])[0]
-        assert task.run_id == self._auth_run_id
-        assert task.type == TaskType.MODEL
-        assert task.model_ref == "models/abc"
+    def _primary_task_id(self, run_id: int) -> int:
+        run = self.state.get_run_info(run_ids=[run_id])[0]
+        assert run.primary_task_id is not None
+        return run.primary_task_id
 
     def _transition_run_status(self, run_id: int, num_transitions: int) -> None:
+        task_id = self._primary_task_id(run_id)
         if num_transitions > 0:
-            _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
+            assert self.state.claim_task(task_id) is not None
         if num_transitions > 1:
-            _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
+            assert self.state.activate_task(task_id)
         if num_transitions > 2:
-            _ = self.state.update_run_status(run_id, RunStatus(Status.FINISHED, "", ""))
+            assert self.state.finish_task(task_id, "", "")
 
     def _create_dummy_run(self, running: bool = True, *, fab_hash: str = "") -> int:
         run_id = self.state.create_run(
@@ -460,11 +443,22 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
     def _set_token(self, token: str) -> None:
         self._appio_auth_interceptor._token = token  # pylint: disable=W0212
 
-    def test_successful_get_node_if_running(self) -> None:
+    def test_create_task_uses_authenticated_run_id(self) -> None:
+        """CreateTask should create tasks for the authenticated run."""
+        response = self._create_task(
+            CreateTaskRequest(type=TaskType.MODEL, model_ref="models/abc")
+        )
+
+        assert response.HasField("task_id")
+        task = self.state.get_tasks(task_ids=[response.task_id])[0]
+        assert task.run_id == self._auth_run_id
+        assert task.type == TaskType.MODEL
+        assert task.model_ref == "models/abc"
+
+    def test_get_node(self) -> None:
         """Test `GetNode` success."""
         # Prepare
-        run_id = self._create_dummy_run()
-        request = GetNodesRequest(run_id=run_id)
+        request = GetNodesRequest()
 
         # Execute
         response, call = self._get_nodes.with_call(request=request)
@@ -472,104 +466,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         # Assert
         assert isinstance(response, GetNodesResponse)
         assert grpc.StatusCode.OK == call.code()
-
-    def _assert_get_nodes_not_allowed(self, run_id: int) -> None:
-        """Assert `GetNodes` not allowed."""
-        run_status = self.state.get_run_status({run_id})[run_id]
-        request = GetNodesRequest(run_id=run_id)
-
-        with self.assertRaises(grpc.RpcError) as e:
-            self._get_nodes.with_call(request=request)
-        assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
-        assert e.exception.details() == self.status_to_msg[run_status.status]
-
-    @parameterized.expand(
-        [
-            (0,),  # Test not successful if RunStatus is pending.
-            (1,),  # Test not successful if RunStatus is starting.
-            (3,),  # Test not successful if RunStatus is finished.
-        ]
-    )  # type: ignore
-    def test_get_nodes_not_successful_if_not_running(
-        self, num_transitions: int
-    ) -> None:
-        """Test `GetNodes` not sucessful if RunStatus is pending."""
-        # Prepare
-        run_id = self._create_dummy_run(running=False)
-
-        self._transition_run_status(run_id, num_transitions)
-
-        # Execute & Assert
-        self._assert_get_nodes_not_allowed(run_id)
-
-    def test_successful_push_messages_if_running(self) -> None:
-        """Test `PushMessages` success."""
-        # Prepare
-        run_id = self._create_dummy_run()
-        message_ins = create_ins_message(
-            src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
-        )
-
-        # Construct message to descendant mapping
-        message = message_from_proto(message_ins)
-        descendant_mapping = get_message_to_descendant_id_mapping(message)
-        request = PushAppMessagesRequest(
-            messages_list=[message_ins],
-            run_id=run_id,
-            message_object_trees=[get_object_tree(message)],
-        )
-
-        # Execute
-        response, call = self._push_messages.with_call(request=request)
-
-        # Assert
-        assert isinstance(response, PushAppMessagesResponse)
-        assert grpc.StatusCode.OK == call.code()
-
-        # Assert: check that response indicates all objects need pushing
-        expected_object_ids = {message.object_id}  # message
-        expected_object_ids |= {
-            obj_id
-            for obj_ids in descendant_mapping.values()
-            for obj_id in obj_ids.object_ids
-        }  # descendants
-        # Construct a single set with all object ids
-        requested_object_ids = set(response.objects_to_push)
-        assert expected_object_ids == requested_object_ids
-
-    def _assert_push_ins_messages_not_allowed(
-        self, message: ProtoMessage, run_id: int
-    ) -> None:
-        """Assert `PushInsMessages` not allowed."""
-        run_status = self.state.get_run_status({run_id})[run_id]
-        request = PushAppMessagesRequest(messages_list=[message], run_id=run_id)
-
-        with self.assertRaises(grpc.RpcError) as e:
-            self._push_messages.with_call(request=request)
-        assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
-        assert e.exception.details() == self.status_to_msg[run_status.status]
-
-    @parameterized.expand(
-        [
-            (0,),  # Test not successful if RunStatus is pending.
-            (1,),  # Test not successful if RunStatus is starting.
-            (3,),  # Test not successful if RunStatus is finished.
-        ]
-    )  # type: ignore
-    def test_push_ins_messages_not_successful_if_not_running(
-        self, num_transitions: int
-    ) -> None:
-        """Test `PushInsMessages` not successful if RunStatus is not running."""
-        # Prepare
-        run_id = self._create_dummy_run(running=False)
-        message_ins = create_ins_message(
-            src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
-        )
-
-        self._transition_run_status(run_id, num_transitions)
-
-        # Execute & Assert
-        self._assert_push_ins_messages_not_allowed(message_ins, run_id)
 
     @parameterized.expand(
         [
@@ -581,10 +477,10 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             (False,),
         ]
     )  # type: ignore
-    def test_pull_messages_if_running(self, register_in_store: bool) -> None:
+    def test_pull_messages(self, register_in_store: bool) -> None:
         """Test `PullMessages` success if objects are registered in ObjectStore."""
         # Prepare
-        run_id = self._create_dummy_run()
+        run_id = self._auth_run_id
 
         # Push Messages and reply
         message_ins = message_from_proto(
@@ -609,7 +505,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
                 run_id, get_object_tree(reply_msg)
             )
 
-        request = PullAppMessagesRequest(message_ids=[str(msg_id)], run_id=run_id)
+        request = PullAppMessagesRequest(message_ids=[str(msg_id)])
 
         # Execute
         response, call = self._pull_messages.with_call(request=request)
@@ -646,7 +542,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
     ) -> None:
         """Test `PullMessages` deletes messages from LinkState."""
         # Prepare
-        run_id = self._create_dummy_run()
+        run_id = self._auth_run_id
 
         # Push Messages and reply
         message_ins = message_from_proto(
@@ -672,7 +568,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         self.state.store_message_res(message=reply_msg)
         # Register response in ObjectStore (so pulling message request can be completed)
         self.store.preregister(run_id, get_object_tree(reply_msg))
-        request = PullAppMessagesRequest(message_ids=[str(msg_id)], run_id=run_id)
+        request = PullAppMessagesRequest(message_ids=[str(msg_id)])
 
         # Execute
         response, call = self._pull_messages.with_call(request=request)
@@ -683,40 +579,11 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert self.state.num_message_ins() == 0
         assert self.state.num_message_res() == 0
 
-    def _assert_pull_messages_not_allowed(self, run_id: int) -> None:
-        """Assert `PullMessages` not allowed."""
-        run_status = self.state.get_run_status({run_id})[run_id]
-        request = PullAppMessagesRequest(run_id=run_id)
-
-        with self.assertRaises(grpc.RpcError) as e:
-            self._pull_messages.with_call(request=request)
-        assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
-        assert e.exception.details() == self.status_to_msg[run_status.status]
-
-    @parameterized.expand(
-        [
-            (0,),  # Test not successful if RunStatus is pending.
-            (1,),  # Test not successful if RunStatus is starting.
-            (3,),  # Test not successful if RunStatus is finished.
-        ]
-    )  # type: ignore
-    def test_pull_messages_not_successful_if_not_running(
-        self, num_transitions: int
-    ) -> None:
-        """Test `PullMessages` not successful if RunStatus is not running."""
-        # Prepare
-        run_id = self._create_dummy_run(running=False)
-
-        self._transition_run_status(run_id, num_transitions)
-
-        # Execute & Assert
-        self._assert_pull_messages_not_allowed(run_id)
-
     def test_pull_message_from_expired_message_error(self) -> None:
         """Test that the servicer correctly handles the registration in the ObjectStore
         of an Error message created by the LinkState due to an expired TTL."""
         # Prepare
-        run_id = self._create_dummy_run()
+        run_id = self._auth_run_id
 
         # Push Messages and reply
         message_ins = message_from_proto(
@@ -734,7 +601,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             mock_dt.now.return_value = future_dt  # over TTL limit
 
             # Execute
-            request = PullAppMessagesRequest(message_ids=[str(msg_id)], run_id=run_id)
+            request = PullAppMessagesRequest(message_ids=[str(msg_id)])
             response, call = self._pull_messages.with_call(request=request)
 
             # Assert
@@ -776,11 +643,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
     def test_push_object_fails(self) -> None:
         """Test `PushObject` in unsupported scenarios."""
         run_id = self._create_dummy_run(running=False)
-        # Run is not running
-        req = PushObjectRequest(node=Node(node_id=123), run_id=run_id)
-        with self.assertRaises(grpc.RpcError) as e:
-            self._push_object(request=req)
-        assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
 
         # Run is running but node ID isn't recognized
         self._transition_run_status(run_id, 2)
@@ -858,11 +720,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
     def test_pull_object_fails(self) -> None:
         """Test `PullObject` in unsuported scenarios."""
         run_id = self._create_dummy_run(running=False)
-        # Run is not running
-        req = PullObjectRequest(node=Node(node_id=123), run_id=run_id)
-        with self.assertRaises(grpc.RpcError) as e:
-            self._pull_object(request=req)
-        assert e.exception.code() == grpc.StatusCode.PERMISSION_DENIED
 
         # Run is running but node ID isn't recognized
         self._transition_run_status(run_id, 2)
@@ -923,10 +780,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
         )
         run_id = self._create_dummy_run(running=False, fab_hash=fab_hash)
-        task_id = self.state.create_task(
-            task_type=TaskType.SERVER_APP, run_id=run_id, fab_hash=fab_hash
-        )
-        assert task_id is not None
+        task_id = self._primary_task_id(run_id)
         servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
 
         # Claim task through the servicer to transition the run to STARTING.

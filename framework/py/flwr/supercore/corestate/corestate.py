@@ -42,6 +42,42 @@ class CoreState(ABC):
         """Return the FAB for the given hash, if present."""
 
     @abstractmethod
+    def add_task_log(self, task_id: int, log_message: str) -> None:
+        """Add a log entry to the task logs for the specified `task_id`.
+
+        Parameters
+        ----------
+        task_id : int
+            The identifier of the task for which to add a log entry.
+        log_message : str
+            The log entry to be added to the task logs.
+        """
+
+    @abstractmethod
+    def get_task_log(
+        self, task_id: int, after_timestamp: float | None
+    ) -> tuple[str, float]:
+        """Get task logs for the specified `task_id`.
+
+        Parameters
+        ----------
+        task_id : int
+            The identifier of the task for which to retrieve logs.
+        after_timestamp : Optional[float]
+            Retrieve logs after this timestamp. If set to `None`, retrieve all logs.
+            The filter is strict: logs at exactly `after_timestamp` are considered
+            already consumed by the caller.
+
+        Returns
+        -------
+        tuple[str, float]
+            A tuple containing:
+            - The concatenated task logs associated with the specified `task_id`.
+            - The timestamp of the latest log entry in the returned logs.
+              Returns `0` if no logs are returned.
+        """
+
+    @abstractmethod
     def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         task_type: str,

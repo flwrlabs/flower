@@ -29,8 +29,16 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     CreateTaskResponse,
     PullPendingTasksRequest,
     PullPendingTasksResponse,
+    PullTaskMessageRequest,
+    PullTaskMessageResponse,
+    PushTaskMessageRequest,
+    PushTaskMessageResponse,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
+)
+from flwr.proto.log_pb2 import (  # pylint: disable=E0611
+    PushLogsRequest,
+    PushLogsResponse,
 )
 from flwr.supercore.constant import (
     TASK_TYPES_REQUIRING_CONNECTOR_REF,
@@ -106,6 +114,40 @@ class AppIoServicer(ABC):
             raise RuntimeError("This line should never be reached.")
 
         return CreateTaskResponse(task_id=created_task_id)
+
+    def PushTaskMessage(
+        self, request: PushTaskMessageRequest, context: grpc.ServicerContext
+    ) -> PushTaskMessageResponse:
+        """Push a task message."""
+        log(DEBUG, "AppIoServicer.PushTaskMessage")
+        context.abort(
+            grpc.StatusCode.UNIMPLEMENTED, "PushTaskMessage is not implemented"
+        )
+        raise RuntimeError("This line should never be reached.")
+
+    def PullTaskMessage(
+        self, request: PullTaskMessageRequest, context: grpc.ServicerContext
+    ) -> PullTaskMessageResponse:
+        """Pull task messages."""
+        log(DEBUG, "AppIoServicer.PullTaskMessage")
+        context.abort(
+            grpc.StatusCode.UNIMPLEMENTED, "PullTaskMessage is not implemented"
+        )
+        raise RuntimeError("This line should never be reached.")
+
+    def PushLogs(
+        self, request: PushLogsRequest, context: grpc.ServicerContext
+    ) -> PushLogsResponse:
+        """Push logs."""
+        log(DEBUG, "AppIoServicer.PushLogs")
+        state = self.state()
+
+        task = get_authenticated_task()
+
+        # Add logs to LinkState
+        merged_logs = "".join(request.logs)
+        state.add_task_log(task.task_id, merged_logs)
+        return PushLogsResponse()
 
 
 def _validate_create_task_request(

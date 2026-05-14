@@ -15,7 +15,13 @@
 # limitations under the License.
 # ==============================================================================
 
-set -e
+set -euo pipefail
+
+if [[ -z "${PYPI_REPOSITORY_PASSWORD:-}" ]]; then
+    echo "Missing required configuration: PYPI_REPOSITORY_PASSWORD" >&2
+    exit 1
+fi
+
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../
 
 # This script will build and publish a nightly release of Flower under the condition
@@ -29,7 +35,7 @@ if [[ $(git log --since="24 hours ago" --pretty=oneline) ]]; then
     sed -i -E "s/^name = \"(.+)\"/name = \"\1-nightly\"/" pyproject.toml
     sed -i -E "s/^version = \"(.+)\"/version = \"\1.dev$(date '+%Y%m%d')\"/" pyproject.toml
     python -m poetry build
-    python -m poetry publish -u __token__ -p $PYPI_TOKEN
+    python -m poetry publish -u __token__ -p "${PYPI_REPOSITORY_PASSWORD}"
 else
     echo "There were no commits in the last 24 hours."
 fi

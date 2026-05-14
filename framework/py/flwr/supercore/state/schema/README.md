@@ -63,7 +63,7 @@ erDiagram
     VARCHAR last_activated_at "nullable"
     VARCHAR last_deactivated_at "nullable"
     BIGINT node_id UK "nullable"
-    TIMESTAMP online_until "nullable"
+    FLOAT online_until "nullable"
     VARCHAR owner_aid "nullable"
     VARCHAR owner_name "nullable"
     BLOB public_key UK "nullable"
@@ -104,7 +104,7 @@ erDiagram
     VARCHAR flwr_aid "nullable"
     VARCHAR override_config "nullable"
     VARCHAR pending_at "nullable"
-    BIGINT primary_task_id "nullable"
+    BIGINT primary_task_id
     BIGINT run_id UK "nullable"
     VARCHAR run_type
     VARCHAR running_at "nullable"
@@ -135,10 +135,23 @@ erDiagram
     VARCHAR type
   }
 
-  token_store {
-    BIGINT run_id PK "nullable"
-    FLOAT active_until "nullable"
-    VARCHAR token UK
+  task_logs {
+    BIGINT task_id FK
+    VARCHAR log
+    FLOAT timestamp
+  }
+
+  task_message {
+    VARCHAR message_id PK
+    BIGINT dst_task_id FK
+    BIGINT src_task_id FK
+    BLOB content "nullable"
+    FLOAT created_at
+    BLOB error "nullable"
+    VARCHAR message_type
+    VARCHAR reply_to_message_id "nullable"
+    BIGINT run_id
+    FLOAT ttl
   }
 
   run ||--o| context : run_id
@@ -148,6 +161,9 @@ erDiagram
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
   objects ||--o| run_objects : object_id
+  task ||--o{ task_logs : task_id
+  task ||--o{ task_message : src_task_id
+  task ||--o{ task_message : dst_task_id
 
 ```
 <!-- END_SQLALCHEMY_DOCS -->

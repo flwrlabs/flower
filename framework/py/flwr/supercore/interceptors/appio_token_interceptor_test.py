@@ -39,8 +39,8 @@ from flwr.supercore.auth import (
     SERVERAPPIO_METHOD_AUTH_POLICY,
 )
 from flwr.supercore.interceptors import (
-    APP_TOKEN_HEADER,
     AUTHENTICATION_FAILED_MESSAGE,
+    TASK_TOKEN_HEADER,
     AppIoTokenClientInterceptor,
     AppIoTokenServerInterceptor,
     create_clientappio_token_auth_server_interceptor,
@@ -95,8 +95,8 @@ def _make_non_unary_handler() -> grpc.RpcMethodHandler:
 class TestAppIoTokenClientInterceptor(TestCase):
     """Unit tests for AppIoTokenClientInterceptor."""
 
-    def test_attach_app_token_header(self) -> None:
-        """The interceptor should attach App token metadata."""
+    def test_attach_task_token_header(self) -> None:
+        """The interceptor should attach task-token metadata."""
         interceptor = AppIoTokenClientInterceptor(token="new-token")
         details = _ClientCallDetails(
             method="/flwr.proto.ServerAppIo/GetNodes",
@@ -118,24 +118,24 @@ class TestAppIoTokenClientInterceptor(TestCase):
         response = interceptor.intercept_unary_unary(
             continuation=continuation,
             client_call_details=details,
-            request=GetNodesRequest(run_id=1),
+            request=GetNodesRequest(),
         )
 
         self.assertEqual(response, "ok")
         metadata = captured["metadata"]
         self.assertIn(("x-test", "value"), metadata)
         self.assertEqual(
-            [item for item in metadata if item[0] == APP_TOKEN_HEADER],
-            [(APP_TOKEN_HEADER, "new-token")],
+            [item for item in metadata if item[0] == TASK_TOKEN_HEADER],
+            [(TASK_TOKEN_HEADER, "new-token")],
         )
 
-    def test_raise_if_app_token_header_already_present(self) -> None:
-        """The interceptor should reject duplicate App token metadata."""
+    def test_raise_if_task_token_header_already_present(self) -> None:
+        """The interceptor should reject duplicate task-token metadata."""
         interceptor = AppIoTokenClientInterceptor(token="new-token")
         details = _ClientCallDetails(
             method="/flwr.proto.ServerAppIo/GetNodes",
             timeout=None,
-            metadata=(("x-test", "value"), (APP_TOKEN_HEADER, "old-token")),
+            metadata=(("x-test", "value"), (TASK_TOKEN_HEADER, "old-token")),
             credentials=None,
             wait_for_ready=None,
             compression=None,
@@ -145,7 +145,7 @@ class TestAppIoTokenClientInterceptor(TestCase):
             interceptor.intercept_unary_unary(
                 continuation=Mock(),
                 client_call_details=details,
-                request=GetNodesRequest(run_id=1),
+                request=GetNodesRequest(),
             )
 
 
@@ -205,7 +205,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
         )
 
         with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(GetNodesRequest(run_id=7), context)
+            intercepted.unary_unary(GetNodesRequest(), context)
         context.abort.assert_called_once_with(
             grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
         )
@@ -225,12 +225,12 @@ class TestAppIoTokenServerInterceptor(TestCase):
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 method,
-                invocation_metadata=((APP_TOKEN_HEADER, "invalid"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "invalid"),),
             ),
         )
 
         with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(GetNodesRequest(run_id=7), context)
+            intercepted.unary_unary(GetNodesRequest(), context)
         context.abort.assert_called_once_with(
             grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
         )
@@ -248,11 +248,11 @@ class TestAppIoTokenServerInterceptor(TestCase):
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 method,
-                invocation_metadata=((APP_TOKEN_HEADER, "valid"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "valid"),),
             ),
         )
 
-        response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=7), Mock()))
+        response = cast(str, intercepted.unary_unary(GetNodesRequest(), Mock()))
         self.assertEqual(response, "ok")
 
     def test_valid_task_token_passes_and_sets_task_id(self) -> None:
@@ -274,11 +274,11 @@ class TestAppIoTokenServerInterceptor(TestCase):
             lambda _: grpc.unary_unary_rpc_method_handler(_handler),
             _HandlerCallDetails(
                 method,
-                invocation_metadata=((APP_TOKEN_HEADER, "task-token"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "task-token"),),
             ),
         )
 
-        response = intercepted.unary_unary(GetNodesRequest(run_id=7), Mock())
+        response = intercepted.unary_unary(GetNodesRequest(), Mock())
         self.assertEqual(response, "ok")
         self.assertIsNotNone(captured_task)
         self.assertEqual(cast(Task, captured_task).task_id, 123)
@@ -288,22 +288,19 @@ class TestAppIoTokenServerInterceptor(TestCase):
         """Protected methods should deny task tokens for a different run."""
         task = Task(task_id=123, run_id=7)
         interceptor = self._new_interceptor(token_to_task={"task-token": task})
-        method = self._find_serverappio_method(requires_token=True)
-        if method is None:
-            self.skipTest("No token-required ServerAppIo method found in policy table.")
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
 
         intercepted = interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
-                method,
-                invocation_metadata=((APP_TOKEN_HEADER, "task-token"),),
+                "/flwr.proto.ServerAppIo/PushObject",
+                invocation_metadata=((TASK_TOKEN_HEADER, "task-token"),),
             ),
         )
 
         with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(GetNodesRequest(run_id=8), context)
+            intercepted.unary_unary(PushObjectRequest(run_id=8), context)
         context.abort.assert_called_once_with(
             grpc.StatusCode.PERMISSION_DENIED,
             RUN_BINDING_FAILED_MESSAGE,
@@ -322,15 +319,15 @@ class TestAppIoTokenServerInterceptor(TestCase):
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 method,
-                invocation_metadata=((APP_TOKEN_HEADER, "task-token"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "task-token"),),
             ),
         )
 
         response = intercepted.unary_unary(PushTaskOutputRequest(), Mock())
         self.assertEqual(response, "ok")
 
-    def test_metadata_token_used_even_when_request_has_token(self) -> None:
-        """Metadata token should be authoritative when both sources exist."""
+    def test_metadata_token_used_for_task_output(self) -> None:
+        """Metadata token should authorize task output requests."""
         interceptor = self._new_interceptor(
             token_to_task={"metadata-token": Task(task_id=1, run_id=5)}
         )
@@ -339,16 +336,11 @@ class TestAppIoTokenServerInterceptor(TestCase):
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 "/flwr.proto.ServerAppIo/PushTaskOutput",
-                invocation_metadata=((APP_TOKEN_HEADER, "metadata-token"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "metadata-token"),),
             ),
         )
 
-        response = cast(
-            str,
-            intercepted.unary_unary(
-                PushTaskOutputRequest(token="request-token", run_id=5), Mock()
-            ),
-        )
+        response = intercepted.unary_unary(PushTaskOutputRequest(), Mock())
         self.assertEqual(response, "ok")
 
     def test_metadata_token_used_for_protected_method(self) -> None:
@@ -361,18 +353,15 @@ class TestAppIoTokenServerInterceptor(TestCase):
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 "/flwr.proto.ServerAppIo/PushMessages",
-                invocation_metadata=((APP_TOKEN_HEADER, "metadata-token"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "metadata-token"),),
             ),
         )
 
-        response = cast(
-            str,
-            intercepted.unary_unary(PushAppMessagesRequest(run_id=5), Mock()),
-        )
+        response = intercepted.unary_unary(PushAppMessagesRequest(), Mock())
         self.assertEqual(response, "ok")
 
-    def test_request_token_without_metadata_is_denied(self) -> None:
-        """Request-body token alone should not satisfy auth."""
+    def test_missing_metadata_token_is_denied_for_task_output(self) -> None:
+        """Missing metadata token should not satisfy auth."""
         interceptor = self._new_interceptor(
             token_to_task={"request-token": Task(task_id=1, run_id=5)}
         )
@@ -388,9 +377,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
         )
 
         with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(
-                PushTaskOutputRequest(token="request-token", run_id=5), context
-            )
+            intercepted.unary_unary(PushTaskOutputRequest(), context)
         context.abort.assert_called_once_with(
             grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
         )
@@ -408,12 +395,12 @@ class TestAppIoTokenServerInterceptor(TestCase):
             continuation,
             _HandlerCallDetails(
                 "/flwr.proto.ServerAppIo/UnknownMethod",
-                invocation_metadata=((APP_TOKEN_HEADER, "valid"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "valid"),),
             ),
         )
 
         with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(GetNodesRequest(run_id=7), context)
+            intercepted.unary_unary(GetNodesRequest(), context)
         continuation.assert_not_called()
         context.abort.assert_called_once_with(
             grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
@@ -434,12 +421,12 @@ class TestAppIoTokenServerInterceptor(TestCase):
             lambda _: _make_non_unary_handler(),
             _HandlerCallDetails(
                 method,
-                invocation_metadata=((APP_TOKEN_HEADER, "valid"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "valid"),),
             ),
         )
 
         with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(GetNodesRequest(run_id=7), context)
+            intercepted.unary_unary(GetNodesRequest(), context)
         context.abort.assert_called_once_with(
             grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
         )
@@ -511,11 +498,11 @@ class TestFactoryFunctions(TestCase):
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 "/flwr.proto.ServerAppIo/GetNodes",
-                invocation_metadata=((APP_TOKEN_HEADER, "valid-token"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "valid-token"),),
             ),
         )
 
-        response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=1), Mock()))
+        response = intercepted.unary_unary(GetNodesRequest(), Mock())
         self.assertEqual(response, "ok")
 
     def test_clientappio_factory_uses_client_policy(self) -> None:
@@ -527,7 +514,7 @@ class TestFactoryFunctions(TestCase):
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
                 "/flwr.proto.ClientAppIo/PushObject",
-                invocation_metadata=((APP_TOKEN_HEADER, "valid-token"),),
+                invocation_metadata=((TASK_TOKEN_HEADER, "valid-token"),),
             ),
         )
 

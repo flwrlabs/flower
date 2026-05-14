@@ -30,11 +30,8 @@ from flwr.common.serde import (
     message_to_proto,
     run_to_proto,
 )
-from flwr.common.typing import RunStatus
 from flwr.proto import serverappio_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    ClaimTaskRequest,
-    ClaimTaskResponse,
     PullAppMessagesRequest,
     PullAppMessagesResponse,
     PullTaskInputRequest,
@@ -43,10 +40,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PushAppMessagesResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
-)
-from flwr.proto.log_pb2 import (  # pylint: disable=E0611
-    PushLogsRequest,
-    PushLogsResponse,
 )
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
@@ -68,7 +61,7 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
 )
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
-from flwr.server.superlink.utils import abort_if
+from flwr.server.superlink.utils import abort_grpc_context, check_abort
 from flwr.server.utils.validator import validate_message
 from flwr.supercore.constant import RunType
 from flwr.supercore.inflatable.inflatable_object import (
@@ -78,7 +71,11 @@ from flwr.supercore.inflatable.inflatable_object import (
     no_object_id_recompute,
 )
 from flwr.supercore.interceptors import get_authenticated_task
-from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
+from flwr.supercore.object_store import (
+    NoObjectInStoreError,
+    ObjectStore,
+    ObjectStoreFactory,
+)
 from flwr.supercore.servicers import AppIoServicer
 
 SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE = (
@@ -101,19 +98,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         """Return the LinkState instance."""
         return self.state_factory.state()
 
-    def ClaimTask(
-        self, request: ClaimTaskRequest, context: grpc.ServicerContext
-    ) -> ClaimTaskResponse:
-        """Claim a pending task."""
-        res = super().ClaimTask(request, context)
-
-        # Keep run status working
-        if res.HasField("token"):
-            state = self.state_factory.state()
-            task = state.get_tasks(task_ids=[request.task_id])[0]
-            state.update_run_status(task.run_id, RunStatus(Status.STARTING, "", ""))
-        return res
-
     def GetNodes(
         self, request: GetNodesRequest, context: grpc.ServicerContext
     ) -> GetNodesResponse:
@@ -124,18 +108,9 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
-        _abort_if_not_serverapp_run(request.run_id, state, context)
+        run_id = _get_authenticated_serverapp_run_id(state, store, context)
 
-        # Abort if the run is not running
-        abort_if(
-            request.run_id,
-            [Status.PENDING, Status.STARTING, Status.FINISHED],
-            state,
-            store,
-            context,
-        )
-
-        all_ids: set[int] = state.get_nodes(request.run_id)
+        all_ids: set[int] = state.get_nodes(run_id)
         nodes: list[Node] = [Node(node_id=node_id) for node_id in all_ids]
         return GetNodesResponse(nodes=nodes)
 
@@ -149,16 +124,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
-        _abort_if_not_serverapp_run(request.run_id, state, context)
-
-        # Abort if the run is not running
-        abort_if(
-            request.run_id,
-            [Status.PENDING, Status.STARTING, Status.FINISHED],
-            state,
-            store,
-            context,
-        )
+        run_id = _get_authenticated_serverapp_run_id(state, store, context)
 
         # Validate request and insert in State
         _raise_if(
@@ -179,12 +145,12 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 detail=", ".join(validation_errors),
             )
             _raise_if(
-                validation_error=request.run_id != message.metadata.run_id,
+                validation_error=run_id != message.metadata.run_id,
                 request_name="PushMessages",
                 detail="`Message.metadata` has mismatched `run_id`",
             )
             # Store objects
-            objects_to_push |= set(store.preregister(request.run_id, object_tree))
+            objects_to_push |= set(store.preregister(run_id, object_tree))
             # Store message
             message_id: str | None = state.store_message_ins(message=message)
             message_ids.append(message_id)
@@ -206,16 +172,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
-        _abort_if_not_serverapp_run(request.run_id, state, context)
-
-        # Abort if the run is not running
-        abort_if(
-            request.run_id,
-            [Status.PENDING, Status.STARTING, Status.FINISHED],
-            state,
-            store,
-            context,
-        )
+        run_id = _get_authenticated_serverapp_run_id(state, store, context)
 
         # Read from state
         messages_res: list[Message] = state.get_message_res(
@@ -228,7 +185,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 with no_object_id_recompute():
                     all_objects = get_all_nested_objects(msg_res)
                     # Preregister
-                    store.preregister(request.run_id, get_object_tree(msg_res))
+                    store.preregister(run_id, get_object_tree(msg_res))
                     # Store objects
                     for obj_id, obj in all_objects.items():
                         store.put(obj_id, obj.deflate())
@@ -249,7 +206,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             # Skip `run_id` check for SuperLink generated replies
             if msg.metadata.src_node_id != SUPERLINK_NODE_ID:
                 _raise_if(
-                    validation_error=request.run_id != msg.metadata.run_id,
+                    validation_error=run_id != msg.metadata.run_id,
                     request_name="PullMessages",
                     detail="`message.metadata` has mismatched `run_id`",
                 )
@@ -304,11 +261,8 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         run = runs[0] if runs else None
         fab = state.get_fab(run.fab_hash) if run and run.fab_hash else None
         if run and fab and serverapp_ctxt:
-            # Update run status to RUNNING
             if state.activate_task(task.task_id):
                 log(INFO, "Started task %d of run %d", task.task_id, run_id)
-                # Keep run status working
-                state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
                 return PullTaskInputResponse(
                     context=context_to_proto(serverapp_ctxt),
                     run=run_to_proto(run),
@@ -343,27 +297,11 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             task.task_id, sub_status=request.sub_status, details=request.details
         ):
             log(INFO, "Finished task %d of run %d", task.task_id, run_id)
-            # Keep run status working
-            state.update_run_status(
-                run_id, RunStatus(Status.FINISHED, request.sub_status, request.details)
-            )
             if request.HasField("context"):
                 state.set_serverapp_context(run_id, context_from_proto(request.context))
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
         return PushTaskOutputResponse()
-
-    def PushLogs(
-        self, request: PushLogsRequest, context: grpc.ServicerContext
-    ) -> PushLogsResponse:
-        """Push logs."""
-        log(DEBUG, "ServerAppIoServicer.PushLogs")
-        state = self.state_factory.state()
-
-        # Add logs to LinkState
-        merged_logs = "".join(request.logs)
-        state.add_serverapp_log(request.run_id, merged_logs)
-        return PushLogsResponse()
 
     def GetFederationOptions(
         self, request: GetFederationOptionsRequest, context: grpc.ServicerContext
@@ -382,16 +320,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
-        _abort_if_not_serverapp_run(request.run_id, state, context)
-
-        # Abort if the run is not running
-        abort_if(
-            request.run_id,
-            [Status.PENDING, Status.STARTING, Status.FINISHED],
-            state,
-            store,
-            context,
-        )
+        _get_authenticated_serverapp_run_id(state, store, context)
 
         if request.node.node_id != SUPERLINK_NODE_ID:
             # Cancel insertion in ObjectStore
@@ -420,16 +349,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
-        _abort_if_not_serverapp_run(request.run_id, state, context)
-
-        # Abort if the run is not running
-        abort_if(
-            request.run_id,
-            [Status.PENDING, Status.STARTING, Status.FINISHED],
-            state,
-            store,
-            context,
-        )
+        _get_authenticated_serverapp_run_id(state, store, context)
 
         if request.node.node_id != SUPERLINK_NODE_ID:
             # Cancel insertion in ObjectStore
@@ -456,16 +376,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
-        _abort_if_not_serverapp_run(request.run_id, state, context)
-
-        # Abort if the run is not running
-        abort_if(
-            request.run_id,
-            [Status.PENDING, Status.STARTING, Status.FINISHED],
-            state,
-            store,
-            context,
-        )
+        _get_authenticated_serverapp_run_id(state, store, context)
 
         # Delete the message object
         store.delete(request.message_object_id)
@@ -482,6 +393,24 @@ def _abort_if_not_serverapp_run(
             grpc.StatusCode.PERMISSION_DENIED,
             SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE,
         )
+
+
+def _get_authenticated_serverapp_run_id(
+    state: LinkState, store: ObjectStore, context: grpc.ServicerContext
+) -> int:
+    """Return the authenticated run ID if it can use ServerAppIo endpoints."""
+    run_id = get_authenticated_task().run_id
+    _abort_if_not_serverapp_run(run_id, state, context)
+    abort_grpc_context(
+        check_abort(
+            run_id,
+            [Status.PENDING, Status.STARTING, Status.FINISHED],
+            state,
+            store,
+        ),
+        context,
+    )
+    return run_id
 
 
 def _raise_if(validation_error: bool, request_name: str, detail: str) -> None:

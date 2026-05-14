@@ -398,6 +398,8 @@ class _StopAfterSuperExecLaunch(Exception):
 def _run_until_connection_start(
     clientappio_certificates: tuple[bytes, bytes, bytes] | None = None,
     clientappio_root_certificates_path: str | None = None,
+    clientappio_api_address: str = "127.0.0.1:9094",
+    bound_address: str = "127.0.0.1:9094",
 ) -> tuple[Mock, Mock]:
     """Run startup only far enough to inspect ClientAppIo and SuperExec wiring."""
     with (
@@ -411,7 +413,7 @@ def _run_until_connection_start(
             side_effect=_StopAfterSuperExecLaunch,
         ),
     ):
-        run_clientappio.return_value.bound_address = "127.0.0.1:9094"
+        run_clientappio.return_value.bound_address = bound_address
         # `_init_connection` starts the long-running SuperNode/SuperLink connection.
         # Raising there keeps this test focused on the setup performed before it.
         with pytest.raises(_StopAfterSuperExecLaunch):
@@ -421,6 +423,7 @@ def _run_until_connection_start(
                 root_certificates=None,
                 insecure=True,
                 transport=TRANSPORT_TYPE_GRPC_RERE,
+                clientappio_api_address=clientappio_api_address,
                 clientappio_certificates=clientappio_certificates,
                 clientappio_root_certificates_path=clientappio_root_certificates_path,
             )
@@ -440,6 +443,7 @@ def test_start_client_internal_launches_insecure_superexec_by_default() -> None:
     command = popen.call_args.args[0]
     assert command[:2] == ["flower-superexec", "--insecure"]
     assert "--root-certificates" not in command
+    assert command[command.index("--appio-api-address") + 1] == "127.0.0.1:9094"
 
 
 def test_start_client_internal_launches_secure_superexec_with_root_certificates() -> (
@@ -461,3 +465,14 @@ def test_start_client_internal_launches_secure_superexec_with_root_certificates(
     command = popen.call_args.args[0]
     assert "--insecure" not in command
     assert command[:3] == ["flower-superexec", "--root-certificates", "/tmp/ca.pem"]
+
+
+def test_start_client_internal_launches_superexec_with_bound_appio_address() -> None:
+    """Subprocess SuperExec should use the actual port selected for AppIO."""
+    _, popen = _run_until_connection_start(
+        clientappio_api_address="localhost:0",
+        bound_address="localhost:54321",
+    )
+
+    command = popen.call_args.args[0]
+    assert command[command.index("--appio-api-address") + 1] == "localhost:54321"
