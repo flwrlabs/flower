@@ -38,6 +38,7 @@ from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
     SubStatus,
 )
+from flwr.common.context import Context
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import (
     log,
@@ -163,7 +164,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     heartbeat_sender = None
     sub_status = SubStatus.FAILED
     details = "Task failed with unknown error."
-    context = None
+    context: Context | None = None
     runtime_env_dir = None
     exit_code = ExitCode.SUCCESS
 
@@ -175,6 +176,18 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         # Stop log uploader for this run and upload final logs
         if log_uploader:
             stop_log_uploader(log_queue, log_uploader)
+
+        # Push final status and context (if available)
+        log(DEBUG, "[flwr-simulation] Will push Simulation task output")
+        out_req = PushTaskOutputRequest(
+            context=context_to_proto(context) if context else None,
+            sub_status=sub_status,
+            details=details,
+        )
+        try:
+            conn._stub.PushTaskOutput(out_req)
+        except grpc.RpcError:
+            pass
 
         cleanup_app_runtime_environment(runtime_env_dir)
 
@@ -302,17 +315,6 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
         # General exit code
         exit_code = ExitCode.SIMULATION_EXCEPTION
-    finally:
-        log(DEBUG, "[flwr-simulation] Will push Simulation task output")
-        out_req = PushTaskOutputRequest(
-            context=context_to_proto(context) if context else None,
-            sub_status=sub_status,
-            details=details,
-        )
-        try:
-            _ = conn._stub.PushTaskOutput(out_req)
-        except grpc.RpcError:
-            pass
 
     flwr_exit(
         code=exit_code,

@@ -102,13 +102,35 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         ],
     )
     channel.subscribe(on_channel_state_change)
+
+    # Initialize variables for exit handler
     heartbeat_sender = None
+    message = None
+    reply_message = None
+    context: Context | None = None
+    sub_status = SubStatus.FAILED
+    details = "ClientApp task failed due to unknown reason"
     runtime_env_dir = None
     exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
         if heartbeat_sender is not None and heartbeat_sender.is_running:
             heartbeat_sender.stop()
+
+        # Push final result
+        nonlocal reply_message
+        if reply_message is None and message is not None:
+            reply_message = Message(
+                Error(code=ErrorCode.CLIENT_APP_CRASHED, reason=details),
+                reply_to=message,
+            )
+        push_task_output(
+            stub=stub,
+            message=reply_message,
+            context=context,
+            sub_status=sub_status,
+            details=details,
+        )
         channel.close()
         cleanup_app_runtime_environment(runtime_env_dir)
 
@@ -127,9 +149,6 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
         # Pull Message, Context, Run and FAB from SuperNode
         message, context, run, fab = pull_task_input(stub)
-        reply_message: Message | None = None
-        sub_status = SubStatus.FAILED
-        details = "ClientApp task failed due to unknown reason"
 
         try:
 
@@ -195,23 +214,6 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
             sub_status = SubStatus.FAILED
             details = reason
-        finally:
-            if reply_message is None:
-                reply_message = Message(
-                    Error(
-                        code=ErrorCode.CLIENT_APP_CRASHED,
-                        reason=details,
-                    ),
-                    reply_to=message,
-                )
-
-            push_task_output(
-                stub=stub,
-                message=reply_message,
-                context=context,
-                sub_status=sub_status,
-                details=details,
-            )
 
     except grpc.RpcError as e:
         log(ERROR, "gRPC error occurred: %s", str(e))
@@ -257,54 +259,61 @@ def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
         raise e
 
 
+def _push_reply(stub: ClientAppIoStub, message: Message, context: Context) -> None:
+    """Push reply message to SuperNode."""
+    # Set message ID
+    message.metadata.__dict__["_message_id"] = message.object_id
+    proto_message = message_to_proto(remove_content_from_message(message))
+
+    with no_object_id_recompute():
+        # Get object tree and all objects to push
+        object_tree = get_object_tree(message)
+
+        # Push Message
+        # This is temporary. The message should not contain its content
+        push_msg_res = stub.PushMessage(
+            PushAppMessagesRequest(
+                messages_list=[proto_message], message_object_trees=[object_tree]
+            )
+        )
+        del proto_message
+
+        # Retrieve the object IDs to push
+        object_ids_to_push = set(push_msg_res.objects_to_push)
+
+        # Push all objects
+        all_objects = get_all_nested_objects(message)
+        del message
+        push_objects(
+            all_objects,
+            make_push_object_fn_protobuf(
+                stub.PushObject,
+                Node(node_id=context.node_id),
+                run_id=context.run_id,
+            ),
+            object_ids_to_push=object_ids_to_push,
+        )
+
+
 def push_task_output(  # pylint: disable=R0913, R0917
     stub: ClientAppIoStub,
-    message: Message,
-    context: Context,
+    message: Message | None,
+    context: Context | None,
     sub_status: str,
     details: str,
 ) -> PushTaskOutputResponse:
     """Push TaskOutput to SuperNode."""
-    # Set message ID
-    message.metadata.__dict__["_message_id"] = message.object_id
-    proto_message = message_to_proto(remove_content_from_message(message))
-    proto_context = context_to_proto(context)
-
     try:
+        # Push reply message
+        if message and context:
+            _push_reply(stub, message, context)
 
-        with no_object_id_recompute():
-            # Get object tree and all objects to push
-            object_tree = get_object_tree(message)
-
-            # Push Message
-            # This is temporary. The message should not contain its content
-            push_msg_res = stub.PushMessage(
-                PushAppMessagesRequest(
-                    messages_list=[proto_message], message_object_trees=[object_tree]
-                )
-            )
-            del proto_message
-
-            # Retrieve the object IDs to push
-            object_ids_to_push = set(push_msg_res.objects_to_push)
-
-            # Push all objects
-            all_objects = get_all_nested_objects(message)
-            del message
-            push_objects(
-                all_objects,
-                make_push_object_fn_protobuf(
-                    stub.PushObject,
-                    Node(node_id=context.node_id),
-                    run_id=context.run_id,
-                ),
-                object_ids_to_push=object_ids_to_push,
-            )
-
-        # Push Context
+        # Push Context and final status
         res: PushTaskOutputResponse = stub.PushTaskOutput(
             PushTaskOutputRequest(
-                context=proto_context, sub_status=sub_status, details=details
+                context=context_to_proto(context) if context else None,
+                sub_status=sub_status,
+                details=details,
             )
         )
         return res
