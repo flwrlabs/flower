@@ -29,7 +29,7 @@ from abc import abstractmethod
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, PropertyMock, patch
 from uuid import uuid4
 
 from parameterized import parameterized
@@ -1991,10 +1991,13 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         self.assertNotIn("FOR TEST LOCK", last_query)
 
         # Execute & assert - with lock clause
-        state._claim_message_ins_select_lock_clause = (  # pylint: disable=protected-access
-            "FOR TEST LOCK"
-        )
-        state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
+        with patch.object(
+            type(state),
+            "select_lock_sql",
+            new_callable=PropertyMock,
+            return_value="FOR TEST LOCK",
+        ):
+            state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
         self.assertIn("FOR TEST LOCK", last_query)
 
     def test_token_expiry_does_not_overwrite_finished_completed_run(self) -> None:

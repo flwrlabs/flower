@@ -84,7 +84,10 @@ PRIMARY_TASK_STATUS_CONDITIONS = {
 class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     """SQLAlchemy-based LinkState implementation."""
 
-    _claim_message_ins_select_lock_clause = ""
+    @property
+    def select_lock_sql(self) -> str:
+        """Return the SQL clause for row-locking, which is overridable by subclasses."""
+        return ""
 
     def __init__(
         self,
@@ -329,23 +332,18 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         candidate_cte = ""
         condition = common_condition
         if limit is not None:
-            # Optional clause for backends that support row-locking while selecting
-            # candidates. Keep it before LIMIT so locked rows are skipped before
-            # limiting the result set.
-            select_lock_sql = (
-                f" {self._claim_message_ins_select_lock_clause}"
-                if self._claim_message_ins_select_lock_clause
-                else ""
-            )
             # Materialize limited candidates before updating. Some backends can
             # otherwise re-evaluate same-table subqueries while UPDATE scans rows.
+            # `self.select_lock_sql` is an optional clause for backends that support
+            # row-locking while selecting candidates. Keep it before LIMIT so locked
+            # rows are skipped before limiting the result set.
             candidate_cte = f"""
                 WITH candidate_message_ins AS (
                     SELECT message_id
                     FROM message_ins
                     WHERE {common_condition}
                     ORDER BY created_at, message_id
-                    {select_lock_sql}
+                    {self.select_lock_sql}
                     LIMIT :limit
                 )
             """
