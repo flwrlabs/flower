@@ -62,6 +62,7 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
 )
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.server.utils.validator import validate_message
+from flwr.supercore.constant import TaskType
 from flwr.supercore.inflatable.inflatable_object import (
     UnexpectedObjectContentError,
     get_all_nested_objects,
@@ -71,6 +72,10 @@ from flwr.supercore.inflatable.inflatable_object import (
 from flwr.supercore.interceptors import get_authenticated_task
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
 from flwr.supercore.servicers import AppIoServicer
+
+SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE = (
+    "Some ServerAppIo API endpoints are only available for Deployment Runtime runs."
+)
 
 
 class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoServicer):
@@ -97,9 +102,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         # Init state
         state = self.state_factory.state()
 
-        # Get authenticated task and associated run ID
-        task = get_authenticated_task()
-        run_id = task.run_id
+        run_id = _get_authenticated_serverapp_run_id(context)
 
         all_ids: set[int] = state.get_nodes(run_id)
         nodes: list[Node] = [Node(node_id=node_id) for node_id in all_ids]
@@ -115,9 +118,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
-        # Get authenticated task and associated run ID
-        task = get_authenticated_task()
-        run_id = task.run_id
+        run_id = _get_authenticated_serverapp_run_id(context)
 
         # Validate request and insert in State
         _raise_if(
@@ -165,9 +166,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
-        # Get authenticated task and associated run ID
-        task = get_authenticated_task()
-        run_id = task.run_id
+        run_id = _get_authenticated_serverapp_run_id(context)
 
         # Read from state
         messages_res: list[Message] = state.get_message_res(
@@ -311,8 +310,10 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         """Push an object to the ObjectStore."""
         log(DEBUG, "ServerAppIoServicer.PushObject")
 
-        # Init state and store
+        # Init store
         store = self.objectstore_factory.store()
+
+        _ = _get_authenticated_serverapp_run_id(context)
 
         if request.node.node_id != SUPERLINK_NODE_ID:
             # Cancel insertion in ObjectStore
@@ -337,8 +338,10 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         """Pull an object from the ObjectStore."""
         log(DEBUG, "ServerAppIoServicer.PullObject")
 
-        # Init state and store
+        # Init store
         store = self.objectstore_factory.store()
+
+        _ = _get_authenticated_serverapp_run_id(context)
 
         if request.node.node_id != SUPERLINK_NODE_ID:
             # Cancel insertion in ObjectStore
@@ -361,13 +364,26 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         """Confirm message received."""
         log(DEBUG, "ServerAppIoServicer.ConfirmMessageReceived")
 
-        # Init state and store
+        # Init store
         store = self.objectstore_factory.store()
+
+        _ = _get_authenticated_serverapp_run_id(context)
 
         # Delete the message object
         store.delete(request.message_object_id)
 
         return ConfirmMessageReceivedResponse()
+
+
+def _get_authenticated_serverapp_run_id(context: grpc.ServicerContext) -> int:
+    """Return the authenticated run ID if it can use ServerAppIo endpoints."""
+    task = get_authenticated_task()
+    if task.type != TaskType.SERVER_APP:
+        context.abort(
+            grpc.StatusCode.PERMISSION_DENIED,
+            SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE,
+        )
+    return task.run_id
 
 
 def _raise_if(validation_error: bool, request_name: str, detail: str) -> None:
