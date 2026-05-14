@@ -169,6 +169,9 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
+        # Set Grpc max retries to 1 to avoid blocking on exit
+        conn._retry_invoker.max_tries = 1
+
         # Stop heartbeat sender
         if heartbeat_sender and heartbeat_sender.is_running:
             heartbeat_sender.stop()

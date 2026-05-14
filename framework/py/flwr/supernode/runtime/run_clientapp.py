@@ -102,7 +102,8 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     )
     channel.subscribe(on_channel_state_change)
     stub = ClientAppIoStub(channel)
-    wrap_stub(stub, make_simple_grpc_retry_invoker())
+    retry_invoker = make_simple_grpc_retry_invoker()
+    wrap_stub(stub, retry_invoker)
 
     # Initialize variables for exit handler
     heartbeat_sender = None
@@ -115,19 +116,16 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
+        # Set Grpc max retries to 1 to avoid blocking on exit
+        retry_invoker.max_tries = 1
+
+        # Stop heartbeat sender
         if heartbeat_sender is not None and heartbeat_sender.is_running:
             heartbeat_sender.stop()
 
-        # Push final result
-        nonlocal reply_message
-        if reply_message is None and message is not None:
-            reply_message = Message(
-                Error(code=ErrorCode.CLIENT_APP_CRASHED, reason=details),
-                reply_to=message,
-            )
+        # Push final status and context (if available)
         push_task_output(
             stub=stub,
-            message=reply_message,
             context=context,
             sub_status=sub_status,
             details=details,
@@ -209,9 +207,13 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
             # Create error message
             reply_message = Message(Error(code=e_code, reason=reason), reply_to=message)
-
             sub_status = SubStatus.FAILED
             details = reason
+
+        finally:
+            # Push reply message to SuperNode
+            if reply_message:
+                push_message(stub, reply_message, context)
 
     except grpc.RpcError as e:
         log(ERROR, "gRPC error occurred: %s", str(e))
@@ -257,7 +259,7 @@ def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
         raise e
 
 
-def _push_reply(stub: ClientAppIoStub, message: Message, context: Context) -> None:
+def push_message(stub: ClientAppIoStub, message: Message, context: Context) -> None:
     """Push reply message to SuperNode."""
     # Set message ID
     message.metadata.__dict__["_message_id"] = message.object_id
@@ -295,17 +297,12 @@ def _push_reply(stub: ClientAppIoStub, message: Message, context: Context) -> No
 
 def push_task_output(  # pylint: disable=R0913, R0917
     stub: ClientAppIoStub,
-    message: Message | None,
     context: Context | None,
     sub_status: str,
     details: str,
 ) -> None:
     """Push TaskOutput to SuperNode."""
     try:
-        # Push reply message
-        if message and context:
-            _push_reply(stub, message, context)
-
         # Push Context and final status
         stub.PushTaskOutput(
             PushTaskOutputRequest(
