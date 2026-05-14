@@ -21,7 +21,6 @@ Create Date: 2026-05-14 14:06:19.316073
 
 from collections.abc import Sequence
 
-
 # pylint: disable=no-member
 
 # revision identifiers, used by Alembic.
