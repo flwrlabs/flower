@@ -855,7 +855,6 @@ requires-dist = [
 dev = [
     { name = "beautysh", specifier = "==6.4.2" },
     { name = "clang-format", specifier = "==17.0.6" },
-    { name = "docformatter", specifier = "==1.7.5" },
     { name = "docstrfmt", git = "https://github.com/charlesbvll/docstrfmt.git?branch=patch-2" },
     { name = "furo", specifier = "==2024.8.6" },
     { name = "gitpython", specifier = "==3.1.41" },
@@ -903,19 +902,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/96/8e/709914eb2b5749865801041647dc7f4e6d00b549cfe88b65ca192995f07c/distlib-0.4.0.tar.gz", hash = "sha256:feec40075be03a04501a973d81f633735b4b69f98b05450592310c0f401a4e0d", size = 614605, upload-time = "2025-07-17T16:52:00.465Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/33/6b/e0547afaf41bf2c42e52430072fa5658766e3d65bd4b03a563d1b6336f57/distlib-0.4.0-py2.py3-none-any.whl", hash = "sha256:9659f7d87e46584a30b5780e43ac7a2143098441670ff0a49d5f9034c54a6c16", size = 469047, upload-time = "2025-07-17T16:51:58.613Z" },
-]
-
-[[package]]
-name = "docformatter"
-version = "1.7.5"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "charset-normalizer" },
-    { name = "untokenize" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/f4/44/aba2c40cf796121b35835ea8c00bc5d93f2f70730eca53b36b8bbbfaefe1/docformatter-1.7.5.tar.gz", hash = "sha256:ffed3da0daffa2e77f80ccba4f0e50bfa2755e1c10e130102571c890a61b246e", size = 25893, upload-time = "2023-07-12T01:45:43.959Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/8b/95/568a2fca29df365b82012b09b64964a05f4f20ac83c2137b262f3fa3188f/docformatter-1.7.5-py3-none-any.whl", hash = "sha256:a24f5545ed1f30af00d106f5d85dc2fce4959295687c24c8f39f5263afaf9186", size = 32798, upload-time = "2023-07-12T01:45:42.458Z" },
 ]
 
 [[package]]
@@ -1084,7 +1070,6 @@ dev = [
     { name = "check-wheel-contents" },
     { name = "clang-format" },
     { name = "devtool" },
-    { name = "docformatter" },
     { name = "docsig" },
     { name = "docstrfmt" },
     { name = "furo" },
@@ -1169,7 +1154,6 @@ dev = [
     { name = "check-wheel-contents", specifier = "==0.6.3" },
     { name = "clang-format", specifier = "==17.0.6" },
     { name = "devtool", editable = "../dev" },
-    { name = "docformatter", specifier = "==1.7.5" },
     { name = "docsig", specifier = "==0.64.0" },
     { name = "docstrfmt", marker = "python_full_version >= '3.10' and python_full_version < '4'", git = "https://github.com/charlesbvll/docstrfmt.git?rev=patch-2" },
     { name = "furo", specifier = "==2024.8.6" },
@@ -4689,12 +4673,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/5e/a7/c202b344c5ca7daf3
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/b0/003792df09decd6849a5e39c28b513c06e84436a54440380862b5aeff25d/tzdata-2025.3-py2.py3-none-any.whl", hash = "sha256:06a47e5700f3081aab02b2e513160914ff0694bce9947d6b76ebd6bf57cfc5d1", size = 348521, upload-time = "2025-12-13T17:45:33.889Z" },
 ]
-
-[[package]]
-name = "untokenize"
-version = "0.1.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f7/46/e7cea8159199096e1df52da20a57a6665da80c37fb8aeb848a3e47442c32/untokenize-0.1.1.tar.gz", hash = "sha256:3865dbbbb8efb4bb5eaa72f1be7f3e0be00ea8b7f125c69cbd1f5fda926f37a2", size = 3099, upload-time = "2014-02-08T16:30:40.631Z" }
 
 [[package]]
 name = "uri-template"
