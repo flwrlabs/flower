@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2024 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,11 +17,14 @@
 
 set -euo pipefail
 
-if [[ -z "${PYPI_REPOSITORY_PASSWORD:-}" ]]; then
-  echo "Missing required configuration: PYPI_REPOSITORY_PASSWORD" >&2
-  exit 1
+if [[ "${PREPARE_FRAMEWORK:-false}" == "true" ]]; then
+  echo "No Flower repository sync is required in flwrlabs/flower."
 fi
 
-cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/../
+if [[ "${PATCH_BASE_DOCKERFILES:-false}" == "true" ]]; then
+  echo "No repository-specific Dockerfile patches are required in flwrlabs/flower."
+fi
 
-uv publish --token "${PYPI_REPOSITORY_PASSWORD}"
+if [[ "${BUILD_LOCAL_WHEEL:-false}" == "true" ]]; then
+  (cd framework && ./dev/build.sh)
+fi

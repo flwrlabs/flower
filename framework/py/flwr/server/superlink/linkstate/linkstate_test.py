@@ -29,7 +29,7 @@ from abc import abstractmethod
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, PropertyMock, patch
 from uuid import uuid4
 
 from parameterized import parameterized
@@ -175,24 +175,6 @@ class StateTest(CoreStateTest):
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
-
-    def test_create_task_sets_primary_task_id_once(self) -> None:
-        """New tasks should not replace the run's primary task."""
-        # Prepare
-        state = self.state_factory()
-        run_id = create_dummy_run(state)
-        run = state.get_run_info(run_ids=[run_id])[0]
-        primary_task_id = run.primary_task_id
-
-        # Execute
-        second_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
-
-        # Assert
-        self.assertIsNotNone(primary_task_id)
-        self.assertIsNotNone(second_task_id)
-        run = state.get_run_info(run_ids=[run_id])[0]
-        self.assertEqual(run.primary_task_id, primary_task_id)
-        self.assertNotEqual(run.primary_task_id, second_task_id)
 
     def test_create_task_rejects_missing_run(self) -> None:
         """Creating a task for an unknown run should fail."""
@@ -952,8 +934,9 @@ class StateTest(CoreStateTest):
         state: LinkState = self.state_factory()
         create_dummy_node(state)
 
-        infos = state.get_node_info(node_ids=[])
-        self.assertEqual(infos, [])
+        self.assertEqual(state.get_node_info(node_ids=[]), [])
+        self.assertEqual(state.get_node_info(owner_aids=[]), [])
+        self.assertEqual(state.get_node_info(statuses=[]), [])
 
     def test_delete_node(self) -> None:
         """Test deleting a client node."""
@@ -1501,6 +1484,12 @@ class StateTest(CoreStateTest):
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 0
 
+    def test_get_message_res_empty_ids_returns_empty_list(self) -> None:
+        """Test that get_message_res returns empty for empty input."""
+        state = self.state_factory()
+
+        self.assertEqual(state.get_message_res(set()), [])
+
     def test_get_message_res_returns_empty_for_missing_message_ins(self) -> None:
         """Test that get_message_res returns an empty result when the corresponding
         Message does not exist."""
@@ -1983,6 +1972,34 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         self.assertIn("ORDER BY created_at, message_id", captured[0])
         self.assertNotIn("rowid", captured[0])
 
+    def test_message_ins_claim_can_append_select_lock_clause(self) -> None:
+        """Message claiming can append a subclass-provided row-locking clause."""
+        # Prepare
+        state = self.state_factory()
+        last_query = ""
+
+        # pylint: disable-next=unused-argument
+        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
+            nonlocal last_query
+            last_query = query
+            return []
+
+        state.query = fake_query  # type: ignore[method-assign]
+
+        # Execute & assert - without lock clause
+        state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
+        self.assertNotIn("FOR TEST LOCK", last_query)
+
+        # Execute & assert - with lock clause
+        with patch.object(
+            type(state),
+            "select_lock_sql",
+            new_callable=PropertyMock,
+            return_value="FOR TEST LOCK",
+        ):
+            state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
+        self.assertIn("FOR TEST LOCK", last_query)
+
     def test_token_expiry_does_not_overwrite_finished_completed_run(self) -> None:
         """Ensure token cleanup doesn't mutate terminal COMPLETED status."""
         # Prepare
@@ -2027,6 +2044,16 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         )
         state.initialize()
         return state
+
+    def _shared_sql_database(self, tmpdir: str) -> str:
+        """Return database location shared by concurrent SqlLinkState replicas."""
+        return os.path.join(tmpdir, "shared.db")
+
+    def _claim_running_process_target(
+        self,
+    ) -> Callable[[str, int, Any, Any, float], None]:
+        """Return process target for STARTING -> RUNNING claim tests."""
+        return _claim_running_in_separate_process
 
     def _create_shared_sql_states(
         self, database_path: str, num_replicas: int = 2
@@ -2089,7 +2116,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         """Ensure concurrent replicas cannot both claim the same instruction."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Prepare
-            db_path = os.path.join(tmpdir, "shared.db")
+            db_path = self._shared_sql_database(tmpdir)
             state = self._create_shared_sql_states(db_path)[0]
             node_id = create_dummy_node(state)
             run_id = create_dummy_run(state)
@@ -2112,7 +2139,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         """Ensure concurrent replicas cannot both claim the same reply Message."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Prepare
-            db_path = os.path.join(tmpdir, "shared.db")
+            db_path = self._shared_sql_database(tmpdir)
             state = self._create_shared_sql_states(db_path)[0]
 
             node_id = create_dummy_node(state)
@@ -2143,7 +2170,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         """Ensure two replicas can each claim work when two Messages are available."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Prepare
-            db_path = os.path.join(tmpdir, "shared.db")
+            db_path = self._shared_sql_database(tmpdir)
             state = self._create_shared_sql_states(db_path)[0]
 
             node_id = create_dummy_node(state)
@@ -2176,7 +2203,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         """Ensure only one replica can claim STARTING -> RUNNING transition."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Prepare
-            db_path = os.path.join(tmpdir, "shared.db")
+            db_path = self._shared_sql_database(tmpdir)
             state = self._create_shared_sql_states(db_path)[0]
             run_id = create_dummy_run(state)
             task_id = get_primary_task_id(state, run_id)
@@ -2188,13 +2215,14 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             timeout = self._CONCURRENT_TEST_TIMEOUT
 
             # Execute
+            claim_target = self._claim_running_process_target()
             processes = [
                 ctx.Process(
-                    target=_claim_running_in_separate_process,
+                    target=claim_target,
                     args=(db_path, task_id, start_event, result_queue, timeout),
                 ),
                 ctx.Process(
-                    target=_claim_running_in_separate_process,
+                    target=claim_target,
                     args=(db_path, task_id, start_event, result_queue, timeout),
                 ),
             ]

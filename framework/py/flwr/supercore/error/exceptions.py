@@ -25,18 +25,20 @@ class EntitlementError(FlowerError):
 
     Parameters
     ----------
-    details : str
+    message : str
+        Sensitive diagnostic message intended for server-side logs.
+    public_details : str
         Client-visible explanation of why the entitlement check failed.
     entitlement_code : int
         Service-defined entitlement code included in the serialized payload
         for programmatic handling.
     """
 
-    def __init__(self, details: str, entitlement_code: int):
+    def __init__(self, message: str, public_details: str, entitlement_code: int):
         super().__init__(
-            message=details,
-            public_details=details,
             code=ApiErrorCode.ENTITLEMENT_ERROR,
+            message=message,  # Sensitive message
+            public_details=public_details,
         )
         self.entitlement_code = entitlement_code
 

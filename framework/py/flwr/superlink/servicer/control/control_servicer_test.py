@@ -373,7 +373,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 self.state.federation_manager,
                 "can_execute",
                 side_effect=EntitlementError(
-                    details="Start run not permitted.",
+                    "Start run denied for this account.",
+                    public_details="Start run not permitted.",
                     entitlement_code=101,
                 ),
             ),
@@ -544,7 +545,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 self.state.federation_manager,
                 "can_execute",
                 side_effect=EntitlementError(
-                    details="Register node not permitted.",
+                    "Register node denied for this account.",
+                    public_details="Register node not permitted.",
                     entitlement_code=102,
                 ),
             ),
@@ -785,7 +787,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 self.state.federation_manager,
                 "can_execute",
                 side_effect=EntitlementError(
-                    details="Create federation not permitted.",
+                    "Create federation denied for this account.",
+                    public_details="Create federation not permitted.",
                     entitlement_code=103,
                 ),
             ),
@@ -992,7 +995,8 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
         self.state.federation_manager.can_execute.side_effect = EntitlementError(
-            details="Create invitation not permitted.",
+            "Create invitation denied for this account.",
+            public_details="Create invitation not permitted.",
             entitlement_code=104,
         )
 
@@ -1051,7 +1055,8 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
         self.state.federation_manager.can_execute.side_effect = EntitlementError(
-            details="Accept invitation not permitted.",
+            "Accept invitation denied for this account.",
+            public_details="Accept invitation not permitted.",
             entitlement_code=105,
         )
 

@@ -29,6 +29,10 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     CreateTaskResponse,
     PullPendingTasksRequest,
     PullPendingTasksResponse,
+    PullTaskMessageRequest,
+    PullTaskMessageResponse,
+    PushTaskMessageRequest,
+    PushTaskMessageResponse,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
@@ -36,7 +40,9 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
     PushLogsResponse,
 )
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import (
+    TASK_TYPES_ALLOWED_TO_CREATE_TASKS,
     TASK_TYPES_REQUIRING_CONNECTOR_REF,
     TASK_TYPES_REQUIRING_FAB_HASH,
     TASK_TYPES_REQUIRING_MODEL_REF,
@@ -91,9 +97,11 @@ class AppIoServicer(ABC):
         """Create a task."""
         log(DEBUG, "AppIoServicer.CreateTask")
 
-        run_id = get_authenticated_task().run_id
+        # Get authenticated task and associated run ID
+        task = get_authenticated_task()
+        run_id = task.run_id
 
-        _validate_create_task_request(request, context)
+        _validate_create_task_request(request, task, context)
 
         state = self.state()
         created_task_id = state.create_task(
@@ -111,6 +119,26 @@ class AppIoServicer(ABC):
 
         return CreateTaskResponse(task_id=created_task_id)
 
+    def PushTaskMessage(
+        self, request: PushTaskMessageRequest, context: grpc.ServicerContext
+    ) -> PushTaskMessageResponse:
+        """Push a task message."""
+        log(DEBUG, "AppIoServicer.PushTaskMessage")
+        context.abort(
+            grpc.StatusCode.UNIMPLEMENTED, "PushTaskMessage is not implemented"
+        )
+        raise RuntimeError("This line should never be reached.")
+
+    def PullTaskMessage(
+        self, request: PullTaskMessageRequest, context: grpc.ServicerContext
+    ) -> PullTaskMessageResponse:
+        """Pull task messages."""
+        log(DEBUG, "AppIoServicer.PullTaskMessage")
+        context.abort(
+            grpc.StatusCode.UNIMPLEMENTED, "PullTaskMessage is not implemented"
+        )
+        raise RuntimeError("This line should never be reached.")
+
     def PushLogs(
         self, request: PushLogsRequest, context: grpc.ServicerContext
     ) -> PushLogsResponse:
@@ -127,30 +155,34 @@ class AppIoServicer(ABC):
 
 
 def _validate_create_task_request(
-    request: CreateTaskRequest, context: grpc.ServicerContext
+    request: CreateTaskRequest, requesting_task: Task, context: grpc.ServicerContext
 ) -> None:
     """Validate the task creation request."""
-    try:
-        task_type = TaskType(request.type)
-    except ValueError:
+    if requesting_task.type not in TASK_TYPES_ALLOWED_TO_CREATE_TASKS:
+        context.abort(
+            grpc.StatusCode.PERMISSION_DENIED,
+            f"Task type '{requesting_task.type}' is not allowed to create tasks.",
+        )
+
+    if request.type not in set(TaskType):
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Invalid task type: {request.type}",
         )
 
-    if task_type in TASK_TYPES_REQUIRING_FAB_HASH and not request.fab_hash:
+    if request.type in TASK_TYPES_REQUIRING_FAB_HASH and not request.fab_hash:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires fab_hash.",
         )
 
-    if task_type in TASK_TYPES_REQUIRING_MODEL_REF and not request.model_ref:
+    if request.type in TASK_TYPES_REQUIRING_MODEL_REF and not request.model_ref:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires model_ref.",
         )
 
-    if task_type in TASK_TYPES_REQUIRING_CONNECTOR_REF and not request.connector_ref:
+    if request.type in TASK_TYPES_REQUIRING_CONNECTOR_REF and not request.connector_ref:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires connector_ref.",

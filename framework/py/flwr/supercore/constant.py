@@ -169,6 +169,9 @@ SQLITE_PRAGMAS = (
     ("mmap_size", "268435456"),  # 256MB memory-mapped I/O
 )
 
+# Constants for SQL LinkState
+SQL_ALLOWED_DIALECTS: frozenset[str] = frozenset({"sqlite"})
+
 
 class NodeStatus:
     """Event log writer types."""
@@ -218,6 +221,13 @@ class TaskType(StrEnum):
     CONNECTOR = "flwr-connector"
 
 
+TASK_TYPES_ALLOWED_TO_CREATE_TASKS: frozenset[TaskType] = frozenset(
+    {
+        TaskType.AGENT_APP,
+        TaskType.SERVER_APP,
+        TaskType.CLIENT_APP,
+    }
+)
 TASK_TYPES_REQUIRING_FAB_HASH: frozenset[TaskType] = frozenset(
     {
         TaskType.SERVER_APP,

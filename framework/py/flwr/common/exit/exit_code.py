@@ -65,6 +65,7 @@ class ExitCode:
     COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE = 603
     COMMON_PATH_INVALID = 604
     COMMON_TLS_SERVER_CERTIFICATES_INVALID = 605
+    RUNTIME_VERSION_INCOMPATIBLE = 606
 
     # Simulation exit codes (700-799)
     SIMULATION_EXCEPTION = 700
@@ -182,6 +183,10 @@ To use the REST API, install `flwr` with the `rest` extra:
     ),
     ExitCode.COMMON_TLS_SERVER_CERTIFICATES_INVALID: (
         "TLS server certificate configuration is incomplete or invalid."
+    ),
+    ExitCode.RUNTIME_VERSION_INCOMPATIBLE: (
+        "Upgrade your Flower version to the required version, or contact the server "
+        "administrator."
     ),
     # Simulation exit codes (700-799)
     ExitCode.SIMULATION_EXCEPTION: (

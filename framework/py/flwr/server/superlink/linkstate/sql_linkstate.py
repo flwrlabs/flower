@@ -14,11 +14,11 @@
 # ==============================================================================
 """SQLAlchemy-based implementation of the link state."""
 
-
 # pylint: disable=too-many-lines
 
 import json
 from collections.abc import Sequence
+from datetime import datetime, timezone
 from logging import ERROR, WARNING
 from typing import Any, Literal
 
@@ -33,6 +33,7 @@ from flwr.common.constant import (
     NODE_ID_NUM_BYTES,
     RUN_ID_NUM_BYTES,
     SUPERLINK_NODE_ID,
+    TASK_ID_NUM_BYTES,
     Status,
 )
 from flwr.common.typing import Run, RunStatus
@@ -83,6 +84,11 @@ PRIMARY_TASK_STATUS_CONDITIONS = {
 class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     """SQLAlchemy-based LinkState implementation."""
 
+    @property
+    def select_lock_sql(self) -> str:
+        """Return the SQL clause for row-locking, which is overridable by subclasses."""
+        return ""
+
     def __init__(
         self,
         database_path: str,
@@ -98,7 +104,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         # Start with linkstate tables
         metadata = create_linkstate_metadata()
 
-        # Add corestate tables (for example token_store and fab)
+        # Add corestate tables (for example fab)
         corestate_metadata = create_corestate_metadata()
         for table in corestate_metadata.tables.values():
             table.to_metadata(metadata)
@@ -118,7 +124,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         model_ref: str | None = None,
         connector_ref: str | None = None,
     ) -> int | None:
-        """Create a task and make it the run's primary task if none exists."""
+        """Create a task."""
         with self.session():
             if not self.query(
                 "SELECT run_id FROM run WHERE run_id = :run_id",
@@ -135,21 +141,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 model_ref=model_ref,
                 connector_ref=connector_ref,
             )
-            if task_id is None:
-                return None
-
-            self.query(
-                """
-                UPDATE run
-                SET primary_task_id = :task_id
-                WHERE run_id = :run_id AND primary_task_id IS NULL
-                """,
-                {
-                    "run_id": uint64_to_int64(run_id),
-                    "task_id": uint64_to_int64(task_id),
-                },
-            )
-
             return task_id
 
     def store_message_ins(self, message: Message) -> str | None:
@@ -338,21 +329,34 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             AND delivered_at = ''
             AND (created_at + ttl) > :current
         """
+        candidate_cte = ""
         condition = common_condition
         if limit is not None:
-            condition = f"""
-                message_id IN (
+            # Materialize limited candidates before updating. Some backends can
+            # otherwise re-evaluate same-table subqueries while UPDATE scans rows.
+            # `self.select_lock_sql` is an optional clause for backends that support
+            # row-locking while selecting candidates. Keep it before LIMIT so locked
+            # rows are skipped before limiting the result set.
+            candidate_cte = f"""
+                WITH candidate_message_ins AS (
                     SELECT message_id
                     FROM message_ins
                     WHERE {common_condition}
                     ORDER BY created_at, message_id
+                    {self.select_lock_sql}
                     LIMIT :limit
+                )
+            """
+            condition = """
+                message_id IN (
+                    SELECT message_id FROM candidate_message_ins
                 )
                 AND delivered_at = ''
             """
             params["limit"] = limit
 
         query = f"""
+            {candidate_cte}
             UPDATE message_ins
             SET delivered_at = :delivered_at
             WHERE {condition}
@@ -446,6 +450,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def get_message_res(self, message_ids: set[str]) -> list[Message]:
         """Get reply Messages for the given Message IDs."""
         # pylint: disable=too-many-locals
+        if not message_ids:
+            return []
+
         ret: dict[str, Message] = {}
 
         with self.session():
@@ -476,21 +483,26 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             # Check node availability
             dst_node_ids: set[int] = set()
             for message_id in message_ids:
-                in_message = found_message_ins_dict[message_id]
+                in_message = found_message_ins_dict.get(message_id)
+                if in_message is None:
+                    continue
                 sint_node_id = uint64_to_int64(in_message.metadata.dst_node_id)
                 dst_node_ids.add(sint_node_id)
-            placeholders = ",".join([f":nid_{i}" for i in range(len(dst_node_ids))])
-            query = f"""
-                SELECT node_id, online_until
-                FROM node
-                WHERE node_id IN ({placeholders})
-                AND status != :unregistered
-            """
-            node_params: dict[str, int | str] = {
-                f"nid_{i}": nid for i, nid in enumerate(dst_node_ids)
-            }
-            node_params["unregistered"] = NodeStatus.UNREGISTERED
-            rows = self.query(query, node_params)
+            if dst_node_ids:
+                placeholders = ",".join([f":nid_{i}" for i in range(len(dst_node_ids))])
+                query = f"""
+                    SELECT node_id, online_until
+                    FROM node
+                    WHERE node_id IN ({placeholders})
+                    AND status != :unregistered
+                """
+                node_params: dict[str, int | str] = {
+                    f"nid_{i}": nid for i, nid in enumerate(dst_node_ids)
+                }
+                node_params["unregistered"] = NodeStatus.UNREGISTERED
+                rows = self.query(query, node_params)
+            else:
+                rows = []
             tmp_ret_dict = check_node_availability_for_in_message(
                 inquired_in_message_ids=message_ids,
                 found_in_message_dict=found_message_ins_dict,
@@ -500,6 +512,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 current_time=current,
             )
             ret.update(tmp_ret_dict)
+
+            # Return accumulated replies if no IDs remain to avoid generating `IN ()`
+            if not message_ids:
+                return list(ret.values())
 
             # Atomically claim all eligible reply Messages
             placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
@@ -630,7 +646,15 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 },
             )
         except IntegrityError as e:
-            if "node.public_key" in str(e):
+            # Check the underlying DB exception to distinguish constraint types.
+            # - SQLite: str(e.orig) is e.g. "UNIQUE constraint failed: node.public_key"
+            # - psycopg3: e.orig.diag.constraint_name contains the constraint name
+            orig = e.orig
+            constraint = getattr(getattr(orig, "diag", None), "constraint_name", None)
+            is_pk_conflict = (
+                "public_key" in constraint if constraint else "public_key" in str(orig)
+            )
+            if is_pk_conflict:
                 raise ValueError("Public key already in use.") from None
             # Must be node ID conflict, almost impossible unless system is compromised
             log(ERROR, "Unexpected node registration failure.")
@@ -646,7 +670,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         query = """
             UPDATE node
             SET status = :unregistered, unregistered_at = :unregistered_at,
-            online_until = IIF(online_until > :current, :current, online_until)
+            online_until = CASE
+                WHEN online_until > :current
+                    THEN :current
+                ELSE online_until
+            END
             WHERE node_id = :node_id AND status != :unregistered
             AND owner_aid = :owner_aid
             RETURNING node_id
@@ -751,25 +779,54 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
     def _check_and_tag_offline_nodes(self, node_ids: list[int] | None = None) -> None:
         """Check and tag offline nodes."""
-        # strftime will convert POSIX timestamp to ISO format
         query = """
-            UPDATE node SET status = :offline,
-            last_deactivated_at =
-            strftime('%Y-%m-%dT%H:%M:%f+00:00', online_until, 'unixepoch')
-            WHERE online_until <= :current_time AND status = :online
+            SELECT node_id, online_until
+            FROM node
+            WHERE online_until <= :current_time
+              AND status = :online
         """
         params: dict[str, Any] = {
-            "offline": NodeStatus.OFFLINE,
             "current_time": now().timestamp(),
             "online": NodeStatus.ONLINE,
         }
         if node_ids is not None:
+            if not node_ids:
+                return
             placeholders = ",".join([f":nid_{i}" for i in range(len(node_ids))])
             query += f" AND node_id IN ({placeholders})"
             params.update(
                 {f"nid_{i}": uint64_to_int64(nid) for i, nid in enumerate(node_ids)}
             )
-        self.query(query, params)
+
+        # Select candidate node_ids first so `last_deactivated_at` can preserve the
+        # expiry time without relying on database-specific epoch formatting functions
+        rows = self.query(query, params)
+        if not rows:
+            return
+
+        update_query = """
+            UPDATE node
+            SET status = :offline, last_deactivated_at = :last_deactivated_at
+            WHERE node_id = :node_id
+              AND status = :online
+              AND online_until <= :current_time
+        """
+        update_data = [
+            {
+                "offline": NodeStatus.OFFLINE,
+                # Convert epoch seconds to a UTC ISO-8601 string
+                "last_deactivated_at": datetime.fromtimestamp(
+                    row["online_until"], tz=timezone.utc
+                ).isoformat(),
+                "node_id": row["node_id"],
+                "online": NodeStatus.ONLINE,
+                # Re-check expiry to avoid marking a node offline after a concurrent
+                # heartbeat extended its `online_until`
+                "current_time": params["current_time"],
+            }
+            for row in rows
+        ]
+        self.query(update_query, update_data)
 
     def get_node_info(  # pylint: disable=too-many-locals
         self,
@@ -779,6 +836,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         statuses: Sequence[str] | None = None,
     ) -> Sequence[NodeInfo]:
         """Retrieve information about nodes based on the specified filters."""
+        if node_ids is not None and len(node_ids) == 0:
+            return []
+        if owner_aids is not None and len(owner_aids) == 0:
+            return []
+        if statuses is not None and len(statuses) == 0:
+            return []
+
         with self.session():
             self._check_and_tag_offline_nodes()
 
@@ -850,63 +914,88 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """Create a new run."""
         task_type = primary_task_type_from_run_type(run_type)
 
-        # Sample a random int64 as run_id
-        uint64_run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
-
-        # Convert the uint64 value to sint64 for SQLite
-        sint64_run_id = uint64_to_int64(uint64_run_id)
-
         # Convert federation_config to JSON string for storage
         fed_config_json = None
         if federation_config:
             fed_config_json = json.dumps(simulation_config_to_json(federation_config))
 
+        run_insert_query = """
+            INSERT INTO run
+            (run_id, fab_id, fab_version, fab_hash, override_config, federation,
+            primary_task_id, federation_config, run_type, pending_at, starting_at,
+            running_at, finished_at, usage_reported_at, sub_status, details,
+            flwr_aid, bytes_sent, bytes_recv, clientapp_runtime)
+            VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
+            :federation, :primary_task_id, :federation_config, :run_type,
+            :pending_at, :starting_at, :running_at, :finished_at,
+            :usage_reported_at, :sub_status, :details, :flwr_aid,
+            :bytes_sent, :bytes_recv, :clientapp_runtime)
+        """
+        task_insert_query = """
+            INSERT INTO task
+            (task_id, type, run_id, fab_hash, model_ref, connector_ref, token,
+             active_until, pending_at, starting_at, running_at, finished_at,
+             sub_status, details)
+            VALUES
+            (:task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
+             :active_until, :pending_at, :starting_at, :running_at, :finished_at,
+             :sub_status, :details)
+        """
+        override_config_json = json.dumps(override_config)
+        run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
+        task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
+        pending_at = now().isoformat()
+
         with self.session():
-            # Check conflicts
             query = "SELECT COUNT(*) as cnt FROM run WHERE run_id = :run_id"
-            rows = self.query(query, {"run_id": sint64_run_id})
+            rows = self.query(query, {"run_id": uint64_to_int64(run_id)})
             if rows[0]["cnt"] == 0:
-                query = """
-                    INSERT INTO run
-                    (run_id, fab_id, fab_version, fab_hash, override_config, federation,
-                    primary_task_id, federation_config, run_type, pending_at,
-                    starting_at, running_at, finished_at, usage_reported_at,
-                    sub_status, details, flwr_aid, bytes_sent, bytes_recv,
-                    clientapp_runtime)
-                    VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
-                    :federation, :primary_task_id, :federation_config, :run_type,
-                    :pending_at, :starting_at, :running_at, :finished_at,
-                    :usage_reported_at, :sub_status, :details, :flwr_aid,
-                    :bytes_sent, :bytes_recv, :clientapp_runtime)
-                """
-                override_config_json = json.dumps(override_config)
-                params = {
-                    "run_id": sint64_run_id,
-                    "fab_id": fab_id or "",
-                    "fab_version": fab_version or "",
-                    "fab_hash": fab_hash or "",
-                    "override_config": override_config_json,
-                    "federation": federation,
-                    "primary_task_id": None,
-                    "federation_config": fed_config_json,
-                    "run_type": run_type,
-                    "pending_at": now().isoformat(),
-                    "starting_at": "",
-                    "running_at": "",
-                    "finished_at": "",
-                    "sub_status": "",
-                    "details": "",
-                    "flwr_aid": flwr_aid or "",
-                    "bytes_sent": 0,
-                    "bytes_recv": 0,
-                    "clientapp_runtime": 0.0,
-                    "usage_reported_at": "",
-                }
-                self.query(query, params)
-                if self.create_task(task_type, uint64_run_id, fab_hash) is None:
-                    log(ERROR, "Failed to create task for run ID %s", uint64_run_id)
-                    return 0
-                return uint64_run_id
+                self.query(
+                    run_insert_query,
+                    {
+                        "run_id": uint64_to_int64(run_id),
+                        "fab_id": fab_id or "",
+                        "fab_version": fab_version or "",
+                        "fab_hash": fab_hash or "",
+                        "override_config": override_config_json,
+                        "federation": federation,
+                        "primary_task_id": uint64_to_int64(task_id),
+                        "federation_config": fed_config_json,
+                        "run_type": run_type,
+                        "pending_at": pending_at,
+                        "starting_at": "",
+                        "running_at": "",
+                        "finished_at": "",
+                        "usage_reported_at": "",
+                        "sub_status": "",
+                        "details": "",
+                        "flwr_aid": flwr_aid or "",
+                        "bytes_sent": 0,
+                        "bytes_recv": 0,
+                        "clientapp_runtime": 0.0,
+                    },
+                )
+                self.query(
+                    task_insert_query,
+                    {
+                        "task_id": uint64_to_int64(task_id),
+                        "type": task_type,
+                        "run_id": uint64_to_int64(run_id),
+                        "fab_hash": fab_hash,
+                        "model_ref": None,
+                        "connector_ref": None,
+                        "token": None,
+                        "active_until": None,
+                        "pending_at": pending_at,
+                        "starting_at": None,
+                        "running_at": None,
+                        "finished_at": None,
+                        "sub_status": "",
+                        "details": "",
+                    },
+                )
+                return run_id
+
         log(ERROR, "Unexpected run creation failure.")
         return 0
 
