@@ -163,33 +163,26 @@ def _validate_create_task_request(
             grpc.StatusCode.PERMISSION_DENIED,
             f"Task type '{requesting_task.type}' is not allowed to create tasks.",
         )
-        raise RuntimeError("This line should never be reached.")
 
-    try:
-        new_task_type = TaskType(request.type)
-    except ValueError:
+    if request.type not in set(TaskType):
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Invalid task type: {request.type}",
         )
-        raise RuntimeError("This line should never be reached.") from None
 
-    if new_task_type in TASK_TYPES_REQUIRING_FAB_HASH and not request.fab_hash:
+    if request.type in TASK_TYPES_REQUIRING_FAB_HASH and not request.fab_hash:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires fab_hash.",
         )
 
-    if new_task_type in TASK_TYPES_REQUIRING_MODEL_REF and not request.model_ref:
+    if request.type in TASK_TYPES_REQUIRING_MODEL_REF and not request.model_ref:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires model_ref.",
         )
 
-    if (
-        new_task_type in TASK_TYPES_REQUIRING_CONNECTOR_REF
-        and not request.connector_ref
-    ):
+    if request.type in TASK_TYPES_REQUIRING_CONNECTOR_REF and not request.connector_ref:
         context.abort(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires connector_ref.",
