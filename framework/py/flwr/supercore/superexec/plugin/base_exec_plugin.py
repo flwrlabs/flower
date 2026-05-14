@@ -52,8 +52,7 @@ class BaseExecPlugin(ExecPlugin):
         return candidate_tasks[0]
 
     def launch_task(self, token: str, task: Task) -> None:
-        """Launch the process to execute the given task using the given
-        token."""
+        """Launch the process to execute the given task using the given token."""
         backend = self.launch_backend or SubprocessLaunchBackend()
         backend.launch(self._build_launch_spec(token=token, task=task))
 
