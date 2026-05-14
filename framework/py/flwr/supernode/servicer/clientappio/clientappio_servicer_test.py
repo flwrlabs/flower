@@ -158,7 +158,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_stub.PushObject.side_effect = mock_push_object
 
         # Execute
-        _ = push_task_output(
+        push_task_output(
             stub=self.mock_stub,
             message=message,
             context=context,

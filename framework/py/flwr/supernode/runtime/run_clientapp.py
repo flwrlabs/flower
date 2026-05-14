@@ -47,7 +47,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputResponse,
     PushAppMessagesRequest,
     PushTaskOutputRequest,
-    PushTaskOutputResponse,
 )
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
@@ -102,6 +101,8 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         ],
     )
     channel.subscribe(on_channel_state_change)
+    stub = ClientAppIoStub(channel)
+    wrap_stub(stub, make_simple_grpc_retry_invoker())
 
     # Initialize variables for exit handler
     heartbeat_sender = None
@@ -140,9 +141,6 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     )
 
     try:
-        stub = ClientAppIoStub(channel)
-        wrap_stub(stub, make_simple_grpc_retry_invoker())
-
         # Start task heartbeat
         heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
         heartbeat_sender.start()
@@ -301,7 +299,7 @@ def push_task_output(  # pylint: disable=R0913, R0917
     context: Context | None,
     sub_status: str,
     details: str,
-) -> PushTaskOutputResponse:
+) -> None:
     """Push TaskOutput to SuperNode."""
     try:
         # Push reply message
@@ -309,13 +307,12 @@ def push_task_output(  # pylint: disable=R0913, R0917
             _push_reply(stub, message, context)
 
         # Push Context and final status
-        res: PushTaskOutputResponse = stub.PushTaskOutput(
+        stub.PushTaskOutput(
             PushTaskOutputRequest(
                 context=context_to_proto(context) if context else None,
                 sub_status=sub_status,
                 details=details,
             )
         )
-        return res
     except grpc.RpcError as e:
         log(ERROR, "[PushTaskOutput] gRPC error occurred: %s", str(e))
