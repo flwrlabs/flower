@@ -1,0 +1,14 @@
+{
+  "inputs": {},
+  "repository": {
+    "default_branch": "main",
+    "full_name": "flwrlabs/flower",
+    "name": "flower",
+    "owner": {
+      "login": "flwrlabs"
+    }
+  },
+  "sender": {
+    "login": "act"
+  }
+}
