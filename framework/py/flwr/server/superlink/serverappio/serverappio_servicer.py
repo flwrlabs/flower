@@ -313,7 +313,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         # Init store
         store = self.objectstore_factory.store()
 
-        _get_authenticated_serverapp_run_id(context)
+        _ = _get_authenticated_serverapp_run_id(context)
 
         if request.node.node_id != SUPERLINK_NODE_ID:
             # Cancel insertion in ObjectStore
@@ -341,7 +341,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         # Init store
         store = self.objectstore_factory.store()
 
-        _get_authenticated_serverapp_run_id(context)
+        _ = _get_authenticated_serverapp_run_id(context)
 
         if request.node.node_id != SUPERLINK_NODE_ID:
             # Cancel insertion in ObjectStore
@@ -367,7 +367,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         # Init store
         store = self.objectstore_factory.store()
 
-        _get_authenticated_serverapp_run_id(context)
+        _ = _get_authenticated_serverapp_run_id(context)
 
         # Delete the message object
         store.delete(request.message_object_id)
