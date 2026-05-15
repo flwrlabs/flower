@@ -1,6 +1,8 @@
 name: Release nightly
 
 on:
+  # Allows maintainers to manually trigger a nightly release out of schedule.
+  # Unauthorized actors are blocked by the authorize-manual-trigger job below.
   workflow_dispatch:
   schedule:
     - cron: "0 23 * * *"
