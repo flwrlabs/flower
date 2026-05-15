@@ -65,10 +65,10 @@ for different registries separate.
 
 Example profiles:
 
-- `testpypi-gitlab`: dry-run Python package publishing with TestPyPI/devpi
-  values and publish Docker images to GitLab Container Registry
-- `testpypi-dockerhub`: dry-run Python package publishing with TestPyPI/devpi
-  values and publish Docker images to Docker Hub
+- `testpypi-gitlab`: package publish dry-runs with TestPyPI/devpi values and
+  Docker image publishing to GitLab Container Registry
+- `testpypi-dockerhub`: package publish dry-runs with TestPyPI/devpi values and
+  Docker image publishing to Docker Hub
 
 Use disposable repositories, namespaces, package versions, and tokens for these
 profiles.
@@ -144,9 +144,9 @@ disposable test registries:
 .github/act/run-publish.sh docker-main testpypi-gitlab all
 ```
 
-Keep Python package publish jobs in `--dryrun` mode unless the workflow supports
-overriding the Poetry package repository. Without that support, a real run
-publishes to the workflow's default package registry.
+The publish wrapper requires `--dryrun` for Python package publish jobs by
+default. Set `ACT_ALLOW_PACKAGE_PUBLISH=1` only for an intentional publish to a
+disposable package repository configured by the selected profile.
 
 Do not use production PyPI or production container namespaces for local `act`
 publish validation.

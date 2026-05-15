@@ -49,7 +49,7 @@ workflow/event:
 Publish workflows should use named profiles so package and container
 credentials stay separate from generic local CI settings.
 
-Create a GitLab Container Registry + TestPyPI profile:
+Create a GitLab Container Registry + package dry-run profile:
 
 ```bash
 cp .github/act/profiles/publish.env.example .github/act/profiles/testpypi-gitlab.env.local
@@ -57,7 +57,7 @@ cp .github/act/profiles/publish-gitlab.vars.example .github/act/profiles/testpyp
 cp .github/act/profiles/publish.secrets.example .github/act/profiles/testpypi-gitlab.secrets.local
 ```
 
-Create a Docker Hub + TestPyPI profile:
+Create a Docker Hub + package dry-run profile:
 
 ```bash
 cp .github/act/profiles/publish.env.example .github/act/profiles/testpypi-dockerhub.env.local
@@ -100,9 +100,10 @@ Run the Docker publishing jobs for the configured test registry:
 The Docker build jobs push images when supplied with valid Docker credentials.
 Use disposable repositories/tags for local validation.
 
-The `release` and `nightly` Python package jobs should stay in `--dryrun` mode
-unless the workflow supports overriding the Poetry package repository. Without
-that support, a real run publishes to the workflow's default package registry.
+The `release` and `nightly` Python package jobs require `--dryrun` by default.
+Set `ACT_ALLOW_PACKAGE_PUBLISH=1` only for an intentional publish to the
+configured non-production package repository. Never use production package
+credentials for local `act` validation.
 
 Publish runs default to `catthehacker/ubuntu:full-22.04` because these workflows
 use setup actions and post steps that need a more complete runner image. Override

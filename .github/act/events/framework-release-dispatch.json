@@ -3,8 +3,7 @@
     "package-version": "",
     "docker-registry": "",
     "docker-registry-user": "",
-    "docker-image-namespace": "",
-    "pypi-repository-url": ""
+    "docker-image-namespace": ""
   },
   "ref": "refs/heads/main",
   "ref_name": "main",
