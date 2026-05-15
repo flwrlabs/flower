@@ -14,7 +14,6 @@
 # ==============================================================================
 """Flower SQLAlchemy-based ObjectStore implementation."""
 
-
 from sqlalchemy import MetaData
 
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
@@ -45,13 +44,16 @@ class SqlObjectStore(ObjectStore, SqlMixin):
     def preregister(self, run_id: int, object_tree: ObjectTree) -> list[str]:
         """Identify and preregister missing objects in the `ObjectStore`."""
         new_objects = []
-        for tree_node in iterate_object_tree(object_tree):
-            obj_id = tree_node.object_id
-            if not is_valid_sha256_hash(obj_id):
-                raise ValueError(f"Invalid object ID format: {obj_id}")
+        tree_nodes = list(iterate_object_tree(object_tree))
+        for tree_node in tree_nodes:
+            if not is_valid_sha256_hash(tree_node.object_id):
+                raise ValueError(f"Invalid object ID format: {tree_node.object_id}")
 
-            child_ids = [child.object_id for child in tree_node.children]
-            with self.session():
+        with self.session():
+            for tree_node in tree_nodes:
+                obj_id = tree_node.object_id
+                child_ids = [child.object_id for child in tree_node.children]
+
                 # Insert new object if it doesn't exist (race-condition safe)
                 # RETURNING returns a row only if the insert succeeded
                 rows = self.query(
@@ -67,20 +69,9 @@ class SqlObjectStore(ObjectStore, SqlMixin):
                         "ref_count": 0,
                     },
                 )
+                is_new = bool(rows)
 
-                if rows:
-                    # New object inserted: set up child relationships
-                    for cid in child_ids:
-                        self.query(
-                            "INSERT INTO object_children (parent_id, child_id) "
-                            "VALUES (:parent_id, :child_id)",
-                            {"parent_id": obj_id, "child_id": cid},
-                        )
-                        self.query(
-                            "UPDATE objects SET ref_count = ref_count + 1 "
-                            "WHERE object_id = :object_id",
-                            {"object_id": cid},
-                        )
+                if is_new:
                     new_objects.append(obj_id)
                 else:
                     # Object exists: check if unavailable
@@ -90,6 +81,37 @@ class SqlObjectStore(ObjectStore, SqlMixin):
                     )
                     if rows and not rows[0]["is_available"]:
                         new_objects.append(obj_id)
+                    rows = self.query(
+                        "SELECT child_id FROM object_children "
+                        "WHERE parent_id = :parent_id",
+                        {"parent_id": obj_id},
+                    )
+                    existing_child_ids = {row["child_id"] for row in rows}
+                    if existing_child_ids != set(child_ids):
+                        raise ValueError(
+                            f"Object {obj_id} was preregistered with different "
+                            "children."
+                        )
+
+                # Set up child relationships. Refresh ref_count only if this call
+                # actually inserted the edge.
+                if is_new:
+                    for cid in child_ids:
+                        edge_rows = self.query(
+                            "INSERT INTO object_children (parent_id, child_id) "
+                            "VALUES (:parent_id, :child_id) "
+                            "ON CONFLICT (parent_id, child_id) DO NOTHING "
+                            "RETURNING child_id",
+                            {"parent_id": obj_id, "child_id": cid},
+                        )
+                        if edge_rows:
+                            self.query(
+                                "UPDATE objects SET ref_count = ("
+                                "SELECT COUNT(*) FROM object_children "
+                                "WHERE child_id = :object_id"
+                                ") WHERE object_id = :object_id",
+                                {"object_id": cid},
+                            )
 
                 # Ensure run mapping
                 self.query(
@@ -170,45 +192,9 @@ class SqlObjectStore(ObjectStore, SqlMixin):
         return rows[0]["content"] if rows else None
 
     def delete(self, object_id: str) -> None:
-        """Delete an object and its unreferenced descendants from the store."""
+        """Delete an object if unreferenced, ignoring run registrations."""
         with self.session():
-            rows = self.query(
-                "SELECT ref_count FROM objects WHERE object_id = :object_id",
-                {"object_id": object_id},
-            )
-
-            # If the object is not in the store, nothing to delete
-            if not rows:
-                return
-
-            # Skip deletion if there are still references
-            if rows[0]["ref_count"] > 0:
-                return
-
-            # Deleting will cascade via FK, but we need to decrement children first
-            children = self.query(
-                "SELECT child_id FROM object_children WHERE parent_id = :parent_id",
-                {"parent_id": object_id},
-            )
-            child_ids = [child["child_id"] for child in children]
-
-            if child_ids:
-                placeholders = ", ".join(f":cid{i}" for i in range(len(child_ids)))
-                params = {f"cid{i}": cid for i, cid in enumerate(child_ids)}
-                self.query(
-                    "UPDATE objects SET ref_count = ref_count - 1 "
-                    f"WHERE object_id IN ({placeholders})",
-                    params,
-                )
-
-            self.query(
-                "DELETE FROM objects WHERE object_id = :object_id",
-                {"object_id": object_id},
-            )
-
-            # Recursively clean children
-            for child_id in child_ids:
-                self.delete(child_id)
+            self._delete_unreferenced(object_id, respect_run_refs=False)
 
     def delete_objects_in_run(self, run_id: int) -> None:
         """Delete all objects that were registered in a specific run."""
@@ -218,18 +204,62 @@ class SqlObjectStore(ObjectStore, SqlMixin):
                 "SELECT object_id FROM run_objects WHERE run_id = :run_id",
                 {"run_id": run_id_sint},
             )
-            for obj in objs:
-                object_id = obj["object_id"]
-                rows = self.query(
-                    "SELECT ref_count FROM objects WHERE object_id=:object_id",
-                    {"object_id": object_id},
-                )
-                if rows and rows[0]["ref_count"] == 0:
-                    self.delete(object_id)
             self.query(
                 "DELETE FROM run_objects WHERE run_id = :run_id",
                 {"run_id": run_id_sint},
             )
+            for obj in objs:
+                self._delete_unreferenced(
+                    obj["object_id"],
+                    respect_run_refs=True,
+                )
+
+    def _delete_unreferenced(self, object_id: str, *, respect_run_refs: bool) -> None:
+        """Delete an object if unreferenced, then check each direct child."""
+        run_ref_condition = ""
+        if respect_run_refs:
+            run_ref_condition = (
+                "AND NOT EXISTS ("
+                "SELECT 1 FROM run_objects WHERE object_id = :object_id"
+                ") "
+            )
+
+        rows = self.query(
+            "SELECT 1 FROM objects "
+            "WHERE object_id = :object_id AND ref_count = 0 "
+            f"{run_ref_condition}",
+            {"object_id": object_id},
+        )
+        if not rows:
+            return
+
+        children = self.query(
+            "SELECT child_id FROM object_children WHERE parent_id = :parent_id",
+            {"parent_id": object_id},
+        )
+        child_ids = [child["child_id"] for child in children]
+
+        rows = self.query(
+            "DELETE FROM objects "
+            "WHERE object_id = :object_id AND ref_count = 0 "
+            f"{run_ref_condition}"
+            "RETURNING object_id",
+            {"object_id": object_id},
+        )
+        if not rows:
+            return
+
+        if child_ids:
+            placeholders = ", ".join(f":cid{i}" for i in range(len(child_ids)))
+            params = {f"cid{i}": cid for i, cid in enumerate(child_ids)}
+            self.query(
+                "UPDATE objects SET ref_count = ref_count - 1 "
+                f"WHERE object_id IN ({placeholders}) AND ref_count > 0",
+                params,
+            )
+
+        for child_id in child_ids:
+            self._delete_unreferenced(child_id, respect_run_refs=respect_run_refs)
 
     def clear(self) -> None:
         """Clear the store."""
