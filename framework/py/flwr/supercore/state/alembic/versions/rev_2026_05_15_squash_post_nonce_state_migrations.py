@@ -482,6 +482,34 @@ def _downgrade_node_online_until() -> None:
         )
 
 
+def _add_object_refcount_check() -> None:
+    """Backfill object ref counts and add the nonnegative check constraint."""
+    op.execute(
+        """
+        UPDATE objects
+        SET ref_count = (
+            SELECT COUNT(*)
+            FROM object_children
+            WHERE object_children.child_id = objects.object_id
+        )
+        """
+    )
+    with op.batch_alter_table("objects", schema=None) as batch_op:
+        batch_op.create_check_constraint(
+            "ck_objects_ref_count_nonnegative",
+            "ref_count >= 0",
+        )
+
+
+def _drop_object_refcount_check() -> None:
+    """Drop the object ref_count check constraint."""
+    with op.batch_alter_table("objects", schema=None) as batch_op:
+        batch_op.drop_constraint(
+            "ck_objects_ref_count_nonnegative",
+            type_="check",
+        )
+
+
 def _backfill_primary_tasks(runs: Sequence[RowMapping]) -> None:
     """Create one primary task per historical run and link it from the run row."""
     bind = op.get_bind()
@@ -669,6 +697,7 @@ def upgrade() -> None:
     _widen_integer_columns()
     _upgrade_node_online_until()
     _create_run_id_foreign_keys()
+    _add_object_refcount_check()
 
     _backfill_primary_tasks(runs)
     _copy_logs_to_task_logs()
@@ -686,6 +715,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade schema."""
+    _drop_object_refcount_check()
     _add_run_status_columns()
     _restore_run_status_columns_from_primary_tasks()
     _copy_task_logs_to_logs()
