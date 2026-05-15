@@ -38,7 +38,9 @@ env:
 jobs:
   authorize-manual-trigger:
     name: Authorize manual trigger
-    uses: ./.github/workflows/_authorize-manual-trigger.yml
+    uses: ./.github/workflows/_repo-authorize-manual-trigger.yml
+    with:
+      caller-event-name: ${{ github.event_name }}
 
   publish-wheel:
     if: ${{ github.repository == 'flwrlabs/flower' }}
