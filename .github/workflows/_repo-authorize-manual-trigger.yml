@@ -1,0 +1,123 @@
+name: Authorize manual trigger
+
+on:
+  # Reusable gate for workflows that should allow automatic triggers but
+  # restrict manual workflow_dispatch runs to trusted repository roles.
+  workflow_call:
+    inputs:
+      allowed-permissions:
+        description: "Comma-separated repository role names allowed to run the workflow manually"
+        required: false
+        type: string
+        default: "maintain,admin"
+
+permissions:
+  contents: read
+
+jobs:
+  authorize:
+    name: Authorize manual trigger
+    runs-on: ubuntu-22.04
+    steps:
+      # Reusable workflows inherit the caller's github context, so event_name is
+      # the event that triggered the caller workflow, not "workflow_call".
+      - name: Skip non-manual trigger
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        run: echo "Manual trigger authorization is not required for ${{ github.event_name }}."
+
+      # Manual runs are allowed only when every relevant actor has one of the
+      # configured repository roles. This covers both initial runs and reruns.
+      - name: Check manual trigger permissions
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Normalize the allowlist so callers can pass role names with
+            // whitespace or mixed case.
+            const allowedPermissionsInput = ${{ toJSON(inputs['allowed-permissions']) }};
+            const allowedPermissions = new Set(
+              allowedPermissionsInput
+                .split(",")
+                .map((permission) => permission.trim().toLowerCase())
+                .filter(Boolean)
+            );
+
+            // Fail closed if the workflow was called with an empty allowlist.
+            if (allowedPermissions.size === 0) {
+              core.setFailed("No allowed repository roles were configured for workflow_dispatch.");
+              return;
+            }
+
+            // github.actor is the original run actor; github.triggering_actor can
+            // differ for reruns. Require both to be authorized when they differ.
+            const actors = [
+              ${{ toJSON(github.actor) }},
+              ${{ toJSON(github.triggering_actor) }},
+            ];
+            const usernames = [
+              ...new Map(
+                actors
+                  .filter(Boolean)
+                  .map((username) => [username.toLowerCase(), username])
+              ).values(),
+            ];
+
+            if (usernames.length === 0) {
+              core.setFailed("Could not determine the workflow_dispatch actor.");
+              return;
+            }
+
+            // The collaborator permission endpoint returns role_name for exact
+            // role matching, while permission catches custom admin-based roles.
+            async function checkPermission(username) {
+              try {
+                const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  username,
+                });
+
+                const roleName = data.role_name ?? "";
+                const permission = data.permission ?? "";
+                const isAllowed =
+                  allowedPermissions.has(roleName.toLowerCase()) ||
+                  (allowedPermissions.has("admin") && permission === "admin");
+
+                return { username, roleName, permission, isAllowed };
+              } catch (error) {
+                return {
+                  username,
+                  roleName: "unknown",
+                  permission: "unknown",
+                  isAllowed: false,
+                  error,
+                };
+              }
+            }
+
+            const checks = await Promise.all(usernames.map(checkPermission));
+
+            // Log all observed roles so failed runs are diagnosable from the job
+            // output without exposing any secrets.
+            for (const check of checks) {
+              core.info(
+                `Manual run actor ${check.username} has ${check.roleName} role (${check.permission} permission)`
+              );
+              if (check.error) {
+                core.info(`Permission lookup failed for ${check.username}: ${check.error.message}`);
+              }
+            }
+
+            const denied = checks.filter((check) => !check.isAllowed);
+
+            // Any unauthorized actor blocks the manual run.
+            if (denied.length > 0) {
+              core.setFailed(
+                [
+                  `workflow_dispatch is limited to repository roles: ${[...allowedPermissions].join(", ")}`,
+                  `Denied: ${denied
+                    .map((check) => `${check.username} has ${check.roleName} role`)
+                    .join("; ")}`,
+                ].join(". ")
+              );
+            }

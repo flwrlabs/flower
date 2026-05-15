@@ -112,6 +112,11 @@ mode:
     * ``--insecure``: This flag tells the SuperLink to operate in an insecure mode, allowing
       unencrypted communication. Refer to the :doc:`how-to-enable-tls-connections` guide to learn how to run your SuperLink with TLS.
 
+.. note::
+
+    To enable TLS also for the SuperLink AppIo API, please refer to :ref:`Launching the
+    SuperLink with TLS <launching-the-superlink-with-tls>`.
+
 Start two Flower SuperNodes
 ===========================
 
@@ -163,6 +168,11 @@ need two terminals for this step.
 
        * ``--clientappio-api-address 127.0.0.1:9095``: Note that a different port is being used. This is only needed because you are running two SuperNodes on the same machine. Typically you would run one node per machine and therefore, the ``--clientappio-api-address`` could be omitted all together and left with its default value.
        * ``--node-config "partition-id=1 num-partitions=2"``: Note here we indicate a different `partition-id`. In this way, a ``ClientApp`` will use a different data partition depending on which SuperNode runs in.
+
+.. note::
+
+    To enable TLS also for the SuperNode AppIo API, please refer to :ref:`Connecting the
+    SuperNodes with TLS <connecting-the-supernodes-with-tls>`.
 
 ********************************************
  Step 3: Run a Flower App on the Federation

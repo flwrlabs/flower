@@ -179,7 +179,7 @@ jobs:
             pull: true
             sbom: true
             platforms: ${{ matrix.platform.docker }}
-            context: ${{ inputs.context != '' && inputs.context || format('{{defaultContext}}:{0}', inputs.file-dir) }}
+            context: ${{ toJSON(inputs.context || format('{0}:{1}', '{{defaultContext}}', inputs.file-dir)) }}
             file: ${{ inputs.dockerfile != '' && inputs.dockerfile || (inputs.context != '' && format('{0}/Dockerfile', inputs.file-dir) || 'Dockerfile') }}
             outputs: type=image,name=${{ inputs.image-repository }},push-by-digest=true,name-canonical=true,push=true
             build-args: |

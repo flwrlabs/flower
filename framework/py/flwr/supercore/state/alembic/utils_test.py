@@ -82,6 +82,10 @@ class TestAlembicRun(unittest.TestCase):
         """Upgrade the test database to the specified Alembic revision."""
         command.upgrade(build_alembic_config(engine), revision)
 
+    def downgrade_to_revision(self, engine: Engine, revision: str) -> None:
+        """Downgrade the test database to the specified Alembic revision."""
+        command.downgrade(build_alembic_config(engine), revision)
+
     def build_run_row(  # pylint: disable=too-many-arguments
         self,
         run_id: int,
@@ -302,7 +306,7 @@ class TestAlembicRun(unittest.TestCase):
                     ],
                 )
 
-            run_migrations(engine)
+            self.upgrade_to_revision(engine, "8253e456d570")
 
             with engine.connect() as connection:
                 runs = {
@@ -384,12 +388,7 @@ class TestAlembicRun(unittest.TestCase):
                     ],
                 )
 
-            run_migrations(engine)
-
-            current = get_current_revisions(engine)
-            script = ScriptDirectory.from_config(build_alembic_config(engine))
-            self.assertEqual(current, set(script.get_heads()))
-            self.assertFalse(check_migrations_pending(engine))
+            self.upgrade_to_revision(engine, "8253e456d570")
 
             with engine.connect() as connection:
                 primary_task = (
@@ -434,6 +433,70 @@ class TestAlembicRun(unittest.TestCase):
             self.assertEqual(
                 primary_task["run_details"], "Run stopped during server upgrade."
             )
+        finally:
+            engine.dispose()
+
+    def test_task_timestamp_migration_downgrade_restores_previous_values(self) -> None:
+        """Ensure task timestamp migration downgrade restores prior value format."""
+        engine = self.create_engine("task_timestamp_downgrade.db")
+        try:
+            # Prepare: insert a task with old timestamp format in old revision
+            self.upgrade_to_revision(engine, "aac61834ee69")
+            with engine.begin() as connection:
+                query = """
+                INSERT INTO task (
+                    task_id, type, run_id, token, active_until,
+                    pending_at, starting_at, running_at, finished_at,
+                    sub_status, details
+                ) VALUES (
+                    :task_id, :type, :run_id, :token, :active_until,
+                    :pending_at, :starting_at, :running_at, :finished_at,
+                    :sub_status, :details
+                )
+                """
+                params = {
+                    "task_id": 123,
+                    "type": TaskType.SERVER_APP,
+                    "run_id": 456,
+                    "token": "token",
+                    "active_until": 1777284240,  # 2026-04-27T10:04:00+00:00
+                    "pending_at": "2026-04-27T10:00:00+00:00",
+                    "starting_at": "2026-04-27T10:01:00+00:00",
+                    "running_at": "2026-04-27T10:02:00+00:00",
+                    "finished_at": "2026-04-27T10:03:00+00:00",
+                    "sub_status": SubStatus.COMPLETED,
+                    "details": "done",
+                }
+                connection.execute(text(query), params)
+
+            # Execute: upgrade to revision e937d3528d23
+            self.upgrade_to_revision(engine, "e937d3528d23")
+
+            # Assert: timestamps should be converted to new format
+            with engine.connect() as connection:
+                query = "SELECT * FROM task WHERE task_id = :task_id"
+                result = connection.execute(text(query), {"task_id": 123})
+                upgraded = result.mappings().one()
+
+            self.assertEqual(upgraded["active_until"], "2026-04-27 10:04:00+00:00")
+            self.assertEqual(upgraded["pending_at"], "2026-04-27 10:00:00+00:00")
+            self.assertEqual(upgraded["starting_at"], "2026-04-27 10:01:00+00:00")
+            self.assertEqual(upgraded["running_at"], "2026-04-27 10:02:00+00:00")
+            self.assertEqual(upgraded["finished_at"], "2026-04-27 10:03:00+00:00")
+
+            # Execute: downgrade back to revision aac61834ee69
+            self.downgrade_to_revision(engine, "aac61834ee69")
+
+            # Assert: timestamps should be restored to original format
+            with engine.connect() as connection:
+                query = "SELECT * FROM task WHERE task_id = :task_id"
+                result = connection.execute(text(query), {"task_id": 123})
+                downgraded = result.mappings().one()
+            self.assertEqual(downgraded["active_until"], 1777284240)
+            self.assertEqual(downgraded["pending_at"], "2026-04-27T10:00:00+00:00")
+            self.assertEqual(downgraded["starting_at"], "2026-04-27T10:01:00+00:00")
+            self.assertEqual(downgraded["running_at"], "2026-04-27T10:02:00+00:00")
+            self.assertEqual(downgraded["finished_at"], "2026-04-27T10:03:00+00:00")
         finally:
             engine.dispose()
 
