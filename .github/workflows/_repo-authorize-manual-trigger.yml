@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       allowed-permissions:
-        description: "Comma-separated repository role names allowed to run the workflow manually"
+        description: "Comma-separated repository role names or base permissions allowed to run the workflow manually"
         required: false
         type: string
         default: "maintain,admin"
@@ -44,11 +44,31 @@ jobs:
               username,
             });
 
+            let isAllowed = allowedPermissions.has(data.role_name);
+
+            if (!isAllowed && allowedPermissions.has("admin") && data.permission === "admin") {
+              isAllowed = true;
+            }
+
+            if (!isAllowed && allowedPermissions.has("maintain") && data.permission === "write") {
+              const collaborators = await github.paginate(github.rest.repos.listCollaborators, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                affiliation: "all",
+                per_page: 100,
+              });
+              const collaborator = collaborators.find(
+                (candidate) => candidate.login.toLowerCase() === username.toLowerCase()
+              );
+              const permissions = collaborator?.permissions ?? {};
+              isAllowed = Boolean(permissions.maintain || permissions.admin);
+            }
+
             core.info(
               `Manual run requested by ${username} with ${data.role_name} role (${data.permission} permission)`
             );
 
-            if (!allowedPermissions.has(data.role_name)) {
+            if (!isAllowed) {
               core.setFailed(
                 `workflow_dispatch is limited to maintainers; ${username} has ${data.role_name} role`
               );
