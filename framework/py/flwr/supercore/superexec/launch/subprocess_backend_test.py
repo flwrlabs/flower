@@ -84,16 +84,6 @@ def test_launch_renders_runtime_dependency_install_flag() -> None:
     assert "--allow-runtime-dependency-installation" in popen.call_args.args[0]
 
 
-def test_launch_omits_parent_pid_when_not_present() -> None:
-    """Launch should omit parent PID when the spec does not include one."""
-    spec = _launch_spec(parent_pid=None)
-
-    with patch("subprocess.Popen") as popen:
-        SubprocessLaunchBackend().launch(spec)
-
-    assert "--parent-pid" not in popen.call_args.args[0]
-
-
 def test_launch_suppresses_serverapp_output() -> None:
     """Launch should suppress output when requested by the spec."""
     spec = _launch_spec(

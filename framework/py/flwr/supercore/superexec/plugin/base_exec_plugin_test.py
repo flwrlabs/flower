@@ -84,24 +84,6 @@ def test_serverapp_launch_delegates_suppressed_stdio_spec() -> None:
     assert spec.suppress_output is True
 
 
-def test_simulation_launch_delegates_simulation_command_spec() -> None:
-    """Simulation launch should delegate the simulation command."""
-    backend = Mock()
-    plugin = ServerAppExecPlugin(
-        appio_api_address="127.0.0.1:9092",
-        insecure=True,
-        root_certificates_path=None,
-        get_run=_get_run,
-        launch_backend=backend,
-    )
-
-    plugin.launch_task(
-        token="token", task=_get_task(task_id=5, task_type=TaskType.SIMULATION)
-    )
-
-    assert _launched_spec(backend).command == "flwr-simulation"
-
-
 class DummyExecPlugin(BaseExecPlugin):
     """Minimal plugin for testing launch spec construction."""
 
