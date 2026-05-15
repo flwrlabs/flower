@@ -15,6 +15,7 @@
 """Utility functions for CoreState."""
 
 
+from datetime import datetime
 from os import urandom
 
 
@@ -31,3 +32,20 @@ def generate_rand_int_from_bytes(
         while num in exclude:
             num = int.from_bytes(urandom(num_bytes), "little", signed=False)
     return num
+
+
+def timestamp_to_iso(value: datetime | str | None) -> str:
+    """Return a timestamp row value as an ISO-formatted string.
+
+    A TIMESTAMP column in the database can be represented as a `datetime` object or an
+    ISO-formatted string. This function ensures that the returned value is always
+    an ISO-formatted string. If the input value is None, return an empty string.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, datetime):
+        return value.isoformat()
+    try:
+        return datetime.fromisoformat(value).isoformat()
+    except ValueError:
+        return value
