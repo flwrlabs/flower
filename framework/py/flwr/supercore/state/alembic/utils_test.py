@@ -384,12 +384,7 @@ class TestAlembicRun(unittest.TestCase):
                     ],
                 )
 
-            run_migrations(engine)
-
-            current = get_current_revisions(engine)
-            script = ScriptDirectory.from_config(build_alembic_config(engine))
-            self.assertEqual(current, set(script.get_heads()))
-            self.assertFalse(check_migrations_pending(engine))
+            self.upgrade_to_revision(engine, "8253e456d570")
 
             with engine.connect() as connection:
                 primary_task = (
