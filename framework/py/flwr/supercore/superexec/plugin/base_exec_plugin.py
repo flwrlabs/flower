@@ -17,6 +17,7 @@
 
 import os
 from collections.abc import Sequence
+from typing import ClassVar
 
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.superexec.launch import (
@@ -36,7 +37,7 @@ class BaseExecPlugin(ExecPlugin):
 
     # Placeholders to be defined in subclasses
     command = ""
-    appio_api_kind: AppIoKind = "clientappio"
+    appio_api_kind: ClassVar[AppIoKind]
     suppress_output = False
 
     def select_run_id(self, candidate_run_ids: Sequence[int]) -> int | None:
