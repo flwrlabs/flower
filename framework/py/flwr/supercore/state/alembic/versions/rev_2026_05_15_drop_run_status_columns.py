@@ -15,7 +15,7 @@
 """Drop run status columns.
 
 Revision ID: 26b5d6018750
-Revises: aac61834ee69
+Revises: e937d3528d23
 Create Date: 2026-05-15 11:22:41.096410
 """
 from collections.abc import Sequence
@@ -27,7 +27,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "26b5d6018750"
-down_revision: str | Sequence[str] | None = "aac61834ee69"
+down_revision: str | Sequence[str] | None = "e937d3528d23"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
