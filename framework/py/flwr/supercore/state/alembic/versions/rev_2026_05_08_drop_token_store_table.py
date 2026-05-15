@@ -15,7 +15,7 @@
 """Drop token_store table.
 
 Revision ID: dd247761db4c
-Revises: 11d1bdac4c8e
+Revises: 8b40f767ddcb
 Create Date: 2026-05-08 11:10:09.790851
 """
 from collections.abc import Sequence
@@ -27,7 +27,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "dd247761db4c"
-down_revision: str | Sequence[str] | None = "11d1bdac4c8e"
+down_revision: str | Sequence[str] | None = "8b40f767ddcb"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
