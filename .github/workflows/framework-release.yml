@@ -22,6 +22,10 @@ on:
         description: "Docker image namespace. Defaults to vars.DOCKER_IMAGE_NAMESPACE."
         required: false
         default: ""
+      pypi-repository-url:
+        description: "Python package repository URL. Defaults to PyPI."
+        required: false
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -64,6 +68,8 @@ jobs:
           PACKAGE_VERSION: ${{ inputs.package-version }}
           PYPI_REPOSITORY_PASSWORD: ${{ secrets.PYPI_REPOSITORY_PASSWORD }}
           PYPI_REPOSITORY_USERNAME: ${{ vars.PYPI_REPOSITORY_USERNAME }}
+          PYPI_REPOSITORY_URL: ${{ inputs.pypi-repository-url || vars.PYPI_REPOSITORY_URL }}
+          PYPI_REPOSITORY_NAME: ${{ vars.PYPI_REPOSITORY_NAME }}
         run: ./framework/dev/release/publish-wheel.sh
 
   prepare-docker-build-matrix:

@@ -16,6 +16,7 @@
 
 
 from sqlalchemy import (
+    TIMESTAMP,
     BigInteger,
     Column,
     Float,
@@ -69,11 +70,11 @@ def create_corestate_metadata() -> MetaData:
         Column("model_ref", String, nullable=True),
         Column("connector_ref", String, nullable=True),
         Column("token", String, nullable=True),
-        Column("active_until", BigInteger, nullable=True),
-        Column("pending_at", String, nullable=False),
-        Column("starting_at", String, nullable=True),
-        Column("running_at", String, nullable=True),
-        Column("finished_at", String, nullable=True),
+        Column("active_until", TIMESTAMP(timezone=True), nullable=True),
+        Column("pending_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("starting_at", TIMESTAMP(timezone=True), nullable=True),
+        Column("running_at", TIMESTAMP(timezone=True), nullable=True),
+        Column("finished_at", TIMESTAMP(timezone=True), nullable=True),
         Column("sub_status", String, nullable=False, server_default=text("''")),
         Column("details", String, nullable=False, server_default=text("''")),
     )
