@@ -95,13 +95,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
     launch_backend_name : str (default: "subprocess")
         The launch backend to use for non-ephemeral app processes.
     """
-    try:
-        launch_backend = get_launch_backend(launch_backend_name)
-    except ValueError as e:
-        flwr_exit(
-            code=ExitCode.SUPEREXEC_INVALID_PLUGIN_CONFIG,
-            message=str(e),
-        )
+    launch_backend = get_launch_backend(launch_backend_name)
 
     interceptors: list[grpc.UnaryUnaryClientInterceptor] = [
         RuntimeVersionClientInterceptor(component_name="SuperExec")

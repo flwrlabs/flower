@@ -15,6 +15,7 @@
 """Tests for SuperExec base plugin launch behavior."""
 
 
+from typing import cast
 from unittest.mock import Mock, patch
 
 from flwr.common.typing import Run
@@ -41,7 +42,7 @@ def _get_task(*, task_id: int = 1, task_type: str = TaskType.SERVER_APP) -> Mock
 
 def _launched_spec(backend: Mock) -> LaunchSpec:
     """Return the LaunchSpec passed to a mock launch backend."""
-    return backend.launch.call_args.args[0]
+    return cast(LaunchSpec, backend.launch.call_args.args[0])
 
 
 def test_clientapp_launch_delegates_default_stdio_spec() -> None:

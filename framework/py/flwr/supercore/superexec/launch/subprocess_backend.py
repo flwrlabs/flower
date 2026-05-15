@@ -42,14 +42,13 @@ class SubprocessLaunchBackend:
         if spec.runtime_dependency_install:
             cmds += ["--allow-runtime-dependency-installation"]
 
-        kwargs: dict[str, object] = {}
-        if spec.suppress_output:
-            kwargs = {
-                "stdout": subprocess.DEVNULL,
-                "stderr": subprocess.DEVNULL,
-            }
-
         # Launch without waiting for completion. Since SuperExec does not manage
         # this subprocess lifecycle, avoid using a `with` statement.
-        # pylint: disable-next=consider-using-with
-        subprocess.Popen(cmds, **kwargs)
+        if spec.suppress_output:
+            subprocess.Popen(  # pylint: disable=consider-using-with
+                cmds,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        else:
+            subprocess.Popen(cmds)  # pylint: disable=consider-using-with

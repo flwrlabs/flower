@@ -22,7 +22,7 @@ AppIoKind = Literal["clientappio", "serverappio"]
 
 
 @dataclass(frozen=True)
-class LaunchSpec:
+class LaunchSpec:  # pylint: disable=too-many-instance-attributes
     """Describe one TaskExecutor launch."""
 
     command: str
@@ -41,4 +41,3 @@ class LaunchBackend(Protocol):
 
     def launch(self, spec: LaunchSpec) -> None:
         """Launch the TaskExecutor work described by the spec."""
-        ...
