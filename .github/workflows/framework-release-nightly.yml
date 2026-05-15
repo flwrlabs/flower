@@ -9,10 +9,15 @@ env:
   FLWR_TELEMETRY_ENABLED: 0
 
 jobs:
+  authorize-manual-trigger:
+    name: Authorize manual trigger
+    uses: ./.github/workflows/_authorize-manual-trigger.yml
+
   release-nightly:
     runs-on: ubuntu-22.04
     name: Relase nightly on PyPI
     if: github.repository == 'flwrlabs/flower'
+    needs: authorize-manual-trigger
     outputs:
       skip: ${{ steps.release.outputs.skip }}
       pip-version: ${{ steps.release.outputs.pip-version }}
@@ -20,9 +25,6 @@ jobs:
       matrix: ${{ steps.release.outputs.matrix }}
     steps:
       - uses: actions/checkout@v5
-      - name: Authorize manual trigger for maintainers only
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        uses: ./.github/actions/authorize-manual-trigger
       - name: Bootstrap
         id: bootstrap
         uses: ./.github/actions/bootstrap

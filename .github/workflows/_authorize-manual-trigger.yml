@@ -1,0 +1,49 @@
+name: Authorize manual trigger
+
+on:
+  workflow_call:
+    inputs:
+      allowed-permissions:
+        description: "Comma-separated repository permissions allowed to run the workflow manually"
+        required: false
+        type: string
+        default: "maintain,admin"
+
+permissions:
+  contents: read
+
+jobs:
+  authorize:
+    name: Authorize manual trigger
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Skip non-manual trigger
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        run: echo "Manual trigger authorization is not required for ${GITHUB_EVENT_NAME}."
+
+      - name: Check triggering user permissions
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const allowedPermissionsInput = ${{ toJSON(inputs['allowed-permissions']) }};
+            const allowedPermissions = new Set(
+              allowedPermissionsInput
+                .split(",")
+                .map((permission) => permission.trim())
+                .filter(Boolean)
+            );
+            const username = context.payload.sender?.login ?? context.actor;
+            const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              username,
+            });
+
+            core.info(`Manual run requested by ${username} with ${data.permission} permission`);
+
+            if (!allowedPermissions.has(data.permission)) {
+              core.setFailed(
+                `workflow_dispatch is limited to maintainers; ${username} has ${data.permission} permission`
+              );
+            }
