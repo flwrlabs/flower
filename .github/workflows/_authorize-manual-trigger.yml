@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       allowed-permissions:
-        description: "Comma-separated repository permissions allowed to run the workflow manually"
+        description: "Comma-separated repository role names allowed to run the workflow manually"
         required: false
         type: string
         default: "maintain,admin"
@@ -40,10 +40,12 @@ jobs:
               username,
             });
 
-            core.info(`Manual run requested by ${username} with ${data.permission} permission`);
+            core.info(
+              `Manual run requested by ${username} with ${data.role_name} role (${data.permission} permission)`
+            );
 
-            if (!allowedPermissions.has(data.permission)) {
+            if (!allowedPermissions.has(data.role_name)) {
               core.setFailed(
-                `workflow_dispatch is limited to maintainers; ${username} has ${data.permission} permission`
+                `workflow_dispatch is limited to maintainers; ${username} has ${data.role_name} role`
               );
             }
