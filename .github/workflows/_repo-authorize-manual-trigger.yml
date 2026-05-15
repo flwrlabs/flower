@@ -3,12 +3,8 @@ name: Authorize manual trigger
 on:
   workflow_call:
     inputs:
-      caller-event-name:
-        description: "Event name that triggered the caller workflow"
-        required: true
-        type: string
       allowed-permissions:
-        description: "Comma-separated repository role names or base permissions allowed to run the workflow manually"
+        description: "Comma-separated repository role names allowed to run the workflow manually"
         required: false
         type: string
         default: "maintain,admin"
@@ -22,11 +18,11 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Skip non-manual trigger
-        if: ${{ inputs['caller-event-name'] != 'workflow_dispatch' }}
-        run: echo "Manual trigger authorization is not required for ${{ inputs['caller-event-name'] }}."
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        run: echo "Manual trigger authorization is not required for ${{ github.event_name }}."
 
-      - name: Check triggering user permissions
-        if: ${{ inputs['caller-event-name'] == 'workflow_dispatch' }}
+      - name: Check manual trigger permissions
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: actions/github-script@v8
         with:
           script: |
@@ -34,48 +30,78 @@ jobs:
             const allowedPermissions = new Set(
               allowedPermissionsInput
                 .split(",")
-                .map((permission) => permission.trim())
+                .map((permission) => permission.trim().toLowerCase())
                 .filter(Boolean)
             );
-            const username = ${{ toJSON(github.triggering_actor) }};
-            const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              username,
-            });
 
-            // Direct role_name matches cover standard roles and explicitly allowed
-            // custom role names.
-            let isAllowed = allowedPermissions.has(data.role_name);
-
-            // Custom admin-based roles can surface as admin permission with a
-            // repository-specific role_name.
-            if (!isAllowed && allowedPermissions.has("admin") && data.permission === "admin") {
-              isAllowed = true;
+            if (allowedPermissions.size === 0) {
+              core.setFailed("No allowed repository roles were configured for workflow_dispatch.");
+              return;
             }
 
-            // Maintain maps to the legacy write permission, so use the
-            // collaborators response to distinguish maintainers from writers.
-            if (!isAllowed && allowedPermissions.has("maintain") && data.permission === "write") {
-              const collaborators = await github.paginate(github.rest.repos.listCollaborators, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                affiliation: "all",
-                per_page: 100,
-              });
-              const collaborator = collaborators.find(
-                (candidate) => candidate.login.toLowerCase() === username.toLowerCase()
+            const actors = [
+              ${{ toJSON(github.actor) }},
+              ${{ toJSON(github.triggering_actor) }},
+            ];
+            const usernames = [
+              ...new Map(
+                actors
+                  .filter(Boolean)
+                  .map((username) => [username.toLowerCase(), username])
+              ).values(),
+            ];
+
+            if (usernames.length === 0) {
+              core.setFailed("Could not determine the workflow_dispatch actor.");
+              return;
+            }
+
+            async function checkPermission(username) {
+              try {
+                const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  username,
+                });
+
+                const roleName = data.role_name ?? "";
+                const permission = data.permission ?? "";
+                const isAllowed =
+                  allowedPermissions.has(roleName.toLowerCase()) ||
+                  (allowedPermissions.has("admin") && permission === "admin");
+
+                return { username, roleName, permission, isAllowed };
+              } catch (error) {
+                return {
+                  username,
+                  roleName: "unknown",
+                  permission: "unknown",
+                  isAllowed: false,
+                  error,
+                };
+              }
+            }
+
+            const checks = await Promise.all(usernames.map(checkPermission));
+
+            for (const check of checks) {
+              core.info(
+                `Manual run actor ${check.username} has ${check.roleName} role (${check.permission} permission)`
               );
-              const permissions = collaborator?.permissions ?? {};
-              isAllowed = Boolean(permissions.maintain || permissions.admin);
+              if (check.error) {
+                core.info(`Permission lookup failed for ${check.username}: ${check.error.message}`);
+              }
             }
 
-            core.info(
-              `Manual run requested by ${username} with ${data.role_name} role (${data.permission} permission)`
-            );
+            const denied = checks.filter((check) => !check.isAllowed);
 
-            if (!isAllowed) {
+            if (denied.length > 0) {
               core.setFailed(
-                `workflow_dispatch is limited to maintainers; ${username} has ${data.role_name} role`
+                [
+                  `workflow_dispatch is limited to repository roles: ${[...allowedPermissions].join(", ")}`,
+                  `Denied: ${denied
+                    .map((check) => `${check.username} has ${check.roleName} role`)
+                    .join("; ")}`,
+                ].join(". ")
               );
             }
