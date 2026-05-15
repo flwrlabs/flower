@@ -46,6 +46,9 @@ jobs:
         id: release
         env:
           PYPI_REPOSITORY_PASSWORD: ${{ secrets.PYPI_REPOSITORY_PASSWORD }}
+          PYPI_REPOSITORY_URL: ${{ vars.PYPI_REPOSITORY_URL }}
+          PYPI_REPOSITORY_NAME: ${{ vars.PYPI_REPOSITORY_NAME }}
+          PYPI_REPOSITORY_USERNAME: ${{ vars.PYPI_REPOSITORY_USERNAME }}
         working-directory: framework
         run: |
           RESULT=$(./dev/publish-nightly.sh)
