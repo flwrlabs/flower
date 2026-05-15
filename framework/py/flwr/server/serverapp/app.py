@@ -155,8 +155,8 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         )
         try:
             grid._stub.PushTaskOutput(pushoutput_req)
-        except grpc.RpcError:
-            pass
+        except grpc.RpcError as err:
+            log(ERROR, "Failed to push task output: %s", str(err))
 
         # Close the Grpc connection
         grid.close()

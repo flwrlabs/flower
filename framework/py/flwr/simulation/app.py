@@ -189,8 +189,8 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         )
         try:
             conn._stub.PushTaskOutput(out_req)
-        except grpc.RpcError:
-            pass
+        except grpc.RpcError as err:
+            log(ERROR, "Failed to push task output: %s", str(err))
 
         cleanup_app_runtime_environment(runtime_env_dir)
 

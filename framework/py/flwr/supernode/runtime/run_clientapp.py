@@ -311,5 +311,5 @@ def push_task_output(  # pylint: disable=R0913, R0917
                 details=details,
             )
         )
-    except grpc.RpcError as e:
-        log(ERROR, "[PushTaskOutput] gRPC error occurred: %s", str(e))
+    except grpc.RpcError as err:
+        log(ERROR, "Failed to push task output: %s", str(err))
