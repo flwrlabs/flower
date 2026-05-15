@@ -8,6 +8,7 @@ version = "1.0.0"
 description = "PyTorch Federated Learning E2E test with Flower"
 license = "Apache-2.0"
 dependencies = [
+    "datasets>=4.0.0,<5.0.0",
     "flwr[simulation] @ {root:parent:parent:uri}",
     "torch>=2.5.0,<3.0.0",
     "torchvision>=0.20.1,<0.21.0",

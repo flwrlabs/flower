@@ -37,7 +37,7 @@ copyright = f"{datetime.date.today().year} Flower Labs GmbH"
 author = "The Flower Authors"
 
 # The full version, including alpha/beta/rc tags
-release = "1.29.0"
+release = "1.30.0"
 
 
 # -- General configuration ---------------------------------------------------

@@ -22,7 +22,6 @@ dev = [
     "clang-format==17.0.6",
     "isort==5.13.2",
     "taplo==0.9.3",
-    "docformatter==1.7.5",
     "mypy==1.8.0",
     "pylint==3.3.1",
     "pytest==7.4.4",
@@ -86,7 +85,3 @@ ignore_missing_imports = true
 
 [tool.pylint."MESSAGES CONTROL"]
 disable = "duplicate-code,too-few-public-methods,useless-import-alias"
-
-[tool.docformatter]
-wrap-summaries = 88
-wrap-descriptions = 88

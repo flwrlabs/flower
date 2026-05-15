@@ -68,7 +68,10 @@ from flwr.supercore.inflatable.inflatable_utils import (
     pull_objects,
     push_objects,
 )
-from flwr.supercore.interceptors import AppIoTokenClientInterceptor
+from flwr.supercore.interceptors import (
+    AppIoTokenClientInterceptor,
+    RuntimeVersionClientInterceptor,
+)
 
 from .grid import Grid
 
@@ -108,10 +111,13 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
     ----------
     serverappio_service_address : str (default: "[::]:9091")
         The address (URL, IPv6, IPv4) of the SuperLink ServerAppIo API service.
+    insecure : bool (default: False)
+        If True, use plaintext (TLS disabled). If False, use TLS.
     root_certificates : Optional[bytes] (default: None)
         The PEM-encoded root certificates as a byte string.
-        If provided, a secure connection using the certificates will be
-        established to an SSL-enabled Flower server.
+        Used only when `insecure` is False. If provided, these certificates are
+        used to verify the server certificate. If None, gRPC default root
+        certificates are used.
     token : str
         Executor token used for ServerAppIo authentication.
     """
@@ -121,6 +127,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
     def __init__(  # pylint: disable=too-many-arguments
         self,
         serverappio_service_address: str = SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
+        insecure: bool = False,
         root_certificates: bytes | None = None,
         *,
         token: str,
@@ -128,6 +135,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
         if token == "":
             raise ValueError("`token` must be a non-empty string")
         self._addr = serverappio_service_address
+        self._insecure = insecure
         self._cert = root_certificates
         self._token = token
         self._run: Run | None = None
@@ -152,9 +160,12 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
             return
         self._channel = create_channel(
             server_address=self._addr,
-            insecure=(self._cert is None),
+            insecure=self._insecure,
             root_certificates=self._cert,
-            interceptors=[AppIoTokenClientInterceptor(token=self._token)],
+            interceptors=[
+                RuntimeVersionClientInterceptor(component_name="flwr-serverapp"),
+                AppIoTokenClientInterceptor(token=self._token),
+            ],
         )
         self._channel.subscribe(on_channel_state_change)
         self._grpc_stub = ServerAppIoStub(self._channel)
@@ -224,9 +235,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
     def get_node_ids(self) -> Iterable[int]:
         """Get node IDs."""
         # Call GrpcServerAppIoStub method
-        res: GetNodesResponse = self._stub.GetNodes(
-            GetNodesRequest(run_id=cast(Run, self._run).run_id)
-        )
+        res: GetNodesResponse = self._stub.GetNodes(GetNodesRequest())
         return [node.node_id for node in res.nodes]
 
     def _try_push_messages(self, run_id: int, messages: Iterable[Message]) -> list[str]:
@@ -245,7 +254,6 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
         res: PushAppMessagesResponse = self._stub.PushMessages(
             PushAppMessagesRequest(
                 messages_list=proto_messages,
-                run_id=run_id,
                 message_object_trees=object_trees,
             )
         )
@@ -314,7 +322,6 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
             res: PullAppMessagesResponse = self._stub.PullMessages(
                 PullAppMessagesRequest(
                     message_ids=message_ids,
-                    run_id=run_id,
                 )
             )
             # Pull Messages from store

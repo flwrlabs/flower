@@ -18,24 +18,39 @@
 import hashlib
 import json
 import secrets
-from typing import cast
+from collections.abc import Sequence
+from typing import Any, Literal
 
-from sqlalchemy import MetaData, text
+from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
 
 from flwr.common import now
 from flwr.common.constant import (
-    FLWR_APP_TOKEN_LENGTH,
+    FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
+    TASK_ID_NUM_BYTES,
+    Status,
+    SubStatus,
 )
 from flwr.common.typing import Fab
+from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
+from .utils import generate_rand_int_from_bytes
+
+# Define SQL conditions for task statuses to ensure consistency across queries
+STATUS_CONDITIONS = {
+    Status.PENDING: "(starting_at IS NULL AND finished_at IS NULL)",
+    Status.STARTING: "(starting_at IS NOT NULL AND running_at IS NULL "
+    "AND finished_at IS NULL)",
+    Status.RUNNING: "(running_at IS NOT NULL AND finished_at IS NULL)",
+    Status.FINISHED: "(finished_at IS NOT NULL)",
+}
 
 
 class SqlCoreState(CoreState, SqlMixin):
@@ -93,109 +108,339 @@ class SqlCoreState(CoreState, SqlMixin):
             verifications=json.loads(row["verifications"]),
         )
 
+    def add_task_log(self, task_id: int, log_message: str) -> None:
+        """Add a log entry to the task logs for the specified `task_id`."""
+        sint64_task_id = uint64_to_int64(task_id)
+
+        try:
+            self.query(
+                """
+                INSERT INTO task_logs (timestamp, task_id, log)
+                VALUES (:current_ts, :task_id, :log)
+                """,
+                {
+                    "current_ts": now().timestamp(),
+                    "task_id": sint64_task_id,
+                    "log": log_message,
+                },
+            )
+        except IntegrityError:
+            raise ValueError(f"Task {task_id} not found") from None
+
+    def get_task_log(
+        self, task_id: int, after_timestamp: float | None
+    ) -> tuple[str, float]:
+        """Get task logs for the specified `task_id`."""
+        sint64_task_id = uint64_to_int64(task_id)
+
+        # We don't check if the task exists before querying logs
+        # because the task_id is validated by the authz layer
+
+        if after_timestamp is None:
+            after_timestamp = 0.0
+
+        # Polling is strict-after: entries at the checkpoint timestamp have
+        # already been delivered.
+        rows = self.query(
+            """
+            SELECT log, timestamp FROM task_logs
+            WHERE task_id = :task_id AND timestamp > :after_timestamp
+            ORDER BY timestamp
+            """,
+            {"task_id": sint64_task_id, "after_timestamp": after_timestamp},
+        )
+        latest_timestamp = rows[-1]["timestamp"] if rows else 0.0
+        return "".join(row["log"] for row in rows), latest_timestamp
+
+    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        task_type: str,
+        run_id: int,
+        fab_hash: str | None = None,
+        model_ref: str | None = None,
+        connector_ref: str | None = None,
+    ) -> int | None:
+        """Create a task and return its ID."""
+        task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
+        sint64_task_id = uint64_to_int64(task_id)
+
+        insert_query = """
+            INSERT INTO task
+            (task_id, type, run_id, fab_hash, model_ref, connector_ref, token,
+             active_until, pending_at, starting_at, running_at, finished_at,
+             sub_status, details)
+            VALUES
+            (:task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
+             :active_until, :pending_at, :starting_at, :running_at, :finished_at,
+             :sub_status, :details);
+        """
+
+        params = {
+            "task_id": sint64_task_id,
+            "type": task_type,
+            "run_id": uint64_to_int64(run_id),
+            "fab_hash": fab_hash,
+            "model_ref": model_ref,
+            "connector_ref": connector_ref,
+            "token": None,
+            "active_until": None,
+            "pending_at": now().isoformat(),
+            "starting_at": None,
+            "running_at": None,
+            "finished_at": None,
+            "sub_status": "",
+            "details": "",
+        }
+
+        with self.session():
+            try:
+                self.query(insert_query, params)
+                return task_id
+            except IntegrityError:
+                return None
+
+    def get_tasks(  # pylint: disable=too-many-arguments,too-many-locals,too-many-branches
+        self,
+        *,
+        task_ids: Sequence[int] | None = None,
+        run_ids: Sequence[int] | None = None,
+        statuses: Sequence[str] | None = None,
+        order_by: Literal["pending_at"] | None = None,
+        ascending: bool = True,
+        limit: int | None = None,
+    ) -> Sequence[Task]:
+        """Retrieve information about tasks based on the specified filters."""
+        if order_by not in (None, "pending_at"):
+            raise AssertionError("`order_by` must be 'pending_at' or None")
+
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+
+        if isinstance(statuses, str):
+            raise ValueError("`statuses` must be a sequence of strings")
+
+        conditions = []
+        params: dict[str, Any] = {}
+
+        if task_ids is not None:
+            if not task_ids:
+                return []
+            sint64_task_ids = [uint64_to_int64(task_id) for task_id in task_ids]
+            placeholders = ",".join([f":tid_{i}" for i in range(len(sint64_task_ids))])
+            conditions.append(f"task_id IN ({placeholders})")
+            params.update(
+                {f"tid_{i}": task_id for i, task_id in enumerate(sint64_task_ids)}
+            )
+
+        if run_ids is not None:
+            if not run_ids:
+                return []
+            sint64_run_ids = [uint64_to_int64(run_id) for run_id in run_ids]
+            placeholders = ",".join([f":rid_{i}" for i in range(len(sint64_run_ids))])
+            conditions.append(f"run_id IN ({placeholders})")
+            params.update(
+                {f"rid_{i}": run_id for i, run_id in enumerate(sint64_run_ids)}
+            )
+
+        if statuses is not None:
+            if not statuses:
+                return []
+            status_conditions = []
+            for status, condition in STATUS_CONDITIONS.items():
+                if status in statuses:
+                    status_conditions.append(condition)
+            if not status_conditions:
+                return []
+            conditions.append(f"({' OR '.join(status_conditions)})")
+
+        query = """
+            SELECT task_id, type, run_id, fab_hash, model_ref, connector_ref,
+                   pending_at, starting_at, running_at, finished_at,
+                   sub_status, details
+            FROM task
+        """
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        if order_by is not None:
+            query += f" ORDER BY {order_by} {'ASC' if ascending else 'DESC'}"
+        if limit is not None:
+            query += " LIMIT :limit"
+            params["limit"] = limit
+
+        rows = self.query(query, params)
+
+        result: list[Task] = []
+        for row in rows:
+            result.append(task_from_row(row))
+        return result
+
     def get_metadata(self) -> MetaData:
         """Return SQLAlchemy MetaData needed for CoreState tables."""
         return create_corestate_metadata()
 
-    def create_token(self, run_id: int) -> str | None:
-        """Create a token for the given run ID."""
-        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)  # Generate a random token
-        current = now().timestamp()
-        active_until = current + HEARTBEAT_DEFAULT_INTERVAL
-        query = """
-            INSERT INTO token_store (run_id, token, active_until)
-            VALUES (:run_id, :token, :active_until)
-            RETURNING token;
-        """
-        data = {
-            "run_id": uint64_to_int64(run_id),
-            "token": token,
-            "active_until": active_until,
-        }
+    def claim_task(self, task_id: int) -> str | None:
+        """Atomically claim a pending task."""
+        token = secrets.token_hex(FLWR_TASK_TOKEN_LENGTH)
+        claimed_at = now()
+        active_until = int(claimed_at.timestamp()) + HEARTBEAT_DEFAULT_INTERVAL
+        sint64_task_id = uint64_to_int64(task_id)
         try:
-            rows = self.query(query, data)
-            return cast(str, rows[0]["token"])
+            # The conditional UPDATE is the atomic claim: exactly one caller can
+            # move a pending, unclaimed task to STARTING and attach a token.
+            rows = self.query(
+                f"""
+                UPDATE task
+                SET token = :token,
+                    active_until = :active_until,
+                    starting_at = :starting_at
+                WHERE task_id = :task_id AND token IS NULL
+                AND {STATUS_CONDITIONS[Status.PENDING]}
+                RETURNING task_id
+                """,
+                {
+                    "task_id": sint64_task_id,
+                    "token": token,
+                    "active_until": active_until,
+                    "starting_at": claimed_at.isoformat(),
+                },
+            )
+            if not rows:
+                return None
+
+            return token
         except IntegrityError:
-            return None  # Token already created for this run ID
-
-    def verify_token(self, run_id: int, token: str) -> bool:
-        """Verify a token for the given run ID."""
-        self._cleanup_expired_tokens()
-        query = "SELECT token FROM token_store WHERE run_id = :run_id;"
-        data = {"run_id": uint64_to_int64(run_id)}
-        rows = self.query(query, data)
-        if not rows:
-            return False
-        return cast(str, rows[0]["token"]) == token
-
-    def delete_token(self, run_id: int) -> None:
-        """Delete the token for the given run ID."""
-        query = "DELETE FROM token_store WHERE run_id = :run_id;"
-        data = {"run_id": uint64_to_int64(run_id)}
-        self.query(query, data)
-
-    def get_run_id_by_token(self, token: str) -> int | None:
-        """Get the run ID associated with a given token."""
-        self._cleanup_expired_tokens()
-        query = "SELECT run_id FROM token_store WHERE token = :token;"
-        data = {"token": token}
-        rows = self.query(query, data)
-        if not rows:
+            # Rare failure: generated token already exists (duplicate)
             return None
-        return int64_to_uint64(rows[0]["run_id"])
 
-    def acknowledge_app_heartbeat(self, token: str) -> bool:
-        """Acknowledge an app heartbeat with the provided token."""
-        # Clean up expired tokens
-        self._cleanup_expired_tokens()
+    def activate_task(self, task_id: int) -> bool:
+        """Move a task from starting to running."""
+        # Expire non-responsive tasks before transitioning task status.
 
-        # Update the active_until field
-        current = now().timestamp()
-        active_until = current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-        query = """
-            UPDATE token_store
-            SET active_until = :active_until
-            WHERE token = :token
-            RETURNING run_id;
-        """
-        data = {"active_until": active_until, "token": token}
-        rows = self.query(query, data)
+        with self.session():
+            self._cleanup_expired_task_tokens()
+
+            # Activation is a strict STARTING -> RUNNING transition.
+            rows = self.query(
+                f"""
+                UPDATE task
+                SET running_at = :running_at
+                WHERE task_id = :task_id AND {STATUS_CONDITIONS[Status.STARTING]}
+                RETURNING task_id
+                """,
+                {"task_id": uint64_to_int64(task_id), "running_at": now().isoformat()},
+            )
         return len(rows) > 0
 
-    def _cleanup_expired_tokens(self) -> None:
-        """Remove expired tokens and perform additional cleanup.
+    def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
+        """Move an unfinished task to finished."""
+        sint64_task_id = uint64_to_int64(task_id)
+        with self.session():
+            self._cleanup_expired_task_tokens()
+            # FINISHED:COMPLETED is only valid from RUNNING.
+            completion_constraint = ""
+            if sub_status == SubStatus.COMPLETED:
+                completion_constraint = "AND running_at IS NOT NULL"
 
-        This method is called before token operations to ensure integrity.
-        Subclasses can override `_on_tokens_expired` to add custom cleanup logic.
-        """
-        current = now().timestamp()
+            rows = self.query(
+                f"""
+                UPDATE task
+                SET finished_at = :finished_at,
+                    sub_status = :sub_status,
+                    details = :details,
+                    active_until = NULL,
+                    token = NULL
+                WHERE task_id = :task_id
+                AND finished_at IS NULL {completion_constraint}
+                RETURNING task_id
+                """,
+                {
+                    "task_id": sint64_task_id,
+                    "finished_at": now().isoformat(),
+                    "sub_status": sub_status,
+                    "details": details,
+                },
+            )
+            if not rows:
+                return False
 
-        with self.session() as session:
-            # Delete expired tokens and get their run_ids and active_until timestamps
-            query = """
-                DELETE FROM token_store
-                WHERE active_until < :current
-                RETURNING run_id, active_until;
+            return True
+
+    def acknowledge_task_heartbeat(self, task_id: int) -> bool:
+        """Extend heartbeat state for the claimed task."""
+        # Heartbeats are accepted only for active, unexpired task claims.
+        with self.session():
+            current = int(now().timestamp())
+            self._cleanup_expired_task_tokens()
+            rows = self.query(
+                """
+                UPDATE task
+                SET active_until = :active_until
+                WHERE task_id = :task_id
+                AND active_until >= :current
+                AND finished_at IS NULL
+                RETURNING task_id
+                """,
+                {
+                    "task_id": uint64_to_int64(task_id),
+                    "current": current,
+                    "active_until": (
+                        current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+                    ),
+                },
+            )
+        return len(rows) > 0
+
+    def get_task_by_token(self, token: str) -> Task | None:
+        """Return the task associated with the task token, if valid."""
+        rows = self.query(
             """
-            rows = session.execute(text(query), {"current": current}).mappings().all()
-            expired_records = [
-                (int64_to_uint64(row["run_id"]), row["active_until"]) for row in rows
-            ]
+            SELECT * FROM task
+            WHERE token = :token AND active_until >= :current AND finished_at IS NULL
+            """,
+            {"token": token, "current": int(now().timestamp())},
+        )
+        if not rows:
+            return None
+        return task_from_row(rows[0])
 
-            # Hook for subclasses
-            if expired_records:
-                self._on_tokens_expired(expired_records)
+    def _cleanup_expired_task_tokens(self) -> None:
+        """Remove expired task heartbeat records.
 
-    def _on_tokens_expired(self, expired_records: list[tuple[int, float]]) -> None:
-        """Handle cleanup of expired tokens.
+        Expired tasks are marked as finished with a failed status, and their tokens are
+        removed.
+        """
+        expired_at = now()
+        current = int(expired_at.timestamp())
+        # Expired task claims are terminal failures and lose their token.
+        rows = self.query(
+            """
+            UPDATE task
+            SET token = NULL, active_until = NULL, finished_at = :finished_at,
+                sub_status = :sub_status, details = :details
+            WHERE token IS NOT NULL AND active_until < :current
+            RETURNING task_id, type, run_id, fab_hash, model_ref, connector_ref,
+                      pending_at, starting_at, running_at, finished_at,
+                      sub_status, details
+            """,
+            {
+                "current": current,
+                "finished_at": expired_at.isoformat(),
+                "sub_status": SubStatus.FAILED,
+                "details": "No heartbeat received from the task",
+            },
+        )
+        if rows:
+            self._on_task_tokens_expired([task_from_row(row) for row in rows])
+
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+        """Handle cleanup of expired task tokens.
 
         Override in subclasses to add custom cleanup logic.
 
         Parameters
         ----------
-        expired_records : list[tuple[int, float]]
-            List of tuples containing (run_id, active_until timestamp)
-            for expired tokens.
+        tasks : list[Task]
+            Tasks whose claims expired and were marked FINISHED:FAILED.
         """
 
     def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:
@@ -221,3 +466,38 @@ class SqlCoreState(CoreState, SqlMixin):
         # IntegrityError can only arise from (namespace, nonce) uniqueness.
         except IntegrityError:
             return False
+
+
+def determine_task_status(row: dict[str, Any]) -> TaskStatus:
+    """Determine the status of the task based on timestamp fields."""
+    if row["pending_at"]:
+        if row["finished_at"]:
+            return TaskStatus(
+                status=Status.FINISHED,
+                sub_status=row["sub_status"],
+                details=row["details"],
+            )
+        if row["starting_at"]:
+            if row["running_at"]:
+                return TaskStatus(status=Status.RUNNING, sub_status="", details="")
+            return TaskStatus(status=Status.STARTING, sub_status="", details="")
+        return TaskStatus(status=Status.PENDING, sub_status="", details="")
+    task_id = int64_to_uint64(row["task_id"])
+    raise ValueError(f"The task {task_id} does not have a valid status.")
+
+
+def task_from_row(row: dict[str, Any]) -> Task:
+    """Convert a database row to a Task object."""
+    return Task(
+        task_id=int64_to_uint64(row["task_id"]),
+        type=row["type"],
+        run_id=int64_to_uint64(row["run_id"]),
+        pending_at=row["pending_at"],
+        starting_at=row["starting_at"],
+        running_at=row["running_at"],
+        finished_at=row["finished_at"],
+        status=determine_task_status(row),
+        fab_hash=row["fab_hash"],
+        model_ref=row["model_ref"],
+        connector_ref=row["connector_ref"],
+    )

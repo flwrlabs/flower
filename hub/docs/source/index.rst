@@ -18,13 +18,14 @@ The Flower Community is growing quickly - we're a friendly group of researchers,
 Flower Hub
 ----------
 
-Flower Hub is a hub for collaborative AI that enables the discovery, distribution, and execution of federated AI apps across heterogeneous environments.
+Flower Hub is a hub for collaborative AI that enables the discovery, distribution, execution, and decentralized verification of federated AI apps across heterogeneous environments, without reliance on a centralized trust authority.
 
 With Flower Hub, you can:
 
 - Focus on **federated application logic** without managing infrastructure complexity.
 - **Run applications with a single command** across simulation and deployment environments.
 - **Publish applications in a standardized format** and share them with the community, fostering collaboration and accelerating federated AI innovation.
+- **Sign published applications** and discover others verified by trusted reviewers.
 - Discover, reuse, and build upon federated applications created by others.
 
 Explore the available applications on Flower Hub and contribute your own federated apps to help grow the ecosystem.
@@ -41,6 +42,7 @@ How-to guides provide step-by-step instructions to help you accomplish specific 
 
   how-to-use-app-from-hub
   how-to-publish-app-on-hub
+  how-to-sign-hub-apps
 
 
 Explanations

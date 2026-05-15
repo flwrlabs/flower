@@ -16,8 +16,11 @@
 
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
+from typing import Literal
 
 from flwr.common.typing import Fab
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 
@@ -39,76 +42,201 @@ class CoreState(ABC):
         """Return the FAB for the given hash, if present."""
 
     @abstractmethod
-    def create_token(self, run_id: int) -> str | None:
-        """Create a token for the given run ID.
+    def add_task_log(self, task_id: int, log_message: str) -> None:
+        """Add a log entry to the task logs for the specified `task_id`.
 
         Parameters
         ----------
-        run_id : int
-            The ID of the run for which to create a token.
+        task_id : int
+            The identifier of the task for which to add a log entry.
+        log_message : str
+            The log entry to be added to the task logs.
+        """
+
+    @abstractmethod
+    def get_task_log(
+        self, task_id: int, after_timestamp: float | None
+    ) -> tuple[str, float]:
+        """Get task logs for the specified `task_id`.
+
+        Parameters
+        ----------
+        task_id : int
+            The identifier of the task for which to retrieve logs.
+        after_timestamp : Optional[float]
+            Retrieve logs after this timestamp. If set to `None`, retrieve all logs.
+            The filter is strict: logs at exactly `after_timestamp` are considered
+            already consumed by the caller.
 
         Returns
         -------
-        str
-            The newly generated token if one does not already exist
-            for the given run ID, otherwise None.
+        tuple[str, float]
+            A tuple containing:
+            - The concatenated task logs associated with the specified `task_id`.
+            - The timestamp of the latest log entry in the returned logs.
+              Returns `0` if no logs are returned.
         """
 
     @abstractmethod
-    def verify_token(self, run_id: int, token: str) -> bool:
-        """Verify a token for the given run ID.
+    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        task_type: str,
+        run_id: int,
+        fab_hash: str | None = None,
+        model_ref: str | None = None,
+        connector_ref: str | None = None,
+    ) -> int | None:
+        """Create a new task.
 
         Parameters
         ----------
+        task_type : str
+            The executor type of the task to create.
         run_id : int
-            The ID of the run for which to verify the token.
-        token : str
-            The token to verify.
-
-        Returns
-        -------
-        bool
-            True if the token is valid for the run ID, False otherwise.
-        """
-
-    @abstractmethod
-    def delete_token(self, run_id: int) -> None:
-        """Delete the token for the given run ID.
-
-        Parameters
-        ----------
-        run_id : int
-            The ID of the run for which to delete the token.
-        """
-
-    @abstractmethod
-    def get_run_id_by_token(self, token: str) -> int | None:
-        """Get the run ID associated with a given token.
-
-        Parameters
-        ----------
-        token : str
-            The token to look up.
+            The run ID this task belongs to.
+        fab_hash : Optional[str] (default: None)
+            FAB hash associated with the task, if applicable.
+        model_ref : Optional[str] (default: None)
+            Model reference associated with the task, if applicable.
+        connector_ref : Optional[str] (default: None)
+            Connector reference associated with the task, if applicable.
 
         Returns
         -------
         Optional[int]
-            The run ID if the token is valid, otherwise None.
+            The task ID of the newly created task, or `None` if task creation
+            fails.
+
+        Notes
+        -----
+        Newly created tasks are in the pending status.
+        This method only persists task data. It does not validate whether the
+        provided fields are required for the given task type.
         """
 
     @abstractmethod
-    def acknowledge_app_heartbeat(self, token: str) -> bool:
-        """Acknowledge an app heartbeat with the provided token.
+    def get_tasks(  # pylint: disable=too-many-arguments
+        self,
+        *,
+        task_ids: Sequence[int] | None = None,
+        run_ids: Sequence[int] | None = None,
+        statuses: Sequence[str] | None = None,
+        order_by: Literal["pending_at"] | None = None,
+        ascending: bool = True,
+        limit: int | None = None,
+    ) -> Sequence[Task]:
+        """Retrieve information about tasks based on the specified filters.
+
+        - If a filter is set to None, it is ignored.
+        - If multiple filters are provided, they are combined using AND logic.
+        - Within each filter, provided values are combined using OR logic.
 
         Parameters
         ----------
-        token : str
-            The token associated with the app.
+        task_ids : Optional[Sequence[int]] (default: None)
+            Sequence of task IDs to filter by.
+        run_ids : Optional[Sequence[int]] (default: None)
+            Sequence of run IDs to filter by.
+        statuses : Optional[Sequence[str]] (default: None)
+            Sequence of task status values to filter by.
+        order_by : Optional[Literal["pending_at"]] (default: None)
+            Field used to order the result.
+        ascending : bool (default: True)
+            Whether sorting should be in ascending order.
+        limit : Optional[int] (default: None)
+            Maximum number of tasks to return. If `None`, no limit is applied.
+
+        Returns
+        -------
+        Sequence[Task]
+            A sequence of Task objects representing tasks matching the specified
+            filters.
+        """
+
+    @abstractmethod
+    def claim_task(self, task_id: int) -> str | None:
+        """Atomically claim a pending task.
+
+        Claiming a task creates a task token, initializes heartbeat state, and
+        moves the task from pending to starting.
+
+        Parameters
+        ----------
+        task_id : int
+            The ID of the task to claim.
+
+        Returns
+        -------
+        Optional[str]
+            The generated task token if the claim succeeds, otherwise `None`.
+        """
+
+    @abstractmethod
+    def activate_task(self, task_id: int) -> bool:
+        """Move a task from starting to running.
+
+        Parameters
+        ----------
+        task_id : int
+            The ID of the task to activate.
 
         Returns
         -------
         bool
-            True if the heartbeat is acknowledged successfully, False otherwise.
+            True if the task existed and transitioned from starting to running,
+            otherwise False.
+        """
+
+    @abstractmethod
+    def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
+        """Move an unfinished task to finished.
+
+        Parameters
+        ----------
+        task_id : int
+            The ID of the task to finish.
+        sub_status : str
+            Terminal task sub-status, such as completed, failed, or stopped.
+            Only RUNNING status can be transitioned to FINISHED:COMPLETED
+        details : str
+            Additional terminal status details.
+
+        Returns
+        -------
+        bool
+            True if the task existed and was not already finished, otherwise
+            False.
+        """
+
+    @abstractmethod
+    def acknowledge_task_heartbeat(self, task_id: int) -> bool:
+        """Extend heartbeat state for the claimed task.
+
+        Parameters
+        ----------
+        task_id : int
+            The ID of the task whose heartbeat should be acknowledged.
+
+        Returns
+        -------
+        bool
+            True if the task heartbeat was acknowledged successfully, otherwise
+            False.
+        """
+
+    @abstractmethod
+    def get_task_by_token(self, token: str) -> Task | None:
+        """Return the task associated with the task token, if valid.
+
+        Parameters
+        ----------
+        token : str
+            The task token to look up.
+
+        Returns
+        -------
+        Task | None
+            The task if the token is valid, otherwise None.
         """
 
     @abstractmethod

@@ -9,7 +9,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flowertune-llm-finance"
-version = "1.2.0"
+version = "1.2.1"
 description = "Base App for the Finance challenge in the FlowerTune LLM Leaderboard"
 license = {file = "LICENSE"}
 # Dependencies for your Flower App
@@ -36,7 +36,7 @@ publisher = "flwrlabs"
 # Point to your ServerApp and ClientApp objects
 # Format: "<module>:<object>"
 fab-format-version = 1
-flwr-version-target = "1.28.0"
+flwr-version-target = "1.29.0"
 
 [tool.flwr.app.components]
 serverapp = "flowertune_finance.server_app:app"

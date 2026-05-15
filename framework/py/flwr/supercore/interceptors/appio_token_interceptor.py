@@ -18,30 +18,32 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from contextvars import ContextVar
 from typing import Any, NoReturn, Protocol, cast
 
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.auth import (
     CLIENTAPPIO_METHOD_AUTH_POLICY,
     SERVERAPPIO_METHOD_AUTH_POLICY,
     MethodTokenPolicy,
 )
-from flwr.supercore.utils import get_metadata_str
+from flwr.supercore.utils import find_metadata_keys, get_metadata_str
 
-APP_TOKEN_HEADER = "flwr-app-token"
+TASK_TOKEN_HEADER = "flwr-task-token"
 AUTHENTICATION_FAILED_MESSAGE = "Authentication failed."
+
+
+_current_task: ContextVar[Task | None] = ContextVar("current_task", default=None)
 
 
 class _TokenState(Protocol):
     """State methods required by token auth."""
 
-    def get_run_id_by_token(self, token: str) -> int | None:
-        """Return the run id associated with token, if it exists."""
-
-    def verify_token(self, run_id: int, token: str) -> bool:
-        """Return whether token is valid for run_id."""
+    def get_task_by_token(self, token: str) -> Task | None:
+        """Return the task associated with the task token, if valid."""
 
 
 def _abort_auth_denied(context: grpc.ServicerContext) -> NoReturn:
@@ -58,7 +60,7 @@ def _unauthenticated_terminator() -> grpc.RpcMethodHandler:
 
 
 class AppIoTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ignore
-    """Attach App token metadata to outbound unary RPCs."""
+    """Attach task-token metadata to outbound unary RPCs."""
 
     def __init__(self, token: str) -> None:
         self._token = token
@@ -69,10 +71,13 @@ class AppIoTokenClientInterceptor(grpc.UnaryUnaryClientInterceptor):  # type: ig
         client_call_details: grpc.ClientCallDetails,
         request: GrpcMessage,
     ) -> grpc.Call:
-        """Add/replace the App token metadata on outbound unary requests."""
-        metadata = list(client_call_details.metadata or [])
-        metadata = [(key, value) for key, value in metadata if key != APP_TOKEN_HEADER]
-        metadata.append((APP_TOKEN_HEADER, self._token))
+        """Attach task-token metadata to outbound unary requests."""
+        metadata = tuple(client_call_details.metadata or ())
+        if find_metadata_keys(metadata, (TASK_TOKEN_HEADER,)):
+            raise RuntimeError(
+                f"{TASK_TOKEN_HEADER} already present in outbound metadata."
+            )
+        metadata += ((TASK_TOKEN_HEADER, self._token),)
         details = client_call_details._replace(metadata=metadata)
         return continuation(details, request)
 
@@ -116,7 +121,7 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
         )
         token = get_metadata_str(
             handler_call_details.invocation_metadata,
-            APP_TOKEN_HEADER,
+            TASK_TOKEN_HEADER,
         )
 
         def _authenticated_handler(
@@ -127,18 +132,38 @@ class AppIoTokenServerInterceptor(grpc.ServerInterceptor):  # type: ignore
                 _abort_auth_denied(context)
 
             state = self._state_provider()
-            run_id = state.get_run_id_by_token(token)
-            # Validate both token->run lookup and run->token mapping.
-            if run_id is None or not state.verify_token(run_id, token):
-                _abort_auth_denied(context)
 
-            return unary_handler(request, context)
+            # Validate task token and set task context for downstream handlers
+            task = state.get_task_by_token(token)
+            if task is not None:
+                ctx_token = _current_task.set(task)
+                try:
+                    return unary_handler(request, context)
+                finally:
+                    _current_task.reset(ctx_token)
+
+            _abort_auth_denied(context)
 
         return grpc.unary_unary_rpc_method_handler(
             _authenticated_handler,
             request_deserializer=method_handler.request_deserializer,
             response_serializer=method_handler.response_serializer,
         )
+
+
+def get_authenticated_task() -> Task:
+    """Return the task identity authenticated for the current RPC.
+
+    The task is available only while handling an RPC authenticated with an AppIo task
+    token.
+    """
+    ret = _current_task.get()
+    if ret is None:
+        raise RuntimeError(
+            "No authenticated task in the current RPC context. "
+            "This function must be called from a task-token-authenticated RPC handler."
+        )
+    return ret
 
 
 def create_serverappio_token_auth_server_interceptor(
