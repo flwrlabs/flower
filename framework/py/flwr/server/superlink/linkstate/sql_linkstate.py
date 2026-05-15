@@ -44,6 +44,7 @@ from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.utils.validator import validate_message
 from flwr.supercore.constant import NodeStatus
 from flwr.supercore.corestate.sql_corestate import SqlCoreState, determine_task_status
+from flwr.supercore.corestate.utils import timestamp_to_iso
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
@@ -897,13 +898,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         run_insert_query = """
             INSERT INTO run
             (run_id, fab_id, fab_version, fab_hash, override_config, federation,
-            primary_task_id, federation_config, run_type, pending_at, starting_at,
-            running_at, finished_at, usage_reported_at, sub_status, details,
+            primary_task_id, federation_config, run_type, usage_reported_at,
             flwr_aid, bytes_sent, bytes_recv, clientapp_runtime)
             VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
             :federation, :primary_task_id, :federation_config, :run_type,
-            :pending_at, :starting_at, :running_at, :finished_at,
-            :usage_reported_at, :sub_status, :details, :flwr_aid,
+            :usage_reported_at, :flwr_aid,
             :bytes_sent, :bytes_recv, :clientapp_runtime)
         """
         task_insert_query = """
@@ -919,7 +918,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         override_config_json = json.dumps(override_config)
         run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
-        pending_at = now().isoformat()
+        pending_at = now()
 
         with self.session():
             query = "SELECT COUNT(*) as cnt FROM run WHERE run_id = :run_id"
@@ -937,13 +936,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         "primary_task_id": uint64_to_int64(task_id),
                         "federation_config": fed_config_json,
                         "run_type": run_type,
-                        "pending_at": pending_at,
-                        "starting_at": "",
-                        "running_at": "",
-                        "finished_at": "",
                         "usage_reported_at": "",
-                        "sub_status": "",
-                        "details": "",
                         "flwr_aid": flwr_aid or "",
                         "bytes_sent": 0,
                         "bytes_recv": 0,
@@ -1376,10 +1369,10 @@ def _run_from_row(row: dict[str, Any]) -> Run:
         fab_version=row["fab_version"],
         fab_hash=row["fab_hash"],
         override_config=json.loads(row["override_config"]),
-        pending_at=row["pending_at"],
-        starting_at=row["starting_at"] or "",
-        running_at=row["running_at"] or "",
-        finished_at=row["finished_at"] or "",
+        pending_at=timestamp_to_iso(row["pending_at"]),
+        starting_at=timestamp_to_iso(row["starting_at"]),
+        running_at=timestamp_to_iso(row["running_at"]),
+        finished_at=timestamp_to_iso(row["finished_at"]),
         status=_run_status_from_row(row),
         flwr_aid=row["flwr_aid"],
         federation=row["federation"],

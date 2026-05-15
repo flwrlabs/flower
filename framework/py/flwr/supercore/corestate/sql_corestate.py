@@ -19,6 +19,7 @@ import hashlib
 import json
 import secrets
 from collections.abc import Sequence
+from datetime import timedelta
 from typing import Any, Literal
 
 from sqlalchemy import MetaData
@@ -41,7 +42,7 @@ from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import generate_rand_int_from_bytes
+from .utils import generate_rand_int_from_bytes, timestamp_to_iso
 
 # Define SQL conditions for task statuses to ensure consistency across queries
 STATUS_CONDITIONS = {
@@ -184,7 +185,7 @@ class SqlCoreState(CoreState, SqlMixin):
             "connector_ref": connector_ref,
             "token": None,
             "active_until": None,
-            "pending_at": now().isoformat(),
+            "pending_at": now(),
             "starting_at": None,
             "running_at": None,
             "finished_at": None,
@@ -282,7 +283,7 @@ class SqlCoreState(CoreState, SqlMixin):
         """Atomically claim a pending task."""
         token = secrets.token_hex(FLWR_TASK_TOKEN_LENGTH)
         claimed_at = now()
-        active_until = int(claimed_at.timestamp()) + HEARTBEAT_DEFAULT_INTERVAL
+        active_until = claimed_at + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
         sint64_task_id = uint64_to_int64(task_id)
         try:
             # The conditional UPDATE is the atomic claim: exactly one caller can
@@ -301,7 +302,7 @@ class SqlCoreState(CoreState, SqlMixin):
                     "task_id": sint64_task_id,
                     "token": token,
                     "active_until": active_until,
-                    "starting_at": claimed_at.isoformat(),
+                    "starting_at": claimed_at,
                 },
             )
             if not rows:
@@ -327,7 +328,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 WHERE task_id = :task_id AND {STATUS_CONDITIONS[Status.STARTING]}
                 RETURNING task_id
                 """,
-                {"task_id": uint64_to_int64(task_id), "running_at": now().isoformat()},
+                {"task_id": uint64_to_int64(task_id), "running_at": now()},
             )
         return len(rows) > 0
 
@@ -355,7 +356,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 """,
                 {
                     "task_id": sint64_task_id,
-                    "finished_at": now().isoformat(),
+                    "finished_at": now(),
                     "sub_status": sub_status,
                     "details": details,
                 },
@@ -369,7 +370,8 @@ class SqlCoreState(CoreState, SqlMixin):
         """Extend heartbeat state for the claimed task."""
         # Heartbeats are accepted only for active, unexpired task claims.
         with self.session():
-            current = int(now().timestamp())
+            current = now()
+            ttl = timedelta(seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL)
             self._cleanup_expired_task_tokens()
             rows = self.query(
                 """
@@ -383,9 +385,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 {
                     "task_id": uint64_to_int64(task_id),
                     "current": current,
-                    "active_until": (
-                        current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-                    ),
+                    "active_until": current + ttl,
                 },
             )
         return len(rows) > 0
@@ -397,7 +397,7 @@ class SqlCoreState(CoreState, SqlMixin):
             SELECT * FROM task
             WHERE token = :token AND active_until >= :current AND finished_at IS NULL
             """,
-            {"token": token, "current": int(now().timestamp())},
+            {"token": token, "current": now()},
         )
         if not rows:
             return None
@@ -410,7 +410,6 @@ class SqlCoreState(CoreState, SqlMixin):
         removed.
         """
         expired_at = now()
-        current = int(expired_at.timestamp())
         # Expired task claims are terminal failures and lose their token.
         rows = self.query(
             """
@@ -423,8 +422,8 @@ class SqlCoreState(CoreState, SqlMixin):
                       sub_status, details
             """,
             {
-                "current": current,
-                "finished_at": expired_at.isoformat(),
+                "current": expired_at,
+                "finished_at": expired_at,
                 "sub_status": SubStatus.FAILED,
                 "details": "No heartbeat received from the task",
             },
@@ -492,10 +491,10 @@ def task_from_row(row: dict[str, Any]) -> Task:
         task_id=int64_to_uint64(row["task_id"]),
         type=row["type"],
         run_id=int64_to_uint64(row["run_id"]),
-        pending_at=row["pending_at"],
-        starting_at=row["starting_at"],
-        running_at=row["running_at"],
-        finished_at=row["finished_at"],
+        pending_at=timestamp_to_iso(row["pending_at"]),
+        starting_at=timestamp_to_iso(row["starting_at"]),
+        running_at=timestamp_to_iso(row["running_at"]),
+        finished_at=timestamp_to_iso(row["finished_at"]),
         status=determine_task_status(row),
         fab_hash=row["fab_hash"],
         model_ref=row["model_ref"],
