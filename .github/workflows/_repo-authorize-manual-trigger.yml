@@ -37,7 +37,7 @@ jobs:
                 .map((permission) => permission.trim())
                 .filter(Boolean)
             );
-            const username = context.payload.sender?.login ?? context.actor;
+            const username = ${{ toJSON(github.triggering_actor) }};
             const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
               owner: context.repo.owner,
               repo: context.repo.repo,
