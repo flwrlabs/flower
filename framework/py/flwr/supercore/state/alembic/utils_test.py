@@ -439,31 +439,20 @@ class TestAlembicRun(unittest.TestCase):
             self.assertNotIn("primary_task_id", run_columns)
 
             with engine.connect() as connection:
-                run = (
-                    connection.execute(
-                        text(
-                            """
-                            SELECT pending_at, starting_at, running_at, finished_at,
-                                   sub_status, details
-                            FROM run
-                            WHERE run_id = :run_id
-                            """
-                        ),
-                        {"run_id": 301},
-                    )
-                    .mappings()
-                    .one()
-                )
-                copied_log = connection.execute(
-                    text(
-                        """
-                            SELECT log
-                            FROM logs
-                            WHERE run_id = :run_id AND node_id = 0
-                            """
-                    ),
-                    {"run_id": 301},
-                ).scalar_one()
+                query = """
+                SELECT pending_at, starting_at, running_at, finished_at,
+                       sub_status, details
+                FROM run
+                WHERE run_id = :run_id
+                """
+                params = {"run_id": 301}
+                run = connection.execute(text(query), parms).mappings().one()
+                query = """
+                SELECT log
+                FROM logs
+                WHERE run_id = :run_id AND node_id = 0
+                """
+                copied_log = connection.execute(text(query), params).scalar_one()
 
             self.assert_timestamp_equal(run["pending_at"], "2026-04-27T10:00:00+00:00")
             self.assert_timestamp_equal(run["starting_at"], "2026-04-27T10:01:00+00:00")
