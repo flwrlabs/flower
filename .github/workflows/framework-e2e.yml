@@ -416,10 +416,7 @@ jobs:
         framework: ["numpy"]
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
-    name: |
-      Build & Install /
-      Python ${{ matrix.python-version }} /
-      ${{ matrix.framework }}
+    name: Build & Install / Python ${{ matrix.python-version }} / ${{ matrix.framework }}
 
     steps:
       - uses: actions/checkout@v5
