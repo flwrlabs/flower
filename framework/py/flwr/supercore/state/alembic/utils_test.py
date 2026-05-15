@@ -149,9 +149,9 @@ class TestAlembicRun(unittest.TestCase):
         """Assert DB timestamp values match regardless of storage formatting."""
 
         def normalize(value: Any) -> str:
-            text = str(value).replace("T", " ")
-            text = text.replace("+00:00", "")
-            return text.split(".")[0]
+            timestamp = str(value).replace("T", " ")
+            timestamp = timestamp.replace("+00:00", "")
+            return timestamp.split(".", maxsplit=1)[0]
 
         self.assertEqual(normalize(actual), normalize(expected))
 
