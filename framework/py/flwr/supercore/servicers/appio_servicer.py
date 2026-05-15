@@ -17,11 +17,13 @@
 
 from abc import ABC, abstractmethod
 from logging import DEBUG
+from typing import NoReturn
 
 import grpc
 
 from flwr.common.constant import Status
 from flwr.common.logger import log
+from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
@@ -40,6 +42,7 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
     PushLogsResponse,
 )
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import (
     TASK_TYPES_REQUIRING_CONNECTOR_REF,
     TASK_TYPES_REQUIRING_FAB_HASH,
@@ -120,20 +123,49 @@ class AppIoServicer(ABC):
     ) -> PushTaskMessageResponse:
         """Push a task message."""
         log(DEBUG, "AppIoServicer.PushTaskMessage")
-        context.abort(
-            grpc.StatusCode.UNIMPLEMENTED, "PushTaskMessage is not implemented"
-        )
-        raise RuntimeError("This line should never be reached.")
+
+        task = get_authenticated_task()
+        _validate_push_task_message_request(request, task, context)
+
+        message = message_from_proto(request.message)
+        message.metadata.__dict__["_run_id"] = task.run_id
+        message.metadata.__dict__["_src_node_id"] = task.task_id
+        message.metadata.__dict__["_dst_node_id"] = request.message.metadata.dst_task_id
+
+        message_id = self.state().store_task_message(message)
+        if message_id is None:
+            _abort_task_message(
+                context,
+                "Task message could not be stored.",
+            )
+
+        return PushTaskMessageResponse(message_id=message_id)
 
     def PullTaskMessage(
         self, request: PullTaskMessageRequest, context: grpc.ServicerContext
     ) -> PullTaskMessageResponse:
         """Pull task messages."""
         log(DEBUG, "AppIoServicer.PullTaskMessage")
-        context.abort(
-            grpc.StatusCode.UNIMPLEMENTED, "PullTaskMessage is not implemented"
+
+        task = get_authenticated_task()
+        limit = request.limit if request.HasField("limit") else None
+        messages = self.state().get_task_message(
+            dst_task_ids=[task.task_id],
+            limit=limit,
         )
-        raise RuntimeError("This line should never be reached.")
+        message_protos = []
+        for message in messages:
+            if (
+                message.metadata.dst_node_id != task.task_id
+                or message.metadata.run_id != task.run_id
+            ):
+                continue
+            message_proto = message_to_proto(message)
+            message_proto.metadata.src_task_id = message.metadata.src_node_id
+            message_proto.metadata.dst_task_id = message.metadata.dst_node_id
+            message_protos.append(message_proto)
+
+        return PullTaskMessageResponse(messages=message_protos)
 
     def PushLogs(
         self, request: PushLogsRequest, context: grpc.ServicerContext
@@ -179,3 +211,45 @@ def _validate_create_task_request(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires connector_ref.",
         )
+
+
+def _validate_push_task_message_request(
+    request: PushTaskMessageRequest,
+    task: Task,
+    context: grpc.ServicerContext,
+) -> None:
+    """Validate task-message metadata against the authenticated task."""
+    if not request.HasField("message"):
+        _abort_task_message(context, "`message` is required.")
+
+    message_proto = request.message
+    if not message_proto.HasField("metadata"):
+        _abort_task_message(context, "`Message.metadata` is required.")
+
+    metadata = message_proto.metadata
+    if metadata.run_id not in (0, task.run_id):
+        _abort_task_message(context, "`Message.metadata.run_id` is inconsistent.")
+
+    if metadata.src_node_id not in (0, task.task_id):
+        _abort_task_message(
+            context,
+            "`Message.metadata.src_node_id` is inconsistent.",
+        )
+
+    if metadata.HasField("src_task_id") and metadata.src_task_id != task.task_id:
+        _abort_task_message(context, "`Message.metadata.src_task_id` is inconsistent.")
+
+    if not metadata.HasField("dst_task_id") or metadata.dst_task_id == 0:
+        _abort_task_message(context, "`Message.metadata.dst_task_id` is required.")
+
+    if metadata.dst_node_id not in (0, metadata.dst_task_id):
+        _abort_task_message(
+            context,
+            "`Message.metadata.dst_node_id` is inconsistent.",
+        )
+
+
+def _abort_task_message(context: grpc.ServicerContext, detail: str) -> NoReturn:
+    """Abort task-message RPCs with a consistent status code."""
+    context.abort(grpc.StatusCode.FAILED_PRECONDITION, detail)
+    raise RuntimeError("This line should never be reached.")

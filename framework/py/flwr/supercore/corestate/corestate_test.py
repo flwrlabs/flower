@@ -588,9 +588,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [
                 message.metadata.message_id
-                for message in state.get_task_message(
-                    dst_task_ids=[other_dst_task_id]
-                )
+                for message in state.get_task_message(dst_task_ids=[other_dst_task_id])
             ],
             [other_destination.metadata.message_id],
         )
