@@ -96,7 +96,7 @@ def test_flower_superexec_clientapp_allows_missing_secret(
         parent_pid=None,
         health_server_address=None,
         runtime_dependency_install=False,
-        backend="subprocess",
+        executor="subprocess",
     )
     captured: dict[str, object] = {}
 
@@ -140,7 +140,7 @@ def test_flower_superexec_serverapp_allows_missing_secret(
         parent_pid=None,
         health_server_address=None,
         runtime_dependency_install=False,
-        backend="subprocess",
+        executor="subprocess",
     )
 
     class _Parser:
@@ -171,10 +171,10 @@ def test_flower_superexec_serverapp_allows_missing_secret(
     assert captured["superexec_auth_secret"] is None
 
 
-def test_flower_superexec_passes_backend_to_run_superexec(
+def test_flower_superexec_passes_executor_to_run_superexec(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """SuperExec should pass the parsed backend name to run_superexec."""
+    """SuperExec should pass the parsed executor type to run_superexec."""
     args = SimpleNamespace(
         insecure=True,
         plugin_type=ExecPluginType.CLIENT_APP,
@@ -185,7 +185,7 @@ def test_flower_superexec_passes_backend_to_run_superexec(
         parent_pid=None,
         health_server_address=None,
         runtime_dependency_install=False,
-        backend="subprocess",
+        executor="subprocess",
     )
     captured: dict[str, object] = {}
 
@@ -212,4 +212,4 @@ def test_flower_superexec_passes_backend_to_run_superexec(
 
     flower_superexec_module.flower_superexec()
 
-    assert captured["launch_backend_name"] == "subprocess"
+    assert captured["executor_type"] == "subprocess"

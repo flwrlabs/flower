@@ -49,5 +49,5 @@ class ServerAppExecPlugin(BaseExecPlugin):
             )
             return
 
-        # Launch the executor process
+        # Launch the TaskExecutor process
         super().launch_task(token, task)

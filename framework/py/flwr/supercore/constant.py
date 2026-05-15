@@ -210,6 +210,12 @@ class RunTime(StrEnum):
     SIMULATION = "simulation"
 
 
+class ExecutorType(StrEnum):
+    """Supported SuperExec executor types."""
+
+    SUBPROCESS = "subprocess"
+
+
 class TaskType(StrEnum):
     """Supported task types."""
 

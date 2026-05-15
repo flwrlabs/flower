@@ -20,10 +20,10 @@ from collections.abc import Sequence
 from typing import ClassVar
 
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
-from flwr.supercore.superexec.launch import (
+from flwr.supercore.superexec.executor import (
     AppIoKind,
-    LaunchSpec,
-    SubprocessLaunchBackend,
+    ExecutionSpec,
+    SubprocessExecutor,
 )
 
 from .exec_plugin import ExecPlugin
@@ -54,14 +54,14 @@ class BaseExecPlugin(ExecPlugin):
 
     def launch_task(self, token: str, task: Task) -> None:
         """Launch the process to execute the given task using the given token."""
-        backend = self.launch_backend or SubprocessLaunchBackend()
-        backend.launch(self._build_launch_spec(token=token, task=task))
+        executor = self.executor or SubprocessExecutor()
+        executor.launch(self._build_execution_spec(token=token, task=task))
 
-    def _build_launch_spec(  # pylint: disable=unused-argument
+    def _build_execution_spec(  # pylint: disable=unused-argument
         self, token: str, task: Task
-    ) -> LaunchSpec:
-        """Build the launch spec for the selected task."""
-        return LaunchSpec(
+    ) -> ExecutionSpec:
+        """Build the execution spec for the selected task."""
+        return ExecutionSpec(
             command=self.command,
             appio_api_address=self.appio_api_address,
             appio_api_kind=self.appio_api_kind,
