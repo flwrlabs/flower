@@ -1103,10 +1103,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         return simulation_config_from_json(json.loads(fed_config_json))
 
-    def _fail_sibling_tasks(
-        self, run_primary_pairs: list[tuple[int, int]], details: str
+    def _finish_sibling_tasks(
+        self, run_primary_pairs: list[tuple[int, int]], sub_status: str, details: str
     ) -> None:
-        """Fail all unfinished sibling tasks for the given run/primary-task pairs.
+        """Finish all unfinished sibling tasks for the given run/primary-task pairs.
 
         The IDs must be sint64 DB values. Each sibling task's ``finished_at`` is
         copied from its run's primary task.
@@ -1135,7 +1135,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             {
                 **run_id_params,
                 **pt_id_params,
-                "sub_status": SubStatus.FAILED,
+                "sub_status": sub_status,
                 "details": details,
             },
         )
@@ -1151,10 +1151,18 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 {"task_id": sint64_task_id},
             )
             if rows:
-                # Fail any remaining sibling tasks and report usage
-                self._fail_sibling_tasks(
+                # Stop all tasks of the run when the run is stopped
+                if sub_status == SubStatus.STOPPED:
+                    sibling_substatus = SubStatus.STOPPED
+                    sibling_details = "Task stopped because the run was stopped"
+                # Otherwise, fail all tasks of the run
+                else:
+                    sibling_substatus = SubStatus.FAILED
+                    sibling_details = "Task failed because the run finished"
+                self._finish_sibling_tasks(
                     [(rows[0]["run_id"], sint64_task_id)],
-                    details="Task failed because the run finished",
+                    sub_status=sibling_substatus,
+                    details=sibling_details,
                 )
                 self.federation_manager.report_run_usage()
         return result
@@ -1182,8 +1190,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             return
 
         # Fail any remaining sibling tasks for expired runs
-        self._fail_sibling_tasks(
+        self._finish_sibling_tasks(
             [(row["run_id"], row["primary_task_id"]) for row in rows],
+            sub_status=SubStatus.FAILED,
             details="Task failed because the run expired",
         )
 

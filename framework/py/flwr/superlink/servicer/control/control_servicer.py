@@ -416,7 +416,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         update_success = _stop_run_in_linkstate(
             state=state,
             store=self.objectstore_factory.store(),
-            run_id=run_id,
+            run=run,
         )
 
         return StopRunResponse(success=update_success)
@@ -735,11 +735,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             store = self.objectstore_factory.store()
             for run in state.get_run_info(federations=[request.federation_name]):
                 if run.status.status != Status.FINISHED:
-                    _stop_run_in_linkstate(
-                        state=state,
-                        store=store,
-                        run_id=run.run_id,
-                    )
+                    _stop_run_in_linkstate(state=state, store=store, run=run)
 
         return ArchiveFederationResponse()
 
@@ -817,7 +813,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 flwr_aids=[removed_flwr_aid],
                 statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
             ):
-                _stop_run_in_linkstate(state=state, store=store, run_id=run.run_id)
+                _stop_run_in_linkstate(state=state, store=store, run=run)
         return RemoveAccountFromFederationResponse()
 
     def CreateInvitation(
@@ -1068,18 +1064,17 @@ def _check_flwr_aid_in_run(
         )
 
 
-def _stop_run_in_linkstate(state: LinkState, store: ObjectStore, run_id: int) -> bool:
+def _stop_run_in_linkstate(state: LinkState, store: ObjectStore, run: Run) -> bool:
     """Stop a run and clean it up using LinkState methods."""
-    # Stop all non-finished tasks of the run
-    update_success = False
-    for task in state.get_tasks(run_ids=[run_id]):
-        update_success |= state.finish_task(task.task_id, SubStatus.STOPPED, "")
+    # Stop the primary task of the run. Other tasks will be stopped automatically.
+    primary_task_id = cast(int, run.primary_task_id)
+    update_success = state.finish_task(primary_task_id, SubStatus.STOPPED, "")
 
     # Clean up the run if any task was successfully updated to STOPPED
     if update_success:
-        message_ids: set[str] = state.get_message_ids_from_run_id(run_id)
+        message_ids: set[str] = state.get_message_ids_from_run_id(run.run_id)
         state.delete_messages(message_ids)
-        store.delete_objects_in_run(run_id)
+        store.delete_objects_in_run(run.run_id)
 
     return update_success
 

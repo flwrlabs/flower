@@ -448,7 +448,28 @@ class StateTest(CoreStateTest):
         tasks = {task.task_id: task for task in state.get_tasks(run_ids=[run_id])}
         assert tasks[extra_task_id].finished_at == tasks[primary_task_id].finished_at
 
-    def test_sibling_tasks_inherit_finished_at_on_finish_task(self) -> None:
+    @parameterized.expand(
+        [
+            (
+                SubStatus.COMPLETED,
+                SubStatus.FAILED,
+                "Task failed because the run finished",
+            ),
+            (
+                SubStatus.FAILED,
+                SubStatus.FAILED,
+                "Task failed because the run finished",
+            ),
+            (
+                SubStatus.STOPPED,
+                SubStatus.STOPPED,
+                "Task stopped because the run was stopped",
+            ),
+        ]
+    )  # type: ignore
+    def test_sibling_tasks_finished_on_finish_task(
+        self, sub_status: str, sibling_sub_status: str, sibling_details: str
+    ) -> None:
         """Sibling tasks must share the primary task's finished_at when finish_task is
         called."""
         # Prepare
@@ -458,14 +479,18 @@ class StateTest(CoreStateTest):
         extra_task_id = state.create_task(task_type="flwr-connector", run_id=run_id)
         assert extra_task_id is not None
         assert state.claim_task(primary_task_id) is not None
-        assert state.activate_task(primary_task_id)
+        if sub_status == SubStatus.COMPLETED:
+            assert state.activate_task(primary_task_id)
 
         # Execute
-        assert state.finish_task(primary_task_id, SubStatus.COMPLETED, "done")
+        assert state.finish_task(primary_task_id, sub_status, "done")
 
         # Assert: sibling finished_at matches primary task finished_at
         tasks = {task.task_id: task for task in state.get_tasks(run_ids=[run_id])}
-        assert tasks[extra_task_id].finished_at == tasks[primary_task_id].finished_at
+        extra_task = tasks[extra_task_id]
+        assert extra_task.finished_at == tasks[primary_task_id].finished_at
+        assert extra_task.status.sub_status == sibling_sub_status
+        assert extra_task.status.details == sibling_details
 
     @parameterized.expand([(1,), (2,), (3,)])  # type: ignore
     def test_usage_report_hook_called_on_each_successful_transition(
