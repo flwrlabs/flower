@@ -1,6 +1,7 @@
 name: Release nightly
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: "0 23 * * *"
 
@@ -19,6 +20,9 @@ jobs:
       matrix: ${{ steps.release.outputs.matrix }}
     steps:
       - uses: actions/checkout@v5
+      - name: Authorize manual trigger for maintainers only
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: ./.github/actions/authorize-manual-trigger
       - name: Bootstrap
         id: bootstrap
         uses: ./.github/actions/bootstrap
