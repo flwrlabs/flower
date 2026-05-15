@@ -585,7 +585,6 @@ provides-extras = ["vision", "audio"]
 dev = [
     { name = "black", extras = ["jupyter"], specifier = "==25.11.0" },
     { name = "devtool", editable = "../../../dev" },
-    { name = "docformatter", specifier = "==1.7.5" },
     { name = "isort", specifier = "==5.13.2" },
     { name = "mypy", specifier = "==1.8.0" },
     { name = "parameterized", specifier = "==0.9.0" },
