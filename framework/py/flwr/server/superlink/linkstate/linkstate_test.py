@@ -186,6 +186,37 @@ class StateTest(CoreStateTest):
         ):
             state.create_task(task_type="flwr-model", run_id=42)
 
+    def test_create_task_rejects_stopped_run(self) -> None:
+        """Creating a task for a stopped run should fail."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+
+        self.assertTrue(state.stop_run(run_id))
+
+        with self.assertRaisesRegex(RuntimeError, f"Run {run_id} is finished."):
+            state.create_task(task_type="flwr-model", run_id=run_id)
+
+    def test_store_messages_rejects_stopped_run(self) -> None:
+        """Messages cannot be stored after a run is stopped."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
+        )
+        self.assertIsNotNone(state.store_message_ins(message=msg))
+        pulled = state.get_message_ins(node_id=node_id, limit=1)[0]
+        reply_msg = Message(RecordDict(), reply_to=pulled)
+
+        self.assertTrue(state.stop_run(run_id))
+
+        self.assertIsNone(state.store_message_ins(message=msg))
+        self.assertIsNone(state.store_message_res(message=reply_msg))
+        self.assertEqual(state.num_message_ins(), 0)
+        self.assertEqual(state.num_message_res(), 0)
+
     def test_get_run_info_without_filters_returns_all_runs(self) -> None:
         """Test get_run_info returns all runs when no filter is provided."""
         # Prepare
@@ -1627,6 +1658,26 @@ class StateTest(CoreStateTest):
         assert init is None
         assert retrieved_context == context
 
+    def test_set_serverapp_context_after_finished_run(self) -> None:
+        """Context can be persisted after normal task completion."""
+        state: LinkState = self.state_factory()
+        run_id = create_dummy_run(state)
+        task_id = get_primary_task_id(state, run_id)
+        context = Context(
+            run_id=run_id,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={},
+            state=RecordDict(),
+            run_config={},
+        )
+
+        assert state.claim_task(task_id) is not None
+        assert state.activate_task(task_id)
+        assert state.finish_task(task_id, SubStatus.COMPLETED, "done")
+        state.set_serverapp_context(run_id, context)
+
+        assert state.get_serverapp_context(run_id) == context
+
     def test_set_context_invalid_run_id(self) -> None:
         """Test set_serverapp_context with invalid run_id."""
         # Prepare
@@ -1945,37 +1996,6 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         )
         state.initialize()
         return state
-
-    def test_create_task_rejects_stopped_run(self) -> None:
-        """Creating a task for a stopped run should fail."""
-        state = self.state_factory()
-        run_id = create_dummy_run(state)
-
-        self.assertTrue(state.stop_run(run_id))
-
-        with self.assertRaisesRegex(RuntimeError, f"Run {run_id} is finished."):
-            state.create_task(task_type="flwr-model", run_id=run_id)
-
-    def test_store_messages_rejects_stopped_run(self) -> None:
-        """Messages cannot be stored after a run is stopped."""
-        state = self.state_factory()
-        node_id = create_dummy_node(state)
-        run_id = create_dummy_run(state)
-        msg = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
-            )
-        )
-        self.assertIsNotNone(state.store_message_ins(message=msg))
-        pulled = state.get_message_ins(node_id=node_id, limit=1)[0]
-        reply_msg = Message(RecordDict(), reply_to=pulled)
-
-        self.assertTrue(state.stop_run(run_id))
-
-        self.assertIsNone(state.store_message_ins(message=msg))
-        self.assertIsNone(state.store_message_res(message=reply_msg))
-        self.assertEqual(state.num_message_ins(), 0)
-        self.assertEqual(state.num_message_res(), 0)
 
     @parameterized.expand(
         [  # type: ignore

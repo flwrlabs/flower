@@ -100,28 +100,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """Get the FederationManager instance."""
         return self._federation_manager
 
-    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        self,
-        task_type: str,
-        run_id: int,
-        fab_hash: str | None = None,
-        model_ref: str | None = None,
-        connector_ref: str | None = None,
-    ) -> int | None:
-        """Create a task."""
-        with self.lock:
-            if run_id not in self.run_ids:
-                raise RuntimeError(
-                    f"Run {run_id} not found. create_task requires an existing run."
-                )
-            return super().create_task(
-                task_type=task_type,
-                run_id=run_id,
-                fab_hash=fab_hash,
-                model_ref=model_ref,
-                connector_ref=connector_ref,
-            )
-
     def _get_run(self, run_id: int) -> Run:
         """Return run metadata with lifecycle fields from its primary task."""
         run = self.run_ids[run_id].run
@@ -146,6 +124,34 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             return False
         return self.run_ids[task.run_id].run.primary_task_id == task_id
 
+    def _is_stopped_run(self, run_id: int) -> bool:
+        """Return True if the run has been stopped."""
+        return self._get_run(run_id).status.sub_status == SubStatus.STOPPED
+
+    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        self,
+        task_type: str,
+        run_id: int,
+        fab_hash: str | None = None,
+        model_ref: str | None = None,
+        connector_ref: str | None = None,
+    ) -> int | None:
+        """Create a task."""
+        with self.lock:
+            if run_id not in self.run_ids:
+                raise RuntimeError(
+                    f"Run {run_id} not found. create_task requires an existing run."
+                )
+            if self._is_stopped_run(run_id):
+                raise RuntimeError(f"Run {run_id} is finished.")
+            return super().create_task(
+                task_type=task_type,
+                run_id=run_id,
+                fab_hash=fab_hash,
+                model_ref=model_ref,
+                connector_ref=connector_ref,
+            )
+
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
         # Validate message
@@ -155,6 +161,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             return None
         # Validate run_id
         if message.metadata.run_id not in self.run_ids:
+            log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
+            return None
+        if self._is_stopped_run(message.metadata.run_id):
             log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
             return None
         federation = self.run_ids[message.metadata.run_id].run.federation
@@ -305,6 +314,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         # Validate run_id
         if res_metadata.run_id != ins_metadata.run_id:
             log(ERROR, "`metadata.run_id` is invalid")
+            return None
+        if self._is_stopped_run(res_metadata.run_id):
+            log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
             return None
 
         message_id = message.metadata.message_id
@@ -816,9 +828,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
     def set_serverapp_context(self, run_id: int, context: Context) -> None:
         """Set the context for the specified `run_id`."""
-        if run_id not in self.run_ids:
-            raise ValueError(f"Run {run_id} not found")
-        self.contexts[run_id] = context
+        with self.lock:
+            if run_id not in self.run_ids:
+                raise ValueError(f"Run {run_id} not found")
+            if self._is_stopped_run(run_id):
+                raise ValueError(f"Run {run_id} not found or already stopped")
+            self.contexts[run_id] = context
 
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`."""

@@ -142,6 +142,30 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         )
         return dict(run_rows[0]) if run_rows else None
 
+    def _lock_not_stopped_run(self, run_id: int) -> dict[str, Any] | None:
+        """Lock the run's primary task row if the run has not been stopped."""
+        sint64_run_id = uint64_to_int64(run_id)
+        rows = self.query(
+            """
+            UPDATE task
+            SET task_id = task_id
+            WHERE task_id = (
+                SELECT primary_task_id FROM run WHERE run_id = :run_id
+            )
+            AND sub_status != :stopped
+            RETURNING task_id
+            """,
+            {"run_id": sint64_run_id, "stopped": SubStatus.STOPPED},
+        )
+        if not rows:
+            return None
+
+        run_rows = self.query(
+            "SELECT run_id, federation FROM run WHERE run_id = :run_id",
+            {"run_id": sint64_run_id},
+        )
+        return dict(run_rows[0]) if run_rows else None
+
     def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         task_type: str,
@@ -403,7 +427,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         params = {f"mid_{i}": msg_id for i, msg_id in enumerate(message_ids)}
         return self.query(query, params)
 
-    def store_message_res(self, message: Message) -> str | None:
+    def store_message_res(  # pylint: disable=too-many-return-statements
+        self, message: Message
+    ) -> str | None:
         """Store one Message."""
         # Validate message
         errors = validate_message(message=message, is_reply_message=True)
@@ -1274,8 +1300,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         sint_run_id = uint64_to_int64(run_id)
 
         with self.session():
-            if not self._lock_unfinished_run(run_id):
-                raise ValueError(f"Run {run_id} not found or already finished")
+            if not self._lock_not_stopped_run(run_id):
+                raise ValueError(f"Run {run_id} not found or already stopped")
 
             # Check if any existing Context assigned to the run_id
             query = "SELECT COUNT(*) as count FROM context WHERE run_id = :run_id"
