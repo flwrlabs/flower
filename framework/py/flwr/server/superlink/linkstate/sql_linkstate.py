@@ -86,6 +86,11 @@ PRIMARY_TASK_STATUS_CONDITIONS = {
 class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     """SQLAlchemy-based LinkState implementation."""
 
+    @property
+    def select_lock_sql(self) -> str:
+        """Return the SQL clause for row-locking, which is overridable by subclasses."""
+        return ""
+
     def __init__(
         self,
         database_path: str,
@@ -112,33 +117,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def federation_manager(self) -> FederationManager:
         """Return the FederationManager instance."""
         return self._federation_manager
-
-    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        self,
-        task_type: str,
-        run_id: int,
-        fab_hash: str | None = None,
-        model_ref: str | None = None,
-        connector_ref: str | None = None,
-    ) -> int | None:
-        """Create a task."""
-        with self.session():
-            if not self.query(
-                "SELECT run_id FROM run WHERE run_id = :run_id",
-                {"run_id": uint64_to_int64(run_id)},
-            ):
-                raise RuntimeError(
-                    f"Run {run_id} not found. create_task requires an existing run."
-                )
-
-            task_id = super().create_task(
-                task_type=task_type,
-                run_id=run_id,
-                fab_hash=fab_hash,
-                model_ref=model_ref,
-                connector_ref=connector_ref,
-            )
-            return task_id
 
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
@@ -326,21 +304,34 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             AND delivered_at = ''
             AND (created_at + ttl) > :current
         """
+        candidate_cte = ""
         condition = common_condition
         if limit is not None:
-            condition = f"""
-                message_id IN (
+            # Materialize limited candidates before updating. Some backends can
+            # otherwise re-evaluate same-table subqueries while UPDATE scans rows.
+            # `self.select_lock_sql` is an optional clause for backends that support
+            # row-locking while selecting candidates. Keep it before LIMIT so locked
+            # rows are skipped before limiting the result set.
+            candidate_cte = f"""
+                WITH candidate_message_ins AS (
                     SELECT message_id
                     FROM message_ins
                     WHERE {common_condition}
                     ORDER BY created_at, message_id
+                    {self.select_lock_sql}
                     LIMIT :limit
+                )
+            """
+            condition = """
+                message_id IN (
+                    SELECT message_id FROM candidate_message_ins
                 )
                 AND delivered_at = ''
             """
             params["limit"] = limit
 
         query = f"""
+            {candidate_cte}
             UPDATE message_ins
             SET delivered_at = :delivered_at
             WHERE {condition}

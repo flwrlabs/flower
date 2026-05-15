@@ -165,7 +165,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
         response = self.interceptor.intercept_unary_unary(
             continuation=continuation,
             client_call_details=details,
-            request=GetNodesRequest(run_id=1),
+            request=GetNodesRequest(),
         )
 
         self.assertIs(response, call)
@@ -190,7 +190,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
             self.interceptor.intercept_unary_unary(
                 continuation=lambda _details, _request: self._make_call(),
                 client_call_details=details,
-                request=GetNodesRequest(run_id=1),
+                request=GetNodesRequest(),
             )
 
     def test_log_unary_incompatibility_from_returned_rpc_error(self) -> None:
@@ -205,7 +205,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
                 client_call_details=_make_call_details(
                     "/flwr.proto.ServerAppIo/GetNodes"
                 ),
-                request=GetNodesRequest(run_id=1),
+                request=GetNodesRequest(),
             )
 
         self.assertIs(response, rpc_error)
@@ -251,7 +251,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
 
         context = Mock()
-        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        response = intercepted.unary_unary(GetNodesRequest(), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_not_called()
 
@@ -263,7 +263,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
 
         context = Mock()
-        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        response = intercepted.unary_unary(GetNodesRequest(), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_called_once()
 
@@ -275,7 +275,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
 
         context = Mock()
-        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        response = intercepted.unary_unary(GetNodesRequest(), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_called_once()
         metadata = dict(context.set_trailing_metadata.call_args.args[0])
@@ -293,7 +293,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
 
         context = Mock()
-        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        response = intercepted.unary_unary(GetNodesRequest(), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_called_once()
         metadata = dict(context.set_trailing_metadata.call_args.args[0])
@@ -322,7 +322,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         context.code.return_value = None
 
         with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+            intercepted.unary_unary(GetNodesRequest(), context)
 
         status, payload = context.abort.call_args.args
         self.assertEqual(status, grpc.StatusCode.FAILED_PRECONDITION)
@@ -355,7 +355,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
 
         context = Mock()
-        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        response = intercepted.unary_unary(GetNodesRequest(), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_not_called()
 
@@ -368,7 +368,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
 
         context = Mock()
-        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        response = intercepted.unary_unary(GetNodesRequest(), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_not_called()
 
@@ -381,7 +381,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
 
         context = Mock()
-        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        response = intercepted.unary_unary(GetNodesRequest(), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_not_called()
 
@@ -395,7 +395,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
 
         context = Mock()
-        responses = list(intercepted.unary_stream(GetNodesRequest(run_id=1), context))
+        responses = list(intercepted.unary_stream(GetNodesRequest(), context))
         self.assertEqual(responses, ["a", "b"])
         context.set_trailing_metadata.assert_called_once()
 
@@ -409,7 +409,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
 
         context = Mock()
-        responses = list(intercepted.unary_stream(GetNodesRequest(run_id=1), context))
+        responses = list(intercepted.unary_stream(GetNodesRequest(), context))
         self.assertEqual(responses, ["a", "b"])
         context.set_trailing_metadata.assert_not_called()
 
@@ -434,7 +434,7 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
                     "/flwr.proto.Fleet/PullTaskIns",
                     metadata,
                 ),
-                request=GetNodesRequest(run_id=1),
+                request=GetNodesRequest(),
             ),
         )
 
@@ -457,7 +457,7 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
             self.interceptor.intercept_unary_stream(
                 continuation=continuation,
                 client_call_details=details,
-                request=GetNodesRequest(run_id=1),
+                request=GetNodesRequest(),
             )
         )
 
@@ -483,7 +483,7 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
             self.interceptor.intercept_unary_stream(
                 continuation=lambda _details, _request: mock_call,
                 client_call_details=_make_call_details("/flwr.proto.Fleet/PullTaskIns"),
-                request=GetNodesRequest(run_id=1),
+                request=GetNodesRequest(),
             )
 
             done_callback = mock_call.add_callback.call_args.args[0]
@@ -507,7 +507,7 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
             response = self.interceptor.intercept_unary_stream(
                 continuation=lambda _details, _request: mock_call,
                 client_call_details=_make_call_details("/flwr.proto.Fleet/PullTaskIns"),
-                request=GetNodesRequest(run_id=1),
+                request=GetNodesRequest(),
             )
 
         self.assertIs(response, mock_call)
@@ -524,7 +524,7 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
             response = self.interceptor.intercept_unary_stream(
                 continuation=lambda _details, _request: rpc_error,
                 client_call_details=_make_call_details("/flwr.proto.Fleet/PullTaskIns"),
-                request=GetNodesRequest(run_id=1),
+                request=GetNodesRequest(),
             )
 
         self.assertIs(response, rpc_error)

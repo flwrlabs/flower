@@ -78,7 +78,7 @@ Format broadly only when appropriate:
 uv run --no-sync --python=3.10.19 ./dev/format.sh
 ```
 
-For narrow edits, prefer targeted `isort`, `black`, `docformatter`, and `ruff`
+For narrow edits, prefer targeted `isort`, `black`, and `ruff`
 commands on the touched files. Keep `py/flwr/proto/` excluded from Python
 formatters because it is generated.
 
