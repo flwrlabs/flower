@@ -17,7 +17,7 @@ jobs:
 
   release-nightly:
     runs-on: ubuntu-22.04
-    name: Relase nightly on PyPI
+    name: Release nightly on PyPI
     if: github.repository == 'flwrlabs/flower'
     needs: authorize-manual-trigger
     outputs:

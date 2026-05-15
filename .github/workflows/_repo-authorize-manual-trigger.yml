@@ -44,12 +44,18 @@ jobs:
               username,
             });
 
+            // Direct role_name matches cover standard roles and explicitly allowed
+            // custom role names.
             let isAllowed = allowedPermissions.has(data.role_name);
 
+            // Custom admin-based roles can surface as admin permission with a
+            // repository-specific role_name.
             if (!isAllowed && allowedPermissions.has("admin") && data.permission === "admin") {
               isAllowed = true;
             }
 
+            // Maintain maps to the legacy write permission, so use the
+            // collaborators response to distinguish maintainers from writers.
             if (!isAllowed && allowedPermissions.has("maintain") && data.permission === "write") {
               const collaborators = await github.paginate(github.rest.repos.listCollaborators, {
                 owner: context.repo.owner,
