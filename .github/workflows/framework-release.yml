@@ -36,16 +36,25 @@ env:
   DOCKER_IMAGE_NAMESPACE: ${{ inputs.docker-image-namespace || vars.DOCKER_IMAGE_NAMESPACE }}
 
 jobs:
+  # No github.repository guard here: the authorization check must run even on
+  # forks so that workflow_dispatch is fail-closed for unauthorized actors.
+  # Secrets are scoped to the main repository and are not available on forks.
+  authorize-manual-trigger:
+    name: Authorize manual trigger
+    uses: ./.github/workflows/_repo-authorize-manual-trigger.yml
+    with:
+      caller-event-name: ${{ github.event_name }}
+
   publish-wheel:
     if: ${{ github.repository == 'flwrlabs/flower' }}
     name: Publish wheel
     runs-on: ubuntu-22.04
     timeout-minutes: 30
+    needs: authorize-manual-trigger
     outputs:
       flwr-version: ${{ steps.publish.outputs.flwr-version }}
     env:
       FLWR_TELEMETRY_ENABLED: 0
-      PYPI_REPOSITORY_PASSWORD: ${{ secrets.PYPI_REPOSITORY_PASSWORD }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -58,6 +67,7 @@ jobs:
       - id: publish
         env:
           PACKAGE_VERSION: ${{ inputs.package-version }}
+          PYPI_REPOSITORY_PASSWORD: ${{ secrets.PYPI_REPOSITORY_PASSWORD }}
           PYPI_REPOSITORY_USERNAME: ${{ vars.PYPI_REPOSITORY_USERNAME }}
         run: ./framework/dev/release/publish-wheel.sh
 

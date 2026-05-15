@@ -1,0 +1,87 @@
+name: Authorize manual trigger
+
+on:
+  workflow_call:
+    inputs:
+      caller-event-name:
+        description: "Event name that triggered the caller workflow"
+        required: true
+        type: string
+      allowed-permissions:
+        description: "Comma-separated repository role names or base permissions allowed to run the workflow manually"
+        required: false
+        type: string
+        default: "maintain,admin"
+
+permissions:
+  contents: read
+  # Required by github.rest.repos.getCollaboratorPermissionLevel and
+  # github.rest.repos.listCollaborators used in the authorization step below.
+  administration: read
+
+jobs:
+  authorize:
+    name: Authorize manual trigger
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Skip non-manual trigger
+        if: ${{ inputs['caller-event-name'] != 'workflow_dispatch' }}
+        run: echo "Manual trigger authorization is not required for ${{ inputs['caller-event-name'] }}."
+
+      - name: Check triggering user permissions
+        if: ${{ inputs['caller-event-name'] == 'workflow_dispatch' }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const allowedPermissionsInput = ${{ toJSON(inputs['allowed-permissions']) }};
+            const allowedPermissions = new Set(
+              allowedPermissionsInput
+                .split(",")
+                .map((permission) => permission.trim())
+                .filter(Boolean)
+            );
+            const username = ${{ toJSON(github.triggering_actor) }};
+            const { data } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              username,
+            });
+
+            // Tier 1: direct role_name match covers standard "maintain" and "admin"
+            // roles as well as custom roles whose name exactly matches an entry in
+            // allowedPermissions.
+            let isAllowed = allowedPermissions.has(data.role_name);
+
+            // Tier 2: custom roles with base_role "admin" surface data.permission
+            // as "admin" but carry a non-standard role_name that won't match tier 1.
+            if (!isAllowed && allowedPermissions.has("admin") && data.permission === "admin") {
+              isAllowed = true;
+            }
+
+            // Tier 3: custom roles with base_role "maintain" map data.permission to
+            // "write" (GitHub's legacy base permission for maintainers), so we must
+            // fall back to the collaborators list which exposes granular permissions
+            // including the boolean maintain flag.
+            if (!isAllowed && allowedPermissions.has("maintain") && data.permission === "write") {
+              const collaborators = await github.paginate(github.rest.repos.listCollaborators, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                affiliation: "all",
+                per_page: 100,
+              });
+              const collaborator = collaborators.find(
+                (candidate) => candidate.login.toLowerCase() === username.toLowerCase()
+              );
+              const permissions = collaborator?.permissions ?? {};
+              isAllowed = Boolean(permissions.maintain || permissions.admin);
+            }
+
+            core.info(
+              `Manual run requested by ${username} with ${data.role_name} role (${data.permission} permission)`
+            );
+
+            if (!isAllowed) {
+              core.setFailed(
+                `workflow_dispatch is limited to maintainers; ${username} has ${data.role_name} role`
+              );
+            }
