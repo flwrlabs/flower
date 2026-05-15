@@ -116,33 +116,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """Return the FederationManager instance."""
         return self._federation_manager
 
-    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        self,
-        task_type: str,
-        run_id: int,
-        fab_hash: str | None = None,
-        model_ref: str | None = None,
-        connector_ref: str | None = None,
-    ) -> int | None:
-        """Create a task."""
-        with self.session():
-            if not self.query(
-                "SELECT run_id FROM run WHERE run_id = :run_id",
-                {"run_id": uint64_to_int64(run_id)},
-            ):
-                raise RuntimeError(
-                    f"Run {run_id} not found. create_task requires an existing run."
-                )
-
-            task_id = super().create_task(
-                task_type=task_type,
-                run_id=run_id,
-                fab_hash=fab_hash,
-                model_ref=model_ref,
-                connector_ref=connector_ref,
-            )
-            return task_id
-
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
         # Validate message

@@ -1,6 +1,7 @@
 name: Release nightly
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: "0 23 * * *"
 
@@ -8,10 +9,15 @@ env:
   FLWR_TELEMETRY_ENABLED: 0
 
 jobs:
+  authorize-manual-trigger:
+    name: Authorize manual trigger
+    uses: ./.github/workflows/_repo-authorize-manual-trigger.yml
+
   release-nightly:
     runs-on: ubuntu-22.04
-    name: Relase nightly on PyPI
+    name: Release nightly on PyPI
     if: github.repository == 'flwrlabs/flower'
+    needs: authorize-manual-trigger
     outputs:
       skip: ${{ steps.release.outputs.skip }}
       pip-version: ${{ steps.release.outputs.pip-version }}
