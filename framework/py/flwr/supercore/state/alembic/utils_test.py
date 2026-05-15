@@ -446,7 +446,7 @@ class TestAlembicRun(unittest.TestCase):
                 WHERE run_id = :run_id
                 """
                 params = {"run_id": 301}
-                run = connection.execute(text(query), parms).mappings().one()
+                run = connection.execute(text(query), params).mappings().one()
                 query = """
                 SELECT log
                 FROM logs
