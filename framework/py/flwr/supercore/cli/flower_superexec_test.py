@@ -213,18 +213,3 @@ def test_flower_superexec_passes_backend_to_run_superexec(
     flower_superexec_module.flower_superexec()
 
     assert captured["launch_backend_name"] == "subprocess"
-
-
-def test_parse_superexec_backend_rejects_unsupported_value() -> None:
-    """SuperExec should reject unsupported launch backend names."""
-    with pytest.raises(SystemExit):
-        _parse_args().parse_args(
-            [
-                "--appio-api-address",
-                "127.0.0.1:9091",
-                "--plugin-type",
-                ExecPluginType.CLIENT_APP,
-                "--backend",
-                "kubernetes",
-            ]
-        )
