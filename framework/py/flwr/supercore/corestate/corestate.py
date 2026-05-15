@@ -241,7 +241,7 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def push_task_message(self, message: Message) -> str | None:
+    def store_task_message(self, message: Message) -> str | None:
         """Store one task-addressed Message.
 
         The source and destination task IDs are read from
@@ -259,7 +259,7 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def pull_task_messages(
+    def get_task_message(
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,

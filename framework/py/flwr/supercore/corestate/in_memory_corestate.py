@@ -322,7 +322,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             task.CopyFrom(self.task_store[task_id])
             return task
 
-    def push_task_message(self, message: Message) -> str | None:
+    def store_task_message(self, message: Message) -> str | None:
         """Store one task-addressed Message."""
         message_id = message.metadata.message_id
         if not _is_valid_task_message(message):
@@ -351,7 +351,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             self.task_message_store[message_id] = message_copy
             return message_id
 
-    def pull_task_messages(
+    def get_task_message(
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,

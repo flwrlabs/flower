@@ -411,7 +411,7 @@ class SqlCoreState(CoreState, SqlMixin):
             return None
         return task_from_row(rows[0])
 
-    def push_task_message(self, message: Message) -> str | None:
+    def store_task_message(self, message: Message) -> str | None:
         """Store one task-addressed Message."""
         if not _is_valid_task_message(message):
             return None
@@ -422,27 +422,8 @@ class SqlCoreState(CoreState, SqlMixin):
 
         with self.session():
             self._cleanup_expired_task_tokens()
-            rows = self.query(
-                """
-                SELECT task_id, run_id, finished_at
-                FROM task
-                WHERE task_id IN (:src_task_id, :dst_task_id)
-                """,
-                {"src_task_id": src_task_id, "dst_task_id": dst_task_id},
-            )
-            tasks = {row["task_id"]: row for row in rows}
-            src_task = tasks.get(src_task_id)
-            dst_task = tasks.get(dst_task_id)
-            if src_task is None or dst_task is None:
-                return None
-            if src_task["run_id"] != dst_task["run_id"]:
-                return None
-            if dst_task["finished_at"] is not None:
-                return None
-
             message_dict = {
                 "message_id": message.metadata.message_id,
-                "run_id": src_task["run_id"],
                 "src_task_id": src_task_id,
                 "dst_task_id": dst_task_id,
                 "reply_to_message_id": message.metadata.reply_to_message_id,
@@ -460,22 +441,36 @@ class SqlCoreState(CoreState, SqlMixin):
                     else None
                 ),
             }
-            columns = ", ".join(message_dict.keys())
-            values = ", ".join(f":{key}" for key in message_dict)
             try:
-                self.query(
-                    f"""
-                    INSERT INTO task_message ({columns})
-                    VALUES ({values})
+                inserted = self.query(
+                    """
+                    INSERT INTO task_message (
+                        message_id, run_id, src_task_id, dst_task_id,
+                        reply_to_message_id, created_at, ttl, message_type,
+                        content, error
+                    )
+                    SELECT
+                        :message_id, src.run_id, :src_task_id, :dst_task_id,
+                        :reply_to_message_id, :created_at, :ttl, :message_type,
+                        :content, :error
+                    FROM task AS src
+                    JOIN task AS dst
+                        ON dst.task_id = :dst_task_id
+                        AND dst.run_id = src.run_id
+                    WHERE src.task_id = :src_task_id
+                        AND dst.finished_at IS NULL
+                    RETURNING message_id
                     """,
                     message_dict,
                 )
             except IntegrityError:
                 return None
+            if not inserted:
+                return None
 
         return message_id
 
-    def pull_task_messages(
+    def get_task_message(
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,

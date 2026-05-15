@@ -476,7 +476,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertIsNone(state.get_task_by_token("missing-token"))
 
-    def test_push_and_pull_task_messages(self) -> None:
+    def test_store_and_get_task_message(self) -> None:
         """Task Messages should round-trip and be delivered once."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
@@ -490,9 +490,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             run_id=run_id + 1,
         )
 
-        message_id = state.push_task_message(message)
-        pulled = state.pull_task_messages(dst_task_ids=[dst_task_id])
-        pulled_again = state.pull_task_messages(dst_task_ids=[dst_task_id])
+        message_id = state.store_task_message(message)
+        pulled = state.get_task_message(dst_task_ids=[dst_task_id])
+        pulled_again = state.get_task_message(dst_task_ids=[dst_task_id])
 
         self.assertEqual(message_id, message.metadata.message_id)
         self.assertEqual(len(pulled), 1)
@@ -506,7 +506,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(pulled_message.metadata.dst_node_id, dst_task_id)
         self.assertTrue(pulled_message.has_content())
 
-    def test_push_task_message_validates_task_relationship(self) -> None:
+    def test_store_task_message_validates_task_relationship(self) -> None:
         """Task Messages should only be stored for valid unfinished same-run tasks."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
@@ -540,14 +540,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         ]
 
         for message in invalid_messages:
-            self.assertIsNone(state.push_task_message(message))
+            self.assertIsNone(state.store_task_message(message))
 
-        self.assertEqual(state.pull_task_messages(dst_task_ids=[dst_task_id]), [])
-        self.assertEqual(state.pull_task_messages(dst_task_ids=[other_run_task_id]), [])
-        self.assertEqual(state.pull_task_messages(dst_task_ids=[finished_task_id]), [])
+        self.assertEqual(state.get_task_message(dst_task_ids=[dst_task_id]), [])
+        self.assertEqual(state.get_task_message(dst_task_ids=[other_run_task_id]), [])
+        self.assertEqual(state.get_task_message(dst_task_ids=[finished_task_id]), [])
 
-    def test_pull_task_messages_filters_destination_and_expiration(self) -> None:
-        """Pulling task Messages should filter by destination and TTL."""
+    def test_get_task_message_filters_destination_and_expiration(self) -> None:
+        """Getting task Messages should filter by destination and TTL."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
         src_task_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
@@ -571,15 +571,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
 
         self.assertEqual(
-            state.push_task_message(expected), expected.metadata.message_id
+            state.store_task_message(expected), expected.metadata.message_id
         )
-        self.assertEqual(state.push_task_message(expired), expired.metadata.message_id)
+        self.assertEqual(state.store_task_message(expired), expired.metadata.message_id)
         self.assertEqual(
-            state.push_task_message(other_destination),
+            state.store_task_message(other_destination),
             other_destination.metadata.message_id,
         )
 
-        pulled = state.pull_task_messages(dst_task_ids=[dst_task_id])
+        pulled = state.get_task_message(dst_task_ids=[dst_task_id])
 
         self.assertEqual(
             [message.metadata.message_id for message in pulled],
@@ -588,15 +588,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             [
                 message.metadata.message_id
-                for message in state.pull_task_messages(
+                for message in state.get_task_message(
                     dst_task_ids=[other_dst_task_id]
                 )
             ],
             [other_destination.metadata.message_id],
         )
 
-    def test_pull_task_messages_limit(self) -> None:
-        """Pulling task Messages should respect the provided limit."""
+    def test_get_task_message_limit(self) -> None:
+        """Getting task Messages should respect the provided limit."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
         src_task_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
@@ -605,11 +605,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         msg_1 = self._create_task_message(src_task_id, dst_task_id, run_id)
         msg_2 = self._create_task_message(src_task_id, dst_task_id, run_id)
-        self.assertEqual(state.push_task_message(msg_1), msg_1.metadata.message_id)
-        self.assertEqual(state.push_task_message(msg_2), msg_2.metadata.message_id)
+        self.assertEqual(state.store_task_message(msg_1), msg_1.metadata.message_id)
+        self.assertEqual(state.store_task_message(msg_2), msg_2.metadata.message_id)
 
-        pulled = state.pull_task_messages(dst_task_ids=[dst_task_id], limit=1)
-        pulled_next = state.pull_task_messages(dst_task_ids=[dst_task_id], limit=1)
+        pulled = state.get_task_message(dst_task_ids=[dst_task_id], limit=1)
+        pulled_next = state.get_task_message(dst_task_ids=[dst_task_id], limit=1)
 
         self.assertEqual(len(pulled), 1)
         self.assertEqual(len(pulled_next), 1)
