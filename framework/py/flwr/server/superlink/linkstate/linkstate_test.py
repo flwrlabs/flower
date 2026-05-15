@@ -427,26 +427,7 @@ class StateTest(CoreStateTest):
         assert extra_task.status.status == Status.FINISHED
         assert extra_task.status.sub_status == SubStatus.FAILED
         assert extra_task.status.details == "Task failed because the run expired"
-
-    def test_sibling_tasks_inherit_finished_at_on_expiry(self) -> None:
-        """Sibling tasks must share the primary task's finished_at on token expiry."""
-        # Prepare
-        state = self.state_factory()
-        run_id = create_dummy_run(state)
-        primary_task_id = get_primary_task_id(state, run_id)
-        extra_task_id = state.create_task(task_type="flwr-connector", run_id=run_id)
-        assert extra_task_id is not None
-        assert state.claim_task(primary_task_id) is not None
-
-        # Execute: advance time past task claim expiry and trigger cleanup
-        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
-        with patch("datetime.datetime") as mock_dt:
-            mock_dt.now.return_value = patched_dt
-            state.get_run_status({run_id})
-
-        # Assert: sibling finished_at matches primary task finished_at
-        tasks = {task.task_id: task for task in state.get_tasks(run_ids=[run_id])}
-        assert tasks[extra_task_id].finished_at == tasks[primary_task_id].finished_at
+        assert extra_task.finished_at == primary_task.finished_at
 
     @parameterized.expand(
         [

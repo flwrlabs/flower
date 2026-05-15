@@ -20,6 +20,7 @@ import json
 import secrets
 from collections.abc import Sequence
 from datetime import timedelta
+from logging import ERROR
 from typing import Any, Literal
 
 from sqlalchemy import MetaData
@@ -34,6 +35,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.common.logger import log
 from flwr.common.typing import Fab
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.sql_mixin import SqlMixin
@@ -334,6 +336,11 @@ class SqlCoreState(CoreState, SqlMixin):
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
+        if sub_status not in (SubStatus.COMPLETED, SubStatus.STOPPED, SubStatus.FAILED):
+            err = f"Invalid sub_status '{sub_status}' for finishing task {task_id}"
+            log(ERROR, err)
+            return False
+
         sint64_task_id = uint64_to_int64(task_id)
         with self.session():
             self._cleanup_expired_task_tokens()
