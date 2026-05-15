@@ -288,9 +288,7 @@ class TestAlembicRun(unittest.TestCase):
             task = tasks[runs[101]["primary_task_id"]]
             self.assertEqual(task["type"], TaskType.SERVER_APP)
             self.assertEqual(task["run_id"], 101)
-            self.assert_timestamp_equal(
-                task["pending_at"], "2026-04-27T10:00:00+00:00"
-            )
+            self.assert_timestamp_equal(task["pending_at"], "2026-04-27T10:00:00+00:00")
             self.assertIsNone(task["starting_at"])
             self.assertIsNone(task["running_at"])
             self.assertIsNone(task["finished_at"])
@@ -302,9 +300,7 @@ class TestAlembicRun(unittest.TestCase):
             self.assert_timestamp_equal(
                 task["starting_at"], "2026-04-27T11:01:00+00:00"
             )
-            self.assert_timestamp_equal(
-                task["running_at"], "2026-04-27T11:02:00+00:00"
-            )
+            self.assert_timestamp_equal(task["running_at"], "2026-04-27T11:02:00+00:00")
             self.assert_timestamp_equal(
                 task["finished_at"], "2026-04-27T11:03:00+00:00"
             )
@@ -458,32 +454,21 @@ class TestAlembicRun(unittest.TestCase):
                     .mappings()
                     .one()
                 )
-                copied_log = (
-                    connection.execute(
-                        text(
-                            """
+                copied_log = connection.execute(
+                    text(
+                        """
                             SELECT log
                             FROM logs
                             WHERE run_id = :run_id AND node_id = 0
                             """
-                        ),
-                        {"run_id": 301},
-                    )
-                    .scalar_one()
-                )
+                    ),
+                    {"run_id": 301},
+                ).scalar_one()
 
-            self.assert_timestamp_equal(
-                run["pending_at"], "2026-04-27T10:00:00+00:00"
-            )
-            self.assert_timestamp_equal(
-                run["starting_at"], "2026-04-27T10:01:00+00:00"
-            )
-            self.assert_timestamp_equal(
-                run["running_at"], "2026-04-27T10:02:00+00:00"
-            )
-            self.assert_timestamp_equal(
-                run["finished_at"], "2026-04-27T10:03:00+00:00"
-            )
+            self.assert_timestamp_equal(run["pending_at"], "2026-04-27T10:00:00+00:00")
+            self.assert_timestamp_equal(run["starting_at"], "2026-04-27T10:01:00+00:00")
+            self.assert_timestamp_equal(run["running_at"], "2026-04-27T10:02:00+00:00")
+            self.assert_timestamp_equal(run["finished_at"], "2026-04-27T10:03:00+00:00")
             self.assertEqual(run["sub_status"], SubStatus.COMPLETED)
             self.assertEqual(run["details"], "done")
             self.assertEqual(copied_log, "log entry")

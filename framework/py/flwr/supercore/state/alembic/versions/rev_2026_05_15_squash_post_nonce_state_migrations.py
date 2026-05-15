@@ -181,9 +181,7 @@ def _create_task_table() -> None:
         sa.Column(
             "sub_status", sa.String(), server_default=sa.text("''"), nullable=False
         ),
-        sa.Column(
-            "details", sa.String(), server_default=sa.text("''"), nullable=False
-        ),
+        sa.Column("details", sa.String(), server_default=sa.text("''"), nullable=False),
         sa.UniqueConstraint("task_id"),
     )
 
