@@ -94,22 +94,16 @@ erDiagram
     BIGINT bytes_recv "nullable"
     BIGINT bytes_sent "nullable"
     FLOAT clientapp_runtime "nullable"
-    VARCHAR details
     VARCHAR fab_hash "nullable"
     VARCHAR fab_id "nullable"
     VARCHAR fab_version "nullable"
     VARCHAR federation "nullable"
     VARCHAR federation_config "nullable"
-    VARCHAR finished_at "nullable"
     VARCHAR flwr_aid "nullable"
     VARCHAR override_config "nullable"
-    VARCHAR pending_at "nullable"
     BIGINT primary_task_id
     BIGINT run_id UK "nullable"
     VARCHAR run_type
-    VARCHAR running_at "nullable"
-    VARCHAR starting_at "nullable"
-    VARCHAR sub_status
     VARCHAR usage_reported_at
   }
 

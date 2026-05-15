@@ -896,13 +896,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         run_insert_query = """
             INSERT INTO run
             (run_id, fab_id, fab_version, fab_hash, override_config, federation,
-            primary_task_id, federation_config, run_type, pending_at, starting_at,
-            running_at, finished_at, usage_reported_at, sub_status, details,
+            primary_task_id, federation_config, run_type, usage_reported_at,
             flwr_aid, bytes_sent, bytes_recv, clientapp_runtime)
             VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
             :federation, :primary_task_id, :federation_config, :run_type,
-            :pending_at, :starting_at, :running_at, :finished_at,
-            :usage_reported_at, :sub_status, :details, :flwr_aid,
+            :usage_reported_at, :flwr_aid,
             :bytes_sent, :bytes_recv, :clientapp_runtime)
         """
         task_insert_query = """
@@ -936,13 +934,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         "primary_task_id": uint64_to_int64(task_id),
                         "federation_config": fed_config_json,
                         "run_type": run_type,
-                        "pending_at": pending_at.isoformat(),
-                        "starting_at": "",
-                        "running_at": "",
-                        "finished_at": "",
                         "usage_reported_at": "",
-                        "sub_status": "",
-                        "details": "",
                         "flwr_aid": flwr_aid or "",
                         "bytes_sent": 0,
                         "bytes_recv": 0,
