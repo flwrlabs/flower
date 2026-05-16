@@ -15,6 +15,8 @@
 """Tests for the validation function of object refs."""
 
 
+from pathlib import Path
+
 from .object_ref import OBJECT_REF_HELP_STR, validate
 
 
@@ -45,3 +47,16 @@ def test_validate_object_reference_fails() -> None:
         error
         == f"Unable to find attribute runa in module flwr.cli.run{OBJECT_REF_HELP_STR}"
     )
+
+
+def test_validate_object_reference_finds_attribute_in_all(tmp_path: Path) -> None:
+    """Test that validate_object_reference finds attributes exported in __all__."""
+    for index, all_value in enumerate(('["app"]', '("app",)')):
+        module_name = f"module_{index}"
+        module_path = tmp_path / f"{module_name}.py"
+        module_path.write_text(f"__all__ = {all_value}\n", encoding="utf-8")
+
+        is_valid, error = validate(f"{module_name}:app", project_dir=tmp_path)
+
+        assert is_valid
+        assert error is None
