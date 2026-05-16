@@ -119,16 +119,16 @@ erDiagram
   }
 
   task {
-    BIGINT active_until "nullable"
+    TIMESTAMP active_until "nullable"
     VARCHAR connector_ref "nullable"
     VARCHAR details
     VARCHAR fab_hash "nullable"
-    VARCHAR finished_at "nullable"
+    TIMESTAMP finished_at "nullable"
     VARCHAR model_ref "nullable"
-    VARCHAR pending_at
+    TIMESTAMP pending_at
     BIGINT run_id
-    VARCHAR running_at "nullable"
-    VARCHAR starting_at "nullable"
+    TIMESTAMP running_at "nullable"
+    TIMESTAMP starting_at "nullable"
     VARCHAR sub_status
     BIGINT task_id UK
     VARCHAR token "nullable"
