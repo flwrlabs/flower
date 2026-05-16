@@ -59,7 +59,9 @@ SuperNodes, and click ``Create``. See the screenshot below for reference.
 
 After clicking ``Create``, you should see your federation in the dashboard. In the
 screenshot below, a user named ``peter123`` created a federation named
-``my-first-federation``.
+``my-first-federation``. The unique name of a federation is always of the form
+``@<username>/<federation-name>``. In the screenshot, the federation's unique name is
+``@peter123/my-first-federation``.
 
 .. image:: ./_static/federation_list.png
     :alt: Federation list showing the newly created federation
