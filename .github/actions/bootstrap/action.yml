@@ -3,7 +3,7 @@ description: "Bootstrap Python environment (install and configure Python version
 inputs:
   python-version:
     description: "Version range or exact version of Python to use, using SemVer's version range syntax."
-    default: 3.10.19
+    default: 3.11.14
   pip-version:
     description: "Version of pip to be installed using pip"
     default: 26.0.1
