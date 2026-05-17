@@ -1,6 +1,219 @@
 # Changelog
 
-## Unreleased
+## v1.30.0 (2026-05-17)
+
+### Thanks to our contributors
+
+We would like to give our special thanks to all the contributors who made the new version of Flower possible (in `git shortlog` order):
+
+`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Heng Pan`, `Javier`, `Micah Sheller`, `Mohammad Naseri`, `Patrick Foley`, `Taner Topal`, `Yan Gao` <!---TOKEN_v1.30.0-->
+
+
+### Documentation improvements
+
+- **docs(framework:skip): Update source texts for translations (auto)** ([#7186](https://github.com/flwrlabs/flower/pull/7186))
+
+- **docs(framework:skip): Update source texts for translations (auto)** ([#7150](https://github.com/flwrlabs/flower/pull/7150))
+
+- **docs(:skip): Remove FS26 links and banners** ([#7050](https://github.com/flwrlabs/flower/pull/7050))
+
+- **docs(framework): Update Helm configs to align main with 1.29.0** ([#7022](https://github.com/flwrlabs/flower/pull/7022))
+
+- **docs(framework:skip): Update source texts for translations (auto)** ([#7011](https://github.com/flwrlabs/flower/pull/7011))
+
+- **docs(framework:skip): Update source texts for translations (auto)** ([#7006](https://github.com/flwrlabs/flower/pull/7006))
+
+
+
+
+### task mechanism
+- **refactor(framework): Deprecate token field in all request messages** ([#7025](https://github.com/flwrlabs/flower/pull/7025))
+- **feat(framework): Add** `CreateTask` **parent task type check** ([#7157](https://github.com/flwrlabs/flower/pull/7157))
+- **refactor(framework): Use** `TIMESTAMP` **types for timestamp fields in the task table** ([#7167](https://github.com/flwrlabs/flower/pull/7167))
+
+- **refactor(framework): Remove obsolete run status columns** ([#7180](https://github.com/flwrlabs/flower/pull/7180))
+
+- **refactor(framework): Remove** `.create_task` **overrides in** `LinkState` **and** `NodeState` ([#7163](https://github.com/flwrlabs/flower/pull/7163))
+
+- **break(framework): Remove run IDs from AppIo requests** ([#7158](https://github.com/flwrlabs/flower/pull/7158))
+
+- **refactor(framework): Move logs from** `LinkState` **to** `CoreState` ([#7144](https://github.com/flwrlabs/flower/pull/7144))
+
+- **feat(framework): Add task message table** ([#7153](https://github.com/flwrlabs/flower/pull/7153))
+
+- **feat(framework): Add task to task communication RPCs** ([#7151](https://github.com/flwrlabs/flower/pull/7151))
+
+- **refactor(framework): Generate error reply for unreplied instruction messages only when the task type is client app** ([#7139](https://github.com/flwrlabs/flower/pull/7139))
+
+- **feat(framework): Update** `create_run` **to include** `primary_task_id` ([#7122](https://github.com/flwrlabs/flower/pull/7122))
+
+- **refactor(framework): Remove run token table** ([#7111](https://github.com/flwrlabs/flower/pull/7111))
+
+- **refactor(framework): Move** `PushLogs` **to** `AppIoServicer` ([#7116](https://github.com/flwrlabs/flower/pull/7116))
+
+- **feat(framework): Add** `task_logs` **table to** `CoreState` **and methods to read/write** ([#7117](https://github.com/flwrlabs/flower/pull/7117))
+
+- **refactor(framework): Link run status to primary task** ([#7118](https://github.com/flwrlabs/flower/pull/7118))
+
+- **refactor(framework): Rename** `APP_TOKEN_HEADER` ([#7112](https://github.com/flwrlabs/flower/pull/7112))
+
+- **refactor(framework): Remove** `run_id` **from** `CreateTask` **payload** ([#7115](https://github.com/flwrlabs/flower/pull/7115))
+
+- **refactor(framework): Remove** `get_run_id_by_token` **,** `acknowledge_app_heartbeat` **, and** `verify_token` **from state** ([#7106](https://github.com/flwrlabs/flower/pull/7106))
+
+- **refactor(framework): Move primary task creation into LinkState** ([#7110](https://github.com/flwrlabs/flower/pull/7110))
+
+- **refactor(framework): Remove** `create_token` **from state** ([#7101](https://github.com/flwrlabs/flower/pull/7101))
+
+- **refactor(framework): Drop** `App` **in favour of** `Task` **in RPCs** ([#7102](https://github.com/flwrlabs/flower/pull/7102))
+
+- **refactor(framework): Move CreateTask to AppIo** ([#7088](https://github.com/flwrlabs/flower/pull/7088))
+
+- **refactor(framework): Remove** `delete_token` **from state** ([#7105](https://github.com/flwrlabs/flower/pull/7105))
+
+- **refactor(framework): Remove** `ListAppsToLaunch` **,** `RequestToken` **,** `SendAppHeartbeat` **and** `UpdateRunStatus` ([#7100](https://github.com/flwrlabs/flower/pull/7100))
+
+- **refactor(framework): Switch executors to** `Task` **system** ([#7097](https://github.com/flwrlabs/flower/pull/7097))
+
+- **feat(framework): Move CreateTask run check into state** ([#7095](https://github.com/flwrlabs/flower/pull/7095))
+
+- **refactor(framework): Make** `SuperExec` **operate on** `Tasks` ([#7083](https://github.com/flwrlabs/flower/pull/7083))
+
+- **feat(framework): Make** `ServerAppIo` **switch to task token** ([#7090](https://github.com/flwrlabs/flower/pull/7090))
+
+- **feat(framework): Allow** `CoreState.get_tasks` **to filter by run ID** ([#7094](https://github.com/flwrlabs/flower/pull/7094))
+
+- **refactor(framework): Make** `ClientAppIoServicer` **claim and finish tasks** ([#7089](https://github.com/flwrlabs/flower/pull/7089))
+
+- **refactor(framework): Refactor** `get_authenticatd_task_id` **to** `get_authenticatd_task` ([#7087](https://github.com/flwrlabs/flower/pull/7087))
+
+- **refactor(framework): Create task in** `SuperNode` **when a** `Message` **is pulled** ([#7079](https://github.com/flwrlabs/flower/pull/7079))
+
+- **feat(framework): Implement Task RPCs in AppIo servicer** ([#7080](https://github.com/flwrlabs/flower/pull/7080))
+
+- **feat(framework): Set the** `primary_task_id` **in** `LinkState.create_task` **when it's not set** ([#7081](https://github.com/flwrlabs/flower/pull/7081))
+
+- **refactor(framework): Create task in** `ControlServicer` **when** `StartRun` **is called** ([#7078](https://github.com/flwrlabs/flower/pull/7078))
+
+- **feat(framework): Allow task token in appio token auth interceptors** ([#7068](https://github.com/flwrlabs/flower/pull/7068))
+
+- **feat(framework): Add AppIo task RPC scaffolding** ([#7069](https://github.com/flwrlabs/flower/pull/7069))
+
+- **feat(framework): Add CreateTask RPC** ([#7047](https://github.com/flwrlabs/flower/pull/7047))
+
+- **refactor(framework): Implement** `claim_task` **,** `activate_task` **,** `finish_task` **,** `acknowledge_task_heartbeat` **and** `get_task_id_by_token` **in** `CoreState` ([#7058](https://github.com/flwrlabs/flower/pull/7058))
+
+- **feat(framework): Add** `primary_task_id` **in** `Run` ([#7054](https://github.com/flwrlabs/flower/pull/7054))
+
+- **feat(framework): Add serverappio RPCs for task token mechanism** ([#7053](https://github.com/flwrlabs/flower/pull/7053))
+
+- **feat(framework): Add task methods in CoreState** ([#7036](https://github.com/flwrlabs/flower/pull/7036))
+
+- **feat(framework): Add flwr-model** ([#7028](https://github.com/flwrlabs/flower/pull/7028))
+
+- **refactor(framework): Introduce** `TaskStatus` ([#7040](https://github.com/flwrlabs/flower/pull/7040))
+
+- **refactor(framework): Update** `task` **table** ([#7044](https://github.com/flwrlabs/flower/pull/7044))
+
+- **refactor(framework): Add** `task` **table to** `CoreState` ([#7031](https://github.com/flwrlabs/flower/pull/7031))
+
+- **feat(framework): Add task.proto** ([#7030](https://github.com/flwrlabs/flower/pull/7030))
+
+### Bugfixes
+- **fix(framework): Support dynamic ClientAppIo ports in SuperNode** ([#7128](https://github.com/flwrlabs/flower/pull/7128))
+
+
+### Postgres support
+- **refactor(framework): Handle** `LinkState` **edge cases** ([#7124](https://github.com/flwrlabs/flower/pull/7124))
+- **refactor(framework): Make node** `online_until` **float** ([#7136](https://github.com/flwrlabs/flower/pull/7136))
+- **refactor(framework): Make** `LinkState` **node liveness SQL portable** ([#7134](https://github.com/flwrlabs/flower/pull/7134))
+- **refactor(framework): Introduce** `SqlMixin` **dialect guardrails** ([#7125](https://github.com/flwrlabs/flower/pull/7125))
+- **fix(framework): Merge flwr Alembic heads** ([#7172](https://github.com/flwrlabs/flower/pull/7172))
+- **refactor(framework): Make SQL file claim test reusable** ([#7162](https://github.com/flwrlabs/flower/pull/7162))
+- **refactor(framework): Introduce select lock clause hook** ([#7161](https://github.com/flwrlabs/flower/pull/7161))
+
+- **refactor(framework): Use stable** `LinkState` **message ordering** ([#7123](https://github.com/flwrlabs/flower/pull/7123))
+- **refactor(framework): Change state schema** `Integer` **columns to** `BigInteger` ([#7043](https://github.com/flwrlabs/flower/pull/7043))
+- **feat(framework): Introduce state backend hook** ([#7143](https://github.com/flwrlabs/flower/pull/7143))
+
+
+### AppIo API TLS
+- **feat(framework): Add** `--root-certificates` **argument for** `flwr-` **commands and** `flower-superexec` ([#6986](https://github.com/flwrlabs/flower/pull/6986))
+
+- **feat(framework): Add TLS for appio servicers** ([#7046](https://github.com/flwrlabs/flower/pull/7046))
+- **docs(framework): Add appio tls notes to tls pages** ([#7175](https://github.com/flwrlabs/flower/pull/7175))
+
+
+### runtime version compatibility check
+- **fix(framework): Handle gRPC calls without callback support in runtime version interceptor** ([#7146](https://github.com/flwrlabs/flower/pull/7146))
+
+- **docs(framework): Mention AppIO runtime version compatibility** ([#7160](https://github.com/flwrlabs/flower/pull/7160))
+
+- **feat(framework): Enforce runtime version compatibility for AppIO** ([#7141](https://github.com/flwrlabs/flower/pull/7141))
+
+- **feat(framework): Add reject mode for runtime version incompatibility** ([#7108](https://github.com/flwrlabs/flower/pull/7108))
+
+- **feat(framework): Log runtime version FlowerError rejections in client interceptor** ([#7107](https://github.com/flwrlabs/flower/pull/7107))
+
+- **feat(framework): Add SuperExec runtime version interceptor** ([#7113](https://github.com/flwrlabs/flower/pull/7113))
+
+- **feat(framework): Add runtime version incompatibility API error code** ([#7103](https://github.com/flwrlabs/flower/pull/7103))
+
+- **feat(framework): Add runtime version check for** `ClientAppIo` ([#7091](https://github.com/flwrlabs/flower/pull/7091))
+
+- **feat(framework): Add runtime version check for Fleet API** ([#7092](https://github.com/flwrlabs/flower/pull/7092))
+
+- **feat(framework): Add runtime version check for Control API** ([#7093](https://github.com/flwrlabs/flower/pull/7093))
+
+- **feat(framework): Add runtime version metadata to ServerAppIo Grid client** ([#7084](https://github.com/flwrlabs/flower/pull/7084))
+
+- **feat(framework): Add opt-in runtime version warnings for** `ServerAppIo` ([#7077](https://github.com/flwrlabs/flower/pull/7077))
+
+- **feat(framework): Support interceptor unary stream** ([#7067](https://github.com/flwrlabs/flower/pull/7067))
+
+- **feat(framework): Add runtime version check for simulation ServerAppIo** ([#7038](https://github.com/flwrlabs/flower/pull/7038))
+
+
+### CI/CD
+- **ci(:skip): Bump dev versions to** `1.29.0` ([#7007](https://github.com/flwrlabs/flower/pull/7007))
+- **ci(framework): Allow configurable Python publish repositories** ([#7166](https://github.com/flwrlabs/flower/pull/7166))
+- **ci(framework): Fix nightly Docker context YAML parsing** ([#7152](https://github.com/flwrlabs/flower/pull/7152))
+- **ci(framework): Limit manual release workflows to maintainers** ([#7176](https://github.com/flwrlabs/flower/pull/7176))
+- **ci(:skip): Remove docformatter** ([#7170](https://github.com/flwrlabs/flower/pull/7170))
+- **ci(framework): Fix nightly binary image namespace rewrite in Docker matrix** ([#7145](https://github.com/flwrlabs/flower/pull/7145))
+- **ci(framework): Parameterize framework release workflows** ([#7086](https://github.com/flwrlabs/flower/pull/7086))
+- **ci(framework): Use new environment variable for PyPI publishing** ([#7159](https://github.com/flwrlabs/flower/pull/7159))
+- **ci(framework): Improve CI job name formatting** ([#7154](https://github.com/flwrlabs/flower/pull/7154))
+
+- **ci(:skip): Fix** `e2e-bare` **test for REST API** ([#7138](https://github.com/flwrlabs/flower/pull/7138))
+- **ci(framework): Add framework preparation hook** ([#7034](https://github.com/flwrlabs/flower/pull/7034))
+- **ci(framework): Add framework/AGENTS.md** ([#7073](https://github.com/flwrlabs/flower/pull/7073))
+- **ci(:skip): Use HF CIFAR-10 for PyTorch e2e datasets** ([#7072](https://github.com/flwrlabs/flower/pull/7072))
+- **ci(framework): Trigger doc releasing when** `dev/docs-ui-config.yml` **is changed** ([#7055](https://github.com/flwrlabs/flower/pull/7055))
+- **ci(framework): Check Alembic migrations in CI** ([#7041](https://github.com/flwrlabs/flower/pull/7041))
+
+### General
+
+- **fix(framework): Fix a space issue in a CLI error message** ([#7013](https://github.com/flwrlabs/flower/pull/7013))
+- **refactor(framework): Support Alembic migration branches** ([#7037](https://github.com/flwrlabs/flower/pull/7037))
+- **refactor(framework): Use** `EntitlementError` ([#7056](https://github.com/flwrlabs/flower/pull/7056))
+- **refactor(framework): Make** `FlowerError` **return** `JSON` **-like message and introduce** `EntitlementError` ([#7051](https://github.com/flwrlabs/flower/pull/7051))
+- **refactor(framework): Include** `server_default` **fields in** `Alembic` **migrations** ([#7057](https://github.com/flwrlabs/flower/pull/7057))
+- **fix(framework): Report clientapp appio communication failures as errors** ([#7061](https://github.com/flwrlabs/flower/pull/7061))
+- **refactor(framework): Make** `details` **and** `sub_status` **columns in** `Run` **table not nullable** ([#7063](https://github.com/flwrlabs/flower/pull/7063))
+- **refactor(framework): Update** `EntitlementError` **definition** ([#7140](https://github.com/flwrlabs/flower/pull/7140))
+- **refactor(framework): Make FAB required in PullAppInputs** ([#7021](https://github.com/flwrlabs/flower/pull/7021))
+- **docs(framework): Update TLS guide to include appio TLS** ([#7109](https://github.com/flwrlabs/flower/pull/7109))
+- **fix(framework): Fix SQLite in-memory database not initializing correctly** ([#7148](https://github.com/flwrlabs/flower/pull/7148))
+- **feat(framework): Prevent simulation runtime from accessing grid endpoints** ([#7024](https://github.com/flwrlabs/flower/pull/7024))
+- **feat(framework): Add FlowerError JSON deserialization** ([#7104](https://github.com/flwrlabs/flower/pull/7104))
+- **fix(:skip): Patch Control API gRPC test** ([#7149](https://github.com/flwrlabs/flower/pull/7149))
+
+- **feat(framework): Add flwr-agentapp** ([#7027](https://github.com/flwrlabs/flower/pull/7027))
+
+### Incompatible changes
+
+- **break(framework): Remove no-token fallback from flwr-{serverapp,simulation,clientapp}** ([#7019](https://github.com/flwrlabs/flower/pull/7019))
 
 ## v1.29.0 (2026-04-12)
 
