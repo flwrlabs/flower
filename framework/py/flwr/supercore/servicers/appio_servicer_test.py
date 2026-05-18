@@ -22,7 +22,7 @@ import grpc
 
 from flwr.common import Message, RecordDict
 from flwr.common.constant import Status
-from flwr.common.serde import message_to_proto
+from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     CreateTaskRequest,
@@ -40,6 +40,7 @@ from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.task_message import ModelTaskMessage
 
 from .appio_servicer import AppIoServicer
 
@@ -502,6 +503,46 @@ class TestAppIoServicer(unittest.TestCase):
         self.assertEqual(message.metadata.dst_task_id, dst_task_id)
         self.assertEqual(message.metadata.src_node_id, 0)
         self.assertEqual(message.metadata.dst_node_id, 0)
+
+    def test_wrapped_task_message_push_pull_with_real_state(self) -> None:
+        """Wrapped task messages should round-trip through AppIo."""
+        # Prepare
+        state = InMemoryCoreState(ObjectStoreFactory().store())
+        servicer = _TestAppIoServicer(state)
+        src_task_id = state.create_task(TaskType.AGENT_APP, run_id=789)
+        dst_task_id = state.create_task(TaskType.MODEL, run_id=789)
+        assert src_task_id is not None and dst_task_id is not None
+
+        spec = ModelTaskMessage.create(
+            dst_task_id=dst_task_id,
+            input="hello",
+            model="gpt-4.1-mini",
+            stream=False,
+        )
+        request = PushTaskMessageRequest(message=message_to_proto(spec.to_message()))
+
+        # Execute
+        with patch(
+            "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+            return_value=Task(task_id=src_task_id, run_id=789),
+        ):
+            push_response = servicer.PushTaskMessage(request, Mock())
+
+        with patch(
+            "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+            return_value=Task(task_id=dst_task_id, run_id=789),
+        ):
+            pull_response = servicer.PullTaskMessage(PullTaskMessageRequest(), Mock())
+
+        # Assert
+        self.assertNotEqual(push_response.message_id, "")
+        self.assertEqual(len(pull_response.messages), 1)
+        message = message_from_proto(pull_response.messages[0])
+        parsed = ModelTaskMessage.from_message(message)
+        self.assertEqual(parsed.payload, spec.payload)
+        self.assertEqual(message.metadata.run_id, 789)
+        self.assertEqual(message.metadata.src_task_id, src_task_id)
+        self.assertEqual(message.metadata.dst_task_id, dst_task_id)
 
     def test_create_task_aborts_if_requesting_task_type_is_not_allowed(self) -> None:
         """CreateTask should reject task creation requests from non-app task types."""
