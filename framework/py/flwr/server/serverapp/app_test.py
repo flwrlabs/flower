@@ -16,6 +16,7 @@
 
 
 import importlib
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -60,6 +61,29 @@ def test_parse_flwr_serverapp_parses_tokenized_invocation() -> None:
     assert args.insecure is True
     assert args.parent_pid == 1234
     assert args.runtime_dependency_install is True
+
+
+def test_parse_flwr_serverapp_parses_token_file_invocation() -> None:
+    """The ServerApp process CLI should parse token file invocation."""
+    args = _parse_args_run_flwr_serverapp().parse_args(
+        [
+            "--token-file",
+            "/path/to/token",
+            "--insecure",
+        ]
+    )
+
+    assert args.token is None
+    assert args.token_file == "/path/to/token"
+    assert args.insecure is True
+
+
+def test_parse_flwr_serverapp_rejects_token_and_token_file() -> None:
+    """The ServerApp process CLI should reject duplicate token sources."""
+    with pytest.raises(SystemExit):
+        _parse_args_run_flwr_serverapp().parse_args(
+            ["--token", "test-token", "--token-file", "/path/to/token"]
+        )
 
 
 def test_flwr_serverapp_parses_args_before_mirroring_output() -> None:
@@ -127,3 +151,41 @@ def test_flwr_serverapp_forwards_cli_args() -> None:
     assert kwargs["certificates"] is None
     assert kwargs["parent_pid"] == 321
     assert kwargs["runtime_dependency_install"] is True
+
+
+def test_flwr_serverapp_forwards_token_file(tmp_path: Path) -> None:
+    """The ServerApp CLI should read and forward token file contents."""
+    token_file = tmp_path / "token"
+    token_file.write_text("test-token\n", encoding="utf-8")
+    args = SimpleNamespace(
+        insecure=True,
+        serverappio_api_address="127.0.0.1:9091",
+        token=None,
+        token_file=str(token_file),
+        root_certificates=None,
+        parent_pid=321,
+        runtime_dependency_install=True,
+    )
+
+    class _Parser:
+        def parse_args(self) -> SimpleNamespace:
+            """Return a fixed namespace for CLI forwarding tests."""
+            return args
+
+    mirror_output_to_queue = Mock()
+    restore_output = Mock()
+    run_serverapp = Mock()
+
+    with (
+        patch.object(serverapp_module, "_parse_args_run_flwr_serverapp", _Parser),
+        patch.object(
+            serverapp_module,
+            "mirror_output_to_queue",
+            mirror_output_to_queue,
+        ),
+        patch.object(serverapp_module, "restore_output", restore_output),
+        patch.object(serverapp_module, "run_serverapp", run_serverapp),
+    ):
+        serverapp_module.flwr_serverapp()
+
+    assert run_serverapp.call_args.kwargs["token"] == "test-token"
