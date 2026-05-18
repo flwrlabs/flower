@@ -263,6 +263,10 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         # Set Grpc max retries to 1 to avoid blocking on exit
         grid._retry_invoker.max_tries = 1
 
+        # Stop log uploader for this run and upload final logs
+        if log_uploader:
+            stop_log_uploader(log_queue, log_uploader)
+
         # Push final status and context (if available)
         pushoutput_req = PushTaskOutputRequest(
             context=context_to_proto(context) if context else None,
@@ -273,10 +277,6 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             grid._stub.PushTaskOutput(pushoutput_req)
         except grpc.RpcError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
-
-        # Stop log uploader for this run and upload final logs
-        if log_uploader:
-            stop_log_uploader(log_queue, log_uploader)
 
         # Stop heartbeat sender
         if heartbeat_sender and heartbeat_sender.is_running:
