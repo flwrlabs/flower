@@ -75,5 +75,8 @@
     "os": false
   },
   "jsdelivr": "./dist/flowerintelligence.cjs.js",
-  "unpkg": "./dist/flowerintelligence.cjs.js"
+  "unpkg": "./dist/flowerintelligence.cjs.js",
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "onnxruntime-node", "protobufjs", "sharp"]
+  }
 }
