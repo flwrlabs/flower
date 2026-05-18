@@ -16,7 +16,8 @@ We would like to give our special thanks to all the contributors who made the ne
 
 - **Add initial runtime version compatibility checks across framework components** ([#7038](https://github.com/flwrlabs/flower/pull/7038), [#7067](https://github.com/flwrlabs/flower/pull/7067), [#7077](https://github.com/flwrlabs/flower/pull/7077), [#7084](https://github.com/flwrlabs/flower/pull/7084), [#7091](https://github.com/flwrlabs/flower/pull/7091), [#7092](https://github.com/flwrlabs/flower/pull/7092), [#7093](https://github.com/flwrlabs/flower/pull/7093), [#7103](https://github.com/flwrlabs/flower/pull/7103), [#7107](https://github.com/flwrlabs/flower/pull/7107), [#7108](https://github.com/flwrlabs/flower/pull/7108), [#7113](https://github.com/flwrlabs/flower/pull/7113), [#7141](https://github.com/flwrlabs/flower/pull/7141), [#7146](https://github.com/flwrlabs/flower/pull/7146), [#7160](https://github.com/flwrlabs/flower/pull/7160), [#7191](https://github.com/flwrlabs/flower/pull/7191))
 
-  Introduces the foundation for runtime version compatibility checks across Flower components. SuperLink-to-SuperExec and SuperNode-to-SuperExec communication now requires matching major and minor Flower releases, improving production safety by preventing incompatible runtime combinations.
+  Introduces runtime version compatibility metadata and checks across Flower runtime components. AppIo communication for `flwr-serverapp`, `flwr-simulation`, and `flwr-clientapp` now enforces matching `major.minor` Flower releases, which prevents incompatible app runtime combinations from proceeding. Control API and Fleet API also observe runtime version metadata to prepare these paths for stricter compatibility handling in future releases.
+
 
 - **Add TLS support for AppIo APIs** ([#6986](https://github.com/flwrlabs/flower/pull/6986), [#7046](https://github.com/flwrlabs/flower/pull/7046), [#7175](https://github.com/flwrlabs/flower/pull/7175))
 
