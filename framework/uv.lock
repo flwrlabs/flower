@@ -138,14 +138,14 @@ wheels = [
 
 [[package]]
 name = "astroid"
-version = "3.3.11"
+version = "4.0.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/18/74/dfb75f9ccd592bbedb175d4a32fc643cf569d7c218508bfbd6ea7ef9c091/astroid-3.3.11.tar.gz", hash = "sha256:1e5a5011af2920c7c67a53f65d536d65bfa7116feeaf2354d8b94f29573bb0ce", size = 400439, upload-time = "2025-07-13T18:04:23.177Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/07/63/0adf26577da5eff6eb7a177876c1cfa213856be9926a000f65c4add9692b/astroid-4.0.4.tar.gz", hash = "sha256:986fed8bcf79fb82c78b18a53352a0b287a73817d6dbcfba3162da36667c49a0", size = 406358, upload-time = "2026-02-07T23:35:07.509Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/af/0f/3b8fdc946b4d9cc8cc1e8af42c4e409468c84441b933d037e101b3d72d86/astroid-3.3.11-py3-none-any.whl", hash = "sha256:54c760ae8322ece1abd213057c4b5bba7c49818853fc901ef09719a60dbf9dec", size = 275612, upload-time = "2025-07-13T18:04:21.07Z" },
+    { url = "https://files.pythonhosted.org/packages/b0/cf/1c5f42b110e57bc5502eb80dbc3b03d256926062519224835ef08134f1f9/astroid-4.0.4-py3-none-any.whl", hash = "sha256:52f39653876c7dec3e3afd4c2696920e05c83832b9737afc21928f2d2eb7a753", size = 276445, upload-time = "2026-02-07T23:35:05.344Z" },
 ]
 
 [[package]]
@@ -912,7 +912,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/a2/55/8f8cab2afd404cf57
 
 [[package]]
 name = "docsig"
-version = "0.64.0"
+version = "0.84.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "astroid" },
@@ -921,9 +921,9 @@ dependencies = [
     { name = "tomli" },
     { name = "wcmatch" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a7/30/05c5b5054cb5b0425ffa7561cd12a0a85ef7ba02f95c3d99bf44fd9f2e7b/docsig-0.64.0.tar.gz", hash = "sha256:f0de51c51459fed58aedbec7e0b2159af976566959751737ed8a1bfe61032324", size = 26642, upload-time = "2024-10-04T10:29:55.969Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7e/c7/ae5c0eb30fd21e4c16e7c7f895927eac43e9c4ff0e5e471ac78d0f4583a9/docsig-0.84.0.tar.gz", hash = "sha256:6b5db6c1e710dc369a8ae2fae165b3b1670c56f91de621dc53ec1e6f995acb42", size = 31358, upload-time = "2026-05-01T22:33:06.022Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/29/d5/cd9036998dc296af40d1b460b0211b9bfb1f24a8c69f81ad6390cd694186/docsig-0.64.0-py3-none-any.whl", hash = "sha256:d1192f99705f95255145bea92747f187466c880cdabea0eda50d147b462cd020", size = 29547, upload-time = "2024-10-04T10:29:53.665Z" },
+    { url = "https://files.pythonhosted.org/packages/3f/b8/da8b9b10cbe128808193949217a1da0093b9fc4fdce88e5134dbfa390605/docsig-0.84.0-py3-none-any.whl", hash = "sha256:3633ca70c9ef3154549f75d597447b4965cfca283f37406e9cdf4372843960a4", size = 36561, upload-time = "2026-05-01T22:33:03.872Z" },
 ]
 
 [[package]]
@@ -1154,7 +1154,7 @@ dev = [
     { name = "check-wheel-contents", specifier = "==0.6.3" },
     { name = "clang-format", specifier = "==17.0.6" },
     { name = "devtool", editable = "../dev" },
-    { name = "docsig", specifier = "==0.64.0" },
+    { name = "docsig", specifier = "==0.84.0" },
     { name = "docstrfmt", marker = "python_full_version >= '3.10' and python_full_version < '4'", git = "https://github.com/charlesbvll/docstrfmt.git?rev=patch-2" },
     { name = "furo", specifier = "==2024.8.6" },
     { name = "gitpython", specifier = "==3.1.32" },
@@ -1174,7 +1174,7 @@ dev = [
     { name = "pipreqs", specifier = "==0.4.13" },
     { name = "pre-commit", specifier = "==3.5.0" },
     { name = "pygithub", specifier = "==2.1.1" },
-    { name = "pylint", specifier = "==3.3.1" },
+    { name = "pylint", specifier = "==4.0.5" },
     { name = "pyroma", specifier = "==4.2" },
     { name = "pytest", specifier = "==7.4.4" },
     { name = "pytest-cov", specifier = "==4.1.0" },
@@ -3214,7 +3214,7 @@ crypto = [
 
 [[package]]
 name = "pylint"
-version = "3.3.1"
+version = "4.0.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "astroid" },
@@ -3226,9 +3226,9 @@ dependencies = [
     { name = "tomli", marker = "python_full_version < '3.11'" },
     { name = "tomlkit" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/63/3a/13e90e29777e695d90f422cf4fadb81c999e4755a9089838561bd0590cac/pylint-3.3.1.tar.gz", hash = "sha256:9f3dcc87b1203e612b78d91a896407787e708b3f189b5fa0b307712d49ff0c6e", size = 1516703, upload-time = "2024-09-24T11:10:50.183Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e4/b6/74d9a8a68b8067efce8d07707fe6a236324ee1e7808d2eb3646ec8517c7d/pylint-4.0.5.tar.gz", hash = "sha256:8cd6a618df75deb013bd7eb98327a95f02a6fb839205a6bbf5456ef96afb317c", size = 1572474, upload-time = "2026-02-20T09:07:33.621Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4d/11/4a3f814eee14593f3cfcf7046bc765bf1646d5c88132c08c45310fc7d85f/pylint-3.3.1-py3-none-any.whl", hash = "sha256:2f846a466dd023513240bc140ad2dd73bfc080a5d85a710afdb728c420a5a2b9", size = 521768, upload-time = "2024-09-24T11:10:47.811Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/6f/9ac2548e290764781f9e7e2aaf0685b086379dabfb29ca38536985471eaf/pylint-4.0.5-py3-none-any.whl", hash = "sha256:00f51c9b14a3b3ae08cff6b2cdd43f28165c78b165b628692e428fb1f8dc2cf2", size = 536694, upload-time = "2026-02-20T09:07:31.028Z" },
 ]
 
 [[package]]

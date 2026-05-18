@@ -31,7 +31,7 @@ attribute.
 """
 
 
-_current_sys_path: str | None = None
+_current_sys_path: str | None = None  # pylint: disable=invalid-name
 _import_lock = Lock()
 
 
