@@ -176,6 +176,22 @@ class StateTest(CoreStateTest):
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
 
+    def test_create_agent_run_creates_agentapp_primary_task(self) -> None:
+        """Creating an agent run should create an AgentApp primary task."""
+        # Prepare
+        state = self.state_factory()
+
+        # Execute
+        run_id = create_dummy_run(state, run_type=RunType.AGENT)
+
+        # Assert
+        tasks = state.get_tasks(run_ids=[run_id])
+        run = state.get_run_info(run_ids=[run_id])[0]
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(run.run_type, RunType.AGENT)
+        self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
+        self.assertEqual(run.primary_task_id, tasks[0].task_id)
+
     def test_get_run_info_without_filters_returns_all_runs(self) -> None:
         """Test get_run_info returns all runs when no filter is provided."""
         # Prepare

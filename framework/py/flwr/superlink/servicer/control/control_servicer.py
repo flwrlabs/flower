@@ -21,14 +21,19 @@ import hashlib
 import json
 import time
 from collections.abc import Generator, Sequence
+from dataclasses import dataclass
+from io import BytesIO
 from logging import ERROR, INFO
 from typing import Any, cast
+from uuid import uuid4
+from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 import grpc
 import requests
 
+from flwr.app.user_config import UserConfig
 from flwr.cli.utils import validate_federation_name
-from flwr.common import Context, RecordDict, now
+from flwr.common import ConfigRecord, Context, RecordDict, now
 from flwr.common.config import (
     flatten_dict,
     fuse_dicts,
@@ -133,6 +138,132 @@ from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
 from .control_account_auth_interceptor import get_current_account_info
 
+_AGENT_RUN_TYPE_KEY = "run_type"
+_AGENT_REF_KEY = "agent_ref"
+_AGENT_INPUT_JSON_KEY = "input_json"
+_AGENT_CONVERSATION_ID_KEY = "conversation_id"
+_AGENT_MODEL_KEY = "model"
+_GPT_CHAT_AGENT_REF = "gpt-chat"
+_AGENT_START_RECORD_KEY = "agent.start"
+
+_BUILTIN_GPT_CHAT_PYPROJECT = """
+[project]
+name = "gpt-chat"
+version = "0.1.0"
+description = "Built-in pass-through GPT Chat agent."
+dependencies = []
+
+[tool.flwr.app]
+publisher = "flwrlabs"
+fab-format-version = 0
+
+[tool.flwr.app.components]
+serverapp = "flwr.supercore.executors.run_agentapp:run_agentapp"
+clientapp = "flwr.supercore.executors.run_agentapp:run_agentapp"
+
+[tool.flwr.app.config]
+run_type = "agent"
+agent_ref = "gpt-chat"
+input_json = "[]"
+conversation_id = ""
+model = ""
+""".lstrip()
+
+
+@dataclass(frozen=True)
+class AgentStartConfig:
+    """Validated internal AgentApp start configuration."""
+
+    agent_ref: str
+    input_json: str
+    conversation_id: str
+    model: str | None = None
+
+
+def _parse_agent_start_config(override_config: UserConfig) -> AgentStartConfig | None:
+    """Parse reserved override_config keys for an AgentApp run."""
+    if override_config.get(_AGENT_RUN_TYPE_KEY) != RunType.AGENT:
+        return None
+
+    agent_ref = override_config.get(_AGENT_REF_KEY)
+    if not isinstance(agent_ref, str) or not agent_ref:
+        raise ValueError("Agent runs require `agent_ref`.")
+    if agent_ref != _GPT_CHAT_AGENT_REF:
+        raise ValueError(f"Unsupported agent_ref: {agent_ref}.")
+
+    input_json = override_config.get(_AGENT_INPUT_JSON_KEY)
+    if not isinstance(input_json, str) or not input_json:
+        raise ValueError("Agent runs require `input_json`.")
+
+    try:
+        parsed_input = json.loads(input_json)
+        if not isinstance(parsed_input, (dict, list)):
+            raise ValueError
+        normalized_input_json = json.dumps(
+            parsed_input,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ValueError(
+            "`input_json` must be valid strict JSON containing an object or list."
+        ) from exc
+
+    conversation_id = override_config.get(_AGENT_CONVERSATION_ID_KEY)
+    if conversation_id is None or conversation_id == "":
+        conversation_id = f"conv-{uuid4().hex}"
+    if not isinstance(conversation_id, str) or not conversation_id.strip():
+        raise ValueError("`conversation_id` must be a non-empty string.")
+
+    model = override_config.get(_AGENT_MODEL_KEY)
+    if model is not None and (not isinstance(model, str) or not model.strip()):
+        raise ValueError("`model` must be a non-empty string.")
+
+    return AgentStartConfig(
+        agent_ref=agent_ref,
+        input_json=normalized_input_json,
+        conversation_id=conversation_id,
+        model=model,
+    )
+
+
+def _resolve_builtin_agent_fab(agent_ref: str) -> tuple[bytes, dict[str, str]]:
+    """Return built-in AgentApp FAB content and verification metadata."""
+    if agent_ref != _GPT_CHAT_AGENT_REF:
+        raise ValueError(f"Unsupported agent_ref: {agent_ref}.")
+
+    buffer = BytesIO()
+    pyproject = ZipInfo("pyproject.toml", date_time=(2024, 10, 1, 0, 0, 0))
+    pyproject.compress_type = ZIP_DEFLATED
+    with ZipFile(buffer, "w", ZIP_DEFLATED) as zip_file:
+        zip_file.writestr(pyproject, _BUILTIN_GPT_CHAT_PYPROJECT)
+    return buffer.getvalue(), {}
+
+
+def _create_agent_start_state(agent_start_config: AgentStartConfig) -> RecordDict:
+    """Create the initial run context state for an AgentApp run."""
+    return RecordDict(
+        {
+            _AGENT_START_RECORD_KEY: ConfigRecord(
+                {
+                    _AGENT_REF_KEY: agent_start_config.agent_ref,
+                    _AGENT_CONVERSATION_ID_KEY: agent_start_config.conversation_id,
+                    _AGENT_INPUT_JSON_KEY: agent_start_config.input_json,
+                    _AGENT_MODEL_KEY: agent_start_config.model or "",
+                }
+            )
+        }
+    )
+
+
+def _abort_failed_precondition(
+    context: grpc.ServicerContext,
+    details: str,
+) -> None:
+    """Abort the RPC with FAILED_PRECONDITION."""
+    context.abort(grpc.StatusCode.FAILED_PRECONDITION, details)
+    raise RuntimeError("This line should never be reached.")
+
 
 # pylint: disable=too-many-public-methods
 class ControlServicer(control_pb2_grpc.ControlServicer):
@@ -159,25 +290,35 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         log(INFO, rpc_name := self.StartRun.__qualname__)
         state = self.linkstate_factory.state()
 
+        flwr_aid = _get_flwr_aid(context)
+        override_config = user_config_from_proto(request.override_config)
+        is_agent_run = override_config.get(_AGENT_RUN_TYPE_KEY) == RunType.AGENT
+        agent_start_config: AgentStartConfig | None = None
+
         verification_dict: dict[str, str] = {}
         note: str | None = None
-        if request.app_spec:
+        if is_agent_run:
+            if request.app_spec or request.fab.content:
+                _abort_failed_precondition(
+                    context,
+                    "Agent runs use built-in AgentApp content and cannot include "
+                    "`app_spec` or `fab`.",
+                )
+            fab_file = b""
+        elif request.app_spec:
             fab_file, verification_dict, note = _get_remote_fab(
                 self.fleet_api_type, request.app_spec, context
             )
         else:
             fab_file = request.fab.content
 
-        if len(fab_file) > FAB_MAX_SIZE:
+        if not is_agent_run and len(fab_file) > FAB_MAX_SIZE:
             log(
                 ERROR,
                 "FAB size exceeds maximum allowed size of %d bytes.",
                 FAB_MAX_SIZE,
             )
             return StartRunResponse()
-
-        flwr_aid = _get_flwr_aid(context)
-        override_config = user_config_from_proto(request.override_config)
 
         with rpc_error_translator(context, rpc_name):
             # Check (1) federation exists and (2) the flwr_aid is a member
@@ -204,7 +345,15 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             run_type = RunType.SERVER_APP
             resolved_federation_config = None
             runtime = RunTime.DEPLOYMENT
-            if sim_cfg := state.federation_manager.get_simulation_config(federation):
+            sim_cfg = state.federation_manager.get_simulation_config(federation)
+            if is_agent_run:
+                run_type = RunType.AGENT
+                if sim_cfg:
+                    _abort_failed_precondition(
+                        context,
+                        "Agent runs do not support simulation federations.",
+                    )
+            elif sim_cfg:
                 run_type = RunType.SIMULATION
                 runtime = RunTime.SIMULATION
                 resolved_federation_config = SimulationConfig()
@@ -216,6 +365,26 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 ActionType.START_RUN,
                 StartRunContext(federation_name=federation, runtime=runtime),
             )
+
+        if is_agent_run:
+            try:
+                agent_start_config = _parse_agent_start_config(override_config)
+                if agent_start_config is None:
+                    raise ValueError("Agent runs require `run_type` to be `agent`.")
+                fab_file, verification_dict = _resolve_builtin_agent_fab(
+                    agent_start_config.agent_ref
+                )
+            except ValueError as err:
+                log(ERROR, "Could not start run: %s", str(err))
+                _abort_failed_precondition(context, str(err))
+
+            if len(fab_file) > FAB_MAX_SIZE:
+                log(
+                    ERROR,
+                    "FAB size exceeds maximum allowed size of %d bytes.",
+                    FAB_MAX_SIZE,
+                )
+                return StartRunResponse()
 
         try:
             # Validate user config overrides matches keys in run config in FAB
@@ -262,25 +431,32 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     "tmp_dir": self.artifact_provider.tmp_dir,
                 }
 
+            context_state = RecordDict()
+            if agent_start_config is not None:
+                context_state = _create_agent_start_state(agent_start_config)
+
             # Create an empty context for the Run
-            context = Context(
+            run_context = Context(
                 run_id=run_id,
                 node_id=SUPERLINK_NODE_ID,
                 # Dict is invariant in mypy
                 node_config=node_config,  # type: ignore[arg-type]
-                state=RecordDict(),
+                state=context_state,
                 run_config={},
             )
 
             # Register the context at the LinkState
-            state.set_serverapp_context(run_id=run_id, context=context)
+            state.set_serverapp_context(run_id=run_id, context=run_context)
 
         except ValueError as e:
             log(ERROR, "Could not start run: %s", str(e))
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
 
         log(INFO, "Created %s run %s", run_type, str(run_id))
-        return StartRunResponse(run_id=run_id, note=note)
+        response = StartRunResponse(run_id=run_id, note=note)
+        if agent_start_config is not None:
+            response.conversation_id = agent_start_config.conversation_id
+        return response
 
     def StreamLogs(  # pylint: disable=C0103
         self, request: StreamLogsRequest, context: grpc.ServicerContext

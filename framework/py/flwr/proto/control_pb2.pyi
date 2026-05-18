@@ -87,16 +87,21 @@ class StartRunResponse(google.protobuf.message.Message):
 
     RUN_ID_FIELD_NUMBER: builtins.int
     NOTE_FIELD_NUMBER: builtins.int
+    CONVERSATION_ID_FIELD_NUMBER: builtins.int
     run_id: builtins.int
     note: builtins.str
+    conversation_id: builtins.str
     def __init__(
         self,
         *,
         run_id: builtins.int | None = ...,
         note: builtins.str | None = ...,
+        conversation_id: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_note", b"_note", "_run_id", b"_run_id", "note", b"note", "run_id", b"run_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_note", b"_note", "_run_id", b"_run_id", "note", b"note", "run_id", b"run_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_conversation_id", b"_conversation_id", "_note", b"_note", "_run_id", b"_run_id", "conversation_id", b"conversation_id", "note", b"note", "run_id", b"run_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_conversation_id", b"_conversation_id", "_note", b"_note", "_run_id", b"_run_id", "conversation_id", b"conversation_id", "note", b"note", "run_id", b"run_id"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_conversation_id", b"_conversation_id"]) -> typing.Literal["conversation_id"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_note", b"_note"]) -> typing.Literal["note"] | None: ...
     @typing.overload

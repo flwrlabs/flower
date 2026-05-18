@@ -201,6 +201,7 @@ class RunType(StrEnum):
 
     SERVER_APP = "serverapp"
     SIMULATION = "simulation"
+    AGENT = "agent"
 
 
 class RunTime(StrEnum):

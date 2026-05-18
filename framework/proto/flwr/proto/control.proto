@@ -126,6 +126,7 @@ message StartRunRequest {
 message StartRunResponse {
   optional uint64 run_id = 1;
   optional string note = 2;
+  optional string conversation_id = 3;
 }
 message StreamLogsRequest {
   uint64 run_id = 1;
