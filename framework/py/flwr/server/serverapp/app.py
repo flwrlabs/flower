@@ -38,8 +38,10 @@ from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
     SubStatus,
 )
+from flwr.common.context import Context
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import (
+    flush_logs,
     log,
     mirror_output_to_queue,
     restore_output,
@@ -100,7 +102,7 @@ def flwr_serverapp() -> None:
     restore_output()
 
 
-def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
+def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     serverappio_api_address: str,
     log_queue: Queue[str | None],
     token: str,
@@ -114,6 +116,14 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
 
+    # Initialize the GrpcGrid
+    grid = GrpcGrid(
+        serverappio_service_address=serverappio_api_address,
+        insecure=insecure,
+        root_certificates=certificates,
+        token=token,
+    )
+
     # Initialize variables for exit handler
     log_uploader = None
     hash_run_id = None
@@ -121,48 +131,17 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     sub_status = SubStatus.FAILED
     details = "Task failed with unknown error."
     heartbeat_sender = None
-    grid = None
-    context = None
+    context: Context | None = None
     runtime_env_dir: Path | None = None
     exit_code = ExitCode.SUCCESS
-
-    def on_exit() -> None:
-        # Set Grpc max retries to 1 to avoid blocking on exit
-        if grid:
-            grid._retry_invoker.max_tries = 1
-
-        # Stop heartbeat sender
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
-
-        # Stop log uploader for this run and upload final logs
-        if log_uploader:
-            stop_log_uploader(log_queue, log_uploader)
-
-        # Close the Grpc connection
-        if grid:
-            grid.close()
-
-        # Clean up run-scoped runtime environment, if any.
-        cleanup_app_runtime_environment(runtime_env_dir)
 
     # Register signal handlers for graceful shutdown
     register_signal_handlers(
         event_type=EventType.FLWR_SERVERAPP_RUN_LEAVE,
-        exit_message="Run stopped by user.",
-        exit_handlers=[on_exit],
+        exit_message="Task stopped by user.",
     )
 
     try:
-
-        # Initialize the GrpcGrid
-        grid = GrpcGrid(
-            serverappio_service_address=serverappio_api_address,
-            insecure=insecure,
-            root_certificates=certificates,
-            token=token,
-        )
-
         # Set up heartbeat sender
         heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(grid._stub))
         heartbeat_sender.start()
@@ -278,19 +257,41 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         exit_code = ExitCode.SERVERAPP_EXCEPTION  # General exit code
         if isinstance(ex, AppExitException):
             exit_code = ex.exit_code
+
     finally:
-        # Update run status
-        if grid:
-            log(DEBUG, "[flwr-serverapp] Will push ServerApp task output")
-            pushoutput_req = PushTaskOutputRequest(
-                context=context_to_proto(context) if context else None,
-                sub_status=sub_status,
-                details=details,
-            )
-            try:
-                grid._stub.PushTaskOutput(pushoutput_req)
-            except grpc.RpcError:
-                pass
+        log(DEBUG, "[flwr-serverapp] Will push ServerApp task output")
+
+        # Set Grpc max retries to 1 to avoid blocking on exit
+        grid._retry_invoker.max_tries = 1
+
+        # Upload any remaining logs before pushing final output
+        if log_uploader:
+            flush_logs(log_queue)
+
+        # Push final status and context (if available)
+        pushoutput_req = PushTaskOutputRequest(
+            context=context_to_proto(context) if context else None,
+            sub_status=sub_status,
+            details=details,
+        )
+        try:
+            grid._stub.PushTaskOutput(pushoutput_req)
+        except grpc.RpcError as err:
+            log(ERROR, "Failed to push task output: %s", str(err))
+
+        # Stop log uploader for this run and upload final logs
+        if log_uploader:
+            stop_log_uploader(log_queue, log_uploader)
+
+        # Stop heartbeat sender
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+
+        # Close the Grpc connection
+        grid.close()
+
+        # Clean up run-scoped runtime environment, if any.
+        cleanup_app_runtime_environment(runtime_env_dir)
 
     flwr_exit(
         code=exit_code,
