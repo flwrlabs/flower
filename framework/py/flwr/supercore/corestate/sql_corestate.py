@@ -413,19 +413,25 @@ class SqlCoreState(CoreState, SqlMixin):
 
     def store_task_message(self, message: Message) -> str | None:
         """Store one task-addressed Message."""
-        if not _is_valid_task_message(message):
+        src_task_id = message.metadata.src_task_id
+        dst_task_id = message.metadata.dst_task_id
+        if (
+            not _is_valid_task_message(message)
+            or src_task_id is None
+            or dst_task_id is None
+        ):
             return None
 
         message_id = message.metadata.message_id
-        src_task_id = uint64_to_int64(message.metadata.src_node_id)
-        dst_task_id = uint64_to_int64(message.metadata.dst_node_id)
+        sint64_src_task_id = uint64_to_int64(src_task_id)
+        sint64_dst_task_id = uint64_to_int64(dst_task_id)
 
         with self.session():
             self._cleanup_expired_task_tokens()
             message_dict = {
                 "message_id": message.metadata.message_id,
-                "src_task_id": src_task_id,
-                "dst_task_id": dst_task_id,
+                "src_task_id": sint64_src_task_id,
+                "dst_task_id": sint64_dst_task_id,
                 "reply_to_message_id": message.metadata.reply_to_message_id,
                 "created_at": message.metadata.created_at,
                 "ttl": message.metadata.ttl,
@@ -649,13 +655,15 @@ def _task_message_from_row(row: dict[str, Any]) -> Message:
     metadata = Metadata(
         run_id=row["run_id"],
         message_id=row["message_id"],
-        src_node_id=row["src_task_id"],
-        dst_node_id=row["dst_task_id"],
+        src_node_id=0,
+        dst_node_id=0,
         reply_to_message_id=row["reply_to_message_id"] or "",
         group_id="",
         created_at=row["created_at"],
         ttl=row["ttl"],
         message_type=row["message_type"],
+        src_task_id=row["src_task_id"],
+        dst_task_id=row["dst_task_id"],
     )
     return make_message(metadata=metadata, content=content, error=error)
 
@@ -664,8 +672,10 @@ def _is_valid_task_message(message: Message) -> bool:
     """Return True if the task message carries the required payload fields."""
     return (
         message.metadata.message_id != ""
-        and message.metadata.src_node_id != 0
-        and message.metadata.dst_node_id != 0
+        and message.metadata.src_task_id is not None
+        and message.metadata.src_task_id != 0
+        and message.metadata.dst_task_id is not None
+        and message.metadata.dst_task_id != 0
         and message.metadata.ttl > 0
         and message.metadata.message_type != ""
         and message.has_content() != message.has_error()

@@ -2198,8 +2198,8 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
                 task_type=TaskType.CLIENT_APP, run_id=run_id
             )
             assert dst_task_id is not None
-            msg = create_ins_message_obj(
-                src_node_id=src_task_id, dst_node_id=dst_task_id, run_id=run_id
+            msg = self._create_task_message(
+                src_task_id=src_task_id, dst_task_id=dst_task_id, run_id=run_id
             )
             assert state.store_task_message(msg)
 

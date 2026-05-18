@@ -81,9 +81,23 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         created_at: float | None = None,
     ) -> Message:
         """Create a task-addressed Message for CoreState tests."""
-        message = Message(RecordDict(), dst_task_id, "query", ttl=ttl)
+        src_node_id = 1
+        while src_node_id in (src_task_id, dst_task_id):
+            src_node_id += 1
+        dst_node_id = src_node_id + 1
+        while dst_node_id in (src_task_id, dst_task_id):
+            dst_node_id += 1
+
+        message = Message(
+            RecordDict(),
+            dst_node_id,
+            "query",
+            ttl=ttl,
+            src_task_id=src_task_id,
+            dst_task_id=dst_task_id,
+        )
         message.metadata.__dict__["_message_id"] = str(uuid4())
-        message.metadata.__dict__["_src_node_id"] = src_task_id
+        message.metadata.__dict__["_src_node_id"] = src_node_id
         message.metadata.__dict__["_run_id"] = run_id
         if created_at is not None:
             message.metadata.created_at = created_at
@@ -504,8 +518,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             pulled_message.metadata.message_id, message.metadata.message_id
         )
         self.assertEqual(pulled_message.metadata.run_id, run_id)
-        self.assertEqual(pulled_message.metadata.src_node_id, src_task_id)
-        self.assertEqual(pulled_message.metadata.dst_node_id, dst_task_id)
+        self.assertEqual(pulled_message.metadata.src_node_id, 0)
+        self.assertEqual(pulled_message.metadata.dst_node_id, 0)
+        self.assertEqual(pulled_message.metadata.src_task_id, src_task_id)
+        self.assertEqual(pulled_message.metadata.dst_task_id, dst_task_id)
         self.assertTrue(pulled_message.has_content())
 
     def test_store_task_message_validates_task_relationship(self) -> None:

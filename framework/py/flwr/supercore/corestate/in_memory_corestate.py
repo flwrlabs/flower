@@ -324,11 +324,15 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
     def store_task_message(self, message: Message) -> str | None:
         """Store one task-addressed Message."""
         message_id = message.metadata.message_id
-        if not _is_valid_task_message(message):
+        src_task_id = message.metadata.src_task_id
+        dst_task_id = message.metadata.dst_task_id
+        if (
+            not _is_valid_task_message(message)
+            or src_task_id is None
+            or dst_task_id is None
+        ):
             return None
 
-        src_task_id = message.metadata.src_node_id
-        dst_task_id = message.metadata.dst_node_id
         with self.lock_task_store:
             self._cleanup_expired_task_tokens_locked()
             src_task = self.task_store.get(src_task_id)
@@ -343,6 +347,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
 
         message_copy = message_from_proto(message_to_proto(message))
         message_copy.metadata.__dict__["_run_id"] = run_id
+        message_copy.metadata.__dict__["_src_node_id"] = 0
+        message_copy.metadata.__dict__["_dst_node_id"] = 0
 
         with self.lock_task_message_store:
             if message_id in self.task_message_store:
@@ -381,7 +387,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             for message_id in message_ids:
                 message = self.task_message_store[message_id]
                 if dst_task_id_set is not None:
-                    if message.metadata.dst_node_id not in dst_task_id_set:
+                    if message.metadata.dst_task_id not in dst_task_id_set:
                         continue
                 if message.metadata.created_at + message.metadata.ttl <= current:
                     continue
@@ -460,8 +466,10 @@ def _is_valid_task_message(message: Message) -> bool:
     """Return True if the task message carries the required payload fields."""
     return (
         message.metadata.message_id != ""
-        and message.metadata.src_node_id != 0
-        and message.metadata.dst_node_id != 0
+        and message.metadata.src_task_id is not None
+        and message.metadata.src_task_id != 0
+        and message.metadata.dst_task_id is not None
+        and message.metadata.dst_task_id != 0
         and message.metadata.ttl > 0
         and message.metadata.message_type != ""
         and message.has_content() != message.has_error()
