@@ -47,7 +47,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputResponse,
     PushAppMessagesRequest,
     PushTaskOutputRequest,
-    PushTaskOutputResponse,
 )
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
@@ -102,34 +101,32 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         ],
     )
     channel.subscribe(on_channel_state_change)
+    stub = ClientAppIoStub(channel)
+    retry_invoker = make_simple_grpc_retry_invoker()
+    wrap_stub(stub, retry_invoker)
+
+    # Initialize variables for exit handler
     heartbeat_sender = None
+    message = None
+    reply_message = None
+    context: Context | None = None
+    sub_status = SubStatus.FAILED
+    details = "ClientApp task failed due to unknown reason"
     runtime_env_dir = None
     exit_code = ExitCode.SUCCESS
 
-    def on_exit() -> None:
-        if heartbeat_sender is not None and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
-        channel.close()
-        cleanup_app_runtime_environment(runtime_env_dir)
-
     register_signal_handlers(
         event_type=EventType.FLWR_CLIENTAPP_RUN_LEAVE,
-        exit_handlers=[on_exit],
+        exit_message="Task stopped by user.",
     )
 
     try:
-        stub = ClientAppIoStub(channel)
-        wrap_stub(stub, make_simple_grpc_retry_invoker())
-
         # Start task heartbeat
         heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
         heartbeat_sender.start()
 
         # Pull Message, Context, Run and FAB from SuperNode
         message, context, run, fab = pull_task_input(stub)
-        reply_message: Message | None = None
-        sub_status = SubStatus.FAILED
-        details = "ClientApp task failed due to unknown reason"
 
         try:
 
@@ -192,30 +189,35 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
             # Create error message
             reply_message = Message(Error(code=e_code, reason=reason), reply_to=message)
-
             sub_status = SubStatus.FAILED
             details = reason
-        finally:
-            if reply_message is None:
-                reply_message = Message(
-                    Error(
-                        code=ErrorCode.CLIENT_APP_CRASHED,
-                        reason=details,
-                    ),
-                    reply_to=message,
-                )
 
-            push_task_output(
-                stub=stub,
-                message=reply_message,
-                context=context,
-                sub_status=sub_status,
-                details=details,
-            )
+        finally:
+            # Push reply message to SuperNode
+            if reply_message:
+                push_message(stub, reply_message, context)
 
     except grpc.RpcError as e:
         log(ERROR, "gRPC error occurred: %s", str(e))
         exit_code = ExitCode.CLIENTAPP_COMMUNICATION_ERROR
+    finally:
+        # Set Grpc max retries to 1 to avoid blocking on exit
+        retry_invoker.max_tries = 1
+
+        # Push final status and context (if available)
+        push_task_output(
+            stub=stub,
+            context=context,
+            sub_status=sub_status,
+            details=details,
+        )
+
+        # Stop heartbeat sender
+        if heartbeat_sender is not None and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+        channel.close()
+
+        cleanup_app_runtime_environment(runtime_env_dir)
 
     flwr_exit(
         code=exit_code,
@@ -257,57 +259,57 @@ def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
         raise e
 
 
-def push_task_output(  # pylint: disable=R0913, R0917
-    stub: ClientAppIoStub,
-    message: Message,
-    context: Context,
-    sub_status: str,
-    details: str,
-) -> PushTaskOutputResponse:
-    """Push TaskOutput to SuperNode."""
+def push_message(stub: ClientAppIoStub, message: Message, context: Context) -> None:
+    """Push reply message to SuperNode."""
     # Set message ID
     message.metadata.__dict__["_message_id"] = message.object_id
     proto_message = message_to_proto(remove_content_from_message(message))
-    proto_context = context_to_proto(context)
 
-    try:
+    with no_object_id_recompute():
+        # Get object tree and all objects to push
+        object_tree = get_object_tree(message)
 
-        with no_object_id_recompute():
-            # Get object tree and all objects to push
-            object_tree = get_object_tree(message)
-
-            # Push Message
-            # This is temporary. The message should not contain its content
-            push_msg_res = stub.PushMessage(
-                PushAppMessagesRequest(
-                    messages_list=[proto_message], message_object_trees=[object_tree]
-                )
-            )
-            del proto_message
-
-            # Retrieve the object IDs to push
-            object_ids_to_push = set(push_msg_res.objects_to_push)
-
-            # Push all objects
-            all_objects = get_all_nested_objects(message)
-            del message
-            push_objects(
-                all_objects,
-                make_push_object_fn_protobuf(
-                    stub.PushObject,
-                    Node(node_id=context.node_id),
-                    run_id=context.run_id,
-                ),
-                object_ids_to_push=object_ids_to_push,
-            )
-
-        # Push Context
-        res: PushTaskOutputResponse = stub.PushTaskOutput(
-            PushTaskOutputRequest(
-                context=proto_context, sub_status=sub_status, details=details
+        # Push Message
+        # This is temporary. The message should not contain its content
+        push_msg_res = stub.PushMessage(
+            PushAppMessagesRequest(
+                messages_list=[proto_message], message_object_trees=[object_tree]
             )
         )
-        return res
-    except grpc.RpcError as e:
-        log(ERROR, "[PushTaskOutput] gRPC error occurred: %s", str(e))
-        raise e
+        del proto_message
+
+        # Retrieve the object IDs to push
+        object_ids_to_push = set(push_msg_res.objects_to_push)
+
+        # Push all objects
+        all_objects = get_all_nested_objects(message)
+        del message
+        push_objects(
+            all_objects,
+            make_push_object_fn_protobuf(
+                stub.PushObject,
+                Node(node_id=context.node_id),
+                run_id=context.run_id,
+            ),
+            object_ids_to_push=object_ids_to_push,
+        )
+
+
+def push_task_output(  # pylint: disable=R0913, R0917
+    stub: ClientAppIoStub,
+    context: Context | None,
+    sub_status: str,
+    details: str,
+) -> None:
+    """Push TaskOutput to SuperNode."""
+    try:
+        # Push Context and final status
+        stub.PushTaskOutput(
+            PushTaskOutputRequest(
+                context=context_to_proto(context) if context else None,
+                sub_status=sub_status,
+                details=details,
+            )
+        )
+    except grpc.RpcError as err:
+        log(ERROR, "Failed to push task output: %s", str(err))
