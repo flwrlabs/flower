@@ -14,6 +14,7 @@
 # ==============================================================================
 """Flower SQLAlchemy-based ObjectStore implementation."""
 
+
 from sqlalchemy import MetaData
 
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
