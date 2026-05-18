@@ -102,7 +102,7 @@ dev = [
     "black[jupyter]==25.11.0",
     "taplo==0.9.3",
     "mypy==1.8.0",
-    "pylint==3.3.1",
+    "pylint==4.0.5",
     "parameterized==0.9.0",
     "pytest==7.4.4",
     "pytest-cov==4.1.0",
@@ -141,7 +141,7 @@ dev = [
     "sphinx-substitution-extensions==2022.2.16",
     "sphinxext-opengraph==0.9.1",
     "docstrfmt @ git+https://github.com/charlesbvll/docstrfmt.git@patch-2 ; python_version >= '3.10' and python_version < '4.0'",
-    "docsig==0.64.0",
+    "docsig==0.84.0",
     "paracelsus==0.15.0",
     "devtool",
 ]
@@ -189,6 +189,9 @@ target-version = ["py310", "py311", "py312", "py313"]
 
 [tool.pylint."MESSAGES CONTROL"]
 disable = "duplicate-code,too-few-public-methods,useless-import-alias"
+
+[tool.pylint.main]
+ignore-paths = ["^py/flwr/supercore/state/alembic/.*$"]
 
 [tool.coverage.run]
 data_file = ".pytest_cache/.coverage"
@@ -267,4 +270,5 @@ convention = "numpy"
 
 [tool.docsig]
 ignore-no-params = true
+disable = ["SIG305", "SIG306"]
 exclude = 'py/flwr/proto/.*|py/flwr/.*_test\.py|py/flwr/cli/new/templates/.*\.tpl'
