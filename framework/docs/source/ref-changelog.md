@@ -26,7 +26,7 @@ We would like to give our special thanks to all the contributors who made the ne
 
   Fixes support for `localhost:0` in the SuperNode ClientAppIo API.
 
-- **Improve framework CI and release workflows** ([#7007](https://github.com/flwrlabs/flower/pull/7007), [#7034](https://github.com/flwrlabs/flower/pull/7034), [#7041](https://github.com/flwrlabs/flower/pull/7041), [#7055](https://github.com/flwrlabs/flower/pull/7055), [#7072](https://github.com/flwrlabs/flower/pull/7072), [#7073](https://github.com/flwrlabs/flower/pull/7073), [#7086](https://github.com/flwrlabs/flower/pull/7086), [#7138](https://github.com/flwrlabs/flower/pull/7138), [#7145](https://github.com/flwrlabs/flower/pull/7145), [#7152](https://github.com/flwrlabs/flower/pull/7152), [#7154](https://github.com/flwrlabs/flower/pull/7154), [#7159](https://github.com/flwrlabs/flower/pull/7159), [#7166](https://github.com/flwrlabs/flower/pull/7166), [#7170](https://github.com/flwrlabs/flower/pull/7170), [#7176](https://github.com/flwrlabs/flower/pull/7176, [#7187](https://github.com/flwrlabs/flower/pull/7187)))
+- **Improve framework CI and release workflows** ([#7007](https://github.com/flwrlabs/flower/pull/7007), [#7034](https://github.com/flwrlabs/flower/pull/7034), [#7041](https://github.com/flwrlabs/flower/pull/7041), [#7055](https://github.com/flwrlabs/flower/pull/7055), [#7072](https://github.com/flwrlabs/flower/pull/7072), [#7073](https://github.com/flwrlabs/flower/pull/7073), [#7086](https://github.com/flwrlabs/flower/pull/7086), [#7138](https://github.com/flwrlabs/flower/pull/7138), [#7145](https://github.com/flwrlabs/flower/pull/7145), [#7152](https://github.com/flwrlabs/flower/pull/7152), [#7154](https://github.com/flwrlabs/flower/pull/7154), [#7159](https://github.com/flwrlabs/flower/pull/7159), [#7166](https://github.com/flwrlabs/flower/pull/7166), [#7170](https://github.com/flwrlabs/flower/pull/7170), [#7176](https://github.com/flwrlabs/flower/pull/7176), [#7187](https://github.com/flwrlabs/flower/pull/7187))
 
 - **Improve framework documentation** ([#7006](https://github.com/flwrlabs/flower/pull/7006), [#7011](https://github.com/flwrlabs/flower/pull/7011), [#7022](https://github.com/flwrlabs/flower/pull/7022), [#7050](https://github.com/flwrlabs/flower/pull/7050), [#7150](https://github.com/flwrlabs/flower/pull/7150), [#7186](https://github.com/flwrlabs/flower/pull/7186))
 
@@ -38,7 +38,7 @@ We would like to give our special thanks to all the contributors who made the ne
 
 - **Disallow manually running internal `flwr-*` commands** ([#7019](https://github.com/flwrlabs/flower/pull/7019))
 
-	Removes support for manually starting `flwr-serverapp`, `flwr-simulation`, and `flwr-clientapp`; these commands can only be launched by SuperExec.
+  Removes support for manually starting `flwr-serverapp`, `flwr-simulation`, and `flwr-clientapp`; these commands can only be launched by SuperExec.
 
 ## v1.29.0 (2026-04-12)
 
