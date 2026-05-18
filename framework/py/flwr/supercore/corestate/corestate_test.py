@@ -424,6 +424,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Expired task claims should transition tasks to FINISHED:FAILED."""
         state = self.state_factory()
         fixed_now = now()
+        active_until = fixed_now + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
         run_id = self.task_run_id(state)
 
         with patch("datetime.datetime") as mock_dt:
@@ -451,6 +452,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             ),
         )
         self.assertTrue(tasks[0].finished_at)
+        self.assertEqual(datetime.fromisoformat(tasks[0].finished_at), active_until)
 
     def test_get_task_by_token_returns_none_for_unknown_token(self) -> None:
         """Unknown task tokens should not resolve to a task."""
