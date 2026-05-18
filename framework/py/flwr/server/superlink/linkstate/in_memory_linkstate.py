@@ -34,7 +34,7 @@ from flwr.common.constant import (
     TASK_ID_NUM_BYTES,
     Status,
 )
-from flwr.common.typing import Run, RunStatus
+from flwr.common.typing import Run, RunEvent, RunEventPayload, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
@@ -82,6 +82,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         # Map run_id to RunRecord
         self.run_ids: dict[int, RunRecord] = {}
         self.contexts: dict[int, Context] = {}
+        self.run_events: dict[int, list[RunEvent]] = {}
         self.message_ins_store: dict[str, Message] = {}
         self.message_res_store: dict[str, Message] = {}
         self.message_ins_id_to_message_res_id: dict[str, str] = {}
@@ -771,6 +772,49 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         if run_id not in self.run_ids:
             raise ValueError(f"Run {run_id} not found")
         self.contexts[run_id] = context
+
+    def store_run_events(
+        self, run_id: int, task_id: int, events: Sequence[RunEventPayload]
+    ) -> Sequence[int]:
+        """Store run events and return assigned sequence numbers."""
+        with self.lock:
+            if run_id not in self.run_ids:
+                raise ValueError(f"Run {run_id} not found")
+
+            stored_events = self.run_events.setdefault(run_id, [])
+            sequence_numbers = []
+            for event_payload in events:
+                sequence_number = len(stored_events) + 1
+                stored_events.append(
+                    RunEvent(
+                        run_id=run_id,
+                        sequence_number=sequence_number,
+                        event=event_payload.event,
+                        data=event_payload.data,
+                        created_at=now().timestamp(),
+                        task_id=task_id,
+                    )
+                )
+                sequence_numbers.append(sequence_number)
+
+            return sequence_numbers
+
+    def get_run_events(
+        self, run_id: int, after_sequence: int = 0, limit: int | None = None
+    ) -> Sequence[RunEvent]:
+        """Retrieve run events ordered by sequence number."""
+        with self.lock:
+            if run_id not in self.run_ids:
+                raise ValueError(f"Run {run_id} not found")
+
+            events = [
+                event
+                for event in self.run_events.get(run_id, [])
+                if event.sequence_number > after_sequence
+            ]
+            if limit is not None:
+                events = events[:limit]
+            return events
 
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`."""

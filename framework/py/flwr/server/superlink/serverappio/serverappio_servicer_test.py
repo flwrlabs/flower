@@ -47,8 +47,11 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputResponse,
     PushAppMessagesRequest,
     PushAppMessagesResponse,
+    PushRunEventsRequest,
+    PushRunEventsResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
+    RunEventPayload,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
@@ -397,6 +400,11 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=CreateTaskRequest.SerializeToString,
             response_deserializer=CreateTaskResponse.FromString,
         )
+        self._push_run_events = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PushRunEvents",
+            request_serializer=PushRunEventsRequest.SerializeToString,
+            response_deserializer=PushRunEventsResponse.FromString,
+        )
 
     def tearDown(self) -> None:
         """Clean up grpc server."""
@@ -442,6 +450,37 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert task.run_id == self._auth_run_id
         assert task.type == TaskType.MODEL
         assert task.model_ref == "models/abc"
+
+    def test_push_run_events_uses_authenticated_task(self) -> None:
+        """PushRunEvents should store events for the authenticated task's run."""
+        request = PushRunEventsRequest(
+            events=[
+                RunEventPayload(event="run.started", data='{"step": 1}'),
+                RunEventPayload(event="run.completed", data="{}"),
+            ]
+        )
+
+        response, call = self._push_run_events.with_call(request=request)
+
+        events = self.state.get_run_events(self._auth_run_id)
+        assert call.code() == grpc.StatusCode.OK
+        assert list(response.sequence_numbers) == [1, 2]
+        assert [event.sequence_number for event in events] == [1, 2]
+        assert [event.event for event in events] == ["run.started", "run.completed"]
+        assert events[0].data == '{"step":1}'
+        assert events[0].run_id == self._auth_run_id
+        assert events[0].task_id == self._primary_task_id(self._auth_run_id)
+
+    def test_push_run_events_rejects_malformed_data(self) -> None:
+        """PushRunEvents should reject malformed event data JSON."""
+        request = PushRunEventsRequest(
+            events=[RunEventPayload(event="run.started", data="{not-json")]
+        )
+
+        with self.assertRaises(grpc.RpcError) as err:
+            self._push_run_events(request=request)
+
+        assert err.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
 
     def test_get_node(self) -> None:
         """Test `GetNode` success."""

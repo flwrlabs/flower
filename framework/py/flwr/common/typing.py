@@ -251,6 +251,26 @@ class Run:  # pylint: disable=too-many-instance-attributes
         )
 
 
+@dataclass(frozen=True)
+class RunEventPayload:
+    """Run event payload submitted by a task executor."""
+
+    event: str
+    data: str
+
+
+@dataclass(frozen=True)
+class RunEvent:
+    """Run event stored by LinkState."""
+
+    run_id: int
+    sequence_number: int
+    event: str
+    data: str
+    created_at: float
+    task_id: int
+
+
 @dataclass
 class Fab:
     """Fab file representation."""

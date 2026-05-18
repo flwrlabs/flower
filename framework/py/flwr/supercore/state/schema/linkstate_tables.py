@@ -148,4 +148,25 @@ def create_linkstate_metadata() -> MetaData:
         Column("error", LargeBinary, nullable=True),
     )
 
+    # --------------------------------------------------------------------------
+    #  Table: run_event
+    # --------------------------------------------------------------------------
+    run_event = Table(
+        "run_event",
+        metadata,
+        Column("run_id", BigInteger, ForeignKey("run.run_id"), nullable=False),
+        Column("sequence_number", BigInteger, nullable=False),
+        Column("event", String, nullable=False),
+        Column("data", String, nullable=False),
+        Column("created_at", Float, nullable=False),
+        Column("task_id", BigInteger, nullable=False),
+        # Composite PK
+        UniqueConstraint("run_id", "sequence_number"),
+    )
+    Index(
+        "idx_run_event_run_id_sequence",
+        run_event.c.run_id,
+        run_event.c.sequence_number,
+    )
+
     return metadata

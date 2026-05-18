@@ -36,7 +36,7 @@ from flwr.common.constant import (
     TASK_ID_NUM_BYTES,
     Status,
 )
-from flwr.common.typing import Run, RunStatus
+from flwr.common.typing import Run, RunEvent, RunEventPayload, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
@@ -1216,6 +1216,90 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     )
                 except IntegrityError:
                     raise ValueError(f"Run {run_id} not found") from None
+
+    def store_run_events(
+        self, run_id: int, task_id: int, events: Sequence[RunEventPayload]
+    ) -> Sequence[int]:
+        """Store run events and return assigned sequence numbers."""
+        sint_run_id = uint64_to_int64(run_id)
+        sint_task_id = uint64_to_int64(task_id)
+
+        with self.session():
+            rows = self.query(
+                "SELECT COUNT(*) as count FROM run WHERE run_id = :run_id",
+                {"run_id": sint_run_id},
+            )
+            if rows[0]["count"] == 0:
+                raise ValueError(f"Run {run_id} not found")
+
+            rows = self.query(
+                """
+                SELECT COALESCE(MAX(sequence_number), 0) as max_sequence_number
+                FROM run_event
+                WHERE run_id = :run_id
+                """,
+                {"run_id": sint_run_id},
+            )
+            next_sequence_number = rows[0]["max_sequence_number"] + 1
+            sequence_numbers = []
+            for event_payload in events:
+                sequence_number = next_sequence_number
+                next_sequence_number += 1
+                self.query(
+                    """
+                    INSERT INTO run_event
+                    (run_id, sequence_number, event, data, created_at, task_id)
+                    VALUES
+                    (:run_id, :sequence_number, :event, :data, :created_at, :task_id)
+                    """,
+                    {
+                        "run_id": sint_run_id,
+                        "sequence_number": sequence_number,
+                        "event": event_payload.event,
+                        "data": event_payload.data,
+                        "created_at": now().timestamp(),
+                        "task_id": sint_task_id,
+                    },
+                )
+                sequence_numbers.append(sequence_number)
+
+            return sequence_numbers
+
+    def get_run_events(
+        self, run_id: int, after_sequence: int = 0, limit: int | None = None
+    ) -> Sequence[RunEvent]:
+        """Retrieve run events ordered by sequence number."""
+        sint_run_id = uint64_to_int64(run_id)
+        rows = self.query(
+            "SELECT COUNT(*) as count FROM run WHERE run_id = :run_id",
+            {"run_id": sint_run_id},
+        )
+        if rows[0]["count"] == 0:
+            raise ValueError(f"Run {run_id} not found")
+
+        query = """
+            SELECT run_id, sequence_number, event, data, created_at, task_id
+            FROM run_event
+            WHERE run_id = :run_id AND sequence_number > :after_sequence
+            ORDER BY sequence_number ASC
+        """
+        params = {"run_id": sint_run_id, "after_sequence": after_sequence}
+        if limit is not None:
+            query += " LIMIT :limit"
+            params["limit"] = limit
+        rows = self.query(query, params)
+
+        return [
+            RunEvent(
+                run_id=int64_to_uint64(row["run_id"]),
+                sequence_number=row["sequence_number"],
+                event=row["event"],
+                data=row["data"],
+                created_at=row["created_at"],
+                task_id=int64_to_uint64(row["task_id"]),
+            )
+            for row in rows
+        ]
 
     def get_valid_message_ins(self, message_id: str) -> dict[str, Any] | None:
         """Check if the Message exists and is valid (not expired).

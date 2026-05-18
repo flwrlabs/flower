@@ -15,7 +15,9 @@
 """ServerAppIo API servicer."""
 
 
+import json
 from logging import DEBUG, ERROR, INFO
+from typing import NoReturn
 
 import grpc
 
@@ -30,6 +32,7 @@ from flwr.common.serde import (
     message_to_proto,
     run_to_proto,
 )
+from flwr.common.typing import RunEventPayload
 from flwr.proto import serverappio_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppMessagesRequest,
@@ -38,6 +41,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputResponse,
     PushAppMessagesRequest,
     PushAppMessagesResponse,
+    PushRunEventsRequest,
+    PushRunEventsResponse,
     PushTaskOutputRequest,
     PushTaskOutputResponse,
 )
@@ -75,6 +80,15 @@ from flwr.supercore.servicers import AppIoServicer
 
 SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE = (
     "Some ServerAppIo API endpoints are only available for Deployment Runtime runs."
+)
+_RUN_EVENT_TASK_TYPES: frozenset[TaskType] = frozenset(
+    {
+        TaskType.SERVER_APP,
+        TaskType.SIMULATION,
+        TaskType.AGENT_APP,
+        TaskType.MODEL,
+        TaskType.CONNECTOR,
+    }
 )
 
 
@@ -297,6 +311,31 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
         return PushTaskOutputResponse()
 
+    def PushRunEvents(
+        self, request: PushRunEventsRequest, context: grpc.ServicerContext
+    ) -> PushRunEventsResponse:
+        """Push run events emitted by a task executor."""
+        log(DEBUG, "ServerAppIoServicer.PushRunEvents")
+
+        task = get_authenticated_task()
+        if task.type not in _RUN_EVENT_TASK_TYPES:
+            context.abort(
+                grpc.StatusCode.PERMISSION_DENIED,
+                f"Task type '{task.type}' is not allowed to push run events.",
+            )
+            raise RuntimeError("This line should never be reached.")
+
+        events = _validate_run_events(request, context)
+        try:
+            sequence_numbers = self.state().store_run_events(
+                task.run_id, task.task_id, events
+            )
+        except ValueError as err:
+            context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(err))
+            raise RuntimeError("This line should never be reached.") from err
+
+        return PushRunEventsResponse(sequence_numbers=sequence_numbers)
+
     def GetFederationOptions(
         self, request: GetFederationOptionsRequest, context: grpc.ServicerContext
     ) -> GetFederationOptionsResponse:
@@ -384,6 +423,42 @@ def _get_authenticated_serverapp_run_id(context: grpc.ServicerContext) -> int:
             SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE,
         )
     return task.run_id
+
+
+def _validate_run_events(
+    request: PushRunEventsRequest, context: grpc.ServicerContext
+) -> list[RunEventPayload]:
+    """Validate and normalize run events from the request."""
+    if len(request.events) == 0:
+        _abort_push_run_events(context, "`events` must not be empty.")
+
+    events = []
+    for event_payload in request.events:
+        event = event_payload.event.strip()
+        if not event:
+            _abort_push_run_events(context, "`event` must be a non-empty string.")
+
+        try:
+            data = json.dumps(
+                json.loads(event_payload.data),
+                separators=(",", ":"),
+                allow_nan=False,
+            )
+        except (TypeError, ValueError, json.JSONDecodeError):
+            _abort_push_run_events(context, "`data` must be valid JSON.")
+
+        events.append(RunEventPayload(event=event, data=data))
+
+    return events
+
+
+def _abort_push_run_events(
+    context: grpc.ServicerContext,
+    detail: str,
+) -> NoReturn:
+    """Abort PushRunEvents with a consistent status code."""
+    context.abort(grpc.StatusCode.FAILED_PRECONDITION, detail)
+    raise RuntimeError("This line should never be reached.")
 
 
 def _raise_if(validation_error: bool, request_name: str, detail: str) -> None:

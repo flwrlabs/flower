@@ -352,6 +352,58 @@ class PushTaskOutputResponse(google.protobuf.message.Message):
 global___PushTaskOutputResponse = PushTaskOutputResponse
 
 @typing.final
+class RunEventPayload(google.protobuf.message.Message):
+    """PushRunEvents messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENT_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    event: builtins.str
+    data: builtins.str
+    def __init__(
+        self,
+        *,
+        event: builtins.str = ...,
+        data: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "event", b"event"]) -> None: ...
+
+global___RunEventPayload = RunEventPayload
+
+@typing.final
+class PushRunEventsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENTS_FIELD_NUMBER: builtins.int
+    @property
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RunEventPayload]: ...
+    def __init__(
+        self,
+        *,
+        events: collections.abc.Iterable[global___RunEventPayload] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
+
+global___PushRunEventsRequest = PushRunEventsRequest
+
+@typing.final
+class PushRunEventsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SEQUENCE_NUMBERS_FIELD_NUMBER: builtins.int
+    @property
+    def sequence_numbers(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
+    def __init__(
+        self,
+        *,
+        sequence_numbers: collections.abc.Iterable[builtins.int] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["sequence_numbers", b"sequence_numbers"]) -> None: ...
+
+global___PushRunEventsResponse = PushRunEventsResponse
+
+@typing.final
 class CreateTaskRequest(google.protobuf.message.Message):
     """CreateTask messages"""
 

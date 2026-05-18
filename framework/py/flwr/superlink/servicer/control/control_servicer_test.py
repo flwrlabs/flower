@@ -39,7 +39,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import user_config_to_proto
-from flwr.common.typing import Run, RunStatus
+from flwr.common.typing import Run, RunEventPayload, RunStatus
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AcceptInvitationResponse,
@@ -72,6 +72,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopRunRequest,
     StreamLogsRequest,
     StreamLogsResponse,
+    StreamRunEventsRequest,
     UnregisterNodeRequest,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
@@ -1338,6 +1339,104 @@ class TestControlServicerAuth(unittest.TestCase):
             self.assertIsInstance(msgs[0], StreamLogsResponse)
             self.assertEqual(msgs[0].log_output, "log1")
             self.assertEqual(msgs[0].latest_timestamp, 1.0)
+
+    def test_stream_run_events_auth_unsuccessful_when_not_federation_member(
+        self,
+    ) -> None:
+        """Test StreamRunEvents aborts when requester is not a federation member."""
+        run_id = self._create_dummy_run("run-owner")
+        request = StreamRunEventsRequest(run_id=run_id)
+        ctx = self.make_context()
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                return_value=SimpleNamespace(flwr_aid="user-123"),
+            ),
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=False
+            ),
+        ):
+            gen = self.servicer.StreamRunEvents(request, ctx)
+            with self.assertRaises(RuntimeError) as cm:
+                next(gen)
+            self.assertIn("FAILED_PRECONDITION", str(cm.exception))
+
+    def test_stream_run_events_auth_successful(self) -> None:
+        """Test StreamRunEvents returns run events for a federation member."""
+        run_id = self._create_dummy_run("run-owner")
+        run = self.state.get_run_info(run_ids=[run_id])[0]
+        assert run.primary_task_id is not None
+        self.state.store_run_events(
+            run_id,
+            run.primary_task_id,
+            [
+                RunEventPayload(event="run.started", data='{"step":1}'),
+                RunEventPayload(event="run.completed", data="{}"),
+            ],
+        )
+        request = StreamRunEventsRequest(run_id=run_id)
+        ctx = self.make_context()
+        ctx.is_active.return_value = True
+
+        with (
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=True
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                return_value=SimpleNamespace(flwr_aid="user-123"),
+            ),
+        ):
+            msgs = list(self.servicer.StreamRunEvents(request, ctx))
+
+        self.assertEqual([msg.sequence_number for msg in msgs], [1, 2])
+        self.assertEqual([msg.event for msg in msgs], ["run.started", "run.completed"])
+        self.assertEqual(msgs[0].data, '{"step":1}')
+        self.assertEqual(msgs[0].task_id, run.primary_task_id)
+        self.assertGreater(msgs[0].created_at, 0.0)
+
+    def test_stream_run_events_after_sequence(self) -> None:
+        """Test StreamRunEvents resumes after a sequence number."""
+        run_id = self._create_dummy_run("run-owner")
+        run = self.state.get_run_info(run_ids=[run_id])[0]
+        assert run.primary_task_id is not None
+        self.state.store_run_events(
+            run_id,
+            run.primary_task_id,
+            [
+                RunEventPayload(event="run.started", data="{}"),
+                RunEventPayload(event="run.completed", data="{}"),
+            ],
+        )
+        request = StreamRunEventsRequest(run_id=run_id, after_sequence=1)
+        ctx = self.make_context()
+        ctx.is_active.return_value = True
+
+        with (
+            patch.object(
+                self.state.federation_manager, "has_member", return_value=True
+            ),
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
+                return_value=SimpleNamespace(flwr_aid="user-123"),
+            ),
+        ):
+            msgs = list(self.servicer.StreamRunEvents(request, ctx))
+
+        self.assertEqual(len(msgs), 1)
+        self.assertEqual(msgs[0].sequence_number, 2)
+        self.assertEqual(msgs[0].event, "run.completed")
+
+    def test_stream_run_events_unknown_run(self) -> None:
+        """Test StreamRunEvents aborts when run ID is unknown."""
+        request = StreamRunEventsRequest(run_id=61016)
+        ctx = self.make_context()
+
+        gen = self.servicer.StreamRunEvents(request, ctx)
+        with self.assertRaises(RuntimeError) as cm:
+            next(gen)
+        self.assertIn("NOT_FOUND", str(cm.exception))
 
     def test_stoprun_auth_unsuccessful_when_not_federation_member(self) -> None:
         """Test StopRun aborts when requester is not a federation member."""

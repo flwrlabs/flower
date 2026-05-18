@@ -809,13 +809,18 @@ class StreamRunEventsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RUN_ID_FIELD_NUMBER: builtins.int
+    AFTER_SEQUENCE_FIELD_NUMBER: builtins.int
     run_id: builtins.int
+    after_sequence: builtins.int
     def __init__(
         self,
         *,
         run_id: builtins.int = ...,
+        after_sequence: builtins.int | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["run_id", b"run_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_after_sequence", b"_after_sequence", "after_sequence", b"after_sequence"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_after_sequence", b"_after_sequence", "after_sequence", b"after_sequence", "run_id", b"run_id"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_after_sequence", b"_after_sequence"]) -> typing.Literal["after_sequence"] | None: ...
 
 global___StreamRunEventsRequest = StreamRunEventsRequest
 
@@ -825,14 +830,30 @@ class StreamRunEventsResponse(google.protobuf.message.Message):
 
     EVENT_FIELD_NUMBER: builtins.int
     DATA_FIELD_NUMBER: builtins.int
+    SEQUENCE_NUMBER_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    TASK_ID_FIELD_NUMBER: builtins.int
     event: builtins.str
     data: builtins.str
+    sequence_number: builtins.int
+    created_at: builtins.float
+    task_id: builtins.int
     def __init__(
         self,
         *,
         event: builtins.str = ...,
         data: builtins.str = ...,
+        sequence_number: builtins.int | None = ...,
+        created_at: builtins.float | None = ...,
+        task_id: builtins.int | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["data", b"data", "event", b"event"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_created_at", b"_created_at", "_sequence_number", b"_sequence_number", "_task_id", b"_task_id", "created_at", b"created_at", "sequence_number", b"sequence_number", "task_id", b"task_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_created_at", b"_created_at", "_sequence_number", b"_sequence_number", "_task_id", b"_task_id", "created_at", b"created_at", "data", b"data", "event", b"event", "sequence_number", b"sequence_number", "task_id", b"task_id"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_created_at", b"_created_at"]) -> typing.Literal["created_at"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_sequence_number", b"_sequence_number"]) -> typing.Literal["sequence_number"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_task_id", b"_task_id"]) -> typing.Literal["task_id"] | None: ...
 
 global___StreamRunEventsResponse = StreamRunEventsResponse

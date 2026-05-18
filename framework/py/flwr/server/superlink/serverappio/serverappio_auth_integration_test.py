@@ -29,6 +29,9 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppMessagesResponse,
     PushAppMessagesRequest,
     PushAppMessagesResponse,
+    PushRunEventsRequest,
+    PushRunEventsResponse,
+    RunEventPayload,
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
@@ -234,6 +237,14 @@ class TestServerAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
                 "/flwr.proto.ServerAppIo/PushLogs",
                 PushLogsRequest(logs=["hello"]),
                 PushLogsResponse.FromString,
+            ),
+            (
+                "push_run_events",
+                "/flwr.proto.ServerAppIo/PushRunEvents",
+                PushRunEventsRequest(
+                    events=[RunEventPayload(event="run.started", data="{}")]
+                ),
+                PushRunEventsResponse.FromString,
             ),
         ]
     )  # type: ignore

@@ -21,7 +21,7 @@ from typing import Literal
 
 from flwr.app.user_config import UserConfig
 from flwr.common import Context, Message
-from flwr.common.typing import Run, RunStatus
+from flwr.common.typing import Run, RunEvent, RunEventPayload, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
@@ -408,6 +408,48 @@ class LinkState(CoreState):  # pylint: disable=R0904
             The identifier of the run for which to set the context.
         context : Context
             The context to be associated with the specified `run_id`.
+        """
+
+    @abc.abstractmethod
+    def store_run_events(
+        self, run_id: int, task_id: int, events: Sequence[RunEventPayload]
+    ) -> Sequence[int]:
+        """Store run events and return assigned sequence numbers.
+
+        Parameters
+        ----------
+        run_id : int
+            The identifier of the run to which the events belong.
+        task_id : int
+            The authenticated task that emitted the events.
+        events : Sequence[RunEventPayload]
+            The event payloads to append to the run event stream.
+
+        Returns
+        -------
+        Sequence[int]
+            State-assigned per-run sequence numbers for the stored events.
+        """
+
+    @abc.abstractmethod
+    def get_run_events(
+        self, run_id: int, after_sequence: int = 0, limit: int | None = None
+    ) -> Sequence[RunEvent]:
+        """Retrieve run events ordered by sequence number.
+
+        Parameters
+        ----------
+        run_id : int
+            The identifier of the run for which to retrieve events.
+        after_sequence : int (default: 0)
+            Return events whose sequence number is greater than this value.
+        limit : Optional[int] (default: None)
+            Maximum number of events to return. If `None`, no limit is applied.
+
+        Returns
+        -------
+        Sequence[RunEvent]
+            Matching events sorted by ascending sequence number.
         """
 
     @abc.abstractmethod

@@ -44,7 +44,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.common.typing import Fab
+from flwr.common.typing import Fab, RunEventPayload
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
@@ -191,6 +191,73 @@ class StateTest(CoreStateTest):
         self.assertEqual(run.run_type, RunType.AGENT)
         self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
+
+    def test_store_run_events_assigns_sequence_numbers(self) -> None:
+        """Test storing run events assigns per-run sequence numbers."""
+        # Prepare
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        task_id = state.get_run_info(run_ids=[run_id])[0].primary_task_id
+        assert task_id is not None
+
+        # Execute
+        sequence_numbers = state.store_run_events(
+            run_id,
+            task_id,
+            [
+                RunEventPayload(event="run.started", data='{"step":1}'),
+                RunEventPayload(event="run.completed", data="{}"),
+            ],
+        )
+
+        # Assert
+        events = state.get_run_events(run_id)
+        self.assertEqual(sequence_numbers, [1, 2])
+        self.assertEqual([event.sequence_number for event in events], [1, 2])
+        self.assertEqual(
+            [event.event for event in events], ["run.started", "run.completed"]
+        )
+        self.assertEqual([event.run_id for event in events], [run_id, run_id])
+        self.assertEqual([event.task_id for event in events], [task_id, task_id])
+        self.assertGreater(events[0].created_at, 0.0)
+
+    def test_get_run_events_filters_after_sequence_and_limit(self) -> None:
+        """Test get_run_events filters by sequence and limit."""
+        # Prepare
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        task_id = state.get_run_info(run_ids=[run_id])[0].primary_task_id
+        assert task_id is not None
+        state.store_run_events(
+            run_id,
+            task_id,
+            [
+                RunEventPayload(event="event.one", data="{}"),
+                RunEventPayload(event="event.two", data="{}"),
+                RunEventPayload(event="event.three", data="{}"),
+            ],
+        )
+
+        # Execute
+        events = state.get_run_events(run_id, after_sequence=1, limit=1)
+
+        # Assert
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].sequence_number, 2)
+        self.assertEqual(events[0].event, "event.two")
+
+    def test_store_run_events_rejects_unknown_run(self) -> None:
+        """Test storing run events rejects unknown runs."""
+        # Prepare
+        state = self.state_factory()
+
+        # Execute/Assert
+        with self.assertRaises(ValueError):
+            state.store_run_events(
+                61016,
+                1,
+                [RunEventPayload(event="run.started", data="{}")],
+            )
 
     def test_get_run_info_without_filters_returns_all_runs(self) -> None:
         """Test get_run_info returns all runs when no filter is provided."""

@@ -145,6 +145,7 @@ _AGENT_CONVERSATION_ID_KEY = "conversation_id"
 _AGENT_MODEL_KEY = "model"
 _GPT_CHAT_AGENT_REF = "gpt-chat"
 _AGENT_START_RECORD_KEY = "agent.start"
+_TERMINAL_RUN_EVENTS = frozenset({"run.completed", "run.failed", "run.cancelled"})
 
 _BUILTIN_GPT_CHAT_PYPROJECT = """
 [project]
@@ -1142,15 +1143,49 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         return ConfigureSimulationFederationResponse()
 
-    # ***************
-    # Unused for now
-    # ***************
     def StreamRunEvents(
         self, request: StreamRunEventsRequest, context: grpc.ServicerContext
     ) -> Generator[StreamRunEventsResponse, Any, None]:
         """Start run event stream."""
-        _ = request, context
-        raise NotImplementedError("StreamRunEvents is not implemented yet.")
+        log(INFO, rpc_name := self.StreamRunEvents.__qualname__)
+
+        state = self.linkstate_factory.state()
+        run_id = request.run_id
+        runs = state.get_run_info(run_ids=[run_id])
+        if not runs:
+            context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
+            raise RuntimeError("This line should never be reached.")
+
+        run = runs[0]
+        with rpc_error_translator(context, rpc_name):
+            flwr_aid = _get_flwr_aid(context)
+            _validate_federation_membership_in_request(
+                state, flwr_aid, run.federation, context
+            )
+
+        after_sequence = (
+            request.after_sequence if request.HasField("after_sequence") else 0
+        )
+        while context.is_active():
+            for run_event in state.get_run_events(run_id, after_sequence):
+                yield StreamRunEventsResponse(
+                    event=run_event.event,
+                    data=run_event.data,
+                    sequence_number=run_event.sequence_number,
+                    created_at=run_event.created_at,
+                    task_id=run_event.task_id,
+                )
+                after_sequence = run_event.sequence_number
+                if run_event.event in _TERMINAL_RUN_EVENTS:
+                    log(INFO, "Terminal event for run ID `%s` returned", run_id)
+                    return
+
+            runs = state.get_run_info(run_ids=[run_id])
+            if not runs or runs[0].status.status == Status.FINISHED:
+                log(INFO, "All events for run ID `%s` returned", run_id)
+                break
+
+            time.sleep(LOG_STREAM_INTERVAL)
 
 
 class FederationNotSpecified(FlowerError):
