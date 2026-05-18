@@ -20,7 +20,7 @@ We would like to give our special thanks to all the contributors who made the ne
 
 - **Add TLS support for AppIo APIs** ([#6986](https://github.com/flwrlabs/flower/pull/6986), [#7046](https://github.com/flwrlabs/flower/pull/7046), [#7175](https://github.com/flwrlabs/flower/pull/7175))
 
-  Introduces TLS support for the ServerAppIo and ClientAppIo APIs. Adds root certificate configuration for `flwr-` commands and `flower-superexec`. Find out more details in the [TLS guide](https://flower.ai/docs/framework/1.29/en/how-to-enable-tls-connections.html).
+  Introduces TLS support for the ServerAppIo and ClientAppIo APIs. Adds root certificate configuration for `flwr-` commands and `flower-superexec`. Find out more details in the [TLS guide](https://flower.ai/docs/framework/1.30/en/how-to-enable-tls-connections.html).
 
 - **Support dynamic ClientAppIo ports in SuperNode** ([#7128](https://github.com/flwrlabs/flower/pull/7128))
 
