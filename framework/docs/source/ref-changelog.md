@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.30.0 (2026-05-17)
+## v1.30.0 (2026-05-18)
 
 ### Thanks to our contributors
 
