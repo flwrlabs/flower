@@ -34,7 +34,16 @@ from flwr.common.constant import (
     TASK_ID_NUM_BYTES,
     Status,
 )
-from flwr.common.typing import Run, RunEvent, RunEventPayload, RunStatus
+from flwr.common.conversation import normalize_conversation_item_json
+from flwr.common.typing import (
+    Conversation,
+    ConversationItem,
+    ConversationItemPayload,
+    Run,
+    RunEvent,
+    RunEventPayload,
+    RunStatus,
+)
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
@@ -66,6 +75,15 @@ class RunRecord:  # pylint: disable=R0902
     lock: threading.RLock = field(default_factory=threading.RLock)
 
 
+@dataclass
+class ConversationRecord:
+    """Conversation data owned by an account."""
+
+    flwr_aid: str
+    conversation: Conversation
+    items: list[ConversationItem] = field(default_factory=list)
+
+
 class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,R0904
     """In-memory LinkState implementation."""
 
@@ -83,6 +101,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         self.run_ids: dict[int, RunRecord] = {}
         self.contexts: dict[int, Context] = {}
         self.run_events: dict[int, list[RunEvent]] = {}
+        self.conversations: dict[str, ConversationRecord] = {}
         self.message_ins_store: dict[str, Message] = {}
         self.message_res_store: dict[str, Message] = {}
         self.message_ins_id_to_message_res_id: dict[str, str] = {}
@@ -815,6 +834,129 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             if limit is not None:
                 events = events[:limit]
             return events
+
+    def create_conversation(
+        self, conversation_id: str, flwr_aid: str, run_id: int, title: str = ""
+    ) -> None:
+        """Create a conversation if it does not already exist."""
+        with self.lock:
+            existing = self.conversations.get(conversation_id)
+            if existing is not None:
+                if existing.flwr_aid != flwr_aid:
+                    raise ValueError(f"Conversation {conversation_id} not found")
+                return
+
+            self._validate_conversation_run_owner(run_id, flwr_aid)
+            current = now().timestamp()
+            self.conversations[conversation_id] = ConversationRecord(
+                flwr_aid=flwr_aid,
+                conversation=Conversation(
+                    conversation_id=conversation_id,
+                    run_id=run_id,
+                    title=title,
+                    created_at=current,
+                    updated_at=current,
+                ),
+            )
+
+    def store_conversation_items(
+        self,
+        conversation_id: str,
+        flwr_aid: str,
+        run_id: int,
+        task_id: int | None,
+        items: Sequence[ConversationItemPayload],
+    ) -> Sequence[int]:
+        """Store conversation items and return assigned item indices."""
+        with self.lock:
+            record = self.conversations.get(conversation_id)
+            if record is None or record.flwr_aid != flwr_aid:
+                raise ValueError(f"Conversation {conversation_id} not found")
+            self._validate_conversation_run_owner(run_id, flwr_aid)
+            if task_id is not None:
+                task = self.task_store.get(task_id)
+                if task is None or task.run_id != run_id:
+                    raise ValueError(f"Task {task_id} not found for run {run_id}")
+
+            item_indices = []
+            for item_payload in items:
+                item_index = len(record.items) + 1
+                created_at = now().timestamp()
+                item = ConversationItem(
+                    conversation_id=conversation_id,
+                    item_index=item_index,
+                    item_json=normalize_conversation_item_json(item_payload.item_json),
+                    created_at=created_at,
+                    run_id=run_id,
+                    task_id=task_id,
+                )
+                record.items.append(item)
+                item_indices.append(item_index)
+                record.conversation = replace(
+                    record.conversation, updated_at=created_at
+                )
+
+            return item_indices
+
+    def list_conversations(
+        self, flwr_aid: str, limit: int | None = None
+    ) -> Sequence[Conversation]:
+        """List conversations owned by the account."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        with self.lock:
+            conversations = [
+                record.conversation
+                for record in self.conversations.values()
+                if record.flwr_aid == flwr_aid
+            ]
+            conversations.sort(
+                key=lambda conversation: (
+                    conversation.updated_at,
+                    conversation.conversation_id,
+                ),
+                reverse=True,
+            )
+            if limit is not None:
+                conversations = conversations[:limit]
+            return conversations
+
+    def get_conversation(
+        self, flwr_aid: str, conversation_id: str
+    ) -> Conversation | None:
+        """Return a conversation owned by the account, if it exists."""
+        with self.lock:
+            record = self.conversations.get(conversation_id)
+            if record is None or record.flwr_aid != flwr_aid:
+                return None
+            return record.conversation
+
+    def get_conversation_items(
+        self, flwr_aid: str, conversation_id: str
+    ) -> Sequence[ConversationItem]:
+        """Return conversation items owned by the account."""
+        with self.lock:
+            record = self.conversations.get(conversation_id)
+            if record is None or record.flwr_aid != flwr_aid:
+                return []
+            return list(record.items)
+
+    def delete_conversation(self, flwr_aid: str, conversation_id: str) -> bool:
+        """Delete a conversation owned by the account."""
+        with self.lock:
+            record = self.conversations.get(conversation_id)
+            if record is None or record.flwr_aid != flwr_aid:
+                return False
+            del self.conversations[conversation_id]
+            return True
+
+    def _validate_conversation_run_owner(self, run_id: int, flwr_aid: str) -> None:
+        """Validate that the run exists and belongs to the account."""
+        run_record = self.run_ids.get(run_id)
+        if run_record is None:
+            raise ValueError(f"Run {run_id} not found")
+        if run_record.run.flwr_aid != flwr_aid:
+            raise ValueError(f"Run {run_id} does not belong to the account")
 
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`."""

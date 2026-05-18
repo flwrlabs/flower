@@ -15,6 +15,24 @@ erDiagram
     BLOB context "nullable"
   }
 
+  conversation {
+    BIGINT run_id FK
+    VARCHAR conversation_id UK
+    FLOAT created_at
+    VARCHAR flwr_aid
+    VARCHAR title
+    FLOAT updated_at
+  }
+
+  conversation_item {
+    VARCHAR conversation_id FK
+    BIGINT run_id FK
+    FLOAT created_at
+    BIGINT item_index
+    VARCHAR item_json
+    BIGINT task_id "nullable"
+  }
+
   fab {
     VARCHAR fab_hash PK
     BLOB content
@@ -158,6 +176,9 @@ erDiagram
   }
 
   run ||--o| context : run_id
+  run ||--o{ conversation : run_id
+  conversation ||--o{ conversation_item : conversation_id
+  run ||--o{ conversation_item : run_id
   run ||--o{ logs : run_id
   run ||--o{ message_ins : run_id
   run ||--o{ message_res : run_id

@@ -18,6 +18,11 @@
 from typing import Any, cast
 
 from flwr.app.user_config import UserConfig, UserConfigValue
+from flwr.proto.conversation_pb2 import Conversation as ProtoConversation
+from flwr.proto.conversation_pb2 import ConversationItem as ProtoConversationItem
+from flwr.proto.conversation_pb2 import (
+    ConversationItemPayload as ProtoConversationItemPayload,
+)
 
 # pylint: disable=E0611
 from flwr.proto.fab_pb2 import Fab as ProtoFab
@@ -617,6 +622,40 @@ def context_from_proto(context_proto: ProtoContext) -> Context:
 
 
 # === Run messages ===
+
+
+def conversation_to_proto(conversation: typing.Conversation) -> ProtoConversation:
+    """Serialize `Conversation` to ProtoBuf."""
+    return ProtoConversation(
+        conversation_id=conversation.conversation_id,
+        run_id=conversation.run_id,
+        title=conversation.title,
+        created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
+    )
+
+
+def conversation_item_to_proto(
+    conversation_item: typing.ConversationItem,
+) -> ProtoConversationItem:
+    """Serialize `ConversationItem` to ProtoBuf."""
+    proto = ProtoConversationItem(
+        conversation_id=conversation_item.conversation_id,
+        item_index=conversation_item.item_index,
+        item_json=conversation_item.item_json,
+        created_at=conversation_item.created_at,
+        run_id=conversation_item.run_id,
+    )
+    if conversation_item.task_id is not None:
+        proto.task_id = conversation_item.task_id
+    return proto
+
+
+def conversation_item_payload_from_proto(
+    payload_proto: ProtoConversationItemPayload,
+) -> typing.ConversationItemPayload:
+    """Deserialize `ConversationItemPayload` from ProtoBuf."""
+    return typing.ConversationItemPayload(item_json=payload_proto.item_json)
 
 
 def run_to_proto(run: typing.Run) -> ProtoRun:

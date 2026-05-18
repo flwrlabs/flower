@@ -58,6 +58,8 @@ SERVERAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ServerAppIo/PushTaskMessage": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PullTaskMessage": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PushRunEvents": MethodTokenPolicy.token_required(),
+    # pylint: disable-next=line-too-long
+    "/flwr.proto.ServerAppIo/PushConversationItems": MethodTokenPolicy.token_required(),  # noqa: E501
 }
 
 CLIENTAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {

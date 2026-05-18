@@ -39,7 +39,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import user_config_to_proto
-from flwr.common.typing import Run, RunEventPayload, RunStatus
+from flwr.common.typing import ConversationItemPayload, Run, RunEventPayload, RunStatus
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
     AcceptInvitationResponse,
@@ -50,6 +50,9 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationRequest,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DeleteConversationRequest,
+    GetConversationRequest,
+    ListConversationsRequest,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -249,6 +252,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         runs = self.state.get_run_info(run_ids=[response.run_id])
         tasks = self.state.get_tasks(run_ids=[response.run_id])
         run_context = self.state.get_serverapp_context(response.run_id)
+        conversation = self.state.get_conversation(self.aid, "conv-test")
+        conversation_items = self.state.get_conversation_items(self.aid, "conv-test")
 
         self.assertEqual(response.conversation_id, "conv-test")
         self.assertEqual(len(runs), 1)
@@ -265,6 +270,13 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             '[{"role":"user","content":"hello"}]',
         )
         self.assertEqual(agent_start["model"], "gpt-4.1-mini")
+        assert conversation is not None
+        self.assertEqual(conversation.run_id, response.run_id)
+        self.assertEqual([item.item_index for item in conversation_items], [1])
+        self.assertEqual(
+            conversation_items[0].item_json,
+            '{"role":"user","content":"hello"}',
+        )
 
     def test_start_agent_run_generates_conversation_id(self) -> None:
         """Test StartRun generates a conversation ID for agent runs."""
@@ -289,6 +301,74 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         assert run_context is not None
         agent_start = run_context.state.config_records["agent.start"]
         self.assertEqual(agent_start["conversation_id"], response.conversation_id)
+        conversation = self.state.get_conversation(self.aid, response.conversation_id)
+        assert conversation is not None
+        self.assertEqual(conversation.run_id, response.run_id)
+        self.assertEqual(
+            self.state.get_conversation_items(self.aid, response.conversation_id),
+            [],
+        )
+
+    def test_conversation_control_rpcs_are_account_scoped(self) -> None:
+        """Test conversation list, get, and delete use account ownership."""
+        # Prepare
+        run_id = self._create_dummy_run(self.aid)
+        other_run_id = self._create_dummy_run("other-aid")
+        self.state.create_conversation("conv-owned", self.aid, run_id)
+        self.state.store_conversation_items(
+            "conv-owned",
+            self.aid,
+            run_id,
+            None,
+            [ConversationItemPayload(item_json='{"role":"user"}')],
+        )
+        self.state.create_conversation("conv-other", "other-aid", other_run_id)
+
+        # Execute
+        list_response = self.servicer.ListConversations(
+            ListConversationsRequest(), Mock()
+        )
+        get_response = self.servicer.GetConversation(
+            GetConversationRequest(conversation_id="conv-owned"), Mock()
+        )
+        delete_other_response = self.servicer.DeleteConversation(
+            DeleteConversationRequest(conversation_id="conv-other"), Mock()
+        )
+        delete_response = self.servicer.DeleteConversation(
+            DeleteConversationRequest(conversation_id="conv-owned"), Mock()
+        )
+
+        # Assert
+        self.assertEqual(
+            [
+                conversation.conversation_id
+                for conversation in list_response.conversations
+            ],
+            ["conv-owned"],
+        )
+        self.assertEqual(get_response.conversation.conversation_id, "conv-owned")
+        self.assertEqual(len(get_response.items), 1)
+        self.assertEqual(get_response.items[0].item_json, '{"role":"user"}')
+        self.assertFalse(delete_other_response.deleted)
+        self.assertTrue(delete_response.deleted)
+        self.assertIsNone(self.state.get_conversation(self.aid, "conv-owned"))
+
+    def test_get_conversation_returns_not_found_for_other_account(self) -> None:
+        """Test GetConversation hides conversations owned by another account."""
+        # Prepare
+        other_run_id = self._create_dummy_run("other-aid")
+        self.state.create_conversation("conv-other", "other-aid", other_run_id)
+        context = Mock()
+
+        # Execute/Assert
+        with self.assertRaises(RuntimeError):
+            self.servicer.GetConversation(
+                GetConversationRequest(conversation_id="conv-other"), context
+            )
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.NOT_FOUND,
+            "Conversation not found.",
+        )
 
     def test_start_agent_run_rejects_unsupported_agent_ref(self) -> None:
         """Test StartRun rejects unknown built-in agents."""

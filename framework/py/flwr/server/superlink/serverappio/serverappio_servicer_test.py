@@ -47,6 +47,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputResponse,
     PushAppMessagesRequest,
     PushAppMessagesResponse,
+    PushConversationItemsRequest,
+    PushConversationItemsResponse,
     PushRunEventsRequest,
     PushRunEventsResponse,
     PushTaskOutputRequest,
@@ -55,6 +57,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatRequest,
     SendTaskHeartbeatResponse,
 )
+from flwr.proto.conversation_pb2 import ConversationItemPayload  # pylint: disable=E0611
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     ConfirmMessageReceivedRequest,
     ConfirmMessageReceivedResponse,
@@ -405,6 +408,11 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             request_serializer=PushRunEventsRequest.SerializeToString,
             response_deserializer=PushRunEventsResponse.FromString,
         )
+        self._push_conversation_items = self._channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PushConversationItems",
+            request_serializer=PushConversationItemsRequest.SerializeToString,
+            response_deserializer=PushConversationItemsResponse.FromString,
+        )
 
     def tearDown(self) -> None:
         """Clean up grpc server."""
@@ -438,6 +446,39 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         if running:
             self._transition_run_status(run_id, 2)
         return run_id
+
+    def _create_agentapp_push_conversation_items_rpc(
+        self, conversation_id: str
+    ) -> tuple[int, int, grpc.Channel, grpc.UnaryUnaryMultiCallable]:
+        run_id = self.state.create_run(
+            "",
+            "",
+            "",
+            {},
+            NOOP_FEDERATION,
+            None,
+            "agent-aid",
+            RunType.AGENT,
+        )
+        task_id = self._primary_task_id(run_id)
+        token = self.state.claim_task(task_id)
+        assert token is not None
+        assert self.state.activate_task(task_id)
+        self.state.create_conversation(conversation_id, "agent-aid", run_id)
+        channel = grpc.intercept_channel(
+            grpc.insecure_channel("localhost:9091"),
+            AppIoTokenClientInterceptor(token),
+            SuperExecAuthClientInterceptor(
+                master_secret=_SUPEREXEC_SECRET,
+                protected_methods=SERVERAPPIO_SUPEREXEC_METHODS,
+            ),
+        )
+        rpc = channel.unary_unary(
+            "/flwr.proto.ServerAppIo/PushConversationItems",
+            request_serializer=PushConversationItemsRequest.SerializeToString,
+            response_deserializer=PushConversationItemsResponse.FromString,
+        )
+        return run_id, task_id, channel, rpc
 
     def test_create_task_uses_authenticated_run_id(self) -> None:
         """CreateTask should create tasks for the authenticated run."""
@@ -479,6 +520,57 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 
         with self.assertRaises(grpc.RpcError) as err:
             self._push_run_events(request=request)
+
+        assert err.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
+
+    def test_push_conversation_items_uses_authenticated_agent_task(self) -> None:
+        """PushConversationItems should store items for the authenticated task."""
+        run_id, task_id, channel, rpc = (
+            self._create_agentapp_push_conversation_items_rpc("conv-1")
+        )
+        request = PushConversationItemsRequest(
+            conversation_id="conv-1",
+            items=[ConversationItemPayload(item_json='{"role": "assistant"}')],
+        )
+
+        try:
+            response, call = rpc.with_call(request=request)
+        finally:
+            channel.close()
+
+        items = self.state.get_conversation_items("agent-aid", "conv-1")
+        assert call.code() == grpc.StatusCode.OK
+        assert list(response.item_indices) == [1]
+        assert len(items) == 1
+        assert items[0].item_json == '{"role":"assistant"}'
+        assert items[0].run_id == run_id
+        assert items[0].task_id == task_id
+
+    def test_push_conversation_items_rejects_non_agent_task(self) -> None:
+        """PushConversationItems should allow only AgentApp tasks."""
+        request = PushConversationItemsRequest(
+            conversation_id="conv-1",
+            items=[ConversationItemPayload(item_json='{"role":"assistant"}')],
+        )
+
+        with self.assertRaises(grpc.RpcError) as err:
+            self._push_conversation_items(request=request)
+
+        assert err.exception.code() == grpc.StatusCode.PERMISSION_DENIED
+
+    def test_push_conversation_items_rejects_malformed_item_json(self) -> None:
+        """PushConversationItems should reject malformed item JSON."""
+        _, _, channel, rpc = self._create_agentapp_push_conversation_items_rpc("conv-1")
+        request = PushConversationItemsRequest(
+            conversation_id="conv-1",
+            items=[ConversationItemPayload(item_json="[1]")],
+        )
+
+        try:
+            with self.assertRaises(grpc.RpcError) as err:
+                rpc(request=request)
+        finally:
+            channel.close()
 
         assert err.exception.code() == grpc.StatusCode.FAILED_PRECONDITION
 

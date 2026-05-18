@@ -82,6 +82,13 @@ service ServerAppIo {
   // Push task logs
   rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
 
+  // Push run events
+  rpc PushRunEvents(PushRunEventsRequest) returns (PushRunEventsResponse) {}
+
+  // Push conversation items
+  rpc PushConversationItems(PushConversationItemsRequest)
+      returns (PushConversationItemsResponse) {}
+
   /////////////////////////////////////////////////////////////////////////////
   // Specific endpoints for ServerAppIo
   /////////////////////////////////////////////////////////////////////////////

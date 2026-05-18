@@ -44,7 +44,7 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.common.typing import Fab, RunEventPayload
+from flwr.common.typing import ConversationItemPayload, Fab, RunEventPayload
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
@@ -258,6 +258,74 @@ class StateTest(CoreStateTest):
                 1,
                 [RunEventPayload(event="run.started", data="{}")],
             )
+
+    def test_conversation_state_stores_owned_items(self) -> None:
+        """Test creating a conversation and appending owned items."""
+        # Prepare
+        state = self.state_factory()
+        run_id = create_dummy_run(state, flwr_aid="aid-1")
+
+        # Execute
+        state.create_conversation("conv-1", "aid-1", run_id)
+        item_indices = state.store_conversation_items(
+            "conv-1",
+            "aid-1",
+            run_id,
+            None,
+            [
+                ConversationItemPayload(item_json='{"role": "user"}'),
+                ConversationItemPayload(item_json='{"role": "assistant"}'),
+            ],
+        )
+
+        # Assert
+        conversation = state.get_conversation("aid-1", "conv-1")
+        items = state.get_conversation_items("aid-1", "conv-1")
+        assert conversation is not None
+        self.assertEqual(item_indices, [1, 2])
+        self.assertEqual(conversation.conversation_id, "conv-1")
+        self.assertEqual(conversation.run_id, run_id)
+        self.assertGreaterEqual(conversation.updated_at, conversation.created_at)
+        self.assertEqual([item.item_index for item in items], [1, 2])
+        self.assertEqual(
+            [item.item_json for item in items],
+            ['{"role":"user"}', '{"role":"assistant"}'],
+        )
+        self.assertEqual([item.run_id for item in items], [run_id, run_id])
+        self.assertIsNone(items[0].task_id)
+
+    def test_conversation_state_enforces_account_scope(self) -> None:
+        """Test conversation reads, appends, and deletes are account-scoped."""
+        # Prepare
+        state = self.state_factory()
+        run_id = create_dummy_run(state, flwr_aid="aid-1")
+        other_run_id = create_dummy_run(state, flwr_aid="aid-2")
+        state.create_conversation("conv-1", "aid-1", run_id)
+        state.create_conversation("conv-2", "aid-2", other_run_id)
+
+        # Execute/Assert
+        with self.assertRaises(ValueError):
+            state.create_conversation("conv-1", "aid-2", other_run_id)
+
+        with self.assertRaises(ValueError):
+            state.store_conversation_items(
+                "conv-1",
+                "aid-2",
+                other_run_id,
+                None,
+                [ConversationItemPayload(item_json='{"role":"user"}')],
+            )
+
+        conversations = state.list_conversations("aid-1")
+        self.assertEqual(
+            [conversation.conversation_id for conversation in conversations],
+            ["conv-1"],
+        )
+        self.assertIsNone(state.get_conversation("aid-2", "conv-1"))
+        self.assertEqual(state.get_conversation_items("aid-2", "conv-1"), [])
+        self.assertFalse(state.delete_conversation("aid-2", "conv-1"))
+        self.assertTrue(state.delete_conversation("aid-1", "conv-1"))
+        self.assertIsNone(state.get_conversation("aid-1", "conv-1"))
 
     def test_get_run_info_without_filters_returns_all_runs(self) -> None:
         """Test get_run_info returns all runs when no filter is provided."""

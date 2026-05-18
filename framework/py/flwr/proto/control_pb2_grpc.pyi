@@ -99,6 +99,24 @@ class ControlStub:
     ]
     """List Federations"""
 
+    ListConversations: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListConversationsRequest,
+        flwr.proto.control_pb2.ListConversationsResponse,
+    ]
+    """List conversations owned by the authenticated account"""
+
+    GetConversation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.GetConversationRequest,
+        flwr.proto.control_pb2.GetConversationResponse,
+    ]
+    """Get a conversation owned by the authenticated account"""
+
+    DeleteConversation: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.DeleteConversationRequest,
+        flwr.proto.control_pb2.DeleteConversationResponse,
+    ]
+    """Delete a conversation owned by the authenticated account"""
+
     ShowFederation: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ShowFederationRequest,
         flwr.proto.control_pb2.ShowFederationResponse,
@@ -248,6 +266,24 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.ListFederationsResponse,
     ]
     """List Federations"""
+
+    ListConversations: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListConversationsRequest,
+        flwr.proto.control_pb2.ListConversationsResponse,
+    ]
+    """List conversations owned by the authenticated account"""
+
+    GetConversation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.GetConversationRequest,
+        flwr.proto.control_pb2.GetConversationResponse,
+    ]
+    """Get a conversation owned by the authenticated account"""
+
+    DeleteConversation: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.DeleteConversationRequest,
+        flwr.proto.control_pb2.DeleteConversationResponse,
+    ]
+    """Delete a conversation owned by the authenticated account"""
 
     ShowFederation: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.ShowFederationRequest,
@@ -420,6 +456,30 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.ListFederationsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListFederationsResponse]]:
         """List Federations"""
+
+    @abc.abstractmethod
+    def ListConversations(
+        self,
+        request: flwr.proto.control_pb2.ListConversationsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListConversationsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListConversationsResponse]]:
+        """List conversations owned by the authenticated account"""
+
+    @abc.abstractmethod
+    def GetConversation(
+        self,
+        request: flwr.proto.control_pb2.GetConversationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.GetConversationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.GetConversationResponse]]:
+        """Get a conversation owned by the authenticated account"""
+
+    @abc.abstractmethod
+    def DeleteConversation(
+        self,
+        request: flwr.proto.control_pb2.DeleteConversationRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.DeleteConversationResponse, collections.abc.Awaitable[flwr.proto.control_pb2.DeleteConversationResponse]]:
+        """Delete a conversation owned by the authenticated account"""
 
     @abc.abstractmethod
     def ShowFederation(

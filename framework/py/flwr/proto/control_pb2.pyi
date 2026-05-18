@@ -19,6 +19,7 @@ limitations under the License.
 
 import builtins
 import collections.abc
+import flwr.proto.conversation_pb2
 import flwr.proto.fab_pb2
 import flwr.proto.federation_config_pb2
 import flwr.proto.federation_pb2
@@ -448,6 +449,105 @@ class ListFederationsResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["federations", b"federations"]) -> None: ...
 
 global___ListFederationsResponse = ListFederationsResponse
+
+@typing.final
+class ListConversationsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    LIMIT_FIELD_NUMBER: builtins.int
+    limit: builtins.int
+    def __init__(
+        self,
+        *,
+        limit: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_limit", b"_limit", "limit", b"limit"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_limit", b"_limit", "limit", b"limit"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
+
+global___ListConversationsRequest = ListConversationsRequest
+
+@typing.final
+class ListConversationsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONVERSATIONS_FIELD_NUMBER: builtins.int
+    @property
+    def conversations(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.conversation_pb2.Conversation]: ...
+    def __init__(
+        self,
+        *,
+        conversations: collections.abc.Iterable[flwr.proto.conversation_pb2.Conversation] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["conversations", b"conversations"]) -> None: ...
+
+global___ListConversationsResponse = ListConversationsResponse
+
+@typing.final
+class GetConversationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONVERSATION_ID_FIELD_NUMBER: builtins.int
+    conversation_id: builtins.str
+    def __init__(
+        self,
+        *,
+        conversation_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["conversation_id", b"conversation_id"]) -> None: ...
+
+global___GetConversationRequest = GetConversationRequest
+
+@typing.final
+class GetConversationResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONVERSATION_FIELD_NUMBER: builtins.int
+    ITEMS_FIELD_NUMBER: builtins.int
+    @property
+    def conversation(self) -> flwr.proto.conversation_pb2.Conversation: ...
+    @property
+    def items(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.conversation_pb2.ConversationItem]: ...
+    def __init__(
+        self,
+        *,
+        conversation: flwr.proto.conversation_pb2.Conversation | None = ...,
+        items: collections.abc.Iterable[flwr.proto.conversation_pb2.ConversationItem] | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["conversation", b"conversation"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["conversation", b"conversation", "items", b"items"]) -> None: ...
+
+global___GetConversationResponse = GetConversationResponse
+
+@typing.final
+class DeleteConversationRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONVERSATION_ID_FIELD_NUMBER: builtins.int
+    conversation_id: builtins.str
+    def __init__(
+        self,
+        *,
+        conversation_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["conversation_id", b"conversation_id"]) -> None: ...
+
+global___DeleteConversationRequest = DeleteConversationRequest
+
+@typing.final
+class DeleteConversationResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    DELETED_FIELD_NUMBER: builtins.int
+    deleted: builtins.bool
+    def __init__(
+        self,
+        *,
+        deleted: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["deleted", b"deleted"]) -> None: ...
+
+global___DeleteConversationResponse = DeleteConversationResponse
 
 @typing.final
 class ShowFederationRequest(google.protobuf.message.Message):

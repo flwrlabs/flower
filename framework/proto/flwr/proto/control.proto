@@ -23,6 +23,7 @@ import "flwr/proto/run.proto";
 import "flwr/proto/node.proto";
 import "flwr/proto/federation.proto";
 import "flwr/proto/federation_config.proto";
+import "flwr/proto/conversation.proto";
 
 service Control {
   // Start run upon request
@@ -59,6 +60,17 @@ service Control {
   // List Federations
   rpc ListFederations(ListFederationsRequest)
       returns (ListFederationsResponse) {}
+
+  // List conversations owned by the authenticated account
+  rpc ListConversations(ListConversationsRequest)
+      returns (ListConversationsResponse) {}
+
+  // Get a conversation owned by the authenticated account
+  rpc GetConversation(GetConversationRequest) returns (GetConversationResponse) {}
+
+  // Delete a conversation owned by the authenticated account
+  rpc DeleteConversation(DeleteConversationRequest)
+      returns (DeleteConversationResponse) {}
 
   // Show Federation
   rpc ShowFederation(ShowFederationRequest) returns (ShowFederationResponse) {}
@@ -181,6 +193,18 @@ message ListNodesResponse {
 message ListFederationsRequest {}
 message ListFederationsResponse { repeated Federation federations = 1; }
 
+message ListConversationsRequest { optional uint64 limit = 1; }
+message ListConversationsResponse { repeated Conversation conversations = 1; }
+
+message GetConversationRequest { string conversation_id = 1; }
+message GetConversationResponse {
+  Conversation conversation = 1;
+  repeated ConversationItem items = 2;
+}
+
+message DeleteConversationRequest { string conversation_id = 1; }
+message DeleteConversationResponse { bool deleted = 1; }
+
 message ShowFederationRequest { string federation_name = 1; }
 message ShowFederationResponse {
   Federation federation = 1;
@@ -248,8 +272,14 @@ message ConfigureSimulationFederationResponse {}
 // ##############
 // Unused for now
 // ##############
-message StreamRunEventsRequest { uint64 run_id = 1; }
+message StreamRunEventsRequest {
+  uint64 run_id = 1;
+  optional uint64 after_sequence = 2;
+}
 message StreamRunEventsResponse {
   string event = 1;
   string data = 2;
+  optional uint64 sequence_number = 3;
+  optional double created_at = 4;
+  optional uint64 task_id = 5;
 }

@@ -21,7 +21,15 @@ from typing import Literal
 
 from flwr.app.user_config import UserConfig
 from flwr.common import Context, Message
-from flwr.common.typing import Run, RunEvent, RunEventPayload, RunStatus
+from flwr.common.typing import (
+    Conversation,
+    ConversationItem,
+    ConversationItemPayload,
+    Run,
+    RunEvent,
+    RunEventPayload,
+    RunStatus,
+)
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
@@ -451,6 +459,49 @@ class LinkState(CoreState):  # pylint: disable=R0904
         Sequence[RunEvent]
             Matching events sorted by ascending sequence number.
         """
+
+    @abc.abstractmethod
+    def create_conversation(
+        self, conversation_id: str, flwr_aid: str, run_id: int, title: str = ""
+    ) -> None:
+        """Create a conversation if it does not already exist.
+
+        Existing conversations with the same owner are left unchanged. Existing
+        conversations owned by another account raise `ValueError`.
+        """
+
+    @abc.abstractmethod
+    def store_conversation_items(
+        self,
+        conversation_id: str,
+        flwr_aid: str,
+        run_id: int,
+        task_id: int | None,
+        items: Sequence[ConversationItemPayload],
+    ) -> Sequence[int]:
+        """Store conversation items and return assigned item indices."""
+
+    @abc.abstractmethod
+    def list_conversations(
+        self, flwr_aid: str, limit: int | None = None
+    ) -> Sequence[Conversation]:
+        """List conversations owned by the account."""
+
+    @abc.abstractmethod
+    def get_conversation(
+        self, flwr_aid: str, conversation_id: str
+    ) -> Conversation | None:
+        """Return a conversation owned by the account, if it exists."""
+
+    @abc.abstractmethod
+    def get_conversation_items(
+        self, flwr_aid: str, conversation_id: str
+    ) -> Sequence[ConversationItem]:
+        """Return conversation items owned by the account."""
+
+    @abc.abstractmethod
+    def delete_conversation(self, flwr_aid: str, conversation_id: str) -> bool:
+        """Delete a conversation owned by the account."""
 
     @abc.abstractmethod
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:

@@ -23,6 +23,7 @@ import grpc
 
 from flwr.common import Message
 from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.common.conversation import normalize_conversation_item_json
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -32,7 +33,7 @@ from flwr.common.serde import (
     message_to_proto,
     run_to_proto,
 )
-from flwr.common.typing import RunEventPayload
+from flwr.common.typing import ConversationItemPayload, RunEventPayload
 from flwr.proto import serverappio_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullAppMessagesRequest,
@@ -41,6 +42,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputResponse,
     PushAppMessagesRequest,
     PushAppMessagesResponse,
+    PushConversationItemsRequest,
+    PushConversationItemsResponse,
     PushRunEventsRequest,
     PushRunEventsResponse,
     PushTaskOutputRequest,
@@ -90,6 +93,7 @@ _RUN_EVENT_TASK_TYPES: frozenset[TaskType] = frozenset(
         TaskType.CONNECTOR,
     }
 )
+_CONVERSATION_ITEM_TASK_TYPES: frozenset[TaskType] = frozenset({TaskType.AGENT_APP})
 
 
 class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoServicer):
@@ -336,6 +340,37 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
 
         return PushRunEventsResponse(sequence_numbers=sequence_numbers)
 
+    def PushConversationItems(
+        self, request: PushConversationItemsRequest, context: grpc.ServicerContext
+    ) -> PushConversationItemsResponse:
+        """Push conversation items emitted by an AgentApp task."""
+        log(DEBUG, "ServerAppIoServicer.PushConversationItems")
+
+        task = get_authenticated_task()
+        if task.type not in _CONVERSATION_ITEM_TASK_TYPES:
+            context.abort(
+                grpc.StatusCode.PERMISSION_DENIED,
+                f"Task type '{task.type}' is not allowed to push conversation items.",
+            )
+            raise RuntimeError("This line should never be reached.")
+
+        conversation_id, items = _validate_conversation_items(request, context)
+        state = self.state()
+        flwr_aid = _get_run_flwr_aid(state, task.run_id, context)
+        try:
+            item_indices = state.store_conversation_items(
+                conversation_id=conversation_id,
+                flwr_aid=flwr_aid,
+                run_id=task.run_id,
+                task_id=task.task_id,
+                items=items,
+            )
+        except ValueError as err:
+            context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(err))
+            raise RuntimeError("This line should never be reached.") from err
+
+        return PushConversationItemsResponse(item_indices=item_indices)
+
     def GetFederationOptions(
         self, request: GetFederationOptionsRequest, context: grpc.ServicerContext
     ) -> GetFederationOptionsResponse:
@@ -450,6 +485,53 @@ def _validate_run_events(
         events.append(RunEventPayload(event=event, data=data))
 
     return events
+
+
+def _validate_conversation_items(
+    request: PushConversationItemsRequest, context: grpc.ServicerContext
+) -> tuple[str, list[ConversationItemPayload]]:
+    """Validate and normalize conversation items from the request."""
+    conversation_id = request.conversation_id.strip()
+    if not conversation_id:
+        _abort_push_conversation_items(
+            context, "`conversation_id` must be a non-empty string."
+        )
+
+    if len(request.items) == 0:
+        _abort_push_conversation_items(context, "`items` must not be empty.")
+
+    items = []
+    for item_payload in request.items:
+        try:
+            item_json = normalize_conversation_item_json(item_payload.item_json)
+        except ValueError as err:
+            _abort_push_conversation_items(context, str(err))
+        items.append(ConversationItemPayload(item_json=item_json))
+
+    return conversation_id, items
+
+
+def _get_run_flwr_aid(
+    state: LinkState, run_id: int, context: grpc.ServicerContext
+) -> str:
+    """Return the Flower Account ID that owns the run."""
+    runs = state.get_run_info(run_ids=[run_id])
+    if not runs or not runs[0].flwr_aid:
+        context.abort(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            f"Run {run_id} is not associated with an account.",
+        )
+        raise RuntimeError("This line should never be reached.")
+    return runs[0].flwr_aid
+
+
+def _abort_push_conversation_items(
+    context: grpc.ServicerContext,
+    detail: str,
+) -> NoReturn:
+    """Abort PushConversationItems with a consistent status code."""
+    context.abort(grpc.StatusCode.FAILED_PRECONDITION, detail)
+    raise RuntimeError("This line should never be reached.")
 
 
 def _abort_push_run_events(

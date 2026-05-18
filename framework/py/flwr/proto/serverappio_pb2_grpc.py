@@ -108,6 +108,11 @@ class ServerAppIoStub(object):
                 request_serializer=flwr_dot_proto_dot_appio__pb2.PushRunEventsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.PushRunEventsResponse.FromString,
                 _registered_method=True)
+        self.PushConversationItems = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/PushConversationItems',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PushConversationItemsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushConversationItemsResponse.FromString,
+                _registered_method=True)
         self.GetFederationOptions = channel.unary_unary(
                 '/flwr.proto.ServerAppIo/GetFederationOptions',
                 request_serializer=flwr_dot_proto_dot_run__pb2.GetFederationOptionsRequest.SerializeToString,
@@ -243,6 +248,13 @@ class ServerAppIoServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def PushConversationItems(self, request, context):
+        """Push conversation items
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetFederationOptions(self, request, context):
         """///////////////////////////////////////////////////////////////////////////
         Specific endpoints for ServerAppIo
@@ -347,6 +359,11 @@ def add_ServerAppIoServicer_to_server(servicer, server):
                     servicer.PushRunEvents,
                     request_deserializer=flwr_dot_proto_dot_appio__pb2.PushRunEventsRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_appio__pb2.PushRunEventsResponse.SerializeToString,
+            ),
+            'PushConversationItems': grpc.unary_unary_rpc_method_handler(
+                    servicer.PushConversationItems,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushConversationItemsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushConversationItemsResponse.SerializeToString,
             ),
             'GetFederationOptions': grpc.unary_unary_rpc_method_handler(
                     servicer.GetFederationOptions,
@@ -747,6 +764,33 @@ class ServerAppIo(object):
             '/flwr.proto.ServerAppIo/PushRunEvents',
             flwr_dot_proto_dot_appio__pb2.PushRunEventsRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.PushRunEventsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PushConversationItems(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ServerAppIo/PushConversationItems',
+            flwr_dot_proto_dot_appio__pb2.PushConversationItemsRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PushConversationItemsResponse.FromString,
             options,
             channel_credentials,
             insecure,

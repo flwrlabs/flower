@@ -36,7 +36,16 @@ from flwr.common.constant import (
     TASK_ID_NUM_BYTES,
     Status,
 )
-from flwr.common.typing import Run, RunEvent, RunEventPayload, RunStatus
+from flwr.common.conversation import normalize_conversation_item_json
+from flwr.common.typing import (
+    Conversation,
+    ConversationItem,
+    ConversationItemPayload,
+    Run,
+    RunEvent,
+    RunEventPayload,
+    RunStatus,
+)
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
@@ -1301,6 +1310,246 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             for row in rows
         ]
 
+    def create_conversation(
+        self, conversation_id: str, flwr_aid: str, run_id: int, title: str = ""
+    ) -> None:
+        """Create a conversation if it does not already exist."""
+        sint_run_id = uint64_to_int64(run_id)
+        with self.session():
+            rows = self.query(
+                """
+                SELECT flwr_aid
+                FROM conversation
+                WHERE conversation_id = :conversation_id
+                """,
+                {"conversation_id": conversation_id},
+            )
+            if rows:
+                if rows[0]["flwr_aid"] != flwr_aid:
+                    raise ValueError(f"Conversation {conversation_id} not found")
+                return
+
+            self._validate_conversation_run_owner(sint_run_id, run_id, flwr_aid)
+            current = now().timestamp()
+            self.query(
+                """
+                INSERT INTO conversation
+                (conversation_id, flwr_aid, run_id, title, created_at, updated_at)
+                VALUES
+                (:conversation_id, :flwr_aid, :run_id, :title, :created_at,
+                 :updated_at)
+                """,
+                {
+                    "conversation_id": conversation_id,
+                    "flwr_aid": flwr_aid,
+                    "run_id": sint_run_id,
+                    "title": title,
+                    "created_at": current,
+                    "updated_at": current,
+                },
+            )
+
+    def store_conversation_items(
+        self,
+        conversation_id: str,
+        flwr_aid: str,
+        run_id: int,
+        task_id: int | None,
+        items: Sequence[ConversationItemPayload],
+    ) -> Sequence[int]:
+        """Store conversation items and return assigned item indices."""
+        sint_run_id = uint64_to_int64(run_id)
+        sint_task_id = uint64_to_int64(task_id) if task_id is not None else None
+        normalized_items = [
+            normalize_conversation_item_json(item.item_json) for item in items
+        ]
+
+        with self.session():
+            self._validate_conversation_owner(conversation_id, flwr_aid)
+            self._validate_conversation_run_owner(sint_run_id, run_id, flwr_aid)
+            if sint_task_id is not None:
+                self._validate_conversation_task(
+                    sint_task_id, task_id, sint_run_id, run_id
+                )
+
+            rows = self.query(
+                """
+                SELECT COALESCE(MAX(item_index), 0) as max_item_index
+                FROM conversation_item
+                WHERE conversation_id = :conversation_id
+                """,
+                {"conversation_id": conversation_id},
+            )
+            next_item_index = rows[0]["max_item_index"] + 1
+
+            item_indices = []
+            for item_json in normalized_items:
+                item_index = next_item_index
+                next_item_index += 1
+                created_at = now().timestamp()
+                self.query(
+                    """
+                    INSERT INTO conversation_item
+                    (conversation_id, item_index, item_json, created_at, run_id,
+                     task_id)
+                    VALUES
+                    (:conversation_id, :item_index, :item_json, :created_at, :run_id,
+                     :task_id)
+                    """,
+                    {
+                        "conversation_id": conversation_id,
+                        "item_index": item_index,
+                        "item_json": item_json,
+                        "created_at": created_at,
+                        "run_id": sint_run_id,
+                        "task_id": sint_task_id,
+                    },
+                )
+                self.query(
+                    """
+                    UPDATE conversation
+                    SET updated_at = :updated_at
+                    WHERE conversation_id = :conversation_id
+                    """,
+                    {
+                        "conversation_id": conversation_id,
+                        "updated_at": created_at,
+                    },
+                )
+                item_indices.append(item_index)
+
+            return item_indices
+
+    def list_conversations(
+        self, flwr_aid: str, limit: int | None = None
+    ) -> Sequence[Conversation]:
+        """List conversations owned by the account."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+
+        query = """
+            SELECT conversation_id, run_id, title, created_at, updated_at
+            FROM conversation
+            WHERE flwr_aid = :flwr_aid
+            ORDER BY updated_at DESC, conversation_id DESC
+        """
+        params: dict[str, str | int] = {"flwr_aid": flwr_aid}
+        if limit is not None:
+            query += " LIMIT :limit"
+            params["limit"] = limit
+
+        rows = self.query(query, params)
+        return [_conversation_from_row(row) for row in rows]
+
+    def get_conversation(
+        self, flwr_aid: str, conversation_id: str
+    ) -> Conversation | None:
+        """Return a conversation owned by the account, if it exists."""
+        rows = self.query(
+            """
+            SELECT conversation_id, run_id, title, created_at, updated_at
+            FROM conversation
+            WHERE conversation_id = :conversation_id AND flwr_aid = :flwr_aid
+            """,
+            {"conversation_id": conversation_id, "flwr_aid": flwr_aid},
+        )
+        if not rows:
+            return None
+        return _conversation_from_row(rows[0])
+
+    def get_conversation_items(
+        self, flwr_aid: str, conversation_id: str
+    ) -> Sequence[ConversationItem]:
+        """Return conversation items owned by the account."""
+        rows = self.query(
+            """
+            SELECT ci.conversation_id, ci.item_index, ci.item_json, ci.created_at,
+                   ci.run_id, ci.task_id
+            FROM conversation_item AS ci
+            JOIN conversation AS c
+                ON c.conversation_id = ci.conversation_id
+            WHERE ci.conversation_id = :conversation_id AND c.flwr_aid = :flwr_aid
+            ORDER BY ci.item_index ASC
+            """,
+            {"conversation_id": conversation_id, "flwr_aid": flwr_aid},
+        )
+        return [_conversation_item_from_row(row) for row in rows]
+
+    def delete_conversation(self, flwr_aid: str, conversation_id: str) -> bool:
+        """Delete a conversation owned by the account."""
+        with self.session():
+            rows = self.query(
+                """
+                SELECT conversation_id
+                FROM conversation
+                WHERE conversation_id = :conversation_id AND flwr_aid = :flwr_aid
+                """,
+                {"conversation_id": conversation_id, "flwr_aid": flwr_aid},
+            )
+            if not rows:
+                return False
+
+            self.query(
+                """
+                DELETE FROM conversation_item
+                WHERE conversation_id = :conversation_id
+                """,
+                {"conversation_id": conversation_id},
+            )
+            self.query(
+                """
+                DELETE FROM conversation
+                WHERE conversation_id = :conversation_id AND flwr_aid = :flwr_aid
+                """,
+                {"conversation_id": conversation_id, "flwr_aid": flwr_aid},
+            )
+            return True
+
+    def _validate_conversation_owner(self, conversation_id: str, flwr_aid: str) -> None:
+        """Validate that the conversation exists and belongs to the account."""
+        rows = self.query(
+            """
+            SELECT conversation_id
+            FROM conversation
+            WHERE conversation_id = :conversation_id AND flwr_aid = :flwr_aid
+            """,
+            {"conversation_id": conversation_id, "flwr_aid": flwr_aid},
+        )
+        if not rows:
+            raise ValueError(f"Conversation {conversation_id} not found")
+
+    def _validate_conversation_run_owner(
+        self, sint_run_id: int, run_id: int, flwr_aid: str
+    ) -> None:
+        """Validate that the run exists and belongs to the account."""
+        rows = self.query(
+            """
+            SELECT flwr_aid
+            FROM run
+            WHERE run_id = :run_id
+            """,
+            {"run_id": sint_run_id},
+        )
+        if not rows:
+            raise ValueError(f"Run {run_id} not found")
+        if rows[0]["flwr_aid"] != flwr_aid:
+            raise ValueError(f"Run {run_id} does not belong to the account")
+
+    def _validate_conversation_task(
+        self, sint_task_id: int, task_id: int | None, sint_run_id: int, run_id: int
+    ) -> None:
+        """Validate that the task exists and belongs to the run."""
+        rows = self.query(
+            """
+            SELECT run_id
+            FROM task
+            WHERE task_id = :task_id
+            """,
+            {"task_id": sint_task_id},
+        )
+        if not rows or rows[0]["run_id"] != sint_run_id:
+            raise ValueError(f"Task {task_id} not found for run {run_id}")
+
     def get_valid_message_ins(self, message_id: str) -> dict[str, Any] | None:
         """Check if the Message exists and is valid (not expired).
 
@@ -1383,6 +1632,31 @@ def _run_status_from_row(row: dict[str, Any]) -> RunStatus:
         status=task_status.status,
         sub_status=task_status.sub_status,
         details=task_status.details,
+    )
+
+
+def _conversation_from_row(row: dict[str, Any]) -> Conversation:
+    """Convert a conversation database row to a Conversation object."""
+    return Conversation(
+        conversation_id=row["conversation_id"],
+        run_id=int64_to_uint64(row["run_id"]),
+        title=row["title"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
+def _conversation_item_from_row(row: dict[str, Any]) -> ConversationItem:
+    """Convert a conversation_item database row to a ConversationItem object."""
+    return ConversationItem(
+        conversation_id=row["conversation_id"],
+        item_index=row["item_index"],
+        item_json=row["item_json"],
+        created_at=row["created_at"],
+        run_id=int64_to_uint64(row["run_id"]),
+        task_id=(
+            int64_to_uint64(row["task_id"]) if row["task_id"] is not None else None
+        ),
     )
 
 

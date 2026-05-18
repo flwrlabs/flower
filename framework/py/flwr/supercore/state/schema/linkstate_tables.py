@@ -169,4 +169,48 @@ def create_linkstate_metadata() -> MetaData:
         run_event.c.sequence_number,
     )
 
+    # --------------------------------------------------------------------------
+    #  Table: conversation
+    # --------------------------------------------------------------------------
+    conversation = Table(
+        "conversation",
+        metadata,
+        Column("conversation_id", String, unique=True, nullable=False),
+        Column("flwr_aid", String, nullable=False),
+        Column("run_id", BigInteger, ForeignKey("run.run_id"), nullable=False),
+        Column("title", String, nullable=False),
+        Column("created_at", Float, nullable=False),
+        Column("updated_at", Float, nullable=False),
+    )
+    Index(
+        "idx_conversation_flwr_aid_updated_at",
+        conversation.c.flwr_aid,
+        conversation.c.updated_at,
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: conversation_item
+    # --------------------------------------------------------------------------
+    conversation_item = Table(
+        "conversation_item",
+        metadata,
+        Column(
+            "conversation_id",
+            String,
+            ForeignKey("conversation.conversation_id"),
+            nullable=False,
+        ),
+        Column("item_index", BigInteger, nullable=False),
+        Column("item_json", String, nullable=False),
+        Column("created_at", Float, nullable=False),
+        Column("run_id", BigInteger, ForeignKey("run.run_id"), nullable=False),
+        Column("task_id", BigInteger, nullable=True),
+        UniqueConstraint("conversation_id", "item_index"),
+    )
+    Index(
+        "idx_conversation_item_conversation_id_item_index",
+        conversation_item.c.conversation_id,
+        conversation_item.c.item_index,
+    )
+
     return metadata

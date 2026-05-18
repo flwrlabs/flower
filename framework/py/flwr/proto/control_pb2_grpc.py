@@ -89,6 +89,21 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.ListFederationsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.ListFederationsResponse.FromString,
                 _registered_method=True)
+        self.ListConversations = channel.unary_unary(
+                '/flwr.proto.Control/ListConversations',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ListConversationsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ListConversationsResponse.FromString,
+                _registered_method=True)
+        self.GetConversation = channel.unary_unary(
+                '/flwr.proto.Control/GetConversation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.GetConversationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.GetConversationResponse.FromString,
+                _registered_method=True)
+        self.DeleteConversation = channel.unary_unary(
+                '/flwr.proto.Control/DeleteConversation',
+                request_serializer=flwr_dot_proto_dot_control__pb2.DeleteConversationRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.DeleteConversationResponse.FromString,
+                _registered_method=True)
         self.ShowFederation = channel.unary_unary(
                 '/flwr.proto.Control/ShowFederation',
                 request_serializer=flwr_dot_proto_dot_control__pb2.ShowFederationRequest.SerializeToString,
@@ -231,6 +246,27 @@ class ControlServicer(object):
 
     def ListFederations(self, request, context):
         """List Federations
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListConversations(self, request, context):
+        """List conversations owned by the authenticated account
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetConversation(self, request, context):
+        """Get a conversation owned by the authenticated account
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteConversation(self, request, context):
+        """Delete a conversation owned by the authenticated account
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -388,6 +424,21 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.ListFederations,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.ListFederationsRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.ListFederationsResponse.SerializeToString,
+            ),
+            'ListConversations': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListConversations,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ListConversationsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ListConversationsResponse.SerializeToString,
+            ),
+            'GetConversation': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetConversation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.GetConversationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.GetConversationResponse.SerializeToString,
+            ),
+            'DeleteConversation': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteConversation,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.DeleteConversationRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.DeleteConversationResponse.SerializeToString,
             ),
             'ShowFederation': grpc.unary_unary_rpc_method_handler(
                     servicer.ShowFederation,
@@ -752,6 +803,87 @@ class Control(object):
             '/flwr.proto.Control/ListFederations',
             flwr_dot_proto_dot_control__pb2.ListFederationsRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.ListFederationsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListConversations(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ListConversations',
+            flwr_dot_proto_dot_control__pb2.ListConversationsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ListConversationsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetConversation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/GetConversation',
+            flwr_dot_proto_dot_control__pb2.GetConversationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.GetConversationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteConversation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/DeleteConversation',
+            flwr_dot_proto_dot_control__pb2.DeleteConversationRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.DeleteConversationResponse.FromString,
             options,
             channel_credentials,
             insecure,

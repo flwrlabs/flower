@@ -19,6 +19,7 @@ limitations under the License.
 
 import builtins
 import collections.abc
+import flwr.proto.conversation_pb2
 import flwr.proto.fab_pb2
 import flwr.proto.federation_config_pb2
 import flwr.proto.message_pb2
@@ -402,6 +403,43 @@ class PushRunEventsResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["sequence_numbers", b"sequence_numbers"]) -> None: ...
 
 global___PushRunEventsResponse = PushRunEventsResponse
+
+@typing.final
+class PushConversationItemsRequest(google.protobuf.message.Message):
+    """PushConversationItems messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONVERSATION_ID_FIELD_NUMBER: builtins.int
+    ITEMS_FIELD_NUMBER: builtins.int
+    conversation_id: builtins.str
+    @property
+    def items(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.conversation_pb2.ConversationItemPayload]: ...
+    def __init__(
+        self,
+        *,
+        conversation_id: builtins.str = ...,
+        items: collections.abc.Iterable[flwr.proto.conversation_pb2.ConversationItemPayload] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["conversation_id", b"conversation_id", "items", b"items"]) -> None: ...
+
+global___PushConversationItemsRequest = PushConversationItemsRequest
+
+@typing.final
+class PushConversationItemsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ITEM_INDICES_FIELD_NUMBER: builtins.int
+    @property
+    def item_indices(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
+    def __init__(
+        self,
+        *,
+        item_indices: collections.abc.Iterable[builtins.int] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["item_indices", b"item_indices"]) -> None: ...
+
+global___PushConversationItemsResponse = PushConversationItemsResponse
 
 @typing.final
 class CreateTaskRequest(google.protobuf.message.Message):

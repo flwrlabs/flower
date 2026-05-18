@@ -271,6 +271,36 @@ class RunEvent:
     task_id: int
 
 
+@dataclass(frozen=True)
+class Conversation:
+    """Conversation summary stored by LinkState."""
+
+    conversation_id: str
+    run_id: int
+    title: str
+    created_at: float
+    updated_at: float
+
+
+@dataclass(frozen=True)
+class ConversationItemPayload:
+    """Conversation item payload submitted by a task executor."""
+
+    item_json: str
+
+
+@dataclass(frozen=True)
+class ConversationItem:
+    """Conversation item stored by LinkState."""
+
+    conversation_id: str
+    item_index: int
+    item_json: str
+    created_at: float
+    run_id: int
+    task_id: int | None
+
+
 @dataclass
 class Fab:
     """Fab file representation."""

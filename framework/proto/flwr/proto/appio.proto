@@ -22,6 +22,7 @@ import "flwr/proto/fab.proto";
 import "flwr/proto/federation_config.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/task.proto";
+import "flwr/proto/conversation.proto";
 
 // These messages are used by both ServerAppIo and ClientAppIo services
 
@@ -79,6 +80,21 @@ message PushTaskOutputRequest {
   string details = 3;
 }
 message PushTaskOutputResponse {}
+
+// PushRunEvents messages
+message RunEventPayload {
+  string event = 1;
+  string data = 2;
+}
+message PushRunEventsRequest { repeated RunEventPayload events = 1; }
+message PushRunEventsResponse { repeated uint64 sequence_numbers = 1; }
+
+// PushConversationItems messages
+message PushConversationItemsRequest {
+  string conversation_id = 1;
+  repeated ConversationItemPayload items = 2;
+}
+message PushConversationItemsResponse { repeated uint64 item_indices = 1; }
 
 // CreateTask messages
 message CreateTaskRequest {

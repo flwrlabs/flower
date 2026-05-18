@@ -57,8 +57,14 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.common.conversation import conversation_item_payloads_from_input_json
 from flwr.common.logger import log
-from flwr.common.serde import run_to_proto, user_config_from_proto
+from flwr.common.serde import (
+    conversation_item_to_proto,
+    conversation_to_proto,
+    run_to_proto,
+    user_config_from_proto,
+)
 from flwr.common.typing import AccountInfo, Fab, Run
 from flwr.proto import control_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -74,10 +80,16 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DeleteConversationRequest,
+    DeleteConversationResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
+    GetConversationRequest,
+    GetConversationResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
+    ListConversationsRequest,
+    ListConversationsResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -448,6 +460,23 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
             # Register the context at the LinkState
             state.set_serverapp_context(run_id=run_id, context=run_context)
+            if agent_start_config is not None:
+                state.create_conversation(
+                    conversation_id=agent_start_config.conversation_id,
+                    flwr_aid=flwr_aid,
+                    run_id=run_id,
+                )
+                initial_items = conversation_item_payloads_from_input_json(
+                    agent_start_config.input_json
+                )
+                if initial_items:
+                    state.store_conversation_items(
+                        conversation_id=agent_start_config.conversation_id,
+                        flwr_aid=flwr_aid,
+                        run_id=run_id,
+                        task_id=None,
+                        items=initial_items,
+                    )
 
         except ValueError as e:
             log(ERROR, "Could not start run: %s", str(e))
@@ -1142,6 +1171,59 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             )
 
         return ConfigureSimulationFederationResponse()
+
+    def ListConversations(
+        self, request: ListConversationsRequest, context: grpc.ServicerContext
+    ) -> ListConversationsResponse:
+        """List conversations owned by the authenticated account."""
+        log(INFO, self.ListConversations.__qualname__)
+
+        state = self.linkstate_factory.state()
+        flwr_aid = _get_flwr_aid(context)
+        limit = request.limit if request.HasField("limit") else None
+        conversations = state.list_conversations(flwr_aid, limit)
+        return ListConversationsResponse(
+            conversations=[
+                conversation_to_proto(conversation) for conversation in conversations
+            ]
+        )
+
+    def GetConversation(
+        self, request: GetConversationRequest, context: grpc.ServicerContext
+    ) -> GetConversationResponse:
+        """Get a conversation owned by the authenticated account."""
+        log(INFO, self.GetConversation.__qualname__)
+
+        conversation_id = request.conversation_id.strip()
+        if not conversation_id:
+            _abort_failed_precondition(context, "`conversation_id` must not be empty.")
+
+        state = self.linkstate_factory.state()
+        flwr_aid = _get_flwr_aid(context)
+        conversation = state.get_conversation(flwr_aid, conversation_id)
+        if conversation is None:
+            context.abort(grpc.StatusCode.NOT_FOUND, "Conversation not found.")
+            raise RuntimeError("This line should never be reached.")
+
+        items = state.get_conversation_items(flwr_aid, conversation_id)
+        return GetConversationResponse(
+            conversation=conversation_to_proto(conversation),
+            items=[conversation_item_to_proto(item) for item in items],
+        )
+
+    def DeleteConversation(
+        self, request: DeleteConversationRequest, context: grpc.ServicerContext
+    ) -> DeleteConversationResponse:
+        """Delete a conversation owned by the authenticated account."""
+        log(INFO, self.DeleteConversation.__qualname__)
+
+        conversation_id = request.conversation_id.strip()
+        if not conversation_id:
+            _abort_failed_precondition(context, "`conversation_id` must not be empty.")
+
+        state = self.linkstate_factory.state()
+        deleted = state.delete_conversation(_get_flwr_aid(context), conversation_id)
+        return DeleteConversationResponse(deleted=deleted)
 
     def StreamRunEvents(
         self, request: StreamRunEventsRequest, context: grpc.ServicerContext

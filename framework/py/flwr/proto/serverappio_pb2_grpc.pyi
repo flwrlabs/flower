@@ -136,6 +136,12 @@ class ServerAppIoStub:
     ]
     """Push run events"""
 
+    PushConversationItems: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushConversationItemsRequest,
+        flwr.proto.appio_pb2.PushConversationItemsResponse,
+    ]
+    """Push conversation items"""
+
     GetFederationOptions: grpc.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetFederationOptionsRequest,
         flwr.proto.run_pb2.GetFederationOptionsResponse,
@@ -264,6 +270,12 @@ class ServerAppIoAsyncStub:
         flwr.proto.appio_pb2.PushRunEventsResponse,
     ]
     """Push run events"""
+
+    PushConversationItems: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushConversationItemsRequest,
+        flwr.proto.appio_pb2.PushConversationItemsResponse,
+    ]
+    """Push conversation items"""
 
     GetFederationOptions: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetFederationOptionsRequest,
@@ -421,6 +433,14 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.appio_pb2.PushRunEventsResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushRunEventsResponse]]:
         """Push run events"""
+
+    @abc.abstractmethod
+    def PushConversationItems(
+        self,
+        request: flwr.proto.appio_pb2.PushConversationItemsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.PushConversationItemsResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushConversationItemsResponse]]:
+        """Push conversation items"""
 
     @abc.abstractmethod
     def GetFederationOptions(
