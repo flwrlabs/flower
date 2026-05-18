@@ -30,17 +30,11 @@ class ServerAppExecPlugin(BaseExecPlugin):
     The plugin always selects the first candidate task.
     """
 
-    appio_api_kind = "serverappio"
     suppress_output = True
 
     def launch_task(self, token: str, task: Task) -> None:
         """Launch the process to execute the given task using the given token."""
-        # Determine the command to launch based on the task type
-        if task.type == TaskType.SERVER_APP:
-            self.command = "flwr-serverapp"
-        elif task.type == TaskType.SIMULATION:
-            self.command = "flwr-simulation"
-        else:
+        if task.type not in (TaskType.SERVER_APP, TaskType.SIMULATION):
             log(
                 ERROR,
                 "Unknown task type '%s' for task_id %d.",
@@ -49,5 +43,8 @@ class ServerAppExecPlugin(BaseExecPlugin):
             )
             return
 
-        # Launch the TaskExecutor process
         super().launch_task(token, task)
+
+    def _get_task_type(self, task: Task) -> TaskType:
+        """Return the task type to execute."""
+        return TaskType(task.type)

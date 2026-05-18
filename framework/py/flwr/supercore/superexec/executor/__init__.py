@@ -2,10 +2,9 @@
 
 from .factory import SUPPORTED_EXECUTORS, get_executor
 from .subprocess_executor import SubprocessExecutor
-from .types import AppIoKind, ExecutionSpec, Executor
+from .types import ExecutionSpec, Executor
 
 __all__ = [
-    "AppIoKind",
     "ExecutionSpec",
     "Executor",
     "SUPPORTED_EXECUTORS",

@@ -1,18 +1,17 @@
 """Executor types for SuperExec TaskExecutor processes."""
 
 from dataclasses import dataclass
-from typing import Literal, Protocol
+from typing import Protocol
 
-AppIoKind = Literal["clientappio", "serverappio"]
+from flwr.supercore.constant import TaskType
 
 
 @dataclass(frozen=True)
 class ExecutionSpec:  # pylint: disable=too-many-instance-attributes
     """Describe one TaskExecutor process execution requested by SuperExec."""
 
-    command: str
+    task_type: TaskType
     appio_api_address: str
-    appio_api_kind: AppIoKind
     token: str
     insecure: bool
     root_certificates_path: str | None

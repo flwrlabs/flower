@@ -59,8 +59,7 @@ def test_clientapp_launch_delegates_default_stdio_spec() -> None:
     plugin.launch_task(token="token", task=_get_task())
 
     spec = _execution_spec_from_executor(executor)
-    assert spec.command == "flwr-clientapp"
-    assert spec.appio_api_kind == "clientappio"
+    assert spec.task_type == TaskType.CLIENT_APP
     assert spec.suppress_output is False
 
 
@@ -80,16 +79,34 @@ def test_serverapp_launch_delegates_suppressed_stdio_spec() -> None:
     )
 
     spec = _execution_spec_from_executor(executor)
-    assert spec.command == "flwr-serverapp"
-    assert spec.appio_api_kind == "serverappio"
+    assert spec.task_type == TaskType.SERVER_APP
+    assert spec.suppress_output is True
+
+
+def test_simulation_launch_delegates_simulation_task_type() -> None:
+    """Simulation launch should delegate a spec with the simulation task type."""
+    executor = Mock()
+    plugin = ServerAppExecPlugin(
+        appio_api_address="127.0.0.1:9092",
+        insecure=True,
+        root_certificates_path=None,
+        get_run=_get_run,
+        executor=executor,
+    )
+
+    plugin.launch_task(
+        token="token", task=_get_task(task_id=5, task_type=TaskType.SIMULATION)
+    )
+
+    spec = _execution_spec_from_executor(executor)
+    assert spec.task_type == TaskType.SIMULATION
     assert spec.suppress_output is True
 
 
 class DummyExecPlugin(BaseExecPlugin):
     """Minimal plugin for testing execution spec construction."""
 
-    command = "dummy-app"
-    appio_api_kind = "clientappio"
+    task_type = TaskType.CLIENT_APP
 
 
 def test_launch_task_forwards_runtime_dependency_install_flag() -> None:

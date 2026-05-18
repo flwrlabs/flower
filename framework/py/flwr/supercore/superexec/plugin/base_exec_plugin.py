@@ -20,8 +20,8 @@ from collections.abc import Sequence
 from typing import ClassVar
 
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore.constant import TaskType
 from flwr.supercore.superexec.executor import (
-    AppIoKind,
     ExecutionSpec,
     SubprocessExecutor,
 )
@@ -36,8 +36,7 @@ class BaseExecPlugin(ExecPlugin):
     """
 
     # Placeholders to be defined in subclasses
-    command = ""
-    appio_api_kind: ClassVar[AppIoKind]
+    task_type: ClassVar[TaskType]
     suppress_output = False
 
     def select_run_id(self, candidate_run_ids: Sequence[int]) -> int | None:
@@ -62,9 +61,8 @@ class BaseExecPlugin(ExecPlugin):
     ) -> ExecutionSpec:
         """Build the execution spec for the selected task."""
         return ExecutionSpec(
-            command=self.command,
+            task_type=self._get_task_type(task),
             appio_api_address=self.appio_api_address,
-            appio_api_kind=self.appio_api_kind,
             token=token,
             insecure=self.insecure,
             root_certificates_path=self.root_certificates_path,
@@ -72,3 +70,7 @@ class BaseExecPlugin(ExecPlugin):
             parent_pid=os.getpid(),
             suppress_output=self.suppress_output,
         )
+
+    def _get_task_type(self, task: Task) -> TaskType:  # pylint: disable=unused-argument
+        """Return the task type to execute."""
+        return self.task_type

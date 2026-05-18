@@ -3,15 +3,16 @@
 import subprocess
 from unittest.mock import Mock, patch
 
+from flwr.supercore.constant import TaskType
+
 from .subprocess_executor import SubprocessExecutor
 from .types import ExecutionSpec
 
 
 def _execution_spec(**overrides: object) -> ExecutionSpec:
     base = {
-        "command": "flwr-clientapp",
+        "task_type": TaskType.CLIENT_APP,
         "appio_api_address": "127.0.0.1:9094",
-        "appio_api_kind": "clientappio",
         "token": "token",
         "insecure": True,
         "root_certificates_path": None,
@@ -88,8 +89,7 @@ def test_launch_suppresses_output_when_requested() -> None:
     with patch.object(subprocess, "Popen") as popen_mock:
         SubprocessExecutor().launch(
             _execution_spec(
-                command="flwr-serverapp",
-                appio_api_kind="serverappio",
+                task_type=TaskType.SERVER_APP,
                 suppress_output=True,
             )
         )
@@ -105,6 +105,23 @@ def test_launch_suppresses_output_when_requested() -> None:
         ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+    )
+
+
+def test_launch_renders_simulation_args() -> None:
+    """Test subprocess executor renders Simulation args."""
+    with patch.object(subprocess, "Popen") as popen_mock:
+        SubprocessExecutor().launch(_execution_spec(task_type=TaskType.SIMULATION))
+
+    popen_mock.assert_called_once_with(
+        [
+            "flwr-simulation",
+            "--serverappio-api-address",
+            "127.0.0.1:9094",
+            "--token",
+            "token",
+            "--insecure",
+        ]
     )
 
 
