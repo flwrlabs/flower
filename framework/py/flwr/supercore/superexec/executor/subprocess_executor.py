@@ -3,15 +3,9 @@
 import os
 import subprocess
 
-from flwr.supercore.constant import TaskType
+from flwr.supercore.constant import TASK_TYPE_TO_APPIO_API_ADDRESS_ARG
 
 from .types import ExecutionSpec
-
-APPIO_ADDRESS_ARGS: dict[TaskType, str] = {
-    TaskType.CLIENT_APP: "--clientappio-api-address",
-    TaskType.SERVER_APP: "--serverappio-api-address",
-    TaskType.SIMULATION: "--serverappio-api-address",
-}
 
 
 class SubprocessExecutor:
@@ -21,7 +15,7 @@ class SubprocessExecutor:
         """Start the TaskExecutor process described by the execution spec."""
         args = [
             spec.task_type.value,
-            APPIO_ADDRESS_ARGS[spec.task_type],
+            TASK_TYPE_TO_APPIO_API_ADDRESS_ARG[spec.task_type],
             spec.appio_api_address,
             "--token",
             spec.token,
