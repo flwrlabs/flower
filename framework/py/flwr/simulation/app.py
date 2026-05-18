@@ -41,6 +41,7 @@ from flwr.common.constant import (
 from flwr.common.context import Context
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import (
+    flush_logs,
     log,
     mirror_output_to_queue,
     restore_output,
@@ -297,9 +298,9 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         # Set Grpc max retries to 1 to avoid blocking on exit
         conn._retry_invoker.max_tries = 1
 
-        # Stop log uploader for this run and upload final logs
+        # Upload any remaining logs before pushing final output
         if log_uploader:
-            stop_log_uploader(log_queue, log_uploader)
+            flush_logs(log_queue)
 
         # Push final status and context (if available)
         out_req = PushTaskOutputRequest(
@@ -311,6 +312,10 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             conn._stub.PushTaskOutput(out_req)
         except grpc.RpcError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
+
+        # Stop log uploader for this run and upload final logs
+        if log_uploader:
+            stop_log_uploader(log_queue, log_uploader)
 
         # Stop heartbeat sender
         if heartbeat_sender and heartbeat_sender.is_running:
