@@ -16,14 +16,16 @@
 
 
 import os
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import ClassVar
 
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
+from flwr.common.typing import Run
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.superexec.executor import (
+    Executor,
     ExecutionSpec,
-    SubprocessExecutor,
 )
 
 from .exec_plugin import ExecPlugin
@@ -36,8 +38,28 @@ class BaseExecPlugin(ExecPlugin):
     """
 
     # Placeholders to be defined in subclasses
+    executor: Executor
     task_type: ClassVar[TaskType]
     suppress_output = False
+
+    def __init__(  # pylint: disable=R0913, R0917
+        self,
+        appio_api_address: str,
+        insecure: bool,
+        root_certificates_path: str | None,
+        get_run: Callable[[int], Run],
+        runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
+        *,
+        executor: Executor,
+    ) -> None:
+        super().__init__(
+            appio_api_address=appio_api_address,
+            insecure=insecure,
+            root_certificates_path=root_certificates_path,
+            get_run=get_run,
+            runtime_dependency_install=runtime_dependency_install,
+            executor=executor,
+        )
 
     def select_run_id(self, candidate_run_ids: Sequence[int]) -> int | None:
         """Select a run ID to execute from a sequence of candidates."""
@@ -53,8 +75,7 @@ class BaseExecPlugin(ExecPlugin):
 
     def launch_task(self, token: str, task: Task) -> None:
         """Launch the process to execute the given task using the given token."""
-        executor = self.executor or SubprocessExecutor()
-        executor.launch(self._build_execution_spec(token=token, task=task))
+        self.executor.launch(self._build_execution_spec(token=token, task=task))
 
     def _build_execution_spec(  # pylint: disable=unused-argument
         self, token: str, task: Task
