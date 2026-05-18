@@ -115,27 +115,9 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     runtime_env_dir = None
     exit_code = ExitCode.SUCCESS
 
-    def on_exit() -> None:
-        # Set Grpc max retries to 1 to avoid blocking on exit
-        retry_invoker.max_tries = 1
-
-        # Stop heartbeat sender
-        if heartbeat_sender is not None and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
-
-        # Push final status and context (if available)
-        push_task_output(
-            stub=stub,
-            context=context,
-            sub_status=sub_status,
-            details=details,
-        )
-        channel.close()
-        cleanup_app_runtime_environment(runtime_env_dir)
-
     register_signal_handlers(
         event_type=EventType.FLWR_CLIENTAPP_RUN_LEAVE,
-        exit_handlers=[on_exit],
+        exit_message="Task stopped by user.",
     )
 
     try:
@@ -218,6 +200,24 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     except grpc.RpcError as e:
         log(ERROR, "gRPC error occurred: %s", str(e))
         exit_code = ExitCode.CLIENTAPP_COMMUNICATION_ERROR
+    finally:
+        # Set Grpc max retries to 1 to avoid blocking on exit
+        retry_invoker.max_tries = 1
+
+        # Push final status and context (if available)
+        push_task_output(
+            stub=stub,
+            context=context,
+            sub_status=sub_status,
+            details=details,
+        )
+
+        # Stop heartbeat sender
+        if heartbeat_sender is not None and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+        channel.close()
+
+        cleanup_app_runtime_environment(runtime_env_dir)
 
     flwr_exit(
         code=exit_code,
