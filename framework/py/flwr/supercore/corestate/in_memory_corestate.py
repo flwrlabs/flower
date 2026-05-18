@@ -20,6 +20,7 @@ import secrets
 from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from threading import Lock
 from typing import Literal
 
@@ -47,7 +48,7 @@ class TokenRecord:
     """Record containing token and heartbeat information."""
 
     token: str
-    active_until: int
+    active_until: datetime
 
 
 class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attributes
@@ -244,7 +245,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             )
             self.task_token_store[task_id] = TokenRecord(
                 token=token,
-                active_until=int(claimed_at.timestamp()) + HEARTBEAT_DEFAULT_INTERVAL,
+                active_until=claimed_at + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL),
             )
             self.task_token_to_task_id[token] = task_id
             return token
@@ -304,10 +305,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             if task is None or record is None or task.status.status == Status.FINISHED:
                 return False
 
-            now_int = int(now().timestamp())
-            record.active_until = (
-                now_int + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-            )
+            ttl = timedelta(seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL)
+            record.active_until = now() + ttl
             return True
 
     def get_task_by_token(self, token: str) -> Task | None:
@@ -325,11 +324,15 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
     def store_task_message(self, message: Message) -> str | None:
         """Store one task-addressed Message."""
         message_id = message.metadata.message_id
-        if not _is_valid_task_message(message):
+        src_task_id = message.metadata.src_task_id
+        dst_task_id = message.metadata.dst_task_id
+        if (
+            not _is_valid_task_message(message)
+            or src_task_id is None
+            or dst_task_id is None
+        ):
             return None
 
-        src_task_id = message.metadata.src_node_id
-        dst_task_id = message.metadata.dst_node_id
         with self.lock_task_store:
             self._cleanup_expired_task_tokens_locked()
             src_task = self.task_store.get(src_task_id)
@@ -344,6 +347,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
 
         message_copy = message_from_proto(message_to_proto(message))
         message_copy.metadata.__dict__["_run_id"] = run_id
+        message_copy.metadata.__dict__["_src_node_id"] = 0
+        message_copy.metadata.__dict__["_dst_node_id"] = 0
 
         with self.lock_task_message_store:
             if message_id in self.task_message_store:
@@ -382,7 +387,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             for message_id in message_ids:
                 message = self.task_message_store[message_id]
                 if dst_task_id_set is not None:
-                    if message.metadata.dst_node_id not in dst_task_id_set:
+                    if message.metadata.dst_task_id not in dst_task_id_set:
                         continue
                 if message.metadata.created_at + message.metadata.ttl <= current:
                     continue
@@ -401,8 +406,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         Expired tasks are marked as finished with a failed status, and their
         tokens are removed.
         """
-        expired_at = now()
-        current = int(expired_at.timestamp())
+        current = now()
         expired_tasks: list[Task] = []
         for task_id, record in list(self.task_token_store.items()):
             if record.active_until < current:
@@ -410,7 +414,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 # status if it's not already finished, and remove the token.
                 task = self.task_store.get(task_id)
                 if task and task.status.status != Status.FINISHED:
-                    task.finished_at = expired_at.isoformat()
+                    task.finished_at = record.active_until.isoformat()
                     task.status.CopyFrom(
                         TaskStatus(
                             status=Status.FINISHED,
@@ -462,8 +466,10 @@ def _is_valid_task_message(message: Message) -> bool:
     """Return True if the task message carries the required payload fields."""
     return (
         message.metadata.message_id != ""
-        and message.metadata.src_node_id != 0
-        and message.metadata.dst_node_id != 0
+        and message.metadata.src_task_id is not None
+        and message.metadata.src_task_id != 0
+        and message.metadata.dst_task_id is not None
+        and message.metadata.dst_task_id != 0
         and message.metadata.ttl > 0
         and message.metadata.message_type != ""
         and message.has_content() != message.has_error()

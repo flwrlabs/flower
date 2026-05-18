@@ -19,6 +19,7 @@ import hashlib
 import json
 import secrets
 from collections.abc import Sequence
+from datetime import timedelta
 from typing import Any, Literal
 
 from sqlalchemy import MetaData
@@ -49,7 +50,7 @@ from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import generate_rand_int_from_bytes
+from .utils import generate_rand_int_from_bytes, timestamp_to_iso
 
 # Define SQL conditions for task statuses to ensure consistency across queries
 STATUS_CONDITIONS = {
@@ -192,7 +193,7 @@ class SqlCoreState(CoreState, SqlMixin):
             "connector_ref": connector_ref,
             "token": None,
             "active_until": None,
-            "pending_at": now().isoformat(),
+            "pending_at": now(),
             "starting_at": None,
             "running_at": None,
             "finished_at": None,
@@ -290,7 +291,7 @@ class SqlCoreState(CoreState, SqlMixin):
         """Atomically claim a pending task."""
         token = secrets.token_hex(FLWR_TASK_TOKEN_LENGTH)
         claimed_at = now()
-        active_until = int(claimed_at.timestamp()) + HEARTBEAT_DEFAULT_INTERVAL
+        active_until = claimed_at + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
         sint64_task_id = uint64_to_int64(task_id)
         try:
             # The conditional UPDATE is the atomic claim: exactly one caller can
@@ -309,7 +310,7 @@ class SqlCoreState(CoreState, SqlMixin):
                     "task_id": sint64_task_id,
                     "token": token,
                     "active_until": active_until,
-                    "starting_at": claimed_at.isoformat(),
+                    "starting_at": claimed_at,
                 },
             )
             if not rows:
@@ -335,7 +336,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 WHERE task_id = :task_id AND {STATUS_CONDITIONS[Status.STARTING]}
                 RETURNING task_id
                 """,
-                {"task_id": uint64_to_int64(task_id), "running_at": now().isoformat()},
+                {"task_id": uint64_to_int64(task_id), "running_at": now()},
             )
         return len(rows) > 0
 
@@ -363,7 +364,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 """,
                 {
                     "task_id": sint64_task_id,
-                    "finished_at": now().isoformat(),
+                    "finished_at": now(),
                     "sub_status": sub_status,
                     "details": details,
                 },
@@ -377,7 +378,8 @@ class SqlCoreState(CoreState, SqlMixin):
         """Extend heartbeat state for the claimed task."""
         # Heartbeats are accepted only for active, unexpired task claims.
         with self.session():
-            current = int(now().timestamp())
+            current = now()
+            ttl = timedelta(seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL)
             self._cleanup_expired_task_tokens()
             rows = self.query(
                 """
@@ -391,9 +393,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 {
                     "task_id": uint64_to_int64(task_id),
                     "current": current,
-                    "active_until": (
-                        current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-                    ),
+                    "active_until": current + ttl,
                 },
             )
         return len(rows) > 0
@@ -405,7 +405,7 @@ class SqlCoreState(CoreState, SqlMixin):
             SELECT * FROM task
             WHERE token = :token AND active_until >= :current AND finished_at IS NULL
             """,
-            {"token": token, "current": int(now().timestamp())},
+            {"token": token, "current": now()},
         )
         if not rows:
             return None
@@ -413,19 +413,25 @@ class SqlCoreState(CoreState, SqlMixin):
 
     def store_task_message(self, message: Message) -> str | None:
         """Store one task-addressed Message."""
-        if not _is_valid_task_message(message):
+        src_task_id = message.metadata.src_task_id
+        dst_task_id = message.metadata.dst_task_id
+        if (
+            not _is_valid_task_message(message)
+            or src_task_id is None
+            or dst_task_id is None
+        ):
             return None
 
         message_id = message.metadata.message_id
-        src_task_id = uint64_to_int64(message.metadata.src_node_id)
-        dst_task_id = uint64_to_int64(message.metadata.dst_node_id)
+        sint64_src_task_id = uint64_to_int64(src_task_id)
+        sint64_dst_task_id = uint64_to_int64(dst_task_id)
 
         with self.session():
             self._cleanup_expired_task_tokens()
             message_dict = {
                 "message_id": message.metadata.message_id,
-                "src_task_id": src_task_id,
-                "dst_task_id": dst_task_id,
+                "src_task_id": sint64_src_task_id,
+                "dst_task_id": sint64_dst_task_id,
                 "reply_to_message_id": message.metadata.reply_to_message_id,
                 "created_at": message.metadata.created_at,
                 "ttl": message.metadata.ttl,
@@ -547,12 +553,11 @@ class SqlCoreState(CoreState, SqlMixin):
         removed.
         """
         expired_at = now()
-        current = int(expired_at.timestamp())
         # Expired task claims are terminal failures and lose their token.
         rows = self.query(
             """
             UPDATE task
-            SET token = NULL, active_until = NULL, finished_at = :finished_at,
+            SET token = NULL, finished_at = active_until, active_until = NULL,
                 sub_status = :sub_status, details = :details
             WHERE token IS NOT NULL AND active_until < :current
             RETURNING task_id, type, run_id, fab_hash, model_ref, connector_ref,
@@ -560,8 +565,7 @@ class SqlCoreState(CoreState, SqlMixin):
                       sub_status, details
             """,
             {
-                "current": current,
-                "finished_at": expired_at.isoformat(),
+                "current": expired_at,
                 "sub_status": SubStatus.FAILED,
                 "details": "No heartbeat received from the task",
             },
@@ -629,10 +633,10 @@ def task_from_row(row: dict[str, Any]) -> Task:
         task_id=int64_to_uint64(row["task_id"]),
         type=row["type"],
         run_id=int64_to_uint64(row["run_id"]),
-        pending_at=row["pending_at"],
-        starting_at=row["starting_at"],
-        running_at=row["running_at"],
-        finished_at=row["finished_at"],
+        pending_at=timestamp_to_iso(row["pending_at"]),
+        starting_at=timestamp_to_iso(row["starting_at"]),
+        running_at=timestamp_to_iso(row["running_at"]),
+        finished_at=timestamp_to_iso(row["finished_at"]),
         status=determine_task_status(row),
         fab_hash=row["fab_hash"],
         model_ref=row["model_ref"],
@@ -651,13 +655,15 @@ def _task_message_from_row(row: dict[str, Any]) -> Message:
     metadata = Metadata(
         run_id=row["run_id"],
         message_id=row["message_id"],
-        src_node_id=row["src_task_id"],
-        dst_node_id=row["dst_task_id"],
+        src_node_id=0,
+        dst_node_id=0,
         reply_to_message_id=row["reply_to_message_id"] or "",
         group_id="",
         created_at=row["created_at"],
         ttl=row["ttl"],
         message_type=row["message_type"],
+        src_task_id=row["src_task_id"],
+        dst_task_id=row["dst_task_id"],
     )
     return make_message(metadata=metadata, content=content, error=error)
 
@@ -666,8 +672,10 @@ def _is_valid_task_message(message: Message) -> bool:
     """Return True if the task message carries the required payload fields."""
     return (
         message.metadata.message_id != ""
-        and message.metadata.src_node_id != 0
-        and message.metadata.dst_node_id != 0
+        and message.metadata.src_task_id is not None
+        and message.metadata.src_task_id != 0
+        and message.metadata.dst_task_id is not None
+        and message.metadata.dst_task_id != 0
         and message.metadata.ttl > 0
         and message.metadata.message_type != ""
         and message.has_content() != message.has_error()

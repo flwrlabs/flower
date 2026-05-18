@@ -81,9 +81,23 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         created_at: float | None = None,
     ) -> Message:
         """Create a task-addressed Message for CoreState tests."""
-        message = Message(RecordDict(), dst_task_id, "query", ttl=ttl)
+        src_node_id = 1
+        while src_node_id in (src_task_id, dst_task_id):
+            src_node_id += 1
+        dst_node_id = src_node_id + 1
+        while dst_node_id in (src_task_id, dst_task_id):
+            dst_node_id += 1
+
+        message = Message(
+            RecordDict(),
+            dst_node_id,
+            "query",
+            ttl=ttl,
+            src_task_id=src_task_id,
+            dst_task_id=dst_task_id,
+        )
         message.metadata.__dict__["_message_id"] = str(uuid4())
-        message.metadata.__dict__["_src_node_id"] = src_task_id
+        message.metadata.__dict__["_src_node_id"] = src_node_id
         message.metadata.__dict__["_run_id"] = run_id
         if created_at is not None:
             message.metadata.created_at = created_at
@@ -442,6 +456,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Expired task claims should transition tasks to FINISHED:FAILED."""
         state = self.state_factory()
         fixed_now = now()
+        active_until = fixed_now + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
         run_id = self.task_run_id(state)
 
         with patch("datetime.datetime") as mock_dt:
@@ -469,6 +484,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             ),
         )
         self.assertTrue(tasks[0].finished_at)
+        self.assertEqual(datetime.fromisoformat(tasks[0].finished_at), active_until)
 
     def test_get_task_by_token_returns_none_for_unknown_token(self) -> None:
         """Unknown task tokens should not resolve to a task."""
@@ -502,8 +518,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             pulled_message.metadata.message_id, message.metadata.message_id
         )
         self.assertEqual(pulled_message.metadata.run_id, run_id)
-        self.assertEqual(pulled_message.metadata.src_node_id, src_task_id)
-        self.assertEqual(pulled_message.metadata.dst_node_id, dst_task_id)
+        self.assertEqual(pulled_message.metadata.src_node_id, 0)
+        self.assertEqual(pulled_message.metadata.dst_node_id, 0)
+        self.assertEqual(pulled_message.metadata.src_task_id, src_task_id)
+        self.assertEqual(pulled_message.metadata.dst_task_id, dst_task_id)
         self.assertTrue(pulled_message.has_content())
 
     def test_store_task_message_validates_task_relationship(self) -> None:

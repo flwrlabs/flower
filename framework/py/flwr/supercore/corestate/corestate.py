@@ -245,7 +245,7 @@ class CoreState(ABC):
         """Store one task-addressed Message.
 
         The source and destination task IDs are read from
-        `message.metadata.src_node_id` and `message.metadata.dst_node_id`.
+        `message.metadata.src_task_id` and `message.metadata.dst_task_id`.
 
         Parameters
         ----------

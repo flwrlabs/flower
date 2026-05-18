@@ -115,7 +115,7 @@ class TestAppIoTokenClientInterceptor(TestCase):
         response = interceptor.intercept_unary_unary(
             continuation=continuation,
             client_call_details=details,
-            request=GetNodesRequest(run_id=1),
+            request=GetNodesRequest(),
         )
 
         self.assertEqual(response, "ok")
@@ -142,7 +142,7 @@ class TestAppIoTokenClientInterceptor(TestCase):
             interceptor.intercept_unary_unary(
                 continuation=Mock(),
                 client_call_details=details,
-                request=GetNodesRequest(run_id=1),
+                request=GetNodesRequest(),
             )
 
 
@@ -202,7 +202,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
         )
 
         with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(GetNodesRequest(run_id=7), context)
+            intercepted.unary_unary(GetNodesRequest(), context)
         context.abort.assert_called_once_with(
             grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
         )
@@ -227,7 +227,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
         )
 
         with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(GetNodesRequest(run_id=7), context)
+            intercepted.unary_unary(GetNodesRequest(), context)
         context.abort.assert_called_once_with(
             grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
         )
@@ -249,7 +249,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
             ),
         )
 
-        response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=7), Mock()))
+        response = cast(str, intercepted.unary_unary(GetNodesRequest(), Mock()))
         self.assertEqual(response, "ok")
 
     def test_valid_task_token_passes_and_sets_task_id(self) -> None:
@@ -275,14 +275,14 @@ class TestAppIoTokenServerInterceptor(TestCase):
             ),
         )
 
-        response = intercepted.unary_unary(GetNodesRequest(run_id=7), Mock())
+        response = intercepted.unary_unary(GetNodesRequest(), Mock())
         self.assertEqual(response, "ok")
         self.assertIsNotNone(captured_task)
         self.assertEqual(cast(Task, captured_task).task_id, 123)
         state.get_task_by_token.assert_called_once_with("task-token")
 
-    def test_metadata_token_used_even_when_request_has_token(self) -> None:
-        """Metadata token should be authoritative when both sources exist."""
+    def test_metadata_token_used_for_task_output(self) -> None:
+        """Metadata token should authorize task output requests."""
         interceptor = self._new_interceptor(
             token_to_task={"metadata-token": Task(task_id=1, run_id=5)}
         )
@@ -295,12 +295,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
             ),
         )
 
-        response = cast(
-            str,
-            intercepted.unary_unary(
-                PushTaskOutputRequest(token="request-token", run_id=5), Mock()
-            ),
-        )
+        response = intercepted.unary_unary(PushTaskOutputRequest(), Mock())
         self.assertEqual(response, "ok")
 
     def test_metadata_token_used_for_protected_method(self) -> None:
@@ -317,14 +312,11 @@ class TestAppIoTokenServerInterceptor(TestCase):
             ),
         )
 
-        response = cast(
-            str,
-            intercepted.unary_unary(PushAppMessagesRequest(run_id=5), Mock()),
-        )
+        response = intercepted.unary_unary(PushAppMessagesRequest(), Mock())
         self.assertEqual(response, "ok")
 
-    def test_request_token_without_metadata_is_denied(self) -> None:
-        """Request-body token alone should not satisfy auth."""
+    def test_missing_metadata_token_is_denied_for_task_output(self) -> None:
+        """Missing metadata token should not satisfy auth."""
         interceptor = self._new_interceptor(
             token_to_task={"request-token": Task(task_id=1, run_id=5)}
         )
@@ -340,9 +332,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
         )
 
         with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(
-                PushTaskOutputRequest(token="request-token", run_id=5), context
-            )
+            intercepted.unary_unary(PushTaskOutputRequest(), context)
         context.abort.assert_called_once_with(
             grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
         )
@@ -365,7 +355,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
         )
 
         with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(GetNodesRequest(run_id=7), context)
+            intercepted.unary_unary(GetNodesRequest(), context)
         continuation.assert_not_called()
         context.abort.assert_called_once_with(
             grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
@@ -391,7 +381,7 @@ class TestAppIoTokenServerInterceptor(TestCase):
         )
 
         with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(GetNodesRequest(run_id=7), context)
+            intercepted.unary_unary(GetNodesRequest(), context)
         context.abort.assert_called_once_with(
             grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
         )
@@ -467,7 +457,7 @@ class TestFactoryFunctions(TestCase):
             ),
         )
 
-        response = cast(str, intercepted.unary_unary(GetNodesRequest(run_id=1), Mock()))
+        response = intercepted.unary_unary(GetNodesRequest(), Mock())
         self.assertEqual(response, "ok")
 
     def test_clientappio_factory_uses_client_policy(self) -> None:
