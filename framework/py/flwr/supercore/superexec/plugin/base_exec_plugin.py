@@ -23,10 +23,7 @@ from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.typing import Run
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
-from flwr.supercore.superexec.executor import (
-    Executor,
-    ExecutionSpec,
-)
+from flwr.supercore.superexec.executor import ExecutionSpec, Executor
 
 from .exec_plugin import ExecPlugin
 
