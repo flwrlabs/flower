@@ -89,6 +89,19 @@ def test_flush_logs_returns_true_when_queue_drains() -> None:
     assert log_queue.empty()
 
 
+def test_flush_logs_returns_true_when_queue_is_empty() -> None:
+    """Test that flushing succeeds when there are no queued logs."""
+    # Prepare
+    log_queue: Queue[str | None] = Queue()
+
+    # Execute
+    result = flush_logs(log_queue, timeout=0.01)
+
+    # Assert
+    assert result
+    assert log_queue.empty()
+
+
 def test_flush_logs_returns_false_when_queue_does_not_drain() -> None:
     """Test that flushing times out if queued logs are not consumed."""
     # Prepare

@@ -452,7 +452,11 @@ def flush_logs(log_queue: Queue[str | None], timeout: float = 3.0) -> bool:
         if remaining <= 0:
             return False
         time.sleep(min(LOG_UPLOAD_INTERVAL, remaining))
-    time.sleep(min(1, remaining))  # Allow the PushLogs call to complete
+
+    remaining = deadline - time.monotonic()
+    if remaining > 0:
+        # Allow the PushLogs call to complete
+        time.sleep(min(1, remaining))
     return True
 
 
