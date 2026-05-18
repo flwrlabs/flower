@@ -488,6 +488,23 @@ class StateTest(CoreStateTest):
 
         state.federation_manager.report_run_usage.assert_called_once()
 
+    def test_stop_run_after_primary_task_finished(self) -> None:
+        """Stopping a run after primary task completion stops secondary tasks."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        primary_task_id = get_primary_task_id(state, run_id)
+        secondary_task_id = state.create_task(TaskType.SERVER_APP, run_id)
+        assert secondary_task_id is not None
+        assert state.claim_task(primary_task_id) is not None
+        assert state.activate_task(primary_task_id)
+        assert state.finish_task(primary_task_id, SubStatus.COMPLETED, "")
+
+        assert state.stop_run(run_id)
+
+        tasks = {task.task_id: task for task in state.get_tasks(run_ids=[run_id])}
+        assert tasks[primary_task_id].status.sub_status == SubStatus.COMPLETED
+        assert tasks[secondary_task_id].status.sub_status == SubStatus.STOPPED
+
     def test_usage_report_hook_not_called_on_non_primary_task_expired(self) -> None:
         """Test report_run_usage is not called when a non-primary task expires."""
         state = self.state_factory()

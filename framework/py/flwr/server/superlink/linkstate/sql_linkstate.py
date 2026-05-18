@@ -118,30 +118,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """Return the FederationManager instance."""
         return self._federation_manager
 
-    def _lock_unfinished_run(self, run_id: int) -> dict[str, Any] | None:
-        """Lock the run's primary task row if the run is still writable."""
-        sint64_run_id = uint64_to_int64(run_id)
-        rows = self.query(
-            """
-            UPDATE task
-            SET task_id = task_id
-            WHERE task_id = (
-                SELECT primary_task_id FROM run WHERE run_id = :run_id
-            )
-            AND finished_at IS NULL
-            RETURNING task_id
-            """,
-            {"run_id": sint64_run_id},
-        )
-        if not rows:
-            return None
-
-        run_rows = self.query(
-            "SELECT run_id, federation FROM run WHERE run_id = :run_id",
-            {"run_id": sint64_run_id},
-        )
-        return dict(run_rows[0]) if run_rows else None
-
     def _lock_not_stopped_run(self, run_id: int) -> dict[str, Any] | None:
         """Lock the run's primary task row if the run has not been stopped."""
         sint64_run_id = uint64_to_int64(run_id)
@@ -161,7 +137,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             return None
 
         run_rows = self.query(
-            "SELECT run_id, federation FROM run WHERE run_id = :run_id",
+            """
+            SELECT run_id, federation, primary_task_id
+            FROM run
+            WHERE run_id = :run_id
+            """,
             {"run_id": sint64_run_id},
         )
         return dict(run_rows[0]) if run_rows else None
@@ -654,7 +634,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def stop_run(self, run_id: int) -> bool:
         """Stop a run and clean up run-scoped messages and objects."""
         with self.session():
-            if not self._lock_unfinished_run(run_id):
+            run_row = self._lock_not_stopped_run(run_id)
+            if not run_row:
                 return False
 
             rows = self.query(
@@ -679,7 +660,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             if not rows:
                 return False
 
-            self.federation_manager.report_run_usage()
+            if any(row["task_id"] == run_row["primary_task_id"] for row in rows):
+                self.federation_manager.report_run_usage()
             self.delete_messages(self.get_message_ids_from_run_id(run_id))
 
         self.object_store.delete_objects_in_run(run_id)
