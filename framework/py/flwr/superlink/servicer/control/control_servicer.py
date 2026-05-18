@@ -171,8 +171,7 @@ publisher = "flwrlabs"
 fab-format-version = 0
 
 [tool.flwr.app.components]
-serverapp = "flwr.supercore.executors.run_agentapp:run_agentapp"
-clientapp = "flwr.supercore.executors.run_agentapp:run_agentapp"
+agentapp = "flwr.agentapp.builtin.gpt_chat:app"
 
 [tool.flwr.app.config]
 run_type = "agent"

@@ -391,6 +391,68 @@ def test_validate_pyproject_toml_fields_no_server_and_client_app() -> None:
     assert len(warnings) == 0
 
 
+def test_validate_pyproject_toml_fields_agent_app() -> None:
+    """Test agent apps can use an agentapp component."""
+    # Prepare
+    config = {
+        "project": {
+            "name": "fedgpt",
+            "version": "1.0.0",
+            "description": "",
+            "license": "",
+            "authors": [],
+        },
+        "tool": {
+            "flwr": {
+                "app": {
+                    "publisher": "flwrlabs",
+                    "config": {"run_type": "agent"},
+                    "components": {"agentapp": "agent:app"},
+                },
+            },
+        },
+    }
+
+    # Execute
+    is_valid, errors, warnings = validate_fields_in_config(config)
+
+    # Assert
+    assert is_valid
+    assert errors == []
+    assert warnings == []
+
+
+def test_validate_pyproject_toml_fields_agent_app_requires_agentapp() -> None:
+    """Test agent app bundles require an agentapp component."""
+    # Prepare
+    config = {
+        "project": {
+            "name": "fedgpt",
+            "version": "1.0.0",
+            "description": "",
+            "license": "",
+            "authors": [],
+        },
+        "tool": {
+            "flwr": {
+                "app": {
+                    "publisher": "flwrlabs",
+                    "config": {"run_type": "agent"},
+                    "components": {},
+                },
+            },
+        },
+    }
+
+    # Execute
+    is_valid, errors, warnings = validate_fields_in_config(config)
+
+    # Assert
+    assert not is_valid
+    assert errors == ['Property "agentapp" missing in [tool.flwr.app.components]']
+    assert warnings == []
+
+
 def test_validate_pyproject_toml_fields() -> None:
     """Test that validate_pyproject_toml_fields succeeds correctly."""
     # Prepare

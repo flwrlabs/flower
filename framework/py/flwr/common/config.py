@@ -360,14 +360,25 @@ def validate_fields_in_config(
         _validate_pattern_list(config["tool"]["flwr"]["app"], FAB_EXCLUDE_KEY, errors)
         if "config" in config["tool"]["flwr"]["app"]:
             _validate_run_config(config["tool"]["flwr"]["app"]["config"], errors)
-        if "components" not in config["tool"]["flwr"]["app"]:
+        app_config = config["tool"]["flwr"]["app"]
+        run_config = app_config.get("config", {})
+        is_agent_app = (
+            isinstance(run_config, dict) and run_config.get("run_type") == "agent"
+        )
+        if "components" not in app_config:
             errors.append("Missing [tool.flwr.app.components] section")
         else:
-            if "serverapp" not in config["tool"]["flwr"]["app"]["components"]:
+            components = app_config["components"]
+            if is_agent_app:
+                if "agentapp" not in components:
+                    errors.append(
+                        'Property "agentapp" missing in [tool.flwr.app.components]'
+                    )
+            elif "serverapp" not in components:
                 errors.append(
                     'Property "serverapp" missing in [tool.flwr.app.components]'
                 )
-            if "clientapp" not in config["tool"]["flwr"]["app"]["components"]:
+            if not is_agent_app and "clientapp" not in components:
                 errors.append(
                     'Property "clientapp" missing in [tool.flwr.app.components]'
                 )
@@ -391,18 +402,27 @@ def validate_config(
     except ValueError as err:
         return False, [str(err)], warnings
 
-    # Validate serverapp
-    serverapp_ref = config["tool"]["flwr"]["app"]["components"]["serverapp"]
-    is_valid, reason = object_ref.validate(serverapp_ref, check_module, project_dir)
+    app_config = config["tool"]["flwr"]["app"]
+    run_config = app_config.get("config", {})
+    components = app_config["components"]
+    if isinstance(run_config, dict) and run_config.get("run_type") == "agent":
+        agentapp_ref = components["agentapp"]
+        is_valid, reason = object_ref.validate(agentapp_ref, check_module, project_dir)
+        if not is_valid and isinstance(reason, str):
+            return False, [reason], warnings
+    else:
+        # Validate serverapp
+        serverapp_ref = components["serverapp"]
+        is_valid, reason = object_ref.validate(serverapp_ref, check_module, project_dir)
 
-    if not is_valid and isinstance(reason, str):
-        return False, [reason], warnings
+        if not is_valid and isinstance(reason, str):
+            return False, [reason], warnings
 
-    # Validate clientapp
-    clientapp_ref = config["tool"]["flwr"]["app"]["components"]["clientapp"]
-    is_valid, reason = object_ref.validate(clientapp_ref, check_module, project_dir)
+        # Validate clientapp
+        clientapp_ref = components["clientapp"]
+        is_valid, reason = object_ref.validate(clientapp_ref, check_module, project_dir)
 
-    if not is_valid and isinstance(reason, str):
-        return False, [reason], warnings
+        if not is_valid and isinstance(reason, str):
+            return False, [reason], warnings
 
     return True, [], warnings
