@@ -17,6 +17,7 @@
 
 import importlib
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -187,29 +188,26 @@ def test_flower_superexec_passes_executor_to_run_superexec(
         runtime_dependency_install=False,
         executor="subprocess",
     )
-    captured: dict[str, object] = {}
-
-    class _Parser:
-        def parse_args(self) -> SimpleNamespace:
-            """Return parsed arguments for the test path."""
-            return args
-
-    def _run_superexec(**kwargs: object) -> None:
-        captured.update(kwargs)
+    parser = Mock()
+    parser.parse_args.return_value = args
+    run_superexec_mock = Mock()
 
     monkeypatch.setattr(
         flower_superexec_module,
         "warn_if_flwr_update_available",
         lambda **_: None,
     )
-    monkeypatch.setattr(flower_superexec_module, "_parse_args", _Parser)
+    monkeypatch.setattr(
+        flower_superexec_module, "_parse_args", Mock(return_value=parser)
+    )
     monkeypatch.setattr(
         flower_superexec_module,
         "_get_plugin_and_stub_class",
         lambda _plugin_type: (object, ClientAppIoStub),
     )
-    monkeypatch.setattr(flower_superexec_module, "run_superexec", _run_superexec)
+    monkeypatch.setattr(flower_superexec_module, "run_superexec", run_superexec_mock)
 
     flower_superexec_module.flower_superexec()
 
-    assert captured["executor_type"] == "subprocess"
+    run_superexec_mock.assert_called_once()
+    assert run_superexec_mock.call_args.kwargs["executor_type"] == "subprocess"

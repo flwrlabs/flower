@@ -1,6 +1,7 @@
 """Tests for SuperExec subprocess executor."""
 
 import subprocess
+from typing import Any
 from unittest.mock import Mock, patch
 
 from flwr.supercore.constant import TaskType
@@ -9,8 +10,8 @@ from .subprocess_executor import SubprocessExecutor
 from .types import ExecutionSpec
 
 
-def _execution_spec(**overrides: object) -> ExecutionSpec:
-    base = {
+def _execution_spec(**overrides: Any) -> ExecutionSpec:
+    base: dict[str, Any] = {
         "task_type": TaskType.CLIENT_APP,
         "appio_api_address": "127.0.0.1:9094",
         "token": "token",
@@ -21,7 +22,7 @@ def _execution_spec(**overrides: object) -> ExecutionSpec:
         "suppress_output": False,
     }
     base.update(overrides)
-    return ExecutionSpec(**base)  # type: ignore[arg-type]
+    return ExecutionSpec(**base)
 
 
 def test_launch_renders_insecure_clientapp_args() -> None:
