@@ -20,6 +20,7 @@ import secrets
 from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from threading import Lock
 from typing import Literal
 
@@ -45,7 +46,7 @@ class TokenRecord:
     """Record containing token and heartbeat information."""
 
     token: str
-    active_until: int
+    active_until: datetime
 
 
 class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attributes
@@ -240,7 +241,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             )
             self.task_token_store[task_id] = TokenRecord(
                 token=token,
-                active_until=int(claimed_at.timestamp()) + HEARTBEAT_DEFAULT_INTERVAL,
+                active_until=claimed_at + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL),
             )
             self.task_token_to_task_id[token] = task_id
             return token
@@ -300,10 +301,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             if task is None or record is None or task.status.status == Status.FINISHED:
                 return False
 
-            now_int = int(now().timestamp())
-            record.active_until = (
-                now_int + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-            )
+            ttl = timedelta(seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL)
+            record.active_until = now() + ttl
             return True
 
     def get_task_by_token(self, token: str) -> Task | None:
@@ -325,8 +324,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         Expired tasks are marked as finished with a failed status, and their
         tokens are removed.
         """
-        expired_at = now()
-        current = int(expired_at.timestamp())
+        current = now()
         expired_tasks: list[Task] = []
         for task_id, record in list(self.task_token_store.items()):
             if record.active_until < current:
@@ -334,7 +332,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 # status if it's not already finished, and remove the token.
                 task = self.task_store.get(task_id)
                 if task and task.status.status != Status.FINISHED:
-                    task.finished_at = expired_at.isoformat()
+                    task.finished_at = record.active_until.isoformat()
                     task.status.CopyFrom(
                         TaskStatus(
                             status=Status.FINISHED,
