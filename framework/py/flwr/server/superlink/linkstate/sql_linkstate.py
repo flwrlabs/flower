@@ -679,6 +679,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             if not rows:
                 return False
 
+            self.federation_manager.report_run_usage()
             self.delete_messages(self.get_message_ids_from_run_id(run_id))
             self.object_store.delete_objects_in_run(run_id)
             return True

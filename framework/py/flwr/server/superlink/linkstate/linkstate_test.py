@@ -475,6 +475,16 @@ class StateTest(CoreStateTest):
         # Assert
         state.federation_manager.report_run_usage.assert_called_once()
 
+    def test_usage_report_hook_called_on_stop_run(self) -> None:
+        """Test report_run_usage hook is called when a run is stopped."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        state.federation_manager.report_run_usage = Mock()  # type: ignore
+
+        assert state.stop_run(run_id)
+
+        state.federation_manager.report_run_usage.assert_called_once()
+
     def test_usage_report_hook_not_called_on_non_primary_task_expired(self) -> None:
         """Test report_run_usage is not called when a non-primary task expires."""
         state = self.state_factory()
