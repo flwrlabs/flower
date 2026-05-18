@@ -18,6 +18,8 @@
 import subprocess
 from unittest.mock import Mock, patch
 
+import pytest
+
 from flwr.common.typing import Run
 from flwr.supercore.constant import TaskType
 from flwr.supercore.superexec.plugin.base_exec_plugin import BaseExecPlugin
@@ -71,6 +73,91 @@ def test_serverapp_launch_isolates_stdio() -> None:
 
     assert popen.call_args.kwargs["stdout"] is subprocess.DEVNULL
     assert popen.call_args.kwargs["stderr"] is subprocess.DEVNULL
+
+
+def test_serverapp_select_task_skips_unsupported_tasks() -> None:
+    """ServerApp plugin should select the first supported SuperLink task."""
+    plugin = ServerAppExecPlugin(
+        appio_api_address="127.0.0.1:9092",
+        insecure=True,
+        root_certificates_path=None,
+        get_run=_get_run,
+    )
+    unsupported_task = _get_task(task_id=1, task_type=TaskType.CLIENT_APP)
+    model_task = _get_task(task_id=2, task_type=TaskType.MODEL)
+
+    assert plugin.select_task([unsupported_task, model_task]) is model_task
+    assert plugin.select_task([unsupported_task]) is None
+
+
+@pytest.mark.parametrize(
+    ("task_type", "command"),
+    [
+        (TaskType.SERVER_APP, "flwr-serverapp"),
+        (TaskType.SIMULATION, "flwr-simulation"),
+        (TaskType.AGENT_APP, "flwr-agentapp"),
+        (TaskType.MODEL, "flwr-model"),
+    ],
+)
+def test_serverapp_launches_supported_superlink_task_commands(
+    task_type: TaskType, command: str
+) -> None:
+    """ServerApp plugin should map supported SuperLink tasks to fixed commands."""
+    plugin = ServerAppExecPlugin(
+        appio_api_address="127.0.0.1:9092",
+        insecure=True,
+        root_certificates_path=None,
+        get_run=_get_run,
+        runtime_dependency_install=True,
+    )
+
+    with (
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.os.getpid",
+            return_value=1234,
+        ),
+        patch(
+            "flwr.supercore.superexec.plugin.base_exec_plugin.subprocess.Popen"
+        ) as popen,
+    ):
+        plugin.launch_task(
+            token="token-123",
+            task=_get_task(task_id=5, task_type=task_type),
+        )
+
+    assert popen.call_args.args[0] == [
+        command,
+        "--insecure",
+        "--serverappio-api-address",
+        "127.0.0.1:9092",
+        "--token",
+        "token-123",
+        "--parent-pid",
+        "1234",
+        "--allow-runtime-dependency-installation",
+    ]
+    assert popen.call_args.kwargs["stdout"] is subprocess.DEVNULL
+    assert popen.call_args.kwargs["stderr"] is subprocess.DEVNULL
+
+
+def test_serverapp_launch_skips_unsupported_task_type() -> None:
+    """ServerApp plugin should not launch unsupported task types."""
+    plugin = ServerAppExecPlugin(
+        appio_api_address="127.0.0.1:9092",
+        insecure=True,
+        root_certificates_path=None,
+        get_run=_get_run,
+    )
+
+    with patch(
+        "flwr.supercore.superexec.plugin.base_exec_plugin.subprocess.Popen"
+    ) as popen:
+        plugin.launch_task(
+            token="token-123",
+            task=_get_task(task_id=5, task_type=TaskType.CLIENT_APP),
+        )
+
+    popen.assert_not_called()
 
 
 class DummyExecPlugin(BaseExecPlugin):

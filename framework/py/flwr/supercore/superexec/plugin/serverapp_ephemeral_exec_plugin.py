@@ -15,13 +15,17 @@
 """Simple ephemeral Flower SuperExec plugin for ServerApp."""
 
 
+from collections.abc import Sequence
 from logging import ERROR
 
 from flwr.common.logger import log
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
-from flwr.supercore.constant import TaskType
 
 from .base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
+from .superlink_task_command import (
+    resolve_superlink_task_command,
+    select_superlink_task,
+)
 
 
 class ServerAppEphemeralExecPlugin(BaseEphemeralExecPlugin):
@@ -29,14 +33,14 @@ class ServerAppEphemeralExecPlugin(BaseEphemeralExecPlugin):
 
     appio_api_address_arg = "--serverappio-api-address"
 
+    def select_task(self, candidate_tasks: Sequence[Task]) -> Task | None:
+        """Select a supported SuperLink task to execute."""
+        return select_superlink_task(candidate_tasks)
+
     def launch_task(self, token: str, task: Task) -> None:
         """Launch the process to execute the given task using the given token."""
-        # Determine the command to launch based on the task type
-        if task.type == TaskType.SERVER_APP:
-            self.command = "flwr-serverapp"
-        elif task.type == TaskType.SIMULATION:
-            self.command = "flwr-simulation"
-        else:
+        command = resolve_superlink_task_command(task.type)
+        if command is None:
             log(
                 ERROR,
                 "Unknown task type '%s' for task_id %d.",
@@ -44,6 +48,8 @@ class ServerAppEphemeralExecPlugin(BaseEphemeralExecPlugin):
                 task.task_id,
             )
             return
+
+        self.command = command
 
         # Launch the executor process
         super().launch_task(token, task)
