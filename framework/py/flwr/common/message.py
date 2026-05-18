@@ -49,8 +49,9 @@ DEFAULT_TTL = 43200  # This is 12 hours
 MESSAGE_INIT_ERROR_MESSAGE = (
     "Invalid arguments for Message. Expected one of the documented "
     "signatures: Message(content: RecordDict, dst_node_id: int, message_type: str,"
-    " *, [ttl: float, group_id: str]) or Message(content: RecordDict | error: Error,"
-    " *, reply_to: Message, [ttl: float])."
+    " *, [ttl: float, group_id: str, src_task_id: int, dst_task_id: int]) or "
+    "Message(content: RecordDict | error: Error, *, reply_to: Message, "
+    "[ttl: float])."
 )
 
 
@@ -99,6 +100,10 @@ class Message(InflatableObject):
     group_id : Optional[str] (default: None)
         An identifier for grouping messages. In some settings, this is used as
         the FL round.
+    src_task_id : Optional[int] (default: None)
+        An identifier for the source task sending this message.
+    dst_task_id : Optional[int] (default: None)
+        An identifier for the destination task receiving this message.
     reply_to : Optional[Message] (default: None)
         The instruction message to which this message is a reply. This message does
         not retain the original message's content but derives its metadata from it.
@@ -113,6 +118,8 @@ class Message(InflatableObject):
         *,
         ttl: float | None = None,
         group_id: str | None = None,
+        src_task_id: int | None = None,
+        dst_task_id: int | None = None,
     ) -> None: ...
 
     @overload
@@ -134,6 +141,8 @@ class Message(InflatableObject):
         error: Error | None = None,
         ttl: float | None = None,
         group_id: str | None = None,
+        src_task_id: int | None = None,
+        dst_task_id: int | None = None,
         reply_to: Message | None = None,
         metadata: Metadata | None = None,
     ) -> None:
@@ -152,6 +161,8 @@ class Message(InflatableObject):
             error=error,
             ttl=ttl,
             group_id=group_id,
+            src_task_id=src_task_id,
+            dst_task_id=dst_task_id,
             reply_to=reply_to,
             metadata=metadata,
         )
@@ -162,7 +173,15 @@ class Message(InflatableObject):
             # except `content`, `error`, or `content_or_error`
             if any(
                 x is not None
-                for x in [dst_node_id, message_type, ttl, group_id, reply_to]
+                for x in [
+                    dst_node_id,
+                    message_type,
+                    ttl,
+                    group_id,
+                    src_task_id,
+                    dst_task_id,
+                    reply_to,
+                ]
             ):
                 raise MessageInitializationError(
                     f"Invalid arguments for {Message.__qualname__}. "
@@ -193,13 +212,24 @@ class Message(InflatableObject):
                 created_at=now().timestamp(),
                 ttl=ttl or DEFAULT_TTL,
                 message_type=message_type,
+                src_task_id=src_task_id,
+                dst_task_id=dst_task_id,
             )
 
         # Create metadata for a reply message
         else:
             # Check arguments
-            # `dst_node_id`, `message_type` and `group_id` must not be set
-            if any(x is not None for x in [dst_node_id, message_type, group_id]):
+            # `dst_node_id`, `message_type`, `group_id`, and task IDs must not be set
+            if any(
+                x is not None
+                for x in [
+                    dst_node_id,
+                    message_type,
+                    group_id,
+                    src_task_id,
+                    dst_task_id,
+                ]
+            ):
                 raise MessageInitializationError()
 
             # Set metadata
@@ -214,6 +244,8 @@ class Message(InflatableObject):
                 created_at=current,
                 ttl=_limit_reply_ttl(current, ttl, reply_to),
                 message_type=reply_to.metadata.message_type,
+                src_task_id=reply_to.metadata.dst_task_id,
+                dst_task_id=reply_to.metadata.src_task_id,
             )
 
         metadata.delivered_at = ""  # Backward compatibility
@@ -501,6 +533,8 @@ def _check_arg_types(  # pylint: disable=too-many-arguments, R0917
     error: Error | None = None,
     ttl: float | None = None,
     group_id: str | None = None,
+    src_task_id: int | None = None,
+    dst_task_id: int | None = None,
     reply_to: Message | None = None,
     metadata: Metadata | None = None,
 ) -> None:
@@ -513,6 +547,8 @@ def _check_arg_types(  # pylint: disable=too-many-arguments, R0917
         and (error is None or isinstance(error, Error))
         and (ttl is None or isinstance(ttl, (int | float)))
         and (group_id is None or isinstance(group_id, str))
+        and (src_task_id is None or isinstance(src_task_id, int))
+        and (dst_task_id is None or isinstance(dst_task_id, int))
         and (reply_to is None or isinstance(reply_to, Message))
         and (metadata is None or isinstance(metadata, Metadata))
     ):
