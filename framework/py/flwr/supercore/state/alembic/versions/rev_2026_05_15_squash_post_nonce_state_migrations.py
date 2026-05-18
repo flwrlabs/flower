@@ -184,6 +184,10 @@ def _create_task_table() -> None:
         sa.Column("details", sa.String(), server_default=sa.text("''"), nullable=False),
         sa.UniqueConstraint("task_id"),
     )
+    with op.batch_alter_table("task", schema=None) as batch_op:
+        batch_op.create_index("idx_task_run_id", ["run_id"], unique=False)
+        batch_op.create_index("idx_task_token", ["token"], unique=False)
+        batch_op.create_index("idx_task_active_until", ["active_until"], unique=False)
 
 
 def _create_task_logs_table() -> None:
@@ -668,6 +672,10 @@ def _drop_task_tables() -> None:
     with op.batch_alter_table("task_logs", schema=None) as batch_op:
         batch_op.drop_index("idx_task_logs_task_id_timestamp")
     op.drop_table("task_logs")
+    with op.batch_alter_table("task", schema=None) as batch_op:
+        batch_op.drop_index("idx_task_run_id")
+        batch_op.drop_index("idx_task_token")
+        batch_op.drop_index("idx_task_active_until")
     op.drop_table("task")
 
 
