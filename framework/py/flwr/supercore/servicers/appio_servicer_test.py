@@ -37,6 +37,9 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
+from flwr.supercore.corestate import CoreState
+from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
+from flwr.supercore.object_store import ObjectStoreFactory
 
 from .appio_servicer import AppIoServicer
 
@@ -44,10 +47,10 @@ from .appio_servicer import AppIoServicer
 class _TestAppIoServicer(AppIoServicer):
     """Concrete AppIoServicer for tests."""
 
-    def __init__(self, state: Mock) -> None:
+    def __init__(self, state: CoreState) -> None:
         self._state = state
 
-    def state(self) -> Mock:
+    def state(self) -> CoreState:
         """Return mocked CoreState."""
         return self._state
 
@@ -66,20 +69,26 @@ class TestAppIoServicer(unittest.TestCase):
         message_id: str = "message-id",
         run_id: int = 0,
         src_node_id: int = 0,
-        dst_node_id: int = 456,
-        src_task_id: int | None = 123,
+        dst_node_id: int = 0,
+        src_task_id: int | None = None,
         dst_task_id: int | None = 456,
     ) -> PushTaskMessageRequest:
         """Create a PushTaskMessageRequest with task metadata."""
-        message = Message(RecordDict(), dst_node_id, "query")
+        message = Message(
+            RecordDict(),
+            dst_node_id,
+            "query",
+            src_task_id=src_task_id,
+            dst_task_id=dst_task_id,
+        )
         message.metadata.__dict__["_message_id"] = message_id
         message.metadata.__dict__["_run_id"] = run_id
         message.metadata.__dict__["_src_node_id"] = src_node_id
         message_proto = message_to_proto(message)
-        if src_task_id is not None:
-            message_proto.metadata.src_task_id = src_task_id
-        if dst_task_id is not None:
-            message_proto.metadata.dst_task_id = dst_task_id
+        if src_task_id is None:
+            message_proto.metadata.ClearField("src_task_id")
+        if dst_task_id is None:
+            message_proto.metadata.ClearField("dst_task_id")
         return PushTaskMessageRequest(message=message_proto)
 
     def test_pull_pending_tasks_returns_pending_tasks(self) -> None:
@@ -313,8 +322,10 @@ class TestAppIoServicer(unittest.TestCase):
         self.state.store_task_message.assert_called_once()
         stored_message = self.state.store_task_message.call_args.args[0]
         self.assertEqual(stored_message.metadata.run_id, 789)
-        self.assertEqual(stored_message.metadata.src_node_id, 123)
-        self.assertEqual(stored_message.metadata.dst_node_id, 456)
+        self.assertEqual(stored_message.metadata.src_node_id, 0)
+        self.assertEqual(stored_message.metadata.dst_node_id, 0)
+        self.assertEqual(stored_message.metadata.src_task_id, 123)
+        self.assertEqual(stored_message.metadata.dst_task_id, 456)
 
     def test_push_task_message_aborts_without_dst_task_id(self) -> None:
         """PushTaskMessage should require destination task metadata."""
@@ -339,6 +350,26 @@ class TestAppIoServicer(unittest.TestCase):
             "`Message.metadata.dst_task_id` is required.",
         )
         self.state.store_task_message.assert_not_called()
+
+    def test_push_task_message_accepts_consistent_src_task_id(self) -> None:
+        """PushTaskMessage should accept source task metadata matching auth."""
+        # Prepare
+        self.state.store_task_message.return_value = "message-id"
+        request = self._create_task_message_request(src_task_id=123)
+
+        # Execute
+        with patch(
+            "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+            return_value=Task(task_id=123, run_id=789),
+        ):
+            response = self.servicer.PushTaskMessage(request, Mock())
+
+        # Assert
+        self.assertEqual(response.message_id, "message-id")
+        self.state.store_task_message.assert_called_once()
+        stored_message = self.state.store_task_message.call_args.args[0]
+        self.assertEqual(stored_message.metadata.src_task_id, 123)
+        self.assertEqual(stored_message.metadata.dst_task_id, 456)
 
     def test_push_task_message_aborts_on_inconsistent_src_task_id(self) -> None:
         """PushTaskMessage should reject mismatched source task metadata."""
@@ -367,10 +398,15 @@ class TestAppIoServicer(unittest.TestCase):
     def test_pull_task_message_uses_authenticated_task_destination(self) -> None:
         """PullTaskMessage should query messages for the authenticated task."""
         # Prepare
-        message = Message(RecordDict(), 321, "query")
+        message = Message(
+            RecordDict(),
+            0,
+            "query",
+            src_task_id=123,
+            dst_task_id=321,
+        )
         message.metadata.__dict__["_message_id"] = "message-id"
         message.metadata.__dict__["_run_id"] = 789
-        message.metadata.__dict__["_src_node_id"] = 123
         self.state.get_task_message.return_value = [message]
 
         # Execute
@@ -391,18 +427,30 @@ class TestAppIoServicer(unittest.TestCase):
         self.assertEqual(len(response.messages), 1)
         self.assertEqual(response.messages[0].metadata.src_task_id, 123)
         self.assertEqual(response.messages[0].metadata.dst_task_id, 321)
+        self.assertEqual(response.messages[0].metadata.src_node_id, 0)
+        self.assertEqual(response.messages[0].metadata.dst_node_id, 0)
 
     def test_pull_task_message_filters_authenticated_task_destination(self) -> None:
         """PullTaskMessage should only return messages for the auth task."""
         # Prepare
-        matching_message = Message(RecordDict(), 321, "query")
+        matching_message = Message(
+            RecordDict(),
+            0,
+            "query",
+            src_task_id=123,
+            dst_task_id=321,
+        )
         matching_message.metadata.__dict__["_message_id"] = "message-id"
         matching_message.metadata.__dict__["_run_id"] = 789
-        matching_message.metadata.__dict__["_src_node_id"] = 123
-        other_message = Message(RecordDict(), 999, "query")
+        other_message = Message(
+            RecordDict(),
+            0,
+            "query",
+            src_task_id=123,
+            dst_task_id=999,
+        )
         other_message.metadata.__dict__["_message_id"] = "other-message-id"
         other_message.metadata.__dict__["_run_id"] = 789
-        other_message.metadata.__dict__["_src_node_id"] = 123
         self.state.get_task_message.return_value = [matching_message, other_message]
 
         # Execute
@@ -415,6 +463,45 @@ class TestAppIoServicer(unittest.TestCase):
         # Assert
         self.assertEqual(len(response.messages), 1)
         self.assertEqual(response.messages[0].metadata.message_id, "message-id")
+
+    def test_task_message_push_pull_with_real_state(self) -> None:
+        """Task messages should round-trip through real CoreState."""
+        # Prepare
+        state = InMemoryCoreState(ObjectStoreFactory().store())
+        servicer = _TestAppIoServicer(state)
+        src_task_id = state.create_task(TaskType.AGENT_APP, run_id=789)
+        dst_task_id = state.create_task(TaskType.MODEL, run_id=789)
+        assert src_task_id is not None and dst_task_id is not None
+
+        request = self._create_task_message_request(
+            message_id="",
+            src_task_id=None,
+            dst_task_id=dst_task_id,
+        )
+
+        # Execute
+        with patch(
+            "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+            return_value=Task(task_id=src_task_id, run_id=789),
+        ):
+            push_response = servicer.PushTaskMessage(request, Mock())
+
+        with patch(
+            "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+            return_value=Task(task_id=dst_task_id, run_id=789),
+        ):
+            pull_response = servicer.PullTaskMessage(PullTaskMessageRequest(), Mock())
+
+        # Assert
+        self.assertNotEqual(push_response.message_id, "")
+        self.assertEqual(len(pull_response.messages), 1)
+        message = pull_response.messages[0]
+        self.assertEqual(message.metadata.message_id, push_response.message_id)
+        self.assertEqual(message.metadata.run_id, 789)
+        self.assertEqual(message.metadata.src_task_id, src_task_id)
+        self.assertEqual(message.metadata.dst_task_id, dst_task_id)
+        self.assertEqual(message.metadata.src_node_id, 0)
+        self.assertEqual(message.metadata.dst_node_id, 0)
 
     def test_create_task_aborts_if_requesting_task_type_is_not_allowed(self) -> None:
         """CreateTask should reject task creation requests from non-app task types."""

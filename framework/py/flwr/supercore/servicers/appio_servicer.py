@@ -132,8 +132,12 @@ class AppIoServicer(ABC):
 
         message = message_from_proto(request.message)
         message.metadata.__dict__["_run_id"] = task.run_id
-        message.metadata.__dict__["_src_node_id"] = task.task_id
-        message.metadata.__dict__["_dst_node_id"] = request.message.metadata.dst_task_id
+        message.metadata.__dict__["_src_node_id"] = 0
+        message.metadata.__dict__["_dst_node_id"] = 0
+        message.metadata.src_task_id = task.task_id
+        message.metadata.dst_task_id = request.message.metadata.dst_task_id
+        if message.metadata.message_id == "":
+            message.metadata.__dict__["_message_id"] = message.object_id
 
         message_id = self.state().store_task_message(message)
         if message_id is None:
@@ -159,14 +163,11 @@ class AppIoServicer(ABC):
         message_protos = []
         for message in messages:
             if (
-                message.metadata.dst_node_id != task.task_id
+                message.metadata.dst_task_id != task.task_id
                 or message.metadata.run_id != task.run_id
             ):
                 continue
-            message_proto = message_to_proto(message)
-            message_proto.metadata.src_task_id = message.metadata.src_node_id
-            message_proto.metadata.dst_task_id = message.metadata.dst_node_id
-            message_protos.append(message_proto)
+            message_protos.append(message_to_proto(message))
 
         return PullTaskMessageResponse(messages=message_protos)
 
@@ -237,23 +238,11 @@ def _validate_push_task_message_request(
     if metadata.run_id not in (0, task.run_id):
         _abort_task_message(context, "`Message.metadata.run_id` is inconsistent.")
 
-    if metadata.src_node_id not in (0, task.task_id):
-        _abort_task_message(
-            context,
-            "`Message.metadata.src_node_id` is inconsistent.",
-        )
-
     if metadata.HasField("src_task_id") and metadata.src_task_id != task.task_id:
         _abort_task_message(context, "`Message.metadata.src_task_id` is inconsistent.")
 
     if not metadata.HasField("dst_task_id") or metadata.dst_task_id == 0:
         _abort_task_message(context, "`Message.metadata.dst_task_id` is required.")
-
-    if metadata.dst_node_id not in (0, metadata.dst_task_id):
-        _abort_task_message(
-            context,
-            "`Message.metadata.dst_node_id` is inconsistent.",
-        )
 
 
 def _abort_task_message(context: grpc.ServicerContext, detail: str) -> NoReturn:
