@@ -417,6 +417,7 @@ class SqlCoreState(CoreState, SqlMixin):
             SET token = NULL, finished_at = active_until, active_until = NULL,
                 sub_status = :sub_status, details = :details
             WHERE token IS NOT NULL AND active_until < :current
+            AND finished_at IS NULL
             RETURNING task_id, type, run_id, fab_hash, model_ref, connector_ref,
                       pending_at, starting_at, running_at, finished_at,
                       sub_status, details

@@ -37,6 +37,7 @@ from flwr.app.user_config import UserConfig
 from flwr.common import DEFAULT_TTL, Context, Error, Message, RecordDict, now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
+    HEARTBEAT_PATIENCE,
     SUPERLINK_NODE_ID,
     ErrorCode,
     Status,
@@ -425,7 +426,9 @@ class StateTest(CoreStateTest):
 
         # Execute
         # The run should be marked as failed after HEARTBEAT_DEFAULT_INTERVAL
-        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        patched_dt = now() + timedelta(
+            seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
+        )
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = patched_dt

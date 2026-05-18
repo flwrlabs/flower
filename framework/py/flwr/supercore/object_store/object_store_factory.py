@@ -19,7 +19,7 @@ from logging import DEBUG
 from threading import Lock
 
 from flwr.common.logger import log
-from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
+from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, FLWR_IN_MEMORY_SQLITE_DB_URL
 
 from .in_memory_object_store import InMemoryObjectStore
 from .object_store import ObjectStore
@@ -65,7 +65,11 @@ class ObjectStoreFactory:
                 self.store_instance = InMemoryObjectStore()
             # SqlObjectStore
             else:
-                store = SqlObjectStore(self.database, enforce_run_state=True)
+                store = SqlObjectStore(
+                    self.database,
+                    enforce_run_state=self.database
+                    not in (":memory:", FLWR_IN_MEMORY_SQLITE_DB_URL),
+                )
                 store.initialize()
                 self.store_instance = store
 

@@ -176,7 +176,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     ) -> int | None:
         """Create a task."""
         with self.session():
-            if not self._lock_unfinished_run(run_id):
+            if not self._lock_not_stopped_run(run_id):
                 if not self.query(
                     "SELECT run_id FROM run WHERE run_id = :run_id",
                     {"run_id": uint64_to_int64(run_id)},
@@ -222,7 +222,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         with self.session():
             # Validate run_id
-            run_row = self._lock_unfinished_run(message.metadata.run_id)
+            run_row = self._lock_not_stopped_run(message.metadata.run_id)
             if not run_row:
                 log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
                 return None
@@ -439,7 +439,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         with self.session():
             res_metadata = message.metadata
-            if not self._lock_unfinished_run(res_metadata.run_id):
+            if not self._lock_not_stopped_run(res_metadata.run_id):
                 log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
                 return None
 
@@ -681,8 +681,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
             self.federation_manager.report_run_usage()
             self.delete_messages(self.get_message_ids_from_run_id(run_id))
-            self.object_store.delete_objects_in_run(run_id)
-            return True
+
+        self.object_store.delete_objects_in_run(run_id)
+        return True
 
     def create_node(
         self,

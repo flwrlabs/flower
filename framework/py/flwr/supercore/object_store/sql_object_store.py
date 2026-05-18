@@ -17,6 +17,7 @@
 
 from sqlalchemy import MetaData
 
+from flwr.common.constant import SubStatus
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.supercore.inflatable.inflatable_object import (
     get_object_id,
@@ -48,7 +49,7 @@ class SqlObjectStore(ObjectStore, SqlMixin):
         """Return SQLAlchemy MetaData for ObjectStore tables."""
         return create_objectstore_metadata()
 
-    def _lock_unfinished_run(self, run_id: int) -> None:
+    def _lock_not_stopped_run(self, run_id: int) -> None:
         """Lock the run's primary task if run-state enforcement is enabled."""
         if not self.enforce_run_state:
             return
@@ -60,10 +61,10 @@ class SqlObjectStore(ObjectStore, SqlMixin):
             WHERE task_id = (
                 SELECT primary_task_id FROM run WHERE run_id = :run_id
             )
-            AND finished_at IS NULL
+            AND sub_status != :stopped
             RETURNING task_id
             """,
-            {"run_id": uint64_to_int64(run_id)},
+            {"run_id": uint64_to_int64(run_id), "stopped": SubStatus.STOPPED},
         )
         if not rows:
             raise ValueError(f"Run {run_id} not found or already finished")
@@ -72,7 +73,7 @@ class SqlObjectStore(ObjectStore, SqlMixin):
         """Identify and preregister missing objects in the `ObjectStore`."""
         new_objects = []
         with self.session():
-            self._lock_unfinished_run(run_id)
+            self._lock_not_stopped_run(run_id)
             for tree_node in iterate_object_tree(object_tree):
                 obj_id = tree_node.object_id
                 if not is_valid_sha256_hash(obj_id):
