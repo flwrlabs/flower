@@ -24,10 +24,7 @@ import grpc
 from google.protobuf.message import Message as GrpcMessage
 
 from flwr.common import now
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    ListAppsToLaunchRequest,
-    RequestTokenRequest,
-)
+from flwr.proto.appio_pb2 import PullPendingTasksRequest  # pylint: disable=E0611
 from flwr.supercore.auth import (
     compute_request_body_sha256,
     compute_superexec_signature,
@@ -95,7 +92,7 @@ class TestSuperExecAuthClientInterceptor(TestCase):
             protected_methods=_SERVERAPPIO_SUPEREXEC_METHODS,
         )
         details = _ClientCallDetails(
-            method="/flwr.proto.ServerAppIo/RequestToken",
+            method="/flwr.proto.ServerAppIo/PullPendingTasks",
             timeout=None,
             metadata=(),
             credentials=None,
@@ -114,7 +111,7 @@ class TestSuperExecAuthClientInterceptor(TestCase):
         response = interceptor.intercept_unary_unary(
             continuation=continuation,
             client_call_details=details,
-            request=RequestTokenRequest(run_id=7),
+            request=PullPendingTasksRequest(),
         )
         self.assertEqual(response, "ok")
         md = dict(captured["metadata"])
@@ -173,8 +170,8 @@ class TestSuperExecAuthServerInterceptor(TestCase):
 
     def test_valid_signed_request_is_allowed(self) -> None:
         """Valid metadata should allow a protected SuperExec RPC."""
-        method = "/flwr.proto.ServerAppIo/RequestToken"
-        request = RequestTokenRequest(run_id=9)
+        method = "/flwr.proto.ServerAppIo/PullPendingTasks"
+        request = PullPendingTasksRequest()
         intercepted = self._interceptor.intercept_service(
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(
@@ -190,7 +187,7 @@ class TestSuperExecAuthServerInterceptor(TestCase):
 
     def test_missing_metadata_is_denied(self) -> None:
         """Missing SuperExec metadata should be denied."""
-        method = "/flwr.proto.ServerAppIo/ListAppsToLaunch"
+        method = "/flwr.proto.ServerAppIo/PullPendingTasks"
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
 
@@ -199,15 +196,15 @@ class TestSuperExecAuthServerInterceptor(TestCase):
             _HandlerCallDetails(method=method, invocation_metadata=()),
         )
         with self.assertRaises(grpc.RpcError):
-            intercepted.unary_unary(ListAppsToLaunchRequest(), context)
+            intercepted.unary_unary(PullPendingTasksRequest(), context)
         context.abort.assert_called_once_with(
             grpc.StatusCode.UNAUTHENTICATED, AUTHENTICATION_FAILED_MESSAGE
         )
 
     def test_replayed_nonce_is_denied(self) -> None:
         """Reusing a nonce within the active window should be denied."""
-        method = "/flwr.proto.ServerAppIo/ListAppsToLaunch"
-        request = ListAppsToLaunchRequest()
+        method = "/flwr.proto.ServerAppIo/PullPendingTasks"
+        request = PullPendingTasksRequest()
         metadata = self._signed_metadata(
             method=method,
             request=request,
@@ -229,8 +226,8 @@ class TestSuperExecAuthServerInterceptor(TestCase):
 
     def test_invalid_body_hash_is_denied(self) -> None:
         """Body hash mismatch should be denied."""
-        method = "/flwr.proto.ServerAppIo/RequestToken"
-        request = RequestTokenRequest(run_id=9)
+        method = "/flwr.proto.ServerAppIo/PullPendingTasks"
+        request = PullPendingTasksRequest()
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
         intercepted = self._interceptor.intercept_service(
@@ -252,8 +249,8 @@ class TestSuperExecAuthServerInterceptor(TestCase):
 
     def test_stale_timestamp_is_denied(self) -> None:
         """Requests outside timestamp tolerance should be denied."""
-        method = "/flwr.proto.ServerAppIo/ListAppsToLaunch"
-        request = ListAppsToLaunchRequest()
+        method = "/flwr.proto.ServerAppIo/PullPendingTasks"
+        request = PullPendingTasksRequest()
         old_ts = int(now().timestamp() - (MAX_TIMESTAMP_DIFF_SECONDS + 5))
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
@@ -281,7 +278,5 @@ class TestSuperExecAuthServerInterceptor(TestCase):
             lambda _: _make_unary_handler(),
             _HandlerCallDetails(method=method, invocation_metadata=()),
         )
-        response = cast(
-            str, intercepted.unary_unary(RequestTokenRequest(run_id=1), Mock())
-        )
+        response = cast(str, intercepted.unary_unary(PullPendingTasksRequest(), Mock()))
         self.assertEqual(response, "ok")

@@ -17,7 +17,7 @@
 
 from unittest import TestCase
 
-from flwr.proto.appio_pb2 import RequestTokenRequest  # pylint: disable=E0611
+from flwr.proto.appio_pb2 import ClaimTaskRequest  # pylint: disable=E0611
 
 from .superexec import (
     canonicalize_superexec_auth_input,
@@ -52,9 +52,9 @@ class TestSuperExecAuthPrimitives(TestCase):
 
     def test_compute_request_body_sha256_is_deterministic(self) -> None:
         """Body SHA256 should be deterministic for equivalent request payloads."""
-        req_a = RequestTokenRequest(run_id=11)
-        req_b = RequestTokenRequest(run_id=11)
-        req_c = RequestTokenRequest(run_id=12)
+        req_a = ClaimTaskRequest(task_id=11)
+        req_b = ClaimTaskRequest(task_id=11)
+        req_c = ClaimTaskRequest(task_id=12)
 
         hash_a = compute_request_body_sha256(req_a)
         hash_b = compute_request_body_sha256(req_b)
@@ -81,7 +81,7 @@ class TestSuperExecAuthPrimitives(TestCase):
         auth_secret = derive_auth_secret(b"master-secret")
         good_signature = compute_superexec_signature(
             auth_secret=auth_secret,
-            method="/flwr.proto.ServerAppIo/RequestToken",
+            method="/flwr.proto.ServerAppIo/ClaimTask",
             timestamp=456,
             nonce="nonce-2",
             body_sha256="f" * 64,

@@ -67,6 +67,7 @@ RUN_FAILURE_DETAILS_NO_HEARTBEAT = "No heartbeat received from the run."
 # IDs
 RUN_ID_NUM_BYTES = 8
 NODE_ID_NUM_BYTES = 8
+TASK_ID_NUM_BYTES = 8
 
 # Constants for FAB
 APP_DIR = "apps"
@@ -179,8 +180,8 @@ FLWR_PRIVATE_MAX_ARRAY_CHUNK_SIZE = int(
 # Constants for serialization
 INT64_MAX_VALUE = 9223372036854775807  # (1 << 63) - 1
 
-# Constants for `flwr-serverapp` and `flwr-clientapp` CLI commands
-FLWR_APP_TOKEN_LENGTH = 128  # Length of the token used
+# Constants for task-token generation
+FLWR_TASK_TOKEN_LENGTH = 128  # Number of bytes used to generate task tokens
 
 # ControlServicer constants
 RUN_ID_NOT_FOUND_MESSAGE = "Run ID not found"

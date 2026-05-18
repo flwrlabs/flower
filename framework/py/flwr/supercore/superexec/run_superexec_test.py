@@ -12,43 +12,60 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for SuperExec runtime dependency installation wiring."""
+"""Tests for SuperExec runtime setup."""
 
 
-from unittest.mock import patch
+from typing import Any
+from unittest.mock import Mock
 
-from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning
+import pytest
+
+from flwr.supercore.interceptors import (
+    RuntimeVersionClientInterceptor,
+    SuperExecAuthClientInterceptor,
+)
+
+from . import run_superexec as run_superexec_module
 
 
-def test_run_with_deprecation_warning_logs_and_forwards_runtime_flags() -> None:
-    """Ensure deprecation path includes runtime dependency install flags."""
-    with (
-        patch("flwr.supercore.superexec.run_superexec.log") as log,
-        patch(
-            "flwr.supercore.superexec.run_superexec.run_superexec"
-        ) as run_superexec_fn,
-    ):
-        run_with_deprecation_warning(
-            cmd="flwr-serverapp",
-            plugin_type="serverapp",
-            plugin_class=object,  # type: ignore[arg-type]
-            stub_class=object,  # type: ignore[arg-type]
+@pytest.mark.parametrize(
+    ("superexec_auth_secret", "expected_interceptor_types"),
+    [
+        (None, (RuntimeVersionClientInterceptor,)),
+        (
+            b"superexec-secret",
+            (RuntimeVersionClientInterceptor, SuperExecAuthClientInterceptor),
+        ),
+    ],
+)
+def test_run_superexec_adds_runtime_version_interceptor(
+    monkeypatch: pytest.MonkeyPatch,
+    superexec_auth_secret: bytes | None,
+    expected_interceptor_types: tuple[type[object], ...],
+) -> None:
+    """SuperExec should attach runtime version metadata to AppIO calls."""
+    channel = Mock()
+    stub = Mock()
+    stub.PullPendingTasks.side_effect = KeyboardInterrupt()
+    captured: dict[str, Any] = {}
+
+    def _create_channel(**kwargs: Any) -> Mock:
+        captured.update(kwargs)
+        return channel
+
+    monkeypatch.setattr(run_superexec_module, "create_channel", _create_channel)
+    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
+    monkeypatch.setattr(run_superexec_module, "wrap_stub", Mock())
+
+    with pytest.raises(KeyboardInterrupt):
+        run_superexec_module.run_superexec(
+            plugin_class=Mock(),
+            stub_class=Mock(return_value=stub),
             appio_api_address="127.0.0.1:9091",
-            parent_pid=321,
-            warn_run_once=False,
-            runtime_dependency_install=True,
+            insecure=True,
+            superexec_auth_secret=superexec_auth_secret,
         )
 
-    assert (
-        "flower-superexec --insecure --plugin-type serverapp "
-        "--appio-api-address 127.0.0.1:9091 --parent-pid 321 "
-        "--allow-runtime-dependency-installation"
-    ) in [call.args[1] for call in log.call_args_list]
-    run_superexec_fn.assert_called_once_with(
-        plugin_class=object,
-        stub_class=object,
-        appio_api_address="127.0.0.1:9091",
-        superexec_auth_secret=None,
-        parent_pid=321,
-        runtime_dependency_install=True,
+    assert tuple(type(interceptor) for interceptor in captured["interceptors"]) == (
+        expected_interceptor_types
     )

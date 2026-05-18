@@ -1,4 +1,6 @@
-# Copyright 2024 Flower Labs GmbH. All Rights Reserved.
+#!/bin/bash
+
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,8 +15,16 @@
 # limitations under the License.
 # ==============================================================================
 
-ARG BASE_REPOSITORY=flwr/base
-ARG BASE_IMAGE
-FROM $BASE_REPOSITORY:$BASE_IMAGE
+set -euo pipefail
 
-ENTRYPOINT ["flwr-clientapp"]
+if [[ "${PREPARE_FRAMEWORK:-false}" == "true" ]]; then
+  echo "No Flower repository sync is required in flwrlabs/flower."
+fi
+
+if [[ "${PATCH_BASE_DOCKERFILES:-false}" == "true" ]]; then
+  echo "No repository-specific Dockerfile patches are required in flwrlabs/flower."
+fi
+
+if [[ "${BUILD_LOCAL_WHEEL:-false}" == "true" ]]; then
+  (cd framework && ./dev/build.sh)
+fi

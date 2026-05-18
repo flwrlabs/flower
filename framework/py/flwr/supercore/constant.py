@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from enum import Enum
 
 from flwr.common.constant import (
@@ -27,6 +28,22 @@ from flwr.common.constant import (
     TIMESTAMP_TOLERANCE,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
+else:
+
+    class StrEnum(str, Enum):
+        """Python 3.10-compatible fallback for enum.StrEnum.
+
+        Preserves StrEnum behavior by returning the member value from str(). Remove this
+        fallback once Python 3.10 support is dropped.
+        """
+
+        def __str__(self) -> str:
+            """Return the member value."""
+            return str(self.value)
+
 
 # Constants for Inflatable
 HEAD_BODY_DIVIDER = b"\x00"
@@ -132,6 +149,11 @@ SUPEREXEC_AUTH_SECRET_CONTEXT = b"superexec-auth-v1"
 MIN_TIMESTAMP_DIFF_SECONDS = -SYSTEM_TIME_TOLERANCE
 MAX_TIMESTAMP_DIFF_SECONDS = TIMESTAMP_TOLERANCE + SYSTEM_TIME_TOLERANCE
 
+# Constants for Flower runtime version metadata
+FLWR_PACKAGE_NAME_METADATA_KEY = "flwr-package-name"
+FLWR_PACKAGE_VERSION_METADATA_KEY = "flwr-package-version"
+FLWR_COMPONENT_NAME_METADATA_KEY = "flwr-component-name"
+VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY = "flwr-version-incompatibility-message"
 
 # System message type
 SYSTEM_MESSAGE_TYPE = "system"
@@ -147,6 +169,9 @@ SQLITE_PRAGMAS = (
     ("mmap_size", "268435456"),  # 256MB memory-mapped I/O
 )
 
+# Constants for SQL LinkState
+SQL_ALLOWED_DIALECTS: frozenset[str] = frozenset({"sqlite"})
+
 
 class NodeStatus:
     """Event log writer types."""
@@ -161,7 +186,7 @@ class NodeStatus:
         raise TypeError(f"{cls.__name__} cannot be instantiated.")
 
 
-class InvitationStatus(str, Enum):
+class InvitationStatus(StrEnum):
     """Status of a federation invitation."""
 
     PENDING = "pending"
@@ -171,21 +196,52 @@ class InvitationStatus(str, Enum):
     EXPIRED = "expired"
 
 
-class RunType(str, Enum):
+class RunType(StrEnum):
     """Supported run types."""
 
     SERVER_APP = "serverapp"
     SIMULATION = "simulation"
 
 
-class RunTime(str, Enum):
+class RunTime(StrEnum):
     """Supported runtimes."""
 
     DEPLOYMENT = "deployment"
     SIMULATION = "simulation"
 
 
-class ActionType(str, Enum):
+class TaskType(StrEnum):
+    """Supported task types."""
+
+    SERVER_APP = "flwr-serverapp"
+    CLIENT_APP = "flwr-clientapp"
+    SIMULATION = "flwr-simulation"
+    AGENT_APP = "flwr-agentapp"
+    MODEL = "flwr-model"
+    CONNECTOR = "flwr-connector"
+
+
+TASK_TYPES_ALLOWED_TO_CREATE_TASKS: frozenset[TaskType] = frozenset(
+    {
+        TaskType.AGENT_APP,
+        TaskType.SERVER_APP,
+        TaskType.CLIENT_APP,
+    }
+)
+TASK_TYPES_REQUIRING_FAB_HASH: frozenset[TaskType] = frozenset(
+    {
+        TaskType.SERVER_APP,
+        TaskType.CLIENT_APP,
+        TaskType.AGENT_APP,
+    }
+)
+TASK_TYPES_REQUIRING_MODEL_REF: frozenset[TaskType] = frozenset({TaskType.MODEL})
+TASK_TYPES_REQUIRING_CONNECTOR_REF: frozenset[TaskType] = frozenset(
+    {TaskType.CONNECTOR}
+)
+
+
+class ActionType(StrEnum):
     """Supported control action types."""
 
     REGISTER_SUPERNODE = "register_supernode"
