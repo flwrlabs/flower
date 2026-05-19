@@ -150,14 +150,14 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 )
             if self._is_finished_run(run_id):
                 raise RuntimeError(f"Run {run_id} is finished.")
-            return super().create_task(
-                task_type=task_type,
-                run_id=run_id,
-                fab_hash=fab_hash,
-                model_ref=model_ref,
-                connector_ref=connector_ref,
-                requesting_task_id=requesting_task_id,
-            )
+        return super().create_task(
+            task_type=task_type,
+            run_id=run_id,
+            fab_hash=fab_hash,
+            model_ref=model_ref,
+            connector_ref=connector_ref,
+            requesting_task_id=requesting_task_id,
+        )
 
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
