@@ -40,6 +40,8 @@ class RunRow:  # pylint: disable=too-many-instance-attributes
         The SHA-256 hash of the FAB.
     status_text : str
         The formatted status text.
+    details: str
+        Additional details about the run status.
     elapsed : float
         The elapsed time in seconds.
     pending_at : str
@@ -68,6 +70,7 @@ class RunRow:  # pylint: disable=too-many-instance-attributes
     fab_version: str
     fab_hash: str
     status_text: str
+    details: str
     elapsed: float
     pending_at: str
     starting_at: str
@@ -134,6 +137,7 @@ def format_runs(runs: list[Run], now_isoformat: str) -> list[RunRow]:
             fab_version=run.fab_version,
             fab_hash=run.fab_hash,
             status_text=status_text,
+            details=run.status.details or "N/A",
             elapsed=elapsed_time.total_seconds(),
             pending_at=_format_datetime(pending_at),
             starting_at=_format_datetime(starting_at),
