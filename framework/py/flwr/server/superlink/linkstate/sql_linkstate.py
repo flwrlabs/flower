@@ -118,48 +118,28 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """Return the FederationManager instance."""
         return self._federation_manager
 
-    def _lock_unfinished_run(self, run_id: int) -> dict[str, Any] | None:
-        """Lock the run's primary task row if the run has not finished."""
+    def _lock_run(
+        self, run_id: int, *, require_unfinished: bool = False
+    ) -> dict[str, Any] | None:
+        """Lock the run's primary task row if it is in the required state."""
         sint64_run_id = uint64_to_int64(run_id)
+        condition = (
+            "finished_at IS NULL" if require_unfinished else "sub_status != :stopped"
+        )
+        params: dict[str, Any] = {"run_id": sint64_run_id}
+        if not require_unfinished:
+            params["stopped"] = SubStatus.STOPPED
         rows = self.query(
-            """
+            f"""
             UPDATE task
             SET task_id = task_id
             WHERE task_id = (
                 SELECT primary_task_id FROM run WHERE run_id = :run_id
             )
-            AND finished_at IS NULL
+            AND {condition}
             RETURNING task_id
             """,
-            {"run_id": sint64_run_id},
-        )
-        if not rows:
-            return None
-
-        run_rows = self.query(
-            """
-            SELECT run_id, federation, primary_task_id
-            FROM run
-            WHERE run_id = :run_id
-            """,
-            {"run_id": sint64_run_id},
-        )
-        return dict(run_rows[0]) if run_rows else None
-
-    def _lock_not_stopped_run(self, run_id: int) -> dict[str, Any] | None:
-        """Lock the run's primary task row if the run has not been stopped."""
-        sint64_run_id = uint64_to_int64(run_id)
-        rows = self.query(
-            """
-            UPDATE task
-            SET task_id = task_id
-            WHERE task_id = (
-                SELECT primary_task_id FROM run WHERE run_id = :run_id
-            )
-            AND sub_status != :stopped
-            RETURNING task_id
-            """,
-            {"run_id": sint64_run_id, "stopped": SubStatus.STOPPED},
+            params,
         )
         if not rows:
             return None
@@ -185,7 +165,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     ) -> int | None:
         """Create a task."""
         with self.session():
-            if not self._lock_unfinished_run(run_id):
+            if not self._lock_run(run_id, require_unfinished=True):
                 if not self.query(
                     "SELECT run_id FROM run WHERE run_id = :run_id",
                     {"run_id": uint64_to_int64(run_id)},
@@ -232,7 +212,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         with self.session():
             # Validate run_id
-            run_row = self._lock_unfinished_run(message.metadata.run_id)
+            run_row = self._lock_run(message.metadata.run_id, require_unfinished=True)
             if not run_row:
                 log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
                 return None
@@ -449,7 +429,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         with self.session():
             res_metadata = message.metadata
-            if not self._lock_unfinished_run(res_metadata.run_id):
+            if not self._lock_run(res_metadata.run_id, require_unfinished=True):
                 log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
                 return None
 
@@ -664,7 +644,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def stop_run(self, run_id: int) -> bool:
         """Stop a run and clean up run-scoped messages and objects."""
         with self.session():
-            run_row = self._lock_not_stopped_run(run_id)
+            run_row = self._lock_run(run_id)
             if not run_row:
                 return False
 
@@ -1314,7 +1294,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         sint_run_id = uint64_to_int64(run_id)
 
         with self.session():
-            if not self._lock_not_stopped_run(run_id):
+            if not self._lock_run(run_id):
                 raise ValueError(f"Run {run_id} not found or already stopped")
 
             # Check if any existing Context assigned to the run_id

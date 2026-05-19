@@ -20,7 +20,7 @@ from logging import DEBUG, ERROR, INFO
 import grpc
 
 from flwr.common import Message
-from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.common.constant import Status, SUPERLINK_NODE_ID
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -61,7 +61,6 @@ from flwr.proto.serverappio_pb2 import (  # pylint: disable=E0611
     GetNodesResponse,
 )
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
-from flwr.server.superlink.utils import cleanup_objects_if_run_finished
 from flwr.server.utils.validator import validate_message
 from flwr.supercore.constant import TaskType
 from flwr.supercore.inflatable.inflatable_object import (
@@ -148,8 +147,11 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             objects_to_push |= set(store.preregister(run_id, object_tree))
             # Store message
             message_id: str | None = state.store_message_ins(message=message)
-            if message_id is None:
-                cleanup_objects_if_run_finished(run_id, state, store)
+            if (
+                message_id is None
+                and state.get_run_status({run_id})[run_id].status == Status.FINISHED
+            ):
+                store.delete_objects_in_run(run_id)
             message_ids.append(message_id)
 
         return PushAppMessagesResponse(

@@ -52,15 +52,6 @@ def check_abort(
     return None
 
 
-def cleanup_objects_if_run_finished(
-    run_id: int, state: LinkState, store: ObjectStore
-) -> None:
-    """Delete run objects if a concurrent lifecycle transition finished the run."""
-    run_status = state.get_run_status({run_id}).get(run_id)
-    if run_status and run_status.status == Status.FINISHED:
-        store.delete_objects_in_run(run_id)
-
-
 def abort_grpc_context(msg: str | None, context: grpc.ServicerContext) -> None:
     """Abort context with statuscode PERMISSION_DENIED if `msg` is not None."""
     if msg is not None:
