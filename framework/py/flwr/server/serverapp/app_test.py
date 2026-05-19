@@ -63,29 +63,6 @@ def test_parse_flwr_serverapp_parses_tokenized_invocation() -> None:
     assert args.runtime_dependency_install is True
 
 
-def test_parse_flwr_serverapp_parses_token_file_invocation() -> None:
-    """The ServerApp process CLI should parse token file invocation."""
-    args = _parse_args_run_flwr_serverapp().parse_args(
-        [
-            "--token-file",
-            "/path/to/token",
-            "--insecure",
-        ]
-    )
-
-    assert args.token is None
-    assert args.token_file == "/path/to/token"
-    assert args.insecure is True
-
-
-def test_parse_flwr_serverapp_rejects_token_and_token_file() -> None:
-    """The ServerApp process CLI should reject duplicate token sources."""
-    with pytest.raises(SystemExit):
-        _parse_args_run_flwr_serverapp().parse_args(
-            ["--token", "test-token", "--token-file", "/path/to/token"]
-        )
-
-
 def test_flwr_serverapp_parses_args_before_mirroring_output() -> None:
     """Argument parsing should happen before stdout/stderr redirection."""
 

@@ -63,5 +63,5 @@ def _parse_args_run_flwr_clientapp() -> argparse.ArgumentParser:
         help="Address of SuperNode's ClientAppIo API (IPv4, IPv6, or a domain name)."
         f"By default, it is set to {CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS}.",
     )
-    add_args_flwr_app_common(parser=parser, token_file=True)
+    add_args_flwr_app_common(parser=parser)
     return parser

@@ -16,6 +16,7 @@
 
 
 import importlib
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -84,6 +85,41 @@ def test_flwr_model_parses_args_before_mirroring_output() -> None:
     mirror_output_to_queue.assert_not_called()
 
 
+def test_flwr_model_rejects_tls_before_token_resolution() -> None:
+    """The ModelApp CLI should reject TLS before reading token files."""
+    args = SimpleNamespace(
+        insecure=False,
+        serverappio_api_address="127.0.0.1:9091",
+        token=None,
+        token_file="/path/to/missing-token",
+        parent_pid=321,
+        runtime_dependency_install=True,
+    )
+
+    class _Parser:
+        def parse_args(self) -> SimpleNamespace:
+            """Return a fixed namespace for CLI validation tests."""
+            return args
+
+    flwr_exit = Mock(side_effect=SystemExit)
+    try_obtain_flwr_app_token = Mock()
+
+    with (
+        patch.object(flwr_model_module, "_parse_args_run_flwr_model", _Parser),
+        patch.object(flwr_model_module, "flwr_exit", flwr_exit),
+        patch.object(
+            flwr_model_module,
+            "try_obtain_flwr_app_token",
+            try_obtain_flwr_app_token,
+        ),
+        pytest.raises(SystemExit),
+    ):
+        flwr_model_module.flwr_model()
+
+    flwr_exit.assert_called_once()
+    try_obtain_flwr_app_token.assert_not_called()
+
+
 def test_flwr_model_forwards_cli_args() -> None:
     """The ModelApp CLI should forward parsed args to the runtime."""
     args = SimpleNamespace(
@@ -125,3 +161,40 @@ def test_flwr_model_forwards_cli_args() -> None:
     assert kwargs["certificates"] is None
     assert kwargs["parent_pid"] == 321
     assert kwargs["runtime_dependency_install"] is True
+
+
+def test_flwr_model_forwards_token_file(tmp_path: Path) -> None:
+    """The ModelApp CLI should read and forward token file contents."""
+    token_file = tmp_path / "token"
+    token_file.write_text("test-token\n", encoding="utf-8")
+    args = SimpleNamespace(
+        insecure=True,
+        serverappio_api_address="127.0.0.1:9091",
+        token=None,
+        token_file=str(token_file),
+        parent_pid=321,
+        runtime_dependency_install=True,
+    )
+
+    class _Parser:
+        def parse_args(self) -> SimpleNamespace:
+            """Return a fixed namespace for CLI forwarding tests."""
+            return args
+
+    mirror_output_to_queue = Mock()
+    restore_output = Mock()
+    run_model = Mock()
+
+    with (
+        patch.object(flwr_model_module, "_parse_args_run_flwr_model", _Parser),
+        patch.object(
+            flwr_model_module,
+            "mirror_output_to_queue",
+            mirror_output_to_queue,
+        ),
+        patch.object(flwr_model_module, "restore_output", restore_output),
+        patch.object(flwr_model_module, "run_model", run_model),
+    ):
+        flwr_model_module.flwr_model()
+
+    assert run_model.call_args.kwargs["token"] == "test-token"

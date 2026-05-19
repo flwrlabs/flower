@@ -306,5 +306,5 @@ def _parse_args_run_flwr_serverapp() -> argparse.ArgumentParser:
         help="Address of SuperLink's ServerAppIo API (IPv4, IPv6, or a domain name)."
         f"By default, it is set to {SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS}.",
     )
-    add_args_flwr_app_common(parser=parser, token_file=True)
+    add_args_flwr_app_common(parser=parser)
     return parser

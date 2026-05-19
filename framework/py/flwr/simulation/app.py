@@ -349,5 +349,5 @@ def _parse_args_run_flwr_simulation() -> argparse.ArgumentParser:
         "`--simulationio-api-address` is accepted as a deprecated alias. "
         f"By default, it is set to {SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS}.",
     )
-    add_args_flwr_app_common(parser=parser, token_file=True)
+    add_args_flwr_app_common(parser=parser)
     return parser
