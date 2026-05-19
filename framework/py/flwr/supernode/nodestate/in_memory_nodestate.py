@@ -203,6 +203,7 @@ class InMemoryNodeState(
                         self.object_store.put(obj_id, obj.deflate())
 
                 # Store the error reply message
+                self.record_message_processing_end(msg.metadata.message_id)
                 self.store_message(error_reply)
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:

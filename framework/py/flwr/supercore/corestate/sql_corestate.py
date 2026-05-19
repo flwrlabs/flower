@@ -268,7 +268,10 @@ class SqlCoreState(CoreState, SqlMixin):
             query += " LIMIT :limit"
             params["limit"] = limit
 
-        rows = self.query(query, params)
+        with self.session():
+            # Clean up expired task tokens before querying tasks
+            self._cleanup_expired_task_tokens()
+            rows = self.query(query, params)
 
         result: list[Task] = []
         for row in rows:
