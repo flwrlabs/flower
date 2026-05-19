@@ -65,7 +65,6 @@ from flwr.supercore.task_message import (
 )
 
 MODEL_STARTED_EVENT = "model.started"
-MODEL_OUTPUT_DELTA_EVENT = "model.output.delta"
 MODEL_COMPLETED_EVENT = "model.completed"
 MODEL_FAILED_EVENT = "model.failed"
 
@@ -197,15 +196,7 @@ def _run_model_task(
         )
 
         def on_stream_event(event: JsonObject) -> None:
-            _push_run_event(
-                stub,
-                MODEL_OUTPUT_DELTA_EVENT,
-                {
-                    "task_id": task_id,
-                    "model": request.spec.payload["model"],
-                    "event": event,
-                },
-            )
+            _push_provider_stream_event(stub, event)
 
         provider_result = invoke_model(request.spec.payload, on_stream_event)
         _push_model_result(stub, request, provider_result)
@@ -334,6 +325,16 @@ def _push_run_event(stub: ServerAppIoModelStub, event: str, data: JsonObject) ->
             ]
         )
     )
+
+
+def _push_provider_stream_event(
+    stub: ServerAppIoModelStub, event_data: JsonObject
+) -> None:
+    """Forward one OpenAI Responses stream event through run events."""
+    event_type = event_data.get("type")
+    if not isinstance(event_type, str) or not event_type:
+        raise ValueError("Model provider stream event requires string `type`.")
+    _push_run_event(stub, event_type, event_data)
 
 
 def _model_completed_event_data(

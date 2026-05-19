@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from logging import ERROR
 from pathlib import Path
 from queue import Queue
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 import grpc
 
@@ -54,7 +54,7 @@ from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
-from flwr.supercore.task_message import JsonObject
+from flwr.supercore.task_message import JsonObject, JsonValue
 
 AGENT_STARTED_EVENT = "agent.started"
 AGENT_COMPLETED_EVENT = "agent.completed"
@@ -211,7 +211,8 @@ def _run_agentapp_task(
             task_input.run.fab_version,
             task_input.fab.hash_str,
         )
-        agent_app(session)
+        response = agent_app(session)
+        _persist_agent_response(session, response)
         session.emit_event(AGENT_COMPLETED_EVENT, {})
         sub_status = SubStatus.COMPLETED
         details = ""
@@ -234,6 +235,70 @@ def _try_emit_failed(session: AgentSession, err: Exception) -> None:
         session.emit_event(AGENT_FAILED_EVENT, {"error": _error_payload(err)})
     except Exception as event_err:  # pylint: disable=broad-exception-caught
         log(ERROR, "Failed to emit agent failure event", exc_info=event_err)
+
+
+def _persist_agent_response(session: AgentSession, response: JsonObject) -> None:
+    """Persist the returned Responses object as one assistant conversation item."""
+    session.conversation.add_items([_assistant_item_from_response(session, response)])
+
+
+def _assistant_item_from_response(
+    session: AgentSession, response: JsonObject
+) -> JsonObject:
+    """Create one assistant conversation item from a Responses object."""
+    output_text = _response_output_text(response)
+    item: JsonObject = {
+        "role": "assistant",
+        "content": output_text,
+        "response_id": _optional_str(response.get("id")),
+        "model": _optional_str(response.get("model")) or session.model.default_model,
+    }
+    if output_text == "":
+        item["response"] = response
+    return item
+
+
+def _response_output_text(response: JsonObject) -> str:
+    """Extract output text from a Responses-compatible response object."""
+    output_text = _optional_str(response.get("output_text"))
+    if output_text is not None:
+        return output_text
+    output = response.get("output")
+    if output is None:
+        return ""
+    return _extract_text(output)
+
+
+def _extract_text(value: JsonValue) -> str:
+    """Extract text from a Responses-compatible JSON value."""
+    parts: list[str] = []
+    _collect_text(value, parts)
+    return "".join(parts)
+
+
+def _collect_text(value: JsonValue, parts: list[str]) -> None:
+    """Collect text leaves from Responses-compatible output structures."""
+    if isinstance(value, str):
+        parts.append(value)
+        return
+    if isinstance(value, list):
+        for item in value:
+            _collect_text(item, parts)
+        return
+    if isinstance(value, dict):
+        for key in ("output_text", "text", "content"):
+            child = value.get(key)
+            if isinstance(child, (str, list, dict)):
+                _collect_text(cast(JsonValue, child), parts)
+                return
+        output = value.get("output")
+        if isinstance(output, (str, list, dict)):
+            _collect_text(cast(JsonValue, output), parts)
+
+
+def _optional_str(value: object) -> str | None:
+    """Return value if it is a string."""
+    return value if isinstance(value, str) else None
 
 
 def _error_details(err: Exception) -> str:

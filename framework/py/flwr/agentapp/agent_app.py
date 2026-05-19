@@ -21,8 +21,9 @@ from collections.abc import Callable
 
 from flwr.agentapp.exceptions import AgentAppError
 from flwr.agentapp.session import AgentSession
+from flwr.supercore.task_message import JsonObject
 
-AgentAppCallable = Callable[[AgentSession], None]
+AgentAppCallable = Callable[[AgentSession], JsonObject]
 
 
 class AgentApp:
@@ -35,18 +36,24 @@ class AgentApp:
         app = AgentApp()
 
         @app.main()
-        def main(session: AgentSession) -> None:
-            session.emit_event("agent.custom", {})
+        def main(session: AgentSession) -> JsonObject:
+            return session.model.response(
+                input_items=session.invocation.input_items,
+                stream=True,
+            )
     """
 
     def __init__(self) -> None:
         self._main: AgentAppCallable | None = None
 
-    def __call__(self, session: AgentSession) -> None:
+    def __call__(self, session: AgentSession) -> JsonObject:
         """Execute the AgentApp."""
         if self._main is None:
             raise AgentAppError("AgentApp has no main function.")
-        self._main(session)
+        result = self._main(session)
+        if not isinstance(result, dict):
+            raise AgentAppError("AgentApp main function must return a JSON object.")
+        return result
 
     def main(self) -> Callable[[AgentAppCallable], AgentAppCallable]:
         """Return a decorator that registers the AgentApp main function."""

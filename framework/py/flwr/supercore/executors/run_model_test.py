@@ -40,7 +40,6 @@ from flwr.supercore.executors.model_provider import (
 from flwr.supercore.executors.run_model import (
     MODEL_COMPLETED_EVENT,
     MODEL_FAILED_EVENT,
-    MODEL_OUTPUT_DELTA_EVENT,
     MODEL_STARTED_EVENT,
     _run_model_task,
 )
@@ -152,10 +151,10 @@ def test_run_model_task_emits_stream_events() -> None:
 
     assert [event for event, _ in stub.run_events] == [
         MODEL_STARTED_EVENT,
-        MODEL_OUTPUT_DELTA_EVENT,
+        "response.output_text.delta",
         MODEL_COMPLETED_EVENT,
     ]
-    assert stub.run_events[1][1]["event"] == {
+    assert stub.run_events[1][1] == {
         "type": "response.output_text.delta",
         "delta": "hi",
     }

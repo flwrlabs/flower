@@ -15,12 +15,14 @@
 """Tests for AgentApp."""
 
 
+from typing import Any
 from unittest.mock import Mock
 
 import pytest
 
 import flwr
 from flwr.agentapp import AgentApp, AgentAppError, AgentSession
+from flwr.supercore.task_message import JsonObject
 
 
 def test_agentapp_public_import_path() -> None:
@@ -35,12 +37,14 @@ def test_agentapp_registers_and_calls_main() -> None:
     calls = []
 
     @app.main()
-    def main(session_arg: AgentSession) -> None:
+    def main(session_arg: AgentSession) -> JsonObject:
         calls.append(session_arg)
+        return {"id": "resp-1"}
 
-    app(session)
+    result = app(session)
 
     assert calls == [session]
+    assert result == {"id": "resp-1"}
 
 
 def test_agentapp_rejects_duplicate_main() -> None:
@@ -48,14 +52,14 @@ def test_agentapp_rejects_duplicate_main() -> None:
     app = AgentApp()
 
     @app.main()
-    def main(_: AgentSession) -> None:
-        return None
+    def main(_: AgentSession) -> JsonObject:
+        return {}
 
     with pytest.raises(ValueError, match="already registered"):
 
         @app.main()
-        def duplicate(_: AgentSession) -> None:
-            return None
+        def duplicate(_: AgentSession) -> JsonObject:
+            return {}
 
 
 def test_agentapp_rejects_missing_main() -> None:
@@ -64,4 +68,17 @@ def test_agentapp_rejects_missing_main() -> None:
     session = Mock(spec=AgentSession)
 
     with pytest.raises(AgentAppError, match="no main"):
+        app(session)
+
+
+def test_agentapp_rejects_non_object_main_result() -> None:
+    """Test AgentApp requires main to return a JSON object."""
+    app = AgentApp()
+    session = Mock(spec=AgentSession)
+
+    @app.main()
+    def main(_: AgentSession) -> Any:
+        return None
+
+    with pytest.raises(AgentAppError, match="must return a JSON object"):
         app(session)

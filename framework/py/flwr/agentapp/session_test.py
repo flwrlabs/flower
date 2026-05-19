@@ -88,7 +88,9 @@ def test_agent_session_parses_start_state() -> None:
     assert session.task_id == AGENT_TASK_ID
     assert session.agent_ref == "test-agent"
     assert session.conversation_id == "conv-1"
-    assert session.input == [{"role": "user", "content": "hi"}]
+    assert session.invocation.input_items == [{"role": "user", "content": "hi"}]
+    assert session.invocation.agent_ref == "test-agent"
+    assert session.invocation.conversation_id == "conv-1"
     assert session.model.default_model == "gpt-4.1-mini"
 
 
@@ -138,7 +140,7 @@ def test_model_client_creates_task_and_returns_result() -> None:
     session = _session(stub)
 
     result = session.model.response(
-        input=[{"role": "user", "content": "hi"}],
+        input_items=[{"role": "user", "content": "hi"}],
         stream=True,
         timeout=0.1,
         poll_interval=0.0,
@@ -149,13 +151,12 @@ def test_model_client_creates_task_and_returns_result() -> None:
     pushed = ModelTaskMessage.from_message(message_from_proto(stub.pushed_messages[0]))
     assert pushed.dst_task_id == MODEL_TASK_ID
     assert pushed.payload["input"] == [{"role": "user", "content": "hi"}]
-    assert result.response_id == "resp-1"
-    assert result.output_text == "hello"
-    assert result.usage == {"input_tokens": 1}
-    assert [event for event, _ in stub.run_events] == [
-        "agent.model.requested",
-        "agent.model.completed",
-    ]
+    assert result == {
+        "id": "resp-1",
+        "output": [{"type": "message", "content": "hello"}],
+        "usage": {"input_tokens": 1},
+    }
+    assert stub.run_events == []
 
 
 def test_model_client_raises_structured_model_errors() -> None:
@@ -172,7 +173,7 @@ def test_model_client_raises_structured_model_errors() -> None:
 
     with pytest.raises(AgentModelError) as err:
         session.model.response(
-            input=[],
+            input_items=[],
             timeout=0.1,
             poll_interval=0.0,
         )
@@ -187,7 +188,7 @@ def test_model_client_times_out_without_matching_result() -> None:
 
     with pytest.raises(AgentModelTimeoutError):
         session.model.response(
-            input=[],
+            input_items=[],
             timeout=0.001,
             poll_interval=0.0,
         )

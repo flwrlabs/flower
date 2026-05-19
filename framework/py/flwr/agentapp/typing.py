@@ -12,24 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Built-in pass-through GPT chat AgentApp."""
+"""JSON type aliases for AgentApp APIs."""
 
 
 from __future__ import annotations
 
-from flwr.agentapp import AgentApp, AgentSession, DEFAULT_MODEL_NAME, JSONObject
+from flwr.supercore.task_message import JsonObject, JsonValue
 
-app = AgentApp()
+JSONObject = JsonObject
+JSONValue = JsonValue
 
-__all__ = ["app"]
-
-
-@app.main()
-def main(agent: AgentSession) -> JSONObject:
-    """Forward invocation input items to the FAB-configured model runtime."""
-    response = agent.model.response(
-        model=DEFAULT_MODEL_NAME,
-        input_items=agent.invocation.input_items,
-        stream=True,
-    )
-    return response
+__all__ = ["JSONObject", "JSONValue"]

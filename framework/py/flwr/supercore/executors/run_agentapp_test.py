@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from flwr.agentapp import AgentApp, AgentSession
 from flwr.common import ConfigRecord, Context, RecordDict
@@ -25,6 +26,7 @@ from flwr.common.constant import SubStatus
 from flwr.common.typing import Fab, Run
 from flwr.proto.appio_pb2 import (
     PullTaskInputResponse,
+    PushConversationItemsResponse,
     PushRunEventsRequest,
     PushTaskOutputRequest,
 )
@@ -44,6 +46,7 @@ class FakeAgentAppExecutorStub:
 
     def __init__(self) -> None:
         self.run_events: list[tuple[str, dict[str, object]]] = []
+        self.conversation_items: list[tuple[str, list[str]]] = []
         self.task_outputs: list[PushTaskOutputRequest] = []
 
     def PullTaskInput(self, request: object) -> PullTaskInputResponse:
@@ -62,6 +65,18 @@ class FakeAgentAppExecutorStub:
         self.task_outputs.append(request)
         return object()
 
+    def PushConversationItems(self, request: Any) -> PushConversationItemsResponse:
+        """Capture conversation items."""
+        self.conversation_items.append(
+            (
+                request.conversation_id,
+                [item.item_json for item in request.items],
+            )
+        )
+        return PushConversationItemsResponse(
+            item_indices=range(len(request.items))
+        )
+
 
 def test_run_agentapp_task_completes_successfully() -> None:
     """Test AgentApp task success flow."""
@@ -70,8 +85,13 @@ def test_run_agentapp_task_completes_successfully() -> None:
     app = AgentApp()
 
     @app.main()
-    def main(session: AgentSession) -> None:
+    def main(session: AgentSession) -> dict[str, object]:
         seen_sessions.append(session)
+        return {
+            "id": "resp-1",
+            "output_text": "hello",
+            "model": "gpt-4.1-mini",
+        }
 
     completed = _run_agentapp_task(
         stub,
@@ -85,6 +105,17 @@ def test_run_agentapp_task_completes_successfully() -> None:
         AGENT_STARTED_EVENT,
         AGENT_COMPLETED_EVENT,
     ]
+    assert stub.conversation_items == [
+        (
+            "conv-1",
+            [
+                (
+                    '{"role":"assistant","content":"hello","response_id":"resp-1",'
+                    '"model":"gpt-4.1-mini"}'
+                )
+            ],
+        )
+    ]
     assert stub.task_outputs[-1].sub_status == SubStatus.COMPLETED
     assert stub.task_outputs[-1].details == ""
 
@@ -95,7 +126,7 @@ def test_run_agentapp_task_fails_on_agent_exception() -> None:
     app = AgentApp()
 
     @app.main()
-    def main(_: AgentSession) -> None:
+    def main(_: AgentSession) -> dict[str, object]:
         raise ValueError("boom")
 
     completed = _run_agentapp_task(

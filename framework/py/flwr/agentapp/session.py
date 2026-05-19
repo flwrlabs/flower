@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from flwr.common import Context
 from flwr.common.typing import Run
@@ -52,9 +52,18 @@ class AgentStartState:
     """Validated AgentApp start state."""
 
     agent_ref: str
-    input: JsonValue
+    input_items: list[JsonObject]
     conversation_id: str
     model: str
+
+
+@dataclass(frozen=True)
+class AgentInvocation:
+    """Invocation data exposed to AgentApp entrypoints."""
+
+    input_items: list[JsonObject]
+    agent_ref: str
+    conversation_id: str
 
 
 class AgentSession:
@@ -78,12 +87,15 @@ class AgentSession:
         self.context = context
         self.run = run
         self.agent_ref = start_state.agent_ref
-        self.input = start_state.input
         self.conversation_id = start_state.conversation_id
+        self.invocation = AgentInvocation(
+            input_items=start_state.input_items,
+            agent_ref=start_state.agent_ref,
+            conversation_id=start_state.conversation_id,
+        )
         self.model = AgentModelClient(
             stub=stub,
             task_id=task_id,
-            emit_event=self.emit_event,
             default_model=start_state.model,
             **(
                 {"response_timeout": model_response_timeout}
@@ -166,14 +178,24 @@ def parse_agent_start_state(context: Context) -> AgentStartState:
         parsed_input = json.loads(input_json)
     except json.JSONDecodeError as exc:
         raise AgentAppError("AgentApp input_json must contain valid JSON.") from exc
-    if not isinstance(parsed_input, (dict, list)):
-        raise AgentAppError("AgentApp input_json must contain a JSON object or list.")
+    input_items = _input_items_from_json_value(parsed_input)
 
     return AgentStartState(
         agent_ref=agent_ref,
-        input=parsed_input,
+        input_items=input_items,
         conversation_id=conversation_id,
         model=model_ref,
+    )
+
+
+def _input_items_from_json_value(value: JsonValue) -> list[JsonObject]:
+    """Return parsed input as a list of JSON objects."""
+    if isinstance(value, dict):
+        return [cast(JsonObject, value)]
+    if isinstance(value, list) and all(isinstance(item, dict) for item in value):
+        return [cast(JsonObject, item) for item in value]
+    raise AgentAppError(
+        "AgentApp input_json must contain a JSON object or list of JSON objects."
     )
 
 
