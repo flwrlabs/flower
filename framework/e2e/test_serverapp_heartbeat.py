@@ -186,23 +186,45 @@ def main() -> None:
     heartbeat_timeout = HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 30
     completed = f"{Status.FINISHED}:{SubStatus.COMPLETED}"
     failed = f"{Status.FINISHED}:{SubStatus.FAILED}"
-    # The simulation runtime can either reconnect and complete or lose its AppIO
-    # channel across the SuperLink restart and be finalized by heartbeat timeout.
-    expected_run2_statuses = {failed, completed} if use_sim else {completed}
-
     # Allow time for SuperLink to detect heartbeat failures and update statuses
     tic = time.time()
     is_valid = False
+    survivor_observed_after_killed_failure = False
+    status_history: list[tuple[str | None, str | None]] = []
     while (time.time() - tic) < heartbeat_timeout:
         run_status = flwr_ls()
-        if (
-            run_status.get(run_id1) == failed
-            and run_status.get(run_id2) in expected_run2_statuses
+        run1_status = run_status.get(run_id1)
+        run2_status = run_status.get(run_id2)
+        status_history.append((run1_status, run2_status))
+
+        if run1_status == failed and run2_status in {Status.RUNNING, completed}:
+            survivor_observed_after_killed_failure = True
+
+        # The simulation runtime can either reconnect and complete or later lose its
+        # AppIO channel across the SuperLink restart and be finalized by heartbeat
+        # timeout. Require evidence that the killed run failed while the survivor
+        # was still non-failed so a regression that fails all in-flight work at once
+        # cannot pass.
+        if run1_status == failed and (
+            run2_status == completed
+            or (
+                use_sim
+                and run2_status == failed
+                and survivor_observed_after_killed_failure
+            )
         ):
             is_valid = True
             break
         time.sleep(1)
-    assert is_valid, f"Run statuses are not updated correctly:\n{run_status}"
+    recent_statuses = "\n".join(
+        f"run_id1={run1_status}, run_id2={run2_status}"
+        for run1_status, run2_status in status_history[-10:]
+    )
+    assert is_valid, (
+        "Run statuses are not updated correctly:\n"
+        f"current={run_status}\n"
+        f"recent status history:\n{recent_statuses}"
+    )
     print("Run statuses are updated correctly.")
 
     # Clean up
