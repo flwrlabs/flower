@@ -45,12 +45,12 @@ jobs:
       - name: Bootstrap
         uses: ./.github/actions/bootstrap
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v3
         with:
           node-version: "22.14.0"
       - name: Install pnpm
         run: |
-          npm install -g pnpm@10.25.0
+          npm install -g pnpm
       - name: Install Flower Intelligence
         run: |
           cd intelligence/ts
