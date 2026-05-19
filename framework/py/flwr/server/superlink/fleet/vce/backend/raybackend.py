@@ -120,7 +120,10 @@ class RayBackend(Backend):
                 pythonpath = f"{pythonpath}{os.pathsep}{os.environ['PYTHONPATH']}"
             os.environ["PYTHONPATH"] = pythonpath
 
-            ray.init(**ray_init_args)
+            ray.init(
+                runtime_env={"env_vars": {"PYTHONPATH": pythonpath}},
+                **ray_init_args,
+            )
 
     @property
     def num_workers(self) -> int:
