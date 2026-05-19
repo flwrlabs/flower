@@ -177,6 +177,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             raise ValueError("`statuses` must be a sequence of strings")
 
         with self.lock_task_store:
+            # Expire non-responsive tasks before getting tasks
+            self._cleanup_expired_task_tokens_locked()
+
             matched_task_ids = set(self.task_store.keys())
 
             if task_ids is not None:
