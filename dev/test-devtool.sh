@@ -17,7 +17,7 @@ python -m mypy devtool
 echo "- mypy: done"
 
 echo "- pylint: start"
-PYLINTHOME=.pylint.d python -m pylint devtool
+PYLINTHOME=.pytest_cache/pylint python -m pylint devtool
 echo "- pylint: done"
 
 echo "- pytest: start"

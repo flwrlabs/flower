@@ -96,32 +96,13 @@ You can control the number of partitions as well as how many features each have 
 
 You can run your Flower project in both _simulation_ and _deployment_ mode without making changes to the code. If you are starting with Flower, we recommend you using the _simulation_ mode as it requires fewer components to be launched manually. By default, `flwr run` will make use of the Simulation Engine.
 
-### Setup Flower Configuration
+This example is designed to run with three virtual `SuperNodes`. First we need to change the configuration of the Simulation Runtime (which by default uses 10 nodes). This guide assumes your default `SuperLink` connection points to one ready for simulations. If you aren't sure, please refer to the [How-to run Flower locally](https://flower.ai/docs/framework/how-to-run-flower-locally.html) guide.
 
-This example is designed to run with three virtual clients since that's the number of `feature-splits` in the app's `pyproject.toml`. Let's first locate the Flower Configuration file and edit one of the existing connections to make it use three nodes.
-
-Locate the Flower Configuration file:
-
-```shell
-flwr config list
+```bash
+flwr federation simulation-config --num-supernodes=3
 ```
 
-```console
-# Example output:
-Flower Config file: /path/to/your/.flwr/config.toml
-SuperLink connections:
- supergrid
- local (default)
-```
-
-Modify the `local` connection so it has three supernodes:
-
-```TOML
-[superlink.local]
-options.num-supernodes = 3
-```
-
-Remember, if you wish to change `options.num-supernodes` you'll need to adjust `feature-splits` in the `pyproject.toml` accordingly.
+Remember, if you wish to change `--num-supernodes` you'll need to adjust `feature-splits` in the `pyproject.toml` accordingly.
 
 ### Run with the Simulation Engine
 

@@ -20,13 +20,15 @@ import subprocess
 from collections.abc import Sequence
 from typing import Any
 
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+
 from .exec_plugin import ExecPlugin
 
 
 class BaseExecPlugin(ExecPlugin):
     """Simple Flower SuperExec plugin for app processes.
 
-    The plugin always selects the first candidate run ID.
+    The plugin always selects the first candidate task.
     """
 
     # Placeholders to be defined in subclasses
@@ -39,12 +41,24 @@ class BaseExecPlugin(ExecPlugin):
             return None
         return candidate_run_ids[0]
 
-    def launch_app(self, token: str, run_id: int) -> None:
-        """Launch the application associated with a given run ID and token."""
-        cmds = [self.command, "--insecure"]
+    def select_task(self, candidate_tasks: Sequence[Task]) -> Task | None:
+        """Select a Task to execute from a sequence of candidates."""
+        if not candidate_tasks:
+            return None
+        return candidate_tasks[0]
+
+    def launch_task(self, token: str, task: Task) -> None:
+        """Launch the process to execute the given task using the given token."""
+        cmds = [self.command]
+        if self.insecure:
+            cmds.append("--insecure")
+        elif self.root_certificates_path:
+            cmds += ["--root-certificates", self.root_certificates_path]
         cmds += [self.appio_api_address_arg, self.appio_api_address]
         cmds += ["--token", token]
         cmds += ["--parent-pid", str(os.getpid())]
+        if self.runtime_dependency_install:
+            cmds += ["--allow-runtime-dependency-installation"]
         # Launch the client app without waiting for it to complete.
         # Since we don't need to manage the process, we intentionally avoid using
         # a `with` statement. Suppress the pylint warning for it in this case.

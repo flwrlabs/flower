@@ -53,34 +53,37 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 
 ### Run with the Simulation Engine
 
-> [!TIP]
-> This example runs faster when the `ClientApp`s have access to a GPU. If your system has one, you can make use of it by configuring the `backend.client-resources` component in your Flower Configuration. Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
+This example is designed to run with 100 virtual `SuperNodes`. First we need to change the configuration of the Simulation Runtime (which by default uses 10 nodes and only CPU). This guide assumes your default `SuperLink` connection points to one ready for simulations. If you aren't sure, please refer to the [How-to run Flower locally](https://flower.ai/docs/framework/how-to-run-flower-locally.html) guide.
+
+```bash
+flwr federation simulation-config --num-supernodes=100
+```
 
 ```bash
 # Run with the default federation (CPU only)
-flwr run .
+flwr run .  --stream
 ```
 
-You can add a new connection in your Flower Configuration (find if via `flwr config list`):
+> [!TIP]
+> This example runs faster when the `ClientApp`s have access to a GPU. If your system has one, adjust the settings of your simulations as shown below. Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
-```TOML
-[superlink.local-gpu]
-options.num-supernodes = 100
-options.backend.client-resources.num-cpus = 4 # each ClientApp assumes to use 4CPUs
-options.backend.client-resources.num-gpus = 0.25 # at most 4 ClientApp will run in a given GPU (lower it to increase parallelism)
+```bash
+flwr federation simulation-config \
+    --client-resources-num-cpus=4 \ # each ClientApp assumes to use 4CPUs
+--client-resources-num-gpus=0.25  # at most 4 ClientApp will run in a given GPU
 ```
 
 And then run the app
 
 ```bash
 # Run with the `local-gpu` settings
-flwr run . local-gpu
+flwr run .  --stream
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example
 
 ```bash
-flwr run --run-config "num-server-rounds=5 fraction-train=0.1"
+flwr run . --run-config "num-server-rounds=5 fraction-train=0.1"  --stream
 ```
 
 > [!TIP]

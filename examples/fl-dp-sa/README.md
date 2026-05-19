@@ -56,39 +56,16 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 > [!NOTE]
 > Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
-This example is designed to run with 100 virtual clients. Let's first locate the Flower Configuration file and create a SuperLink connection with 100 clients.
-
-Locate the Flower Configuration file:
-
-```shell
-flwr config list
-```
-
-```console
-# Example output:
-Flower Config file: /path/to/your/.flwr/config.toml
-SuperLink connections:
- supergrid
- local (default)
-```
-
-Create a new `Superlink` connection:
-
-```TOML
-[superlink.local-xl]
-options.num-supernodes = 100
-```
-
-Finally, run the app by passing the name of the SuperLink connection you just created.
+This example is designed to run with 100 virtual `SuperNodes`. First we need to change the configuration of the Simulation Runtime (which by default uses 10 nodes). This guide assumes your default `SuperLink` connection points to one ready for simulations. If you aren't sure, please refer to the [How-to run Flower locally](https://flower.ai/docs/framework/how-to-run-flower-locally.html) guide.
 
 ```bash
-flwr run . local-xl
+flwr federation simulation-config --num-supernodes=100
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
 
 ```bash
-flwr run . --run-config "noise-multiplier=0.1 clipping-norm=5"
+flwr run . --run-config "noise-multiplier=0.1 clipping-norm=5"  --stream
 ```
 
 ### Run with the Deployment Engine

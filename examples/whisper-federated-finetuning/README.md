@@ -137,30 +137,15 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 
 ### Run with the Simulation Engine
 
-The run is defined in the `pyproject.toml` which: specifies the paths to `ClientApp` and `ServerApp` as well as their parameterization with configs in the `[tool.flwr.app.config]` block. Before launching our simulation, we need to define a `SuperLink Connection` in the `Flower Configuration`. To do this, let's first locate the Flower Configuration file and then edit it.
+The run is defined in the `pyproject.toml` which: specifies the paths to `ClientApp` and `ServerApp` as well as their parameterization with configs in the `[tool.flwr.app.config]` block.
 
-Locate the Flower Configuration file:
+This example is designed to run with 422 virtual `SuperNodes`. This is the result of grouping all 2112 speakers into groups of 5. First we need to change the configuration of the Simulation Runtime (which by default uses 10 nodes). This guide assumes your default `SuperLink` connection points to one ready for simulations. If you aren't sure, please refer to the [How-to run Flower locally](https://flower.ai/docs/framework/how-to-run-flower-locally.html) guide.
 
-```shell
-flwr config list
-```
-
-```console
-# Example output:
-Flower Config file: /path/to/your/.flwr/config.toml
-SuperLink connections:
- supergrid
- local (default)
-```
-
-Edit the `local` configuration so it looks like the following.
-
-```TOML
-[superlink.flowertune]
-options.num-supernodes = 422 # we are grouping 2112 speakers into groups of 5
-options.backend.client-resources.num-cpus = 4
-options.backend.client-resources.num-gpus = 0.0
-options.backend.init-args.log-to-driver = false # set to true to enable all logs from simulation engine
+```bash
+flwr federation simulation-config \
+    --num-supernodes=422 \
+    --client-resources-num-cpus=4 \
+    --init-args-log-to-driver=false # set to true to enable all logs from simulation engine
 ```
 
 > [!NOTE]
@@ -168,10 +153,10 @@ options.backend.init-args.log-to-driver = false # set to true to enable all logs
 
 ```shell
 # Run with default settings (21 clients per round out of 422)
-flwr run .
+flwr run . --stream
 ```
 
-You can expect a summary at then showing federated metrics (i.e. the average training accuracy and loss across clients sampled in a round) looking like this:
+You can expect a summary at the end showing federated metrics (i.e. the average training accuracy and loss across clients sampled in a round) looking like this:
 
 ```shell
 INFO :      [SUMMARY]

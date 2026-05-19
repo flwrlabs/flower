@@ -36,7 +36,6 @@ from rich.console import Console
 from flwr.proto.log_pb2 import PushLogsRequest  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
-from flwr.proto.simulationio_pb2_grpc import SimulationIoStub  # pylint: disable=E0611
 
 from .constant import LOG_UPLOAD_INTERVAL
 
@@ -427,7 +426,7 @@ def start_log_uploader(
     log_queue: Queue[str | None],
     node_id: int,
     run_id: int,
-    stub: ServerAppIoStub | SimulationIoStub,
+    stub: ServerAppIoStub,
 ) -> threading.Thread:
     """Start the log uploader thread and return it."""
     thread = threading.Thread(
@@ -438,11 +437,27 @@ def start_log_uploader(
 
 
 def stop_log_uploader(
-    log_queue: Queue[str | None], log_uploader: threading.Thread
+    log_queue: Queue[str | None], log_uploader: threading.Thread, timeout: float = 3.0
 ) -> None:
     """Stop the log uploader thread."""
     log_queue.put(None)
-    log_uploader.join()
+    log_uploader.join(timeout=timeout)
+
+
+def flush_logs(log_queue: Queue[str | None], timeout: float = 3.0) -> bool:
+    """Wait until queued logs have been consumed by the uploader."""
+    deadline = time.monotonic() + timeout
+    while not log_queue.empty():
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        time.sleep(min(LOG_UPLOAD_INTERVAL, remaining))
+
+    remaining = deadline - time.monotonic()
+    if remaining > 0:
+        # Allow the PushLogs call to complete
+        time.sleep(min(1, remaining))
+    return True
 
 
 def _remove_emojis(text: str) -> str:

@@ -85,17 +85,17 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 > Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
 ```bash
-flwr run .
+flwr run . --stream
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
 
 ```bash
 # To run bagging aggregation for 5 rounds evaluated on centralised test set
-flwr run . --run-config "train-method='bagging' num-server-rounds=5 centralised-eval=true"
+flwr run . --run-config "train-method='bagging' num-server-rounds=5 centralised-eval=true" --stream
 
 # To run cyclic training with linear partitioner type evaluated on centralised test set:
-flwr run . --run-config "train-method='cyclic' partitioner-type='linear' centralised-eval-client=true"
+flwr run . --run-config "train-method='cyclic' partitioner-type='linear' centralised-eval-client=true" --stream
 ```
 
 ### Run with the Deployment Engine

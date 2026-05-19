@@ -95,19 +95,25 @@ The `results.json` would look along the lines of:
 
 ### Run with the Simulation Engine
 
-With default parameters, 25% of the total 50 nodes (see `num-supernodes` in `pyproject.toml`) will be sampled for `train` and 50% for an `evaluate` round. By default, `ClientApp` objects will run on CPU.
+In this example, we want to run a simulation with 50 virtual `SuperNodes`. First we need to change the configuration of the Simulation Runtime (which by default uses 10 nodes). This guide assumes your default `SuperLink` connection points to one ready for simulations. If you aren't sure, please refer to the [How-to run Flower locally](https://flower.ai/docs/framework/how-to-run-flower-locally.html) guide.
+
+```bash
+flwr federation simulation-config --num-supernodes=50
+```
+
+With default parameters, 25% of the total 50 nodes will be sampled for `train` and 50% for an `evaluate` round. By default, `ClientApp` objects will run on CPU.
 
 > [!TIP]
 > To run your `ClientApps` on GPU or to adjust the degree or parallelism of your simulation, edit the Flower Config. Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html#defining-clientapp-resources) to learn more about Flower simulations and how to optimize them.
 
 ```bash
-flwr run .
+flwr run . --stream
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
 
 ```bash
-flwr run . --run-config "num-server-rounds=5 fraction-train=0.5"
+flwr run . --run-config "num-server-rounds=5 fraction-train=0.5"  --stream
 ```
 
 ### Run with the Deployment Engine

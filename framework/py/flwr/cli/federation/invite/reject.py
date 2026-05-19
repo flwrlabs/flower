@@ -15,7 +15,7 @@
 """Flower command line interface `federation invite reject` command."""
 
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
@@ -31,8 +31,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.control_pb2_grpc import ControlStub
 
-from ..error_handlers import handle_invite_grpc_error
-
 
 def reject(
     federation: Annotated[
@@ -44,7 +42,7 @@ def reject(
         typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,
@@ -64,7 +62,7 @@ def _reject_invitation(
     is_json: bool,
 ) -> None:
     """Send a reject invitation request."""
-    with flwr_cli_grpc_exc_handler(handle_invite_grpc_error):
+    with flwr_cli_grpc_exc_handler():
         _: RejectInvitationResponse = stub.RejectInvitation(request)
 
     if is_json:

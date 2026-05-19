@@ -17,7 +17,7 @@
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import typer
 from rich.console import Console
@@ -39,8 +39,6 @@ from flwr.proto.federation_pb2 import Invitation  # pylint: disable=E0611
 from flwr.supercore.constant import InvitationStatus
 from flwr.supercore.date import isoformat8601_utc
 
-from ..error_handlers import handle_invite_grpc_error
-
 _STATUS_TO_COLOR: dict[str, str] = {
     InvitationStatus.PENDING: "yellow",
     InvitationStatus.ACCEPTED: "green",
@@ -56,7 +54,7 @@ def ls(
         typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,
@@ -89,7 +87,7 @@ def _list_invitations(
     verbose: bool,
 ) -> None:
     """Send a list invitations request."""
-    with flwr_cli_grpc_exc_handler(handle_invite_grpc_error):
+    with flwr_cli_grpc_exc_handler():
         response: ListInvitationsResponse = stub.ListInvitations(request)
 
     created_invitations = _filter_invitations(response.created_invitations, verbose)

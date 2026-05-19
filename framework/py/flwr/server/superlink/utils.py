@@ -56,15 +56,3 @@ def abort_grpc_context(msg: str | None, context: grpc.ServicerContext) -> None:
     """Abort context with statuscode PERMISSION_DENIED if `msg` is not None."""
     if msg is not None:
         context.abort(grpc.StatusCode.PERMISSION_DENIED, msg)
-
-
-def abort_if(
-    run_id: int,
-    abort_status_list: list[str],
-    state: LinkState,
-    store: ObjectStore | None,
-    context: grpc.ServicerContext,
-) -> None:
-    """Abort context if status of the provided `run_id` is in `abort_status_list`."""
-    msg = check_abort(run_id, abort_status_list, state, store)
-    abort_grpc_context(msg, context)

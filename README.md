@@ -9,7 +9,6 @@
     <a href="https://flower.ai/">Website</a> |
     <a href="https://flower.ai/blog">Blog</a> |
     <a href="https://flower.ai/docs/">Docs</a> |
-    <a href="https://flower.ai/events/flower-ai-summit-2026">Summit</a> |
     <a href="https://flower.ai/join-slack">Slack</a>
     <br /><br />
 </p>
@@ -134,7 +133,6 @@ Other [examples](https://github.com/flwrlabs/flower/tree/main/examples):
 - [Federated Finetuning of OpenAI's Whisper](https://github.com/flwrlabs/flower/tree/main/examples/whisper-federated-finetuning)
 - [Federated Finetuning of Large Language Model](https://github.com/flwrlabs/flower/tree/main/examples/flowertune-llm)
 - [Federated Finetuning of a Vision Transformer](https://github.com/flwrlabs/flower/tree/main/examples/flowertune-vit)
-- [Advanced Flower with TensorFlow/Keras](https://github.com/flwrlabs/flower/tree/main/examples/advanced-tensorflow)
 - [Advanced Flower with PyTorch](https://github.com/flwrlabs/flower/tree/main/examples/advanced-pytorch)
 - [Comprehensive Flower+XGBoost](https://github.com/flwrlabs/flower/tree/main/examples/xgboost-comprehensive)
 - [Flower with KaplanMeierFitter from the lifelines library](https://github.com/flwrlabs/flower/tree/main/examples/federated-kaplan-meier-fitter)

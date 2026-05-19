@@ -18,6 +18,7 @@ syntax = "proto3";
 package flwr.proto;
 import "flwr/proto/run.proto";
 import "flwr/proto/node.proto";
+import "flwr/proto/federation_config.proto";
 
 message Account {
   string id = 1;
@@ -36,6 +37,8 @@ message Federation {
   string description = 4;      // Added in v1.26.0
   repeated Member members = 5; // Added in v1.27.0
   bool archived = 6;           // Added in v1.27.0
+  bool simulation = 7;         // Added in v1.28.0
+  SimulationConfig config = 8; // Added in v1.28.0
 }
 
 message Invitation {

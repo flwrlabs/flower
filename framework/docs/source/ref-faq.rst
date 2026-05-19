@@ -49,3 +49,31 @@ Flower.
 
     If this prints a value (for example, ``b4c5f2c8-...``), you are in Windows Terminal.
     If it prints nothing, you are likely running in a non-Windows-Terminal host (for example, conhost), which can show raw ANSI escape codes or incorrect emoji rendering.
+
+.. dropdown:: :fa:`eye,mr-1` I got SQL database errors (like ``Exception calling application: database is locked``) when running local simulations. What should I do?
+
+    .. _faq-local-superlink-db-error:
+
+    Local simulations run through a managed local SuperLink. By default, that local
+    SuperLink stores its state in a SQLite database under ``$FLWR_HOME``. SQLite is reliable
+    on a local file system, but it can perform poorly on networked filesystems such
+    as NFS-mounted home directories or HPC cluster storage. In those environments, you
+    might see errors such as ``database is locked`` or other SQLite-related failures.
+
+    To avoid these issues, stop the background local SuperLink and switch the local
+    connection to the in-memory mode in your Flower configuration:
+
+    .. code-block:: toml
+
+        [superlink.local]
+        address = ":local-in-memory:"
+
+    After that, start your local simulation again with ``flwr run``. Flower will launch
+    the managed local SuperLink with an in-memory database instead of an on-disk SQLite
+    database, which avoids filesystem locking issues. See
+    :ref:`Flower Configuration <flower-config-local-in-memory>` for details.
+
+    The tradeoff is that this mode is not persistent. When the managed local SuperLink
+    stops, it loses its state, including run history and stored logs for previous runs.
+    If you need persistence, prefer keeping ``$FLWR_HOME`` on a local disk instead of a
+    network drive.

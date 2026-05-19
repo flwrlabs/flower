@@ -14,7 +14,8 @@
 # ==============================================================================
 """Flower command line interface `federation create` command."""
 
-from typing import Annotated
+
+from typing import Annotated, Literal
 
 import click
 import typer
@@ -47,7 +48,7 @@ def create(  # pylint: disable=R0914, R0913, R0917, R0912
         typer.Argument(help="Name of the SuperLink connection."),
     ] = None,
     output_format: Annotated[
-        str,
+        Literal["default", "json"],
         typer.Option(
             "--format",
             case_sensitive=False,
@@ -62,6 +63,14 @@ def create(  # pylint: disable=R0914, R0913, R0917, R0912
             help="Description of the federation.",
         ),
     ] = None,
+    simulation: Annotated[
+        bool,
+        typer.Option(
+            "--simulation",
+            help="Create this federation for simulation use.",
+            is_flag=True,
+        ),
+    ] = False,
 ) -> None:
     """Create a new federation."""
     with cli_output_handler(output_format=output_format) as is_json:
@@ -79,6 +88,7 @@ def create(  # pylint: disable=R0914, R0913, R0917, R0912
             request = CreateFederationRequest(
                 federation_name=federation,
                 description=description if description else "",
+                simulation=simulation,
             )
             _create_federation(stub=stub, request=request, is_json=is_json)
 

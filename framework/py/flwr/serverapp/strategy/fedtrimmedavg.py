@@ -139,7 +139,9 @@ class FedTrimmedAvg(FedAvg):
             ]
             # Compute trimmed mean and save as Array in ArrayRecord
             try:
-                arrays[array_key] = Array(trim_mean(np.stack(layers), self.beta))
+                arrays[array_key] = Array(
+                    np.asarray(trim_mean(np.stack(layers), self.beta))
+                )
             except ValueError as e:
                 raise AggregationError(
                     f"Trimmed mean could not be computed. "

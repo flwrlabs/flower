@@ -16,7 +16,7 @@ authors = [
 ]
 
 dependencies = [
-    "flwr[simulation]>=1.27.0",
+    "flwr[simulation]>=1.28.0",
     "transformers>=4.30.0,<5.0",
     "lerobot[pusht] @ git+https://github.com/huggingface/lerobot.git@96c7052777aca85d4e55dfba8f81586103ba8f61",
     "flwr-datasets>=0.5.0",

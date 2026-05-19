@@ -49,11 +49,11 @@ In this case there is only one federation named ``default`` under the account ``
 .. code-block:: shell
 
     📄 Listing federations...
-    ┏━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-    ┃  Federation   ┃                    Description                     ┃
-    ┡━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-    │ @none/default │ A federation for testing and development purposes. │
-    └───────────────┴────────────────────────────────────────────────────┘
+    ┏━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┓
+    ┃  Federation   ┃                    Description                     ┃  Runtime   ┃ Status ┃
+    ┡━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━┩
+    │ @none/default │ A federation for testing and development purposes. │ deployment │ active │
+    └───────────────┴────────────────────────────────────────────────────┴────────────┴────────┘
 
 **********************
  Inspect a Federation

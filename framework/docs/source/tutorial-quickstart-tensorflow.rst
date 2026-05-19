@@ -97,7 +97,6 @@ With default arguments you will see streamed output like this:
 
 .. code-block:: shell
 
-    Successfully built flwrlabs.quickstart-tensorflow.1-0-0.014c8eb3.fab
     Starting local SuperLink on 127.0.0.1:39093...
     Successfully started run 1859953118041441032
     INFO :      Starting FedAvg strategy:

@@ -59,39 +59,22 @@ fewer components to be launched manually. By default, `flwr run` will make use o
 > [!NOTE]
 > Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
-This example is designed to run with five virtual clients. Let's first locate the Flower Configuration file and edit one of the existing connections to make it use five nodes.
+This example is designed to run with 5 virtual `SuperNodes`. First we need to change the configuration of the Simulation Runtime (which by default uses 10 nodes). This guide assumes your default `SuperLink` connection points to one ready for simulations. If you aren't sure, please refer to the [How-to run Flower locally](https://flower.ai/docs/framework/how-to-run-flower-locally.html) guide.
 
-Locate the Flower Configuration file:
-
-```shell
-flwr config list
-```
-
-```console
-# Example output:
-Flower Config file: /path/to/your/.flwr/config.toml
-SuperLink connections:
- supergrid
- local (default)
-```
-
-Modify the `local` connection so it has five supernodes:
-
-```TOML
-[superlink.local]
-options.num-supernodes = 5
+```bash
+flwr federation simulation-config --num-supernodes=5
 ```
 
 Finally, let's run the app:
 
 ```bash
-flwr run .
+flwr run .  --stream
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
 
 ```bash
-flwr run . --run-config num-server-rounds=10
+flwr run . --run-config num-server-rounds=10  --stream
 ```
 
 ### Run with the Deployment Engine

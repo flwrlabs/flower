@@ -562,16 +562,17 @@ with Flower! The last step is to run our simulation in the command line, as foll
     $ flwr run . --stream
 
 This submits the run to the managed local SuperLink for the ``[superlink.local]``
-profile, which then executes the federated learning simulation with 10 clients, or
-SuperNodes, using the Flower Simulation Runtime. Plain ``flwr run .`` submits the run,
-prints the run ID, and returns without streaming logs. For the full local workflow, see
-:doc:`how-to-run-flower-locally`.
+profile (identified in the Flower configuration with ``address = ":local:"``), which
+then executes the federated learning simulation with 10 clients, or SuperNodes, using
+the Flower Simulation Runtime. Plain ``flwr run .`` would submit the run, print the run
+ID, and return without streaming logs. For the full local workflow, see
+:doc:`how-to-run-flower-locally`. If you run into SQL database errors during local
+simulations, see :ref:`FAQ <faq-local-superlink-db-error>`.
 
 You should expect streamed output similar to this:
 
 .. code-block:: shell
 
-    Successfully built flwrlabs.quickstart-pytorch.1-0-0.014c8eb3.fab
     Starting local SuperLink on 127.0.0.1:39093...
     Successfully started run 1859953118041441032
     INFO :      Starting FedAvg strategy:
@@ -611,9 +612,10 @@ Behind the scenes
 
 So how does this work? How does Flower execute this simulation?
 
-When we execute ``flwr run`` against the default local profile, Flower submits the run
-to the managed local SuperLink and tells it that there are 10 clients
-(``options.num-supernodes = 10``, where each SuperNode launches one ``ClientApp``).
+When we execute ``flwr run`` against the default local connection configuration (for
+example, the one with ``address = ":local:"``), Flower submits the run to the managed
+local SuperLink. By default, the local SuperLink will configure the simulation runtime
+to use 10 clients. Each will run an instance of the ``ClientApp`` we defined earlier.
 
 The local SuperLink then starts the ``ServerApp`` and asks it to issue instructions to
 those nodes using the ``FedAvg`` strategy. In this example, ``FedAvg`` is configured

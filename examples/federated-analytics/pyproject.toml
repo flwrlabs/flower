@@ -11,7 +11,7 @@ authors = [
     { name = "The Flower Authors", email = "hello@flower.ai" },
 ]
 dependencies = [
-    "flwr>=1.27.0",
+    "flwr>=1.28.0",
     "pandas==2.3.3",
     "SQLAlchemy==2.0.45",
     "psycopg[binary]==3.3.2",

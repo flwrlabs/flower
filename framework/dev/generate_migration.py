@@ -21,40 +21,73 @@ database against the current table definitions in the schema/ directory.
 The temporary database file is automatically cleaned up after the migration
 script is generated in the versions/ directory.
 
-Example:
+Usage:
     python -m dev.generate_migration "Add user preferences table"
+    python -m dev.generate_migration --head ee@head "Add EE table"
 """
 
 
-from pathlib import Path
+import argparse
 import subprocess
-import sys
+from pathlib import Path
+
+DEFAULT_HEAD = "flwr@head"
+
+
+def _remove_existing_temp_db(db_path: Path) -> None:
+    """Remove a stale temporary database before running Alembic."""
+    try:
+        db_path.unlink()
+    except FileNotFoundError:
+        return
+    except OSError as e:
+        raise SystemExit(
+            f"Failed to remove existing temporary database '{db_path}': {e}"
+        ) from e
 
 
 def main() -> None:
     """Parse arguments and generate migration revision."""
-    if len(sys.argv) < 2:
-        print("Usage: python -m dev.generate_migration <message>")
-        print()
-        print("Example:")
-        print('  python -m dev.generate_migration "Add new_column to run table"')
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="Generate an Alembic migration revision."
+    )
+    parser.add_argument("message", help="Migration description message.")
+    parser.add_argument(
+        "--head",
+        default=DEFAULT_HEAD,
+        help=(
+            "Branch head to extend (default: %(default)s). "
+            "Use 'ee@head' to target the EE branch."
+        ),
+    )
+    args = parser.parse_args()
 
-    message = sys.argv[1]
+    # Clean up any leftover state.db from a previous failed run
+    db_path = Path("state.db")
+    if db_path.exists():
+        _remove_existing_temp_db(db_path)
 
     try:
-        # Run alembic upgrade head - blocks until complete
-        print("Upgrading temporary database to head revision...")
+        # Upgrade all branches to their latest revisions
+        print("Upgrading temporary database to head revisions...")
         subprocess.run(
-            ["alembic", "upgrade", "head"],
+            ["alembic", "upgrade", "heads"],
             check=True,
             capture_output=False,
         )
 
-        # Run alembic revision autogenerate - only runs after upgrade completes
-        print(f"Generating migration: {message}")
+        # Generate migration targeting the specified branch head
+        print(f"Generating migration: {args.message}")
         subprocess.run(
-            ["alembic", "revision", "--autogenerate", "-m", message],
+            [
+                "alembic",
+                "revision",
+                "--autogenerate",
+                "--head",
+                args.head,
+                "-m",
+                args.message,
+            ],
             check=True,
             capture_output=False,
         )
@@ -63,7 +96,6 @@ def main() -> None:
 
     finally:
         # Clean up the state.db file
-        db_path = Path("state.db")
         if db_path.exists():
             try:
                 db_path.unlink()

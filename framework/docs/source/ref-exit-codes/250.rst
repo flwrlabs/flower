@@ -1,0 +1,24 @@
+#####################################
+ [250] CLIENTAPP_COMMUNICATION_ERROR
+#####################################
+
+*************
+ Description
+*************
+
+During a run, the internal ClientApp process could not communicate with the SuperNode
+ClientAppIo API.
+
+****************
+ How to Resolve
+****************
+
+Check the run output and the surrounding SuperNode and SuperExec process logs for the
+underlying gRPC error. By default, these processes log to stdout/stderr; in
+containerized deployments, inspect the relevant SuperNode and SuperExec pod/container
+logs.
+
+A likely cause is that the ClientApp process took too long to start, for example on a
+very slow or overloaded system, causing a timeout error. If the logs are not enough to
+diagnose the issue, contact the Flower team and include the relevant run, SuperNode, and
+SuperExec/ClientApp logs.

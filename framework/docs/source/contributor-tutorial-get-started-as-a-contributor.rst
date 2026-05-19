@@ -98,7 +98,7 @@ Compile ProtoBuf Definitions
 
 ::
 
-    $ python -m flwr_tool.protoc
+    $ ./framework/dev/protoc.sh
 
 Auto-Format Code
 ================

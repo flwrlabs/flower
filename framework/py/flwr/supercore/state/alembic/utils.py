@@ -41,7 +41,8 @@ _version_locations: list[Path] = []
 
 ALEMBIC_DIR = Path(__file__).resolve().parent
 ALEMBIC_VERSION_TABLE = "alembic_version"
-FLWR_STATE_BASELINE_REVISION = "8e65d8ae60b0"
+FLWR_STATE_BASELINE_REVISION = "8e65d8ae60b0"  # Never change this
+FLWR_STATE_LATEST_REVISIONS = "heads"
 
 
 def register_metadata_provider(provider: MetadataProvider) -> None:
@@ -132,14 +133,14 @@ def run_migrations(engine: Engine) -> None:
 
     # Standard database with version tracking: just upgrade.
     if has_version_table:
-        command.upgrade(config, "head")
+        command.upgrade(config, FLWR_STATE_LATEST_REVISIONS)
         return
 
     table_names = _get_user_table_names(engine)
 
     # Empty/new database: run all migrations from scratch.
     if not table_names:
-        command.upgrade(config, "head")
+        command.upgrade(config, FLWR_STATE_LATEST_REVISIONS)
         return
 
     # Pre-Alembic database detected without version tracking: verify database matches
@@ -165,7 +166,7 @@ def run_migrations(engine: Engine) -> None:
         FLWR_STATE_BASELINE_REVISION,
     )
     stamp_existing_database(engine, FLWR_STATE_BASELINE_REVISION)
-    command.upgrade(config, "head")
+    command.upgrade(config, FLWR_STATE_LATEST_REVISIONS)
     log(INFO, "Flower state database stamped and upgraded successfully!")
 
 
@@ -173,7 +174,12 @@ def build_alembic_config(engine: Engine) -> Config:
     """Create Alembic config with script location, DB URL, and version locations."""
     config = Config()
     config.set_main_option("script_location", str(ALEMBIC_DIR))
-    config.set_main_option("sqlalchemy.url", str(engine.url))
+    # render_as_string(hide_password=False) preserves the real password;
+    # str(engine.url) masks it as '***' which breaks Alembic's connection.
+    # The .replace("%", "%%") escapes percent-encoded characters (e.g. %3D)
+    # so ConfigParser doesn't treat them as interpolation placeholders.
+    url = engine.url.render_as_string(hide_password=False).replace("%", "%%")
+    config.set_main_option("sqlalchemy.url", url)
 
     # Combine base version location with any registered external locations
     base_versions = ALEMBIC_DIR / "versions"

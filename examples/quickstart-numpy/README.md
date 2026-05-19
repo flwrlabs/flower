@@ -51,7 +51,7 @@ pip install -e .
 In the `quickstart-numpy` directory, use `flwr run` to run a local simulation:
 
 ```bash
-flwr run .
+flwr run . --stream
 ```
 
 Refer to the [How to Run Simulations](https://flower.ai/docs/framework/how-to-run-simulations.html) guide in the documentation for advice on how to optimize your simulations.

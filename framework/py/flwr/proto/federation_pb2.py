@@ -24,21 +24,22 @@ _sym_db = _symbol_database.Default()
 
 from flwr.proto import run_pb2 as flwr_dot_proto_dot_run__pb2
 from flwr.proto import node_pb2 as flwr_dot_proto_dot_node__pb2
+from flwr.proto import federation_config_pb2 as flwr_dot_proto_dot_federation__config__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1b\x66lwr/proto/federation.proto\x12\nflwr.proto\x1a\x14\x66lwr/proto/run.proto\x1a\x15\x66lwr/proto/node.proto\"#\n\x07\x41\x63\x63ount\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\"<\n\x06Member\x12$\n\x07\x61\x63\x63ount\x18\x01 \x01(\x0b\x32\x13.flwr.proto.Account\x12\x0c\n\x04role\x18\x02 \x01(\t\"\xaa\x01\n\nFederation\x12\x0c\n\x04name\x18\x01 \x01(\t\x12#\n\x05nodes\x18\x02 \x03(\x0b\x32\x14.flwr.proto.NodeInfo\x12\x1d\n\x04runs\x18\x03 \x03(\x0b\x32\x0f.flwr.proto.Run\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\x12#\n\x07members\x18\x05 \x03(\x0b\x32\x12.flwr.proto.Member\x12\x10\n\x08\x61rchived\x18\x06 \x01(\x08\"\xb0\x01\n\nInvitation\x12\x17\n\x0f\x66\x65\x64\x65ration_name\x18\x01 \x01(\t\x12$\n\x07inviter\x18\x02 \x01(\x0b\x32\x13.flwr.proto.Account\x12$\n\x07invitee\x18\x03 \x01(\x0b\x32\x13.flwr.proto.Account\x12\x0e\n\x06status\x18\x04 \x01(\t\x12\x12\n\ncreated_at\x18\x05 \x01(\t\x12\x19\n\x11status_changed_at\x18\x06 \x01(\tb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1b\x66lwr/proto/federation.proto\x12\nflwr.proto\x1a\x14\x66lwr/proto/run.proto\x1a\x15\x66lwr/proto/node.proto\x1a\"flwr/proto/federation_config.proto\"#\n\x07\x41\x63\x63ount\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\"<\n\x06Member\x12$\n\x07\x61\x63\x63ount\x18\x01 \x01(\x0b\x32\x13.flwr.proto.Account\x12\x0c\n\x04role\x18\x02 \x01(\t\"\xec\x01\n\nFederation\x12\x0c\n\x04name\x18\x01 \x01(\t\x12#\n\x05nodes\x18\x02 \x03(\x0b\x32\x14.flwr.proto.NodeInfo\x12\x1d\n\x04runs\x18\x03 \x03(\x0b\x32\x0f.flwr.proto.Run\x12\x13\n\x0b\x64\x65scription\x18\x04 \x01(\t\x12#\n\x07members\x18\x05 \x03(\x0b\x32\x12.flwr.proto.Member\x12\x10\n\x08\x61rchived\x18\x06 \x01(\x08\x12\x12\n\nsimulation\x18\x07 \x01(\x08\x12,\n\x06\x63onfig\x18\x08 \x01(\x0b\x32\x1c.flwr.proto.SimulationConfig\"\xb0\x01\n\nInvitation\x12\x17\n\x0f\x66\x65\x64\x65ration_name\x18\x01 \x01(\t\x12$\n\x07inviter\x18\x02 \x01(\x0b\x32\x13.flwr.proto.Account\x12$\n\x07invitee\x18\x03 \x01(\x0b\x32\x13.flwr.proto.Account\x12\x0e\n\x06status\x18\x04 \x01(\t\x12\x12\n\ncreated_at\x18\x05 \x01(\t\x12\x19\n\x11status_changed_at\x18\x06 \x01(\tb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'flwr.proto.federation_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_ACCOUNT']._serialized_start=88
-  _globals['_ACCOUNT']._serialized_end=123
-  _globals['_MEMBER']._serialized_start=125
-  _globals['_MEMBER']._serialized_end=185
-  _globals['_FEDERATION']._serialized_start=188
-  _globals['_FEDERATION']._serialized_end=358
-  _globals['_INVITATION']._serialized_start=361
-  _globals['_INVITATION']._serialized_end=537
+  _globals['_ACCOUNT']._serialized_start=124
+  _globals['_ACCOUNT']._serialized_end=159
+  _globals['_MEMBER']._serialized_start=161
+  _globals['_MEMBER']._serialized_end=221
+  _globals['_FEDERATION']._serialized_start=224
+  _globals['_FEDERATION']._serialized_end=460
+  _globals['_INVITATION']._serialized_start=463
+  _globals['_INVITATION']._serialized_end=639
 # @@protoc_insertion_point(module_scope)

@@ -158,7 +158,8 @@ def generic_create_grpc_server(  # pylint: disable=too-many-arguments, R0914, R0
     Returns
     -------
     server : grpc.Server
-        A non-running instance of a gRPC server.
+        A non-running instance of a gRPC server. The actual used address can be accessed
+        via `server.bound_address`.
     """
     # Check if port is in use
     if is_port_in_use(server_address):
@@ -220,10 +221,12 @@ def generic_create_grpc_server(  # pylint: disable=too-many-arguments, R0914, R0
             # https://grpc.github.io/grpc/python/grpc.html#create-server-credentials
             require_client_auth=False,
         )
-        server.add_secure_port(server_address, server_credentials)
+        port = server.add_secure_port(server_address, server_credentials)
     else:
-        server.add_insecure_port(server_address)
+        port = server.add_insecure_port(server_address)
 
+    # Allow the port to be accessible outside the function
+    server.bound_address = f"{server_address.rpartition(':')[0]}:{port}"
     return server
 
 
