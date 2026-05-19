@@ -184,6 +184,13 @@ def main() -> None:
     # Allow enough time for token expiry based heartbeat detection:
     # HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL (+ buffer for restart/retries)
     heartbeat_timeout = HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 30
+    # The simulation runtime can lose its AppIO channel across the SuperLink restart,
+    # so the survivor may also be finalized by heartbeat timeout.
+    expected_run2_status = (
+        f"{Status.FINISHED}:{SubStatus.FAILED}"
+        if use_sim
+        else f"{Status.FINISHED}:{SubStatus.COMPLETED}"
+    )
 
     # Allow time for SuperLink to detect heartbeat failures and update statuses
     tic = time.time()
@@ -191,8 +198,8 @@ def main() -> None:
     while (time.time() - tic) < heartbeat_timeout:
         run_status = flwr_ls()
         if (
-            run_status[run_id1] == f"{Status.FINISHED}:{SubStatus.FAILED}"
-            and run_status[run_id2] == f"{Status.FINISHED}:{SubStatus.COMPLETED}"
+            run_status.get(run_id1) == f"{Status.FINISHED}:{SubStatus.FAILED}"
+            and run_status.get(run_id2) == expected_run2_status
         ):
             is_valid = True
             break
