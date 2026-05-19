@@ -4,7 +4,7 @@
 
 It is recommended to run your Python setup within a virtual environment. This guide
 shows three different examples how to create a virtual environment with pyenv
-virtualenv, poetry, or Anaconda. You can follow the instructions or choose your
+virtualenv, uv, or Anaconda. You can follow the instructions or choose your
 preferred setup.
 
 ****************
@@ -47,24 +47,23 @@ Activate the virtualenv by running the following command:
 
     echo flower-3.10.19 > .python-version
 
-************************
- Virtualenv with Poetry
-************************
+********************
+ Virtualenv with uv
+********************
 
-The Flower examples are based on `Poetry <https://python-poetry.org/docs/>`_ to manage
-dependencies. After installing Poetry you can create and activate a virtual environment
-with:
-
-.. code-block:: shell
-
-    poetry shell
-
-If you open a new terminal you can activate the previously created virtual environment
-with the following command:
+The Flower framework uses `uv <https://docs.astral.sh/uv/>`_ to manage dependencies.
+After installing uv, create the virtual environment from the framework lockfile with:
 
 .. code-block:: shell
 
-    source $(poetry env info --path)/bin/activate
+    cd framework
+    uv sync --locked --all-extras --all-groups
+
+Activate the created virtual environment with:
+
+.. code-block:: shell
+
+    source .venv/bin/activate
 
 **************************
  Virtualenv with Anaconda
