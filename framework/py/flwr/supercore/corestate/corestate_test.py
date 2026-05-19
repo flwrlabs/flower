@@ -454,6 +454,35 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertTrue(tasks[0].finished_at)
         self.assertEqual(datetime.fromisoformat(tasks[0].finished_at), active_until)
 
+    def test_get_tasks_expires_stale_task_tokens(self) -> None:
+        """Reading tasks should expire stale claimed task tokens first."""
+        state = self.state_factory()
+        fixed_now = now()
+        active_until = fixed_now + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
+        run_id = self.task_run_id(state)
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+            assert task_id is not None
+            assert state.claim_task(task_id) is not None
+
+            mock_dt.now.return_value = fixed_now + timedelta(
+                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
+            )
+            tasks = state.get_tasks(task_ids=[task_id])
+
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(
+            tasks[0].status,
+            TaskStatus(
+                status=Status.FINISHED,
+                sub_status=SubStatus.FAILED,
+                details="No heartbeat received from the task",
+            ),
+        )
+        self.assertEqual(datetime.fromisoformat(tasks[0].finished_at), active_until)
+
     def test_get_task_by_token_returns_none_for_unknown_token(self) -> None:
         """Unknown task tokens should not resolve to a task."""
         state = self.state_factory()
