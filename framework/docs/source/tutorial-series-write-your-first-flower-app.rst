@@ -54,8 +54,8 @@ case, you'll fetch the `@flwrlabs/demo <https://flower.ai/apps/flwrlabs/demo/>`_
 
     $ flwr new @flwrlabs/demo
 
-After running it you'll notice a new directory named ``demo`` has been created. It
-should have the following structure:
+After running it you'll notice a new directory named ``demo`` has been created in the
+directory you executed the above command from. It should have the following structure:
 
 .. code-block:: shell
 
@@ -68,9 +68,17 @@ should have the following structure:
     ├── pyproject.toml      # Project metadata like dependencies and configs
     └── README.md
 
+You did it! You have pulled an existing Flower App from the Flower Hub. Open the
+``demo`` directory in your code editor of choice, then advance to the next section to
+learn about the core components of a Flower App.
+
 ***********************
  Flower App Components
 ***********************
+
+**********************
+ Customizing your App
+**********************
 
 ***************************
  Run your App on SuperGrid
