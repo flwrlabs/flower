@@ -7,11 +7,10 @@ FRAMEWORK_ROOT="${REPO_ROOT}/framework"
 
 version=${1:-3.10.19}
 
-# Delete caches, venv, and lock file
+# Delete caches and venv
 "${FRAMEWORK_ROOT}/dev/rm-caches.sh"
 "${SCRIPT_DIR}/venv-delete.sh" "$version"
-[ ! -e "${FRAMEWORK_ROOT}/poetry.lock" ] || rm "${FRAMEWORK_ROOT}/poetry.lock"
 
 # Recreate
 "${SCRIPT_DIR}/venv-create.sh" "$version"
-"${SCRIPT_DIR}/bootstrap.sh"
+"${SCRIPT_DIR}/bootstrap.sh" "$version"

@@ -64,11 +64,11 @@ then
 else
     echo 'Virtual env already installed, nothing to do.'
     echo "If not already done, "\
-    "you must run dev/bootstrap.sh $version to install all the dependencies"
+    "you must run dev/bootstrap.sh $version to install all dependencies with uv"
     exit
 fi
 
 echo "$(tput bold)Virtual env flower-$version created, "\
-"you must now run dev/bootstrap.sh $version to install all dependencies.$(tput sgr0)"
+"you must now run dev/bootstrap.sh $version to install all dependencies with uv.$(tput sgr0)"
 
 exec "$SHELL"
