@@ -147,14 +147,10 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         heartbeat_sender.start()
 
         # Pull task input from SuperLink
-        try:
-            log(DEBUG, "[flwr-serverapp] Pull task input")
-            req = PullTaskInputRequest()
-            res: PullTaskInputResponse = grid._stub.PullTaskInput(req)
-        except grpc.RpcError as ex:
-            if ex.code() == grpc.StatusCode.FAILED_PRECONDITION:
-                raise RuntimeError("Failed to start the run.") from ex
-            raise
+        log(DEBUG, "[flwr-serverapp] Pull task input")
+        req = PullTaskInputRequest()
+        res: PullTaskInputResponse = grid._stub.PullTaskInput(req)
+
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
         fab = fab_from_proto(res.fab)
@@ -238,12 +234,6 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         # Send resulting context
         # Temporarily disable pushing resulting context to servicer
         context.state = RecordDict()
-
-    except RuntimeError:
-        log(ERROR, "Failed to start run.")
-        exit_code = ExitCode.SERVERAPP_RUN_START_REJECTED
-        sub_status = SubStatus.FAILED
-        details = "Failed when pulling task input."
 
     except Exception as ex:  # pylint: disable=broad-exception-caught
         exc_entity = "ServerApp"
