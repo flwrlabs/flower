@@ -139,7 +139,7 @@ same run details page you saw right after launching the app.
 
 In the next tutorial, you'll learn how to write your own Flower App and run it on
 SuperGrid. You'll also learn about strategies, a powerful way to customize the behavior
-of your collaborative AI workload.
+of your collaborative AI workloads.
 
 ************
  Next steps
@@ -152,6 +152,8 @@ Flower Discuss <https://discuss.flower.ai>`__) and on Slack (`Join Slack
 There's a dedicated ``#questions`` Slack channel if you need help, but we'd also love to
 hear who you are in ``#introductions``!
 
-The :doc:`Flower Federated Learning Tutorial - Part 2
-<tutorial-series-use-a-federated-learning-strategy-pytorch>` goes into more depth about
-strategies and all the advanced things you can build with them.
+The :doc:`Flower Collaborative AI Tutorial - Part 2
+<tutorial-series-write-your-first-flower-app>` will walk you through the process of
+writing your own Flower App by describing first how each component, like the `ServerApp`
+and `ClientApp`, interact with each other. You'll also learn how to run your app on
+SuperGrid and monitor its progress.
