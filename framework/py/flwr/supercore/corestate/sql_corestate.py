@@ -160,6 +160,7 @@ class SqlCoreState(CoreState, SqlMixin):
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
+        requesting_task_id: int | None = None,
     ) -> int | None:
         """Create a task and return its ID."""
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
@@ -195,6 +196,20 @@ class SqlCoreState(CoreState, SqlMixin):
 
         with self.session():
             try:
+                if requesting_task_id is not None:
+                    requesting_task_rows = self.query(
+                        """
+                        UPDATE task
+                        SET task_id = task_id
+                        WHERE task_id = :requesting_task_id
+                        AND finished_at IS NULL
+                        RETURNING task_id
+                        """,
+                        {"requesting_task_id": uint64_to_int64(requesting_task_id)},
+                    )
+                    if not requesting_task_rows:
+                        return None
+
                 self.query(insert_query, params)
                 return task_id
             except IntegrityError:

@@ -118,6 +118,34 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """Return the FederationManager instance."""
         return self._federation_manager
 
+    def _lock_unfinished_run(self, run_id: int) -> dict[str, Any] | None:
+        """Lock the run's primary task row if the run has not finished."""
+        sint64_run_id = uint64_to_int64(run_id)
+        rows = self.query(
+            """
+            UPDATE task
+            SET task_id = task_id
+            WHERE task_id = (
+                SELECT primary_task_id FROM run WHERE run_id = :run_id
+            )
+            AND finished_at IS NULL
+            RETURNING task_id
+            """,
+            {"run_id": sint64_run_id},
+        )
+        if not rows:
+            return None
+
+        run_rows = self.query(
+            """
+            SELECT run_id, federation, primary_task_id
+            FROM run
+            WHERE run_id = :run_id
+            """,
+            {"run_id": sint64_run_id},
+        )
+        return dict(run_rows[0]) if run_rows else None
+
     def _lock_not_stopped_run(self, run_id: int) -> dict[str, Any] | None:
         """Lock the run's primary task row if the run has not been stopped."""
         sint64_run_id = uint64_to_int64(run_id)
@@ -153,10 +181,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
+        requesting_task_id: int | None = None,
     ) -> int | None:
         """Create a task."""
         with self.session():
-            if not self._lock_not_stopped_run(run_id):
+            if not self._lock_unfinished_run(run_id):
                 if not self.query(
                     "SELECT run_id FROM run WHERE run_id = :run_id",
                     {"run_id": uint64_to_int64(run_id)},
@@ -172,6 +201,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 fab_hash=fab_hash,
                 model_ref=model_ref,
                 connector_ref=connector_ref,
+                requesting_task_id=requesting_task_id,
             )
             return task_id
 
@@ -202,7 +232,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         with self.session():
             # Validate run_id
-            run_row = self._lock_not_stopped_run(message.metadata.run_id)
+            run_row = self._lock_unfinished_run(message.metadata.run_id)
             if not run_row:
                 log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
                 return None
@@ -419,7 +449,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         with self.session():
             res_metadata = message.metadata
-            if not self._lock_not_stopped_run(res_metadata.run_id):
+            if not self._lock_unfinished_run(res_metadata.run_id):
                 log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
                 return None
 

@@ -61,7 +61,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
-from flwr.server.superlink.utils import check_abort
+from flwr.server.superlink.utils import check_abort, cleanup_objects_if_run_finished
 from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStore
 
@@ -208,6 +208,8 @@ def push_messages(
         objects_to_push |= set(store.preregister(run_id, object_tree))
     # Store Message in State
     message_id: str | None = state.store_message_res(message=msg)
+    if message_id is None:
+        cleanup_objects_if_run_finished(run_id, state, store)
 
     # Build response
     response = PushMessagesResponse(

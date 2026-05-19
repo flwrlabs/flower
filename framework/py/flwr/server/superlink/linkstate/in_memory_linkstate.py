@@ -125,6 +125,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             return False
         return self.run_ids[task.run_id].run.primary_task_id == task_id
 
+    def _is_finished_run(self, run_id: int) -> bool:
+        """Return True if the run has finished."""
+        return self._get_run(run_id).status.status == Status.FINISHED
+
     def _is_stopped_run(self, run_id: int) -> bool:
         """Return True if the run has been stopped."""
         return self._get_run(run_id).status.sub_status == SubStatus.STOPPED
@@ -136,6 +140,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
+        requesting_task_id: int | None = None,
     ) -> int | None:
         """Create a task."""
         with self.lock:
@@ -143,7 +148,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 raise RuntimeError(
                     f"Run {run_id} not found. create_task requires an existing run."
                 )
-            if self._is_stopped_run(run_id):
+            if self._is_finished_run(run_id):
                 raise RuntimeError(f"Run {run_id} is finished.")
             return super().create_task(
                 task_type=task_type,
@@ -151,6 +156,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 fab_hash=fab_hash,
                 model_ref=model_ref,
                 connector_ref=connector_ref,
+                requesting_task_id=requesting_task_id,
             )
 
     def store_message_ins(self, message: Message) -> str | None:
@@ -160,14 +166,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         if any(errors):
             log(ERROR, errors)
             return None
-        # Validate run_id
-        if message.metadata.run_id not in self.run_ids:
-            log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
-            return None
-        if self._is_stopped_run(message.metadata.run_id):
-            log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
-            return None
-        federation = self.run_ids[message.metadata.run_id].run.federation
         # Validate source node ID
         if message.metadata.src_node_id != SUPERLINK_NODE_ID:
             log(
@@ -176,25 +174,35 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 message.metadata.src_node_id,
             )
             return None
-        # Validate destination node ID
-        dst_node = self.nodes.get(message.metadata.dst_node_id)
-        if (
-            # Node must exist
-            dst_node is None
-            # Node must be online or offline
-            or dst_node.status not in (NodeStatus.ONLINE, NodeStatus.OFFLINE)
-            # Node must belong to the same federation
-            or not self.federation_manager.has_node(dst_node.node_id, federation)
-        ):
-            log(
-                ERROR,
-                "Invalid destination node ID for Message: %s",
-                message.metadata.dst_node_id,
-            )
-            return None
 
         message_id = message.metadata.message_id
         with self.lock:
+            # Validate run_id
+            if message.metadata.run_id not in self.run_ids:
+                log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
+                return None
+            if self._is_finished_run(message.metadata.run_id):
+                log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
+                return None
+            federation = self.run_ids[message.metadata.run_id].run.federation
+
+            # Validate destination node ID
+            dst_node = self.nodes.get(message.metadata.dst_node_id)
+            if (
+                # Node must exist
+                dst_node is None
+                # Node must be online or offline
+                or dst_node.status not in (NodeStatus.ONLINE, NodeStatus.OFFLINE)
+                # Node must belong to the same federation
+                or not self.federation_manager.has_node(dst_node.node_id, federation)
+            ):
+                log(
+                    ERROR,
+                    "Invalid destination node ID for Message: %s",
+                    message.metadata.dst_node_id,
+                )
+                return None
+
             self.message_ins_store[message_id] = message
 
         # Return the new message_id
@@ -312,16 +320,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 )
                 return None
 
-        # Validate run_id
-        if res_metadata.run_id != ins_metadata.run_id:
-            log(ERROR, "`metadata.run_id` is invalid")
-            return None
-        if self._is_stopped_run(res_metadata.run_id):
-            log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
-            return None
+            # Validate run_id
+            if res_metadata.run_id != ins_metadata.run_id:
+                log(ERROR, "`metadata.run_id` is invalid")
+                return None
+            if self._is_finished_run(res_metadata.run_id):
+                log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
+                return None
 
-        message_id = message.metadata.message_id
-        with self.lock:
+            message_id = message.metadata.message_id
             self.message_res_store[message_id] = message
             self.message_ins_id_to_message_res_id[msg_ins_id] = message_id
 

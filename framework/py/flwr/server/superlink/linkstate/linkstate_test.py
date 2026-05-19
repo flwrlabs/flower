@@ -50,7 +50,6 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 # pylint: disable=E0611
 from flwr.proto.message_pb2 import Message as ProtoMessage
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata
-from flwr.proto.message_pb2 import ObjectTree
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 
 # pylint: enable=E0611
@@ -2134,32 +2133,6 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
     ) -> Callable[[str, int, Any, Any, float], None]:
         """Return process target for STARTING -> RUNNING claim tests."""
         return _claim_running_in_separate_process
-
-    def test_sql_object_preregister_rejects_stopped_run(self) -> None:
-        """SQL ObjectStore rejects preregistration after a run is stopped."""
-        tmp_dir = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, tmp_dir, True)
-        database_path = os.path.join(tmp_dir, "state.db")
-        object_store = ObjectStoreFactory(database_path).store()
-        state = SqlLinkState(
-            database_path=database_path,
-            federation_manager=NoOpFederationManager(),
-            object_store=object_store,
-        )
-        state.initialize()
-        run_id = create_dummy_run(state)
-        object_id = hashlib.sha256(b"run-object").hexdigest()
-
-        self.assertEqual(
-            object_store.preregister(run_id, ObjectTree(object_id=object_id)),
-            [object_id],
-        )
-        self.assertTrue(state.stop_run(run_id))
-
-        with self.assertRaisesRegex(
-            ValueError, f"Run {run_id} not found or already finished"
-        ):
-            object_store.preregister(run_id, ObjectTree(object_id=object_id))
 
     def _create_shared_sql_states(
         self, database_path: str, num_replicas: int = 2

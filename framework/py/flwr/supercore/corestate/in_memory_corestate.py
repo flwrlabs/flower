@@ -137,9 +137,18 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
+        requesting_task_id: int | None = None,
     ) -> int | None:
         """Create a task and return its ID."""
         with self.lock_task_store:
+            if requesting_task_id is not None:
+                requesting_task = self.task_store.get(requesting_task_id)
+                if (
+                    requesting_task is None
+                    or requesting_task.status.status == Status.FINISHED
+                ):
+                    return None
+
             task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
 
             task = Task(
