@@ -54,6 +54,8 @@ class SqlObjectStore(ObjectStore, SqlMixin):
             for tree_node in tree_nodes:
                 obj_id = tree_node.object_id
                 child_ids = [child.object_id for child in tree_node.children]
+                if len(child_ids) != len(set(child_ids)):
+                    raise ValueError(f"Object {obj_id} has duplicate children.")
 
                 # Insert new object if it doesn't exist (race-condition safe)
                 # RETURNING returns a row only if the insert succeeded
@@ -94,25 +96,19 @@ class SqlObjectStore(ObjectStore, SqlMixin):
                             "children."
                         )
 
-                # Set up child relationships. Refresh ref_count only if this call
-                # actually inserted the edge.
+                # Set up child relationships.
                 if is_new:
                     for cid in child_ids:
-                        edge_rows = self.query(
+                        self.query(
                             "INSERT INTO object_children (parent_id, child_id) "
-                            "VALUES (:parent_id, :child_id) "
-                            "ON CONFLICT (parent_id, child_id) DO NOTHING "
-                            "RETURNING child_id",
+                            "VALUES (:parent_id, :child_id)",
                             {"parent_id": obj_id, "child_id": cid},
                         )
-                        if edge_rows:
-                            self.query(
-                                "UPDATE objects SET ref_count = ("
-                                "SELECT COUNT(*) FROM object_children "
-                                "WHERE child_id = :object_id"
-                                ") WHERE object_id = :object_id",
-                                {"object_id": cid},
-                            )
+                        self.query(
+                            "UPDATE objects SET ref_count = ref_count + 1 "
+                            "WHERE object_id = :object_id",
+                            {"object_id": cid},
+                        )
 
                 # Ensure run mapping
                 self.query(
@@ -193,9 +189,9 @@ class SqlObjectStore(ObjectStore, SqlMixin):
         return rows[0]["content"] if rows else None
 
     def delete(self, object_id: str) -> None:
-        """Delete an object if unreferenced, ignoring run registrations."""
+        """Delete an object and its unreferenced descendants from the store."""
         with self.session():
-            self._delete_unreferenced(object_id, respect_run_refs=False)
+            self._delete_unreferenced(object_id)
 
     def delete_objects_in_run(self, run_id: int) -> None:
         """Delete all objects that were registered in a specific run."""
@@ -210,25 +206,12 @@ class SqlObjectStore(ObjectStore, SqlMixin):
                 {"run_id": run_id_sint},
             )
             for obj in objs:
-                self._delete_unreferenced(
-                    obj["object_id"],
-                    respect_run_refs=True,
-                )
+                self._delete_unreferenced(obj["object_id"])
 
-    def _delete_unreferenced(self, object_id: str, *, respect_run_refs: bool) -> None:
+    def _delete_unreferenced(self, object_id: str) -> None:
         """Delete an object if unreferenced, then check each direct child."""
-        run_ref_condition = ""
-        if respect_run_refs:
-            run_ref_condition = (
-                "AND NOT EXISTS ("
-                "SELECT 1 FROM run_objects WHERE object_id = :object_id"
-                ") "
-            )
-
         rows = self.query(
-            "SELECT 1 FROM objects "
-            "WHERE object_id = :object_id AND ref_count = 0 "
-            f"{run_ref_condition}",
+            "SELECT 1 FROM objects WHERE object_id = :object_id AND ref_count = 0",
             {"object_id": object_id},
         )
         if not rows:
@@ -243,7 +226,6 @@ class SqlObjectStore(ObjectStore, SqlMixin):
         rows = self.query(
             "DELETE FROM objects "
             "WHERE object_id = :object_id AND ref_count = 0 "
-            f"{run_ref_condition}"
             "RETURNING object_id",
             {"object_id": object_id},
         )
@@ -260,7 +242,7 @@ class SqlObjectStore(ObjectStore, SqlMixin):
             )
 
         for child_id in child_ids:
-            self._delete_unreferenced(child_id, respect_run_refs=respect_run_refs)
+            self._delete_unreferenced(child_id)
 
     def clear(self) -> None:
         """Clear the store."""

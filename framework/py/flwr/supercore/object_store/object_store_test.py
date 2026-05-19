@@ -341,28 +341,6 @@ class ObjectStoreTest(unittest.TestCase):
         # Assert: The store should be empty now
         self.assertEqual(len(object_store), 0)
 
-    def test_delete_objects_in_run_preserves_object_registered_in_other_run(
-        self,
-    ) -> None:
-        """Ensure run cleanup does not delete objects still mapped to another run."""
-        store = self.object_store_factory()
-        obj = CustomDataClass(data=b"shared")
-        object_content = obj.deflate()
-        object_id = get_object_id(object_content)
-
-        store.preregister(run_id=1, object_tree=get_object_tree(obj))
-        store.preregister(run_id=2, object_tree=get_object_tree(obj))
-        store.put(object_id, object_content)
-
-        store.delete_objects_in_run(run_id=1)
-
-        self.assertEqual(object_content, store.get(object_id))
-        self.assertEqual(len(store), 1)
-
-        store.delete_objects_in_run(run_id=2)
-
-        self.assertIsNone(store.get(object_id))
-
 
 def _create_object_hierarchy() -> tuple[list[CustomDataClass], dict[str, bytes]]:
     """Create a hierarchy of objects for testing.
