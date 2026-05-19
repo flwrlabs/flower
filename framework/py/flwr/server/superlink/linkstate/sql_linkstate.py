@@ -647,21 +647,34 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             run_row = self._lock_run(run_id)
             if not run_row:
                 return False
+            primary_task_id = run_row["primary_task_id"]
+            primary_unfinished = self.query(
+                """
+                SELECT finished_at IS NULL AS unfinished
+                FROM task
+                WHERE task_id = :task_id
+                """,
+                {"task_id": primary_task_id},
+            )[0]["unfinished"]
 
             rows = self.query(
                 """
                 UPDATE task
-                SET finished_at = :finished_at,
+                SET finished_at = CASE
+                        WHEN finished_at IS NULL THEN :finished_at
+                        ELSE finished_at
+                    END,
                     sub_status = :sub_status,
                     details = :details,
                     active_until = NULL,
                     token = NULL
                 WHERE run_id = :run_id
-                AND finished_at IS NULL
+                AND (finished_at IS NULL OR task_id = :primary_task_id)
                 RETURNING task_id
                 """,
                 {
                     "run_id": uint64_to_int64(run_id),
+                    "primary_task_id": primary_task_id,
                     "finished_at": now().isoformat(),
                     "sub_status": SubStatus.STOPPED,
                     "details": "",
@@ -670,7 +683,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             if not rows:
                 return False
 
-            if any(row["task_id"] == run_row["primary_task_id"] for row in rows):
+            if primary_unfinished:
                 self.federation_manager.report_run_usage()
             self.delete_messages(self.get_message_ids_from_run_id(run_id))
 

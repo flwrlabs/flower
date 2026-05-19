@@ -439,6 +439,20 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         for task in self.get_tasks(run_ids=[run_id]):
             update_success |= self.finish_task(task.task_id, SubStatus.STOPPED, "")
 
+        with self.lock_task_store:
+            with self.lock:
+                if run_id not in self.run_ids:
+                    return False
+                primary_task_id = cast(int, self.run_ids[run_id].run.primary_task_id)
+                primary_task = self.task_store[primary_task_id]
+                if primary_task.status.sub_status == SubStatus.STOPPED:
+                    if not update_success:
+                        return False
+                else:
+                    primary_task.status.sub_status = SubStatus.STOPPED
+                    primary_task.status.details = ""
+                    update_success = True
+
         if not update_success:
             return False
 

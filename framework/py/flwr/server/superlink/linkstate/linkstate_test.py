@@ -501,7 +501,7 @@ class StateTest(CoreStateTest):
         assert state.stop_run(run_id)
 
         tasks = {task.task_id: task for task in state.get_tasks(run_ids=[run_id])}
-        assert tasks[primary_task_id].status.sub_status == SubStatus.COMPLETED
+        assert tasks[primary_task_id].status.sub_status == SubStatus.STOPPED
         assert tasks[secondary_task_id].status.sub_status == SubStatus.STOPPED
 
     def test_usage_report_hook_not_called_on_non_primary_task_expired(self) -> None:
