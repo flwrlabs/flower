@@ -159,21 +159,8 @@ jobs:
         working-directory: intelligence/ts
         run: pnpm install
 
-      - name: Get API Key
-        id: get_api_key
-        env:
-          FI_DEV_REMOTE_URL: ${{ secrets.FI_DEV_REMOTE_URL }}
-          FI_MGMT_API_KEY: ${{ secrets.FI_MGMT_API_KEY }}
-        run: |
-          api_key=$(./intelligence/dev/get-api-key.sh)
-          echo "::add-mask::$api_key"
-          echo "api_key=$api_key" >> $GITHUB_OUTPUT
-
       - name: Run tests
         working-directory: intelligence/ts
-        env:
-          FI_DEV_REMOTE_URL: ${{ secrets.FI_DEV_REMOTE_URL }}
-          FI_API_KEY: ${{ steps.get_api_key.outputs.api_key }}
         run: pnpm test
 
   fi_ts_docs:
