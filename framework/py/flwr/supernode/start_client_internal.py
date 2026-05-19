@@ -46,7 +46,6 @@ from flwr.common.constant import (
     TRANSPORT_TYPES,
     ErrorCode,
     ExecPluginType,
-    Status,
     SubStatus,
 )
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
@@ -492,8 +491,6 @@ def _push_messages(
     # This is to ensure that only one message is processed at a time
     # Wait until a reply message is available
     while not (reply_messages := state.get_messages(is_reply=True)):
-        # Temporary: Trigger cleanup of expired task tokens
-        state.get_tasks(statuses=[Status.PENDING])
         time.sleep(0.5)
 
     for message in reply_messages:
