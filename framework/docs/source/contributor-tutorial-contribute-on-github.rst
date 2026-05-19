@@ -32,8 +32,9 @@ If you're familiar with how contributing on GitHub works, you can directly check
        track of them using Git and then you upload your new history back to GitHub.
 2. **Forking the Flower repository**
        A fork is a personal copy of a GitHub repository. To create one for Flower, you
-       must navigate to https://github.com/adap/flower (while connected to your GitHub
-       account) and click the ``Fork`` button situated on the top right of the page.
+       must navigate to https://github.com/flwrlabs/flower (while connected to your
+       GitHub account) and click the ``Fork`` button situated on the top right of the
+       page.
 
        .. image:: _static/fork_button.png
 
@@ -85,7 +86,7 @@ If you're familiar with how contributing on GitHub works, you can directly check
 
        .. code-block:: shell
 
-           $ git remote add upstream https://github.com/adap/flower.git
+           $ git remote add upstream https://github.com/flwrlabs/flower.git
 
        The following diagram visually explains what we did in the previous steps:
 

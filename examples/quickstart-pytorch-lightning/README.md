@@ -10,12 +10,18 @@ This introductory example to Flower uses PyTorch Lightning, but deep knowledge o
 
 ## Project Setup
 
-Start by cloning the example project. We prepared a single-line command that you can copy into your shell which will checkout the example for you:
+### Fetch the app
+
+Install Flower:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git _tmp \
-        && mv _tmp/examples/quickstart-pytorch-lightning . \
-        && rm -rf _tmp && cd quickstart-pytorch-lightning
+pip install flwr
+```
+
+Fetch the app:
+
+```shell
+flwr new @flwrlabs/quickstart-pytorch-lightning
 ```
 
 This will create a new directory called `quickstart-pytorch-lightning` containing the following files:
@@ -49,13 +55,13 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 > Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
 ```bash
-flwr run .
+flwr run . --stream
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
 
 ```bash
-flwr run . --run-config "num-server-rounds=5 max-epochs=2"
+flwr run . --run-config "num-server-rounds=5 max-epochs=2" --stream
 ```
 
 ### Run with the Deployment Engine

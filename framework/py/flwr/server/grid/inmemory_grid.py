@@ -63,12 +63,15 @@ class InMemoryGrid(Grid):
         ):
             raise ValueError(f"Invalid message: {message}")
 
-    def set_run(self, run_id: int) -> None:
+    def set_run(self, run: Run) -> None:
         """Initialize the run."""
-        runs = self.state.get_run_info(run_ids=[run_id])
+        if not isinstance(run, Run):
+            run_type = type(run).__name__
+            raise TypeError(f"`run` must be an instance of Run, got {run_type}")
+        runs = self.state.get_run_info(run_ids=[run.run_id])
         if not runs:
-            raise RuntimeError(f"Cannot find the run with ID: {run_id}")
-        self._run = runs[0]
+            raise RuntimeError(f"Cannot find the run with ID: {run.run_id}")
+        self._run = run
 
     @property
     def run(self) -> Run:

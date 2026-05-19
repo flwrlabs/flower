@@ -15,7 +15,7 @@ environment.
 
        .. code-block:: bash
 
-           $ git clone --depth=1 https://github.com/adap/flower.git && cd flower
+           $ git clone --depth=1 https://github.com/flwrlabs/flower.git && cd flower
 
 2. Verify the Docker daemon is running.
 
@@ -154,13 +154,13 @@ After creating the image, we can test whether the image is working:
     :substitutions:
 
     # main branch
-    git+https://github.com/adap/flower.git@main#subdirectory=framework
+    git+https://github.com/flwrlabs/flower.git@main#subdirectory=framework
 
     # commit hash
-    git+https://github.com/adap/flower.git@4bc1bca3d0576dd2233972d9d91c2c7e8eb03edd#subdirectory=framework
+    git+https://github.com/flwrlabs/flower.git@4bc1bca3d0576dd2233972d9d91c2c7e8eb03edd#subdirectory=framework
 
     # tag
-    git+https://github.com/adap/flower.git@|stable_flwr_version|#subdirectory=framework
+    git+https://github.com/flwrlabs/flower.git@|stable_flwr_version|#subdirectory=framework
 
     # artifact store
     https://artifact.flower.ai/py/main/latest/flwr-|stable_flwr_version|-py3-none-any.whl

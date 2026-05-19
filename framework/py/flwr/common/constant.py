@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import os
+from typing import Final
 
 TRANSPORT_TYPE_GRPC_RERE = "grpc-rere"
 TRANSPORT_TYPE_GRPC_ADAPTER = "grpc-adapter"
@@ -36,7 +37,6 @@ SERVERAPPIO_PORT = "9091"
 FLEETAPI_GRPC_RERE_PORT = "9092"
 FLEETAPI_PORT = "9095"
 CONTROL_API_PORT = "9093"
-SIMULATIONIO_PORT = "9096"
 # Octets
 SERVER_OCTET = "0.0.0.0"
 CLIENT_OCTET = "127.0.0.1"
@@ -52,8 +52,6 @@ FLEET_API_GRPC_BIDI_DEFAULT_ADDRESS = (
 )
 FLEET_API_REST_DEFAULT_ADDRESS = f"{SERVER_OCTET}:{FLEETAPI_PORT}"
 CONTROL_API_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{CONTROL_API_PORT}"
-SIMULATIONIO_API_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{SIMULATIONIO_PORT}"
-SIMULATIONIO_API_DEFAULT_CLIENT_ADDRESS = f"{CLIENT_OCTET}:{SIMULATIONIO_PORT}"
 
 # Constants for heartbeat
 HEARTBEAT_DEFAULT_INTERVAL = 30
@@ -69,6 +67,7 @@ RUN_FAILURE_DETAILS_NO_HEARTBEAT = "No heartbeat received from the run."
 # IDs
 RUN_ID_NUM_BYTES = 8
 NODE_ID_NUM_BYTES = 8
+TASK_ID_NUM_BYTES = 8
 
 # Constants for FAB
 APP_DIR = "apps"
@@ -78,11 +77,18 @@ FAB_HASH_TRUNCATION = 8
 FAB_MAX_SIZE = 10 * 1024 * 1024  # 10 MB
 FLWR_DIR = ".flwr"  # The default Flower directory: ~/.flwr/
 FLWR_HOME = "FLWR_HOME"  # If set, override the default Flower directory
+# FAB include and exclude keys in pyproject.toml
+FAB_INCLUDE_KEY = "fab-include"
+FAB_EXCLUDE_KEY = "fab-exclude"
 # FAB file include patterns (gitignore-style patterns)
 FAB_INCLUDE_PATTERNS = (
     "**/*.py",
     "**/*.toml",
     "**/*.md",
+    "**/*.yaml",
+    "**/*.yml",
+    "**/*.json",
+    "**/*.jsonl",
     "/LICENSE",
 )
 # FAB file exclude patterns (gitignore-style patterns)
@@ -90,6 +96,23 @@ FAB_EXCLUDE_PATTERNS = (
     f"{FLWR_DIR}/**",  # Exclude the .flwr directory
     "**/__pycache__/**",
     FAB_CONFIG_FILE,  # Exclude the original pyproject.toml
+    "**/*_test.py",
+    "**/test_*.py",
+    # Distribution / packaging
+    "build/**",
+    "eggs/**",
+    ".eggs/**",
+    "lib/**",
+    "lib64/**",
+    "parts/**",
+    "*.egg",
+    # Environments
+    ".venv/**",
+    "env/**",
+    "venv/**",
+    "ENV/**",
+    "env.bak/**",
+    "venv.bak/**",
 )
 
 # Constant for SuperLink
@@ -113,6 +136,9 @@ MESSAGE_TTL_TOLERANCE = 1e-1
 # Isolation modes
 ISOLATION_MODE_SUBPROCESS = "subprocess"
 ISOLATION_MODE_PROCESS = "process"
+
+# Runtime dependency installation toggle
+RUNTIME_DEPENDENCY_INSTALL = False
 
 # Log streaming configurations
 CONN_REFRESH_PERIOD = 60  # Stream connection refresh period
@@ -154,8 +180,8 @@ FLWR_PRIVATE_MAX_ARRAY_CHUNK_SIZE = int(
 # Constants for serialization
 INT64_MAX_VALUE = 9223372036854775807  # (1 << 63) - 1
 
-# Constants for `flwr-serverapp` and `flwr-clientapp` CLI commands
-FLWR_APP_TOKEN_LENGTH = 128  # Length of the token used
+# Constants for task-token generation
+FLWR_TASK_TOKEN_LENGTH = 128  # Number of bytes used to generate task tokens
 
 # ControlServicer constants
 RUN_ID_NOT_FOUND_MESSAGE = "Run ID not found"
@@ -166,11 +192,7 @@ SUPERNODE_NOT_CREATED_FROM_CLI_MESSAGE = "Invalid SuperNode credentials"
 PUBLIC_KEY_ALREADY_IN_USE_MESSAGE = "Public key already in use"
 PUBLIC_KEY_NOT_VALID = "The provided public key is not valid"
 NODE_NOT_FOUND_MESSAGE = "Node ID not found for account"
-FEDERATION_NOT_SPECIFIED_MESSAGE = "No federation specified in the request"
 FEDERATION_NOT_FOUND_MESSAGE = "Federation '%s' does not exist"
-SUPERLINK_DOES_NOT_SUPPORT_FED_MANAGEMENT_MESSAGE = (
-    "SuperLink does not support federation management."
-)
 
 
 class MessageTypeLegacy:
@@ -240,8 +262,8 @@ class SubStatus:
 class CliOutputFormat:
     """Define output format for `flwr` CLI commands."""
 
-    DEFAULT = "default"
-    JSON = "json"
+    DEFAULT: Final = "default"
+    JSON: Final = "json"
 
     def __new__(cls) -> CliOutputFormat:
         """Prevent instantiation."""
@@ -284,7 +306,8 @@ class ExecPluginType:
 
     CLIENT_APP = "clientapp"
     SERVER_APP = "serverapp"
-    SIMULATION = "simulation"
+    SIMULATION = "simulation"  # Deprecated
+    SERVER_APP_EPHEMERAL = "serverapp-ephemeral"
 
     def __new__(cls) -> ExecPluginType:
         """Prevent instantiation."""

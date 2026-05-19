@@ -23,6 +23,7 @@ import click
 import typer
 
 from .config_utils import load_and_validate, validate_federation_in_project_config
+from .constant import LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE
 from .flower_config import (
     init_flwr_config,
     parse_superlink_connection,
@@ -121,6 +122,8 @@ def _migrate_pyproject_toml_to_flower_config(
     migrated_conn_names: list[str] = []
     for name, toml_fed_config in toml_federations.items():
         if isinstance(toml_fed_config, dict):
+            if "options" in toml_fed_config and "address" not in toml_fed_config:
+                toml_fed_config["address"] = LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE
             # Resolve relative root-certificates path
             if cert_path := toml_fed_config.get("root-certificates"):
                 if not Path(cert_path).is_absolute():

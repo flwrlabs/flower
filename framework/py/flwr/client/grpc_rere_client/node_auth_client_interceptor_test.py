@@ -50,6 +50,11 @@ from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
     SendNodeHeartbeatResponse,
 )
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
+from flwr.supercore.constant import (
+    FLWR_COMPONENT_NAME_METADATA_KEY,
+    FLWR_PACKAGE_NAME_METADATA_KEY,
+    FLWR_PACKAGE_VERSION_METADATA_KEY,
+)
 from flwr.supercore.primitives.asymmetric import (
     generate_key_pairs,
     public_key_to_bytes,
@@ -211,6 +216,9 @@ class TestAuthenticateClientInterceptor(unittest.TestCase):
             expected_public_key = public_key_to_bytes(self._client_public_key)
 
             # Assert
+            assert metadata_dict[FLWR_COMPONENT_NAME_METADATA_KEY] == "SuperNode"
+            assert FLWR_PACKAGE_NAME_METADATA_KEY in metadata_dict
+            assert FLWR_PACKAGE_VERSION_METADATA_KEY in metadata_dict
             assert isinstance(signature, bytes)
             assert isinstance(timestamp, str)
             assert actual_public_key == expected_public_key

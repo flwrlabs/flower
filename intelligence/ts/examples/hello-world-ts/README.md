@@ -9,7 +9,7 @@ tags: [node, minimal, typescript]
 You must first download the example with the following command:
 
 ```bash
-git clone --depth=1 https://github.com/adap/flower.git _tmp && mv _tmp/intelligence/ts/examples/hello-world-ts . && rm -rf _tmp && cd hello-world-ts
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp && mv _tmp/intelligence/ts/examples/hello-world-ts . && rm -rf _tmp && cd hello-world-ts
 ```
 
 You can then install the project dependencies with:

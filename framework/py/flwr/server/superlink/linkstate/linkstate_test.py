@@ -16,37 +16,36 @@
 # pylint: disable=invalid-name, too-many-lines, R0904, R0913
 
 
+import hashlib
+import multiprocessing
+import os
 import secrets
+import shutil
 import tempfile
+import threading
 import time
 import unittest
 from abc import abstractmethod
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock, patch
+from typing import Any
+from unittest.mock import Mock, PropertyMock, patch
 from uuid import uuid4
 
 from parameterized import parameterized
 
 from flwr.app.user_config import UserConfig
-from flwr.common import (
-    DEFAULT_TTL,
-    ConfigRecord,
-    Context,
-    Error,
-    Message,
-    RecordDict,
-    now,
-)
+from flwr.common import DEFAULT_TTL, Context, Error, Message, RecordDict, now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
-    RUN_FAILURE_DETAILS_NO_HEARTBEAT,
     SUPERLINK_NODE_ID,
     ErrorCode,
     Status,
     SubStatus,
 )
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.common.typing import RunStatus
+from flwr.common.typing import Fab
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
 from flwr.proto.message_pb2 import Message as ProtoMessage
@@ -55,7 +54,8 @@ from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 
 # pylint: enable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
-from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus
+from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, RunType, TaskType
+from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
@@ -73,10 +73,68 @@ class StateTest(CoreStateTest):
         """Provide state implementation to test."""
         raise NotImplementedError()
 
+    def task_run_id(self, state: CoreState) -> int:
+        """Provide an existing run ID for inherited CoreState task tests."""
+        assert isinstance(state, LinkState)
+        return create_dummy_run(state)
+
+    def other_task_run_id(self, state: CoreState) -> int:
+        """Provide a second existing run ID for inherited CoreState task tests."""
+        assert isinstance(state, LinkState)
+        return create_dummy_run(state)
+
     def create_public_key(self) -> bytes:
         """Create a P-384 public key for node creation."""
         _, public_key = generate_key_pairs()
         return public_key_to_bytes(public_key)
+
+    def test_store_and_get_fab(self) -> None:
+        """Test storing and retrieving a FAB."""
+        state = self.state_factory()
+        content = b"fab-content"
+        fab = Fab(hashlib.sha256(content).hexdigest(), content, {"meta": "data"})
+
+        fab_hash = state.store_fab(fab)
+        retrieved = state.get_fab(fab_hash)
+
+        self.assertIsNotNone(retrieved)
+        assert retrieved is not None
+        self.assertEqual(retrieved.hash_str, fab_hash)
+        self.assertEqual(retrieved.content, fab.content)
+        self.assertEqual(retrieved.verifications, fab.verifications)
+
+        # Retrieved FAB should be a defensive copy.
+        retrieved.verifications["meta"] = "mutated"
+        reloaded = state.get_fab(fab_hash)
+        self.assertIsNotNone(reloaded)
+        assert reloaded is not None
+        self.assertEqual(reloaded.verifications, {"meta": "data"})
+
+    def test_store_fab_deduplicates_by_hash(self) -> None:
+        """Test storing the same FAB content reuses the same hash."""
+        state = self.state_factory()
+        content = b"fab-content"
+        hash_str = hashlib.sha256(content).hexdigest()
+
+        fab_hash = state.store_fab(Fab(hash_str, content, {"meta": "data"}))
+        other_hash = state.store_fab(Fab(hash_str, content, {"meta": "next"}))
+        retrieved = state.get_fab(fab_hash)
+
+        self.assertEqual(fab_hash, other_hash)
+        self.assertIsNotNone(retrieved)
+        assert retrieved is not None
+        self.assertEqual(retrieved.verifications, {"meta": "next"})
+
+    def test_get_fab_missing_returns_none(self) -> None:
+        """Test missing FAB retrieval."""
+        state = self.state_factory()
+        self.assertIsNone(state.get_fab("missing-fab-hash"))
+
+    def test_store_fab_rejects_hash_mismatch(self) -> None:
+        """Test storing a FAB fails when provided hash doesn't match content."""
+        state = self.state_factory()
+        with self.assertRaisesRegex(ValueError, "FAB hash mismatch"):
+            state.store_fab(Fab("not-the-content-hash", b"fab-content", {}))
 
     def test_create_and_get_run_info(self) -> None:
         """Test if create_run and get_run_info work correctly."""
@@ -88,8 +146,9 @@ class StateTest(CoreStateTest):
             "9f86d08",
             {"test_key": "test_value"},
             "health-federation",
-            ConfigRecord(),
+            None,
             "i1r9f",
+            RunType.SERVER_APP,
         )
 
         # Execute
@@ -101,6 +160,21 @@ class StateTest(CoreStateTest):
         assert run.federation == "health-federation"
         assert run.override_config["test_key"] == "test_value"
         assert run.flwr_aid == "i1r9f"
+
+    def test_create_run_creates_primary_task(self) -> None:
+        """Creating a run should also create its primary task."""
+        # Prepare
+        state = self.state_factory()
+
+        # Execute
+        run_id = create_dummy_run(state)
+
+        # Assert
+        tasks = state.get_tasks(run_ids=[run_id])
+        run = state.get_run_info(run_ids=[run_id])[0]
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
+        self.assertEqual(run.primary_task_id, tasks[0].task_id)
 
     def test_get_run_info_without_filters_returns_all_runs(self) -> None:
         """Test get_run_info returns all runs when no filter is provided."""
@@ -282,34 +356,13 @@ class StateTest(CoreStateTest):
         runs_run_ids_empty = state.get_run_info(run_ids=[])
         self.assertEqual(list(runs_run_ids_empty), [])
 
-    def test_get_pending_run_id(self) -> None:
-        """Test if get_pending_run_id works correctly."""
-        # Prepare
-        state = self.state_factory()
-        _ = create_dummy_run(state)
-        run_id2 = create_dummy_run(state)
-        state.update_run_status(run_id2, RunStatus(Status.STARTING, "", ""))
-
-        # Execute
-        pending_run_id = state.get_pending_run_id()
-        assert pending_run_id is not None
-        run_status_dict = state.get_run_status({pending_run_id})
-        assert run_status_dict[pending_run_id].status == Status.PENDING
-
-        # Change state
-        state.update_run_status(pending_run_id, RunStatus(Status.STARTING, "", ""))
-        # Attempt get pending run
-        pending_run_id = state.get_pending_run_id()
-        assert pending_run_id is None
-
-    def test_get_and_update_run_status(self) -> None:
-        """Test if get_run_status and update_run_status work correctly."""
+    def test_get_run_status_uses_primary_task_status(self) -> None:
+        """Test if get_run_status derives status from the primary task."""
         # Prepare
         state = self.state_factory()
         run_id1 = create_dummy_run(state)
         run_id2 = create_dummy_run(state)
-        state.update_run_status(run_id2, RunStatus(Status.STARTING, "", ""))
-        state.update_run_status(run_id2, RunStatus(Status.RUNNING, "", ""))
+        transition_run_status(state, run_id2, 2)
 
         # Execute
         run_status_dict = state.get_run_status({run_id1, run_id2})
@@ -320,16 +373,14 @@ class StateTest(CoreStateTest):
         assert status1.status == Status.PENDING
         assert status2.status == Status.RUNNING
 
-    @parameterized.expand(
-        [("get_run_info",), ("get_run_status",), ("update_run_status",)]
-    )  # type: ignore
+    @parameterized.expand([("get_run_info",), ("get_run_status",)])  # type: ignore
     def test_run_failed_due_to_heartbeat(self, test_method: str) -> None:
         """Test methods work correctly when the run has no heartbeat."""
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
-        assert state.create_token(run_id) is not None
-        state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
+        task_id = get_primary_task_id(state, run_id)
+        assert state.claim_task(task_id) is not None
 
         # Execute
         # The run should be marked as failed after HEARTBEAT_DEFAULT_INTERVAL
@@ -343,87 +394,63 @@ class StateTest(CoreStateTest):
                 status = run.status
             elif test_method == "get_run_status":
                 status = state.get_run_status({run_id})[run_id]
-            elif test_method == "update_run_status":
-                # The updation should fail because the run is already finished
-                assert not state.update_run_status(
-                    run_id, RunStatus(Status.FINISHED, SubStatus.FAILED, "")
-                )
-                status = state.get_run_status({run_id})[run_id]
             else:
                 raise AssertionError
 
         # Assert
         assert status.status == Status.FINISHED
         assert status.sub_status == SubStatus.FAILED
-        assert status.details == RUN_FAILURE_DETAILS_NO_HEARTBEAT
+        assert status.details == "No heartbeat received from the task"
 
-    @parameterized.expand([(0,), (1,), (2,)])  # type: ignore
-    def test_status_transition_valid(
-        self, num_transitions_before_finishing: int
+    @parameterized.expand([(1,), (2,), (3,)])  # type: ignore
+    def test_usage_report_hook_called_on_each_successful_transition(
+        self, num_transitions: int
     ) -> None:
-        """Test valid run status transactions."""
+        """Test report_run_usage hook is called only on the FINISHED transition."""
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
+        state.federation_manager.report_run_usage = Mock()  # type: ignore
+        # Execute
+        transition_run_status(state, run_id, num_transitions)
+        # Assert: hook is called only when the run reaches FINISHED (num_transitions==3)
+        expected_calls = 1 if num_transitions == 3 else 0
+        assert state.federation_manager.report_run_usage.call_count == expected_calls
 
-        # Execute and assert
-        status = state.get_run_status({run_id})[run_id]
+    def test_usage_report_hook_called_on_primary_task_expired(self) -> None:
+        """Test report_run_usage hook is called when the primary task expires."""
+        # Prepare
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        task_id = get_primary_task_id(state, run_id)
+        assert state.claim_task(task_id) is not None
+        state.federation_manager.report_run_usage = Mock()  # type: ignore
+        # Execute: advance time past token expiry and trigger cleanup
+        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = patched_dt
+            state.get_run_status({run_id})
+
+        # Assert
+        state.federation_manager.report_run_usage.assert_called_once()
+
+    def test_usage_report_hook_not_called_on_non_primary_task_expired(self) -> None:
+        """Test report_run_usage is not called when a non-primary task expires."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
+        assert task_id is not None
+        assert state.claim_task(task_id) is not None
+        state.federation_manager.report_run_usage = Mock()  # type: ignore
+
+        # Execute: advance time past task claim expiry and trigger cleanup
+        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = patched_dt
+            status = state.get_run_status({run_id})[run_id]
+
         assert status.status == Status.PENDING
-
-        if num_transitions_before_finishing > 0:
-            assert state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-            status = state.get_run_status({run_id})[run_id]
-            assert status.status == Status.STARTING
-
-        if num_transitions_before_finishing > 1:
-            assert state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
-            status = state.get_run_status({run_id})[run_id]
-            assert status.status == Status.RUNNING
-
-        assert state.update_run_status(
-            run_id, RunStatus(Status.FINISHED, SubStatus.FAILED, "mock failure")
-        )
-
-        status = state.get_run_status({run_id})[run_id]
-        assert status.status == Status.FINISHED
-
-    def test_status_transition_invalid(self) -> None:
-        """Test invalid run status transitions."""
-        # Prepare
-        state = self.state_factory()
-        run_id = create_dummy_run(state)
-        run_statuses = [
-            RunStatus(Status.PENDING, "", ""),
-            RunStatus(Status.STARTING, "", ""),
-            RunStatus(Status.PENDING, "", ""),
-            RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
-        ]
-
-        # Execute and assert
-        # Cannot transition from RunStatus.PENDING to RunStatus.PENDING,
-        # RunStatus.RUNNING, or RunStatus.FINISHED with COMPLETED substatus
-        for run_status in [s for s in run_statuses if s.status != Status.STARTING]:
-            assert not state.update_run_status(run_id, run_status)
-        state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-        # Cannot transition from RunStatus.STARTING to RunStatus.PENDING,
-        # RunStatus.STARTING, or RunStatus.FINISHED with COMPLETED substatus
-        for run_status in [s for s in run_statuses if s.status != Status.RUNNING]:
-            assert not state.update_run_status(run_id, run_status)
-        state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
-        # Cannot transition from RunStatus.RUNNING
-        # to RunStatus.PENDING, RunStatus.STARTING, or RunStatus.RUNNING
-        for run_status in [s for s in run_statuses if s.status != Status.FINISHED]:
-            assert not state.update_run_status(run_id, run_status)
-        state.update_run_status(
-            run_id, RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
-        )
-        # Cannot transition to any status from RunStatus.FINISHED
-        run_statuses += [
-            RunStatus(Status.FINISHED, SubStatus.FAILED, ""),
-            RunStatus(Status.FINISHED, SubStatus.STOPPED, ""),
-        ]
-        for run_status in run_statuses:
-            assert not state.update_run_status(run_id, run_status)
+        state.federation_manager.report_run_usage.assert_not_called()
 
     def test_get_message_ins_empty(self) -> None:
         """Validate that a new state has no input Messages."""
@@ -897,8 +924,9 @@ class StateTest(CoreStateTest):
         state: LinkState = self.state_factory()
         create_dummy_node(state)
 
-        infos = state.get_node_info(node_ids=[])
-        self.assertEqual(infos, [])
+        self.assertEqual(state.get_node_info(node_ids=[]), [])
+        self.assertEqual(state.get_node_info(owner_aids=[]), [])
+        self.assertEqual(state.get_node_info(statuses=[]), [])
 
     def test_delete_node(self) -> None:
         """Test deleting a client node."""
@@ -1446,6 +1474,12 @@ class StateTest(CoreStateTest):
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 0
 
+    def test_get_message_res_empty_ids_returns_empty_list(self) -> None:
+        """Test that get_message_res returns empty for empty input."""
+        state = self.state_factory()
+
+        self.assertEqual(state.get_message_res(set()), [])
+
     def test_get_message_res_returns_empty_for_missing_message_ins(self) -> None:
         """Test that get_message_res returns an empty result when the corresponding
         Message does not exist."""
@@ -1600,108 +1634,27 @@ class StateTest(CoreStateTest):
         with self.assertRaises(ValueError):
             state.set_serverapp_context(61016, context)  # Invalid run_id
 
-    def test_add_serverapp_log_invalid_run_id(self) -> None:
-        """Test adding serverapp log with invalid run_id."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        invalid_run_id = 99999
-        log_entry = "Invalid log entry"
-
-        # Execute and assert
-        with self.assertRaises(ValueError):
-            state.add_serverapp_log(invalid_run_id, log_entry)
-
-    def test_get_serverapp_log_invalid_run_id(self) -> None:
-        """Test retrieving serverapp log with invalid run_id."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        invalid_run_id = 99999
-
-        # Execute and assert
-        with self.assertRaises(ValueError):
-            state.get_serverapp_log(invalid_run_id, after_timestamp=None)
-
-    def test_add_and_get_serverapp_log(self) -> None:
-        """Test adding and retrieving serverapp logs."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state)
-        log_entry_1 = "Log entry 1"
-        log_entry_2 = "Log entry 2"
-        timestamp = now().timestamp()
-
-        # Execute
-        state.add_serverapp_log(run_id, log_entry_1)
-        state.add_serverapp_log(run_id, log_entry_2)
-        retrieved_logs, latest = state.get_serverapp_log(
-            run_id, after_timestamp=timestamp
-        )
-
-        # Assert
-        assert latest > timestamp
-        assert log_entry_1 + log_entry_2 == retrieved_logs
-
-    def test_get_serverapp_log_after_timestamp(self) -> None:
-        """Test retrieving serverapp logs after a specific timestamp."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state)
-        log_entry_1 = "Log entry 1"
-        log_entry_2 = "Log entry 2"
-        state.add_serverapp_log(run_id, log_entry_1)
-        # Add trivial delays to avoid random failure due to same timestamp
-        time.sleep(1e-6)
-        timestamp = now().timestamp()
-        time.sleep(1e-6)
-        state.add_serverapp_log(run_id, log_entry_2)
-
-        # Execute
-        retrieved_logs, latest = state.get_serverapp_log(
-            run_id, after_timestamp=timestamp
-        )
-
-        # Assert
-        assert latest > timestamp
-        assert log_entry_1 not in retrieved_logs
-        assert log_entry_2 == retrieved_logs
-
-    def test_get_serverapp_log_after_timestamp_no_logs(self) -> None:
-        """Test retrieving serverapp logs after a specific timestamp but no logs are
-        found."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state)
-        log_entry = "Log entry"
-        state.add_serverapp_log(run_id, log_entry)
-        timestamp = now().timestamp() + 0.001  # Ensure timestamp is after the log entry
-
-        # Execute
-        retrieved_logs, latest = state.get_serverapp_log(
-            run_id, after_timestamp=timestamp
-        )
-
-        # Assert
-        assert latest == 0
-        assert retrieved_logs == ""
-
-    def test_create_run_with_and_without_federation_options(self) -> None:
-        """Test that the recording and fetching of federation options works."""
+    def test_create_run_with_and_without_federation_config(self) -> None:
+        """Test that run federation config is stored on the run."""
         # Prepare
         state = self.state_factory()
-        # A run w/ federation options
-        fed_options = ConfigRecord({"setting-a": 123, "setting-b": [4, 5, 6]})
-        run_id = create_dummy_run(state, federation_options=fed_options)
-        state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
+        federation_config = SimulationConfig(num_supernodes=3, backend="ray")
+        run_id = create_dummy_run(
+            state,
+            federation_config=federation_config,
+            run_type=RunType.SIMULATION,
+        )
+        second_run_id = create_dummy_run(state)
 
         # Execute
-        fed_options_fetched = state.get_federation_options(run_id=run_id)
+        run_info = state.get_run_info(run_ids=[run_id])[0]
+        second_run_info = state.get_run_info(run_ids=[second_run_id])[0]
 
         # Assert
-        assert fed_options_fetched == fed_options
-
-        # Generate a run_id that doesn't exist. Then check None is returned
-        unique_int = next(num for num in range(0, 1) if num not in {run_id})
-        assert state.get_federation_options(run_id=unique_int) is None
+        assert run_info.run_type == RunType.SIMULATION
+        assert state.get_federation_config(run_id) == federation_config
+        assert second_run_info.run_type == RunType.SERVER_APP
+        assert state.get_federation_config(second_run_id) is None
 
     def test_set_linkstate_of_federation_manager(self) -> None:
         """Test that setting the LinkState of the FederationManager works."""
@@ -1810,7 +1763,7 @@ def create_ins_message(
     dst_node_id: int,
     run_id: int,
 ) -> ProtoMessage:
-    """Create a Message for testing."""
+    """Create an instruction Message proto for testing."""
     proto = ProtoMessage(
         metadata=ProtoMetadata(
             run_id=run_id,
@@ -1834,7 +1787,7 @@ def create_res_message(
     run_id: int,
     error: Error | None = None,
 ) -> ProtoMessage:
-    """Create a (reply) Message for testing."""
+    """Create a (reply) Message proto for testing."""
     in_msg_proto = create_ins_message(
         src_node_id=dst_node_id, dst_node_id=src_node_id, run_id=run_id
     )
@@ -1848,16 +1801,39 @@ def create_res_message(
     return message_to_proto(out_msg)
 
 
+def create_ins_message_obj(src_node_id: int, dst_node_id: int, run_id: int) -> Message:
+    """Create an instruction Message object for testing."""
+    proto = create_ins_message(src_node_id, dst_node_id, run_id)
+    return message_from_proto(proto)
+
+
+def create_res_message_obj(
+    src_node_id: int,
+    dst_node_id: int,
+    run_id: int,
+    error: Error | None = None,
+) -> Message:
+    """Create a (reply) Message object for testing."""
+    proto = create_res_message(src_node_id, dst_node_id, run_id, error)
+    return message_from_proto(proto)
+
+
+def get_primary_task_id(state: LinkState, run_id: int) -> int:
+    """Return the primary task ID for a run."""
+    run = state.get_run_info(run_ids=[run_id])[0]
+    assert run.primary_task_id is not None
+    return run.primary_task_id
+
+
 def transition_run_status(state: LinkState, run_id: int, num_transitions: int) -> None:
-    """Transition run status from PENDING."""
+    """Transition the primary task status from PENDING."""
+    task_id = get_primary_task_id(state, run_id)
     if num_transitions > 0:
-        state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
+        assert state.claim_task(task_id) is not None
     if num_transitions > 1:
-        state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
+        assert state.activate_task(task_id)
     if num_transitions > 2:
-        state.update_run_status(
-            run_id, RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
-        )
+        assert state.finish_task(task_id, SubStatus.COMPLETED, "")
 
 
 def create_dummy_node(
@@ -1883,8 +1859,9 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     fab_hash: str | None = "mock_fab_hash",
     override_config: UserConfig | None = None,
     federation: str = NOOP_FEDERATION,
-    federation_options: ConfigRecord | None = None,
+    federation_config: SimulationConfig | None = None,
     flwr_aid: str | None = "mock_flwr_aid",
+    run_type: str = RunType.SERVER_APP,
 ) -> int:
     """Create a dummy run."""
     return state.create_run(
@@ -1893,9 +1870,34 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
         fab_hash=fab_hash,
         override_config=override_config or {},
         federation=federation,
-        federation_options=federation_options or ConfigRecord(),
+        federation_config=federation_config,
         flwr_aid=flwr_aid,
+        run_type=run_type,
     )
+
+
+def _claim_running_in_separate_process(
+    database_path: str,
+    task_id: int,
+    start_event: Any,
+    result_queue: Any,
+    timeout: float,
+) -> None:
+    """Try to claim STARTING -> RUNNING in a dedicated process."""
+    state = SqlLinkState(
+        database_path=database_path,
+        federation_manager=NoOpFederationManager(),
+        object_store=ObjectStoreFactory().store(),
+    )
+    state.initialize()
+    if not start_event.wait(timeout=timeout):
+        result_queue.put((False, "start-event-timeout"))
+        return
+    try:
+        result = state.activate_task(task_id)
+        result_queue.put((result, None))
+    except Exception as ex:  # pylint: disable=broad-exception-caught
+        result_queue.put((False, repr(ex)))
 
 
 class InMemoryStateTest(StateTest):
@@ -1935,23 +1937,318 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state.initialize()
         return state
 
+    @parameterized.expand(
+        [  # type: ignore
+            ("claim", "_claim_message_ins_rows", (1, 3)),
+            ("load", "_load_message_ins_rows", ({"abc"},)),
+        ]
+    )
+    def test_message_ins_rows_uses_deterministic_ordering(
+        self, _name: str, method: str, args: tuple[Any, ...]
+    ) -> None:
+        """Message querying should use deterministic ordering."""
+        state = self.state_factory()
+        captured: list[str] = []
 
-class SqlFileBasedTest(StateTest, unittest.TestCase):
+        # pylint: disable-next=unused-argument
+        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
+            captured.append(query)
+            return []
+
+        state.query = fake_query  # type: ignore[method-assign]
+        getattr(state, method)(*args)
+
+        self.assertTrue(captured)
+        self.assertIn("ORDER BY created_at, message_id", captured[0])
+        self.assertNotIn("rowid", captured[0])
+
+    def test_message_ins_claim_can_append_select_lock_clause(self) -> None:
+        """Message claiming can append a subclass-provided row-locking clause."""
+        # Prepare
+        state = self.state_factory()
+        last_query = ""
+
+        # pylint: disable-next=unused-argument
+        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
+            nonlocal last_query
+            last_query = query
+            return []
+
+        state.query = fake_query  # type: ignore[method-assign]
+
+        # Execute & assert - without lock clause
+        state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
+        self.assertNotIn("FOR TEST LOCK", last_query)
+
+        # Execute & assert - with lock clause
+        with patch.object(
+            type(state),
+            "select_lock_sql",
+            new_callable=PropertyMock,
+            return_value="FOR TEST LOCK",
+        ):
+            state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
+        self.assertIn("FOR TEST LOCK", last_query)
+
+    def test_token_expiry_does_not_overwrite_finished_completed_run(self) -> None:
+        """Ensure token cleanup doesn't mutate terminal COMPLETED status."""
+        # Prepare
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        task_id = get_primary_task_id(state, run_id)
+        assert state.claim_task(task_id) is not None
+        assert state.activate_task(task_id)
+        assert state.finish_task(task_id, SubStatus.COMPLETED, "done")
+
+        extra_task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
+        assert extra_task_id is not None
+        assert state.claim_task(extra_task_id) is not None
+
+        # Execute: force token expiry and trigger cleanup
+        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = patched_dt
+            status = state.get_run_status({run_id})[run_id]
+
+        # Assert
+        assert status.status == Status.FINISHED
+        assert status.sub_status == SubStatus.COMPLETED
+        assert status.details == "done"
+
+
+class SqlFileBasedTest(SqlInMemoryStateTest):
     """Test SqlLinkState implementation with file-based database."""
 
     __test__ = True
+    _CONCURRENT_TEST_TIMEOUT = 10.0
+    states: list[SqlLinkState] = []
 
     def state_factory(self) -> SqlLinkState:
         """Return SqlLinkState with file-based database."""
-        # pylint: disable-next=consider-using-with,attribute-defined-outside-init
-        self.tmp_file = tempfile.NamedTemporaryFile()
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir, True)
         state = SqlLinkState(
-            database_path=self.tmp_file.name,
+            database_path=os.path.join(tmp_dir, "state.db"),
             federation_manager=NoOpFederationManager(),
             object_store=ObjectStoreFactory().store(),
         )
         state.initialize()
         return state
+
+    def _shared_sql_database(self, tmpdir: str) -> str:
+        """Return database location shared by concurrent SqlLinkState replicas."""
+        return os.path.join(tmpdir, "shared.db")
+
+    def _claim_running_process_target(
+        self,
+    ) -> Callable[[str, int, Any, Any, float], None]:
+        """Return process target for STARTING -> RUNNING claim tests."""
+        return _claim_running_in_separate_process
+
+    def _create_shared_sql_states(
+        self, database_path: str, num_replicas: int = 2
+    ) -> list[SqlLinkState]:
+        """Create two SqlLinkState replicas sharing the same SQLite file."""
+        self.states = []
+        for _ in range(num_replicas):
+            state = SqlLinkState(
+                database_path=database_path,
+                federation_manager=NoOpFederationManager(),
+                object_store=ObjectStoreFactory().store(),
+            )
+            state.initialize()
+            self.states.append(state)
+        return self.states
+
+    def _query_states_in_parallel(
+        self,
+        fn: Callable[[SqlLinkState], Any],
+        timeout: float = _CONCURRENT_TEST_TIMEOUT,
+    ) -> list[Any]:
+        """Query SqlLinkState concurrently and return their results."""
+        n_threads = len(self.states)
+        barrier = threading.Barrier(n_threads + 1)
+        results: list[Any] = [None] * n_threads
+        exceptions: list[Exception] = []
+
+        def _run(idx: int) -> None:
+            try:
+                barrier.wait(timeout=timeout)
+                results[idx] = fn(self.states[idx])
+            except Exception as ex:  # pylint: disable=broad-exception-caught
+                exceptions.append(ex)
+
+        threads = [
+            threading.Thread(target=_run, args=(idx,)) for idx in range(n_threads)
+        ]
+        for thread in threads:
+            thread.start()
+        try:
+            barrier.wait(timeout=timeout)
+        except threading.BrokenBarrierError as ex:
+            exceptions.append(ex)
+        for thread in threads:
+            thread.join(timeout=timeout)
+        alive_threads = [thread for thread in threads if thread.is_alive()]
+        if alive_threads:
+            alive_count = len(alive_threads)
+            raise AssertionError(
+                f"Concurrent test timed out; {alive_count} thread(s) still alive "
+                f"after {timeout} seconds."
+            )
+
+        if exceptions:
+            raise exceptions[0]
+        return results
+
+    # pylint: disable-next=too-many-locals
+    def test_get_message_ins_claim_is_unique_across_replicas(self) -> None:
+        """Ensure concurrent replicas cannot both claim the same instruction."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Prepare
+            db_path = self._shared_sql_database(tmpdir)
+            state = self._create_shared_sql_states(db_path)[0]
+            node_id = create_dummy_node(state)
+            run_id = create_dummy_run(state)
+            msg = create_ins_message_obj(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
+            assert state.store_message_ins(message=msg)
+
+            # Execute
+            results = self._query_states_in_parallel(
+                lambda state: state.get_message_ins(node_id=node_id, limit=1)
+            )
+            claimed = [msgs for msgs in results if msgs]
+
+            # Assert
+            assert len(claimed) == 1
+            assert len(claimed[0]) == 1
+
+    def test_get_message_res_claim_is_unique_across_replicas(self) -> None:
+        """Ensure concurrent replicas cannot both claim the same reply Message."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Prepare
+            db_path = self._shared_sql_database(tmpdir)
+            state = self._create_shared_sql_states(db_path)[0]
+
+            node_id = create_dummy_node(state)
+            assert state.store_message_ins(
+                create_ins_message_obj(
+                    src_node_id=SUPERLINK_NODE_ID,
+                    dst_node_id=node_id,
+                    run_id=create_dummy_run(state),
+                )
+            )
+            pulled_ins = state.get_message_ins(node_id=node_id, limit=1)[0]
+
+            msg_res = Message(RecordDict(), reply_to=pulled_ins)
+            msg_res.metadata.__dict__["_message_id"] = str(uuid4())
+            assert state.store_message_res(msg_res)
+
+            # Execute
+            msg_id = pulled_ins.metadata.message_id
+            results = self._query_states_in_parallel(
+                lambda state: state.get_message_res({msg_id}),
+            )
+
+            # Assert
+            assert sum(len(res) for res in results if res is not None) == 1
+
+    # pylint: disable-next=too-many-locals
+    def test_get_message_ins_distributes_available_work_under_contention(self) -> None:
+        """Ensure two replicas can each claim work when two Messages are available."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Prepare
+            db_path = self._shared_sql_database(tmpdir)
+            state = self._create_shared_sql_states(db_path)[0]
+
+            node_id = create_dummy_node(state)
+            run_id = create_dummy_run(state)
+            msg_0 = create_ins_message_obj(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
+            msg_1 = create_ins_message_obj(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
+            assert state.store_message_ins(message=msg_0)
+            assert state.store_message_ins(message=msg_1)
+
+            # Execute
+            results = self._query_states_in_parallel(
+                lambda state: state.get_message_ins(node_id=node_id, limit=1)
+            )
+            claimed_messages = [msgs for msgs in results if msgs]
+
+            # Assert
+            assert len(claimed_messages) == 2
+            assert all(len(msgs) == 1 for msgs in claimed_messages)
+            assert (
+                claimed_messages[0][0].metadata.message_id
+                != claimed_messages[1][0].metadata.message_id
+            )
+
+    # pylint: disable-next=too-many-locals
+    def test_activate_task_running_claim_is_atomic_across_replicas(self) -> None:
+        """Ensure only one replica can claim STARTING -> RUNNING transition."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Prepare
+            db_path = self._shared_sql_database(tmpdir)
+            state = self._create_shared_sql_states(db_path)[0]
+            run_id = create_dummy_run(state)
+            task_id = get_primary_task_id(state, run_id)
+            assert state.claim_task(task_id) is not None
+
+            ctx = multiprocessing.get_context("spawn")
+            start_event = ctx.Event()
+            result_queue = ctx.Queue()
+            timeout = self._CONCURRENT_TEST_TIMEOUT
+
+            # Execute
+            claim_target = self._claim_running_process_target()
+            processes = [
+                ctx.Process(
+                    target=claim_target,
+                    args=(db_path, task_id, start_event, result_queue, timeout),
+                ),
+                ctx.Process(
+                    target=claim_target,
+                    args=(db_path, task_id, start_event, result_queue, timeout),
+                ),
+            ]
+            for proc in processes:
+                proc.start()
+            # Release both processes to claim at (roughly) the same time.
+            start_event.set()
+            for proc in processes:
+                proc.join(timeout=timeout)
+
+            alive_processes = [proc for proc in processes if proc.is_alive()]
+            if alive_processes:
+                for proc in alive_processes:
+                    proc.terminate()
+                for proc in alive_processes:
+                    proc.join(timeout=1.0)
+                self.fail(
+                    f"Concurrent run-claim test timed out; {len(alive_processes)} "
+                    f"process(es) still alive after {timeout} seconds."
+                )
+            for proc in processes:
+                assert proc.exitcode == 0
+
+            results: list[bool] = []
+            errors: list[str] = []
+            for _ in processes:
+                result, error = result_queue.get(timeout=timeout)
+                results.append(result)
+                if error is not None:
+                    errors.append(error)
+            if errors:
+                self.fail(f"Concurrent run-claim process failed: {errors[0]}")
+
+            # Assert
+            assert results.count(True) == 1
+            assert results.count(False) == 1
 
 
 if __name__ == "__main__":

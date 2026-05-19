@@ -30,7 +30,7 @@ from flwr.common.serde import (
     message_to_proto,
     run_to_proto,
 )
-from flwr.common.typing import Fab, InvalidRunStatusException, Run
+from flwr.common.typing import InvalidRunStatusException, Run
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -62,7 +62,6 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.utils import check_abort
-from flwr.supercore.ffs import Ffs
 from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStore
 
@@ -250,11 +249,11 @@ def get_run(
 
 
 def get_fab(
-    request: GetFabRequest, ffs: Ffs, state: LinkState, store: ObjectStore
+    request: GetFabRequest, state: LinkState, store: ObjectStore
 ) -> GetFabResponse:
     """Get FAB."""
     # Validate that the requesting SuperNode is part of the federation
-    _validate_node_in_federation(state, request.node.node_id, request.run_id)
+    run = _validate_node_in_federation(state, request.node.node_id, request.run_id)
 
     # Abort if the run is not running
     abort_msg = check_abort(
@@ -266,8 +265,13 @@ def get_fab(
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
 
-    if result := ffs.get(request.hash_str):
-        fab = Fab(request.hash_str, result[0], result[1])
+    if request.hash_str != run.fab_hash:
+        raise ValueError(
+            f"Requested FAB hash {request.hash_str} does not match run FAB "
+            f"hash {run.fab_hash}."
+        )
+
+    if fab := state.get_fab(request.hash_str):
         return GetFabResponse(fab=fab_to_proto(fab))
 
     raise ValueError(f"Found no FAB with hash: {request.hash_str}")

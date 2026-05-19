@@ -21,8 +21,8 @@ from typing import Literal
 
 from flwr.app.user_config import UserConfig
 from flwr.common import Context, Message
-from flwr.common.record import ConfigRecord
 from flwr.common.typing import Run, RunStatus
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.superlink.federation import FederationManager
@@ -255,28 +255,30 @@ class LinkState(CoreState):  # pylint: disable=R0904
         fab_hash: str | None,
         override_config: UserConfig,
         federation: str,
-        federation_options: ConfigRecord,
+        federation_config: SimulationConfig | None,
         flwr_aid: str | None,
+        run_type: str,
     ) -> int:
         """Create a new run.
 
         Parameters
         ----------
-        fab_id : Optional[str]
+        fab_id : str | None
             The ID of the FAB, of format `<publisher>/<app-name>`.
-        fab_version : Optional[str]
+        fab_version : str | None
             The version of the FAB.
-        fab_hash : Optional[str]
+        fab_hash : str | None
             The SHA256 hex hash of the FAB.
         override_config : UserConfig
             Configuration overrides for the run config.
         federation : str
             The federation this run belongs to.
-        federation_options : ConfigRecord
-            Federation configurations. For now, only `num-supernodes` for
-            the simulation runtime.
-        flwr_aid : Optional[str]
+        federation_config : SimulationConfig | None
+            Optional resolved federation configuration for the run.
+        flwr_aid : str | None
             Flower Account ID of the creator.
+        run_type : str
+            The type of run being created.
 
         Returns
         -------
@@ -331,6 +333,10 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
+    def get_federation_config(self, run_id: int) -> SimulationConfig | None:
+        """Get the resolved federation configuration for the specified `run_id`."""
+
+    @abc.abstractmethod
     def get_run_status(self, run_ids: set[int]) -> dict[int, RunStatus]:
         """Retrieve the statuses for the specified runs.
 
@@ -348,49 +354,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         -----
         Only valid run IDs that exist in the State will be included in the returned
         dictionary. If a run ID is not found, it will be omitted from the result.
-        """
-
-    @abc.abstractmethod
-    def update_run_status(self, run_id: int, new_status: RunStatus) -> bool:
-        """Update the status of the run with the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run.
-        new_status : RunStatus
-            The new status to be assigned to the run.
-
-        Returns
-        -------
-        bool
-            True if the status update is successful; False otherwise.
-        """
-
-    @abc.abstractmethod
-    def get_pending_run_id(self) -> int | None:
-        """Get the `run_id` of a run with `Status.PENDING` status.
-
-        Returns
-        -------
-        Optional[int]
-            The `run_id` of a `Run` that is pending to be started; None if
-            there is no Run pending.
-        """
-
-    @abc.abstractmethod
-    def get_federation_options(self, run_id: int) -> ConfigRecord | None:
-        """Retrieve the federation options for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run.
-
-        Returns
-        -------
-        Optional[ConfigRecord]
-            The federation options for the run if it exists; None otherwise.
         """
 
     @abc.abstractmethod
@@ -445,41 +408,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
             The identifier of the run for which to set the context.
         context : Context
             The context to be associated with the specified `run_id`.
-        """
-
-    @abc.abstractmethod
-    def add_serverapp_log(self, run_id: int, log_message: str) -> None:
-        """Add a log entry to the ServerApp logs for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run for which to add a log entry.
-        log_message : str
-            The log entry to be added to the ServerApp logs.
-        """
-
-    @abc.abstractmethod
-    def get_serverapp_log(
-        self, run_id: int, after_timestamp: float | None
-    ) -> tuple[str, float]:
-        """Get the ServerApp logs for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run for which to retrieve the ServerApp logs.
-
-        after_timestamp : Optional[float]
-            Retrieve logs after this timestamp. If set to `None`, retrieve all logs.
-
-        Returns
-        -------
-        tuple[str, float]
-            A tuple containing:
-            - The ServerApp logs associated with the specified `run_id`.
-            - The timestamp of the latest log entry in the returned logs.
-              Returns `0` if no logs are returned.
         """
 
     @abc.abstractmethod

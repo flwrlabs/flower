@@ -63,7 +63,7 @@ flwr-datasets = "flwr_datasets.cli.app:app"
 
 [project.urls]
 homepage = "https://flower.ai"
-repository = "https://github.com/adap/flower"
+repository = "https://github.com/flwrlabs/flower"
 documentation = "https://flower.ai/docs/datasets"
 
 [dependency-groups]
@@ -73,7 +73,6 @@ dev = [
     "isort==5.13.2",
     "black[jupyter]==25.11.0",
     "taplo==0.9.3",
-    "docformatter==1.7.5",
     "mypy==1.8.0",
     "pylint==3.3.1",
     "parameterized==0.9.0",
@@ -87,7 +86,7 @@ dev = [
 default-groups = ["dev"]
 
 [tool.uv.sources]
-devtool = { path = "devtool", editable = true }
+devtool = { path = "../dev", editable = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["flwr_datasets"]
@@ -133,10 +132,6 @@ disallow_untyped_calls = false
 module = "torch.*"
 follow_imports = "skip"
 follow_imports_for_stubs = true
-
-[tool.docformatter]
-wrap-summaries = 88
-wrap-descriptions = 88
 
 [tool.ruff]
 target-version = "py310"

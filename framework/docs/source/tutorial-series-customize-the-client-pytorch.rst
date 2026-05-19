@@ -33,9 +33,9 @@ communicate arbitrary Python objects via a ``Message`` and how to use it on the
 
 .. tip::
 
-    `Star Flower on GitHub <https://github.com/adap/flower>`__ ⭐️ and join the Flower
-    community on Flower Discuss and the Flower Slack to connect, ask questions, and get
-    help:
+    `Star Flower on GitHub <https://github.com/flwrlabs/flower>`__ ⭐️ and join the
+    Flower community on Flower Discuss and the Flower Slack to connect, ask questions,
+    and get help:
 
     - `Join Flower Discuss <https://discuss.flower.ai/>`__ We'd love to hear from you in
       the ``Introduction`` topic! If anything is unclear, post in ``Flower Help -
@@ -302,7 +302,10 @@ Finally, we run the Flower App.
 
 .. code-block:: shell
 
-    $ flwr run .
+    $ flwr run . --stream
+
+Plain ``flwr run .`` submits the run, prints the run ID, and returns without streaming
+logs. See :doc:`how-to-run-flower-locally` for the full local workflow.
 
 You will observe that the training metadata from each client is logged to the console of
 the ``ServerApp``. If you finish embedding the creation of the ``TrainProcessMetadata``

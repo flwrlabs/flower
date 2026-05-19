@@ -51,7 +51,7 @@ pip install -e .
 In the `quickstart-numpy` directory, use `flwr run` to run a local simulation:
 
 ```bash
-flwr run .
+flwr run . --stream
 ```
 
 Refer to the [How to Run Simulations](https://flower.ai/docs/framework/how-to-run-simulations.html) guide in the documentation for advice on how to optimize your simulations.
@@ -66,7 +66,7 @@ You can run Flower on Docker too! Check out the [Flower with Docker](https://flo
 
 - Flower website: [flower.ai](https://flower.ai/)
 - Check the documentation: [flower.ai/docs](https://flower.ai/docs/)
-- Give Flower a ⭐️ on GitHub: [GitHub](https://github.com/adap/flower)
+- Give Flower a ⭐️ on GitHub: [GitHub](https://github.com/flwrlabs/flower)
 - Join the Flower community!
   - [Flower Slack](https://flower.ai/join-slack/)
   - [Flower Discuss](https://discuss.flower.ai/)

@@ -25,9 +25,9 @@ previously by creating a much more customized version of ``FedAdagrad``.
 
 .. tip::
 
-    `Star Flower on GitHub <https://github.com/adap/flower>`__ ⭐️ and join the Flower
-    community on Flower Discuss and the Flower Slack to connect, ask questions, and get
-    help:
+    `Star Flower on GitHub <https://github.com/flwrlabs/flower>`__ ⭐️ and join the
+    Flower community on Flower Discuss and the Flower Slack to connect, ask questions,
+    and get help:
 
     - `Join Flower Discuss <https://discuss.flower.ai/>`__ We'd love to hear from you in
       the ``Introduction`` topic! If anything is unclear, post in ``Flower Help -
@@ -118,7 +118,7 @@ perform learning rate decay and communicate the updated learning rate as part of
 |configrecord_link|_ sent to the clients in the ``Message``. In this tutorial you'll
 learn how to customize the |strategy_start_link|_ method. If you inspect the `source
 code
-<https://github.com/adap/flower/blob/main/framework/py/flwr/serverapp/strategy/strategy.py#L135>`_
+<https://github.com/flwrlabs/flower/blob/main/framework/py/flwr/serverapp/strategy/strategy.py#L135>`_
 of this method you'll see that it contains a for loop where each iteration represents a
 federated learning round. Each round consists of three distinct stages:
 
@@ -366,7 +366,10 @@ Finally, let's run the ``FlowerApp``:
 
 .. code-block:: shell
 
-    $ flwr run .
+    $ flwr run . --stream
+
+Plain ``flwr run .`` submits the run, prints the run ID, and returns without streaming
+logs. See :doc:`how-to-run-flower-locally` for the full local workflow.
 
 After starting the run you will notice two things:
 

@@ -17,6 +17,8 @@ env:
 
 jobs:
   changes:
+    # To re-enable, remove `if: false` from the changes job.
+    if: ${{ false }}
     runs-on: ubuntu-22.04
     permissions:
       pull-requests: read

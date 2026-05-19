@@ -35,6 +35,7 @@ uv run python -m devtool.check_copyright ../framework/py/flwr
 uv run python -m devtool.fix_copyright ../framework/py/flwr
 uv run python -m devtool.update_html_themes
 uv run python -m devtool.build_example_docs
+uv run python -m devtool.protoc --project-dir ../framework
 ```
 
 ## Run Existing Dev Scripts with `uv`
@@ -44,9 +45,15 @@ them via `uv run` to ensure they use the `devtool` environment:
 
 ```bash
 cd dev
+uv run ./test-devtool.sh
+uv run ./format-devtool.sh
 uv run ./test.sh
 uv run ./format.sh
 ```
+
+The `test-devtool.sh` and `format-devtool.sh` scripts target the `devtool`
+package, including its unit tests. The existing `test.sh` and `format.sh` scripts
+still target examples and benchmarks.
 
 ## Updating Dependencies
 

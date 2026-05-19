@@ -31,8 +31,9 @@ from flwr.supercore.constant import (
 from .publish import (
     _build_multipart_files_param,
     _collect_file_paths,
-    _depth_of,
     _detect_mime,
+    _validate_app_name,
+    _validate_description,
     _validate_files,
 )
 
@@ -46,20 +47,6 @@ def write(tmp: Path, file_name: str, data: bytes) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
     return path
-
-
-@pytest.mark.parametrize(
-    ("rel", "expected"),
-    [
-        (Path("a.py"), 0),
-        (Path("d1/file.txt"), 1),
-        (Path("d1/d2/d3/f.txt"), 3),
-        (Path("d1/d2/d3/d4/d5/x"), 5),
-    ],
-)
-def test_depth_of(rel: Path, expected: int) -> None:
-    """Test the directory depth detection."""
-    assert _depth_of(rel) == expected
 
 
 def test_detect_mime_has_string(tmp_path: Path) -> None:
@@ -263,3 +250,51 @@ def test_build_multipart_files_param(tmp_path: Path) -> None:
     # ExitStack closes the opened file object
     with pytest.raises(ValueError):
         fobj.read(1)  # closed file
+
+
+def test_validate_description_empty_raises() -> None:
+    """Test empty description raises ClickException."""
+    with pytest.raises(click.ClickException, match="can't be empty"):
+        _validate_description("")
+
+
+def test_validate_description_valid() -> None:
+    """Test valid description passes validation."""
+    _validate_description("A simple Flower federated learning app.")
+
+
+@pytest.mark.parametrize("value", ["app-numpy33", "App-NumPy33"])
+def test_validate_app_name_accepts_valid_values(value: str) -> None:
+    """Test valid app names pass validation."""
+    _validate_app_name(value, "Flower App name")
+
+
+@pytest.mark.parametrize("value", ["app_numpy33", "33app", "app.numpy33"])
+def test_validate_app_name_rejects_invalid_values(value: str) -> None:
+    """Test invalid app names are rejected."""
+    with pytest.raises(click.ClickException, match="valid app name must start"):
+        _validate_app_name(value, "Flower App name")
+
+
+def test_validate_description_long_continue(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test long description continues when user confirms."""
+    monkeypatch.setattr("typer.confirm", lambda *args, **kwargs: True)
+
+    long_desc = "x" * 201
+    _validate_description(long_desc)
+
+
+def test_validate_description_long_cancel(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test long description cancels when user declines."""
+    monkeypatch.setattr("typer.confirm", lambda *args, **kwargs: False)
+
+    long_desc = "x" * 201
+    with pytest.raises(click.ClickException, match="cancelled"):
+        _validate_description(long_desc)
+
+
+@pytest.mark.parametrize("value", [None, 123, 3.14, [], {}])
+def test_validate_description_non_string_raises(value: object) -> None:
+    """Test non-string descriptions raise ClickException."""
+    with pytest.raises(click.ClickException):
+        _validate_description(value)

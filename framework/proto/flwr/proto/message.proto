@@ -46,6 +46,8 @@ message Metadata {
   double ttl = 7;
   string message_type = 8;
   double created_at = 9;
+  optional uint64 src_task_id = 10;
+  optional uint64 dst_task_id = 11;
 }
 
 message ObjectIDs { repeated string object_ids = 1; }

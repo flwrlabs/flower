@@ -116,7 +116,7 @@ afterEvaluate {
         pom {
           name.set("Flower Intelligence")
           description.set("Open-Source On-Device AI with optional Confidential Remote Compute")
-          url.set("https://github.com/adap/flower/")
+          url.set("https://github.com/flwrlabs/flower/")
 
           licenses {
             license {
@@ -131,9 +131,9 @@ afterEvaluate {
             }
           }
           scm {
-            connection.set("scm:git:git://github.com/adap/flower.git")
-            developerConnection.set("scm:git:ssh://git@github.com/adap/flower.git")
-            url.set("https://github.com/adap/flower/")
+            connection.set("scm:git:git://github.com/flwrlabs/flower.git")
+            developerConnection.set("scm:git:ssh://git@github.com/flwrlabs/flower.git")
+            url.set("https://github.com/flwrlabs/flower/")
           }
         }
       }

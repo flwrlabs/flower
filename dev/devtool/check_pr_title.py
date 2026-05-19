@@ -16,15 +16,26 @@
 
 import re
 import sys
-import tomllib
 from pathlib import Path
 from typing import Any
+
+_toml: Any
+
+try:
+    import tomllib
+
+    _toml = tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
+    import tomli
+
+    _toml = tomli
 
 
 def _load_config() -> dict[str, Any]:
     config_path = Path(__file__).resolve().parent.parent / "changelog_config.toml"
     with config_path.open("rb") as file:
-        return tomllib.load(file)
+        config: dict[str, Any] = _toml.load(file)
+        return config
 
 
 def _validate_title(pr_title: str, config: dict[str, Any]) -> tuple[bool, str]:
@@ -47,7 +58,8 @@ def _validate_title(pr_title: str, config: dict[str, Any]) -> tuple[bool, str]:
     # This check is there to ignore dependabot PRs from title checks
     if pr_title.startswith("build"):
         return True, ""
-    elif not match:
+
+    if not match:
         valid = False
     else:
         if match.group(4).split()[0] not in allowed_verbs:
@@ -60,6 +72,7 @@ def _validate_title(pr_title: str, config: dict[str, Any]) -> tuple[bool, str]:
 
 
 def main() -> None:
+    """Validate a pull request title from the command line."""
     if len(sys.argv) < 2:
         raise ValueError("Usage: python -m devtool.check_pr_title '<title>'")
 

@@ -26,17 +26,13 @@ class Grid(ABC):
     """Abstract base class Grid to send/receive messages."""
 
     @abstractmethod
-    def set_run(self, run_id: int) -> None:
-        """Request a run to the SuperLink with a given ``run_id``.
-
-        If a ``Run`` with the specified ``run_id`` exists, a local ``Run``
-        object will be created. It enables further functionality
-        in the grid, such as sending ``Message`` objects.
+    def set_run(self, run: Run) -> None:
+        """Set the run this ``Grid`` object operates in.
 
         Parameters
         ----------
-        run_id : int
-            The ``run_id`` of the ``Run`` this ``Grid`` object operates in.
+        run : Run
+            The ``Run`` this ``Grid`` object operates in.
         """
 
     @property

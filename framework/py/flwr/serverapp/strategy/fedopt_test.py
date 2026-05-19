@@ -22,7 +22,11 @@ from parameterized import parameterized
 from flwr.common import ArrayRecord
 
 from ..exception import AggregationError
+from .fedadagrad import FedAdagrad
+from .fedadam import FedAdam
 from .fedopt import FedOpt
+from .fedyogi import FedYogi
+from .strategy_utils_test import create_mock_reply
 
 
 @parameterized.expand(  # type: ignore
@@ -65,3 +69,21 @@ def test_compute_deltat_raises_error(
     else:
         with pytest.raises(AggregationError):
             strategy._compute_deltat_and_mt(aggregated_arrayrecord)
+
+
+@parameterized.expand([FedAdagrad, FedAdam, FedYogi])  # type: ignore
+def test_fedopt_strategies_aggregate_scalar_arrays(strategy_cls: type[FedOpt]) -> None:
+    """Test FedOpt-based strategies with scalar-shaped arrays."""
+    strategy = strategy_cls()
+    strategy.current_arrays = {"0": np.array(0.0)}
+    replies = [
+        create_mock_reply(ArrayRecord([np.array(1.0)]), num_examples=1),
+        create_mock_reply(ArrayRecord([np.array(3.0)]), num_examples=2),
+    ]
+
+    actual, _ = strategy.aggregate_train(1, replies)
+
+    assert actual is not None
+    scalar_weight = actual.to_numpy_ndarrays()[0]
+    assert scalar_weight.shape == ()
+    assert np.isfinite(scalar_weight)

@@ -49,9 +49,10 @@ using Flower and MLX. It is recommended to create a virtual environment and run
 everything within a :doc:`virtualenv <contributor-how-to-set-up-a-virtual-env>`.
 
 Let's use ``flwr new`` to create a complete Flower+MLX project. It will generate all the
-files needed to run, by default with the Simulation Engine, a federation of 10 nodes
-using |fedavg_link|_. The dataset will be partitioned using Flower Dataset's
-`IidPartitioner
+files needed to run a federation of 10 nodes using |fedavg_link|_. By default, the
+generated app uses a local simulation profile that ``flwr run`` submits to a managed
+local SuperLink, which then executes the run with the Flower Simulation Runtime. The
+dataset will be partitioned using Flower Dataset's `IidPartitioner
 <https://flower.ai/docs/datasets/ref-api/flwr_datasets.partitioner.IidPartitioner.html#flwr_datasets.partitioner.IidPartitioner>`_.
 
 Now that we have a rough idea of what this example is about, let's get started. First,
@@ -60,7 +61,7 @@ install Flower in your new environment:
 .. code-block:: shell
 
     # In a new Python environment
-    $ pip install flwr
+    $ pip install flwr[simulation]
 
 Then, run the command below:
 
@@ -93,30 +94,20 @@ To run the project do:
 
 .. code-block:: shell
 
-    # Run with default arguments
-    $ flwr run .
+    # Run with default arguments and stream logs
+    $ flwr run . --stream
 
-With default arguments, you will see output like this:
+Plain ``flwr run .`` submits the run, prints the run ID, and returns without streaming
+logs. For the full local workflow, see :doc:`how-to-run-flower-locally`.
+
+With default arguments, you will see streamed output like this:
 
 .. code-block:: shell
 
-    Loading project configuration...
-    Success
+    Starting local SuperLink on 127.0.0.1:39093...
+    Successfully started run 1859953118041441032
     INFO :      Starting FedAvg strategy:
     INFO :          ├── Number of rounds: 3
-    INFO :          ├── ArrayRecord (0.10 MB)
-    INFO :          ├── ConfigRecord (train): (empty!)
-    INFO :          ├── ConfigRecord (evaluate): (empty!)
-    INFO :          ├──> Sampling:
-    INFO :          │       ├──Fraction: train (1.00) | evaluate ( 1.00)
-    INFO :          │       ├──Minimum nodes: train (2) | evaluate (2)
-    INFO :          │       └──Minimum available nodes: 2
-    INFO :          └──> Keys in records:
-    INFO :                  ├── Weighted by: 'num-examples'
-    INFO :                  ├── ArrayRecord key: 'arrays'
-    INFO :                  └── ConfigRecord key: 'config'
-    INFO :
-    INFO :
     INFO :      [ROUND 1/3]
     INFO :      configure_train: Sampled 10 nodes (out of 10)
     INFO :      aggregate_train: Received 10 results and 0 failures
@@ -124,44 +115,14 @@ With default arguments, you will see output like this:
     INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
     INFO :      aggregate_evaluate: Received 10 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'accuracy': 0.2720000118017197, 'loss': 2.24028}
-    INFO :
     INFO :      [ROUND 2/3]
-    INFO :      configure_train: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_train: Received 10 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'accuracy': 0.38191667497158055, 'loss': 2.076018}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'accuracy': 0.38441667854785927, 'loss': 2.078289}
-    INFO :
+    INFO :      ...
     INFO :      [ROUND 3/3]
-    INFO :      configure_train: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_train: Received 10 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'accuracy': 0.5058750063180925, 'loss': 1.80676848}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'accuracy': 0.5099166750907898, 'loss': 1.80801609}
-    INFO :
+    INFO :      ...
     INFO :      Strategy execution finished in 9.96s
-    INFO :
     INFO :      Final results:
-    INFO :
-    INFO :          Global Arrays:
-    INFO :                  ArrayRecord (0.102 MB)
-    INFO :
-    INFO :          Aggregated ClientApp-side Train Metrics:
-    INFO :          { 1: {'accuracy': '2.7038e-01', 'loss': '2.2391e+00'},
-    INFO :            2: {'accuracy': '3.8192e-01', 'loss': '2.0760e+00'},
-    INFO :            3: {'accuracy': '5.0588e-01', 'loss': '1.8068e+00'}}
-    INFO :
-    INFO :          Aggregated ClientApp-side Evaluate Metrics:
-    INFO :          { 1: {'accuracy': '2.7200e-01', 'loss': '2.2403e+00'},
-    INFO :            2: {'accuracy': '3.8442e-01', 'loss': '2.0783e+00'},
-    INFO :            3: {'accuracy': '5.0992e-01', 'loss': '1.8080e+00'}}
-    INFO :
     INFO :          ServerApp-side Evaluate Metrics:
     INFO :          {}
-    INFO :
-
     Saving final model to disk...
 
 You can also override the parameters defined in the ``[tool.flwr.app.config]`` section
@@ -497,6 +458,6 @@ Congratulations! You've successfully built and run your first federated learning
 .. note::
 
     Check the `source code
-    <https://github.com/adap/flower/blob/main/examples/quickstart-mlx>`_ of the extended
-    version of this tutorial in ``examples/quickstart-mlx`` in the Flower GitHub
-    repository.
+    <https://github.com/flwrlabs/flower/blob/main/examples/quickstart-mlx>`_ of the
+    extended version of this tutorial in ``examples/quickstart-mlx`` in the Flower
+    GitHub repository.

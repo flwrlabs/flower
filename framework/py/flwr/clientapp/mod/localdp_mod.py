@@ -157,7 +157,7 @@ class LocalDpMod:
         # Replace outgoing ArrayRecord's Array while preserving their keys
         out_msg.content[new_array_record_key] = ArrayRecord(
             {
-                k: Array(v)
+                k: Array(np.asarray(v))
                 for k, v in zip(
                     client_to_server_arrecord.keys(),
                     client_to_server_ndarrays,
