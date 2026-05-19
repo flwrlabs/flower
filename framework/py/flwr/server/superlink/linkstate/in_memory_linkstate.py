@@ -143,21 +143,34 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         requesting_task_id: int | None = None,
     ) -> int | None:
         """Create a task."""
-        with self.lock:
-            if run_id not in self.run_ids:
-                raise RuntimeError(
-                    f"Run {run_id} not found. create_task requires an existing run."
+        with self.lock_task_store:
+            with self.lock:
+                if run_id not in self.run_ids:
+                    raise RuntimeError(
+                        f"Run {run_id} not found. create_task requires an existing run."
+                    )
+                if self._is_finished_run(run_id):
+                    raise RuntimeError(f"Run {run_id} is finished.")
+                if requesting_task_id is not None:
+                    requesting_task = self.task_store.get(requesting_task_id)
+                    if (
+                        requesting_task is None
+                        or requesting_task.status.status == Status.FINISHED
+                    ):
+                        return None
+
+                task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
+                self.task_store[task_id] = Task(
+                    task_id=task_id,
+                    type=task_type,
+                    run_id=run_id,
+                    status=TaskStatus(status=Status.PENDING, sub_status="", details=""),
+                    pending_at=now().isoformat(),
+                    fab_hash=fab_hash,
+                    model_ref=model_ref,
+                    connector_ref=connector_ref,
                 )
-            if self._is_finished_run(run_id):
-                raise RuntimeError(f"Run {run_id} is finished.")
-        return super().create_task(
-            task_type=task_type,
-            run_id=run_id,
-            fab_hash=fab_hash,
-            model_ref=model_ref,
-            connector_ref=connector_ref,
-            requesting_task_id=requesting_task_id,
-        )
+                return task_id
 
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
@@ -640,8 +653,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """Create a new run."""
         task_type = primary_task_type_from_run_type(run_type)
 
-        with self.lock:
-            with self.lock_task_store:
+        with self.lock_task_store:
+            with self.lock:
                 run_id = generate_rand_int_from_bytes(
                     RUN_ID_NUM_BYTES,
                     exclude=set(self.run_ids),
