@@ -337,7 +337,7 @@ def start_vce(
 
     def backend_fn() -> Backend:
         """Instantiate a Backend."""
-        from .backend.raybackend import RayBackend # pylint: disable=C0415
+        from .backend.raybackend import RayBackend  # pylint: disable=C0415
 
         return RayBackend(backend_config)
 
