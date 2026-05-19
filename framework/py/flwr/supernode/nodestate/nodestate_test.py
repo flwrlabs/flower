@@ -208,6 +208,7 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         msg = make_dummy_message(run_id=run_id)
         self.state.store_message(msg)
         assert self.state.get_messages(run_ids=[run_id])
+        self.state.record_message_processing_start(msg.metadata.message_id)
 
         # Execute: retrieve
         with patch("datetime.datetime") as mock_datetime:
@@ -222,6 +223,9 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         self.assertEqual(replies[0].metadata.reply_to_message_id, msg.object_id)
         self.assertTrue(replies[0].has_error())
         self.assertEqual(replies[0].error.code, ErrorCode.CLIENT_APP_CRASHED)
+        self.assertGreater(
+            self.state.get_message_processing_duration(msg.metadata.message_id), 0.0
+        )
 
     def test_record_message_processing_timing(self) -> None:
         """Test recording message processing start and end times."""
