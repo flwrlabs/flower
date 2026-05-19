@@ -48,7 +48,6 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
 from .backend import Backend
-from .backend.raybackend import RayBackend
 
 NodeToPartitionMapping = dict[int, int]
 
@@ -338,6 +337,8 @@ def start_vce(
 
     def backend_fn() -> Backend:
         """Instantiate a Backend."""
+        from .backend.raybackend import RayBackend # pylint: disable=C0415
+
         return RayBackend(backend_config)
 
     # Load ClientApp if needed
