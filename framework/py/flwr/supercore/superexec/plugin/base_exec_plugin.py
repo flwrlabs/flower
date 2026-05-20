@@ -17,9 +17,11 @@
 
 import os
 from collections.abc import Callable, Sequence
+from logging import ERROR
 from typing import ClassVar
 
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
+from flwr.common.logger import log
 from flwr.common.typing import Run
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
@@ -35,8 +37,7 @@ class BaseExecPlugin(ExecPlugin):
     """
 
     # Placeholders to be defined in subclasses
-    executor: Executor
-    task_type: ClassVar[TaskType]
+    supported_task_types: ClassVar[frozenset[TaskType]]
     suppress_output = False
 
     def __init__(  # pylint: disable=R0913, R0917
@@ -57,6 +58,7 @@ class BaseExecPlugin(ExecPlugin):
             runtime_dependency_install=runtime_dependency_install,
             executor=executor,
         )
+        self.executor: Executor = executor
 
     def select_run_id(self, candidate_run_ids: Sequence[int]) -> int | None:
         """Select a run ID to execute from a sequence of candidates."""
@@ -72,14 +74,17 @@ class BaseExecPlugin(ExecPlugin):
 
     def launch_task(self, token: str, task: Task) -> None:
         """Launch the process to execute the given task using the given token."""
-        self.executor.launch(self._build_execution_spec(token=token, task=task))
+        task_type = self._get_supported_task_type(task)
+        if task_type is None:
+            return
+        self.executor.launch(
+            self._build_execution_spec(token=token, task_type=task_type)
+        )
 
-    def _build_execution_spec(  # pylint: disable=unused-argument
-        self, token: str, task: Task
-    ) -> ExecutionSpec:
+    def _build_execution_spec(self, token: str, task_type: TaskType) -> ExecutionSpec:
         """Build the execution spec for the selected task."""
         return ExecutionSpec(
-            task_type=self._get_task_type(task),
+            task_type=task_type,
             appio_api_address=self.appio_api_address,
             token=token,
             insecure=self.insecure,
@@ -89,6 +94,20 @@ class BaseExecPlugin(ExecPlugin):
             suppress_output=self.suppress_output,
         )
 
-    def _get_task_type(self, task: Task) -> TaskType:  # pylint: disable=unused-argument
-        """Return the task type to execute."""
-        return self.task_type
+    def _get_supported_task_type(self, task: Task) -> TaskType | None:
+        """Return the task type if it is supported by the plugin."""
+        try:
+            task_type = TaskType(task.type)
+        except ValueError:
+            task_type = None
+
+        if task_type not in self.supported_task_types:
+            log(
+                ERROR,
+                "Unknown task type '%s' for task_id %d.",
+                task.type,
+                task.task_id,
+            )
+            return None
+
+        return task_type

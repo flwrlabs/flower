@@ -89,14 +89,11 @@ def test_launch_renders_runtime_dependency_install_flag() -> None:
 
 def test_launch_renders_parent_pid_flag() -> None:
     """Test subprocess executor renders subprocess parent PID flag."""
-    with (
-        patch("os.getpid", return_value=123),
-        patch.object(subprocess, "Popen") as popen_mock,
-    ):
+    with patch.object(subprocess, "Popen") as popen_mock:
         SubprocessExecutor().launch(_execution_spec(parent_pid=999))
 
     assert "--parent-pid" in popen_mock.call_args.args[0]
-    assert "123" in popen_mock.call_args.args[0]
+    assert "999" in popen_mock.call_args.args[0]
 
 
 def test_launch_suppresses_output_when_requested() -> None:

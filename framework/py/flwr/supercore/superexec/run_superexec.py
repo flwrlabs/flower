@@ -63,7 +63,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
     parent_pid: int | None = None,
     health_server_address: str | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
-    executor_type: str = ExecutorType.SUBPROCESS.value,
+    executor_type: ExecutorType = ExecutorType.SUBPROCESS,
 ) -> None:
     """Run Flower SuperExec.
 
@@ -93,7 +93,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
         NOT be started.
     runtime_dependency_install : bool (default: False)
         Whether runtime dependency installation is allowed.
-    executor_type : str (default: "subprocess")
+    executor_type : ExecutorType (default: ExecutorType.SUBPROCESS)
         The executor to use for non-ephemeral app processes.
     """
     executor = get_executor(executor_type)

@@ -14,10 +14,12 @@
 # ==============================================================================
 """Subprocess executor for SuperExec TaskExecutor processes."""
 
-import os
 import subprocess
 
-from flwr.supercore.constant import TASK_TYPE_TO_APPIO_API_ADDRESS_ARG
+from flwr.supercore.constant import (
+    TASK_TYPE_TO_APPIO_API_ADDRESS_ARG,
+    TASK_TYPE_TO_COMMAND,
+)
 
 from .types import ExecutionSpec
 
@@ -28,7 +30,7 @@ class SubprocessExecutor:
     def launch(self, spec: ExecutionSpec) -> None:
         """Start the TaskExecutor process described by the execution spec."""
         args = [
-            spec.task_type.value,
+            TASK_TYPE_TO_COMMAND[spec.task_type],
             TASK_TYPE_TO_APPIO_API_ADDRESS_ARG[spec.task_type],
             spec.appio_api_address,
             "--token",
@@ -41,7 +43,7 @@ class SubprocessExecutor:
             args.extend(["--root-certificates", spec.root_certificates_path])
 
         if spec.parent_pid is not None:
-            args.extend(["--parent-pid", str(os.getpid())])
+            args.extend(["--parent-pid", str(spec.parent_pid)])
 
         if spec.runtime_dependency_install:
             args.append("--allow-runtime-dependency-installation")

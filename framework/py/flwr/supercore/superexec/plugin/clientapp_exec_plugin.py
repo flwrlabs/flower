@@ -26,4 +26,4 @@ class ClientAppExecPlugin(BaseExecPlugin):
     The plugin always selects the first candidate run ID.
     """
 
-    task_type = TaskType.CLIENT_APP
+    supported_task_types = frozenset({TaskType.CLIENT_APP})

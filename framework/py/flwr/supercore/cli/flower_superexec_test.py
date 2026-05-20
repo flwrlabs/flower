@@ -24,6 +24,7 @@ import pytest
 from flwr.common.constant import ExecPluginType
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.supercore.constant import ExecutorType
 from flwr.supercore.version import package_version
 
 from .flower_superexec import _parse_args
@@ -97,7 +98,7 @@ def test_flower_superexec_clientapp_allows_missing_secret(
         parent_pid=None,
         health_server_address=None,
         runtime_dependency_install=False,
-        executor="subprocess",
+        executor=ExecutorType.SUBPROCESS,
     )
     captured: dict[str, object] = {}
 
@@ -141,7 +142,7 @@ def test_flower_superexec_serverapp_allows_missing_secret(
         parent_pid=None,
         health_server_address=None,
         runtime_dependency_install=False,
-        executor="subprocess",
+        executor=ExecutorType.SUBPROCESS,
     )
 
     class _Parser:
@@ -186,7 +187,7 @@ def test_flower_superexec_passes_executor_to_run_superexec(
         parent_pid=None,
         health_server_address=None,
         runtime_dependency_install=False,
-        executor="subprocess",
+        executor=ExecutorType.SUBPROCESS,
     )
     parser = Mock()
     parser.parse_args.return_value = args
@@ -210,4 +211,6 @@ def test_flower_superexec_passes_executor_to_run_superexec(
     flower_superexec_module.flower_superexec()
 
     run_superexec_mock.assert_called_once()
-    assert run_superexec_mock.call_args.kwargs["executor_type"] == "subprocess"
+    assert (
+        run_superexec_mock.call_args.kwargs["executor_type"] == ExecutorType.SUBPROCESS
+    )

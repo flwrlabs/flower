@@ -32,7 +32,7 @@ def _get_run(_: int) -> Run:
     return Run.create_empty(run_id=1)
 
 
-def _get_task(*, task_id: int = 1, task_type: str = TaskType.SERVER_APP) -> Mock:
+def _get_task(*, task_id: int = 1, task_type: str = TaskType.CLIENT_APP) -> Mock:
     """Return a minimal dummy task-like object."""
     task = Mock()
     task.task_id = task_id
@@ -61,6 +61,24 @@ def test_clientapp_launch_delegates_default_stdio_spec() -> None:
     spec = _execution_spec_from_executor(executor)
     assert spec.task_type == TaskType.CLIENT_APP
     assert spec.suppress_output is False
+
+
+def test_clientapp_launch_ignores_unsupported_task_type() -> None:
+    """ClientApp launch should ignore unsupported task types."""
+    executor = Mock()
+    plugin = ClientAppExecPlugin(
+        appio_api_address="127.0.0.1:9094",
+        insecure=True,
+        root_certificates_path=None,
+        get_run=_get_run,
+        executor=executor,
+    )
+
+    plugin.launch_task(
+        token="token", task=_get_task(task_id=5, task_type=TaskType.SERVER_APP)
+    )
+
+    executor.launch.assert_not_called()
 
 
 def test_serverapp_launch_delegates_suppressed_stdio_spec() -> None:
@@ -106,7 +124,7 @@ def test_simulation_launch_delegates_simulation_task_type() -> None:
 class DummyExecPlugin(BaseExecPlugin):
     """Minimal plugin for testing execution spec construction."""
 
-    task_type = TaskType.CLIENT_APP
+    supported_task_types = frozenset({TaskType.CLIENT_APP})
 
 
 def test_launch_task_forwards_runtime_dependency_install_flag() -> None:
