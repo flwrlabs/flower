@@ -82,6 +82,9 @@ def try_obtain_flwr_app_token(args: argparse.Namespace) -> str:
     """Validate and return the token from CLI args or a token file."""
     token = getattr(args, "token", None)
     if token is not None:
+        token = token.strip()
+        if not token:
+            sys.exit("Path argument `--token` does not contain a token.")
         return token
 
     token_file = getattr(args, "token_file", None)
