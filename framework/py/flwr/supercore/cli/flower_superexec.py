@@ -177,7 +177,7 @@ def _parse_args() -> argparse.ArgumentParser:
     parser.add_argument(
         "--executor",
         type=ExecutorType,
-        choices=SUPPORTED_EXECUTORS,
+        choices=tuple(ExecutorType),
         default=ExecutorType.SUBPROCESS,
         help="The executor used to run task processes, for example as local "
         "subprocesses.",
