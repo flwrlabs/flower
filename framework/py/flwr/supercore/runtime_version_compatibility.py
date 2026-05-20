@@ -170,8 +170,9 @@ class RuntimeVersionMetadata:
             or local_version.minor != peer_version.minor
         ):
             return (
-                f"{self.component_name} version {self.package_version} only accepts "
-                "peers from the same major.minor release, but received "
+                f"{self.component_name} version {self.package_version} detected a "
+                "runtime version mismatch: expected a peer from the same "
+                "major.minor release, but received "
                 f"{peer.component_name} version {peer.package_version}."
             )
 

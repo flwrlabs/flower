@@ -268,7 +268,10 @@ class SqlCoreState(CoreState, SqlMixin):
             query += " LIMIT :limit"
             params["limit"] = limit
 
-        rows = self.query(query, params)
+        with self.session():
+            # Clean up expired task tokens before querying tasks
+            self._cleanup_expired_task_tokens()
+            rows = self.query(query, params)
 
         result: list[Task] = []
         for row in rows:
@@ -414,7 +417,7 @@ class SqlCoreState(CoreState, SqlMixin):
         rows = self.query(
             """
             UPDATE task
-            SET token = NULL, active_until = NULL, finished_at = :finished_at,
+            SET token = NULL, finished_at = active_until, active_until = NULL,
                 sub_status = :sub_status, details = :details
             WHERE token IS NOT NULL AND active_until < :current
             RETURNING task_id, type, run_id, fab_hash, model_ref, connector_ref,
@@ -423,7 +426,6 @@ class SqlCoreState(CoreState, SqlMixin):
             """,
             {
                 "current": expired_at,
-                "finished_at": expired_at,
                 "sub_status": SubStatus.FAILED,
                 "details": "No heartbeat received from the task",
             },
