@@ -171,10 +171,18 @@ class SqlCoreState(CoreState, SqlMixin):
             (task_id, type, run_id, fab_hash, model_ref, connector_ref, token,
              active_until, pending_at, starting_at, running_at, finished_at,
              sub_status, details)
-            VALUES
-            (:task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
+            SELECT
+             :task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
              :active_until, :pending_at, :starting_at, :running_at, :finished_at,
-             :sub_status, :details);
+             :sub_status, :details
+            WHERE :requesting_task_id IS NULL
+            OR EXISTS (
+                SELECT 1
+                FROM task
+                WHERE task_id = :requesting_task_id
+                AND finished_at IS NULL
+            )
+            RETURNING task_id;
         """
 
         params = {
@@ -192,26 +200,17 @@ class SqlCoreState(CoreState, SqlMixin):
             "finished_at": None,
             "sub_status": "",
             "details": "",
+            "requesting_task_id": (
+                uint64_to_int64(requesting_task_id)
+                if requesting_task_id is not None
+                else None
+            ),
         }
 
         with self.session():
             try:
-                if requesting_task_id is not None:
-                    requesting_task_rows = self.query(
-                        """
-                        UPDATE task
-                        SET task_id = task_id
-                        WHERE task_id = :requesting_task_id
-                        AND finished_at IS NULL
-                        RETURNING task_id
-                        """,
-                        {"requesting_task_id": uint64_to_int64(requesting_task_id)},
-                    )
-                    if not requesting_task_rows:
-                        return None
-
-                self.query(insert_query, params)
-                return task_id
+                rows = self.query(insert_query, params)
+                return task_id if rows else None
             except IntegrityError:
                 return None
 

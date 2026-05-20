@@ -121,69 +121,27 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     def _lock_run(
         self, run_id: int, *, require_unfinished: bool = False
     ) -> dict[str, Any] | None:
-        """Lock the run's primary task row if it is in the required state."""
-        sint64_run_id = uint64_to_int64(run_id)
-        condition = (
-            "finished_at IS NULL" if require_unfinished else "sub_status != :stopped"
-        )
-        params: dict[str, Any] = {"run_id": sint64_run_id}
-        if not require_unfinished:
-            params["stopped"] = SubStatus.STOPPED
+        """Lock the run row if it is in the required state."""
+        condition = ""
+        if require_unfinished:
+            condition = """
+            AND EXISTS (
+                SELECT 1
+                FROM task
+                WHERE task.task_id = run.primary_task_id
+                AND task.finished_at IS NULL
+            )
+            """
         rows = self.query(
             f"""
-            UPDATE task
-            SET task_id = task_id
-            WHERE task_id = (
-                SELECT primary_task_id FROM run WHERE run_id = :run_id
-            )
-            AND {condition}
-            RETURNING task_id
+            UPDATE run
+            SET run_id = run_id
+            WHERE run_id = :run_id {condition}
+            RETURNING run_id, federation, primary_task_id
             """,
-            params,
+            {"run_id": uint64_to_int64(run_id)},
         )
-        if not rows:
-            return None
-
-        run_rows = self.query(
-            """
-            SELECT run_id, federation, primary_task_id
-            FROM run
-            WHERE run_id = :run_id
-            """,
-            {"run_id": sint64_run_id},
-        )
-        return dict(run_rows[0]) if run_rows else None
-
-    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        self,
-        task_type: str,
-        run_id: int,
-        fab_hash: str | None = None,
-        model_ref: str | None = None,
-        connector_ref: str | None = None,
-        requesting_task_id: int | None = None,
-    ) -> int | None:
-        """Create a task."""
-        with self.session():
-            if not self._lock_run(run_id, require_unfinished=True):
-                if not self.query(
-                    "SELECT run_id FROM run WHERE run_id = :run_id",
-                    {"run_id": uint64_to_int64(run_id)},
-                ):
-                    raise RuntimeError(
-                        f"Run {run_id} not found. create_task requires an existing run."
-                    )
-                raise RuntimeError(f"Run {run_id} is finished.")
-
-            task_id = super().create_task(
-                task_type=task_type,
-                run_id=run_id,
-                fab_hash=fab_hash,
-                model_ref=model_ref,
-                connector_ref=connector_ref,
-                requesting_task_id=requesting_task_id,
-            )
-            return task_id
+        return dict(rows[0]) if rows else None
 
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
@@ -643,49 +601,14 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
     def stop_run(self, run_id: int) -> bool:
         """Stop a run and clean up run-scoped messages and objects."""
-        with self.session():
-            run_row = self._lock_run(run_id)
-            if not run_row:
-                return False
-            primary_task_id = run_row["primary_task_id"]
-            primary_unfinished = self.query(
-                """
-                SELECT finished_at IS NULL AS unfinished
-                FROM task
-                WHERE task_id = :task_id
-                """,
-                {"task_id": primary_task_id},
-            )[0]["unfinished"]
+        update_success = False
+        for task in self.get_tasks(run_ids=[run_id]):
+            update_success |= self.finish_task(task.task_id, SubStatus.STOPPED, "")
 
-            rows = self.query(
-                """
-                UPDATE task
-                SET finished_at = CASE
-                        WHEN finished_at IS NULL THEN :finished_at
-                        ELSE finished_at
-                    END,
-                    sub_status = :sub_status,
-                    details = :details,
-                    active_until = NULL,
-                    token = NULL
-                WHERE run_id = :run_id
-                AND (finished_at IS NULL OR task_id = :primary_task_id)
-                RETURNING task_id
-                """,
-                {
-                    "run_id": uint64_to_int64(run_id),
-                    "primary_task_id": primary_task_id,
-                    "finished_at": now().isoformat(),
-                    "sub_status": SubStatus.STOPPED,
-                    "details": "",
-                },
-            )
-            if not rows:
-                return False
+        if not update_success:
+            return False
 
-            if primary_unfinished:
-                self.federation_manager.report_run_usage()
-            self.delete_messages(self.get_message_ids_from_run_id(run_id))
+        self.delete_messages(self.get_message_ids_from_run_id(run_id))
 
         self.object_store.delete_objects_in_run(run_id)
         return True
@@ -1307,8 +1230,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         sint_run_id = uint64_to_int64(run_id)
 
         with self.session():
-            if not self._lock_run(run_id):
-                raise ValueError(f"Run {run_id} not found or already stopped")
+            if not self.query(
+                "SELECT run_id FROM run WHERE run_id = :run_id",
+                {"run_id": sint_run_id},
+            ):
+                raise ValueError(f"Run {run_id} not found")
 
             # Check if any existing Context assigned to the run_id
             query = "SELECT COUNT(*) as count FROM context WHERE run_id = :run_id"

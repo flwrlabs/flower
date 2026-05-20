@@ -129,49 +129,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """Return True if the run has finished."""
         return self._get_run(run_id).status.status == Status.FINISHED
 
-    def _is_stopped_run(self, run_id: int) -> bool:
-        """Return True if the run has been stopped."""
-        return self._get_run(run_id).status.sub_status == SubStatus.STOPPED
-
-    def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        self,
-        task_type: str,
-        run_id: int,
-        fab_hash: str | None = None,
-        model_ref: str | None = None,
-        connector_ref: str | None = None,
-        requesting_task_id: int | None = None,
-    ) -> int | None:
-        """Create a task."""
-        with self.lock_task_store:
-            with self.lock:
-                if run_id not in self.run_ids:
-                    raise RuntimeError(
-                        f"Run {run_id} not found. create_task requires an existing run."
-                    )
-                if self._is_finished_run(run_id):
-                    raise RuntimeError(f"Run {run_id} is finished.")
-                if requesting_task_id is not None:
-                    requesting_task = self.task_store.get(requesting_task_id)
-                    if (
-                        requesting_task is None
-                        or requesting_task.status.status == Status.FINISHED
-                    ):
-                        return None
-
-                task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
-                self.task_store[task_id] = Task(
-                    task_id=task_id,
-                    type=task_type,
-                    run_id=run_id,
-                    status=TaskStatus(status=Status.PENDING, sub_status="", details=""),
-                    pending_at=now().isoformat(),
-                    fab_hash=fab_hash,
-                    model_ref=model_ref,
-                    connector_ref=connector_ref,
-                )
-                return task_id
-
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
         # Validate message
@@ -439,20 +396,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         for task in self.get_tasks(run_ids=[run_id]):
             update_success |= self.finish_task(task.task_id, SubStatus.STOPPED, "")
 
-        with self.lock_task_store:
-            with self.lock:
-                if run_id not in self.run_ids:
-                    return False
-                primary_task_id = cast(int, self.run_ids[run_id].run.primary_task_id)
-                primary_task = self.task_store[primary_task_id]
-                if primary_task.status.sub_status == SubStatus.STOPPED:
-                    if not update_success:
-                        return False
-                else:
-                    primary_task.status.sub_status = SubStatus.STOPPED
-                    primary_task.status.details = ""
-                    update_success = True
-
         if not update_success:
             return False
 
@@ -667,64 +610,63 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """Create a new run."""
         task_type = primary_task_type_from_run_type(run_type)
 
-        with self.lock_task_store:
-            with self.lock:
-                run_id = generate_rand_int_from_bytes(
-                    RUN_ID_NUM_BYTES,
-                    exclude=set(self.run_ids),
-                )
-                task_id = generate_rand_int_from_bytes(
-                    TASK_ID_NUM_BYTES,
-                    exclude=set(self.task_store),
-                )
-                pending_at = now().isoformat()
-                run_record = RunRecord(
-                    run=Run(
-                        run_id=run_id,
-                        fab_id=fab_id if fab_id else "",
-                        fab_version=fab_version if fab_version else "",
-                        fab_hash=fab_hash if fab_hash else "",
-                        override_config=override_config,
-                        pending_at="",
-                        starting_at="",
-                        running_at="",
-                        finished_at="",
-                        status=RunStatus(
-                            status=Status.PENDING,
-                            sub_status="",
-                            details="",
-                        ),
-                        flwr_aid=flwr_aid if flwr_aid else "",
-                        federation=federation,
-                        primary_task_id=task_id,
-                        bytes_sent=0,
-                        bytes_recv=0,
-                        clientapp_runtime=0.0,
-                        run_type=run_type,
-                    ),
-                    federation_config=federation_config,
-                )
-                self.run_ids[run_id] = run_record
-                # Add run_id to the flwr_aid_to_run_ids mapping if flwr_aid is provided
-                if flwr_aid:
-                    self.flwr_aid_to_run_ids[flwr_aid].add(run_id)
-
-                self.task_store[task_id] = Task(
-                    task_id=task_id,
-                    type=task_type,
+        with self.lock_task_store, self.lock:
+            run_id = generate_rand_int_from_bytes(
+                RUN_ID_NUM_BYTES,
+                exclude=set(self.run_ids),
+            )
+            task_id = generate_rand_int_from_bytes(
+                TASK_ID_NUM_BYTES,
+                exclude=set(self.task_store),
+            )
+            pending_at = now().isoformat()
+            run_record = RunRecord(
+                run=Run(
                     run_id=run_id,
-                    status=TaskStatus(
+                    fab_id=fab_id if fab_id else "",
+                    fab_version=fab_version if fab_version else "",
+                    fab_hash=fab_hash if fab_hash else "",
+                    override_config=override_config,
+                    pending_at="",
+                    starting_at="",
+                    running_at="",
+                    finished_at="",
+                    status=RunStatus(
                         status=Status.PENDING,
                         sub_status="",
                         details="",
                     ),
-                    pending_at=pending_at,
-                    fab_hash=fab_hash,
-                    model_ref=None,
-                    connector_ref=None,
-                )
+                    flwr_aid=flwr_aid if flwr_aid else "",
+                    federation=federation,
+                    primary_task_id=task_id,
+                    bytes_sent=0,
+                    bytes_recv=0,
+                    clientapp_runtime=0.0,
+                    run_type=run_type,
+                ),
+                federation_config=federation_config,
+            )
+            self.run_ids[run_id] = run_record
+            # Add run_id to the flwr_aid_to_run_ids mapping if flwr_aid is provided
+            if flwr_aid:
+                self.flwr_aid_to_run_ids[flwr_aid].add(run_id)
 
-                return run_id
+            self.task_store[task_id] = Task(
+                task_id=task_id,
+                type=task_type,
+                run_id=run_id,
+                status=TaskStatus(
+                    status=Status.PENDING,
+                    sub_status="",
+                    details="",
+                ),
+                pending_at=pending_at,
+                fab_hash=fab_hash,
+                model_ref=None,
+                connector_ref=None,
+            )
+
+            return run_id
 
     def get_run_info(
         self,
@@ -866,8 +808,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         with self.lock:
             if run_id not in self.run_ids:
                 raise ValueError(f"Run {run_id} not found")
-            if self._is_stopped_run(run_id):
-                raise ValueError(f"Run {run_id} not found or already stopped")
             self.contexts[run_id] = context
 
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:

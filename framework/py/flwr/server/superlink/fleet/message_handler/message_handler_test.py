@@ -18,10 +18,8 @@
 from unittest.mock import MagicMock
 
 from flwr.common import Metadata, RecordDict, now
-from flwr.common.constant import Status
 from flwr.common.message import make_message
 from flwr.common.serde import message_to_proto
-from flwr.common.typing import RunStatus
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     PullMessagesRequest,
     PushMessagesRequest,
@@ -124,8 +122,8 @@ def test_push_messages() -> None:
     state.store_traffic.assert_called_once()
 
 
-def test_push_messages_cleans_up_only_failed_reply_objects() -> None:
-    """Test push_messages cleanup is scoped to the failed reply."""
+def test_push_messages_cleans_up_failed_message_objects() -> None:
+    """Test push_messages cleanup preregistered objects on message store failure."""
     msg = make_message(
         content=RecordDict(),
         metadata=Metadata(
@@ -147,13 +145,11 @@ def test_push_messages_cleans_up_only_failed_reply_objects() -> None:
     )
     state = MagicMock()
     state.store_message_res.return_value = None
-    state.get_run_status.side_effect = [
-        {123: RunStatus(status=Status.RUNNING, sub_status="", details="")},
-        {123: RunStatus(status=Status.FINISHED, sub_status="", details="")},
-    ]
     store = MagicMock()
+    store.preregister.return_value = ["object-id"]
 
-    push_messages(request=request, state=state, store=store)
+    response = push_messages(request=request, state=state, store=store)
 
     store.delete.assert_called_once_with("object-id")
     store.delete_objects_in_run.assert_not_called()
+    assert not response.objects_to_push

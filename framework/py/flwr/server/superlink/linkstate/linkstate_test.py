@@ -176,26 +176,6 @@ class StateTest(CoreStateTest):
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
 
-    def test_create_task_rejects_missing_run(self) -> None:
-        """Creating a task for an unknown run should fail."""
-        state = self.state_factory()
-
-        with self.assertRaisesRegex(
-            RuntimeError,
-            "Run 42 not found. create_task requires an existing run.",
-        ):
-            state.create_task(task_type="flwr-model", run_id=42)
-
-    def test_create_task_rejects_stopped_run(self) -> None:
-        """Creating a task for a stopped run should fail."""
-        state = self.state_factory()
-        run_id = create_dummy_run(state)
-
-        self.assertTrue(state.stop_run(run_id))
-
-        with self.assertRaisesRegex(RuntimeError, f"Run {run_id} is finished."):
-            state.create_task(task_type="flwr-model", run_id=run_id)
-
     def test_store_messages_rejects_stopped_run(self) -> None:
         """Messages cannot be stored after a run is stopped."""
         state = self.state_factory()
@@ -501,7 +481,7 @@ class StateTest(CoreStateTest):
         assert state.stop_run(run_id)
 
         tasks = {task.task_id: task for task in state.get_tasks(run_ids=[run_id])}
-        assert tasks[primary_task_id].status.sub_status == SubStatus.STOPPED
+        assert tasks[primary_task_id].status.sub_status == SubStatus.COMPLETED
         assert tasks[secondary_task_id].status.sub_status == SubStatus.STOPPED
 
     def test_usage_report_hook_not_called_on_non_primary_task_expired(self) -> None:
