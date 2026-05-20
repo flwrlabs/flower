@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import dataclass, field
 from unittest.mock import Mock
 
 import pytest
@@ -25,29 +26,21 @@ import requests
 from .provider import JSONObject, ModelProviderError, invoke_responses_model
 
 
+@dataclass
 class _Response:
-    def __init__(
-        self,
-        *,
-        status_code: int = 200,
-        body: object | None = None,
-        text: str = "",
-        headers: dict[str, str] | None = None,
-        lines: list[bytes] | None = None,
-    ) -> None:
-        self.status_code = status_code
-        self._body = body
-        self.text = text
-        self.headers = headers or {}
-        self._lines = lines or []
+    status_code: int = 200
+    body: object | None = None
+    text: str = ""
+    headers: dict[str, str] = field(default_factory=dict)
+    lines: list[bytes] = field(default_factory=list)
 
     def json(self) -> object:
         """Return the mocked JSON response body."""
-        return self._body
+        return self.body
 
     def iter_lines(self) -> Iterator[bytes]:
         """Return the mocked stream response lines."""
-        return iter(self._lines)
+        return iter(self.lines)
 
 
 def _patch_post(monkeypatch: pytest.MonkeyPatch, response: _Response) -> Mock:
@@ -75,7 +68,7 @@ def test_invoke_responses_model_uses_env_config(
     result = invoke_responses_model(request)
 
     assert result.response == {"id": "resp_1", "object": "response"}
-    assert result.events == []
+    assert not result.events
     assert post_mock.call_args.args[0] == "https://example.test/v1/responses"
     assert post_mock.call_args.kwargs["headers"] == {"Authorization": "Bearer fk_test"}
     assert post_mock.call_args.kwargs["json"] == request
