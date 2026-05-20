@@ -212,7 +212,8 @@ def push_messages(
         message_id is None
         and state.get_run_status({run_id})[run_id].status == Status.FINISHED
     ):
-        store.delete_objects_in_run(run_id)
+        for object_tree in request.message_object_trees:
+            store.delete(object_tree.object_id)
 
     # Build response
     response = PushMessagesResponse(

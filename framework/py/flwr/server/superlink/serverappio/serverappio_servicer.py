@@ -151,7 +151,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 message_id is None
                 and state.get_run_status({run_id})[run_id].status == Status.FINISHED
             ):
-                store.delete_objects_in_run(run_id)
+                store.delete(object_tree.object_id)
             message_ids.append(message_id)
 
         return PushAppMessagesResponse(
