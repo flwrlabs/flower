@@ -22,6 +22,7 @@ from flwr.common import Message
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.supercore.date import now
 
+# unix timestamp of 28 February 2025 00h:00m:00s UTC
 _MIN_VALID_MESSAGE_CREATED_AT = 1740700800.0
 
 
@@ -83,8 +84,7 @@ def validate_task_message(message: Message) -> list[str]:  # pylint: disable=R09
             "`metadata.src_task_id` and `metadata.dst_task_id` must be different."
         )
 
-    # Temporary: task messages are routed through SuperLink until task-to-task
-    # communication is supported in SuperNodes.
+    # Temporary: task messages are only supported in SuperLink for now.
     if metadata.src_node_id != SUPERLINK_NODE_ID:
         validation_errors.append(
             f"`metadata.src_node_id` is not {SUPERLINK_NODE_ID} (SuperLink node ID)"

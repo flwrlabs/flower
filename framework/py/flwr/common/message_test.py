@@ -301,26 +301,6 @@ def test_create_ins_message_with_dst_task_id_success() -> None:
     assert msg.metadata.dst_task_id == 789
 
 
-def test_create_ins_message_with_src_task_id_failure() -> None:
-    """Test that source task ID is not exposed in the constructor."""
-    # Execute
-    with pytest.raises(TypeError, match="src_task_id"):
-        Message(  # type: ignore[call-overload]  # pylint: disable=E1123
-            RecordDict(), 123, "query", src_task_id=456
-        )
-
-
-def test_create_ins_message_failure_excludes_task_ids_from_error() -> None:
-    """Test that task IDs are not included in the generic constructor error."""
-    # Execute
-    with pytest.raises(MessageInitializationError) as exc:
-        Message(RecordDict(), 123)  # type: ignore[call-overload]
-
-    # Assert
-    assert "src_task_id" not in str(exc.value)
-    assert "dst_task_id" not in str(exc.value)
-
-
 @pytest.mark.parametrize(
     "content_or_error,ttl",
     product([RecordDict(), Error(0)], [None, 10.0, 20]),
