@@ -211,7 +211,10 @@ def push_messages(
         objects_to_push |= set(store.preregister(run_id, object_tree))
     # Store Message in State
     message_id: str | None = state.store_message_res(message=msg)
-    if message_id is None:
+    if (
+        message_id is None
+        and state.get_run_status({run_id})[run_id].status == Status.FINISHED
+    ):
         for object_tree in request.message_object_trees:
             store.delete(object_tree.object_id)
             for tree_node in iterate_object_tree(object_tree):

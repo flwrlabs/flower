@@ -20,7 +20,7 @@ from logging import DEBUG, ERROR, INFO
 import grpc
 
 from flwr.common import Message
-from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -148,7 +148,10 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             objects_to_push |= set(store.preregister(run_id, object_tree))
             # Store message
             message_id: str | None = state.store_message_ins(message=message)
-            if message_id is None:
+            if (
+                message_id is None
+                and state.get_run_status({run_id})[run_id].status == Status.FINISHED
+            ):
                 store.delete(object_tree.object_id)
                 for tree_node in iterate_object_tree(object_tree):
                     objects_to_push.discard(tree_node.object_id)
