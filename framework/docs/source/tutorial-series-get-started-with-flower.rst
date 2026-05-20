@@ -109,9 +109,11 @@ execution of your app.
     :align: center
     :target: ./_static/run_started_dashboard.png
 
-If you click the ``Logs`` tab, you'll see the logs from the app execution. This app ran
-for three rounds and sampled all 10 nodes in each round. At the end, it logged the
-aggregated results from all rounds.
+If you click the ``Logs`` tab, you'll see the logs from the app execution. This demo app
+ran for three rounds and sampled all 10 nodes in each round. In each round, the server
+aggregated different metrics received from the clients. You can see these in the logs
+under the ``'random_metric'`` key. At the end, the logs show the aggregated results from
+all rounds.
 
 .. image:: ./_static/run_logs_dashboard.png
     :alt: Logs tab showing logs from the app execution
