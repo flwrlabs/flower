@@ -89,21 +89,24 @@ class UtilsTest(unittest.TestCase):
 
         _assert_has_error(errors, "metadata.message_id")
 
-    def test_validate_task_message_rejects_missing_run_id(self) -> None:
-        """Test that run_id must be set."""
+    def test_validate_task_message_accepts_unset_run_id(self) -> None:
+        """Test that run_id is not required."""
         message = _create_task_message(run_id=0)
 
+        self.assertEqual(validate_task_message(message), [])
+
+    def test_validate_task_message_accepts_missing_src_task_id(self) -> None:
+        """Test that source task ID is not required."""
+        message = _create_task_message(src_task_id=None)
+
+        self.assertEqual(validate_task_message(message), [])
+
+    def test_validate_task_message_rejects_missing_dst_task_id(self) -> None:
+        """Test that destination task ID must be set."""
+        message = _create_task_message(dst_task_id=None)
+
         errors = validate_task_message(message)
 
-        _assert_has_error(errors, "metadata.run_id")
-
-    def test_validate_task_message_rejects_missing_task_ids(self) -> None:
-        """Test that source and destination task IDs must be set."""
-        message = _create_task_message(src_task_id=None, dst_task_id=None)
-
-        errors = validate_task_message(message)
-
-        _assert_has_error(errors, "metadata.src_task_id")
         _assert_has_error(errors, "metadata.dst_task_id")
 
     def test_validate_task_message_rejects_same_task_ids(self) -> None:
