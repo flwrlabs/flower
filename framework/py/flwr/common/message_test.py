@@ -305,7 +305,9 @@ def test_create_ins_message_with_src_task_id_failure() -> None:
     """Test that source task ID is not exposed in the constructor."""
     # Execute
     with pytest.raises(TypeError, match="src_task_id"):
-        Message(RecordDict(), 123, "query", src_task_id=456)  # type: ignore
+        Message(  # type: ignore[call-overload]  # pylint: disable=E1123
+            RecordDict(), 123, "query", src_task_id=456
+        )
 
 
 def test_create_ins_message_failure_excludes_task_ids_from_error() -> None:

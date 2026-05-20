@@ -57,7 +57,7 @@ def timestamp_to_iso(value: datetime | str | None) -> str:
         return value
 
 
-def validate_task_message(message: Message) -> list[str]:
+def validate_task_message(message: Message) -> list[str]:  # pylint: disable=R0912
     """Validate a task Message."""
     validation_errors = []
     metadata = message.metadata

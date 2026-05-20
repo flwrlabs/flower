@@ -24,7 +24,7 @@ from flwr.common.message import make_message
 from .utils import generate_rand_int_from_bytes, validate_task_message
 
 
-def _create_task_message(
+def _create_task_message(  # pylint: disable=too-many-arguments
     *,
     message_id: str = "message-id",
     run_id: int = 1,
