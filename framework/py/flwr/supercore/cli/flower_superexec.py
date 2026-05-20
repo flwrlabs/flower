@@ -35,7 +35,6 @@ from flwr.supercore.auth import (
 )
 from flwr.supercore.constant import EXEC_PLUGIN_SECTION, ExecutorType
 from flwr.supercore.grpc_health import add_args_health
-from flwr.supercore.superexec.executor import SUPPORTED_EXECUTORS
 from flwr.supercore.superexec.plugin import (
     ClientAppExecPlugin,
     ExecPlugin,

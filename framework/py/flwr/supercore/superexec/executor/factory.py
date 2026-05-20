@@ -19,8 +19,6 @@ from flwr.supercore.constant import ExecutorType
 from .subprocess_executor import SubprocessExecutor
 from .types import Executor
 
-SUPPORTED_EXECUTORS = tuple(ExecutorType)
-
 
 def get_executor(executor_type: ExecutorType) -> Executor:
     """Return the executor for the configured executor type."""
