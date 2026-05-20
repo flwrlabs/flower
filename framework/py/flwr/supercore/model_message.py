@@ -18,7 +18,7 @@
 from __future__ import annotations
 
 import json
-from typing import ClassVar, TypeVar, cast
+from typing import ClassVar, TypeAlias, TypeVar, cast
 
 from flwr.app.metadata import Metadata
 from flwr.common.message import Message, make_message
@@ -26,8 +26,9 @@ from flwr.common.record import ConfigRecord, RecordDict
 from flwr.supercore.date import now
 from flwr.supercore.inflatable.inflatable_object import InflatableObject
 
-JSONValue = object
-JSONObject = dict[str, JSONValue]
+JSONScalar: TypeAlias = bool | float | int | str | None
+JSONValue: TypeAlias = JSONScalar | dict[str, "JSONValue"] | list["JSONValue"]
+JSONObject: TypeAlias = dict[str, JSONValue]
 
 _PAYLOAD_RECORD_KEY = "payload"
 _PAYLOAD_JSON_KEY = "json"
@@ -61,10 +62,10 @@ class ModelRequest(Message):
     ) -> None:
         payload: JSONObject = {
             "model": model,
-            "input": input,
+            "input": cast(JSONValue, input),
             "stream": stream,
         }
-        _set_optional(payload, "tools", tools)
+        _set_optional(payload, "tools", cast(JSONValue | None, tools))
         _set_optional(payload, "tool_choice", tool_choice)
         _set_optional(payload, "reasoning", reasoning)
         _set_optional(payload, "previous_response_id", previous_response_id)
@@ -87,43 +88,6 @@ class ModelRequest(Message):
     def payload(self) -> JSONObject:
         """Return this request's Responses create-request payload."""
         return _payload_from_message(self)
-
-    @classmethod
-    def create(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        cls,
-        *,
-        dst_task_id: int,
-        input: list[JSONObject],  # pylint: disable=redefined-builtin
-        model: str,
-        stream: bool,
-        tools: list[JSONObject] | None = None,
-        tool_choice: JSONValue | None = None,
-        reasoning: JSONObject | None = None,
-        previous_response_id: str | None = None,
-        instructions: str | None = None,
-        max_output_tokens: int | None = None,
-        metadata: JSONObject | None = None,
-        text: JSONObject | None = None,
-        reply_to_message_id: str = "",
-        ttl: float = _DEFAULT_TASK_MESSAGE_TTL,
-    ) -> ModelRequest:
-        """Create a model request message."""
-        return cls(
-            dst_task_id=dst_task_id,
-            input=input,
-            model=model,
-            stream=stream,
-            tools=tools,
-            tool_choice=tool_choice,
-            reasoning=reasoning,
-            previous_response_id=previous_response_id,
-            instructions=instructions,
-            max_output_tokens=max_output_tokens,
-            metadata=metadata,
-            text=text,
-            reply_to_message_id=reply_to_message_id,
-            ttl=ttl,
-        )
 
     @classmethod
     def from_message(cls, message: Message) -> ModelRequest:
@@ -172,23 +136,6 @@ class ModelResponse(Message):
     def payload(self) -> JSONObject:
         """Return this response's OpenAI Responses object payload."""
         return _payload_from_message(self)
-
-    @classmethod
-    def create(
-        cls,
-        *,
-        dst_task_id: int,
-        response: JSONObject,
-        reply_to_message_id: str = "",
-        ttl: float = _DEFAULT_TASK_MESSAGE_TTL,
-    ) -> ModelResponse:
-        """Create a model response message."""
-        return cls(
-            dst_task_id=dst_task_id,
-            response=response,
-            reply_to_message_id=reply_to_message_id,
-            ttl=ttl,
-        )
 
     @classmethod
     def from_message(cls, message: Message) -> ModelResponse:
@@ -291,17 +238,33 @@ def _validate_message_type(message: Message, expected: str) -> None:
         raise ValueError(f"Expected message type {expected}, got {actual}.")
 
 
+def _validate_object_list_field(
+    payload: JSONObject, field: str, *, owner: str, required: bool = False
+) -> None:
+    """Validate that a payload field is a list of JSON objects."""
+    if field not in payload:
+        if required:
+            raise ValueError(f"{owner} payload requires list field '{field}'.")
+        return
+
+    value = payload[field]
+    if not isinstance(value, list):
+        if required:
+            raise ValueError(f"{owner} payload requires list field '{field}'.")
+        raise ValueError(f"{owner} payload field '{field}' must be a list.")
+    if not all(isinstance(item, dict) for item in value):
+        raise ValueError(f"{owner} payload field '{field}' must be a list of objects.")
+
+
 def _validate_model_request_payload(payload: JSONObject) -> None:
     """Validate the minimal Responses create-request shape."""
     if not isinstance(payload.get("model"), str):
         raise ValueError("ModelRequest payload requires string field 'model'.")
-    if not isinstance(payload.get("input"), list):
-        raise ValueError("ModelRequest payload requires list field 'input'.")
+    _validate_object_list_field(payload, "input", owner="ModelRequest", required=True)
     if not isinstance(payload.get("stream"), bool):
         raise ValueError("ModelRequest payload requires bool field 'stream'.")
 
-    if "tools" in payload and not isinstance(payload["tools"], list):
-        raise ValueError("ModelRequest payload field 'tools' must be a list.")
+    _validate_object_list_field(payload, "tools", owner="ModelRequest")
     if "reasoning" in payload and not isinstance(payload["reasoning"], dict):
         raise ValueError("ModelRequest payload field 'reasoning' must be an object.")
     if "previous_response_id" in payload and not isinstance(
@@ -332,8 +295,7 @@ def _validate_model_response_payload(payload: JSONObject) -> None:
         raise ValueError("ModelResponse payload field 'id' must be a string.")
     if "status" in payload and not isinstance(payload["status"], str):
         raise ValueError("ModelResponse payload field 'status' must be a string.")
-    if "output" in payload and not isinstance(payload["output"], list):
-        raise ValueError("ModelResponse payload field 'output' must be a list.")
+    _validate_object_list_field(payload, "output", owner="ModelResponse")
     if (
         "error" in payload
         and payload["error"] is not None

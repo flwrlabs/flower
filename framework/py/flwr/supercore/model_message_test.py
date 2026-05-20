@@ -167,7 +167,7 @@ def test_model_response_creates_responses_object_payload() -> None:
 
 def test_model_messages_roundtrip_through_plain_message_proto() -> None:
     """Typed model messages should roundtrip through message.proto.Message."""
-    request = ModelRequest.create(
+    request = ModelRequest(
         dst_task_id=123,
         input=[{"role": "user", "content": "Hello"}],
         model="gpt-5",
@@ -211,6 +211,29 @@ def test_model_request_from_message_rejects_wrong_message_type() -> None:
         ModelRequest.from_message(message)
 
 
+@pytest.mark.parametrize("dst_task_id", ["123", True])
+def test_model_request_rejects_invalid_constructor_dst_task_id(
+    dst_task_id: Any,
+) -> None:
+    """ModelRequest should reject invalid destination task IDs immediately."""
+    with pytest.raises(ValueError, match="dst_task_id"):
+        ModelRequest(
+            dst_task_id=dst_task_id,
+            input=[],
+            model="gpt-5",
+            stream=True,
+        )
+
+
+@pytest.mark.parametrize("dst_task_id", ["123", True])
+def test_model_response_rejects_invalid_constructor_dst_task_id(
+    dst_task_id: Any,
+) -> None:
+    """ModelResponse should reject invalid destination task IDs immediately."""
+    with pytest.raises(ValueError, match="dst_task_id"):
+        ModelResponse(dst_task_id=dst_task_id, response={"object": "response"})
+
+
 @pytest.mark.parametrize(
     "message",
     [
@@ -249,6 +272,8 @@ def test_model_request_from_message_rejects_invalid_payload(message: Message) ->
         {"model": "gpt-5", "stream": True},
         {"model": "gpt-5", "input": []},
         {"model": "gpt-5", "input": [], "stream": "true"},
+        {"model": "gpt-5", "input": [1], "stream": True},
+        {"model": "gpt-5", "input": [], "stream": True, "tools": ["x"]},
         {"model": "gpt-5", "input": [], "stream": True, "reasoning": []},
     ],
 )
@@ -269,6 +294,7 @@ def test_model_request_from_message_rejects_invalid_request_shape(
         {"object": "chat.completion"},
         {"object": "response", "id": 123},
         {"object": "response", "output": {}},
+        {"object": "response", "output": [1]},
         {"object": "response", "error": "failed"},
     ],
 )
