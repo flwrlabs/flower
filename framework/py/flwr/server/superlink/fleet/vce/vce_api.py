@@ -47,7 +47,7 @@ from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
-from .backend import Backend, error_messages_backends, supported_backends
+from .backend import Backend
 
 NodeToPartitionMapping = dict[int, int]
 
@@ -333,27 +333,13 @@ def start_vce(
     )
 
     # Load backend config
-    log(DEBUG, "Supported backends: %s", list(supported_backends.keys()))
     backend_config = json.loads(backend_config_json_stream)
-
-    try:
-        backend_type = supported_backends[backend_name]
-    except KeyError as ex:
-        log(
-            ERROR,
-            "Backend `%s`, is not supported. Use any of %s or add support "
-            "for a new backend.",
-            backend_name,
-            list(supported_backends.keys()),
-        )
-        if backend_name in error_messages_backends:
-            log(ERROR, error_messages_backends[backend_name])
-
-        raise ex
 
     def backend_fn() -> Backend:
         """Instantiate a Backend."""
-        return backend_type(backend_config)
+        from .backend.raybackend import RayBackend  # pylint: disable=C0415
+
+        return RayBackend(backend_config)
 
     # Load ClientApp if needed
     def _load() -> ClientApp:
