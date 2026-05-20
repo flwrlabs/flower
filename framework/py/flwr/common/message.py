@@ -49,9 +49,10 @@ DEFAULT_TTL = 43200  # This is 12 hours
 MESSAGE_INIT_ERROR_MESSAGE = (
     "Invalid arguments for Message. Expected one of the documented "
     "signatures: Message(content: RecordDict, dst_node_id: int, message_type: str,"
-    " *, [ttl: float, group_id: str, src_task_id: int, dst_task_id: int]) or "
+    " *, ttl: float | None = None, group_id: str | None = None, "
+    "src_task_id: int | None = None, dst_task_id: int | None = None) or "
     "Message(content: RecordDict | error: Error, *, reply_to: Message, "
-    "[ttl: float])."
+    "ttl: float | None = None)."
 )
 
 
