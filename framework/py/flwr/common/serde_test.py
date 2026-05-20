@@ -448,6 +448,47 @@ def test_message_serialization_deserialization(
     assert original.metadata == deserialized.metadata
 
 
+def test_message_serialization_preserves_optional_task_ids() -> None:
+    """Test serialization and deserialization of optional Message task IDs."""
+    # Prepare
+    maker = RecordMaker(state=2)
+    metadata = maker.metadata()
+    metadata.src_task_id = 123
+    metadata.dst_task_id = 456
+    original = make_message(metadata=metadata, content=maker.recorddict(1, 1, 1))
+
+    # Execute
+    proto = message_to_proto(original)
+    deserialized = message_from_proto(proto)
+
+    # Assert
+    assert proto.metadata.HasField("src_task_id")
+    assert proto.metadata.HasField("dst_task_id")
+    assert deserialized.metadata.src_task_id == 123
+    assert deserialized.metadata.dst_task_id == 456
+    assert original.metadata == deserialized.metadata
+
+
+def test_message_serialization_preserves_absent_task_ids() -> None:
+    """Test absent optional Message task IDs remain absent after serialization."""
+    # Prepare
+    maker = RecordMaker(state=2)
+    original = make_message(
+        metadata=maker.metadata(), content=maker.recorddict(1, 1, 1)
+    )
+
+    # Execute
+    proto = message_to_proto(original)
+    deserialized = message_from_proto(proto)
+
+    # Assert
+    assert not proto.metadata.HasField("src_task_id")
+    assert not proto.metadata.HasField("dst_task_id")
+    assert deserialized.metadata.src_task_id is None
+    assert deserialized.metadata.dst_task_id is None
+    assert original.metadata == deserialized.metadata
+
+
 def test_context_serialization_deserialization() -> None:
     """Test serialization and deserialization of Context."""
     # Prepare
