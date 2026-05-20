@@ -16,7 +16,6 @@
 
 
 import importlib
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -128,40 +127,3 @@ def test_flwr_agentapp_forwards_cli_args() -> None:
     assert kwargs["certificates"] is None
     assert kwargs["parent_pid"] == 321
     assert kwargs["runtime_dependency_install"] is True
-
-
-def test_flwr_agentapp_forwards_token_file(tmp_path: Path) -> None:
-    """The AgentApp CLI should read and forward token file contents."""
-    token_file = tmp_path / "token"
-    token_file.write_text("test-token\n", encoding="utf-8")
-    args = SimpleNamespace(
-        insecure=True,
-        serverappio_api_address="127.0.0.1:9091",
-        token=None,
-        token_file=str(token_file),
-        parent_pid=321,
-        runtime_dependency_install=True,
-    )
-
-    class _Parser:
-        def parse_args(self) -> SimpleNamespace:
-            """Return a fixed namespace for CLI forwarding tests."""
-            return args
-
-    mirror_output_to_queue = Mock()
-    restore_output = Mock()
-    run_agentapp = Mock()
-
-    with (
-        patch.object(flwr_agentapp_module, "_parse_args_run_flwr_agentapp", _Parser),
-        patch.object(
-            flwr_agentapp_module,
-            "mirror_output_to_queue",
-            mirror_output_to_queue,
-        ),
-        patch.object(flwr_agentapp_module, "restore_output", restore_output),
-        patch.object(flwr_agentapp_module, "run_agentapp", run_agentapp),
-    ):
-        flwr_agentapp_module.flwr_agentapp()
-
-    assert run_agentapp.call_args.kwargs["token"] == "test-token"

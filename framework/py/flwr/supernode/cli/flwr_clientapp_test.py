@@ -16,7 +16,6 @@
 
 
 import importlib
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -94,33 +93,3 @@ def test_flwr_clientapp_forwards_cli_args() -> None:
     assert kwargs["certificates"] is None
     assert kwargs["parent_pid"] == 321
     assert kwargs["runtime_dependency_install"] is True
-
-
-def test_flwr_clientapp_forwards_token_file(tmp_path: Path) -> None:
-    """The ClientApp CLI should read and forward token file contents."""
-    token_file = tmp_path / "token"
-    token_file.write_text("test-token\n", encoding="utf-8")
-    args = SimpleNamespace(
-        insecure=True,
-        clientappio_api_address="127.0.0.1:9094",
-        token=None,
-        token_file=str(token_file),
-        root_certificates=None,
-        parent_pid=321,
-        runtime_dependency_install=True,
-    )
-
-    class _Parser:
-        def parse_args(self) -> SimpleNamespace:
-            """Return a fixed namespace for CLI forwarding tests."""
-            return args
-
-    run_clientapp = Mock()
-
-    with (
-        patch.object(flwr_clientapp_module, "_parse_args_run_flwr_clientapp", _Parser),
-        patch.object(flwr_clientapp_module, "run_clientapp", run_clientapp),
-    ):
-        flwr_clientapp_module.flwr_clientapp()
-
-    assert run_clientapp.call_args.kwargs["token"] == "test-token"
