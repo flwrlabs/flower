@@ -166,7 +166,24 @@ class InMemoryObjectStore(ObjectStore):
     def delete(self, object_id: str) -> None:
         """Delete an object and its unreferenced descendants from the store."""
         with self.lock_store:
-            self._delete_unreferenced(object_id)
+            # If the object is not in the store, nothing to delete
+            if (object_entry := self.store.get(object_id)) is None:
+                return
+
+            # Delete the object if it has no references left
+            if object_entry.ref_count == 0:
+                del self.store[object_id]
+
+                # Remove the object from the run's mapping
+                for run_id in object_entry.runs:
+                    self.run_objects_mapping[run_id].discard(object_id)
+
+                # Decrease the reference count of its children
+                for child_id in object_entry.child_object_ids:
+                    self.store[child_id].ref_count -= 1
+
+                    # Recursively try to delete the child object
+                    self.delete(child_id)
 
     def delete_objects_in_run(self, run_id: int) -> None:
         """Delete all objects that were registered in a specific run."""
@@ -185,34 +202,10 @@ class InMemoryObjectStore(ObjectStore):
                 # and every message object must have a `ref_count` of 0
                 if object_entry.ref_count == 0:
                     # Delete the message object and its unreferenced descendants
-                    self._delete_unreferenced(object_id)
+                    self.delete(object_id)
 
             # Remove the run from the mapping
             del self.run_objects_mapping[run_id]
-
-    def _delete_unreferenced(self, object_id: str) -> None:
-        """Delete an object if unreferenced, then recurse into descendants."""
-        # If the object is not in the store, nothing to delete
-        if (object_entry := self.store.get(object_id)) is None:
-            return
-
-        # Delete the object if it has no object references left
-        if object_entry.ref_count != 0:
-            return
-
-        del self.store[object_id]
-
-        # Remove the object from the run's mapping
-        for run_id in object_entry.runs:
-            self.run_objects_mapping[run_id].discard(object_id)
-
-        # Decrease the reference count of its children
-        for child_id in object_entry.child_object_ids:
-            if child_entry := self.store.get(child_id):
-                child_entry.ref_count -= 1
-
-            # Recursively try to delete the child object
-            self._delete_unreferenced(child_id)
 
     def clear(self) -> None:
         """Clear the store."""
