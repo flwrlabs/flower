@@ -312,7 +312,7 @@ def test_create_ins_message_failure_excludes_task_ids_from_error() -> None:
     """Test that task IDs are not included in the generic constructor error."""
     # Execute
     with pytest.raises(MessageInitializationError) as exc:
-        Message(RecordDict(), 123)
+        Message(RecordDict(), 123)  # type: ignore[call-overload]
 
     # Assert
     assert "src_task_id" not in str(exc.value)

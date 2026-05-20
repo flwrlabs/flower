@@ -18,6 +18,12 @@
 from datetime import datetime
 from os import urandom
 
+from flwr.common import Message
+from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.supercore.date import now
+
+_MIN_VALID_MESSAGE_CREATED_AT = 1740700800.0
+
 
 def generate_rand_int_from_bytes(
     num_bytes: int, exclude: set[int] | None = None
@@ -49,3 +55,72 @@ def timestamp_to_iso(value: datetime | str | None) -> str:
         return datetime.fromisoformat(value).isoformat()
     except ValueError:
         return value
+
+
+def validate_task_message(message: Message) -> list[str]:
+    """Validate a task Message."""
+    validation_errors = []
+    metadata = message.metadata
+
+    if metadata.message_id == "":
+        validation_errors.append("empty `metadata.message_id`")
+
+    if not metadata.run_id:
+        validation_errors.append("`metadata.run_id` is not set.")
+
+    if metadata.src_task_id is None:
+        validation_errors.append("`metadata.src_task_id` is not set.")
+
+    if metadata.dst_task_id is None:
+        validation_errors.append("`metadata.dst_task_id` is not set.")
+
+    if (
+        metadata.src_task_id is not None
+        and metadata.dst_task_id is not None
+        and metadata.src_task_id == metadata.dst_task_id
+    ):
+        validation_errors.append(
+            "`metadata.src_task_id` and `metadata.dst_task_id` must be different."
+        )
+
+    # Temporary: task messages are routed through SuperLink until task-to-task
+    # communication is supported in SuperNodes.
+    if metadata.src_node_id != SUPERLINK_NODE_ID:
+        validation_errors.append(
+            f"`metadata.src_node_id` is not {SUPERLINK_NODE_ID} (SuperLink node ID)"
+        )
+
+    if metadata.dst_node_id != SUPERLINK_NODE_ID:
+        validation_errors.append(
+            f"`metadata.dst_node_id` is not {SUPERLINK_NODE_ID} (SuperLink node ID)"
+        )
+
+    created_at_is_valid = isinstance(metadata.created_at, (int, float))
+    if not created_at_is_valid:
+        validation_errors.append(
+            "`metadata.created_at` must be a float that records the unix timestamp "
+            "in seconds when the message was created."
+        )
+    elif metadata.created_at < _MIN_VALID_MESSAGE_CREATED_AT:
+        validation_errors.append(
+            "`metadata.created_at` must be a float that records the unix timestamp "
+            "in seconds when the message was created."
+        )
+
+    ttl_is_valid = isinstance(metadata.ttl, (int, float)) and metadata.ttl > 0
+    if not ttl_is_valid:
+        validation_errors.append("`metadata.ttl` must be higher than zero")
+    elif (
+        created_at_is_valid and metadata.created_at + metadata.ttl <= now().timestamp()
+    ):
+        validation_errors.append("Message TTL has expired")
+
+    if metadata.message_type == "":
+        validation_errors.append("`metadata.message_type` MUST be set")
+
+    if not message.has_content() != message.has_error():
+        validation_errors.append(
+            "Either message `content` or `error` MUST be set (but not both)"
+        )
+
+    return validation_errors
