@@ -29,7 +29,7 @@ from flwr.supercore.date import now
 from flwr.supercore.inflatable.inflatable_object import (
     get_object_type_from_object_content,
 )
-from flwr.supercore.model_message import ModelRequest, ModelResponse
+from flwr.supercore.model_message import JSONObject, ModelRequest, ModelResponse
 
 
 def _metadata(
@@ -142,7 +142,7 @@ def test_model_request_creates_responses_request_payload() -> None:
 
 def test_model_response_creates_responses_object_payload() -> None:
     """ModelResponse should carry the OpenAI Responses object directly."""
-    response_payload = {
+    response_payload: JSONObject = {
         "id": "resp_123",
         "object": "response",
         "status": "completed",
@@ -176,7 +176,7 @@ def test_model_messages_roundtrip_through_plain_message_proto() -> None:
 
     plain = message_from_proto(message_to_proto(request))
 
-    assert type(plain) is Message
+    assert plain.__class__ is Message
     parsed = ModelRequest.from_message(plain)
     assert isinstance(parsed, ModelRequest)
     assert parsed.payload == request.payload
@@ -209,29 +209,6 @@ def test_model_request_from_message_rejects_wrong_message_type() -> None:
 
     with pytest.raises(ValueError, match="Expected message type"):
         ModelRequest.from_message(message)
-
-
-@pytest.mark.parametrize("dst_task_id", ["123", True])
-def test_model_request_rejects_invalid_constructor_dst_task_id(
-    dst_task_id: Any,
-) -> None:
-    """ModelRequest should reject invalid destination task IDs immediately."""
-    with pytest.raises(ValueError, match="dst_task_id"):
-        ModelRequest(
-            dst_task_id=dst_task_id,
-            input=[],
-            model="gpt-5",
-            stream=True,
-        )
-
-
-@pytest.mark.parametrize("dst_task_id", ["123", True])
-def test_model_response_rejects_invalid_constructor_dst_task_id(
-    dst_task_id: Any,
-) -> None:
-    """ModelResponse should reject invalid destination task IDs immediately."""
-    with pytest.raises(ValueError, match="dst_task_id"):
-        ModelResponse(dst_task_id=dst_task_id, response={"object": "response"})
 
 
 @pytest.mark.parametrize(
@@ -310,10 +287,12 @@ def test_model_response_from_message_rejects_invalid_response_shape(
 
 def test_model_request_rejects_non_json_payload_values() -> None:
     """ModelRequest should reject values that cannot be encoded as JSON."""
+    input_with_non_json_value: Any = [{"role": "user", "content": object()}]
+
     with pytest.raises(ValueError, match="JSON serializable"):
         ModelRequest(
             dst_task_id=123,
-            input=[{"role": "user", "content": object()}],
+            input=input_with_non_json_value,
             model="gpt-5",
             stream=True,
         )

@@ -42,7 +42,7 @@ class ModelRequest(Message):
 
     MESSAGE_TYPE: ClassVar[str] = "query.model_request"
 
-    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,super-init-not-called
         self,
         *,
         dst_task_id: int,
@@ -114,7 +114,7 @@ class ModelResponse(Message):
 
     MESSAGE_TYPE: ClassVar[str] = "query.model_response"
 
-    def __init__(
+    def __init__(  # pylint: disable=super-init-not-called
         self,
         *,
         dst_task_id: int,
@@ -163,7 +163,7 @@ def _set_optional(payload: JSONObject, key: str, value: JSONValue | None) -> Non
         payload[key] = value
 
 
-def _init_message_from_payload(
+def _init_message_from_payload(  # pylint: disable=too-many-arguments
     message: Message,
     *,
     dst_task_id: int,
