@@ -15,6 +15,7 @@
 """Ray backend for the Fleet API using the Simulation Engine."""
 
 
+import os
 import sys
 from collections.abc import Callable
 from logging import DEBUG, ERROR
@@ -110,8 +111,17 @@ class RayBackend(Backend):
             if backend_config.get(self.init_args_key):
                 for k, v in backend_config[self.init_args_key].items():
                     ray_init_args[k] = v
+            ray_init_args.setdefault("include_dashboard", False)
+
+            # Ray subprocesses inherit environment variables, but not this
+            # driver's in-memory sys.path changes from runtime dependency setup.
+            pythonpath = os.pathsep.join(sys.path)
+            if os.environ.get("PYTHONPATH"):
+                pythonpath = f"{pythonpath}{os.pathsep}{os.environ['PYTHONPATH']}"
+            os.environ["PYTHONPATH"] = pythonpath
+
             ray.init(
-                runtime_env={"env_vars": {"PYTHONPATH": ":".join(sys.path)}},
+                runtime_env={"env_vars": {"PYTHONPATH": pythonpath}},
                 **ray_init_args,
             )
 

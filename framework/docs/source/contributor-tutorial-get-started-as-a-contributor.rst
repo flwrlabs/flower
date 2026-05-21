@@ -12,8 +12,8 @@
 - (Optional) `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_
 
 Flower uses ``pyproject.toml`` to manage dependencies and configure development tools
-(the ones which support it). The framework project uses uv for dependency management
-and package builds.
+(the ones which support it). ``uv`` is used for dependency management, build, and
+publishing workflows.
 
 *************************
  Developer Machine Setup
@@ -155,7 +155,8 @@ underneath.
  Build Release
 ***************
 
-Flower uses uv to build releases. The necessary command is wrapped in a simple script:
+Flower uses ``uv`` to build releases. The necessary command is wrapped in a simple
+script:
 
 ::
 

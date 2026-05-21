@@ -9,7 +9,8 @@
 Using uv (recommended)
 ======================
 
-Install a ``flwr`` pre-release from PyPI:
+Install a ``flwr`` pre-release from PyPI with ``uv add``, which updates
+``pyproject.toml`` and syncs the environment:
 
 - ``uv add --prerelease=allow "flwr==1.0.0a0"`` (without extras)
 - ``uv add --prerelease=allow "flwr[simulation]==1.0.0a0"`` (with extras)
@@ -25,8 +26,8 @@ Install ``flwr`` from a local wheel file:
 - ``uv add "../../dist/flwr-1.8.0-py3-none-any.whl" --extra simulation`` (with
   extras)
 
-Please refer to the uv documentation for further details: `uv add
-<https://docs.astral.sh/uv/reference/cli/#uv-add>`_
+Please refer to the uv documentation for further details: `Managing dependencies with uv
+<https://docs.astral.sh/uv/concepts/projects/dependencies/>`_
 
 Using pip (recommended on Colab)
 ================================
