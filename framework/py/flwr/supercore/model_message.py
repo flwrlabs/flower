@@ -18,21 +18,19 @@
 from __future__ import annotations
 
 import json
-from typing import ClassVar, TypeVar, cast
+from collections.abc import Sequence
+from typing import ClassVar, cast
 
 from flwr.app.message_type import MessageType
 from flwr.app.metadata import Metadata
-from flwr.common.message import Message, make_message
+from flwr.common.message import Message
 from flwr.common.record import ConfigRecord, RecordDict
 from flwr.supercore.date import now
-from flwr.supercore.inflatable.inflatable_object import InflatableObject
 from flwr.supercore.typing import JSONValue, JSONObject
 
 _PAYLOAD_RECORD_KEY = "payload"
 _PAYLOAD_JSON_KEY = "json"
 _DEFAULT_TASK_MESSAGE_TTL = 3600.0
-
-T = TypeVar("T", bound=Message)
 
 
 class ModelRequest(Message):
@@ -40,14 +38,14 @@ class ModelRequest(Message):
 
     MESSAGE_TYPE: ClassVar[str] = MessageType.QUERY
 
-    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,super-init-not-called
+    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
         self,
         *,
         dst_task_id: int,
-        input: list[JSONObject],  # pylint: disable=redefined-builtin
+        input: Sequence[JSONObject],  # pylint: disable=redefined-builtin
         model: str,
         stream: bool,
-        tools: list[JSONObject] | None = None,
+        tools: Sequence[JSONObject] | None = None,
         tool_choice: JSONValue | None = None,
         reasoning: JSONObject | None = None,
         previous_response_id: str | None = None,
@@ -73,38 +71,41 @@ class ModelRequest(Message):
         _set_optional(payload, "text", text)
 
         _validate_model_request_payload(payload)
-        _init_message_from_payload(
-            self,
-            dst_task_id=dst_task_id,
-            message_type=self.MESSAGE_TYPE,
-            payload=payload,
-            reply_to_message_id=reply_to_message_id,
-            ttl=ttl,
+        message_metadata, content = _build_metadata_and_content(
+            dst_task_id,
+            self.MESSAGE_TYPE,
+            payload,
+            reply_to_message_id,
+            ttl,
+        )
+        super().__init__(  # type: ignore[call-overload]
+            metadata=message_metadata,
+            content=content,
         )
 
     @property
     def payload(self) -> JSONObject:
         """Return this request's Responses create-request payload."""
-        return _payload_from_message(self)
+        if not self.has_content():
+            raise ValueError("Expected a message with content.")
+        return _payload_from_content(self.content)
 
     @classmethod
     def from_message(cls, message: Message) -> ModelRequest:
         """Parse a generic message into a model request."""
-        _validate_message_type(message, cls.MESSAGE_TYPE)
-        payload = _payload_from_message(message)
+        if message.metadata.message_type != cls.MESSAGE_TYPE:
+            raise ValueError(
+                f"Expected message type {cls.MESSAGE_TYPE}, "
+                f"got {message.metadata.message_type}."
+            )
+        if not message.has_content():
+            raise ValueError("Expected a message with content.")
+
+        payload = _payload_from_content(message.content)
         _validate_model_request_payload(payload)
-        return _copy_as(cls, message)
-
-    def deflate(self) -> bytes:
-        """Deflate as the underlying transport `Message`."""
-        return _deflate_as_message(self)
-
-    @classmethod
-    def inflate(
-        cls, object_content: bytes, children: dict[str, InflatableObject] | None = None
-    ) -> ModelRequest:
-        """Inflate a model request from bytes."""
-        return cls.from_message(Message.inflate(object_content, children))
+        request = cls.__new__(cls)
+        request.__dict__.update(message.__dict__)
+        return request
 
 
 class ModelResponse(Message):
@@ -112,7 +113,7 @@ class ModelResponse(Message):
 
     MESSAGE_TYPE: ClassVar[str] = MessageType.QUERY
 
-    def __init__(  # pylint: disable=super-init-not-called
+    def __init__(
         self,
         *,
         dst_task_id: int,
@@ -123,39 +124,43 @@ class ModelResponse(Message):
         if not reply_to_message_id:
             raise ValueError("ModelResponse requires reply_to_message_id.")
         _validate_model_response_payload(response)
-        _init_message_from_payload(
-            self,
-            dst_task_id=dst_task_id,
-            message_type=self.MESSAGE_TYPE,
-            payload=response,
-            reply_to_message_id=reply_to_message_id,
-            ttl=ttl,
+        metadata, content = _build_metadata_and_content(
+            dst_task_id,
+            self.MESSAGE_TYPE,
+            response,
+            reply_to_message_id,
+            ttl,
+        )
+        super().__init__(  # type: ignore[call-overload]
+            metadata=metadata,
+            content=content,
         )
 
     @property
     def payload(self) -> JSONObject:
         """Return this response's OpenAI Responses object payload."""
-        return _payload_from_message(self)
+        if not self.has_content():
+            raise ValueError("Expected a message with content.")
+        return _payload_from_content(self.content)
 
     @classmethod
     def from_message(cls, message: Message) -> ModelResponse:
         """Parse a generic message into a model response."""
-        _validate_message_type(message, cls.MESSAGE_TYPE)
-        _validate_reply_to_message_id(message)
-        payload = _payload_from_message(message)
+        if message.metadata.message_type != cls.MESSAGE_TYPE:
+            raise ValueError(
+                f"Expected message type {cls.MESSAGE_TYPE}, "
+                f"got {message.metadata.message_type}."
+            )
+        if not message.metadata.reply_to_message_id:
+            raise ValueError("ModelResponse requires reply_to_message_id.")
+        if not message.has_content():
+            raise ValueError("Expected a message with content.")
+
+        payload = _payload_from_content(message.content)
         _validate_model_response_payload(payload)
-        return _copy_as(cls, message)
-
-    def deflate(self) -> bytes:
-        """Deflate as the underlying transport `Message`."""
-        return _deflate_as_message(self)
-
-    @classmethod
-    def inflate(
-        cls, object_content: bytes, children: dict[str, InflatableObject] | None = None
-    ) -> ModelResponse:
-        """Inflate a model response from bytes."""
-        return cls.from_message(Message.inflate(object_content, children))
+        response = cls.__new__(cls)
+        response.__dict__.update(message.__dict__)
+        return response
 
 
 def _set_optional(payload: JSONObject, key: str, value: JSONValue | None) -> None:
@@ -164,16 +169,14 @@ def _set_optional(payload: JSONObject, key: str, value: JSONValue | None) -> Non
         payload[key] = value
 
 
-def _init_message_from_payload(  # pylint: disable=too-many-arguments
-    message: Message,
-    *,
+def _build_metadata_and_content(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     dst_task_id: int,
     message_type: str,
     payload: JSONObject,
     reply_to_message_id: str,
     ttl: float,
-) -> None:
-    """Initialize a Message subclass from a task payload."""
+) -> tuple[Metadata, RecordDict]:
+    """Build message metadata and content from a task payload."""
     metadata = Metadata(
         run_id=0,
         message_id="",
@@ -186,14 +189,7 @@ def _init_message_from_payload(  # pylint: disable=too-many-arguments
         message_type=message_type,
         dst_task_id=dst_task_id,
     )
-    metadata.delivered_at = ""
-    message.__dict__.update(
-        {
-            "_metadata": metadata,
-            "_content": _payload_to_content(payload),
-            "_error": None,
-        }
-    )
+    return metadata, _payload_to_content(payload)
 
 
 def _payload_to_content(payload: JSONObject) -> RecordDict:
@@ -225,53 +221,37 @@ def _payload_from_content(content: RecordDict) -> JSONObject:
     return cast(JSONObject, payload)
 
 
-def _payload_from_message(message: Message) -> JSONObject:
-    """Parse a JSON object payload from a message."""
-    if not message.has_content():
-        raise ValueError("Expected a message with content.")
-    return _payload_from_content(message.content)
-
-
-def _validate_message_type(message: Message, expected: str) -> None:
-    """Validate that the message type matches the expected value."""
-    actual = message.metadata.message_type
-    if actual != expected:
-        raise ValueError(f"Expected message type {expected}, got {actual}.")
-
-
-def _validate_reply_to_message_id(message: Message) -> None:
-    """Validate that the message identifies the request it replies to."""
-    if not message.metadata.reply_to_message_id:
-        raise ValueError("ModelResponse requires reply_to_message_id.")
-
-
-def _validate_object_list_field(
+def _validate_object_sequence_field(
     payload: JSONObject, field: str, *, owner: str, required: bool = False
 ) -> None:
-    """Validate that a payload field is a list of JSON objects."""
+    """Validate that a payload field is a sequence of JSON objects."""
     if field not in payload:
         if required:
-            raise ValueError(f"{owner} payload requires list field '{field}'.")
+            raise ValueError(f"{owner} payload requires sequence field '{field}'.")
         return
 
     value = payload[field]
-    if not isinstance(value, list):
+    if not isinstance(value, Sequence) or isinstance(value, str):
         if required:
-            raise ValueError(f"{owner} payload requires list field '{field}'.")
-        raise ValueError(f"{owner} payload field '{field}' must be a list.")
+            raise ValueError(f"{owner} payload requires sequence field '{field}'.")
+        raise ValueError(f"{owner} payload field '{field}' must be a sequence.")
     if not all(isinstance(item, dict) for item in value):
-        raise ValueError(f"{owner} payload field '{field}' must be a list of objects.")
+        raise ValueError(
+            f"{owner} payload field '{field}' must be a sequence of objects."
+        )
 
 
 def _validate_model_request_payload(payload: JSONObject) -> None:
     """Validate the minimal Responses create-request shape."""
     if not isinstance(payload.get("model"), str):
         raise ValueError("ModelRequest payload requires string field 'model'.")
-    _validate_object_list_field(payload, "input", owner="ModelRequest", required=True)
+    _validate_object_sequence_field(
+        payload, "input", owner="ModelRequest", required=True
+    )
     if not isinstance(payload.get("stream"), bool):
         raise ValueError("ModelRequest payload requires bool field 'stream'.")
 
-    _validate_object_list_field(payload, "tools", owner="ModelRequest")
+    _validate_object_sequence_field(payload, "tools", owner="ModelRequest")
     if "reasoning" in payload and not isinstance(payload["reasoning"], dict):
         raise ValueError("ModelRequest payload field 'reasoning' must be an object.")
     if "previous_response_id" in payload and not isinstance(
@@ -302,28 +282,10 @@ def _validate_model_response_payload(payload: JSONObject) -> None:
         raise ValueError("ModelResponse payload field 'id' must be a string.")
     if "status" in payload and not isinstance(payload["status"], str):
         raise ValueError("ModelResponse payload field 'status' must be a string.")
-    _validate_object_list_field(payload, "output", owner="ModelResponse")
+    _validate_object_sequence_field(payload, "output", owner="ModelResponse")
     if (
         "error" in payload
         and payload["error"] is not None
         and not isinstance(payload["error"], dict)
     ):
         raise ValueError("ModelResponse payload field 'error' must be an object.")
-
-
-def _copy_as(cls: type[T], message: Message) -> T:
-    """Return a Message subclass instance carrying the original message data."""
-    typed = cls.__new__(cls)
-    typed.__dict__.update(
-        {
-            "_metadata": message.metadata,
-            "_content": message.content,
-            "_error": None,
-        }
-    )
-    return typed
-
-
-def _deflate_as_message(message: Message) -> bytes:
-    """Deflate a typed message using the plain Message transport header."""
-    return make_message(metadata=message.metadata, content=message.content).deflate()

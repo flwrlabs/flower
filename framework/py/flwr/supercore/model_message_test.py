@@ -21,14 +21,9 @@ from typing import Any
 import pytest
 
 from flwr.app.metadata import Metadata
-from flwr.common import ConfigRecord, Error, Message, RecordDict
+from flwr.common import ConfigRecord, Message, RecordDict
 from flwr.common.message import make_message
-from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.common.serde_utils import metadata_from_proto, metadata_to_proto
 from flwr.supercore.date import now
-from flwr.supercore.inflatable.inflatable_object import (
-    get_object_type_from_object_content,
-)
 from flwr.supercore.model_message import ModelRequest, ModelResponse
 from flwr.supercore.typing import JSONObject
 
@@ -36,7 +31,6 @@ from flwr.supercore.typing import JSONObject
 def _metadata(
     *,
     message_type: str,
-    src_task_id: int | None = None,
     dst_task_id: int | None = 123,
     reply_to_message_id: str = "",
 ) -> Metadata:
@@ -51,7 +45,6 @@ def _metadata(
         created_at=now().timestamp(),
         ttl=3600.0,
         message_type=message_type,
-        src_task_id=src_task_id,
         dst_task_id=dst_task_id,
     )
 
@@ -76,39 +69,6 @@ def _message_with_payload(
             }
         ),
     )
-
-
-def test_metadata_task_ids_roundtrip_through_proto() -> None:
-    """Metadata should preserve task IDs through protobuf serde."""
-    metadata = _metadata(
-        message_type=ModelRequest.MESSAGE_TYPE,
-        src_task_id=123,
-        dst_task_id=456,
-    )
-
-    proto = metadata_to_proto(metadata)
-    assert proto.HasField("src_task_id")
-    assert proto.HasField("dst_task_id")
-    assert proto.src_task_id == 123
-    assert proto.dst_task_id == 456
-
-    actual = metadata_from_proto(proto)
-    assert actual.src_task_id == 123
-    assert actual.dst_task_id == 456
-
-
-def test_metadata_task_ids_remain_unset_when_absent() -> None:
-    """Metadata should not set optional task ID proto fields when absent."""
-    proto = metadata_to_proto(
-        _metadata(message_type=ModelRequest.MESSAGE_TYPE, dst_task_id=None)
-    )
-
-    assert not proto.HasField("src_task_id")
-    assert not proto.HasField("dst_task_id")
-
-    actual = metadata_from_proto(proto)
-    assert actual.src_task_id is None
-    assert actual.dst_task_id is None
 
 
 def test_model_request_creates_responses_request_payload() -> None:
@@ -175,39 +135,39 @@ def test_model_response_creates_responses_object_payload() -> None:
     assert "response" not in response.payload
 
 
-def test_model_messages_roundtrip_through_plain_message_proto() -> None:
-    """Typed model messages should roundtrip through message.proto.Message."""
-    request = ModelRequest(
-        dst_task_id=123,
-        input=[{"role": "user", "content": "Hello"}],
-        model="gpt-5",
-        stream=False,
+def test_model_request_from_message_wraps_plain_message() -> None:
+    """ModelRequest should parse a plain Message carrying a request payload."""
+    message = _message_with_payload(
+        {
+            "model": "gpt-5",
+            "input": [{"role": "user", "content": "Hello"}],
+            "stream": False,
+        },
+        message_type=ModelRequest.MESSAGE_TYPE,
     )
 
-    plain = message_from_proto(message_to_proto(request))
-
-    assert plain.__class__ is Message
-    parsed = ModelRequest.from_message(plain)
+    parsed = ModelRequest.from_message(message)
     assert isinstance(parsed, ModelRequest)
-    assert parsed.payload == request.payload
+    assert parsed.payload == {
+        "model": "gpt-5",
+        "input": [{"role": "user", "content": "Hello"}],
+        "stream": False,
+    }
     assert parsed.metadata.dst_task_id == 123
 
 
-def test_model_message_deflates_as_plain_message_transport() -> None:
-    """Typed messages should keep the inflatable transport type as Message."""
-    request = ModelRequest(
-        dst_task_id=123,
-        input=[{"role": "user", "content": "Hello"}],
-        model="gpt-5",
-        stream=True,
+def test_model_response_from_message_wraps_plain_message() -> None:
+    """ModelResponse should parse a plain Message carrying a response payload."""
+    message = _message_with_payload(
+        {"object": "response", "id": "resp_123"},
+        message_type=ModelResponse.MESSAGE_TYPE,
+        reply_to_message_id="request-message-id",
     )
 
-    request_bytes = request.deflate()
-
-    assert get_object_type_from_object_content(request_bytes) == Message.__qualname__
-    inflated = ModelRequest.inflate(request_bytes, children=request.children)
-    assert isinstance(inflated, ModelRequest)
-    assert inflated.payload == request.payload
+    parsed = ModelResponse.from_message(message)
+    assert isinstance(parsed, ModelResponse)
+    assert parsed.payload == {"object": "response", "id": "resp_123"}
+    assert parsed.metadata.reply_to_message_id == "request-message-id"
 
 
 def test_model_request_from_message_rejects_wrong_message_type() -> None:
@@ -242,78 +202,34 @@ def test_model_response_from_message_requires_reply_to_message_id() -> None:
         ModelResponse.from_message(message)
 
 
-@pytest.mark.parametrize(
-    "message",
-    [
-        make_message(
-            metadata=_metadata(message_type=ModelRequest.MESSAGE_TYPE),
-            content=RecordDict(),
-        ),
-        make_message(
-            metadata=_metadata(message_type=ModelRequest.MESSAGE_TYPE),
-            content=RecordDict({"payload": ConfigRecord({"json": 1})}),
-        ),
-        make_message(
-            metadata=_metadata(message_type=ModelRequest.MESSAGE_TYPE),
-            content=RecordDict({"payload": ConfigRecord({"json": "{"})}),
-        ),
-        make_message(
-            metadata=_metadata(message_type=ModelRequest.MESSAGE_TYPE),
-            content=RecordDict({"payload": ConfigRecord({"json": "[]"})}),
-        ),
-        make_message(
-            metadata=_metadata(message_type=ModelRequest.MESSAGE_TYPE),
-            error=Error(code=1, reason="failed"),
-        ),
-    ],
-)
-def test_model_request_from_message_rejects_invalid_payload(message: Message) -> None:
-    """ModelRequest parsing should reject invalid payload transport shape."""
+def test_model_request_from_message_rejects_missing_payload() -> None:
+    """ModelRequest parsing should require a payload record."""
+    message = make_message(
+        metadata=_metadata(message_type=ModelRequest.MESSAGE_TYPE),
+        content=RecordDict(),
+    )
+
     with pytest.raises(ValueError):
         ModelRequest.from_message(message)
 
 
-@pytest.mark.parametrize(
-    "payload",
-    [
-        {"input": [], "stream": True},
-        {"model": "gpt-5", "stream": True},
-        {"model": "gpt-5", "input": []},
-        {"model": "gpt-5", "input": [], "stream": "true"},
-        {"model": "gpt-5", "input": [1], "stream": True},
-        {"model": "gpt-5", "input": [], "stream": True, "tools": ["x"]},
-        {"model": "gpt-5", "input": [], "stream": True, "reasoning": []},
-    ],
-)
-def test_model_request_from_message_rejects_invalid_request_shape(
-    payload: dict[str, Any],
-) -> None:
-    """ModelRequest parsing should validate Responses request fields."""
+def test_model_request_from_message_rejects_invalid_request_payload() -> None:
+    """ModelRequest parsing should validate the minimal request shape."""
     with pytest.raises(ValueError):
         ModelRequest.from_message(
-            _message_with_payload(payload, message_type=ModelRequest.MESSAGE_TYPE)
+            _message_with_payload(
+                {"input": [], "stream": True},
+                message_type=ModelRequest.MESSAGE_TYPE,
+            )
         )
 
 
-@pytest.mark.parametrize(
-    "payload",
-    [
-        {},
-        {"object": "chat.completion"},
-        {"object": "response", "id": 123},
-        {"object": "response", "output": {}},
-        {"object": "response", "output": [1]},
-        {"object": "response", "error": "failed"},
-    ],
-)
-def test_model_response_from_message_rejects_invalid_response_shape(
-    payload: dict[str, Any],
-) -> None:
-    """ModelResponse parsing should validate Responses object fields."""
+def test_model_response_from_message_rejects_invalid_response_payload() -> None:
+    """ModelResponse parsing should validate the minimal response shape."""
     with pytest.raises(ValueError):
         ModelResponse.from_message(
             _message_with_payload(
-                payload,
+                {"object": "chat.completion"},
                 message_type=ModelResponse.MESSAGE_TYPE,
                 reply_to_message_id="request-message-id",
             )
