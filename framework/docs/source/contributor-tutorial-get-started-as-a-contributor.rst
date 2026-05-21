@@ -7,13 +7,13 @@
 ***************
 
 - `Python 3.10 <https://docs.python.org/3.10/>`_ or above
-- `Poetry 2.3 <https://python-poetry.org/>`_ or above
+- `uv 0.10.7 <https://docs.astral.sh/uv/>`_ or above
 - (Optional) `pyenv <https://github.com/pyenv/pyenv>`_
 - (Optional) `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_
 
 Flower uses ``pyproject.toml`` to manage dependencies and configure development tools
-(the ones which support it). Poetry is a build tool which supports `PEP 517
-<https://peps.python.org/pep-0517/>`_.
+(the ones which support it). ``uv`` is used for dependency management, build, and
+publishing workflows.
 
 *************************
  Developer Machine Setup
@@ -71,19 +71,14 @@ Create Flower Dev Environment
            $ pyenv virtualenv <your-python-version> <your-env-name>
            $ pyenv activate <your-env-name>
 
-3. Install Poetry, which is used to manage dependencies and development workflows:
-
-       ::
-
-           (your-env-name) $ pip install poetry==2.3.2
-
+3. Install ``uv``, which is used to manage dependencies and development workflows.
 4. Navigate to the ``framework`` directory and install the Flower project in development
    mode, including all optional dependencies:
 
        ::
 
            (your-env-name) $ cd framework
-           (your-env-name) $ python -m poetry install --all-extras
+           (your-env-name) $ uv sync --locked --all-extras --all-groups
 
 *********************
  Convenience Scripts
@@ -168,7 +163,7 @@ underneath.
  Build Release
 ***************
 
-Flower uses Poetry to build releases. The necessary command is wrapped in a simple
+Flower uses ``uv`` to build releases. The necessary command is wrapped in a simple
 script:
 
 ::

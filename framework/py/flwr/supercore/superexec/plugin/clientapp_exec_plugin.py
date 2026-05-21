@@ -15,6 +15,8 @@
 """Simple Flower SuperExec plugin for ClientApp."""
 
 
+from flwr.supercore.constant import TaskType
+
 from .base_exec_plugin import BaseExecPlugin
 
 
@@ -24,5 +26,4 @@ class ClientAppExecPlugin(BaseExecPlugin):
     The plugin always selects the first candidate run ID.
     """
 
-    command = "flwr-clientapp"
-    appio_api_address_arg = "--clientappio-api-address"
+    supported_task_types = frozenset({TaskType.CLIENT_APP})

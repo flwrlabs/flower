@@ -29,17 +29,14 @@ jobs:
       - uses: actions/checkout@v5
       - name: Bootstrap
         uses: ./.github/actions/bootstrap
-        with:
-          uv-skip: "false"
-          poetry-skip: "true"
       - name: Install dependencies
         run: |
           cd dev
-          uv sync --frozen
+          uv sync --locked
       - name: Check docs format
         run: |
           cd dev
-          uv run docstrfmt --check ../intelligence/docs/source
+          uv run --no-sync docstrfmt --check ../intelligence/docs/source
   build_ts_docs:
     runs-on: ubuntu-22.04
     name: Build TypeScript Docs
@@ -151,7 +148,7 @@ jobs:
         if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         run: |
           cd framework
-          python -m poetry install --extras "simulation"
+          uv sync --locked --all-groups --extra simulation
       - name: Download TS docs
         if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         uses: actions/download-artifact@v4
@@ -167,8 +164,8 @@ jobs:
       - name: Build final docs
         if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         run: |
-          cd intelligence/docs
-          make html
+          cd framework
+          uv run --no-sync make -C ../intelligence/docs html
       - name: Deploy docs
         if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         env:
