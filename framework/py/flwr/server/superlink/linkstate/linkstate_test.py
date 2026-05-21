@@ -448,10 +448,10 @@ class StateTest(CoreStateTest):
             ),
         ]
     )  # type: ignore
-    def test_sibling_tasks_finished_on_finish_task(
-        self, sub_status: str, sibling_sub_status: str, sibling_details: str
+    def test_run_tasks_finished_on_finish_task(
+        self, sub_status: str, run_sub_status: str, run_details: str
     ) -> None:
-        """Sibling tasks must share the primary task's finished_at when finish_task is
+        """Run tasks must share the primary task's finished_at when finish_task is
         called."""
         # Prepare
         state = self.state_factory()
@@ -466,12 +466,12 @@ class StateTest(CoreStateTest):
         # Execute
         assert state.finish_task(primary_task_id, sub_status, "done")
 
-        # Assert: sibling finished_at matches primary task finished_at
+        # Assert: run task finished_at matches primary task finished_at
         tasks = {task.task_id: task for task in state.get_tasks(run_ids=[run_id])}
         extra_task = tasks[extra_task_id]
         assert extra_task.finished_at == tasks[primary_task_id].finished_at
-        assert extra_task.status.sub_status == sibling_sub_status
-        assert extra_task.status.details == sibling_details
+        assert extra_task.status.sub_status == run_sub_status
+        assert extra_task.status.details == run_details
 
     @parameterized.expand([(1,), (2,), (3,)])  # type: ignore
     def test_usage_report_hook_called_on_each_successful_transition(

@@ -722,12 +722,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 if run_id in self.run_ids
             }
 
-    def _finish_sibling_tasks(
+    def _finish_run_tasks(
         self, run_primary_pairs: list[tuple[int, int]], sub_status: str, details: str
     ) -> None:
-        """Finish all unfinished sibling tasks for the given run/primary-task pairs.
+        """Finish all unfinished tasks of the run for the given run/primary-task pairs.
 
-        Each sibling task's ``finished_at`` is copied from its run's primary task.
+        Each task's ``finished_at`` is copied from its run's primary task.
         """
         for run_id, primary_task_id in run_primary_pairs:
             primary_task = self.task_store.get(primary_task_id)
@@ -752,16 +752,16 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 if task is not None:
                     # Stop all tasks of the run when the run is stopped
                     if sub_status == SubStatus.STOPPED:
-                        sibling_substatus = SubStatus.STOPPED
-                        sibling_details = "Task stopped because the run was stopped"
+                        finish_sub_status = SubStatus.STOPPED
+                        finish_details = "Task stopped because the run was stopped"
                     # Otherwise, fail all tasks of the run
                     else:
-                        sibling_substatus = SubStatus.FAILED
-                        sibling_details = "Task failed because the run finished"
-                    self._finish_sibling_tasks(
+                        finish_sub_status = SubStatus.FAILED
+                        finish_details = "Task failed because the run finished"
+                    self._finish_run_tasks(
                         [(task.run_id, task_id)],
-                        sub_status=sibling_substatus,
-                        details=sibling_details,
+                        sub_status=finish_sub_status,
+                        details=finish_details,
                     )
             self.federation_manager.report_run_usage()
         return result
@@ -781,7 +781,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         if not pairs:
             return
 
-        self._finish_sibling_tasks(
+        self._finish_run_tasks(
             pairs,
             sub_status=SubStatus.FAILED,
             details="Task failed because the run expired",
