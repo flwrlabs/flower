@@ -587,15 +587,13 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertEqual(state.get_task_message(), [])
 
-    def test_get_task_message_filters_destination_and_expiration(self) -> None:
-        """Getting task Messages should filter by destination and TTL."""
+    def test_get_task_message_filters_destination_and_rejects_expired(self) -> None:
+        """Getting task Messages should filter by destination and reject expired."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
         src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
         dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
-        other_dst_task_id = state.create_task(
-            task_type=TaskType.MODEL, run_id=run_id
-        )
+        other_dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
         assert (
             src_task_id is not None
             and dst_task_id is not None
@@ -607,27 +605,20 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         expired = _create_task_message(
             src_task_id, dst_task_id, run_id, ttl=1.0, created_at=current - 2.0
         )
-        other_destination = _create_task_message(
-            src_task_id, other_dst_task_id, run_id
-        )
+        other_destination = _create_task_message(src_task_id, other_dst_task_id, run_id)
 
         self.assertTrue(state.store_task_message(expected))
-        self.assertTrue(state.store_task_message(expired))
+        self.assertFalse(state.store_task_message(expired))
         self.assertTrue(state.store_task_message(other_destination))
 
         pulled = state.get_task_message(dst_task_ids=[dst_task_id])
 
-        self.assertEqual(
-            [message.metadata.message_id for message in pulled],
-            [expected.metadata.message_id],
-        )
-        self.assertTrue(state.store_task_message(expired))
+        self.assertEqual(len(pulled), 1)
+        self.assertEqual(pulled[0].metadata.message_id, expected.metadata.message_id)
         self.assertEqual(
             [
                 message.metadata.message_id
-                for message in state.get_task_message(
-                    dst_task_ids=[other_dst_task_id]
-                )
+                for message in state.get_task_message(dst_task_ids=[other_dst_task_id])
             ],
             [other_destination.metadata.message_id],
         )

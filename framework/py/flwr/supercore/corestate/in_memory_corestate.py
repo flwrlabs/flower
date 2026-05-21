@@ -40,7 +40,7 @@ from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import generate_rand_int_from_bytes
+from .utils import generate_rand_int_from_bytes, validate_task_message
 
 
 @dataclass
@@ -324,31 +324,27 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             task.CopyFrom(self.task_store[task_id])
             return task
 
-    def store_task_message(self, message: Message) -> str | None:
+    def store_task_message(self, message: Message) -> bool:
         """Store one task-addressed Message."""
         message_id = message.metadata.message_id
         src_task_id = message.metadata.src_task_id
         dst_task_id = message.metadata.dst_task_id
-        if (
-            not _is_valid_task_message(message)
-            or src_task_id is None
-            or dst_task_id is None
-        ):
-            return None
+        if validate_task_message(message) or src_task_id is None or dst_task_id is None:
+            return False
 
         with self.lock_task_store:
             self._cleanup_expired_task_tokens_locked()
             src_task = self.task_store.get(src_task_id)
             dst_task = self.task_store.get(dst_task_id)
             if src_task is None or dst_task is None:
-                return None
+                return False
             if src_task.run_id != dst_task.run_id:
-                return None
+                return False
             if Status.FINISHED in (
                 src_task.status.status,
                 dst_task.status.status,
             ):
-                return None
+                return False
             run_id = src_task.run_id
 
         message_copy = message_from_proto(message_to_proto(message))
@@ -358,9 +354,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
 
         with self.lock_task_message_store:
             if message_id in self.task_message_store:
-                return None
+                return False
             self.task_message_store[message_id] = message_copy
-            return message_id
+            return True
 
     def get_task_message(
         self,
@@ -469,17 +465,3 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         for key, expires_at in list(self.nonce_store.items()):
             if expires_at < current:
                 del self.nonce_store[key]
-
-
-def _is_valid_task_message(message: Message) -> bool:
-    """Return True if the task message carries the required payload fields."""
-    return (
-        message.metadata.message_id != ""
-        and message.metadata.src_task_id is not None
-        and message.metadata.src_task_id != 0
-        and message.metadata.dst_task_id is not None
-        and message.metadata.dst_task_id != 0
-        and message.metadata.ttl > 0
-        and message.metadata.message_type != ""
-        and message.has_content() != message.has_error()
-    )

@@ -50,7 +50,7 @@ from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import generate_rand_int_from_bytes, timestamp_to_iso
+from .utils import generate_rand_int_from_bytes, timestamp_to_iso, validate_task_message
 
 # Define SQL conditions for task statuses to ensure consistency across queries
 STATUS_CONDITIONS = {
@@ -414,18 +414,13 @@ class SqlCoreState(CoreState, SqlMixin):
             return None
         return task_from_row(rows[0])
 
-    def store_task_message(self, message: Message) -> str | None:
+    def store_task_message(self, message: Message) -> bool:
         """Store one task-addressed Message."""
         src_task_id = message.metadata.src_task_id
         dst_task_id = message.metadata.dst_task_id
-        if (
-            not _is_valid_task_message(message)
-            or src_task_id is None
-            or dst_task_id is None
-        ):
-            return None
+        if validate_task_message(message) or src_task_id is None or dst_task_id is None:
+            return False
 
-        message_id = message.metadata.message_id
         sint64_src_task_id = uint64_to_int64(src_task_id)
         sint64_dst_task_id = uint64_to_int64(dst_task_id)
 
@@ -474,11 +469,11 @@ class SqlCoreState(CoreState, SqlMixin):
                     message_dict,
                 )
             except IntegrityError:
-                return None
+                return False
             if not inserted:
-                return None
+                return False
 
-        return message_id
+        return True
 
     def get_task_message(
         self,
@@ -673,17 +668,3 @@ def _task_message_from_row(row: dict[str, Any]) -> Message:
         dst_task_id=row["dst_task_id"],
     )
     return make_message(metadata=metadata, content=content, error=error)
-
-
-def _is_valid_task_message(message: Message) -> bool:
-    """Return True if the task message carries the required payload fields."""
-    return (
-        message.metadata.message_id != ""
-        and message.metadata.src_task_id is not None
-        and message.metadata.src_task_id != 0
-        and message.metadata.dst_task_id is not None
-        and message.metadata.dst_task_id != 0
-        and message.metadata.ttl > 0
-        and message.metadata.message_type != ""
-        and message.has_content() != message.has_error()
-    )
