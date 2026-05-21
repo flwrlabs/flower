@@ -220,11 +220,12 @@ we need to pass it to the strategy's ``start`` method as shown below.
 
         # .. unchanged
 
-Finally, we run the simulation.
+From here on, we'll run locally so you can iterate faster while editing the app. Run the
+local simulation with:
 
 .. code-block:: shell
 
-    $ flwr run . --stream
+    $ flwr run . local --stream
 
 You'll note that the server logs the metrics returned by the callback after each round.
 Also, at the end of the run, note the ``ServerApp-side Evaluate Metrics`` shown:
@@ -283,12 +284,12 @@ see how this looks like in code. Create a new file called ``custom_strategy.py``
 Next, we use this new strategy in our ``ServerApp`` by importing it in your
 ``server_app.py`` and use it instead of the standard ``FedAdagrad``.
 
-Finally, run the training with the following command. Here we increase the number of
-rounds to 15 to see the learning rate decay in action.
+Run locally again, this time increasing the number of rounds to 15 to see the learning
+rate decay in action.
 
 .. code-block:: shell
 
-    $ flwr run . --stream --run-config="num-server-rounds=15"
+    $ flwr run . local --stream --run-config="num-server-rounds=15"
 
 You'll note that in the ``configure_train`` stage of rounds 5 and 10, the learning rate
 is decreased by a factor of 0.5 and the new learning rate is printed to the terminal.
@@ -331,7 +332,7 @@ default Simulation Runtime configuration via the ``--federation-config`` flag:
 .. code-block:: shell
 
     # Run with 50 clients
-    $ flwr run . --stream --federation-config="num-supernodes=50"
+    $ flwr run . local --stream --federation-config="num-supernodes=50"
 
 For more details on the Simulation Runtime and its configuration, check out the
 :doc:`Simulation Runtime documentation <how-to-run-simulations>`.
@@ -385,7 +386,7 @@ Finally, run the simulation with the following command:
 
 .. code-block:: shell
 
-    $ flwr run . --stream
+    $ flwr run . local --stream
 
 *******
  Recap

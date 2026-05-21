@@ -133,9 +133,9 @@ same run details page you saw right after launching the app.
     :align: center
     :target: ./_static/federation_dashboard_shows_run.png
 
-In the next tutorial, you'll learn how to write your own Flower App and run it on
-SuperGrid. You'll also learn about strategies, a powerful way to customize the behavior
-of your collaborative AI workloads.
+In the next tutorial, you'll download an existing Flower App, run it from your local
+machine on SuperGrid, make a small customization, and learn how the main Flower App
+components fit together.
 
 ************
  Next steps
@@ -148,8 +148,7 @@ Flower Discuss <https://discuss.flower.ai>`__) and on Slack (`Join Slack
 There's a dedicated ``#questions`` Slack channel if you need help, but we'd also love to
 hear who you are in ``#introductions``!
 
-The :doc:`Flower Collaborative AI Tutorial - Part 2
+The :doc:`Flower Collaborative AI Tutorial - Part 2: Write your first Flower App
 <tutorial-series-write-your-first-flower-app>` will walk you through the process of
-writing your own Flower App by describing first how each component, like the `ServerApp`
-and `ClientApp`, interact with each other. You'll also learn how to run your app on
-SuperGrid and monitor its progress.
+customizing your first Flower App and understanding how components like ``ServerApp``
+and ``ClientApp`` interact with each other.

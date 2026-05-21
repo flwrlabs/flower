@@ -84,11 +84,11 @@ tutorial:
 **********************************************
 
 Flower strategies have a number of methods that can be overridden to customize their
-behavior. In part 2, you learned how to customize the ``configure_train`` method to
-perform learning rate decay and communicate the updated learning rate as part of the
-|configrecord_link|_ sent to the clients in the ``Message``. In this tutorial you'll
-learn how to customize the |strategy_start_link|_ method. If you inspect the `source
-code
+behavior. In the previous strategy tutorial, you learned how to customize the
+``configure_train`` method to perform learning rate decay and communicate the updated
+learning rate as part of the |configrecord_link|_ sent to the clients in the
+``Message``. In this tutorial you'll learn how to customize the |strategy_start_link|_
+method. If you inspect the `source code
 <https://github.com/flwrlabs/flower/blob/main/framework/py/flwr/serverapp/strategy/strategy.py#L135>`_
 of this method you'll see that it contains a for loop where each iteration represents a
 federated learning round. Each round consists of three distinct stages:
@@ -98,7 +98,7 @@ federated learning round. Each round consists of three distinct stages:
 2. An evaluation stage, where a subset of clients is selected to evaluate the updated
    global model on their local validation sets.
 3. An optional stage to evaluate the global model on the server side. Note that this is
-   what you enabled in part 2 of this tutorial by means of the ``central_evaluate``
+   what you enabled in the previous tutorial by means of the ``global_evaluate``
    callback.
 
 Let's extend the ``CustomFedAdagrad`` strategy we created earlier and introduce:
@@ -333,14 +333,16 @@ run`` a new directory will be used. Let's see how this looks in code:
 
         # ... rest unchanged
 
-Finally, let's run the ``FlowerApp``:
+Finally, let's run the ``FlowerApp`` locally. This tutorial writes model checkpoints to
+your working directory and logs metrics to Weights & Biases, so a local run makes it
+easy to inspect the outputs.
 
 .. code-block:: shell
 
-    $ flwr run . --stream
+    $ flwr run . local --stream
 
-Plain ``flwr run .`` submits the run, prints the run ID, and returns without streaming
-logs. See :doc:`how-to-run-flower-locally` for the full local workflow.
+Plain ``flwr run . local`` submits the run, prints the run ID, and returns without
+streaming logs. See :doc:`how-to-run-flower-locally` for the full local workflow.
 
 After starting the run you will notice two things:
 
@@ -364,9 +366,8 @@ Flower strategy. This method is the main entry point of any strategy and contain
 logic to execute the federated learning process. In this tutorial, you learned how to
 log the metrics to Weight & Biases and how to save model checkpoints to disk.
 
-In the next tutorial, we're going to cover how to communicate arbitrary Python objects
-between the ``ClientApp`` and the ``ServerApp`` by serializing them and send them in a
-``Message`` as a ``ConfigRecord``.
+In the next tutorial, you'll communicate additional information between the
+``ClientApp`` and the ``ServerApp`` by serializing it and sending it in a ``Message``.
 
 ************
  Next steps
@@ -378,3 +379,7 @@ Flower Discuss <https://discuss.flower.ai>`__) and on Slack (`Join Slack
 
 There's a dedicated ``#questions`` Slack channel if you need help, but we'd also love to
 hear who you are in ``#introductions``!
+
+The :doc:`Flower Collaborative AI Tutorial - Part 6: Communicate custom Messages
+<tutorial-series-customize-the-client-pytorch>` shows how to customize what the
+``ClientApp`` sends back to the ``ServerApp``.

@@ -368,6 +368,6 @@ Flower Discuss <https://discuss.flower.ai>`__) and on Slack (`Join Slack
 There's a dedicated ``#questions`` Slack channel if you need help, but we'd also love to
 hear who you are in ``#introductions``!
 
-The :doc:`Flower Collaborative AI Tutorial - Get started with Flower
+The :doc:`Flower Collaborative AI Tutorial - Part 1: Get started with Flower
 <tutorial-series-get-started-with-flower>` shows how to create your first federation on
 SuperGrid and run a Flower App without writing code.

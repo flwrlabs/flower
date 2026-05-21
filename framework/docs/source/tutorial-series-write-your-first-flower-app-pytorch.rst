@@ -146,8 +146,8 @@ first login to SuperGrid:
     # This will open a browser window where you can enter your SuperGrid credentials.
     $ flwr login
 
-Once you are logged in, run the following command to run the app on SuperGrid and
-accross the federation you created in the previous tutorial:
+Once you are logged in, run the following command to run the app on SuperGrid and across
+the federation you created in the previous tutorial:
 
 .. code-block:: shell
 
@@ -156,7 +156,7 @@ accross the federation you created in the previous tutorial:
     # Run the app across the federation you created in the previous tutorial
     $ flwr run . --federation @<username>/<federation-name>
     # for example
-    # flwr run . --federation @peter123/my-first-federation`
+    # flwr run . --federation @peter123/my-first-federation
 
 SuperGrid will start a new run for this app. Open the `SuperGrid dashboard
 <https://flower.ai/federations/>`__, select your federation, and click the new run to
@@ -171,12 +171,12 @@ You can override values from ``pyproject.toml`` at run time. For example:
 
 .. code-block:: shell
 
-    # Run the app for five rounds intead of the default three rounds
+    # Run the app for five rounds instead of the default three rounds
     $ flwr run . --federation @<username>/<federation-name> \
         --run-config "num-server-rounds=5"
 
     # Run the app for five rounds and a smaller batch size
-    $ flwr run . --federation @<username>/<federation-name>
+    $ flwr run . --federation @<username>/<federation-name> \
         --run-config "num-server-rounds=5" \
         --run-config "batch-size=16"
 
@@ -228,7 +228,7 @@ The streamed output should include logs similar to this:
 .. note::
 
     In the above ``flwr run`` command you are not specifying a federation, this is
-    becuase for local prototyping there is only one federation available. Because of
+    because for local prototyping there is only one federation available. Because of
     this, the ``--federation`` flag is not required.
 
 .. note::

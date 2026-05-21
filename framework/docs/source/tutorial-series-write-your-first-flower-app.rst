@@ -91,8 +91,8 @@ first login to SuperGrid:
     # This will open a browser window where you can enter your SuperGrid credentials.
     $ flwr login
 
-Once you are logged in, run the following command to run the app on SuperGrid and
-accross the federation you created in the previous tutorial:
+Once you are logged in, run the following command to run the app on SuperGrid and across
+the federation you created in the previous tutorial:
 
 .. code-block:: shell
 
@@ -101,7 +101,7 @@ accross the federation you created in the previous tutorial:
     # Run the app across the federation you created in the previous tutorial
     $ flwr run . --federation @<username>/<federation-name>
     # for example
-    # flwr run . --federation @peter123/my-first-federation`
+    # flwr run . --federation @peter123/my-first-federation
 
 Then, if you navigate to the `SuperGrid dashboard <https://flower.ai/federations/>`__,
 you should see a new run in the list of runs of your federation. Click on it to see the
@@ -290,6 +290,6 @@ Flower Discuss <https://discuss.flower.ai>`__) and on Slack (`Join Slack
 There's a dedicated ``#questions`` Slack channel if you need help, but we'd also love to
 hear who you are in ``#introductions``!
 
-The :doc:`Flower Collaborative AI Tutorial - Part 3
-<tutorial-series-write-your-first-flower-app-pytorch>` presents a more advanced Flower
-App that uses PyTorch and real training and evaluation logic.
+The :doc:`Flower Collaborative AI Tutorial - Part 3: Write a Flower App for a PyTorch
+model <tutorial-series-write-your-first-flower-app-pytorch>` presents a more advanced
+Flower App that uses PyTorch and real training and evaluation logic.

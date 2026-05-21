@@ -267,10 +267,10 @@ strategy to handle the deserialization and use of the ``TrainProcessMetadata`` o
     ``@app.train()`` function. If we had sent it from an ``@app.evaluate()`` function,
     we would override the ``aggregate_evaluate`` method instead.
 
-Let's create a new custom strategy (or reuse the one created in part 2 and part 3 of
-this tutorial) in ``server_app.py`` that extends the ``FedAdagrad`` strategy and
-overrides the ``aggregate_train`` method to deserialize the ``TrainProcessMetadata``
-object from each client and print the training time and convergence status:
+Let's create a new custom strategy, or reuse the one created in the previous strategy
+tutorials, in ``server_app.py`` that extends the ``FedAdagrad`` strategy and overrides
+the ``aggregate_train`` method to deserialize the ``TrainProcessMetadata`` object from
+each client and print the training time and convergence status:
 
 .. code-block:: python
     :emphasize-lines: 1,8,18,19,21
@@ -304,10 +304,10 @@ Finally, we run the Flower App.
 
 .. code-block:: shell
 
-    $ flwr run . --stream
+    $ flwr run . local --stream
 
-Plain ``flwr run .`` submits the run, prints the run ID, and returns without streaming
-logs. See :doc:`how-to-run-flower-locally` for the full local workflow.
+Plain ``flwr run . local`` submits the run, prints the run ID, and returns without
+streaming logs. See :doc:`how-to-run-flower-locally` for the full local workflow.
 
 You will observe that the training metadata from each client is logged to the console of
 the ``ServerApp``. If you finish embedding the creation of the ``TrainProcessMetadata``
@@ -316,7 +316,7 @@ object in the ``ClientApp``, you should see output similar to this:
 .. code-block:: console
 
     INFO :      [ROUND 1/3]
-    INFO :      configure_train: Sampled 25 nodes (out of 1000)
+    INFO :      configure_train: Sampled 5 nodes (out of 50)
     {'training_time': 123.45, 'converged': True, 'training_losses': {'epoch1': 0.56, 'epoch2': 0.34}}
     {'training_time': 130.67, 'converged': False, 'training_losses': {'epoch1': 0.60, 'epoch2': 0.40}}
     ...
