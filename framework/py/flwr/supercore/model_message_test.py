@@ -29,7 +29,8 @@ from flwr.supercore.date import now
 from flwr.supercore.inflatable.inflatable_object import (
     get_object_type_from_object_content,
 )
-from flwr.supercore.model_message import JSONObject, ModelRequest, ModelResponse
+from flwr.supercore.model_message import ModelRequest, ModelResponse
+from flwr.supercore.typing import JSONObject
 
 
 def _metadata(
@@ -37,6 +38,7 @@ def _metadata(
     message_type: str,
     src_task_id: int | None = None,
     dst_task_id: int | None = 123,
+    reply_to_message_id: str = "",
 ) -> Metadata:
     """Create metadata for model message tests."""
     return Metadata(
@@ -44,7 +46,7 @@ def _metadata(
         message_id="",
         src_node_id=0,
         dst_node_id=0,
-        reply_to_message_id="",
+        reply_to_message_id=reply_to_message_id,
         group_id="",
         created_at=now().timestamp(),
         ttl=3600.0,
@@ -54,10 +56,18 @@ def _metadata(
     )
 
 
-def _message_with_payload(payload: dict[str, Any], *, message_type: str) -> Message:
+def _message_with_payload(
+    payload: dict[str, Any],
+    *,
+    message_type: str,
+    reply_to_message_id: str = "",
+) -> Message:
     """Create a plain Message carrying compact JSON payload."""
     return make_message(
-        metadata=_metadata(message_type=message_type),
+        metadata=_metadata(
+            message_type=message_type,
+            reply_to_message_id=reply_to_message_id,
+        ),
         content=RecordDict(
             {
                 "payload": ConfigRecord(
@@ -120,7 +130,7 @@ def test_model_request_creates_responses_request_payload() -> None:
     )
 
     assert isinstance(request, Message)
-    assert request.metadata.message_type == "query.model_request"
+    assert request.metadata.message_type == "query"
     assert request.metadata.run_id == 0
     assert request.metadata.src_task_id is None
     assert request.metadata.dst_task_id == 123
@@ -158,7 +168,7 @@ def test_model_response_creates_responses_object_payload() -> None:
     )
 
     assert isinstance(response, Message)
-    assert response.metadata.message_type == "query.model_response"
+    assert response.metadata.message_type == "query"
     assert response.metadata.dst_task_id == 456
     assert response.metadata.reply_to_message_id == "request-message-id"
     assert response.payload == response_payload
@@ -204,11 +214,32 @@ def test_model_request_from_message_rejects_wrong_message_type() -> None:
     """ModelRequest parsing should reject non-request messages."""
     message = _message_with_payload(
         {"model": "gpt-5", "input": [], "stream": True},
-        message_type=ModelResponse.MESSAGE_TYPE,
+        message_type="train",
     )
 
     with pytest.raises(ValueError, match="Expected message type"):
         ModelRequest.from_message(message)
+
+
+def test_model_response_requires_reply_to_message_id() -> None:
+    """ModelResponse should identify the request message it replies to."""
+    with pytest.raises(ValueError, match="requires reply_to_message_id"):
+        ModelResponse(
+            dst_task_id=456,
+            response={"object": "response"},
+            reply_to_message_id="",
+        )
+
+
+def test_model_response_from_message_requires_reply_to_message_id() -> None:
+    """ModelResponse parsing should reject messages without reply metadata."""
+    message = _message_with_payload(
+        {"object": "response"},
+        message_type=ModelResponse.MESSAGE_TYPE,
+    )
+
+    with pytest.raises(ValueError, match="requires reply_to_message_id"):
+        ModelResponse.from_message(message)
 
 
 @pytest.mark.parametrize(
@@ -281,7 +312,11 @@ def test_model_response_from_message_rejects_invalid_response_shape(
     """ModelResponse parsing should validate Responses object fields."""
     with pytest.raises(ValueError):
         ModelResponse.from_message(
-            _message_with_payload(payload, message_type=ModelResponse.MESSAGE_TYPE)
+            _message_with_payload(
+                payload,
+                message_type=ModelResponse.MESSAGE_TYPE,
+                reply_to_message_id="request-message-id",
+            )
         )
 
 

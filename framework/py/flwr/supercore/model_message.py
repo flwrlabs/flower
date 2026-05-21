@@ -18,17 +18,15 @@
 from __future__ import annotations
 
 import json
-from typing import ClassVar, TypeAlias, TypeVar, cast
+from typing import ClassVar, TypeVar, cast
 
+from flwr.app.message_type import MessageType
 from flwr.app.metadata import Metadata
 from flwr.common.message import Message, make_message
 from flwr.common.record import ConfigRecord, RecordDict
 from flwr.supercore.date import now
 from flwr.supercore.inflatable.inflatable_object import InflatableObject
-
-JSONScalar: TypeAlias = bool | float | int | str | None
-JSONValue: TypeAlias = JSONScalar | dict[str, "JSONValue"] | list["JSONValue"]
-JSONObject: TypeAlias = dict[str, JSONValue]
+from flwr.supercore.typing import JSONValue, JSONObject
 
 _PAYLOAD_RECORD_KEY = "payload"
 _PAYLOAD_JSON_KEY = "json"
@@ -40,7 +38,7 @@ T = TypeVar("T", bound=Message)
 class ModelRequest(Message):
     """Task-routed model request in OpenAI Responses create-request shape."""
 
-    MESSAGE_TYPE: ClassVar[str] = "query.model_request"
+    MESSAGE_TYPE: ClassVar[str] = MessageType.QUERY
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals,super-init-not-called
         self,
@@ -62,10 +60,10 @@ class ModelRequest(Message):
     ) -> None:
         payload: JSONObject = {
             "model": model,
-            "input": cast(JSONValue, input),
+            "input": input,
             "stream": stream,
         }
-        _set_optional(payload, "tools", cast(JSONValue | None, tools))
+        _set_optional(payload, "tools", tools)
         _set_optional(payload, "tool_choice", tool_choice)
         _set_optional(payload, "reasoning", reasoning)
         _set_optional(payload, "previous_response_id", previous_response_id)
@@ -112,16 +110,18 @@ class ModelRequest(Message):
 class ModelResponse(Message):
     """Task-routed model response in OpenAI Responses object shape."""
 
-    MESSAGE_TYPE: ClassVar[str] = "query.model_response"
+    MESSAGE_TYPE: ClassVar[str] = MessageType.QUERY
 
     def __init__(  # pylint: disable=super-init-not-called
         self,
         *,
         dst_task_id: int,
         response: JSONObject,
-        reply_to_message_id: str = "",
+        reply_to_message_id: str,
         ttl: float = _DEFAULT_TASK_MESSAGE_TTL,
     ) -> None:
+        if not reply_to_message_id:
+            raise ValueError("ModelResponse requires reply_to_message_id.")
         _validate_model_response_payload(response)
         _init_message_from_payload(
             self,
@@ -141,6 +141,7 @@ class ModelResponse(Message):
     def from_message(cls, message: Message) -> ModelResponse:
         """Parse a generic message into a model response."""
         _validate_message_type(message, cls.MESSAGE_TYPE)
+        _validate_reply_to_message_id(message)
         payload = _payload_from_message(message)
         _validate_model_response_payload(payload)
         return _copy_as(cls, message)
@@ -189,31 +190,24 @@ def _init_message_from_payload(  # pylint: disable=too-many-arguments
     message.__dict__.update(
         {
             "_metadata": metadata,
-            "_content": RecordDict(
-                {_PAYLOAD_RECORD_KEY: _config_record_from_payload(payload)}
-            ),
+            "_content": _payload_to_content(payload),
             "_error": None,
         }
     )
 
 
-def _config_record_from_payload(payload: JSONObject) -> ConfigRecord:
-    """Serialize a JSON object payload into a ConfigRecord."""
+def _payload_to_content(payload: JSONObject) -> RecordDict:
+    """Serialize a JSON object payload into message content."""
     try:
         encoded = json.dumps(payload, separators=(",", ":"), allow_nan=False)
     except (TypeError, ValueError) as err:
         raise ValueError("Payload must be JSON serializable.") from err
-    return ConfigRecord({_PAYLOAD_JSON_KEY: encoded})
+    return RecordDict({_PAYLOAD_RECORD_KEY: ConfigRecord({_PAYLOAD_JSON_KEY: encoded})})
 
 
-def _payload_from_message(message: Message) -> JSONObject:
-    """Parse a JSON object payload from a message."""
-    if message.has_error():
-        raise ValueError("Expected a message with content, got an error message.")
-    if not message.has_content():
-        raise ValueError("Expected a message with content.")
-
-    record = message.content.config_records.get(_PAYLOAD_RECORD_KEY)
+def _payload_from_content(content: RecordDict) -> JSONObject:
+    """Parse a JSON object payload from message content."""
+    record = content.config_records.get(_PAYLOAD_RECORD_KEY)
     if record is None:
         raise ValueError("Expected a payload ConfigRecord.")
 
@@ -231,11 +225,24 @@ def _payload_from_message(message: Message) -> JSONObject:
     return cast(JSONObject, payload)
 
 
+def _payload_from_message(message: Message) -> JSONObject:
+    """Parse a JSON object payload from a message."""
+    if not message.has_content():
+        raise ValueError("Expected a message with content.")
+    return _payload_from_content(message.content)
+
+
 def _validate_message_type(message: Message, expected: str) -> None:
     """Validate that the message type matches the expected value."""
     actual = message.metadata.message_type
     if actual != expected:
         raise ValueError(f"Expected message type {expected}, got {actual}.")
+
+
+def _validate_reply_to_message_id(message: Message) -> None:
+    """Validate that the message identifies the request it replies to."""
+    if not message.metadata.reply_to_message_id:
+        raise ValueError("ModelResponse requires reply_to_message_id.")
 
 
 def _validate_object_list_field(
