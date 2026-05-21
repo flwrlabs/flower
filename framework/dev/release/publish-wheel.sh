@@ -39,7 +39,10 @@ if [[ -n "${PACKAGE_VERSION:-}" ]]; then
 elif [[ "${GITHUB_REF_NAME:-}" == framework-* ]]; then
   tag_name="${GITHUB_REF_NAME#framework-}"
 else
-  tag_name=$(cd framework && uv version --short)
+  tag_name=$(
+    cd framework &&
+      python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])'
+  )
 fi
 
 # Make the resolved version available to later GitHub Actions steps.
