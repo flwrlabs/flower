@@ -107,6 +107,15 @@ erDiagram
     VARCHAR usage_reported_at
   }
 
+  run_event {
+    INTEGER id PK
+    BIGINT run_id FK
+    VARCHAR data
+    VARCHAR event
+    INTEGER sequence_number
+    FLOAT timestamp
+  }
+
   run_objects {
     VARCHAR object_id PK,FK
     BIGINT run_id PK
@@ -154,6 +163,7 @@ erDiagram
   run ||--o{ message_res : run_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
+  run ||--o{ run_event : run_id
   objects ||--o| run_objects : object_id
   task ||--o{ task_logs : task_id
   task ||--o{ task_message : src_task_id

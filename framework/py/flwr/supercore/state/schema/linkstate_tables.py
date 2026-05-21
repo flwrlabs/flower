@@ -21,6 +21,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Index,
+    Integer,
     LargeBinary,
     MetaData,
     String,
@@ -96,6 +97,27 @@ def create_linkstate_metadata() -> MetaData:
         Column("log", String),
         # Composite PK
         UniqueConstraint("timestamp", "run_id", "node_id"),
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: run_event
+    # --------------------------------------------------------------------------
+    Table(
+        "run_event",
+        metadata,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("timestamp", Float, nullable=False),
+        Column("run_id", BigInteger, ForeignKey("run.run_id"), nullable=False),
+        Column("sequence_number", Integer, nullable=False),
+        Column("event", String, nullable=False),
+        Column("data", String, nullable=False),
+        Index("idx_run_event_run_id", "run_id"),
+        Index(
+            "uq_run_event_run_id_sequence_number",
+            "run_id",
+            "sequence_number",
+            unique=True,
+        ),
     )
 
     # --------------------------------------------------------------------------
