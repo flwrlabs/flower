@@ -14,7 +14,6 @@
 # ==============================================================================
 """Executor types for SuperExec TaskExecutor processes."""
 
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -36,6 +35,7 @@ class ExecutionSpec:  # pylint: disable=too-many-instance-attributes
     runtime_dependency_install: bool
     parent_pid: int | None
     suppress_output: bool
+    task_id: int
 
 
 class LaunchResultStatus(StrEnum):
