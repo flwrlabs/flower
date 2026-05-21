@@ -33,7 +33,7 @@ from flwr.supercore.auth import (
     add_superexec_auth_secret_args,
     load_superexec_auth_secret,
 )
-from flwr.supercore.constant import EXEC_PLUGIN_SECTION
+from flwr.supercore.constant import EXEC_PLUGIN_SECTION, ExecutorType
 from flwr.supercore.grpc_health import add_args_health
 from flwr.supercore.superexec.plugin import (
     ClientAppExecPlugin,
@@ -127,6 +127,7 @@ def flower_superexec() -> None:
         parent_pid=args.parent_pid,
         health_server_address=args.health_server_address,
         runtime_dependency_install=args.runtime_dependency_install,
+        executor_type=args.executor,
     )
 
 
@@ -171,6 +172,14 @@ def _parse_args() -> argparse.ArgumentParser:
         default=None,
         help="The PID of the parent process. When set, the process will terminate "
         "when the parent process exits.",
+    )
+    parser.add_argument(
+        "--executor",
+        type=ExecutorType,
+        choices=tuple(ExecutorType),
+        default=ExecutorType.SUBPROCESS,
+        help="The executor used to run task processes, for example as local "
+        "subprocesses.",
     )
     add_superexec_auth_secret_args(parser)
     add_args_health(parser)

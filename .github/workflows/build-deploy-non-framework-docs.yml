@@ -27,33 +27,37 @@ jobs:
         run: ./dev/test-copyright.sh
       - name: Bootstrap
         uses: ./.github/actions/bootstrap
-        with:
-          uv-skip: "false"
       - name: Install pandoc
         run: sudo apt install pandoc
       - name: Install docs dependencies
         run: |
           cd framework
-          python -m poetry install
-          python -m pip install -e ../datasets
+          uv sync --locked --all-groups
+          uv pip install -e ../datasets
       - name: Install devtool dependencies
         run: |
           cd dev
-          uv sync --frozen
+          uv sync --locked
       - name: Update HTML theme options
         run: |
           cd dev
-          uv run python -m devtool.update_html_themes
+          uv run --no-sync python -m devtool.update_html_themes
       - name: Build baselines docs
-        run: ./dev/build-baseline-docs.sh
+        run: |
+          cd framework
+          uv run --no-sync ../dev/build-baseline-docs.sh
       - name: Build examples docs
         run: |
           cd dev
-          uv run python -m devtool.build_example_docs
+          uv run --no-sync python -m devtool.build_example_docs
       - name: Build datasets docs
-        run: ./datasets/dev/build-flwr-datasets-docs.sh
+        run: |
+          cd framework
+          uv run --no-sync ../datasets/dev/build-flwr-datasets-docs.sh
       - name: Build hub docs
-        run: ./dev/build-hub-docs.sh
+        run: |
+          cd framework
+          uv run --no-sync ../dev/build-hub-docs.sh
       - name: Deploy docs
         if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         env:

@@ -50,8 +50,6 @@ jobs:
         uses: ./.github/actions/bootstrap
         with:
           python-version: ${{ matrix.python }}
-          uv-skip: "false"
-          poetry-skip: "true"
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@v1.3.1
         with:
@@ -69,7 +67,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd datasets
-          uv sync --frozen --all-extras
+          uv sync --locked --all-extras
       - name: Cache Hugging Face datasets
         uses: actions/cache@v3
         with:
@@ -81,11 +79,11 @@ jobs:
           cd datasets
           if [ -n "${{ secrets.HF_TOKEN }}" ]; then
             echo "Logging into Hugging Face..."
-            uv run hf auth login --token ${{ secrets.HF_TOKEN }}
+            uv run --no-sync hf auth login --token ${{ secrets.HF_TOKEN }}
           else
             echo "Skipping Hugging Face login stage (HF_TOKEN not set)"
           fi
       - name: Test (formatting + unit tests)
         run: |
           cd datasets
-          uv run ./dev/test.sh
+          uv run --no-sync ./dev/test.sh
