@@ -467,6 +467,7 @@ class SqlCoreState(CoreState, SqlMixin):
                         ON dst.task_id = :dst_task_id
                         AND dst.run_id = src.run_id
                     WHERE src.task_id = :src_task_id
+                        AND src.finished_at IS NULL
                         AND dst.finished_at IS NULL
                     RETURNING message_id
                     """,
@@ -483,9 +484,12 @@ class SqlCoreState(CoreState, SqlMixin):
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
+        order_by: Literal["created_at"] | None = None,
         limit: int | None = None,
     ) -> Sequence[Message]:
         """Retrieve undelivered task-addressed Messages."""
+        if order_by not in (None, "created_at"):
+            raise AssertionError("`order_by` must be 'created_at' or None")
         if limit is not None and limit < 0:
             raise AssertionError("`limit` must be >= 0")
         if limit == 0:

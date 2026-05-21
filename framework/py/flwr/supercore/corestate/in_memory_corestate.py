@@ -344,7 +344,10 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 return None
             if src_task.run_id != dst_task.run_id:
                 return None
-            if dst_task.status.status == Status.FINISHED:
+            if Status.FINISHED in (
+                src_task.status.status,
+                dst_task.status.status,
+            ):
                 return None
             run_id = src_task.run_id
 
@@ -363,9 +366,12 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
+        order_by: Literal["created_at"] | None = None,
         limit: int | None = None,
     ) -> Sequence[Message]:
         """Retrieve undelivered task-addressed Messages."""
+        if order_by not in (None, "created_at"):
+            raise AssertionError("`order_by` must be 'created_at' or None")
         if limit is not None and limit < 0:
             raise AssertionError("`limit` must be >= 0")
         if limit == 0:
