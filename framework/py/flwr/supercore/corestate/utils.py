@@ -91,8 +91,7 @@ def validate_task_message(message: Message) -> list[str]:  # pylint: disable=R09
             "in seconds when the message was created."
         )
 
-    ttl_is_valid = isinstance(metadata.ttl, (int, float)) and metadata.ttl > 0
-    if not ttl_is_valid:
+    if metadata.ttl <= 0:
         validation_errors.append("`metadata.ttl` must be higher than zero")
     elif metadata.created_at + metadata.ttl <= now().timestamp():
         validation_errors.append("Message TTL has expired")
