@@ -20,17 +20,17 @@ from contextlib import ExitStack
 from datetime import datetime, timedelta
 from typing import Any, cast
 from unittest.mock import patch
-from uuid import uuid4
 
 from parameterized import parameterized
 
-from flwr.common import Message, RecordDict, now
+from flwr.common import Message, Metadata, RecordDict, now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
     Status,
     SubStatus,
 )
+from flwr.common.message import make_message
 from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 
@@ -79,6 +79,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         run_id: int,
         ttl: float = 60.0,
         created_at: float | None = None,
+        group_id: str = "",
     ) -> Message:
         """Create a task-addressed Message for CoreState tests."""
         src_node_id = 1
@@ -88,19 +89,21 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         while dst_node_id in (src_task_id, dst_task_id):
             dst_node_id += 1
 
-        message = Message(
-            RecordDict(),
-            dst_node_id,
-            "query",
+        metadata = Metadata(
+            run_id=run_id,
+            message_id="",
+            src_node_id=src_node_id,
+            dst_node_id=dst_node_id,
+            reply_to_message_id="",
+            group_id=group_id,
+            created_at=created_at if created_at is not None else now().timestamp(),
             ttl=ttl,
+            message_type="query",
             src_task_id=src_task_id,
             dst_task_id=dst_task_id,
         )
-        message.metadata.__dict__["_message_id"] = str(uuid4())
-        message.metadata.__dict__["_src_node_id"] = src_node_id
-        message.metadata.__dict__["_run_id"] = run_id
-        if created_at is not None:
-            message.metadata.created_at = created_at
+        message = make_message(metadata=metadata, content=RecordDict())
+        message.metadata.__dict__["_message_id"] = message.object_id
         return message
 
     def test_create_and_get_task(self) -> None:
@@ -533,13 +536,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             src_task_id=src_task_id,
             dst_task_id=dst_task_id,
             run_id=run_id + 1,
+            group_id="round-1",
         )
 
-        message_id = state.store_task_message(message)
+        stored = state.store_task_message(message)
         pulled = state.get_task_message(dst_task_ids=[dst_task_id])
         pulled_again = state.get_task_message(dst_task_ids=[dst_task_id])
 
-        self.assertEqual(message_id, message.metadata.message_id)
+        self.assertTrue(stored)
         self.assertEqual(len(pulled), 1)
         self.assertEqual(pulled_again, [])
         pulled_message = pulled[0]
@@ -547,6 +551,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             pulled_message.metadata.message_id, message.metadata.message_id
         )
         self.assertEqual(pulled_message.metadata.run_id, run_id)
+        self.assertEqual(pulled_message.metadata.group_id, "round-1")
         self.assertEqual(pulled_message.metadata.src_node_id, 0)
         self.assertEqual(pulled_message.metadata.dst_node_id, 0)
         self.assertEqual(pulled_message.metadata.src_task_id, src_task_id)
@@ -587,7 +592,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         ]
 
         for message in invalid_messages:
-            self.assertIsNone(state.store_task_message(message))
+            self.assertFalse(state.store_task_message(message))
 
         self.assertEqual(state.get_task_message(dst_task_ids=[dst_task_id]), [])
         self.assertEqual(state.get_task_message(dst_task_ids=[other_run_task_id]), [])
@@ -617,14 +622,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             src_task_id, other_dst_task_id, run_id
         )
 
-        self.assertEqual(
-            state.store_task_message(expected), expected.metadata.message_id
-        )
-        self.assertEqual(state.store_task_message(expired), expired.metadata.message_id)
-        self.assertEqual(
-            state.store_task_message(other_destination),
-            other_destination.metadata.message_id,
-        )
+        self.assertTrue(state.store_task_message(expected))
+        self.assertTrue(state.store_task_message(expired))
+        self.assertTrue(state.store_task_message(other_destination))
 
         pulled = state.get_task_message(dst_task_ids=[dst_task_id])
 
@@ -632,6 +632,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [message.metadata.message_id for message in pulled],
             [expected.metadata.message_id],
         )
+        self.assertTrue(state.store_task_message(expired))
         self.assertEqual(
             [
                 message.metadata.message_id
@@ -652,8 +653,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         msg_1 = self._create_task_message(src_task_id, dst_task_id, run_id)
         msg_2 = self._create_task_message(src_task_id, dst_task_id, run_id)
-        self.assertEqual(state.store_task_message(msg_1), msg_1.metadata.message_id)
-        self.assertEqual(state.store_task_message(msg_2), msg_2.metadata.message_id)
+        self.assertTrue(state.store_task_message(msg_1))
+        self.assertTrue(state.store_task_message(msg_2))
 
         pulled = state.get_task_message(dst_task_ids=[dst_task_id], limit=1)
         pulled_next = state.get_task_message(dst_task_ids=[dst_task_id], limit=1)

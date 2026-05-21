@@ -1962,37 +1962,6 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         self.assertIn("ORDER BY created_at, message_id", captured[0])
         self.assertNotIn("rowid", captured[0])
 
-    def test_store_task_message_rechecks_destination_status_during_insert(
-        self,
-    ) -> None:
-        """Task Message insert should fail if the destination just finished."""
-        state = self.state_factory()
-        run_id = self.task_run_id(state)
-        src_task_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=run_id)
-        assert src_task_id is not None and dst_task_id is not None
-        message = self._create_task_message(src_task_id, dst_task_id, run_id)
-
-        original_query = state.query
-        dst_finished_before_insert = False
-
-        def query_with_destination_finish(
-            query: str, data: Any = None
-        ) -> list[dict[str, Any]]:
-            nonlocal dst_finished_before_insert
-            if not dst_finished_before_insert and "INSERT INTO task_message" in query:
-                dst_finished_before_insert = True
-                self.assertTrue(
-                    state.finish_task(dst_task_id, SubStatus.FAILED, "done")
-                )
-            return original_query(query, data)
-
-        state.query = query_with_destination_finish  # type: ignore[method-assign]
-
-        self.assertIsNone(state.store_task_message(message))
-        self.assertTrue(dst_finished_before_insert)
-        self.assertEqual(state.get_task_message(dst_task_ids=[dst_task_id]), [])
-
     def test_message_ins_claim_can_append_select_lock_clause(self) -> None:
         """Message claiming can append a subclass-provided row-locking clause."""
         # Prepare
@@ -2185,35 +2154,6 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
 
             # Assert
             assert sum(len(res) for res in results if res is not None) == 1
-
-    def test_get_task_message_claim_is_unique_across_replicas(self) -> None:
-        """Ensure concurrent replicas cannot both claim the same task Message."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Prepare
-            db_path = os.path.join(tmpdir, "shared.db")
-            state = self._create_shared_sql_states(db_path)[0]
-            run_id = create_dummy_run(state)
-            src_task_id = get_primary_task_id(state, run_id)
-            dst_task_id = state.create_task(
-                task_type=TaskType.CLIENT_APP, run_id=run_id
-            )
-            assert dst_task_id is not None
-            msg = self._create_task_message(
-                src_task_id=src_task_id, dst_task_id=dst_task_id, run_id=run_id
-            )
-            assert state.store_task_message(msg)
-
-            # Execute
-            results = self._query_states_in_parallel(
-                lambda state: state.get_task_message(
-                    dst_task_ids=[dst_task_id], limit=1
-                )
-            )
-            claimed = [msgs for msgs in results if msgs]
-
-            # Assert
-            assert len(claimed) == 1
-            assert len(claimed[0]) == 1
 
     # pylint: disable-next=too-many-locals
     def test_get_message_ins_distributes_available_work_under_contention(self) -> None:

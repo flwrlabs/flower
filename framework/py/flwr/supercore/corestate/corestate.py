@@ -241,7 +241,7 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def store_task_message(self, message: Message) -> str | None:
+    def store_task_message(self, message: Message) -> bool:
         """Store one task-addressed Message.
 
         The source and destination task IDs are read from
@@ -254,8 +254,8 @@ class CoreState(ABC):
 
         Returns
         -------
-        str | None
-            The message ID if the message was stored, otherwise None.
+        bool
+            True if the message was stored, otherwise False.
         """
 
     @abstractmethod
