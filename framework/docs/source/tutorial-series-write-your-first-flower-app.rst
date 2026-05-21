@@ -95,7 +95,7 @@ first login to SuperGrid:
 .. code-block:: shell
 
     # This will open a browser window where you can enter your SuperGrid credentials.
-    flwr login
+    $ flwr login
 
 Once you are logged in, run the following command to run the app on SuperGrid and
 accross the federation you created in the previous tutorial:
@@ -103,9 +103,9 @@ accross the federation you created in the previous tutorial:
 .. code-block:: shell
 
     # Navigate to the directory of the app you want to run
-    cd /path/to/demo
+    $ cd /path/to/demo
     # Run the app across the federation you created in the previous tutorial
-    flwr run . --federation @<username>/<federation-name>
+    $ flwr run . --federation @<username>/<federation-name>
     # for example
     # flwr run . --federation @peter123/my-first-federation`
 
@@ -165,7 +165,7 @@ SuperGrid:
 .. code-block:: shell
 
     # Run your app
-    flwr run . --federation @<username>/<federation-name>
+    $ flwr run . --federation @<username>/<federation-name>
 
 Then, if you navigate to the `SuperGrid dashboard <https://flower.ai/federations/>`__,
 and open the logs of the new run, you should see the new printed messages from the
