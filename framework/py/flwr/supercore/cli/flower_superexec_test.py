@@ -17,12 +17,14 @@
 
 import importlib
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
 from flwr.common.constant import ExecPluginType
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.supercore.constant import ExecutorType
 from flwr.supercore.version import package_version
 
 from .flower_superexec import _parse_args
@@ -96,6 +98,7 @@ def test_flower_superexec_clientapp_allows_missing_secret(
         parent_pid=None,
         health_server_address=None,
         runtime_dependency_install=False,
+        executor=ExecutorType.SUBPROCESS,
     )
     captured: dict[str, object] = {}
 
@@ -139,6 +142,7 @@ def test_flower_superexec_serverapp_allows_missing_secret(
         parent_pid=None,
         health_server_address=None,
         runtime_dependency_install=False,
+        executor=ExecutorType.SUBPROCESS,
     )
 
     class _Parser:
@@ -167,3 +171,46 @@ def test_flower_superexec_serverapp_allows_missing_secret(
     flower_superexec_module.flower_superexec()
 
     assert captured["superexec_auth_secret"] is None
+
+
+def test_flower_superexec_passes_executor_to_run_superexec(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SuperExec should pass the parsed executor type to run_superexec."""
+    args = SimpleNamespace(
+        insecure=True,
+        plugin_type=ExecPluginType.CLIENT_APP,
+        plugin_config=None,
+        root_certificates=None,
+        superexec_auth_secret_file=None,
+        appio_api_address="127.0.0.1:9091",
+        parent_pid=None,
+        health_server_address=None,
+        runtime_dependency_install=False,
+        executor=ExecutorType.SUBPROCESS,
+    )
+    parser = Mock()
+    parser.parse_args.return_value = args
+    run_superexec_mock = Mock()
+
+    monkeypatch.setattr(
+        flower_superexec_module,
+        "warn_if_flwr_update_available",
+        lambda **_: None,
+    )
+    monkeypatch.setattr(
+        flower_superexec_module, "_parse_args", Mock(return_value=parser)
+    )
+    monkeypatch.setattr(
+        flower_superexec_module,
+        "_get_plugin_and_stub_class",
+        lambda _plugin_type: (object, ClientAppIoStub),
+    )
+    monkeypatch.setattr(flower_superexec_module, "run_superexec", run_superexec_mock)
+
+    flower_superexec_module.flower_superexec()
+
+    run_superexec_mock.assert_called_once()
+    assert (
+        run_superexec_mock.call_args.kwargs["executor_type"] == ExecutorType.SUBPROCESS
+    )
