@@ -26,7 +26,6 @@ from .utils import generate_rand_int_from_bytes, validate_task_message
 
 def _create_task_message(  # pylint: disable=too-many-arguments
     *,
-    message_id: str = "message-id",
     run_id: int = 1,
     src_node_id: int = SUPERLINK_NODE_ID,
     dst_node_id: int = SUPERLINK_NODE_ID,
@@ -47,15 +46,16 @@ def _create_task_message(  # pylint: disable=too-many-arguments
         group_id="",
         created_at=created_at if created_at is not None else now().timestamp(),
         ttl=ttl,
-        message_type="train",
+        message_type=message_type,
         src_task_id=src_task_id,
         dst_task_id=dst_task_id,
     )
-    metadata.__dict__["_message_type"] = message_type
 
     if has_error:
-        return make_message(metadata=metadata, error=Error(0))
-    return make_message(metadata=metadata, content=RecordDict())
+        msg = make_message(metadata=metadata, error=Error(0))
+    else:
+        msg = make_message(metadata=metadata, content=RecordDict())
+    msg.metadata.__dict__["_message_id"] = msg.object_id
 
 
 def _assert_has_error(errors: list[str], expected: str) -> None:
@@ -83,7 +83,7 @@ class UtilsTest(unittest.TestCase):
 
     def test_validate_task_message_rejects_missing_message_id(self) -> None:
         """Test that message_id must be set."""
-        message = _create_task_message(message_id="")
+        message.metadata.__dict__["_message_id"] = ""
 
         errors = validate_task_message(message)
 
