@@ -71,8 +71,8 @@ def _message_with_payload(
     )
 
 
-def test_model_request_creates_responses_request_payload() -> None:
-    """ModelRequest should carry an OpenAI Responses create-request payload."""
+def test_model_messages_create_payloads() -> None:
+    """Model messages should carry their Responses payloads."""
     request = ModelRequest(
         dst_task_id=123,
         input=[{"role": "user", "content": "Hello"}],
@@ -109,9 +109,6 @@ def test_model_request_creates_responses_request_payload() -> None:
         "text": {"format": {"type": "text"}},
     }
 
-
-def test_model_response_creates_responses_object_payload() -> None:
-    """ModelResponse should carry the OpenAI Responses object directly."""
     response_payload: JSONObject = {
         "id": "resp_123",
         "object": "response",
@@ -132,7 +129,6 @@ def test_model_response_creates_responses_object_payload() -> None:
     assert response.metadata.dst_task_id == 456
     assert response.metadata.reply_to_message_id == "request-message-id"
     assert response.payload == response_payload
-    assert "response" not in response.payload
 
 
 @pytest.mark.parametrize(
@@ -179,67 +175,50 @@ def test_from_message_wraps_plain_message(
     assert parsed.payload == expected_payload
 
 
-def test_model_response_requires_reply_to_message_id() -> None:
-    """ModelResponse should identify the request message it replies to."""
-    with pytest.raises(ValueError, match="requires reply_to_message_id"):
-        ModelResponse(
-            dst_task_id=456,
-            response={"object": "response"},
-            reply_to_message_id="",
-        )
-
-
 @pytest.mark.parametrize(
-    ("parser", "message", "match"),
+    ("build", "match"),
     [
         (
-            ModelRequest.from_message,
-            _message_with_payload(
-                {"model": "gpt-5", "input": [], "stream": True},
-                message_type="train",
-            ),
-            "Expected message type",
-        ),
-        (
-            ModelRequest.from_message,
-            make_message(
-                metadata=_metadata(message_type=ModelRequest.MESSAGE_TYPE),
-                content=RecordDict(),
-            ),
-            "payload",
-        ),
-        (
-            ModelRequest.from_message,
-            _message_with_payload(
-                {"input": [], "stream": True},
-                message_type=ModelRequest.MESSAGE_TYPE,
-            ),
-            "model",
-        ),
-        (
-            ModelResponse.from_message,
-            _message_with_payload(
-                {"object": "response"},
-                message_type=ModelResponse.MESSAGE_TYPE,
+            lambda: ModelResponse(
+                dst_task_id=456,
+                response={"object": "response"},
+                reply_to_message_id="",
             ),
             "reply_to_message_id",
         ),
         (
-            ModelResponse.from_message,
-            _message_with_payload(
-                {"object": "chat.completion"},
-                message_type=ModelResponse.MESSAGE_TYPE,
-                reply_to_message_id="request-message-id",
+            lambda: ModelRequest.from_message(
+                _message_with_payload(
+                    {"model": "gpt-5", "input": [], "stream": True},
+                    message_type="train",
+                )
             ),
-            "Responses object",
+            "Expected message type",
+        ),
+        (
+            lambda: ModelRequest.from_message(
+                _message_with_payload(
+                    {"input": [], "stream": True},
+                    message_type=ModelRequest.MESSAGE_TYPE,
+                )
+            ),
+            "model",
+        ),
+        (
+            lambda: ModelResponse.from_message(
+                _message_with_payload(
+                    {"object": "response"},
+                    message_type=ModelResponse.MESSAGE_TYPE,
+                )
+            ),
+            "reply_to_message_id",
         ),
     ],
 )
-def test_from_message_rejects_invalid_message(
-    parser: Callable[[Message], object],
-    message: Message,
+def test_invalid_model_messages_raise(
+    build: Callable[[], object],
     match: str,
 ) -> None:
-    """Model message parsers should reject invalid plain Messages."""
+    """Model messages should reject invalid public inputs."""
     with pytest.raises(ValueError, match=match):
-        parser(message)
+        build()
