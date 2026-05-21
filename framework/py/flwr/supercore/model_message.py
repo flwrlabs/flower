@@ -26,7 +26,7 @@ from flwr.app.metadata import Metadata
 from flwr.common.message import Message
 from flwr.common.record import ConfigRecord, RecordDict
 from flwr.supercore.date import now
-from flwr.supercore.typing import JSONValue, JSONObject
+from flwr.supercore.typing import JSONObject, JSONValue
 
 _PAYLOAD_RECORD_KEY = "payload"
 _PAYLOAD_JSON_KEY = "json"
