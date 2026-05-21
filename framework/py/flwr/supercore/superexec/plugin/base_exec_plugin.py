@@ -16,11 +16,16 @@
 
 
 import os
-import subprocess
-from collections.abc import Sequence
-from typing import Any
+from collections.abc import Callable, Sequence
+from logging import ERROR
+from typing import ClassVar
 
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
+from flwr.common.logger import log
+from flwr.common.typing import Run
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore.constant import TaskType
+from flwr.supercore.superexec.executor import ExecutionSpec, Executor
 
 from .exec_plugin import ExecPlugin
 
@@ -32,8 +37,28 @@ class BaseExecPlugin(ExecPlugin):
     """
 
     # Placeholders to be defined in subclasses
-    command = ""
-    appio_api_address_arg = ""
+    supported_task_types: ClassVar[frozenset[TaskType]]
+    suppress_output = False
+
+    def __init__(  # pylint: disable=R0913, R0917
+        self,
+        appio_api_address: str,
+        insecure: bool,
+        root_certificates_path: str | None,
+        get_run: Callable[[int], Run],
+        runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
+        *,
+        executor: Executor,
+    ) -> None:
+        super().__init__(
+            appio_api_address=appio_api_address,
+            insecure=insecure,
+            root_certificates_path=root_certificates_path,
+            get_run=get_run,
+            runtime_dependency_install=runtime_dependency_install,
+            executor=executor,
+        )
+        self.executor: Executor = executor
 
     def select_run_id(self, candidate_run_ids: Sequence[int]) -> int | None:
         """Select a run ID to execute from a sequence of candidates."""
@@ -49,22 +74,40 @@ class BaseExecPlugin(ExecPlugin):
 
     def launch_task(self, token: str, task: Task) -> None:
         """Launch the process to execute the given task using the given token."""
-        cmds = [self.command]
-        if self.insecure:
-            cmds.append("--insecure")
-        elif self.root_certificates_path:
-            cmds += ["--root-certificates", self.root_certificates_path]
-        cmds += [self.appio_api_address_arg, self.appio_api_address]
-        cmds += ["--token", token]
-        cmds += ["--parent-pid", str(os.getpid())]
-        if self.runtime_dependency_install:
-            cmds += ["--allow-runtime-dependency-installation"]
-        # Launch the client app without waiting for it to complete.
-        # Since we don't need to manage the process, we intentionally avoid using
-        # a `with` statement. Suppress the pylint warning for it in this case.
-        # pylint: disable-next=consider-using-with
-        subprocess.Popen(cmds, **self.get_popen_kwargs())
+        task_type = self._get_supported_task_type(task)
+        if task_type is None:
+            return
+        self.executor.launch(
+            self._build_execution_spec(token=token, task_type=task_type)
+        )
 
-    def get_popen_kwargs(self) -> dict[str, Any]:
-        """Return subprocess keyword arguments when launching app processes."""
-        return {}
+    def _build_execution_spec(self, token: str, task_type: TaskType) -> ExecutionSpec:
+        """Build the execution spec for the selected task."""
+        return ExecutionSpec(
+            task_type=task_type,
+            appio_api_address=self.appio_api_address,
+            token=token,
+            insecure=self.insecure,
+            root_certificates_path=self.root_certificates_path,
+            runtime_dependency_install=self.runtime_dependency_install,
+            parent_pid=os.getpid(),
+            suppress_output=self.suppress_output,
+        )
+
+    def _get_supported_task_type(self, task: Task) -> TaskType | None:
+        """Return the task type if it is supported by the plugin."""
+        try:
+            task_type = TaskType(task.type)
+        except ValueError:
+            task_type = None
+
+        if task_type not in self.supported_task_types:
+            log(
+                ERROR,
+                "Unknown task type '%s' for task_id %d.",
+                task.type,
+                task.task_id,
+            )
+            return None
+
+        return task_type
