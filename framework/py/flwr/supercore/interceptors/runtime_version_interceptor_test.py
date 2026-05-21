@@ -224,7 +224,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         self.interceptor = RuntimeVersionServerInterceptor(
             connection_name="flwr-simulation <-> SuperLink ServerAppIo API",
             local_metadata=RuntimeVersionMetadata.from_local_component(
-                "superlink",
+                "SuperLink",
                 package_name_value="flwr",
                 package_version_value="1.29.0",
             ),
@@ -281,8 +281,9 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         metadata = dict(context.set_trailing_metadata.call_args.args[0])
         self.assertEqual(
             metadata[VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY],
-            "superlink version 1.29.0 only accepts peers from the same major.minor "
-            "release, but received simulation version 1.30.1.",
+            "SuperLink version 1.29.0 detected a runtime version mismatch: "
+            "expected a peer from the same major.minor release, but received "
+            "simulation version 1.30.1.",
         )
 
     def test_package_name_mismatch_preserves_warning_details(self) -> None:
@@ -307,7 +308,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         self.interceptor = RuntimeVersionServerInterceptor(
             connection_name="flwr-simulation <-> SuperLink ServerAppIo API",
             local_metadata=RuntimeVersionMetadata.from_local_component(
-                "superlink",
+                "SuperLink",
                 package_name_value="flwr",
                 package_version_value="1.29.0",
             ),
@@ -332,8 +333,9 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
         self.assertEqual(
             error_payload["public_details"],
-            "superlink version 1.29.0 only accepts peers from the same major.minor "
-            "release, but received simulation version 1.30.1.",
+            "SuperLink version 1.29.0 detected a runtime version mismatch: "
+            "expected a peer from the same major.minor release, but received "
+            "simulation version 1.30.1.",
         )
 
     def test_serverappio_factory_rejects_incompatible_by_default(self) -> None:

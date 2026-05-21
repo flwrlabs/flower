@@ -160,7 +160,8 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         ):
             log(DEBUG, "Finished task %d of run %s", task.task_id, run_id)
             # Save the context to the state
-            state.store_context(context_from_proto(request.context))
+            if request.HasField("context"):
+                state.store_context(context_from_proto(request.context))
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
 

@@ -15,9 +15,7 @@
 """Client-side message handler tests."""
 
 
-import unittest
 import uuid
-from copy import copy
 
 from flwr.client import Client
 from flwr.client.typing import ClientFnExt
@@ -44,7 +42,7 @@ from flwr.common import typing
 from flwr.common.constant import MessageTypeLegacy
 from flwr.common.message import make_message
 
-from .message_handler import handle_legacy_message_from_msgtype, validate_out_message
+from .message_handler import handle_legacy_message_from_msgtype
 
 
 class ClientWithoutProps(Client):
@@ -254,79 +252,3 @@ def test_client_with_get_properties() -> None:
 
     # Ensure the message created last has a higher timestamp
     assert actual_msg.metadata.created_at < expected_msg.metadata.created_at
-
-
-class TestMessageValidation(unittest.TestCase):
-    """Test message validation."""
-
-    def setUp(self) -> None:
-        """Set up the message validation."""
-        # Common setup for tests
-        self.in_metadata = Metadata(
-            run_id=123,
-            message_id="qwerty",
-            src_node_id=10,
-            dst_node_id=20,
-            reply_to_message_id="",
-            group_id="group1",
-            created_at=now().timestamp(),
-            ttl=DEFAULT_TTL,
-            message_type="evaluate",
-        )
-
-        self.valid_out_metadata = Metadata(
-            run_id=123,
-            message_id="",
-            src_node_id=20,
-            dst_node_id=10,
-            reply_to_message_id="qwerty",
-            group_id="group1",
-            created_at=now().timestamp(),
-            ttl=DEFAULT_TTL,
-            message_type="evaluate",
-        )
-        self.common_content = RecordDict()
-
-    def test_valid_message(self) -> None:
-        """Test a valid message."""
-        # Prepare
-        valid_message = make_message(
-            metadata=self.valid_out_metadata, content=RecordDict()
-        )
-        valid_message.metadata.__dict__["_message_id"] = valid_message.object_id
-
-        # Assert
-        self.assertTrue(validate_out_message(valid_message, self.in_metadata))
-
-    def test_invalid_message_run_id(self) -> None:
-        """Test invalid messages."""
-        # Prepare
-        msg = make_message(metadata=self.valid_out_metadata, content=RecordDict())
-
-        # Execute
-        invalid_metadata_list: list[Metadata] = []
-        attrs = list(vars(self.valid_out_metadata).keys())
-        for attr in attrs:
-            if attr == "_delivered_at":
-                continue
-            if attr == "_ttl":  # Skip configurable ttl
-                continue
-            # Make an invalid metadata
-            invalid_metadata = copy(self.valid_out_metadata)
-            value = getattr(invalid_metadata, attr)
-            if isinstance(value, int):
-                value = 999
-            elif isinstance(value, str):
-                value = "999"
-            elif isinstance(value, float):
-                if attr == "_created_at":
-                    # make it be in 1h the past
-                    value = value - 3600
-            setattr(invalid_metadata, attr, value)
-            # Add to list
-            invalid_metadata_list.append(invalid_metadata)
-
-        # Assert
-        for invalid_metadata in invalid_metadata_list:
-            msg.__dict__["_metadata"] = invalid_metadata
-            self.assertFalse(validate_out_message(msg, self.in_metadata))

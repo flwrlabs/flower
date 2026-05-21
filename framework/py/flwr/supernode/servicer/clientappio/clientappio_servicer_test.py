@@ -48,7 +48,11 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     iterate_object_tree,
 )
-from flwr.supernode.runtime.run_clientapp import pull_task_input, push_task_output
+from flwr.supernode.runtime.run_clientapp import (
+    pull_task_input,
+    push_message,
+    push_task_output,
+)
 
 from .clientappio_servicer import ClientAppIoServicer
 
@@ -158,9 +162,9 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_stub.PushObject.side_effect = mock_push_object
 
         # Execute
-        _ = push_task_output(
+        push_message(self.mock_stub, message, context)
+        push_task_output(
             stub=self.mock_stub,
-            message=message,
             context=context,
             sub_status=sub_status,
             details=details,

@@ -4,7 +4,7 @@ This directory provides developer tooling used across the repository (for exampl
 formatting, docs helpers, and repository checks).
 
 `devtool` uses `uv` for dependency management and command execution.
-The Flower `framework` project remains Poetry-based.
+The Flower `framework` project also uses `uv` for CI and local developer workflows.
 
 ## Prerequisites
 
@@ -79,4 +79,4 @@ uv sync --frozen
 
 - CI jobs that use `devtool` should run `uv sync --frozen` and execute commands with
   `uv run`.
-- CI jobs that install `framework` still use Poetry.
+- CI jobs that install `framework` should use `uv sync` and `uv run`.

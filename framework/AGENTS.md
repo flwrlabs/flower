@@ -42,11 +42,11 @@ cd framework
 uv sync --locked --python=3.11.14 --all-extras --all-groups
 ```
 
-CI installs with Poetry, so when reproducing CI setup exactly use:
+CI installs with uv, so when reproducing CI setup exactly use:
 
 ```bash
 cd framework
-python -m poetry install --all-extras
+uv sync --locked --python=3.11.14 --all-extras --all-groups
 ```
 
 Useful checks:
@@ -203,5 +203,5 @@ uv run --no-sync --python=3.11.14 ./dev/test-wheel.sh
 Do not commit `dist/` artifacts.
 
 - If dependency constraints change, update `pyproject.toml` and `uv.lock`
-  intentionally. CI checks `uv.lock` freshness, while framework CI still
-  installs with Poetry.
+  intentionally. CI checks `uv.lock` freshness, and framework CI installs
+  with uv.

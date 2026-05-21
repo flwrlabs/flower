@@ -16,10 +16,9 @@
 
 import re
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any
-
-import tomllib
 
 
 def _load_config() -> dict[str, Any]:

@@ -31,20 +31,20 @@ jobs:
       - name: Install dependencies
         run: |
           cd framework
-          python -m poetry install
+          uv sync --locked --all-groups
 
       - name: Install pandoc
         uses: nikeee/setup-pandoc@v1
 
       - name: Update text and translations for all locales
         run: |
-          cd framework/docs
-          make update-text
-          for langDir in locales/*; do
+          cd framework
+          uv run --no-sync make -C docs update-text
+          for langDir in docs/locales/*; do
             if [ -d "$langDir" ]; then
               lang=$(basename $langDir)
               echo "Updating language $lang"
-              make update-lang lang=$lang
+              uv run --no-sync make -C docs update-lang lang=$lang
             fi
           done
 
