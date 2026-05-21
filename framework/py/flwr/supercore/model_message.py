@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
-from typing import ClassVar, cast
+from typing import cast
 
 from flwr.app.message_type import MessageType
 from flwr.app.metadata import Metadata
@@ -36,15 +36,13 @@ _DEFAULT_TASK_MESSAGE_TTL = 3600.0
 class ModelRequest(Message):
     """Task-routed model request in OpenAI Responses create-request shape."""
 
-    MESSAGE_TYPE: ClassVar[str] = MessageType.QUERY
-
     def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
         self,
         *,
         dst_task_id: int,
-        input: Sequence[JSONObject],  # pylint: disable=redefined-builtin
+        input_: str | Sequence[JSONObject],
         model: str,
-        stream: bool,
+        stream: bool = False,
         tools: Sequence[JSONObject] | None = None,
         tool_choice: JSONValue | None = None,
         reasoning: JSONObject | None = None,
@@ -58,7 +56,7 @@ class ModelRequest(Message):
     ) -> None:
         payload: JSONObject = {
             "model": model,
-            "input": input,
+            "input": input_,
             "stream": stream,
         }
         _set_optional(payload, "tools", tools)
@@ -73,7 +71,6 @@ class ModelRequest(Message):
         _validate_model_request_payload(payload)
         message_metadata, content = _build_metadata_and_content(
             dst_task_id,
-            self.MESSAGE_TYPE,
             payload,
             reply_to_message_id,
             ttl,
@@ -93,9 +90,9 @@ class ModelRequest(Message):
     @classmethod
     def from_message(cls, message: Message) -> ModelRequest:
         """Parse a generic message into a model request."""
-        if message.metadata.message_type != cls.MESSAGE_TYPE:
+        if message.metadata.message_type != MessageType.QUERY:
             raise ValueError(
-                f"Expected message type {cls.MESSAGE_TYPE}, "
+                f"Expected message type {MessageType.QUERY}, "
                 f"got {message.metadata.message_type}."
             )
         if not message.has_content():
@@ -111,8 +108,6 @@ class ModelRequest(Message):
 class ModelResponse(Message):
     """Task-routed model response in OpenAI Responses object shape."""
 
-    MESSAGE_TYPE: ClassVar[str] = MessageType.QUERY
-
     def __init__(
         self,
         *,
@@ -126,7 +121,6 @@ class ModelResponse(Message):
         _validate_model_response_payload(response)
         metadata, content = _build_metadata_and_content(
             dst_task_id,
-            self.MESSAGE_TYPE,
             response,
             reply_to_message_id,
             ttl,
@@ -146,9 +140,9 @@ class ModelResponse(Message):
     @classmethod
     def from_message(cls, message: Message) -> ModelResponse:
         """Parse a generic message into a model response."""
-        if message.metadata.message_type != cls.MESSAGE_TYPE:
+        if message.metadata.message_type != MessageType.QUERY:
             raise ValueError(
-                f"Expected message type {cls.MESSAGE_TYPE}, "
+                f"Expected message type {MessageType.QUERY}, "
                 f"got {message.metadata.message_type}."
             )
         if not message.metadata.reply_to_message_id:
@@ -169,9 +163,8 @@ def _set_optional(payload: JSONObject, key: str, value: JSONValue | None) -> Non
         payload[key] = value
 
 
-def _build_metadata_and_content(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def _build_metadata_and_content(
     dst_task_id: int,
-    message_type: str,
     payload: JSONObject,
     reply_to_message_id: str,
     ttl: float,
@@ -186,7 +179,7 @@ def _build_metadata_and_content(  # pylint: disable=too-many-arguments,too-many-
         group_id="",
         created_at=now().timestamp(),
         ttl=ttl,
-        message_type=message_type,
+        message_type=MessageType.QUERY,
         dst_task_id=dst_task_id,
     )
     return metadata, _payload_to_content(payload)
@@ -201,6 +194,11 @@ def _payload_to_content(payload: JSONObject) -> RecordDict:
     return RecordDict({_PAYLOAD_RECORD_KEY: ConfigRecord({_PAYLOAD_JSON_KEY: encoded})})
 
 
+def _reject_non_finite_json_number(value: str) -> None:
+    """Reject non-finite JSON number constants accepted by Python's decoder."""
+    raise ValueError(f"Payload JSON contains non-finite number {value}.")
+
+
 def _payload_from_content(content: RecordDict) -> JSONObject:
     """Parse a JSON object payload from message content."""
     record = content.config_records.get(_PAYLOAD_RECORD_KEY)
@@ -212,8 +210,8 @@ def _payload_from_content(content: RecordDict) -> JSONObject:
         raise ValueError("Expected payload JSON to be a string.")
 
     try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError as err:
+        payload = json.loads(raw, parse_constant=_reject_non_finite_json_number)
+    except ValueError as err:
         raise ValueError("Payload JSON is malformed.") from err
 
     if not isinstance(payload, dict):
@@ -221,7 +219,7 @@ def _payload_from_content(content: RecordDict) -> JSONObject:
     return cast(JSONObject, payload)
 
 
-def _validate_object_sequence_field(
+def _validate_json_object_sequence_field(
     payload: JSONObject, field: str, *, owner: str, required: bool = False
 ) -> None:
     """Validate that a payload field is a sequence of JSON objects."""
@@ -241,17 +239,34 @@ def _validate_object_sequence_field(
         )
 
 
+def _validate_model_request_input_field(payload: JSONObject) -> None:
+    """Validate that a model request input is a string or sequence of objects."""
+    if "input" not in payload:
+        raise ValueError("ModelRequest payload requires field 'input'.")
+
+    value = payload["input"]
+    if isinstance(value, str):
+        return
+    if not isinstance(value, Sequence):
+        raise ValueError(
+            "ModelRequest payload field 'input' must be a string or sequence."
+        )
+    if not all(isinstance(item, dict) for item in value):
+        raise ValueError(
+            "ModelRequest payload field 'input' must be a string or sequence "
+            "of objects."
+        )
+
+
 def _validate_model_request_payload(payload: JSONObject) -> None:
     """Validate the minimal Responses create-request shape."""
     if not isinstance(payload.get("model"), str):
         raise ValueError("ModelRequest payload requires string field 'model'.")
-    _validate_object_sequence_field(
-        payload, "input", owner="ModelRequest", required=True
-    )
-    if not isinstance(payload.get("stream"), bool):
-        raise ValueError("ModelRequest payload requires bool field 'stream'.")
+    _validate_model_request_input_field(payload)
+    if "stream" in payload and not isinstance(payload["stream"], bool):
+        raise ValueError("ModelRequest payload field 'stream' must be a bool.")
 
-    _validate_object_sequence_field(payload, "tools", owner="ModelRequest")
+    _validate_json_object_sequence_field(payload, "tools", owner="ModelRequest")
     if "reasoning" in payload and not isinstance(payload["reasoning"], dict):
         raise ValueError("ModelRequest payload field 'reasoning' must be an object.")
     if "previous_response_id" in payload and not isinstance(
@@ -282,7 +297,7 @@ def _validate_model_response_payload(payload: JSONObject) -> None:
         raise ValueError("ModelResponse payload field 'id' must be a string.")
     if "status" in payload and not isinstance(payload["status"], str):
         raise ValueError("ModelResponse payload field 'status' must be a string.")
-    _validate_object_sequence_field(payload, "output", owner="ModelResponse")
+    _validate_json_object_sequence_field(payload, "output", owner="ModelResponse")
     if (
         "error" in payload
         and payload["error"] is not None

@@ -20,6 +20,7 @@ from collections.abc import Callable
 
 import pytest
 
+from flwr.app.message_type import MessageType
 from flwr.app.metadata import Metadata
 from flwr.common import ConfigRecord, Message, RecordDict
 from flwr.common.message import make_message
@@ -71,11 +72,27 @@ def _message_with_payload(
     )
 
 
+def _message_with_json_payload(
+    payload_json: str,
+    *,
+    message_type: str,
+    reply_to_message_id: str = "",
+) -> Message:
+    """Create a plain Message carrying raw JSON payload text."""
+    return make_message(
+        metadata=_metadata(
+            message_type=message_type,
+            reply_to_message_id=reply_to_message_id,
+        ),
+        content=RecordDict({"payload": ConfigRecord({"json": payload_json})}),
+    )
+
+
 def test_model_messages_create_payloads() -> None:
     """Model messages should carry their Responses payloads."""
     request = ModelRequest(
         dst_task_id=123,
-        input=[{"role": "user", "content": "Hello"}],
+        input_=[{"role": "user", "content": "Hello"}],
         model="gpt-5",
         stream=True,
         tools=[{"type": "web_search_preview"}],
@@ -131,6 +148,21 @@ def test_model_messages_create_payloads() -> None:
     assert response.payload == response_payload
 
 
+def test_model_request_accepts_string_input_and_default_stream() -> None:
+    """Model requests should accept simple string prompts."""
+    request = ModelRequest(
+        dst_task_id=123,
+        input_="Hello",
+        model="gpt-5",
+    )
+
+    assert request.payload == {
+        "model": "gpt-5",
+        "input": "Hello",
+        "stream": False,
+    }
+
+
 @pytest.mark.parametrize(
     ("parser", "message", "expected_cls", "expected_payload"),
     [
@@ -142,7 +174,7 @@ def test_model_messages_create_payloads() -> None:
                     "input": [{"role": "user", "content": "Hello"}],
                     "stream": False,
                 },
-                message_type=ModelRequest.MESSAGE_TYPE,
+                message_type=MessageType.QUERY,
             ),
             ModelRequest,
             {
@@ -152,10 +184,25 @@ def test_model_messages_create_payloads() -> None:
             },
         ),
         (
+            ModelRequest.from_message,
+            _message_with_payload(
+                {
+                    "model": "gpt-5",
+                    "input": "Hello",
+                },
+                message_type=MessageType.QUERY,
+            ),
+            ModelRequest,
+            {
+                "model": "gpt-5",
+                "input": "Hello",
+            },
+        ),
+        (
             ModelResponse.from_message,
             _message_with_payload(
                 {"object": "response", "id": "resp_123"},
-                message_type=ModelResponse.MESSAGE_TYPE,
+                message_type=MessageType.QUERY,
                 reply_to_message_id="request-message-id",
             ),
             ModelResponse,
@@ -199,16 +246,62 @@ def test_from_message_wraps_plain_message(
             lambda: ModelRequest.from_message(
                 _message_with_payload(
                     {"input": [], "stream": True},
-                    message_type=ModelRequest.MESSAGE_TYPE,
+                    message_type=MessageType.QUERY,
                 )
             ),
             "model",
         ),
         (
+            lambda: ModelRequest.from_message(
+                _message_with_payload(
+                    {"model": "gpt-5", "input": 1},
+                    message_type=MessageType.QUERY,
+                )
+            ),
+            "input",
+        ),
+        (
+            lambda: ModelRequest.from_message(
+                _message_with_payload(
+                    {"model": "gpt-5", "input": ["Hello"]},
+                    message_type=MessageType.QUERY,
+                )
+            ),
+            "input",
+        ),
+        (
+            lambda: ModelRequest.from_message(
+                _message_with_payload(
+                    {"model": "gpt-5", "input": "Hello", "stream": "false"},
+                    message_type=MessageType.QUERY,
+                )
+            ),
+            "stream",
+        ),
+        (
+            lambda: ModelRequest.from_message(
+                _message_with_json_payload(
+                    '{"model":"gpt-5","input":"Hello","tool_choice":NaN}',
+                    message_type=MessageType.QUERY,
+                )
+            ),
+            "malformed",
+        ),
+        (
+            lambda: ModelResponse.from_message(
+                _message_with_json_payload(
+                    '{"object":"response","error":{"code":Infinity}}',
+                    message_type=MessageType.QUERY,
+                    reply_to_message_id="request-message-id",
+                )
+            ),
+            "malformed",
+        ),
+        (
             lambda: ModelResponse.from_message(
                 _message_with_payload(
                     {"object": "response"},
-                    message_type=ModelResponse.MESSAGE_TYPE,
+                    message_type=MessageType.QUERY,
                 )
             ),
             "reply_to_message_id",
