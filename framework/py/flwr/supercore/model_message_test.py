@@ -29,14 +29,14 @@ from flwr.supercore.model_message import ModelRequest, ModelResponse
 from flwr.supercore.typing import JSONObject
 
 
-def _metadata(
+def _message_with_payload(
+    payload: JSONObject,
     *,
     message_type: str,
-    dst_task_id: int | None = 123,
     reply_to_message_id: str = "",
-) -> Metadata:
-    """Create metadata for model message tests."""
-    return Metadata(
+) -> Message:
+    """Create a plain Message carrying compact JSON payload."""
+    metadata = Metadata(
         run_id=0,
         message_id="",
         src_node_id=0,
@@ -46,30 +46,13 @@ def _metadata(
         created_at=now().timestamp(),
         ttl=3600.0,
         message_type=message_type,
-        dst_task_id=dst_task_id,
+        dst_task_id=123,
     )
-
-
-def _message_with_payload(
-    payload: JSONObject,
-    *,
-    message_type: str,
-    reply_to_message_id: str = "",
-) -> Message:
-    """Create a plain Message carrying compact JSON payload."""
-    return make_message(
-        metadata=_metadata(
-            message_type=message_type,
-            reply_to_message_id=reply_to_message_id,
-        ),
-        content=RecordDict(
-            {
-                "payload": ConfigRecord(
-                    {"json": json.dumps(payload, separators=(",", ":"))}
-                )
-            }
-        ),
+    content = RecordDict()
+    content["payload"] = ConfigRecord(
+        {"json": json.dumps(payload, separators=(",", ":"))}
     )
+    return make_message(metadata=metadata, content=content)
 
 
 def _message_with_json_payload(
