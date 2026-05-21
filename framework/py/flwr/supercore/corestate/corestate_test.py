@@ -617,10 +617,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         pulled = state.get_task_message(dst_task_ids=[dst_task_id])
 
-        self.assertEqual(
-            [message.metadata.message_id for message in pulled],
-            [expected.metadata.message_id],
-        )
+        self.assertEqual(len(pulled), 1)
+        self.assertEqual(pulled[0].object_id, expected.object_id)
         self.assertTrue(state.store_task_message(expired))
         self.assertEqual(
             [
