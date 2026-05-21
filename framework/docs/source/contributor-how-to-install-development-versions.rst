@@ -6,12 +6,11 @@
  Install development versions of Flower
 ****************************************
 
-Using Poetry (recommended)
-==========================
+Using uv (recommended)
+======================
 
 Install a ``flwr`` pre-release from PyPI: update the ``flwr`` dependency in
-``pyproject.toml`` and then reinstall (ensure to delete ``poetry.lock`` via ``rm
-poetry.lock`` before running ``python -m poetry install``).
+``pyproject.toml`` and then reinstall with ``uv sync``.
 
 - ``flwr = { version = "1.0.0a0", allow-prereleases = true }`` (without extras)
 - ``flwr = { version = "1.0.0a0", allow-prereleases = true, extras = ["simulation"] }``
@@ -28,8 +27,8 @@ Install ``flwr`` from a local wheel file via ``pyproject.toml``:
 - ``flwr = { path = "../../dist/flwr-1.8.0-py3-none-any.whl", extras = ["simulation"]
   }`` (with extras)
 
-Please refer to the Poetry documentation for further details: `Poetry Dependency
-Specification <https://python-poetry.org/docs/dependency-specification/>`_
+Please refer to the uv documentation for further details: `Managing dependencies with uv
+<https://docs.astral.sh/uv/concepts/projects/dependencies/>`_
 
 Using pip (recommended on Colab)
 ================================

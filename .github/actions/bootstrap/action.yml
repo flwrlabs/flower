@@ -10,20 +10,9 @@ inputs:
   setuptools-version:
     description: "Version of setuptools to be installed using pip"
     default: 82.0.0
-  poetry-version:
-    description: "Version of poetry to be installed using pip"
-    default: 2.3.2
-  poetry-skip:
-    description: "Option to skip the poetry installation"
-    required: false
-    default: "false"
   uv-version:
     description: "Version of uv to install"
     default: "0.10.7"
-  uv-skip:
-    description: "Option to skip the uv installation"
-    required: false
-    default: "true"
 outputs:
   python-version:
     description: "Version range or exact version of Python"
@@ -34,9 +23,6 @@ outputs:
   setuptools-version:
     description: "Installed version of setuptools"
     value: ${{ steps.versions.outputs.setuptools-version }}
-  poetry-version:
-    description: "Requested version of poetry"
-    value: ${{ steps.versions.outputs.poetry-version }}
   uv-version:
     description: "Requested version of uv"
     value: ${{ steps.versions.outputs.uv-version }}
@@ -48,7 +34,6 @@ runs:
       with:
         python-version: ${{ inputs.python-version }}
     - name: Set up uv
-      if: ${{ inputs.uv-skip == 'false' }}
       uses: astral-sh/setup-uv@v7
       with:
         version: ${{ inputs.uv-version }}
@@ -56,10 +41,6 @@ runs:
       run: |
         python -m pip install -U pip==${{ inputs.pip-version }}
         python -m pip install -U setuptools==${{ inputs.setuptools-version }}
-        if ${{ inputs.poetry-skip == 'false' }}; then
-          python -m pip install -U poetry==${{ inputs.poetry-version }}
-          python -m poetry config virtualenvs.create false
-        fi
       shell: bash
     - id: versions
       shell: bash
@@ -67,5 +48,4 @@ runs:
         echo "python-version=$(echo ${{ inputs.python-version }})" >> $GITHUB_OUTPUT
         echo "pip-version=$(echo ${{ inputs.pip-version }})" >> $GITHUB_OUTPUT
         echo "setuptools-version=$(echo ${{ inputs.setuptools-version }})" >> $GITHUB_OUTPUT
-        echo "poetry-version=$(echo ${{ inputs.poetry-version }})" >> $GITHUB_OUTPUT
         echo "uv-version=$(echo ${{ inputs.uv-version }})" >> $GITHUB_OUTPUT

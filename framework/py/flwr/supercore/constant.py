@@ -210,6 +210,12 @@ class RunTime(StrEnum):
     SIMULATION = "simulation"
 
 
+class ExecutorType(StrEnum):
+    """Supported SuperExec executor types."""
+
+    SUBPROCESS = "subprocess"
+
+
 class TaskType(StrEnum):
     """Supported task types."""
 
@@ -221,6 +227,16 @@ class TaskType(StrEnum):
     CONNECTOR = "flwr-connector"
 
 
+TASK_TYPE_TO_APPIO_API_ADDRESS_ARG: dict[TaskType, str] = {
+    TaskType.CLIENT_APP: "--clientappio-api-address",
+    TaskType.SERVER_APP: "--serverappio-api-address",
+    TaskType.SIMULATION: "--serverappio-api-address",
+}
+TASK_TYPE_TO_COMMAND: dict[TaskType, str] = {
+    TaskType.CLIENT_APP: "flwr-clientapp",
+    TaskType.SERVER_APP: "flwr-serverapp",
+    TaskType.SIMULATION: "flwr-simulation",
+}
 TASK_TYPES_ALLOWED_TO_CREATE_TASKS: frozenset[TaskType] = frozenset(
     {
         TaskType.AGENT_APP,

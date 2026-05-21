@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-05-13 00:27+0000\n"
+"POT-Creation-Date: 2026-05-16 00:24+0000\n"
 "PO-Revision-Date: 2024-05-25 11:09+0000\n"
 "Last-Translator: Gustavo Bertoli <gubertoli@gmail.com>\n"
 "Language: pt_BR\n"
@@ -2803,7 +2803,7 @@ msgstr ""
 #: ../../source/how-to-run-flower-on-azure.rst:230
 #: ../../source/how-to-run-flower-on-gcp.rst:624
 #: ../../source/how-to-run-flower-on-red-hat-openshift.rst:678
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:202
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:212
 #: ../../source/how-to-upgrade-to-flower-1.28.rst:80
 #: ../../source/how-to-upgrade-to-flower-1.28.rst:99
 msgid "config.toml"
@@ -3912,7 +3912,7 @@ msgstr ""
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:94
 #: ../../source/docker/tutorial-quickstart-docker.rst:310
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:186
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:196
 msgid ""
 "Find the Flower Configuration TOML file in your machine. This file is "
 "automatically create for your when you first use a Flower CLI command. "
@@ -9254,7 +9254,7 @@ msgstr ""
 
 #: ../../source/how-to-authenticate-supernodes.rst:144
 #: ../../source/how-to-enable-tls-connections.rst:237
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:230
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:240
 msgid ""
 "You can setup your ``local-deployment`` profile as the default so you "
 "don't have to specify it in every Flower CLI command that needs to "
@@ -13337,18 +13337,25 @@ msgid ""
 "TLS."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:116
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:117
+msgid ""
+"To enable TLS also for the SuperLink AppIo API, please refer to "
+":ref:`Launching the SuperLink with TLS <launching-the-superlink-with-"
+"tls>`."
+msgstr ""
+
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:121
 #, fuzzy
 msgid "Start two Flower SuperNodes"
 msgstr "``FLWR_VERSION``"
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:118
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:123
 msgid ""
 "In this step, you will launch two SuperNodes and connect them to the "
 "SuperLink. You will need two terminals for this step."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:123
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:128
 msgid ""
 "Note that the values passed via the ``--node-config`` argument are "
 "specific to the behaviour of the ``ClientApp``. If you inspect the code "
@@ -13360,17 +13367,17 @@ msgid ""
 "receive, for example, the path to a directory of images."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:131
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:136
 msgid ""
 "**Terminal 1** Start the first SuperNode after activating your "
 "environment:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:143
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:148
 msgid "``flower-supernode``: Name of the SuperNode installed CLI executable."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:144
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:149
 msgid ""
 "``--insecure``: This flag tells the SuperNode to operate in an insecure "
 "mode, allowing unencrypted communication. Refer to the :doc:`how-to-"
@@ -13378,7 +13385,7 @@ msgid ""
 "TLS."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:146
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:151
 msgid ""
 "``--superlink 127.0.0.1:9092``: Connect to the SuperLink's Fleet API at "
 "the address ``127.0.0.1:9092``. If you had launched the SuperLink in a "
@@ -13386,14 +13393,14 @@ msgid ""
 " machine."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:148
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:153
 msgid ""
 "``--clientappio-api-address 127.0.0.1:9094``: Set the address and port "
 "number where the SuperNode is listening to communicate with the "
 "``ClientApp``."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:150
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:155
 msgid ""
 "``--node-config \"partition-id=0 num-partitions=2\"``: The ``ClientApp`` "
 "code generated via ``flwr new`` expects those two key-value pairs to be "
@@ -13401,13 +13408,13 @@ msgid ""
 "partitions to ``2`` for the SuperNode configuration."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:152
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:157
 msgid ""
 "**Terminal 2** Start the second SuperNode after activating your "
 "environment:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:164
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:169
 msgid ""
 "``--clientappio-api-address 127.0.0.1:9095``: Note that a different port "
 "is being used. This is only needed because you are running two SuperNodes"
@@ -13416,18 +13423,25 @@ msgid ""
 "together and left with its default value."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:165
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:170
 msgid ""
 "``--node-config \"partition-id=1 num-partitions=2\"``: Note here we "
 "indicate a different `partition-id`. In this way, a ``ClientApp`` will "
 "use a different data partition depending on which SuperNode runs in."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:169
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:174
+msgid ""
+"To enable TLS also for the SuperNode AppIo API, please refer to "
+":ref:`Connecting the SuperNodes with TLS <connecting-the-supernodes-with-"
+"tls>`."
+msgstr ""
+
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:179
 msgid "Step 3: Run a Flower App on the Federation"
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:173
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:183
 msgid ""
 "The Flower Configuration file is automatically created for you when you "
 "first use a Flower CLI command. Use ``flwr config list`` to see available"
@@ -13435,7 +13449,7 @@ msgid ""
 "Read more about it in the :doc:`ref-flower-configuration` guide."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:178
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:188
 msgid ""
 "At this point, you have launched two SuperNodes that are connected to the"
 " same SuperLink. The system is idling waiting for a ``Run`` to be "
@@ -13447,43 +13461,43 @@ msgid ""
 "(only when testing locally, real deployments require TLS)."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:200
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:210
 msgid ""
 "Open the ``config.toml`` file and at the end add a new SuperLink "
 "connection:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:211
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:221
 msgid ""
 "You can customize the string that follows ``[superlink.]`` to fit your "
 "needs. However, please note that the string cannot contain a dot (``.``)."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:214
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:224
 msgid ""
 "In this example, ``local-deployment`` has been used. Just remember to "
 "replace ``local-deployment`` with your chosen name in both the "
 "``[superlink.]`` string and the corresponding ``flwr run .`` command."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:218
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:228
 msgid ""
 "In another terminal and with your Python environment activated, run the "
 "Flower App and follow the ``ServerApp`` logs to track the execution of "
 "the run:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:225
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:235
 msgid ""
 "If you want to rerun the project or test an updated version by making "
 "changes to the code, simply re-run the command above."
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:237
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:247
 msgid "Step 4: Clean Up"
 msgstr ""
 
-#: ../../source/how-to-run-flower-with-deployment-engine.rst:239
+#: ../../source/how-to-run-flower-with-deployment-engine.rst:249
 msgid ""
 "Use the ``Ctrl+C`` command in each terminal to stop the respective "
 "processes."
@@ -33057,11 +33071,22 @@ msgstr ""
 msgid "Used by the SuperExec and the ``ClientApp`` processes"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:139
+#: ../../source/ref-flower-network-communication.rst:140
+msgid ""
+"AppIo APIs enforce runtime version compatibility between the API server "
+"and its callers. By default, requests from callers using an incompatible "
+"major.minor runtime version are rejected before AppIo communication "
+"proceeds. Older callers without runtime metadata are currently accepted "
+"by this compatibility check for backward compatibility. Keep the "
+"SuperLink, SuperNode, SuperExec, ``ServerApp``, and ``ClientApp`` runtime"
+" components on compatible Flower versions."
+msgstr ""
+
+#: ../../source/ref-flower-network-communication.rst:148
 msgid "Isolation Mode"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:141
+#: ../../source/ref-flower-network-communication.rst:150
 msgid ""
 "Both SuperLink and SuperNode can operate in different isolation modes. "
 "The **SuperExec** is responsible for scheduling, launching, and managing "
@@ -33069,7 +33094,7 @@ msgid ""
 "process."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:145
+#: ../../source/ref-flower-network-communication.rst:154
 msgid ""
 "The ``subprocess`` isolation mode configures the SuperLink/SuperNode to "
 "automatically run the SuperExec as a subprocess upon start. The "
@@ -33082,7 +33107,7 @@ msgid ""
 "understanding of how to use both modes."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:153
+#: ../../source/ref-flower-network-communication.rst:162
 msgid ""
 "When using the ``process`` isolation mode, additional network connections"
 " are necessary to allow the external process running the SuperExec, "
@@ -33090,7 +33115,7 @@ msgid ""
 "SuperNode:"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:157
+#: ../../source/ref-flower-network-communication.rst:166
 msgid ""
 "**SuperExec/ServerApp process to SuperLink (ServerAppIO API)**: Both the "
 "SuperExec for ``ServerApp``\\s and the ``ServerApp`` processes act as "
@@ -33102,7 +33127,7 @@ msgid ""
 "SuperNodes (via the SuperLink)."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:163
+#: ../../source/ref-flower-network-communication.rst:172
 msgid ""
 "**SuperExec/ClientApp process to SuperNode (ClientAppIO API)**: Both the "
 "SuperExec for ``ClientApp``\\s and the ``ClientApp`` processes act as "
@@ -33114,22 +33139,22 @@ msgid ""
 "parameters) to the SuperNode."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:172
+#: ../../source/ref-flower-network-communication.rst:181
 msgid ""
 "The AppIo links above can run with plaintext communication or with "
 "server-authenticated TLS. Without the ``--appio-ssl-*`` options, these "
 "links remain unencrypted and should stay inside a trusted network:"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:176
+#: ../../source/ref-flower-network-communication.rst:185
 msgid "SuperLink + SuperExec + ``ServerApp`` process"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:177
+#: ../../source/ref-flower-network-communication.rst:186
 msgid "SuperNode + SuperExec + ``ClientApp`` process"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:179
+#: ../../source/ref-flower-network-communication.rst:188
 msgid ""
 "To secure these links, configure the ServerAppIo and ClientAppIo API "
 "servers with ``--appio-ssl-certfile``, ``--appio-ssl-keyfile``, and "
@@ -33140,35 +33165,35 @@ msgid ""
 "concrete commands."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:188
+#: ../../source/ref-flower-network-communication.rst:197
 msgid ""
 "When running without TLS, each group must remain inside a single trusted "
 "network. They should never communicate with each other over untrusted "
 "networks (e.g., the public internet)."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:193
+#: ../../source/ref-flower-network-communication.rst:202
 msgid "Account Authentication"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:195
+#: ../../source/ref-flower-network-communication.rst:204
 msgid ""
 "When account authentication is enabled, Flower uses an OIDC-compatible "
 "server to authenticate requests:"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:198
+#: ../../source/ref-flower-network-communication.rst:207
 msgid ""
 "**SuperLink to OIDC server**: A SuperLink can optionally be configured to"
 " only allow authenticated users to interact with it. In this setting, the"
 " Flower SuperLink acts as a REST client to the OIDC-compatible server."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:203
+#: ../../source/ref-flower-network-communication.rst:212
 msgid "Application-specific Connections"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:205
+#: ../../source/ref-flower-network-communication.rst:214
 msgid ""
 "Users who write Flower Apps (``ServerApp`` and ``ClientApp``) can also "
 "make additional network requests. This is, strictly speaking, not part of"
@@ -33178,12 +33203,12 @@ msgid ""
 "want to allow."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:211
+#: ../../source/ref-flower-network-communication.rst:220
 #, fuzzy
 msgid "Typical examples include:"
 msgstr "Exemplo"
 
-#: ../../source/ref-flower-network-communication.rst:213
+#: ../../source/ref-flower-network-communication.rst:222
 msgid ""
 "**ClientApp to Database**: ``ClientApp`` instances typically need to be "
 "able to access the data to perform the action they have been designed for"
@@ -33194,7 +33219,7 @@ msgid ""
 "likely be different to the illustration above."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:219
+#: ../../source/ref-flower-network-communication.rst:228
 msgid ""
 "**ServerApp to Database**: ``ServerApp`` instances might want to access "
 "the data to perform the action they have been designed for (e.g. evaluate"
@@ -33204,7 +33229,7 @@ msgid ""
 "the ``ServerApp`` components."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:224
+#: ../../source/ref-flower-network-communication.rst:233
 msgid ""
 "**ServerApp to metric logging service**: Metric logging services like "
 "TensorBoard, MLFlow and Weights & Biases are often used to track the "
@@ -33212,11 +33237,11 @@ msgid ""
 "acts as a client to the metric logging service."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:230
+#: ../../source/ref-flower-network-communication.rst:239
 msgid "Communication Model"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:232
+#: ../../source/ref-flower-network-communication.rst:241
 msgid ""
 "During real-world deployment, the push/pull communication model adopted "
 "by each component can influence decisions related to resource "
@@ -33225,14 +33250,14 @@ msgid ""
 "the Flower components:"
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:237
+#: ../../source/ref-flower-network-communication.rst:246
 msgid ""
 "**SuperLink ↔ SuperNode (Fleet API)**: The SuperNode pulls/pushes "
 "Messages from/to the SuperLink via the Fleet API. The SuperNode also "
 "pulls the FAB if a new run is being executed."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:240
+#: ../../source/ref-flower-network-communication.rst:249
 msgid ""
 "**SuperLink ↔ ServerApp (ServerAppIo API)**: The ``ServerApp`` process "
 "pulls/pushes Messages from/to the SuperLink via the ServerAppIo API. The "
@@ -33241,7 +33266,7 @@ msgid ""
 " to the SuperLink."
 msgstr ""
 
-#: ../../source/ref-flower-network-communication.rst:244
+#: ../../source/ref-flower-network-communication.rst:253
 msgid ""
 "**SuperNode ↔ ClientApp (ClientAppIo API)**: The ``ClientApp`` process "
 "pulls/pushes Messages from/to the SuperNode via the ClientAppIo API. The "

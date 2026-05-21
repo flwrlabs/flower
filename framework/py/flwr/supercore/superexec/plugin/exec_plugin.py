@@ -22,6 +22,7 @@ from typing import Any
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.typing import Run
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore.superexec.executor import Executor
 
 
 class ExecPlugin(ABC):
@@ -34,12 +35,15 @@ class ExecPlugin(ABC):
         root_certificates_path: str | None,
         get_run: Callable[[int], Run],
         runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
+        executor: Executor | None = None,
     ) -> None:
         self.appio_api_address = appio_api_address
         self.insecure = insecure
         self.root_certificates_path = root_certificates_path
         self.get_run = get_run
         self.runtime_dependency_install = runtime_dependency_install
+        # Non-ephemeral plugins use the executor to start task processes.
+        self.executor = executor
 
     @abstractmethod
     def select_run_id(self, candidate_run_ids: Sequence[int]) -> int | None:
@@ -78,14 +82,14 @@ class ExecPlugin(ABC):
     def launch_task(self, token: str, task: Task) -> None:
         """Launch the process to execute the given task using the given token.
 
-        This method starts the executor process using the given `token`.
+        This method starts the TaskExecutor process using the given `token`.
         The `task` identifies what should be executed and allows plugin
         implementations to associate the launch with a specific task.
 
         Parameters
         ----------
         token : str
-            The token required to run the executor process.
+            The token required to run the TaskExecutor process.
         task : Task
             The task to execute.
         """
