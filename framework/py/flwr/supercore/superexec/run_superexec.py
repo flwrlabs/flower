@@ -35,6 +35,7 @@ from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.constant import ExecutorType
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
 from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
@@ -46,6 +47,7 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 )
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
+from .executor import get_executor
 from .plugin import ExecPlugin
 from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
 
@@ -61,6 +63,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
     parent_pid: int | None = None,
     health_server_address: str | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
+    executor_type: ExecutorType = ExecutorType.SUBPROCESS,
 ) -> None:
     """Run Flower SuperExec.
 
@@ -90,7 +93,11 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
         NOT be started.
     runtime_dependency_install : bool (default: False)
         Whether runtime dependency installation is allowed.
+    executor_type : ExecutorType (default: ExecutorType.SUBPROCESS)
+        The executor to use for non-ephemeral app processes.
     """
+    executor = get_executor(executor_type)
+
     interceptors: list[grpc.UnaryUnaryClientInterceptor] = [
         RuntimeVersionClientInterceptor(component_name="SuperExec")
     ]
@@ -151,6 +158,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
         root_certificates_path=root_certificates_path,
         get_run=get_run,
         runtime_dependency_install=runtime_dependency_install,
+        executor=executor,
     )
 
     # Load plugin configuration from file if provided
