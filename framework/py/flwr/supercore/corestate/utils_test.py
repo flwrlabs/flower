@@ -39,7 +39,7 @@ def _create_task_message(  # pylint: disable=too-many-arguments
     """Create a task Message for testing."""
     metadata = Metadata(
         run_id=run_id,
-        message_id=message_id,
+        message_id="",
         src_node_id=src_node_id,
         dst_node_id=dst_node_id,
         reply_to_message_id="",
