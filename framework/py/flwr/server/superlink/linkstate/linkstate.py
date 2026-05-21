@@ -411,6 +411,31 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
+    def get_run_events(
+        self, run_id: int, after_index: int | None
+    ) -> tuple[list[tuple[str, str]], int]:
+        """Get run event entries for the specified `run_id`.
+
+        Parameters
+        ----------
+        run_id : int
+            The identifier of the run for which to retrieve run events.
+        after_index : Optional[int]
+            Retrieve run events with sequence index greater than this cursor.
+            If set to `None`, retrieve all run events.
+
+        Returns
+        -------
+        tuple[list[tuple[str, str]], int]
+            A tuple containing:
+            - A list of `(event, data)` tuples ordered by sequence index.
+              Only the contiguous sequence suffix after `after_index` is returned.
+            - The sequence index of the latest returned contiguous run event entry.
+              Returns `0` when no contiguous run events are returned, or when the
+              latest returned event has `sequence_number == 0`.
+        """
+
+    @abc.abstractmethod
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`.
 

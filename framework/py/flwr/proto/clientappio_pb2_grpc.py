@@ -102,6 +102,11 @@ class ClientAppIoStub(object):
                 request_serializer=flwr_dot_proto_dot_log__pb2.PushLogsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_log__pb2.PushLogsResponse.FromString,
                 _registered_method=True)
+        self.PushRunEvents = channel.unary_unary(
+                '/flwr.proto.ClientAppIo/PushRunEvents',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PushRunEventsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushRunEventsResponse.FromString,
+                _registered_method=True)
         self.PushMessage = channel.unary_unary(
                 '/flwr.proto.ClientAppIo/PushMessage',
                 request_serializer=flwr_dot_proto_dot_appio__pb2.PushAppMessagesRequest.SerializeToString,
@@ -220,6 +225,13 @@ class ClientAppIoServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def PushRunEvents(self, request, context):
+        """Push run events
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def PushMessage(self, request, context):
         """///////////////////////////////////////////////////////////////////////////
         Specific endpoints for ClientAppIo
@@ -305,6 +317,11 @@ def add_ClientAppIoServicer_to_server(servicer, server):
                     servicer.PushLogs,
                     request_deserializer=flwr_dot_proto_dot_log__pb2.PushLogsRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_log__pb2.PushLogsResponse.SerializeToString,
+            ),
+            'PushRunEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.PushRunEvents,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushRunEventsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushRunEventsResponse.SerializeToString,
             ),
             'PushMessage': grpc.unary_unary_rpc_method_handler(
                     servicer.PushMessage,
@@ -668,6 +685,33 @@ class ClientAppIo(object):
             '/flwr.proto.ClientAppIo/PushLogs',
             flwr_dot_proto_dot_log__pb2.PushLogsRequest.SerializeToString,
             flwr_dot_proto_dot_log__pb2.PushLogsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PushRunEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ClientAppIo/PushRunEvents',
+            flwr_dot_proto_dot_appio__pb2.PushRunEventsRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PushRunEventsResponse.FromString,
             options,
             channel_credentials,
             insecure,

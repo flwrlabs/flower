@@ -15,8 +15,10 @@
 """Shared AppIo API servicer."""
 
 
+import json
 from abc import ABC, abstractmethod
 from logging import DEBUG
+from typing import Any, cast
 
 import grpc
 
@@ -31,6 +33,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullPendingTasksResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
+    PushRunEventsRequest,
+    PushRunEventsResponse,
     PushTaskMessageRequest,
     PushTaskMessageResponse,
     SendTaskHeartbeatRequest,
@@ -153,6 +157,55 @@ class AppIoServicer(ABC):
         state.add_task_log(task.task_id, merged_logs)
         return PushLogsResponse()
 
+    def PushRunEvents(
+        self, request: PushRunEventsRequest, context: grpc.ServicerContext
+    ) -> PushRunEventsResponse:
+        """Push run events."""
+        log(DEBUG, "AppIoServicer.PushRunEvents")
+
+        task = get_authenticated_task()
+        events_to_store: list[tuple[str, str]] = []
+        prev_sequence_number: int | None = None
+        for entry in request.events:
+            event_name = entry.event.strip()
+            if not event_name:
+                context.abort(grpc.StatusCode.INVALID_ARGUMENT, "event is required")
+                raise RuntimeError("Unreachable after abort.")
+
+            parsed = _parse_json_object(
+                value=entry.data,
+                field_name="data",
+                context=context,
+            )
+            sequence_number = _require_sequence_number(
+                payload=parsed,
+                context=context,
+            )
+            if (
+                prev_sequence_number is not None
+                and sequence_number <= prev_sequence_number
+            ):
+                context.abort(
+                    grpc.StatusCode.INVALID_ARGUMENT,
+                    (
+                        "sequence_number values in one PushRunEvents request "
+                        "must be strictly increasing"
+                    ),
+                )
+                raise RuntimeError("Unreachable after abort.")
+            prev_sequence_number = sequence_number
+            events_to_store.append(
+                (event_name, json.dumps(parsed, separators=(",", ":")))
+            )
+
+        try:
+            stored_count = self.state().add_run_events(task.run_id, events_to_store)
+        except ValueError as err:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(err))
+            raise RuntimeError("Unreachable after abort.") from err
+
+        return PushRunEventsResponse(stored_count=stored_count)
+
 
 def _validate_create_task_request(
     request: CreateTaskRequest, requesting_task: Task, context: grpc.ServicerContext
@@ -187,3 +240,41 @@ def _validate_create_task_request(
             grpc.StatusCode.FAILED_PRECONDITION,
             f"Task type '{request.type}' requires connector_ref.",
         )
+
+
+def _parse_json_object(
+    *,
+    value: str,
+    field_name: str,
+    context: grpc.ServicerContext,
+) -> dict[str, Any]:
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as err:
+        context.abort(
+            grpc.StatusCode.INVALID_ARGUMENT,
+            f"{field_name} must be valid JSON",
+        )
+        raise RuntimeError("Unreachable after abort.") from err
+    if not isinstance(parsed, dict):
+        context.abort(
+            grpc.StatusCode.INVALID_ARGUMENT,
+            f"{field_name} must encode a JSON object",
+        )
+        raise RuntimeError("Unreachable after abort.")
+    return cast(dict[str, Any], parsed)
+
+
+def _require_sequence_number(
+    *,
+    payload: dict[str, Any],
+    context: grpc.ServicerContext,
+) -> int:
+    sequence_number = payload.get("sequence_number")
+    if not isinstance(sequence_number, int) or sequence_number < 0:
+        context.abort(
+            grpc.StatusCode.INVALID_ARGUMENT,
+            "data must include non-negative integer `sequence_number`",
+        )
+        raise RuntimeError("Unreachable after abort.")
+    return sequence_number

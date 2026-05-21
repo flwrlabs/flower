@@ -129,6 +129,12 @@ class ClientAppIoStub:
     ]
     """Push task logs"""
 
+    PushRunEvents: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushRunEventsRequest,
+        flwr.proto.appio_pb2.PushRunEventsResponse,
+    ]
+    """Push run events"""
+
     PushMessage: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushAppMessagesRequest,
         flwr.proto.appio_pb2.PushAppMessagesResponse,
@@ -239,6 +245,12 @@ class ClientAppIoAsyncStub:
         flwr.proto.log_pb2.PushLogsResponse,
     ]
     """Push task logs"""
+
+    PushRunEvents: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushRunEventsRequest,
+        flwr.proto.appio_pb2.PushRunEventsResponse,
+    ]
+    """Push run events"""
 
     PushMessage: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushAppMessagesRequest,
@@ -376,6 +388,14 @@ class ClientAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.log_pb2.PushLogsResponse, collections.abc.Awaitable[flwr.proto.log_pb2.PushLogsResponse]]:
         """Push task logs"""
+
+    @abc.abstractmethod
+    def PushRunEvents(
+        self,
+        request: flwr.proto.appio_pb2.PushRunEventsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.PushRunEventsResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushRunEventsResponse]]:
+        """Push run events"""
 
     @abc.abstractmethod
     def PushMessage(

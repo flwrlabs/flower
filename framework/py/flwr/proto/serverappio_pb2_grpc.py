@@ -103,6 +103,11 @@ class ServerAppIoStub(object):
                 request_serializer=flwr_dot_proto_dot_log__pb2.PushLogsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_log__pb2.PushLogsResponse.FromString,
                 _registered_method=True)
+        self.PushRunEvents = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/PushRunEvents',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PushRunEventsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushRunEventsResponse.FromString,
+                _registered_method=True)
         self.GetFederationOptions = channel.unary_unary(
                 '/flwr.proto.ServerAppIo/GetFederationOptions',
                 request_serializer=flwr_dot_proto_dot_run__pb2.GetFederationOptionsRequest.SerializeToString,
@@ -231,6 +236,13 @@ class ServerAppIoServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def PushRunEvents(self, request, context):
+        """Push run events
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetFederationOptions(self, request, context):
         """///////////////////////////////////////////////////////////////////////////
         Specific endpoints for ServerAppIo
@@ -330,6 +342,11 @@ def add_ServerAppIoServicer_to_server(servicer, server):
                     servicer.PushLogs,
                     request_deserializer=flwr_dot_proto_dot_log__pb2.PushLogsRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_log__pb2.PushLogsResponse.SerializeToString,
+            ),
+            'PushRunEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.PushRunEvents,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushRunEventsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushRunEventsResponse.SerializeToString,
             ),
             'GetFederationOptions': grpc.unary_unary_rpc_method_handler(
                     servicer.GetFederationOptions,
@@ -703,6 +720,33 @@ class ServerAppIo(object):
             '/flwr.proto.ServerAppIo/PushLogs',
             flwr_dot_proto_dot_log__pb2.PushLogsRequest.SerializeToString,
             flwr_dot_proto_dot_log__pb2.PushLogsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PushRunEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ServerAppIo/PushRunEvents',
+            flwr_dot_proto_dot_appio__pb2.PushRunEventsRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PushRunEventsResponse.FromString,
             options,
             channel_credentials,
             insecure,

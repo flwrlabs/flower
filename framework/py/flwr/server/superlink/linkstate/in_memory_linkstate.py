@@ -15,7 +15,9 @@
 """In-memory LinkState implementation."""
 
 
+import json
 import threading
+from bisect import bisect_right
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
@@ -61,8 +63,10 @@ class RunRecord:  # pylint: disable=R0902
     run: Run
     federation_config: SimulationConfig | None = None
     logs: list[tuple[float, str]] = field(default_factory=list)
+    run_events: list[tuple[int, str, str]] = field(default_factory=list)
     usage_reported_at: str = ""
     log_lock: threading.Lock = field(default_factory=threading.Lock)
+    run_event_lock: threading.Lock = field(default_factory=threading.Lock)
     lock: threading.RLock = field(default_factory=threading.RLock)
 
 
@@ -772,6 +776,78 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             raise ValueError(f"Run {run_id} not found")
         self.contexts[run_id] = context
 
+    def add_run_events(self, run_id: int, events: list[tuple[str, str]]) -> int:
+        """Add ordered run event entries for the specified `run_id`."""
+        if not events:
+            return 0
+        with self.lock:
+            if run_id not in self.run_ids:
+                raise ValueError(f"Run {run_id} not found")
+            run = self.run_ids[run_id]
+
+        parsed_events: list[tuple[int, str, str]] = []
+        seen_sequence_numbers: set[int] = set()
+        for event_name, payload in events:
+            sequence_number = _extract_sequence_number_from_event_data(payload)
+            if sequence_number in seen_sequence_numbers:
+                raise ValueError(
+                    f"Duplicate run event sequence_number {sequence_number} "
+                    f"for run {run_id}"
+                )
+            seen_sequence_numbers.add(sequence_number)
+            parsed_events.append((sequence_number, event_name, payload))
+
+        with run.run_event_lock:
+            for sequence_number, event_name, payload in parsed_events:
+                insert_idx = bisect_right(
+                    run.run_events,
+                    sequence_number,
+                    key=lambda run_event: run_event[0],
+                )
+                if (
+                    insert_idx > 0
+                    and run.run_events[insert_idx - 1][0] == sequence_number
+                ) or (
+                    insert_idx < len(run.run_events)
+                    and run.run_events[insert_idx][0] == sequence_number
+                ):
+                    raise ValueError(
+                        f"Duplicate run event sequence_number {sequence_number} "
+                        f"for run {run_id}"
+                    )
+                run.run_events.insert(
+                    insert_idx, (sequence_number, event_name, payload)
+                )
+        return len(parsed_events)
+
+    def get_run_events(
+        self, run_id: int, after_index: int | None
+    ) -> tuple[list[tuple[str, str]], int]:
+        """Get run event entries for the specified `run_id`."""
+        with self.lock:
+            if run_id not in self.run_ids:
+                raise ValueError(f"Run {run_id} not found")
+            run = self.run_ids[run_id]
+
+        if after_index is None:
+            after_index = -1
+        with run.run_event_lock:
+            index = bisect_right(
+                run.run_events,
+                after_index,
+                key=lambda run_event: run_event[0],
+            )
+            expected_sequence = after_index + 1
+            replay_events: list[tuple[str, str]] = []
+            latest_index = 0
+            for sequence_number, event, data in run.run_events[index:]:
+                if sequence_number != expected_sequence:
+                    break
+                replay_events.append((event, data))
+                latest_index = sequence_number
+                expected_sequence += 1
+            return replay_events, latest_index
+
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`."""
         # Validate non-negative values
@@ -802,3 +878,18 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             if run_id not in self.run_ids:
                 raise ValueError(f"Run {run_id} not found")
             self.run_ids[run_id].run.clientapp_runtime += runtime
+
+
+def _extract_sequence_number_from_event_data(data: str) -> int:
+    try:
+        payload = json.loads(data)
+    except json.JSONDecodeError as err:
+        raise ValueError("Run event data must be valid JSON") from err
+    if not isinstance(payload, dict):
+        raise ValueError("Run event data must encode a JSON object")
+    sequence_number = payload.get("sequence_number")
+    if not isinstance(sequence_number, int) or sequence_number < 0:
+        raise ValueError(
+            "Run event data must include non-negative integer `sequence_number`"
+        )
+    return sequence_number

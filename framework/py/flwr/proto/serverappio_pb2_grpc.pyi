@@ -130,6 +130,12 @@ class ServerAppIoStub:
     ]
     """Push task logs"""
 
+    PushRunEvents: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushRunEventsRequest,
+        flwr.proto.appio_pb2.PushRunEventsResponse,
+    ]
+    """Push run events"""
+
     GetFederationOptions: grpc.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetFederationOptionsRequest,
         flwr.proto.run_pb2.GetFederationOptionsResponse,
@@ -252,6 +258,12 @@ class ServerAppIoAsyncStub:
         flwr.proto.log_pb2.PushLogsResponse,
     ]
     """Push task logs"""
+
+    PushRunEvents: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushRunEventsRequest,
+        flwr.proto.appio_pb2.PushRunEventsResponse,
+    ]
+    """Push run events"""
 
     GetFederationOptions: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetFederationOptionsRequest,
@@ -401,6 +413,14 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.log_pb2.PushLogsResponse, collections.abc.Awaitable[flwr.proto.log_pb2.PushLogsResponse]]:
         """Push task logs"""
+
+    @abc.abstractmethod
+    def PushRunEvents(
+        self,
+        request: flwr.proto.appio_pb2.PushRunEventsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.PushRunEventsResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushRunEventsResponse]]:
+        """Push run events"""
 
     @abc.abstractmethod
     def GetFederationOptions(

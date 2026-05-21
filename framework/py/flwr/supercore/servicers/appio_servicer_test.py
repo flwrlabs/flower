@@ -21,10 +21,13 @@ from unittest.mock import Mock, patch
 import grpc
 
 from flwr.common.constant import Status
+from flwr.proto.appio_pb2 import RunEvent  # pylint: disable=E0611
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     CreateTaskRequest,
     PullPendingTasksRequest,
+    PushRunEventsRequest,
+    PushRunEventsResponse,
     SendTaskHeartbeatRequest,
 )
 from flwr.proto.log_pb2 import (  # pylint: disable=E0611
@@ -318,3 +321,140 @@ class TestAppIoServicer(unittest.TestCase):
         # Assert
         self.state.add_task_log.assert_called_once_with(123, "hello world")
         self.assertIsInstance(response, PushLogsResponse)
+
+    def test_push_run_events_stores_compacted_events(self) -> None:
+        """PushRunEvents should validate, compact, and store run events."""
+        self.state.add_run_events.return_value = 2
+        request = PushRunEventsRequest(
+            events=[
+                RunEvent(
+                    event="response.output_text.delta",
+                    data='{"type": "response.output_text.delta", "delta": "hi", '
+                    '"sequence_number": 0}',
+                ),
+                RunEvent(
+                    event="response.completed",
+                    data='{"type": "response.completed", "sequence_number": 1}',
+                ),
+            ]
+        )
+
+        with patch(
+            "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+            return_value=Mock(run_id=123),
+        ):
+            response = self.servicer.PushRunEvents(request, Mock())
+
+        self.state.add_run_events.assert_called_once_with(
+            123,
+            [
+                (
+                    "response.output_text.delta",
+                    '{"type":"response.output_text.delta","delta":"hi",'
+                    '"sequence_number":0}',
+                ),
+                (
+                    "response.completed",
+                    '{"type":"response.completed","sequence_number":1}',
+                ),
+            ],
+        )
+        self.assertIsInstance(response, PushRunEventsResponse)
+        self.assertEqual(response.stored_count, 2)
+
+    def test_push_run_events_rejects_non_object_json(self) -> None:
+        """PushRunEvents should reject event data that is not a JSON object."""
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch(
+                "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+                return_value=Mock(run_id=123),
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.PushRunEvents(
+                PushRunEventsRequest(
+                    events=[
+                        RunEvent(
+                            event="response.output_text.delta",
+                            data='"not-object"',
+                        )
+                    ]
+                ),
+                context,
+            )
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.INVALID_ARGUMENT,
+            "data must encode a JSON object",
+        )
+        self.state.add_run_events.assert_not_called()
+
+    def test_push_run_events_rejects_missing_sequence_number(self) -> None:
+        """PushRunEvents should require canonical sequence_number in data."""
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch(
+                "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+                return_value=Mock(run_id=123),
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.PushRunEvents(
+                PushRunEventsRequest(
+                    events=[
+                        RunEvent(
+                            event="response.output_text.delta",
+                            data='{"type":"response.output_text.delta","delta":"hi"}',
+                        )
+                    ]
+                ),
+                context,
+            )
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.INVALID_ARGUMENT,
+            "data must include non-negative integer `sequence_number`",
+        )
+        self.state.add_run_events.assert_not_called()
+
+    def test_push_run_events_rejects_non_increasing_sequence_numbers(self) -> None:
+        """PushRunEvents should reject non-increasing sequence numbers in a batch."""
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch(
+                "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+                return_value=Mock(run_id=123),
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.PushRunEvents(
+                PushRunEventsRequest(
+                    events=[
+                        RunEvent(
+                            event="response.output_text.delta",
+                            data='{"type":"response.output_text.delta",'
+                            '"sequence_number":2}',
+                        ),
+                        RunEvent(
+                            event="response.output_text.delta",
+                            data='{"type":"response.output_text.delta",'
+                            '"sequence_number":2}',
+                        ),
+                    ]
+                ),
+                context,
+            )
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.INVALID_ARGUMENT,
+            "sequence_number values in one PushRunEvents request must be "
+            "strictly increasing",
+        )
+        self.state.add_run_events.assert_not_called()

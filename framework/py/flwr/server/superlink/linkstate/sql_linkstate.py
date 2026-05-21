@@ -1217,6 +1217,97 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 except IntegrityError:
                     raise ValueError(f"Run {run_id} not found") from None
 
+    def add_run_events(self, run_id: int, events: list[tuple[str, str]]) -> int:
+        """Add ordered run event entries for the specified `run_id`."""
+        if not events:
+            return 0
+
+        parsed_events: list[dict[str, Any]] = []
+        seen_sequence_numbers: set[int] = set()
+        for event_name, payload in events:
+            sequence_number = _extract_sequence_number_from_event_data(payload)
+            if sequence_number in seen_sequence_numbers:
+                raise ValueError(
+                    f"Duplicate run event sequence_number {sequence_number} "
+                    f"for run {run_id}"
+                )
+            seen_sequence_numbers.add(sequence_number)
+            parsed_events.append(
+                {
+                    "sequence_number": sequence_number,
+                    "event": event_name,
+                    "data": payload,
+                }
+            )
+
+        current_ts = now().timestamp()
+        sint64_run_id = uint64_to_int64(run_id)
+        with self.session():
+            run_rows = self.query(
+                "SELECT run_id FROM run WHERE run_id = :run_id",
+                {"run_id": sint64_run_id},
+            )
+            if not run_rows:
+                raise ValueError(f"Run {run_id} not found")
+            try:
+                self.query(
+                    """
+                    INSERT INTO run_event
+                        (timestamp, run_id, sequence_number, event, data)
+                    VALUES (:current_ts, :run_id, :sequence_number, :event, :data)
+                    """,
+                    [
+                        {
+                            "current_ts": current_ts,
+                            "run_id": sint64_run_id,
+                            "sequence_number": entry["sequence_number"],
+                            "event": entry["event"],
+                            "data": entry["data"],
+                        }
+                        for entry in parsed_events
+                    ],
+                )
+            except IntegrityError:
+                raise ValueError(
+                    f"Duplicate run event sequence_number for run {run_id}"
+                ) from None
+        return len(parsed_events)
+
+    def get_run_events(
+        self, run_id: int, after_index: int | None
+    ) -> tuple[list[tuple[str, str]], int]:
+        """Get run event entries for the specified `run_id`."""
+        sint64_run_id = uint64_to_int64(run_id)
+        with self.session():
+            rows = self.query(
+                "SELECT run_id FROM run WHERE run_id = :run_id",
+                {"run_id": sint64_run_id},
+            )
+            if not rows:
+                raise ValueError(f"Run {run_id} not found")
+            if after_index is None:
+                after_index = -1
+            rows = self.query(
+                """
+                SELECT sequence_number, event, data
+                FROM run_event
+                WHERE run_id = :run_id AND sequence_number > :after_index
+                ORDER BY sequence_number
+                """,
+                {"run_id": sint64_run_id, "after_index": after_index},
+            )
+            expected_sequence = after_index + 1
+            replay_events: list[tuple[str, str]] = []
+            latest_index = 0
+            for row in rows:
+                sequence_number = row["sequence_number"]
+                if sequence_number != expected_sequence:
+                    break
+                replay_events.append((row["event"], row["data"]))
+                latest_index = sequence_number
+                expected_sequence += 1
+        return replay_events, latest_index
+
     def get_valid_message_ins(self, message_id: str) -> dict[str, Any] | None:
         """Check if the Message exists and is valid (not expired).
 
@@ -1323,3 +1414,18 @@ def _run_from_row(row: dict[str, Any]) -> Run:
         clientapp_runtime=row["clientapp_runtime"],
         run_type=row["run_type"],
     )
+
+
+def _extract_sequence_number_from_event_data(data: str) -> int:
+    try:
+        payload = json.loads(data)
+    except json.JSONDecodeError as err:
+        raise ValueError("Run event data must be valid JSON") from err
+    if not isinstance(payload, dict):
+        raise ValueError("Run event data must encode a JSON object")
+    sequence_number = payload.get("sequence_number")
+    if not isinstance(sequence_number, int) or sequence_number < 0:
+        raise ValueError(
+            "Run event data must include non-negative integer `sequence_number`"
+        )
+    return sequence_number

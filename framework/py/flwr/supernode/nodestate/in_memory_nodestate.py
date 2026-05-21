@@ -15,6 +15,8 @@
 """In-memory NodeState implementation."""
 
 
+import json
+from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
 from threading import Lock, RLock
@@ -70,6 +72,9 @@ class InMemoryNodeState(
         # Store run ID to Run mapping
         self.run_store: dict[int, Run] = {}
         self.lock_run_store = Lock()
+        # Store run ID to ordered run events
+        self.run_events: dict[int, list[tuple[int, str, str]]] = {}
+        self.lock_run_event_store = Lock()
         # Store run ID to Context mapping
         self.ctx_store: dict[int, Context] = {}
         self.lock_ctx_store = Lock()
@@ -170,6 +175,47 @@ class InMemoryNodeState(
         with self.lock_run_store:
             return self.run_store.get(run_id)
 
+    def add_run_events(self, run_id: int, events: list[tuple[str, str]]) -> int:
+        """Add ordered run event entries for the specified `run_id`."""
+        if not events:
+            return 0
+        with self.lock_run_store:
+            if run_id not in self.run_store:
+                raise ValueError(f"Run {run_id} not found")
+
+        parsed_events: list[tuple[int, str, str]] = []
+        seen_sequence_numbers: set[int] = set()
+        for event_name, payload in events:
+            sequence_number = _extract_sequence_number_from_event_data(payload)
+            if sequence_number in seen_sequence_numbers:
+                raise ValueError(
+                    f"Duplicate run event sequence_number {sequence_number} "
+                    f"for run {run_id}"
+                )
+            seen_sequence_numbers.add(sequence_number)
+            parsed_events.append((sequence_number, event_name, payload))
+
+        with self.lock_run_event_store:
+            run_events = self.run_events.setdefault(run_id, [])
+            for sequence_number, event_name, payload in parsed_events:
+                insert_idx = bisect_right(
+                    run_events,
+                    sequence_number,
+                    key=lambda run_event: run_event[0],
+                )
+                if (
+                    insert_idx > 0 and run_events[insert_idx - 1][0] == sequence_number
+                ) or (
+                    insert_idx < len(run_events)
+                    and run_events[insert_idx][0] == sequence_number
+                ):
+                    raise ValueError(
+                        f"Duplicate run event sequence_number {sequence_number} "
+                        f"for run {run_id}"
+                    )
+                run_events.insert(insert_idx, (sequence_number, event_name, payload))
+        return len(parsed_events)
+
     def store_context(self, context: Context) -> None:
         """Store a context."""
         with self.lock_ctx_store:
@@ -261,3 +307,18 @@ class InMemoryNodeState(
             # Delete the identified entries
             for msg_id in to_delete:
                 del self.time_store[msg_id]
+
+
+def _extract_sequence_number_from_event_data(data: str) -> int:
+    try:
+        payload = json.loads(data)
+    except json.JSONDecodeError as err:
+        raise ValueError("Run event data must be valid JSON") from err
+    if not isinstance(payload, dict):
+        raise ValueError("Run event data must encode a JSON object")
+    sequence_number = payload.get("sequence_number")
+    if not isinstance(sequence_number, int) or sequence_number < 0:
+        raise ValueError(
+            "Run event data must include non-negative integer `sequence_number`"
+        )
+    return sequence_number

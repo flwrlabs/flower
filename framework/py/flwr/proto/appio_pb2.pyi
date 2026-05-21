@@ -352,6 +352,57 @@ class PushTaskOutputResponse(google.protobuf.message.Message):
 global___PushTaskOutputResponse = PushTaskOutputResponse
 
 @typing.final
+class RunEvent(google.protobuf.message.Message):
+    """PushRunEvents messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENT_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    event: builtins.str
+    data: builtins.str
+    def __init__(
+        self,
+        *,
+        event: builtins.str = ...,
+        data: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "event", b"event"]) -> None: ...
+
+global___RunEvent = RunEvent
+
+@typing.final
+class PushRunEventsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENTS_FIELD_NUMBER: builtins.int
+    @property
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RunEvent]: ...
+    def __init__(
+        self,
+        *,
+        events: collections.abc.Iterable[global___RunEvent] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
+
+global___PushRunEventsRequest = PushRunEventsRequest
+
+@typing.final
+class PushRunEventsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    STORED_COUNT_FIELD_NUMBER: builtins.int
+    stored_count: builtins.int
+    def __init__(
+        self,
+        *,
+        stored_count: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["stored_count", b"stored_count"]) -> None: ...
+
+global___PushRunEventsResponse = PushRunEventsResponse
+
+@typing.final
 class CreateTaskRequest(google.protobuf.message.Message):
     """CreateTask messages"""
 

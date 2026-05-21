@@ -78,6 +78,24 @@ class CoreState(ABC):
         """
 
     @abstractmethod
+    def add_run_events(self, run_id: int, events: list[tuple[str, str]]) -> int:
+        """Add ordered run event entries for the specified `run_id`.
+
+        Parameters
+        ----------
+        run_id : int
+            The identifier of the run for which to add run events.
+        events : list[tuple[str, str]]
+            Ordered `(event, data)` tuples where `data` is a JSON string payload.
+            Each payload must include a non-negative integer `sequence_number`.
+
+        Returns
+        -------
+        int
+            Number of stored run events.
+        """
+
+    @abstractmethod
     def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         task_type: str,
