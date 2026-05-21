@@ -99,7 +99,7 @@ def validate_task_message(message: Message) -> list[str]:  # pylint: disable=R09
     if metadata.message_type == "":
         validation_errors.append("`metadata.message_type` MUST be set")
 
-    if not message.has_content() != message.has_error():
+    if message.has_content() == message.has_error():
         validation_errors.append(
             "Either message `content` or `error` MUST be set (but not both)"
         )
