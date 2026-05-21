@@ -10,17 +10,21 @@ This guide shows how to register a SuperNode in SuperGrid and start the
 ``flower-supernode`` process so it can connect to SuperGrid. Once connected, the
 SuperNode can participate in runs submitted to federations that include it.
 
+.. note::
+
+    This guide assumes you already have a Flower account on `flower.ai
+    <https://flower.ai/>`__ and can access SuperGrid. To be able to connect a SuperNode
+    to SuperGrid, you might need to first ask for access. Contact hello@flower.ai to
+    request access.
+
 You will need:
 
 - Access to SuperGrid at https://flower.ai/supernodes/.
+- A federation for ``Deployment``. Note that federations for ``Simulation`` do not
+  support adding SuperNodes to them.
 - A public/private key pair for each SuperNode you want to connect. This tutorial shows
   how to create these with ``ssh-keygen`` in the terminal.
 - A machine where the SuperNode process can keep running.
-
-.. note::
-
-    To be able to connect a SuperNode to SuperGrid, you might need to first ask for
-    access. Contact hello@flower.ai to request access.
 
 ************************************
  Register SuperNodes with SuperGrid
