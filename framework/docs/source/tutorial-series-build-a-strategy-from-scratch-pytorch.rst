@@ -14,27 +14,20 @@
 
 .. _fedadagrad_link: ref-api/flwr.serverapp.strategy.FedAdagrad.html
 
-Welcome to the third part of the Flower federated learning tutorial. In previous parts
-of this tutorial, we introduced federated learning with PyTorch and the Flower framework
-(:doc:`part 1 <tutorial-series-get-started-with-flower-pytorch>`) and we learned how
-strategies can be used to customize the execution on both the server and the clients
-(:doc:`part 2 <tutorial-series-use-a-federated-learning-strategy-pytorch>`).
+Welcome to the next part of the Flower collaborative AI tutorial!
 
-In this tutorial, we'll continue to customize the federated learning system we built
-previously by creating a much more customized version of ``FedAdagrad``.
+In the previous tutorials, you created a simulated federation on SuperGrid, ran and
+customized Flower Apps, moved from the NumPy demo to the PyTorch quickstart app, and
+then customized that PyTorch app by changing and extending its strategy. In this
+tutorial, you'll go one step further and create a more customized version of
+``FedAdagrad``.
 
 .. tip::
 
     `Star Flower on GitHub <https://github.com/flwrlabs/flower>`__ ⭐️ and join the
-    Flower community on Flower Discuss and the Flower Slack to connect, ask questions,
-    and get help:
-
-    - `Join Flower Discuss <https://discuss.flower.ai/>`__ We'd love to hear from you in
-      the ``Introduction`` topic! If anything is unclear, post in ``Flower Help -
-      Beginners``.
-    - `Join Flower Slack <https://flower.ai/join-slack>`__ We'd love to hear from you in
-      the ``#introductions`` channel! If anything is unclear, head over to the
-      ``#questions`` channel.
+    Flower community on `Flower Discuss <https://discuss.flower.ai/>`__ or `Flower Slack
+    <https://flower.ai/join-slack>`__ to introduce yourself, ask questions, and get
+    help.
 
 Let's build a new ``Strategy`` with a customized |strategy_start_link|_ method that:
 
@@ -45,58 +38,36 @@ Let's build a new ``Strategy`` with a customized |strategy_start_link|_ method t
  Preparation
 *************
 
-Before we begin with the actual code, let's make sure that we have everything we need.
+This tutorial continues from the :doc:`previous tutorial
+<tutorial-series-use-a-federated-learning-strategy-pytorch>`. If you completed it, open
+the existing ``quickstart-pytorch`` directory and continue from there.
 
 Installing dependencies
 =======================
 
-.. note::
-
-    If you've completed part 1 and 2 of the tutorial, you can skip this step. But
-    remember to include ``wandb`` as a dependency in your ``pyproject.toml`` file and
-    install it in your environment.
-
-First, we install the Flower package ``flwr``:
-
-.. code-block:: shell
-
-    # In a new Python environment
-    $ pip install -U "flwr[simulation]"
-
-Then, run the command below:
-
-.. code-block:: shell
-
-    $ flwr new @flwrlabs/quickstart-pytorch
-
-After running it you'll notice a new directory named ``quickstart-pytorch`` has been
-created. It should have the following structure:
-
-.. code-block:: shell
-
-    quickstart-pytorch
-    ├── pytorchexample
-    │   ├── __init__.py
-    │   ├── client_app.py   # Defines your ClientApp
-    │   ├── server_app.py   # Defines your ServerApp
-    │   └── task.py         # Defines your model, training and data loading
-    ├── pyproject.toml      # Project metadata like dependencies and configs
-    └── README.md
-
-Next, add the `wandb` dependency to the project by editing the ``pyproject.toml`` file
-located in the root of the project. Add the following line to the list of dependencies:
+In this tutorial, you'll use Weights & Biases to log strategy metrics. Add ``wandb`` to
+the dependency list in ``pyproject.toml``:
 
 .. code-block:: shell
 
     "wandb>=0.17.8"
 
-Next, we install the project and its dependencies, which are specified in the
-``pyproject.toml`` file:
+Then install the updated project dependencies:
 
 .. code-block:: shell
 
     $ cd quickstart-pytorch
     $ pip install -e .
+
+If you are starting here directly, first create the app as shown in the previous
+tutorial:
+
+.. code-block:: shell
+
+    # Install Flower
+    $ pip install -U "flwr[simulation]"
+    # Create a new Flower App using the PyTorch quickstart template
+    $ flwr new @flwrlabs/quickstart-pytorch
 
 .. note::
 

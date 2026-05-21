@@ -30,25 +30,19 @@
 
 .. _strategy_start_link: ref-api/flwr.serverapp.strategy.Strategy.html#flwr.serverapp.strategy.Strategy.start
 
-Welcome to the next part of the federated learning tutorial. In previous parts of this
-tutorial, we introduced federated learning with PyTorch and Flower (:doc:`part 1
-<tutorial-series-get-started-with-flower-pytorch>`).
+Welcome to the next part of the Flower collaborative AI tutorial!
 
-In part 2, we'll begin to customize the federated learning system we built in part 1
-using the Flower framework, Flower Datasets, and PyTorch.
+In the previous tutorials, you created a simulated federation on SuperGrid, ran a Flower
+App from Flower Hub, customized the NumPy demo app, and then ran the PyTorch quickstart
+app on SuperGrid and locally. In this tutorial, you'll customize that PyTorch app by
+changing and extending the federated learning strategy used by the ``ServerApp``.
 
 .. tip::
 
     `Star Flower on GitHub <https://github.com/flwrlabs/flower>`__ ⭐️ and join the
-    Flower community on Flower Discuss and the Flower Slack to connect, ask questions,
-    and get help:
-
-    - `Join Flower Discuss <https://discuss.flower.ai/>`__ We'd love to hear from you in
-      the ``Introduction`` topic! If anything is unclear, post in ``Flower Help -
-      Beginners``.
-    - `Join Flower Slack <https://flower.ai/join-slack>`__ We'd love to hear from you in
-      the ``#introductions`` channel! If anything is unclear, head over to the
-      ``#questions`` channel.
+    Flower community on `Flower Discuss <https://discuss.flower.ai/>`__ or `Flower Slack
+    <https://flower.ai/join-slack>`__ to introduce yourself, ask questions, and get
+    help.
 
 Let's move beyond FedAvg with Flower strategies! 🌼
 
@@ -56,60 +50,29 @@ Let's move beyond FedAvg with Flower strategies! 🌼
  Preparation
 *************
 
-Before we begin with the actual code, let's make sure that we have everything we need.
+This tutorial continues from the :doc:`previous tutorial
+<tutorial-series-write-your-first-flower-app-pytorch>`, where you created and ran the
+``@flwrlabs/quickstart-pytorch`` app. If you completed it, open the existing
+``quickstart-pytorch`` directory and continue from there.
 
-Installing dependencies
-=======================
-
-.. note::
-
-    If you've completed part 1 of the tutorial, you can skip this step.
-
-First, we install the Flower package ``flwr``:
+If you are starting here directly, install Flower and fetch the same app:
 
 .. code-block:: shell
 
-    # In a new Python environment
+    # Install Flower with the simulation extra
     $ pip install -U "flwr[simulation]"
-
-Then, run the command below:
-
-.. code-block:: shell
-
+    # Fetch the app from Flower Hub
     $ flwr new @flwrlabs/quickstart-pytorch
-
-After running it you'll notice a new directory named ``quickstart-pytorch`` has been
-created. It should have the following structure:
-
-.. code-block:: shell
-
-    quickstart-pytorch
-    ├── pytorchexample
-    │   ├── __init__.py
-    │   ├── client_app.py   # Defines your ClientApp
-    │   ├── server_app.py   # Defines your ServerApp
-    │   └── task.py         # Defines your model, training and data loading
-    ├── pyproject.toml      # Project metadata like dependencies and configs
-    └── README.md
-
-Next, we install the project and its dependencies, which are specified in the
-``pyproject.toml`` file:
-
-.. code-block:: shell
-
+    # Navigate to the app directory
     $ cd quickstart-pytorch
+    # Install the app dependencies
     $ pip install -e .
 
-So far, everything should look familiar if you've worked through the introductory
-tutorial. With that, we're ready to introduce a number of new features.
+With that, we're ready to introduce a number of new strategy features.
 
 *******************************
  Choosing a different strategy
 *******************************
-
-In part 1, we created a |serverapp_link|_ (in ``server_app.py``). In it, we defined the
-strategy, the model to federatedly train, and then we launched the strategy by calling
-its ``|strategy_start_link|`` method.
 
 The strategy encapsulates the federated learning approach/algorithm, for example,
 |fedavg_link|_. Let's try to use a different strategy this time. Modify the following
@@ -146,16 +109,24 @@ lines in your ``server_app.py`` to switch from ``FedAvg`` to |fedadagrad_link|_.
             evaluate_fn=global_evaluate,
         )
 
-        # Save final model to disk
-        print("\nSaving final model to disk...")
-        state_dict = result.arrays.to_torch_state_dict()
-        torch.save(state_dict, "final_model.pt")
-
-Next, run the training with the following command:
+Next, run the app on SuperGrid to confirm that the new strategy is being used:
 
 .. code-block:: shell
 
-    $ flwr run . --stream
+    # Log in if you are not already logged in
+    $ flwr login
+    # Run the app across the federation you created earlier in this tutorial series
+    $ flwr run . --federation @<username>/<federation-name>
+
+Open the `SuperGrid dashboard <https://flower.ai/federations/>`__, select your
+federation, and inspect the logs for the new run. You should see that Flower starts the
+``FedAdagrad`` strategy instead of ``FedAvg``.
+
+You can also run the same app locally while developing or debugging:
+
+.. code-block:: shell
+
+    $ flwr run . local --stream
 
 **************************************
  Server-side parameter **evaluation**
@@ -359,8 +330,8 @@ default Simulation Runtime configuration via the ``--federation-config`` flag:
 
 .. code-block:: shell
 
-    # Run with 200 clients
-    $ flwr run . --stream --federation-config="num-supernodes=200"
+    # Run with 50 clients
+    $ flwr run . --stream --federation-config="num-supernodes=50"
 
 For more details on the Simulation Runtime and its configuration, check out the
 :doc:`Simulation Runtime documentation <how-to-run-simulations>`.
@@ -369,23 +340,22 @@ Note that we can reuse the ``ClientApp`` for different ``num-supernodes`` since 
 ``Context`` carries the ``num-partitions`` key and for simulations with Flower, the
 number of partitions is equal to the number of SuperNodes.
 
-We now have 200 partitions, each holding 45 training and 5 validation examples. Given
-that the number of training examples on each client is quite small, we should probably
-train the model a bit longer, so we configure the clients to perform 3 local training
-epochs. We should also adjust the fraction of clients selected for training during each
-round (we don't want all 200 clients participating in every round), so we add
-``fraction-train = 0.025`` and adjust ``fraction-evaluate`` to ``0.05``, which means
-that only 2.5% of available clients will be selected for training each round (so 5
-clients) and 5% of them for evaluation (so 10 clients). We can add and adjust values in
-the ``pyproject.toml`` for ease of experimentation:
+We now have 50 partitions, each holding 800 training and 200 validation examples. We
+configure the clients to perform 3 local training epochs and adjust the fraction of
+clients selected for training during each round. Since we don't want all 50 clients
+participating in every round, we add ``fraction-train = 0.1`` and adjust
+``fraction-evaluate`` to ``0.2``, which means that 10% of available clients will be
+selected for training each round (so 5 clients) and 20% of them for evaluation (so 10
+clients). We can add and adjust values in the ``pyproject.toml`` for ease of
+experimentation:
 
 .. code-block:: toml
 
     [tool.flwr.app.config]
     num-server-rounds = 3
-    fraction-train = 0.025  # <-- new
-    fraction-evaluate = 0.05 # <-- updated
-    local-epochs = 1
+    fraction-train = 0.1  # <-- new
+    fraction-evaluate = 0.2 # <-- updated
+    local-epochs = 3
     learning-rate = 0.1
     batch-size = 32
 
@@ -404,9 +374,9 @@ following:
         strategy = CustomFedAdagrad(
             fraction_train=fraction_train,
             fraction_evaluate=fraction_evaluate,
-            min_train_nodes=20,  # Optional config
-            min_evaluate_nodes=40,  # Optional config
-            min_available_nodes=1000,  # Optional config
+            min_train_nodes=5,  # Optional config
+            min_evaluate_nodes=10,  # Optional config
+            min_available_nodes=50,  # Optional config
         )
 
         # ... rest unchanged
@@ -428,8 +398,8 @@ so little code, right?
 
 In the later sections, we've seen how we can communicate arbitrary values between server
 and clients to fully customize client-side execution. With that capability, we built a
-large-scale Federated Learning simulation using the Flower Simulation Runtime and ran an
-experiment involving 1000 clients in the same workload — all in the same Flower project!
+larger Federated Learning simulation using the Flower Simulation Runtime and ran an
+experiment involving 50 clients in the same workload -- all in the same Flower project!
 
 ************
  Next steps
@@ -442,6 +412,6 @@ Flower Discuss <https://discuss.flower.ai>`__) and on Slack (`Join Slack
 There's a dedicated ``#questions`` Slack channel if you need help, but we'd also love to
 hear who you are in ``#introductions``!
 
-The :doc:`Flower Federated Learning Tutorial - Part 3
+The :doc:`Flower Collaborative AI Tutorial - Part 5: Build a strategy from scratch
 <tutorial-series-build-a-strategy-from-scratch-pytorch>` shows how to build a fully
 custom ``Strategy`` from scratch.

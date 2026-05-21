@@ -20,15 +20,9 @@ App and see, in concrete terms, how the demo app uses those components together.
 .. tip::
 
     `Star Flower on GitHub <https://github.com/flwrlabs/flower>`__ ⭐️ and join the
-    Flower community on Flower Discuss and the Flower Slack to connect, ask questions,
-    and get help:
-
-    - `Join Flower Discuss <https://discuss.flower.ai/>`__ We'd love to hear from you in
-      the ``Introduction`` topic! If anything is unclear, post in ``Flower Help -
-      Beginners``.
-    - `Join Flower Slack <https://flower.ai/join-slack>`__ We'd love to hear from you in
-      the ``#introductions`` channel! If anything is unclear, head over to the
-      ``#questions`` channel.
+    Flower community on `Flower Discuss <https://discuss.flower.ai/>`__ or `Flower Slack
+    <https://flower.ai/join-slack>`__ to introduce yourself, ask questions, and get
+    help.
 
 Let's get started! 🌼
 
