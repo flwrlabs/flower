@@ -40,7 +40,7 @@ def main(grid: Grid, context: Context) -> None:
         num_rounds=num_rounds,
     )
 
-    # Save final model to disk
-    print("\nSaving final model to disk...")
-    ndarrays = result.arrays.to_numpy_ndarrays()
-    np.savez("final_model.npz", *ndarrays)
+    # # Save final model to disk
+    # print("\nSaving final model to disk...")
+    # ndarrays = result.arrays.to_numpy_ndarrays()
+    # np.savez("final_model.npz", *ndarrays)
