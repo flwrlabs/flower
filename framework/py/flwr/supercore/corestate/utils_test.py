@@ -56,6 +56,7 @@ def _create_task_message(  # pylint: disable=too-many-arguments
     else:
         msg = make_message(metadata=metadata, content=RecordDict())
     msg.metadata.__dict__["_message_id"] = msg.object_id
+    return msg
 
 
 def _assert_has_error(errors: list[str], expected: str) -> None:
