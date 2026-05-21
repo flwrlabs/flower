@@ -20,6 +20,7 @@ import sys
 from logging import DEBUG, ERROR, INFO, WARN
 from os.path import isfile
 from pathlib import Path
+from typing import cast
 
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, TRANSPORT_TYPE_REST
 from flwr.common.logger import log
@@ -80,14 +81,14 @@ def add_args_flwr_app_common(parser: argparse.ArgumentParser) -> None:
 
 def try_obtain_flwr_app_token(args: argparse.Namespace) -> str:
     """Validate and return the token from CLI args or a token file."""
-    token = getattr(args, "token", None)
+    token = cast(str | None, getattr(args, "token", None))
     if token is not None:
         token = token.strip()
         if not token:
             sys.exit("Path argument `--token` does not contain a token.")
         return token
 
-    token_file = getattr(args, "token_file", None)
+    token_file = cast(str | None, getattr(args, "token_file", None))
     if token_file is None:
         sys.exit("Either '--token' or '--token-file' must be specified.")
 

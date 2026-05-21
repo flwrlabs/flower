@@ -17,7 +17,6 @@
 
 import argparse
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -123,7 +122,7 @@ def test_flwr_app_common_args_reject_run_once() -> None:
 
 def test_try_obtain_flwr_app_token_returns_token() -> None:
     """Token resolution should return direct token arguments."""
-    args = SimpleNamespace(token="test-token")
+    args = argparse.Namespace(token="test-token")
 
     assert try_obtain_flwr_app_token(args) == "test-token"
 
@@ -132,7 +131,7 @@ def test_try_obtain_flwr_app_token_reads_token_file(tmp_path: Path) -> None:
     """Token resolution should read token-file contents."""
     token_file = tmp_path / "token"
     token_file.write_text("test-token\n", encoding="utf-8")
-    args = SimpleNamespace(token=None, token_file=str(token_file))
+    args = argparse.Namespace(token=None, token_file=str(token_file))
 
     assert try_obtain_flwr_app_token(args) == "test-token"
 
@@ -141,7 +140,7 @@ def test_try_obtain_flwr_app_token_rejects_missing_token_file(
     tmp_path: Path,
 ) -> None:
     """Token resolution should reject missing token files."""
-    args = SimpleNamespace(token=None, token_file=str(tmp_path / "missing-token"))
+    args = argparse.Namespace(token=None, token_file=str(tmp_path / "missing-token"))
 
     with pytest.raises(SystemExit):
         try_obtain_flwr_app_token(args)
@@ -151,7 +150,7 @@ def test_try_obtain_flwr_app_token_rejects_empty_token_file(tmp_path: Path) -> N
     """Token resolution should reject empty token files."""
     token_file = tmp_path / "token"
     token_file.write_text(" \n", encoding="utf-8")
-    args = SimpleNamespace(token=None, token_file=str(token_file))
+    args = argparse.Namespace(token=None, token_file=str(token_file))
 
     with pytest.raises(SystemExit):
         try_obtain_flwr_app_token(args)
