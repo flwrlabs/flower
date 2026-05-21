@@ -70,17 +70,25 @@ jobs:
       - name: Install dependencies
         if: ${{ needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true' }}
         run: |
-          cd framework 
-          python -m poetry install --all-extras
+          cd framework
+          uv sync --python=${{ matrix.python }} --locked --all-extras --all-groups
       - name: Check if protos need recompilation
         if: ${{ needs.changes.outputs.framework == 'true' }}
-        run: ./framework/dev/check-protos.sh
+        run: |
+          cd framework
+          uv run --no-sync ./dev/check-protos.sh
       - name: Check if migrations are up to date
         if: ${{ needs.changes.outputs.framework == 'true' && matrix.python == '3.10' }}
-        run: ./framework/dev/check-migrations.sh
+        run: |
+          cd framework
+          uv run --no-sync ./dev/check-migrations.sh
       - name: Lint + Test (isort/black/mypy/pylint/flake8/pytest)
         if: ${{ needs.changes.outputs.framework == 'true' }}
-        run: ./framework/dev/test.sh
+        run: |
+          cd framework
+          uv run --no-sync ./dev/test.sh
       - name: Check benchmarks and examples
         if: ${{ needs.changes.outputs.ex_bench == 'true' }}
-        run: ./dev/test.sh
+        run: |
+          cd framework
+          uv run --no-sync ../dev/test.sh
