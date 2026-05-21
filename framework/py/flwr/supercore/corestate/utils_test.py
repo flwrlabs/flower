@@ -26,7 +26,7 @@ from .utils import generate_rand_int_from_bytes, validate_task_message
 
 def _create_task_message(  # pylint: disable=too-many-arguments
     *,
-    message_id: str | None = None,
+    message_id: str = "message-id",
     run_id: int = 1,
     src_node_id: int = SUPERLINK_NODE_ID,
     dst_node_id: int = SUPERLINK_NODE_ID,
