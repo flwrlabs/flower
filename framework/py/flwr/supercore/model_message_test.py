@@ -21,53 +21,29 @@ from collections.abc import Callable
 import pytest
 
 from flwr.app.message_type import MessageType
-from flwr.app.metadata import Metadata
 from flwr.common import ConfigRecord, Message, RecordDict
-from flwr.common.message import make_message
-from flwr.supercore.date import now
+from flwr.supercore.corestate.utils_test import create_task_message
 from flwr.supercore.model_message import ModelRequest, ModelResponse
 from flwr.supercore.typing import JSONObject
 
 
 def _message_with_payload(
-    payload: JSONObject,
+    payload: JSONObject | str,
     *,
     message_type: str,
     reply_to_message_id: str = "",
 ) -> Message:
-    """Create a plain Message carrying compact JSON payload."""
-    metadata = Metadata(
-        run_id=0,
-        message_id="",
-        src_node_id=0,
-        dst_node_id=0,
-        reply_to_message_id=reply_to_message_id,
-        group_id="",
-        created_at=now().timestamp(),
-        ttl=3600.0,
-        message_type=message_type,
-        dst_task_id=123,
+    """Create a plain Message carrying compact or raw JSON payload."""
+    payload_json = (
+        payload
+        if isinstance(payload, str)
+        else json.dumps(payload, separators=(",", ":"))
     )
-    content = RecordDict()
-    content["payload"] = ConfigRecord(
-        {"json": json.dumps(payload, separators=(",", ":"))}
-    )
-    return make_message(metadata=metadata, content=content)
-
-
-def _message_with_json_payload(
-    payload_json: str,
-    *,
-    message_type: str,
-    reply_to_message_id: str = "",
-) -> Message:
-    """Create a plain Message carrying raw JSON payload text."""
-    return make_message(
-        metadata=_metadata(
-            message_type=message_type,
-            reply_to_message_id=reply_to_message_id,
-        ),
+    return create_task_message(
         content=RecordDict({"payload": ConfigRecord({"json": payload_json})}),
+        message_type=message_type,
+        reply_to_message_id=reply_to_message_id,
+        dst_task_id=123,
     )
 
 
@@ -263,7 +239,7 @@ def test_from_message_wraps_plain_message(
         ),
         (
             lambda: ModelRequest.from_message(
-                _message_with_json_payload(
+                _message_with_payload(
                     '{"model":"gpt-5","input":"Hello","tool_choice":NaN}',
                     message_type=MessageType.QUERY,
                 )
@@ -272,7 +248,7 @@ def test_from_message_wraps_plain_message(
         ),
         (
             lambda: ModelResponse.from_message(
-                _message_with_json_payload(
+                _message_with_payload(
                     '{"object":"response","error":{"code":Infinity}}',
                     message_type=MessageType.QUERY,
                     reply_to_message_id="request-message-id",
