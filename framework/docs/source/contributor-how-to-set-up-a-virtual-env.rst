@@ -30,8 +30,8 @@ From the repository root, run the bootstrap script:
     ./dev/bootstrap.sh
 
 This creates ``framework/.venv`` with the repository's default Python version and
-installs all framework dependencies from ``framework/uv.lock``. To use a specific
-Python version, pass it as the first argument:
+installs all framework dependencies from ``framework/uv.lock``. To use a specific Python
+version, pass it as the first argument:
 
 .. code-block:: shell
 
@@ -50,9 +50,9 @@ You can also run uv directly from the ``framework`` directory:
     cd framework
     uv sync --python 3.10.19 --locked --all-extras --all-groups
 
-*****************************
+****************************
  Python Versions with Pyenv
-*****************************
+****************************
 
 If you use `pyenv <https://github.com/pyenv/pyenv>`_, install the Python version you
 want uv to use:
@@ -67,9 +67,9 @@ Then pass that version to the bootstrap script:
 
     ./dev/bootstrap.sh 3.10.19
 
-******************************
+*******************************
  Python Versions with Anaconda
-******************************
+*******************************
 
 If you prefer conda, create and activate a Python environment, then let uv create the
 framework project environment. See the `conda installation guide

@@ -58,7 +58,6 @@ Create Flower Dev Environment
 
 2. Install uv by following the `uv installation instructions
    <https://docs.astral.sh/uv/getting-started/installation/>`_.
-
 3. Bootstrap the framework development environment:
 
        ::

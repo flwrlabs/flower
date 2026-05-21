@@ -23,8 +23,7 @@ Install ``flwr`` from a local copy of the Flower source code:
 Install ``flwr`` from a local wheel file:
 
 - ``uv add "../../dist/flwr-1.8.0-py3-none-any.whl"`` (without extras)
-- ``uv add "../../dist/flwr-1.8.0-py3-none-any.whl" --extra simulation`` (with
-  extras)
+- ``uv add "../../dist/flwr-1.8.0-py3-none-any.whl" --extra simulation`` (with extras)
 
 Please refer to the uv documentation for further details: `Managing dependencies with uv
 <https://docs.astral.sh/uv/concepts/projects/dependencies/>`_
