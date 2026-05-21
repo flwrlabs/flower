@@ -84,6 +84,7 @@ class UtilsTest(unittest.TestCase):
 
     def test_validate_task_message_rejects_missing_message_id(self) -> None:
         """Test that message_id must be set."""
+        message = _create_task_message()
         message.metadata.__dict__["_message_id"] = ""
 
         errors = validate_task_message(message)
@@ -153,7 +154,8 @@ class UtilsTest(unittest.TestCase):
 
     def test_validate_task_message_rejects_missing_message_type(self) -> None:
         """Test that message_type must be set."""
-        message = _create_task_message(message_type="")
+        message = _create_task_message()
+        message.metadata.__dict__["_message_type"] = ""
 
         errors = validate_task_message(message)
 
