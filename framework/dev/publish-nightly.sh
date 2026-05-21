@@ -25,7 +25,7 @@ if [[ -z "${PYPI_REPOSITORY_PASSWORD:-}" ]]; then
     exit 1
 fi
 
-# Move from framework/dev to framework so Poetry can find pyproject.toml.
+# Move from framework/dev to framework so uv can find pyproject.toml.
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../
 
 # Nightlies are only published if there was repository activity in the last 24
@@ -35,24 +35,12 @@ cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../
 if [[ $(git log --since="24 hours ago" --pretty=oneline) ]]; then
     sed -i -E "s/^name = \"(.+)\"/name = \"\1-nightly\"/" pyproject.toml
     sed -i -E "s/^version = \"(.+)\"/version = \"\1.dev$(date '+%Y%m%d')\"/" pyproject.toml
-
-    # Build both publishable Python artifacts from the rewritten metadata.
-    python -m poetry build
-
-    # Store publish options in an array so usernames, passwords, and URLs are
-    # passed to Poetry as separate arguments even if they contain shell metacharacters.
-    publish_args=(-u "${PYPI_REPOSITORY_USERNAME:-__token__}" -p "${PYPI_REPOSITORY_PASSWORD}")
+    uv build --clear
+    publish_args=(--username "${PYPI_REPOSITORY_USERNAME:-__token__}" --password "${PYPI_REPOSITORY_PASSWORD}")
     if [[ -n "${PYPI_REPOSITORY_URL:-}" ]]; then
-        # When a repository URL is configured, register it with Poetry and
-        # publish there instead of using Poetry's default PyPI endpoint.
-        repository_name="${PYPI_REPOSITORY_NAME:-act}"
-        python -m poetry config "repositories.${repository_name}" "${PYPI_REPOSITORY_URL}"
-        publish_args=(-r "${repository_name}" "${publish_args[@]}")
+        publish_args=(--publish-url "${PYPI_REPOSITORY_URL}" "${publish_args[@]}")
     fi
-
-    # Poetry only builds when --build is passed, so this publishes the artifacts
-    # from the explicit build step above instead of rebuilding them.
-    python -m poetry publish --dist-dir dist "${publish_args[@]}"
+    uv publish "${publish_args[@]}"
 else
     echo "There were no commits in the last 24 hours."
 fi

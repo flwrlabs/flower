@@ -16,6 +16,8 @@
 
 
 import sys
+import threading
+import time
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from queue import Queue
@@ -24,6 +26,7 @@ from .logger import (
     FLOWER_LOGGER,
     configure_superlink_log_file,
     console_handler,
+    flush_logs,
     mirror_output_to_queue,
     restore_output,
 )
@@ -62,6 +65,55 @@ def test_restore_output() -> None:
     assert log_queue.get() == "Test message before restore"
     assert log_queue.get() == "\n"
     assert log_queue.empty()
+
+
+def test_flush_logs_returns_true_when_queue_drains() -> None:
+    """Test that flushing succeeds once all queued logs are consumed."""
+    # Prepare
+    log_queue: Queue[str | None] = Queue()
+    log_queue.put("Test message")
+
+    def drain_queue() -> None:
+        time.sleep(0.05)
+        log_queue.get()
+
+    thread = threading.Thread(target=drain_queue)
+    thread.start()
+
+    # Execute
+    result = flush_logs(log_queue, timeout=1.0)
+    thread.join()
+
+    # Assert
+    assert result
+    assert log_queue.empty()
+
+
+def test_flush_logs_returns_true_when_queue_is_empty() -> None:
+    """Test that flushing succeeds when there are no queued logs."""
+    # Prepare
+    log_queue: Queue[str | None] = Queue()
+
+    # Execute
+    result = flush_logs(log_queue, timeout=0.01)
+
+    # Assert
+    assert result
+    assert log_queue.empty()
+
+
+def test_flush_logs_returns_false_when_queue_does_not_drain() -> None:
+    """Test that flushing times out if queued logs are not consumed."""
+    # Prepare
+    log_queue: Queue[str | None] = Queue()
+    log_queue.put("Test message")
+
+    # Execute
+    result = flush_logs(log_queue, timeout=0.01)
+
+    # Assert
+    assert not result
+    assert not log_queue.empty()
 
 
 def test_configure_superlink_log_file(tmp_path: Path) -> None:

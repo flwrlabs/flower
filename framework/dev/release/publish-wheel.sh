@@ -39,7 +39,7 @@ if [[ -n "${PACKAGE_VERSION:-}" ]]; then
 elif [[ "${GITHUB_REF_NAME:-}" == framework-* ]]; then
   tag_name="${GITHUB_REF_NAME#framework-}"
 else
-  tag_name=$(cd framework && python -m poetry version --short)
+  tag_name=$(cd framework && uv version --short)
 fi
 
 # Make the resolved version available to later GitHub Actions steps.
@@ -57,17 +57,10 @@ curl --fail --location --silent --show-error "${wheel_url}" --output "framework/
 curl --fail --location --silent --show-error "${tar_url}" --output "framework/dist/${tar_name}"
 
 # Store publish options in an array so usernames, passwords, and URLs are passed
-# to Poetry as separate arguments even if they contain special shell characters.
-publish_args=(-u "${PYPI_REPOSITORY_USERNAME}" -p "${PYPI_REPOSITORY_PASSWORD}")
+# to uv as separate arguments even if they contain special shell characters.
+publish_args=(--username "${PYPI_REPOSITORY_USERNAME}" --password "${PYPI_REPOSITORY_PASSWORD}")
 if [[ -n "${PYPI_REPOSITORY_URL:-}" ]]; then
-  # When a repository URL is configured, register it with Poetry and publish
-  # there instead of using Poetry's default PyPI endpoint.
-  repository_name="${PYPI_REPOSITORY_NAME:-act}"
-  (cd framework && python -m poetry config "repositories.${repository_name}" "${PYPI_REPOSITORY_URL}")
-  publish_args=(-r "${repository_name}" "${publish_args[@]}")
+  publish_args=(--publish-url "${PYPI_REPOSITORY_URL}" "${publish_args[@]}")
 fi
 
-# Run Poetry from the framework directory because pyproject.toml lives there.
-# Poetry only builds when --build is passed, so this publishes the downloaded
-# artifacts from dist instead of rebuilding them.
-(cd framework && python -m poetry publish --dist-dir dist "${publish_args[@]}")
+uv publish "${publish_args[@]}" "framework/dist/${wheel_name}" "framework/dist/${tar_name}"

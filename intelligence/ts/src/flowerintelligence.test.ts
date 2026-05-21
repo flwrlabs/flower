@@ -17,10 +17,17 @@ import { vi } from 'vitest';
 
 vi.mock('./constants', () => ({
   DEFAULT_MODEL: 'meta/llama3.2-1b/instruct-fp16',
-  REMOTE_URL: process.env.FI_DEV_REMOTE_URL,
+  REMOTE_URL: process.env.FI_DEV_REMOTE_URL ?? 'https://example.test',
   VERSION: '0.2.6',
   SDK: 'TS',
   ALLOWED_ROLES: ['system', 'assistant', 'user'],
+}));
+
+vi.mock('./engines/common/model', () => ({
+  getEngineModelConfig: async () => ({
+    ok: true,
+    value: { name: 'hf-internal-testing/tiny-random-gpt2', vram: 0 },
+  }),
 }));
 
 import { describe, expect, it, beforeEach, assert } from 'vitest';
@@ -33,9 +40,28 @@ describe('FlowerIntelligence', () => {
   let fi: FlowerIntelligence;
 
   beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(RemoteEngine.prototype, 'chat').mockImplementation(
+      async (_messages, _model, _temperature, _topP, maxCompletionTokens, responseFormat) => {
+        const content: string = responseFormat
+          ? JSON.stringify({ brand: 'Toyota', model: 'Supra', car_type: 'Coupe' })
+          : maxCompletionTokens
+            ? 'Short reply'
+            : 'Hello from the remote engine.';
+
+        return {
+          ok: true,
+          message: {
+            role: 'assistant',
+            content,
+          },
+        };
+      }
+    );
+
     fi = new FlowerIntelligence();
     fi.remoteHandoff = true;
-    fi.apiKey = process.env.FI_API_KEY ?? '';
+    fi.apiKey = process.env.FI_API_KEY ?? 'test-api-key';
   });
 
   describe('getEngine', () => {

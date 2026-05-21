@@ -49,9 +49,9 @@ DEFAULT_TTL = 43200  # This is 12 hours
 MESSAGE_INIT_ERROR_MESSAGE = (
     "Invalid arguments for Message. Expected one of the documented "
     "signatures: Message(content: RecordDict, dst_node_id: int, message_type: str,"
-    " *, [ttl: float, group_id: str, src_task_id: int, dst_task_id: int]) or "
+    " *, ttl: float | None = None, group_id: str | None = None) or "
     "Message(content: RecordDict | error: Error, *, reply_to: Message, "
-    "[ttl: float])."
+    "ttl: float | None = None)."
 )
 
 
@@ -100,10 +100,8 @@ class Message(InflatableObject):
     group_id : Optional[str] (default: None)
         An identifier for grouping messages. In some settings, this is used as
         the FL round.
-    src_task_id : Optional[int] (default: None)
-        An identifier for the source task sending this message.
     dst_task_id : Optional[int] (default: None)
-        An identifier for the destination task receiving this message.
+        Experimental. An identifier for the destination task receiving this message.
     reply_to : Optional[Message] (default: None)
         The instruction message to which this message is a reply. This message does
         not retain the original message's content but derives its metadata from it.
@@ -118,7 +116,6 @@ class Message(InflatableObject):
         *,
         ttl: float | None = None,
         group_id: str | None = None,
-        src_task_id: int | None = None,
         dst_task_id: int | None = None,
     ) -> None: ...
 
@@ -141,7 +138,6 @@ class Message(InflatableObject):
         error: Error | None = None,
         ttl: float | None = None,
         group_id: str | None = None,
-        src_task_id: int | None = None,
         dst_task_id: int | None = None,
         reply_to: Message | None = None,
         metadata: Metadata | None = None,
@@ -161,7 +157,6 @@ class Message(InflatableObject):
             error=error,
             ttl=ttl,
             group_id=group_id,
-            src_task_id=src_task_id,
             dst_task_id=dst_task_id,
             reply_to=reply_to,
             metadata=metadata,
@@ -178,7 +173,6 @@ class Message(InflatableObject):
                     message_type,
                     ttl,
                     group_id,
-                    src_task_id,
                     dst_task_id,
                     reply_to,
                 ]
@@ -212,21 +206,20 @@ class Message(InflatableObject):
                 created_at=now().timestamp(),
                 ttl=ttl or DEFAULT_TTL,
                 message_type=message_type,
-                src_task_id=src_task_id,
                 dst_task_id=dst_task_id,
             )
 
         # Create metadata for a reply message
         else:
             # Check arguments
-            # `dst_node_id`, `message_type`, `group_id`, and task IDs must not be set
+            # `dst_node_id`, `message_type`, `group_id`, and `dst_task_id` must not
+            # be set
             if any(
                 x is not None
                 for x in [
                     dst_node_id,
                     message_type,
                     group_id,
-                    src_task_id,
                     dst_task_id,
                 ]
             ):
@@ -533,7 +526,6 @@ def _check_arg_types(  # pylint: disable=too-many-arguments, R0917
     error: Error | None = None,
     ttl: float | None = None,
     group_id: str | None = None,
-    src_task_id: int | None = None,
     dst_task_id: int | None = None,
     reply_to: Message | None = None,
     metadata: Metadata | None = None,
@@ -545,9 +537,8 @@ def _check_arg_types(  # pylint: disable=too-many-arguments, R0917
         and (message_type is None or isinstance(message_type, str))
         and (content is None or isinstance(content, RecordDict))
         and (error is None or isinstance(error, Error))
-        and (ttl is None or isinstance(ttl, (int | float)))
+        and (ttl is None or isinstance(ttl, (int, float)))
         and (group_id is None or isinstance(group_id, str))
-        and (src_task_id is None or isinstance(src_task_id, int))
         and (dst_task_id is None or isinstance(dst_task_id, int))
         and (reply_to is None or isinstance(reply_to, Message))
         and (metadata is None or isinstance(metadata, Metadata))

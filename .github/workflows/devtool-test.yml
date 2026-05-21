@@ -49,8 +49,6 @@ jobs:
         uses: ./.github/actions/bootstrap
         with:
           python-version: ${{ matrix.python }}
-          uv-skip: "false"
-          poetry-skip: "true"
       - name: Install dependencies
         run: |
           cd dev
