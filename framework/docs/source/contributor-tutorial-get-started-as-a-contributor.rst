@@ -6,10 +6,9 @@
  Prerequisites
 ***************
 
-- `Python 3.10 <https://docs.python.org/3.10/>`_ or above
-- `uv <https://docs.astral.sh/uv/>`_
+- `Python 3.11 <https://docs.python.org/3.11/>`_ or above
+- `uv 0.10.7 <https://docs.astral.sh/uv/>`_ or above
 - (Optional) `pyenv <https://github.com/pyenv/pyenv>`_
-- (Optional) `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_
 
 Flower uses ``pyproject.toml`` to manage dependencies and configure development tools
 (the ones which support it). ``uv`` is used for dependency management, build, and
@@ -69,7 +68,7 @@ Create Flower Dev Environment
 
        ::
 
-           $ ./dev/bootstrap.sh 3.10.19
+           $ ./dev/bootstrap.sh 3.11.14
 
 *********************
  Convenience Scripts

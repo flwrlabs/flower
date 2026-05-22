@@ -18,7 +18,7 @@
 import argparse
 from logging import DEBUG, INFO
 
-from flwr.common.args import add_args_flwr_app_common
+from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.constant import CLIENTAPPIO_API_DEFAULT_CLIENT_ADDRESS
 from flwr.common.logger import log
 from flwr.supercore.tls import validate_and_resolve_root_certificates
@@ -29,6 +29,7 @@ from flwr.supernode.runtime.run_clientapp import run_clientapp
 def flwr_clientapp() -> None:
     """Run process-isolated Flower ClientApp."""
     args = _parse_args_run_flwr_clientapp().parse_args()
+    token = try_obtain_flwr_app_token(args)
 
     log(INFO, "Start `flwr-clientapp` process")
     log(
@@ -36,11 +37,11 @@ def flwr_clientapp() -> None:
         "`flwr-clientapp` will attempt to connect to SuperNode's "
         "ClientAppIo API at %s with token %s",
         args.clientappio_api_address,
-        mask_string(args.token) if args.token else "None",
+        mask_string(token),
     )
     run_clientapp(
         clientappio_api_address=args.clientappio_api_address,
-        token=args.token,
+        token=token,
         insecure=args.insecure,
         certificates=validate_and_resolve_root_certificates(
             args.root_certificates, args.insecure
