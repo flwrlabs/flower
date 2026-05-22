@@ -449,12 +449,9 @@ class SqlCoreState(CoreState, SqlMixin):
                     """,
                     message_dict,
                 )
+                return bool(inserted)
             except IntegrityError:
                 return False
-            if not inserted:
-                return False
-
-        return True
 
     def get_task_message(
         self,
