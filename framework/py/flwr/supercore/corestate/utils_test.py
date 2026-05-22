@@ -100,6 +100,24 @@ class UtilsTest(unittest.TestCase):
 
         self.assertEqual(validate_task_message(message), [])
 
+    def test_validate_task_message_rejects_delivered_at(self) -> None:
+        """Test that delivered_at must not be set."""
+        message = create_task_message()
+        message.metadata.delivered_at = "2026-01-01T00:00:00+00:00"
+
+        errors = validate_task_message(message)
+
+        _assert_has_error(errors, "metadata.delivered_at")
+
+    def test_validate_task_message_rejects_group_id(self) -> None:
+        """Test that group_id must not be set."""
+        message = create_task_message()
+        message.metadata.group_id = "group"
+
+        errors = validate_task_message(message)
+
+        _assert_has_error(errors, "metadata.group_id")
+
     def test_validate_task_message_accepts_missing_src_task_id(self) -> None:
         """Test that source task ID is not required."""
         message = create_task_message(src_task_id=None)

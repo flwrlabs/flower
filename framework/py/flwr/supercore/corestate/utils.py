@@ -66,6 +66,12 @@ def validate_task_message(message: Message) -> list[str]:  # pylint: disable=R09
     if metadata.message_id == "":
         validation_errors.append("empty `metadata.message_id`")
 
+    if metadata.delivered_at != "":
+        validation_errors.append("`metadata.delivered_at` must be an empty str")
+
+    if metadata.group_id != "":
+        validation_errors.append("`metadata.group_id` MUST not be set")
+
     if metadata.dst_task_id is None:
         validation_errors.append("`metadata.dst_task_id` is not set.")
 

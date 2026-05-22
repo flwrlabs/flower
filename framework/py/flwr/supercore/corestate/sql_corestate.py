@@ -20,6 +20,7 @@ import json
 import secrets
 from collections.abc import Sequence
 from datetime import timedelta
+from logging import ERROR
 from typing import Any, Literal
 
 from sqlalchemy import MetaData
@@ -36,6 +37,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.common.logger import log
 from flwr.common.message import make_message
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
@@ -424,7 +426,7 @@ class SqlCoreState(CoreState, SqlMixin):
 
         with self.session():
             self._cleanup_expired_task_tokens()
-            self._cleanup_expired_task_messages()
+            self._cleanup_invalid_task_messages()
             message_dict = _task_message_to_row(message)
             try:
                 inserted = self.query(
@@ -435,7 +437,7 @@ class SqlCoreState(CoreState, SqlMixin):
                         content, error
                     )
                     SELECT
-                        :message_id, src.run_id, :src_task_id, :dst_task_id,
+                        :message_id, :run_id, :src_task_id, :dst_task_id,
                         :reply_to_message_id, :created_at, :ttl, :message_type,
                         :content, :error
                     FROM task AS src
@@ -443,7 +445,7 @@ class SqlCoreState(CoreState, SqlMixin):
                         ON dst.task_id = :dst_task_id
                         AND dst.run_id = src.run_id
                     WHERE src.task_id = :src_task_id
-                        AND src.finished_at IS NULL
+                        AND (:run_id = 0 OR :run_id = src.run_id)
                         AND dst.finished_at IS NULL
                     RETURNING message_id
                     """,
@@ -452,6 +454,7 @@ class SqlCoreState(CoreState, SqlMixin):
             except IntegrityError:
                 return False
             if not inserted:
+                self._log_task_message_run_mismatch(message)
                 return False
 
         return True
@@ -475,18 +478,31 @@ class SqlCoreState(CoreState, SqlMixin):
 
         with self.session():
             self._cleanup_expired_task_tokens()
-            self._cleanup_expired_task_messages()
-            rows = self._claim_task_message_rows(dst_task_ids, limit)
+            self._cleanup_invalid_task_messages()
+            rows = self._claim_task_message_rows(dst_task_ids, order_by, limit)
 
-        rows.sort(key=lambda row: row["created_at"])
+        if order_by == "created_at":
+            rows.sort(key=lambda row: row["created_at"])
         return [_task_message_from_row(row) for row in rows]
 
     def _claim_task_message_rows(
-        self, dst_task_ids: Sequence[int] | None, limit: int | None
+        self,
+        dst_task_ids: Sequence[int] | None,
+        order_by: Literal["created_at"] | None,
+        limit: int | None,
     ) -> list[dict[str, Any]]:
         """Atomically claim eligible task Messages."""
-        params: dict[str, int] = {}
-        conditions: list[str] = []
+        params: dict[str, Any] = {"current": now().timestamp()}
+        conditions = [
+            "(created_at + ttl) > :current",
+            """
+            EXISTS (
+                SELECT 1 FROM task AS dst
+                WHERE dst.task_id = task_message.dst_task_id
+                    AND dst.finished_at IS NULL
+            )
+            """,
+        ]
         if dst_task_ids is not None:
             sint64_dst_task_ids = [uint64_to_int64(task_id) for task_id in dst_task_ids]
             placeholders = ",".join(
@@ -508,7 +524,7 @@ class SqlCoreState(CoreState, SqlMixin):
                     SELECT message_id
                     FROM task_message
                     {where_clause}
-                    ORDER BY created_at
+                    {"ORDER BY created_at" if order_by == "created_at" else ""}
                     LIMIT :limit
                 )
             """
@@ -526,6 +542,47 @@ class SqlCoreState(CoreState, SqlMixin):
             RETURNING *
         """
         return self.query(query, params)
+
+    def _log_task_message_run_mismatch(self, message: Message) -> None:
+        """Log task-message run mismatch reasons, if present."""
+        src_task_id = message.metadata.src_task_id
+        dst_task_id = message.metadata.dst_task_id
+        if src_task_id is None or dst_task_id is None:
+            return
+
+        rows = self.query(
+            """
+            SELECT src.run_id AS src_run_id, dst.run_id AS dst_run_id
+            FROM task AS src
+            JOIN task AS dst ON dst.task_id = :dst_task_id
+            WHERE src.task_id = :src_task_id
+            """,
+            {
+                "src_task_id": uint64_to_int64(src_task_id),
+                "dst_task_id": uint64_to_int64(dst_task_id),
+            },
+        )
+        if not rows:
+            return
+
+        src_run_id = int64_to_uint64(rows[0]["src_run_id"])
+        dst_run_id = int64_to_uint64(rows[0]["dst_run_id"])
+        if src_run_id != dst_run_id:
+            log(
+                ERROR,
+                "Source task %d and destination task %d belong to different runs.",
+                src_task_id,
+                dst_task_id,
+            )
+            return
+        if message.metadata.run_id not in (0, src_run_id):
+            log(
+                ERROR,
+                "Task Message %s run ID %d does not match task run ID %d.",
+                message.metadata.message_id,
+                message.metadata.run_id,
+                src_run_id,
+            )
 
     def _cleanup_expired_task_tokens(self) -> None:
         """Remove expired task heartbeat records.
@@ -554,12 +611,17 @@ class SqlCoreState(CoreState, SqlMixin):
         if rows:
             self._on_task_tokens_expired([task_from_row(row) for row in rows])
 
-    def _cleanup_expired_task_messages(self) -> None:
-        """Remove expired task-addressed Messages."""
+    def _cleanup_invalid_task_messages(self) -> None:
+        """Remove expired Messages and Messages for invalid destination tasks."""
         self.query(
             """
             DELETE FROM task_message
             WHERE (created_at + ttl) <= :current
+                OR NOT EXISTS (
+                    SELECT 1 FROM task AS dst
+                    WHERE dst.task_id = task_message.dst_task_id
+                        AND dst.finished_at IS NULL
+                )
             """,
             {"current": now().timestamp()},
         )
@@ -642,6 +704,7 @@ def _task_message_to_row(message: Message) -> dict[str, Any]:
     assert src_task_id is not None and dst_task_id is not None
     return {
         "message_id": message.metadata.message_id,
+        "run_id": uint64_to_int64(message.metadata.run_id),
         "src_task_id": uint64_to_int64(src_task_id),
         "dst_task_id": uint64_to_int64(dst_task_id),
         "reply_to_message_id": message.metadata.reply_to_message_id,
