@@ -486,56 +486,50 @@ class SqlCoreState(CoreState, SqlMixin):
         limit: int | None,
     ) -> list[dict[str, Any]]:
         """Atomically claim eligible task Messages."""
-        params: dict[str, Any] = {"current": now().timestamp()}
-        conditions = [
-            "(created_at + ttl) > :current",
-            """
-            EXISTS (
-                SELECT 1 FROM task AS dst
-                WHERE dst.task_id = task_message.dst_task_id
-                    AND dst.finished_at IS NULL
-            )
-            """,
-        ]
+        conditions: list[str] = []
+        params: dict[str, Any] = {}
+
+        # Filter by destination task IDs
         if dst_task_ids is not None:
-            sint64_dst_task_ids = [uint64_to_int64(task_id) for task_id in dst_task_ids]
+            sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
             placeholders = ",".join(
-                [f":dst_tid_{i}" for i in range(len(sint64_dst_task_ids))]
+                f":dtid_{i}" for i in range(len(sint64_dst_task_ids))
             )
             conditions.append(f"dst_task_id IN ({placeholders})")
             params.update(
-                {
-                    f"dst_tid_{i}": task_id
-                    for i, task_id in enumerate(sint64_dst_task_ids)
-                }
+                {f"dtid_{i}": tid for i, tid in enumerate(sint64_dst_task_ids)}
             )
 
-        candidate_cte = ""
-        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
         if limit is not None:
-            candidate_cte = f"""
-                WITH candidate_task_messages AS (
+            # Materialize limited candidates before deleting. Some backends can
+            # otherwise re-evaluate same-table subqueries while DELETE scans rows.
+            # `self.select_lock_sql` is an optional clause for backends that support
+            # row-locking while selecting candidates. Keep it before LIMIT so locked
+            # rows are skipped before limiting the result set.
+            order_clause = f"ORDER BY {order_by}" if order_by is not None else ""
+            params["limit"] = limit
+            query = f"""
+                WITH selected AS (
                     SELECT message_id
                     FROM task_message
                     {where_clause}
-                    {"ORDER BY created_at" if order_by == "created_at" else ""}
-                    LIMIT :limit
+                    {order_clause}
                     {self.select_lock_sql}
+                    LIMIT :limit
                 )
+                DELETE FROM task_message
+                WHERE message_id IN (SELECT message_id FROM selected)
+                RETURNING *
             """
-            where_clause = """
-                WHERE message_id IN (
-                    SELECT message_id FROM candidate_task_messages
-                )
+        else:
+            query = f"""
+                DELETE FROM task_message
+                {where_clause}
+                RETURNING *
             """
-            params["limit"] = limit
 
-        query = f"""
-            {candidate_cte}
-            DELETE FROM task_message
-            {where_clause}
-            RETURNING *
-        """
         return self.query(query, params)
 
     def _cleanup_expired_task_tokens(self) -> None:
