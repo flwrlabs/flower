@@ -421,30 +421,10 @@ class SqlCoreState(CoreState, SqlMixin):
         if validate_task_message(message) or src_task_id is None or dst_task_id is None:
             return False
 
-        sint64_src_task_id = uint64_to_int64(src_task_id)
-        sint64_dst_task_id = uint64_to_int64(dst_task_id)
-
         with self.session():
             self._cleanup_expired_task_tokens()
-            message_dict = {
-                "message_id": message.metadata.message_id,
-                "src_task_id": sint64_src_task_id,
-                "dst_task_id": sint64_dst_task_id,
-                "reply_to_message_id": message.metadata.reply_to_message_id,
-                "created_at": message.metadata.created_at,
-                "ttl": message.metadata.ttl,
-                "message_type": message.metadata.message_type,
-                "content": (
-                    recorddict_to_proto(message.content).SerializeToString()
-                    if message.has_content()
-                    else None
-                ),
-                "error": (
-                    error_to_proto(message.error).SerializeToString()
-                    if message.has_error()
-                    else None
-                ),
-            }
+            self._cleanup_expired_task_messages()
+            message_dict = _task_message_to_row(message)
             try:
                 inserted = self.query(
                     """
@@ -494,26 +474,18 @@ class SqlCoreState(CoreState, SqlMixin):
 
         with self.session():
             self._cleanup_expired_task_tokens()
+            self._cleanup_expired_task_messages()
             rows = self._claim_task_message_rows(dst_task_ids, limit)
-            for row in rows:
-                row["run_id"] = int64_to_uint64(row["run_id"])
-                row["src_task_id"] = int64_to_uint64(row["src_task_id"])
-                row["dst_task_id"] = int64_to_uint64(row["dst_task_id"])
 
-        rows.sort(key=lambda row: (row["created_at"], row["message_id"]))
+        rows.sort(key=lambda row: row["created_at"])
         return [_task_message_from_row(row) for row in rows]
 
     def _claim_task_message_rows(
         self, dst_task_ids: Sequence[int] | None, limit: int | None
     ) -> list[dict[str, Any]]:
         """Atomically claim eligible task Messages."""
-        current = now()
-        params: dict[str, str | int | float] = {
-            "current": current.timestamp(),
-        }
-        conditions = [
-            "(created_at + ttl) > :current",
-        ]
+        params: dict[str, int] = {}
+        conditions: list[str] = []
         if dst_task_ids is not None:
             sint64_dst_task_ids = [uint64_to_int64(task_id) for task_id in dst_task_ids]
             placeholders = ",".join(
@@ -527,23 +499,29 @@ class SqlCoreState(CoreState, SqlMixin):
                 }
             )
 
-        common_condition = " AND ".join(conditions)
-        condition = common_condition
+        candidate_cte = ""
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         if limit is not None:
-            condition = f"""
-                message_id IN (
-                SELECT message_id
-                FROM task_message
-                WHERE {common_condition}
-                ORDER BY created_at, message_id
-                LIMIT :limit
-            )
+            candidate_cte = f"""
+                WITH candidate_task_messages AS (
+                    SELECT message_id
+                    FROM task_message
+                    {where_clause}
+                    ORDER BY created_at
+                    LIMIT :limit
+                )
+            """
+            where_clause = """
+                WHERE message_id IN (
+                    SELECT message_id FROM candidate_task_messages
+                )
             """
             params["limit"] = limit
 
         query = f"""
+            {candidate_cte}
             DELETE FROM task_message
-            WHERE {condition}
+            {where_clause}
             RETURNING *
         """
         return self.query(query, params)
@@ -554,7 +532,6 @@ class SqlCoreState(CoreState, SqlMixin):
         Expired tasks are marked as finished with a failed status, and their tokens are
         removed.
         """
-        self._cleanup_expired_task_messages()
         expired_at = now()
         # Expired task claims are terminal failures and lose their token.
         rows = self.query(
@@ -657,6 +634,32 @@ def task_from_row(row: dict[str, Any]) -> Task:
     )
 
 
+def _task_message_to_row(message: Message) -> dict[str, Any]:
+    """Convert a task-addressed Message to database row values."""
+    src_task_id = message.metadata.src_task_id
+    dst_task_id = message.metadata.dst_task_id
+    assert src_task_id is not None and dst_task_id is not None
+    return {
+        "message_id": message.metadata.message_id,
+        "src_task_id": uint64_to_int64(src_task_id),
+        "dst_task_id": uint64_to_int64(dst_task_id),
+        "reply_to_message_id": message.metadata.reply_to_message_id,
+        "created_at": message.metadata.created_at,
+        "ttl": message.metadata.ttl,
+        "message_type": message.metadata.message_type,
+        "content": (
+            recorddict_to_proto(message.content).SerializeToString()
+            if message.has_content()
+            else None
+        ),
+        "error": (
+            error_to_proto(message.error).SerializeToString()
+            if message.has_error()
+            else None
+        ),
+    }
+
+
 def _task_message_from_row(row: dict[str, Any]) -> Message:
     """Convert a task_message row to a Message."""
     content, error = None, None
@@ -666,7 +669,7 @@ def _task_message_from_row(row: dict[str, Any]) -> Message:
         error = error_from_proto(ProtoError.FromString(row["error"]))
 
     metadata = Metadata(
-        run_id=row["run_id"],
+        run_id=int64_to_uint64(row["run_id"]),
         message_id=row["message_id"],
         src_node_id=0,
         dst_node_id=0,
@@ -675,7 +678,7 @@ def _task_message_from_row(row: dict[str, Any]) -> Message:
         created_at=row["created_at"],
         ttl=row["ttl"],
         message_type=row["message_type"],
-        src_task_id=row["src_task_id"],
-        dst_task_id=row["dst_task_id"],
+        src_task_id=int64_to_uint64(row["src_task_id"]),
+        dst_task_id=int64_to_uint64(row["dst_task_id"]),
     )
     return make_message(metadata=metadata, content=content, error=error)

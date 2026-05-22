@@ -347,6 +347,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 return False
             run_id = src_task.run_id
 
+        self._cleanup_expired_task_messages()
         message_copy = message_from_proto(message_to_proto(message))
         message_copy.metadata.__dict__["_run_id"] = run_id
         message_copy.metadata.__dict__["_src_node_id"] = 0
@@ -377,6 +378,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
 
         with self.lock_task_store:
             self._cleanup_expired_task_tokens_locked()
+        self._cleanup_expired_task_messages()
 
         dst_task_id_set = set(dst_task_ids) if dst_task_ids is not None else None
         selected_messages: list[Message] = []
@@ -384,10 +386,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         with self.lock_task_message_store:
             message_ids = sorted(
                 self.task_message_store.keys(),
-                key=lambda msg_id: (
-                    self.task_message_store[msg_id].metadata.created_at,
-                    msg_id,
-                ),
+                key=lambda msg_id: self.task_message_store[msg_id].metadata.created_at,
             )
             for message_id in message_ids:
                 message = self.task_message_store[message_id]
@@ -412,7 +411,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         Expired tasks are marked as finished with a failed status, and their
         tokens are removed.
         """
-        self._cleanup_expired_task_messages()
         current = now()
         expired_tasks: list[Task] = []
         for task_id, record in list(self.task_token_store.items()):
