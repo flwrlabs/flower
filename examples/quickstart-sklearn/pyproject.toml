@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-sklearn"
-version = "1.1.2"
+version = "1.1.3"
 description = "Federated Learning with scikit-learn and Flower (Quickstart Example)"
 license = {file = "LICENSE"}
 dependencies = [
@@ -29,3 +29,4 @@ clientapp = "sklearnexample.client_app:app"
 penalty = "l2"
 num-server-rounds = 25
 min-available-clients = 2
+save-model = false
