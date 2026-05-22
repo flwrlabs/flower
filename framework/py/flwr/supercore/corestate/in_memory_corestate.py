@@ -21,8 +21,9 @@ from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from logging import ERROR
 from threading import Lock
-from typing import Literal
+from typing import Literal, cast
 
 from flwr.common import now
 from flwr.common.constant import (
@@ -33,14 +34,14 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.common.logger import log
 from flwr.common.message import Message
-from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.common.typing import Fab
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import generate_rand_int_from_bytes
+from .utils import generate_rand_int_from_bytes, validate_task_message
 
 
 @dataclass
@@ -181,6 +182,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             raise ValueError("`statuses` must be a sequence of strings")
 
         with self.lock_task_store:
+            # Expire non-responsive tasks before getting tasks
+            self._cleanup_expired_task_tokens_locked()
+
             matched_task_ids = set(self.task_store.keys())
 
             if task_ids is not None:
@@ -321,48 +325,58 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             task.CopyFrom(self.task_store[task_id])
             return task
 
-    def store_task_message(self, message: Message) -> str | None:
+    def store_task_message(self, message: Message) -> bool:
         """Store one task-addressed Message."""
         message_id = message.metadata.message_id
-        src_task_id = message.metadata.src_task_id
-        dst_task_id = message.metadata.dst_task_id
-        if (
-            not _is_valid_task_message(message)
-            or src_task_id is None
-            or dst_task_id is None
-        ):
-            return None
+        if validate_task_message(message):
+            return False
+        src_task_id = cast(int, message.metadata.src_task_id)
+        dst_task_id = cast(int, message.metadata.dst_task_id)
 
-        with self.lock_task_store:
+        with self.lock_task_store, self.lock_task_message_store:
             self._cleanup_expired_task_tokens_locked()
+            self._cleanup_invalid_task_messages_locked(now().timestamp())
             src_task = self.task_store.get(src_task_id)
             dst_task = self.task_store.get(dst_task_id)
             if src_task is None or dst_task is None:
-                return None
+                return False
             if src_task.run_id != dst_task.run_id:
-                return None
+                log(
+                    ERROR,
+                    "Cannot store message: source task %d and destination task %d "
+                    "belong to different runs.",
+                    src_task_id,
+                    dst_task_id,
+                )
+                return False
+            if message.metadata.run_id != src_task.run_id:
+                log(
+                    ERROR,
+                    "Cannot store message for task %s: message run ID %d "
+                    "does not match task run ID %d.",
+                    message_id,
+                    message.metadata.run_id,
+                    src_task.run_id,
+                )
+                return False
             if dst_task.status.status == Status.FINISHED:
-                return None
-            run_id = src_task.run_id
+                return False
 
-        message_copy = message_from_proto(message_to_proto(message))
-        message_copy.metadata.__dict__["_run_id"] = run_id
-        message_copy.metadata.__dict__["_src_node_id"] = 0
-        message_copy.metadata.__dict__["_dst_node_id"] = 0
-
-        with self.lock_task_message_store:
             if message_id in self.task_message_store:
-                return None
-            self.task_message_store[message_id] = message_copy
-            return message_id
+                return False
+            self.task_message_store[message_id] = message
+            return True
 
     def get_task_message(
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
         limit: int | None = None,
+        order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
         """Retrieve undelivered task-addressed Messages."""
+        if order_by not in (None, "created_at"):
+            raise AssertionError("`order_by` must be 'created_at' or None")
         if limit is not None and limit < 0:
             raise AssertionError("`limit` must be >= 0")
         if limit == 0:
@@ -370,32 +384,34 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         if dst_task_ids is not None and not dst_task_ids:
             return []
 
-        with self.lock_task_store:
+        with self.lock_task_store, self.lock_task_message_store:
             self._cleanup_expired_task_tokens_locked()
+            current = now().timestamp()
+            self._cleanup_invalid_task_messages_locked(current)
 
-        dst_task_id_set = set(dst_task_ids) if dst_task_ids is not None else None
-        selected_messages: list[Message] = []
-        current = now().timestamp()
-        with self.lock_task_message_store:
-            message_ids = sorted(
-                self.task_message_store.keys(),
-                key=lambda msg_id: (
-                    self.task_message_store[msg_id].metadata.created_at,
-                    msg_id,
-                ),
-            )
-            for message_id in message_ids:
+            # Filter by dst_task_id
+            dst_task_id_set = set(dst_task_ids) if dst_task_ids is not None else None
+            candidate_ids = [
+                message_id
+                for message_id, message in self.task_message_store.items()
+                if dst_task_id_set is None
+                or message.metadata.dst_task_id in dst_task_id_set
+            ]
+
+            # Apply requested sort order
+            if order_by == "created_at":
+                candidate_ids.sort(
+                    key=lambda msg_id: self.task_message_store[
+                        msg_id
+                    ].metadata.created_at
+                )
+
+            selected_ids = candidate_ids[:limit] if limit is not None else candidate_ids
+            selected_messages = []
+            for message_id in selected_ids:
                 message = self.task_message_store[message_id]
-                if dst_task_id_set is not None:
-                    if message.metadata.dst_task_id not in dst_task_id_set:
-                        continue
-                if message.metadata.created_at + message.metadata.ttl <= current:
-                    continue
-
                 del self.task_message_store[message_id]
                 selected_messages.append(message)
-                if limit is not None and len(selected_messages) >= limit:
-                    break
 
         return selected_messages
 
@@ -431,6 +447,20 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         if expired_tasks:
             self._on_task_tokens_expired(expired_tasks)
 
+    def _cleanup_invalid_task_messages_locked(self, current: float) -> None:
+        """Remove expired Messages and Messages for invalid destination tasks."""
+        for message_id, message in list(self.task_message_store.items()):
+            dst_task_id = message.metadata.dst_task_id
+            dst_task = (
+                self.task_store.get(dst_task_id) if dst_task_id is not None else None
+            )
+            if (
+                dst_task is None
+                or dst_task.status.status == Status.FINISHED
+                or message.metadata.created_at + message.metadata.ttl <= current
+            ):
+                del self.task_message_store[message_id]
+
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
         """Handle cleanup of expired task tokens.
 
@@ -460,17 +490,3 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         for key, expires_at in list(self.nonce_store.items()):
             if expires_at < current:
                 del self.nonce_store[key]
-
-
-def _is_valid_task_message(message: Message) -> bool:
-    """Return True if the task message carries the required payload fields."""
-    return (
-        message.metadata.message_id != ""
-        and message.metadata.src_task_id is not None
-        and message.metadata.src_task_id != 0
-        and message.metadata.dst_task_id is not None
-        and message.metadata.dst_task_id != 0
-        and message.metadata.ttl > 0
-        and message.metadata.message_type != ""
-        and message.has_content() != message.has_error()
-    )

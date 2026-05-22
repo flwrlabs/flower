@@ -286,19 +286,18 @@ def test_create_ins_message_success(
     assert msg.metadata.reply_to_message_id == ""  # Should be unset
 
 
-def test_create_ins_message_with_task_ids_success() -> None:
-    """Test creating an instruction message with source and destination task IDs."""
+def test_create_ins_message_with_dst_task_id_success() -> None:
+    """Test creating an instruction message with a destination task ID."""
     # Execute
     msg = Message(
         content=RecordDict(),
         dst_node_id=123,
         message_type="query",
-        src_task_id=456,
         dst_task_id=789,
     )
 
     # Assert
-    assert msg.metadata.src_task_id == 456
+    assert msg.metadata.src_task_id is None
     assert msg.metadata.dst_task_id == 789
 
 
@@ -368,7 +367,6 @@ def test_create_reply_message_success(
         ((RecordDict(), 123, "query"), {"ttl": "wrong type"}),
         ((RecordDict(), 123, "query"), {"group_id": 123}),
         ((RecordDict(), 123, "query"), {"group_id": 123.0}),
-        ((RecordDict(), 123, "query"), {"src_task_id": "wrong type"}),
         ((RecordDict(), 123, "query"), {"dst_task_id": "wrong type"}),
     ],
 )
@@ -399,7 +397,6 @@ def test_create_ins_message_failure(args: Any, kwargs: dict[str, Any]) -> None:
         ((Error(0),), {"message_type": "query"}),
         ((RecordDict(),), {"group_id": "group_xyz"}),
         ((Error(0),), {"group_id": "group_xyz"}),
-        ((RecordDict(),), {"src_task_id": 123}),
         ((Error(0),), {"dst_task_id": 456}),
         # Use invalid arg types
         (("wrong type",), {}),

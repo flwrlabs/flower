@@ -241,7 +241,7 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def store_task_message(self, message: Message) -> str | None:
+    def store_task_message(self, message: Message) -> bool:
         """Store one task-addressed Message.
 
         The source and destination task IDs are read from
@@ -254,8 +254,8 @@ class CoreState(ABC):
 
         Returns
         -------
-        str | None
-            The message ID if the message was stored, otherwise None.
+        bool
+            True if the message was stored, otherwise False.
         """
 
     @abstractmethod
@@ -264,6 +264,7 @@ class CoreState(ABC):
         *,
         dst_task_ids: Sequence[int] | None = None,
         limit: int | None = None,
+        order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
         """Retrieve undelivered task-addressed Messages.
 
@@ -276,6 +277,9 @@ class CoreState(ABC):
             Sequence of destination task IDs to filter by.
         limit : Optional[int] (default: None)
             Maximum number of messages to return. If `None`, no limit is applied.
+        order_by : Optional[Literal["created_at"]] (default: None)
+            If set to "created_at", matching messages are returned in ascending
+            creation-time order.
 
         Returns
         -------

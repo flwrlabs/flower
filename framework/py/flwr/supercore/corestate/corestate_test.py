@@ -20,14 +20,14 @@ from contextlib import ExitStack
 from datetime import datetime, timedelta
 from typing import Any, cast
 from unittest.mock import patch
-from uuid import uuid4
 
 from parameterized import parameterized
 
-from flwr.common import Message, RecordDict, now
+from flwr.common import now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
+    SUPERLINK_NODE_ID,
     Status,
     SubStatus,
 )
@@ -35,6 +35,7 @@ from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 
 from . import CoreState
+from .utils_test import create_task_message
 
 
 class StateTest(unittest.TestCase):  # pylint: disable=R0904
@@ -71,37 +72,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         mock_datetime.now.side_effect = timestamps
         return stack
-
-    def _create_task_message(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        self,
-        src_task_id: int,
-        dst_task_id: int,
-        run_id: int,
-        ttl: float = 60.0,
-        created_at: float | None = None,
-    ) -> Message:
-        """Create a task-addressed Message for CoreState tests."""
-        src_node_id = 1
-        while src_node_id in (src_task_id, dst_task_id):
-            src_node_id += 1
-        dst_node_id = src_node_id + 1
-        while dst_node_id in (src_task_id, dst_task_id):
-            dst_node_id += 1
-
-        message = Message(
-            RecordDict(),
-            dst_node_id,
-            "query",
-            ttl=ttl,
-            src_task_id=src_task_id,
-            dst_task_id=dst_task_id,
-        )
-        message.metadata.__dict__["_message_id"] = str(uuid4())
-        message.metadata.__dict__["_src_node_id"] = src_node_id
-        message.metadata.__dict__["_run_id"] = run_id
-        if created_at is not None:
-            message.metadata.created_at = created_at
-        return message
 
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
@@ -184,6 +154,13 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with self.assertRaises(AssertionError):
             _ = state.get_tasks(order_by=cast(Any, "foo"))
+
+    def test_get_task_message_invalid_order_by_raises(self) -> None:
+        """Unsupported task-message order_by values should be rejected."""
+        state = self.state_factory()
+
+        with self.assertRaises(AssertionError):
+            _ = state.get_task_message(order_by=cast(Any, "foo"))
 
     def test_get_task_returns_copy(self) -> None:
         """Retrieved task should be a defensive copy."""
@@ -486,6 +463,35 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertTrue(tasks[0].finished_at)
         self.assertEqual(datetime.fromisoformat(tasks[0].finished_at), active_until)
 
+    def test_get_tasks_expires_stale_task_tokens(self) -> None:
+        """Reading tasks should expire stale claimed task tokens first."""
+        state = self.state_factory()
+        fixed_now = now()
+        active_until = fixed_now + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
+        run_id = self.task_run_id(state)
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+            assert task_id is not None
+            assert state.claim_task(task_id) is not None
+
+            mock_dt.now.return_value = fixed_now + timedelta(
+                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
+            )
+            tasks = state.get_tasks(task_ids=[task_id])
+
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(
+            tasks[0].status,
+            TaskStatus(
+                status=Status.FINISHED,
+                sub_status=SubStatus.FAILED,
+                details="No heartbeat received from the task",
+            ),
+        )
+        self.assertEqual(datetime.fromisoformat(tasks[0].finished_at), active_until)
+
     def test_get_task_by_token_returns_none_for_unknown_token(self) -> None:
         """Unknown task tokens should not resolve to a task."""
         state = self.state_factory()
@@ -493,145 +499,174 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertIsNone(state.get_task_by_token("missing-token"))
 
     def test_store_and_get_task_message(self) -> None:
-        """Task Messages should round-trip and be delivered once."""
+        """Task Messages should round-trip, filter, and be delivered once."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        src_task_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=run_id)
-        assert src_task_id is not None and dst_task_id is not None
-
-        message = self._create_task_message(
-            src_task_id=src_task_id,
-            dst_task_id=dst_task_id,
-            run_id=run_id + 1,
-        )
-
-        message_id = state.store_task_message(message)
-        pulled = state.get_task_message(dst_task_ids=[dst_task_id])
-        pulled_again = state.get_task_message(dst_task_ids=[dst_task_id])
-
-        self.assertEqual(message_id, message.metadata.message_id)
-        self.assertEqual(len(pulled), 1)
-        self.assertEqual(pulled_again, [])
-        pulled_message = pulled[0]
-        self.assertEqual(
-            pulled_message.metadata.message_id, message.metadata.message_id
-        )
-        self.assertEqual(pulled_message.metadata.run_id, run_id)
-        self.assertEqual(pulled_message.metadata.src_node_id, 0)
-        self.assertEqual(pulled_message.metadata.dst_node_id, 0)
-        self.assertEqual(pulled_message.metadata.src_task_id, src_task_id)
-        self.assertEqual(pulled_message.metadata.dst_task_id, dst_task_id)
-        self.assertTrue(pulled_message.has_content())
-
-    def test_store_task_message_validates_task_relationship(self) -> None:
-        """Task Messages should only be stored for valid unfinished same-run tasks."""
-        state = self.state_factory()
-        run_id = self.task_run_id(state)
-        other_run_id = self.other_task_run_id(state)
-        src_task_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=run_id)
-        other_run_task_id = state.create_task(
-            task_type=TaskType.CLIENT_APP, run_id=other_run_id
-        )
-        finished_task_id = state.create_task(
-            task_type=TaskType.CLIENT_APP, run_id=run_id
-        )
-        assert (
-            src_task_id is not None
-            and dst_task_id is not None
-            and other_run_task_id is not None
-            and finished_task_id is not None
-        )
-        assert state.finish_task(finished_task_id, SubStatus.FAILED, "done")
-
-        missing_task_id = (
-            max(src_task_id, dst_task_id, other_run_task_id, finished_task_id) + 1
-        )
-        while state.get_tasks(task_ids=[missing_task_id]):
-            missing_task_id += 1
-        invalid_messages = [
-            self._create_task_message(missing_task_id, dst_task_id, run_id),
-            self._create_task_message(src_task_id, missing_task_id, run_id),
-            self._create_task_message(src_task_id, other_run_task_id, run_id),
-            self._create_task_message(src_task_id, finished_task_id, run_id),
-        ]
-
-        for message in invalid_messages:
-            self.assertIsNone(state.store_task_message(message))
-
-        self.assertEqual(state.get_task_message(dst_task_ids=[dst_task_id]), [])
-        self.assertEqual(state.get_task_message(dst_task_ids=[other_run_task_id]), [])
-        self.assertEqual(state.get_task_message(dst_task_ids=[finished_task_id]), [])
-
-    def test_get_task_message_filters_destination_and_expiration(self) -> None:
-        """Getting task Messages should filter by destination and TTL."""
-        state = self.state_factory()
-        run_id = self.task_run_id(state)
-        src_task_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=run_id)
-        other_dst_task_id = state.create_task(
-            task_type=TaskType.CLIENT_APP, run_id=run_id
-        )
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        other_dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
         assert (
             src_task_id is not None
             and dst_task_id is not None
             and other_dst_task_id is not None
         )
 
-        current = now().timestamp()
-        expected = self._create_task_message(src_task_id, dst_task_id, run_id)
-        expired = self._create_task_message(
-            src_task_id, dst_task_id, run_id, ttl=1.0, created_at=current - 2.0
+        message = create_task_message(
+            src_task_id=src_task_id,
+            dst_task_id=dst_task_id,
+            run_id=run_id,
         )
-        other_destination = self._create_task_message(
-            src_task_id, other_dst_task_id, run_id
+        expired = create_task_message(
+            src_task_id,
+            dst_task_id,
+            run_id,
+            created_at=now().timestamp() - 2.0,
+            ttl=1.0,
+        )
+        other_destination = create_task_message(src_task_id, other_dst_task_id, run_id)
+
+        self.assertTrue(state.store_task_message(message))
+        self.assertFalse(state.store_task_message(expired))
+        self.assertTrue(state.store_task_message(other_destination))
+        self.assertTrue(state.finish_task(other_dst_task_id, SubStatus.FAILED, "done"))
+        pulled = state.get_task_message(dst_task_ids=[dst_task_id])
+        pulled_again = state.get_task_message(dst_task_ids=[dst_task_id])
+        pulled_other = state.get_task_message(dst_task_ids=[other_dst_task_id])
+
+        self.assertEqual(len(pulled), 1)
+        self.assertEqual(pulled_again, [])
+        self.assertEqual(pulled_other, [])
+        pulled_message = pulled[0]
+        self.assertEqual(
+            pulled_message.metadata.message_id, message.metadata.message_id
+        )
+        self.assertEqual(pulled_message.metadata.run_id, run_id)
+        self.assertEqual(pulled_message.metadata.src_node_id, SUPERLINK_NODE_ID)
+        self.assertEqual(pulled_message.metadata.dst_node_id, SUPERLINK_NODE_ID)
+        self.assertEqual(pulled_message.metadata.src_task_id, src_task_id)
+        self.assertEqual(pulled_message.metadata.dst_task_id, dst_task_id)
+        self.assertTrue(pulled_message.has_content())
+
+    def test_store_task_message_validates_task_relationship(self) -> None:
+        """Task Messages should only be stored for valid same-run destinations."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        other_run_id = self.other_task_run_id(state)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        other_run_task_id = state.create_task(
+            task_type=TaskType.MODEL, run_id=other_run_id
+        )
+        finished_src_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id
+        )
+        finished_dst_task_id = state.create_task(
+            task_type=TaskType.MODEL, run_id=run_id
+        )
+        assert (
+            src_task_id is not None
+            and dst_task_id is not None
+            and other_run_task_id is not None
+            and finished_src_task_id is not None
+            and finished_dst_task_id is not None
+        )
+        assert state.finish_task(finished_src_task_id, SubStatus.FAILED, "done")
+        assert state.finish_task(finished_dst_task_id, SubStatus.FAILED, "done")
+
+        missing_task_id = (
+            max(
+                src_task_id,
+                dst_task_id,
+                other_run_task_id,
+                finished_src_task_id,
+                finished_dst_task_id,
+            )
+            + 1
+        )
+        while state.get_tasks(task_ids=[missing_task_id]):
+            missing_task_id += 1
+        invalid_messages = [
+            create_task_message(missing_task_id, dst_task_id, run_id),
+            create_task_message(src_task_id, missing_task_id, run_id),
+            create_task_message(src_task_id, other_run_task_id, run_id),
+            create_task_message(src_task_id, finished_dst_task_id, run_id),
+            create_task_message(src_task_id, dst_task_id, 0),
+            create_task_message(src_task_id, dst_task_id, other_run_id),
+        ]
+        finished_source_message = create_task_message(
+            finished_src_task_id, dst_task_id, run_id
         )
 
-        self.assertEqual(
-            state.store_task_message(expected), expected.metadata.message_id
-        )
-        self.assertEqual(state.store_task_message(expired), expired.metadata.message_id)
-        self.assertEqual(
-            state.store_task_message(other_destination),
-            other_destination.metadata.message_id,
-        )
+        for message in invalid_messages:
+            self.assertFalse(state.store_task_message(message))
+        self.assertTrue(state.store_task_message(finished_source_message))
 
         pulled = state.get_task_message(dst_task_ids=[dst_task_id])
 
+        self.assertEqual(len(pulled), 1)
         self.assertEqual(
-            [message.metadata.message_id for message in pulled],
-            [expected.metadata.message_id],
+            pulled[0].metadata.message_id,
+            finished_source_message.metadata.message_id,
         )
+        self.assertEqual(state.get_task_message(dst_task_ids=[other_run_task_id]), [])
         self.assertEqual(
-            [
-                message.metadata.message_id
-                for message in state.get_task_message(dst_task_ids=[other_dst_task_id])
-            ],
-            [other_destination.metadata.message_id],
+            state.get_task_message(dst_task_ids=[finished_dst_task_id]), []
         )
+        self.assertEqual(state.get_task_message(), [])
+
+    def test_get_task_message_does_not_return_expired_messages(self) -> None:
+        """Getting task Messages should not return expired Messages."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert src_task_id is not None and dst_task_id is not None
+
+        msg_ttl = 60.0
+        current = now()
+        expired = create_task_message(
+            src_task_id,
+            dst_task_id,
+            run_id,
+            created_at=current.timestamp(),
+            ttl=msg_ttl,
+        )
+        self.assertTrue(state.store_task_message(expired))
+
+        future = current + timedelta(seconds=msg_ttl + 1)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = future
+            self.assertEqual(state.get_task_message(dst_task_ids=[dst_task_id]), [])
 
     def test_get_task_message_limit(self) -> None:
         """Getting task Messages should respect the provided limit."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
-        src_task_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=run_id)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
         assert src_task_id is not None and dst_task_id is not None
 
-        msg_1 = self._create_task_message(src_task_id, dst_task_id, run_id)
-        msg_2 = self._create_task_message(src_task_id, dst_task_id, run_id)
-        self.assertEqual(state.store_task_message(msg_1), msg_1.metadata.message_id)
-        self.assertEqual(state.store_task_message(msg_2), msg_2.metadata.message_id)
+        current = now().timestamp()
+        msg_1 = create_task_message(
+            src_task_id, dst_task_id, run_id, created_at=current - 2.0
+        )
+        msg_2 = create_task_message(
+            src_task_id, dst_task_id, run_id, created_at=current - 1.0
+        )
+        self.assertTrue(state.store_task_message(msg_2))
+        self.assertTrue(state.store_task_message(msg_1))
 
-        pulled = state.get_task_message(dst_task_ids=[dst_task_id], limit=1)
-        pulled_next = state.get_task_message(dst_task_ids=[dst_task_id], limit=1)
+        pulled = state.get_task_message(
+            dst_task_ids=[dst_task_id], order_by="created_at", limit=1
+        )
+        pulled_next = state.get_task_message(
+            dst_task_ids=[dst_task_id], order_by="created_at", limit=1
+        )
 
         self.assertEqual(len(pulled), 1)
         self.assertEqual(len(pulled_next), 1)
-        self.assertNotEqual(
-            pulled[0].metadata.message_id, pulled_next[0].metadata.message_id
-        )
+        self.assertEqual(pulled[0].metadata.message_id, msg_1.metadata.message_id)
+        self.assertEqual(pulled_next[0].metadata.message_id, msg_2.metadata.message_id)
 
     def test_reserve_nonce_first_reservation_succeeds(self) -> None:
         """A new nonce reservation should succeed."""

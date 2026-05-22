@@ -84,16 +84,14 @@ Representative default output:
 .. code-block:: bash
 
     $ flwr list
-    Listing all runs...
-    ┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┓
-    ┃ Run ID              ┃ FAB              ┃ Status             ┃ Elapsed  ┃ Pending At         ┃ Running At         ┃ Finished At        ┃
-    ┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━┩
-    │ 1859953118041441032 │ flwrlabs/myawes… │ finished:completed │ 00:00:55 │ 2024-12-16         │ 2024-12-16         │ 2024-12-16         │
-    │                     │ (v1.0.0)         │                    │          │ 11:12:33Z          │ 11:12:33Z          │ 11:13:28Z          │
-    ├─────────────────────┼──────────────────┼────────────────────┼──────────┼────────────────────┼────────────────────┼────────────────────┤
-    │ 1420074065701160142 │ flwrlabs/myawes… │ running            │ 00:00:09 │ 2024-12-16         │ 2024-12-16         │ N/A                │
-    │ 0                   │ (v1.0.0)         │                    │          │ 12:18:39Z          │ 12:18:39Z          │                    │
-    └─────────────────────┴──────────────────┴────────────────────┴──────────┴────────────────────┴────────────────────┴────────────────────┘
+    📄 Listing all runs...
+    ┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┓
+    ┃        Run ID        ┃  Federation   ┃               App               ┃       Status       ┃ Elapsed ┃   Status Changed @   ┃
+    ┡━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━┩
+    │ 1859953118041441032  │ @none/default │ @flwrlabs/myawesomeapp==1.0.0   │ finished:completed │ 55s     │ 2024-12-16 11:13:28Z │
+    ├──────────────────────┼───────────────┼─────────────────────────────────┼────────────────────┼─────────┼──────────────────────┤
+    │ 14200740657011601420 │ @none/default │ @flwrlabs/myawesomeapp==1.0.0   │ running            │ 9s      │ 2024-12-16 12:18:39Z │
+    └──────────────────────┴───────────────┴─────────────────────────────────┴────────────────────┴─────────┴──────────────────────┘
 
 To return structured JSON instead:
 
@@ -105,12 +103,13 @@ To return structured JSON instead:
       "runs": [
         {
           "run-id": "1859953118041441032",
-          "federation": "",
+          "federation": "@none/default",
           "fab-id": "flwrlabs/myawesomeapp",
           "fab-name": "myawesomeapp",
           "fab-version": "1.0.0",
-          "fab-hash": "014c8eb3",
+          "fab-hash": "014c8eb3014c8eb3014c8eb3014c8eb3014c8eb3014c8eb3014c8eb3014c8eb3",
           "status": "finished:completed",
+          "status-details": "N/A",
           "elapsed": 55.0,
           "pending-at": "2024-12-16 11:12:33Z",
           "starting-at": "2024-12-16 11:12:33Z",
@@ -129,12 +128,13 @@ To return structured JSON instead:
         },
         {
           "run-id": "14200740657011601420",
-          "federation": "",
+          "federation": "@none/default",
           "fab-id": "flwrlabs/myawesomeapp",
           "fab-name": "myawesomeapp",
           "fab-version": "1.0.0",
-          "fab-hash": "014c8eb3",
+          "fab-hash": "014c8eb3014c8eb3014c8eb3014c8eb3014c8eb3014c8eb3014c8eb3014c8eb3",
           "status": "running",
+          "status-details": "N/A",
           "elapsed": 9.0,
           "pending-at": "2024-12-16 12:18:39Z",
           "starting-at": "2024-12-16 12:18:39Z",
@@ -157,9 +157,10 @@ To return structured JSON instead:
 Each entry under ``runs`` contains:
 
 - ``run-id``: the run ID
-- ``federation``: the federation identifier, if any
+- ``federation``: the federation identifier
 - ``fab-id`` / ``fab-name`` / ``fab-version`` / ``fab-hash``: Flower App metadata
 - ``status``: the current run status
+- ``status-details``: additional status detail text
 - ``elapsed``: elapsed run time in seconds
 - ``pending-at`` / ``starting-at`` / ``running-at`` / ``finished-at``: run timestamps
 - ``network-traffic``: inbound, outbound, and total bytes
