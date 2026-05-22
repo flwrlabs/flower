@@ -387,6 +387,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             self._cleanup_expired_task_tokens_locked()
             current = now().timestamp()
             self._cleanup_invalid_task_messages_locked(current)
+
+            # Filter by dst_task_id
             dst_task_id_set = set(dst_task_ids) if dst_task_ids is not None else None
             candidate_ids = [
                 message_id
