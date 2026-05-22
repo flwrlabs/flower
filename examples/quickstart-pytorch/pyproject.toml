@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-pytorch"
-version = "1.1.2"
+version = "1.1.3"
 description = "Federated Learning with PyTorch and Flower (Quickstart Example)"
 license = {file = "LICENSE"}
 dependencies = [
@@ -32,3 +32,4 @@ fraction-evaluate = 0.5
 local-epochs = 1
 learning-rate = 0.1
 batch-size = 32
+save-model = false

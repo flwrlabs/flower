@@ -42,11 +42,11 @@ cd framework
 uv sync --locked --python=3.10.19 --all-extras --all-groups
 ```
 
-CI installs with Poetry, so when reproducing CI setup exactly use:
+CI installs with uv, so when reproducing CI setup exactly use:
 
 ```bash
 cd framework
-python -m poetry install --all-extras
+uv sync --locked --python=3.10.19 --all-extras --all-groups
 ```
 
 Useful checks:

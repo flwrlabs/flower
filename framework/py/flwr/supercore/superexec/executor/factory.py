@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Simple Flower SuperExec plugin for ClientApp."""
+"""Executor factory for SuperExec TaskExecutor processes."""
+
+from flwr.supercore.constant import ExecutorType
+
+from .subprocess_executor import SubprocessExecutor
+from .types import Executor
 
 
-from flwr.supercore.constant import TaskType
+def get_executor(executor_type: ExecutorType) -> Executor:
+    """Return the executor for the configured executor type."""
+    if executor_type == ExecutorType.SUBPROCESS:
+        return SubprocessExecutor()
 
-from .base_exec_plugin import BaseExecPlugin
-
-
-class ClientAppExecPlugin(BaseExecPlugin):
-    """Simple Flower SuperExec plugin for ClientApp.
-
-    The plugin always selects the first candidate run ID.
-    """
-
-    supported_task_types = frozenset({TaskType.CLIENT_APP})
+    raise ValueError(f"Unsupported executor: {executor_type}")
