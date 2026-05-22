@@ -88,7 +88,6 @@ With default arguments you will see streamed output like this:
     INFO :      Final results:
     INFO :          ServerApp-side Evaluate Metrics:
     INFO :          {}
-    Saving final model to disk...
 
 You can also override the parameters defined in the ``[tool.flwr.app.config]`` section
 in ``pyproject.toml`` like this:
@@ -393,17 +392,18 @@ To it we pass:
             num_rounds=num_rounds,
         )
 
-        # Save final model to disk
-        print("\nSaving final model to disk...")
-        ndarrays = result.arrays.to_numpy_ndarrays()
-        np.savez("final_model.npz", *ndarrays)
+        if context.run_config["save-model"]:
+            # Save final model to disk
+            print("\nSaving final model to disk...")
+            ndarrays = result.arrays.to_numpy_ndarrays()
+            np.savez("final_model.npz", *ndarrays)
 
 Note the ``start`` method of the strategy returns a result object. This object contains
 all the relevant information about the FL process, including the final model weights as
 an ``ArrayRecord``, and federated training and evaluation metrics as ``MetricRecords``.
 You can easily log the metrics using Python's `pprint
-<https://docs.python.org/3/library/pprint.html>`_ and save the global model NumPy arrays
-using ``np.savez()`` as shown above.
+<https://docs.python.org/3/library/pprint.html>`_ and, if ``save-model`` is set to
+``true``, save the global model NumPy arrays using ``np.savez()`` as shown above.
 
 Congratulations! You've successfully built and run your first federated learning system
 for JAX with Flower!

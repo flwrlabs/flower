@@ -25,13 +25,15 @@ from .utils import generate_rand_int_from_bytes, validate_task_message
 
 
 def create_task_message(  # pylint: disable=too-many-arguments
+    *,
+    run_id: int = 1,
     src_task_id: int | None = 1,
     dst_task_id: int | None = 2,
-    run_id: int = 1,
-    *,
+    reply_to_message_id: str = "",
     created_at: float | None = None,
     ttl: float = 60.0,
     message_type: str = "train",
+    content: RecordDict | None = None,
     has_error: bool = False,
 ) -> Message:
     """Create a task Message for testing."""
@@ -40,7 +42,7 @@ def create_task_message(  # pylint: disable=too-many-arguments
         message_id="",
         src_node_id=SUPERLINK_NODE_ID,
         dst_node_id=SUPERLINK_NODE_ID,
-        reply_to_message_id="",
+        reply_to_message_id=reply_to_message_id,
         group_id="",
         created_at=created_at if created_at is not None else now().timestamp(),
         ttl=ttl,
@@ -50,11 +52,14 @@ def create_task_message(  # pylint: disable=too-many-arguments
     )
 
     if has_error:
-        message = make_message(metadata=metadata, error=Error(0))
+        msg = make_message(metadata=metadata, error=Error(0))
     else:
-        message = make_message(metadata=metadata, content=RecordDict())
-    message.metadata.__dict__["_message_id"] = message.object_id
-    return message
+        msg = make_message(
+            metadata=metadata,
+            content=content if content is not None else RecordDict(),
+        )
+    msg.metadata.__dict__["_message_id"] = msg.object_id
+    return msg
 
 
 def _assert_has_error(errors: list[str], expected: str) -> None:
