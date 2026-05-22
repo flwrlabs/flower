@@ -35,6 +35,7 @@ from flwr.common.constant import (
     SUPERLINK_NODE_ID,
     TASK_ID_NUM_BYTES,
     Status,
+    SubStatus,
 )
 from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
@@ -117,6 +118,31 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """Return the FederationManager instance."""
         return self._federation_manager
 
+    def _lock_run(
+        self, run_id: int, *, require_unfinished: bool = False
+    ) -> dict[str, Any] | None:
+        """Lock the run row if it is in the required state."""
+        condition = ""
+        if require_unfinished:
+            condition = """
+            AND EXISTS (
+                SELECT 1
+                FROM task
+                WHERE task.task_id = run.primary_task_id
+                AND task.finished_at IS NULL
+            )
+            """
+        rows = self.query(
+            f"""
+            UPDATE run
+            SET run_id = run_id
+            WHERE run_id = :run_id {condition}
+            RETURNING run_id, federation, primary_task_id
+            """,
+            {"run_id": uint64_to_int64(run_id)},
+        )
+        return dict(rows[0]) if rows else None
+
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
         # Validate message
@@ -144,12 +170,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         with self.session():
             # Validate run_id
-            query = "SELECT federation FROM run WHERE run_id = :run_id"
-            rows = self.query(query, {"run_id": data[0]["run_id"]})
-            if not rows:
+            run_row = self._lock_run(message.metadata.run_id, require_unfinished=True)
+            if not run_row:
                 log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
                 return None
-            federation: str = rows[0]["federation"]
+            federation: str = run_row["federation"]
 
             # Validate destination node ID
             query = """SELECT node_id FROM node WHERE node_id = :node_id
@@ -350,7 +375,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         params = {f"mid_{i}": msg_id for i, msg_id in enumerate(message_ids)}
         return self.query(query, params)
 
-    def store_message_res(self, message: Message) -> str | None:
+    def store_message_res(  # pylint: disable=too-many-return-statements
+        self, message: Message
+    ) -> str | None:
         """Store one Message."""
         # Validate message
         errors = validate_message(message=message, is_reply_message=True)
@@ -358,66 +385,63 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             log(ERROR, errors)
             return None
 
-        res_metadata = message.metadata
-        msg_ins_id = res_metadata.reply_to_message_id
-        msg_ins = self.get_valid_message_ins(msg_ins_id)
-        if msg_ins is None:
-            log(
-                ERROR,
-                "Failed to store Message reply: "
-                "The message it replies to with message_id %s does not exist or "
-                "has expired, or was deleted because the target SuperNode was "
-                "removed from the federation.",
-                msg_ins_id,
+        with self.session():
+            res_metadata = message.metadata
+            if not self._lock_run(res_metadata.run_id, require_unfinished=True):
+                log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
+                return None
+
+            msg_ins_id = res_metadata.reply_to_message_id
+            msg_ins = self.get_valid_message_ins(msg_ins_id)
+            if msg_ins is None:
+                log(
+                    ERROR,
+                    "Failed to store Message reply: "
+                    "The message it replies to with message_id %s does not exist or "
+                    "has expired, or was deleted because the target SuperNode was "
+                    "removed from the federation.",
+                    msg_ins_id,
+                )
+                return None
+
+            # Ensure that the dst_node_id of the original message matches the
+            # src_node_id of reply being processed.
+            if int64_to_uint64(msg_ins["dst_node_id"]) != res_metadata.src_node_id:
+                return None
+
+            # Fail if the Message TTL exceeds the expiration time of the Message it
+            # replies to, with a small tolerance for floating-point precision.
+            max_allowed_ttl = (
+                msg_ins["created_at"] + msg_ins["ttl"] - res_metadata.created_at
             )
-            return None
+            if res_metadata.ttl and (
+                res_metadata.ttl - max_allowed_ttl > MESSAGE_TTL_TOLERANCE
+            ):
+                log(
+                    WARNING,
+                    "Received Message with TTL %.2f exceeding the allowed maximum "
+                    "TTL %.2f.",
+                    res_metadata.ttl,
+                    max_allowed_ttl,
+                )
+                return None
 
-        # Ensure that the dst_node_id of the original message matches the src_node_id
-        # of reply being processed.
-        if (
-            msg_ins
-            and message
-            and int64_to_uint64(msg_ins["dst_node_id"]) != res_metadata.src_node_id
-        ):
-            return None
+            # Store Message
+            msg_dict = message_to_dict(message)
 
-        # Fail if the Message TTL exceeds the
-        # expiration time of the Message it replies to.
-        # Condition: ins_metadata.created_at + ins_metadata.ttl ≥
-        #            res_metadata.created_at + res_metadata.ttl
-        # A small tolerance is introduced to account
-        # for floating-point precision issues.
-        max_allowed_ttl = (
-            msg_ins["created_at"] + msg_ins["ttl"] - res_metadata.created_at
-        )
-        if res_metadata.ttl and (
-            res_metadata.ttl - max_allowed_ttl > MESSAGE_TTL_TOLERANCE
-        ):
-            log(
-                WARNING,
-                "Received Message with TTL %.2f exceeding the allowed maximum "
-                "TTL %.2f.",
-                res_metadata.ttl,
-                max_allowed_ttl,
+            # Convert values from uint64 to sint64 for SQLite
+            convert_uint64_values_in_dict_to_sint64(
+                msg_dict, ["run_id", "src_node_id", "dst_node_id"]
             )
-            return None
 
-        # Store Message
-        msg_dict = message_to_dict(message)
+            columns = ", ".join([f":{key}" for key in msg_dict])
+            query = f"INSERT INTO message_res VALUES({columns})"
 
-        # Convert values from uint64 to sint64 for SQLite
-        convert_uint64_values_in_dict_to_sint64(
-            msg_dict, ["run_id", "src_node_id", "dst_node_id"]
-        )
-
-        columns = ", ".join([f":{key}" for key in msg_dict])
-        query = f"INSERT INTO message_res VALUES({columns})"
-
-        try:
-            self.query(query, msg_dict)
-        except IntegrityError:
-            log(ERROR, "`run` is invalid")
-            return None
+            try:
+                self.query(query, msg_dict)
+            except IntegrityError:
+                log(ERROR, "`run` is invalid")
+                return None
 
         return message.metadata.message_id
 
@@ -574,6 +598,20 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             rows = self.query(query, params)
 
         return {row["message_id"] for row in rows}
+
+    def stop_run(self, run_id: int) -> bool:
+        """Stop a run and clean up run-scoped messages and objects."""
+        update_success = False
+        for task in self.get_tasks(run_ids=[run_id]):
+            update_success |= self.finish_task(task.task_id, SubStatus.STOPPED, "")
+
+        if not update_success:
+            return False
+
+        self.delete_messages(self.get_message_ids_from_run_id(run_id))
+
+        self.object_store.delete_objects_in_run(run_id)
+        return True
 
     def create_node(
         self,
@@ -1192,6 +1230,12 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         sint_run_id = uint64_to_int64(run_id)
 
         with self.session():
+            if not self.query(
+                "SELECT run_id FROM run WHERE run_id = :run_id",
+                {"run_id": sint_run_id},
+            ):
+                raise ValueError(f"Run {run_id} not found")
+
             # Check if any existing Context assigned to the run_id
             query = "SELECT COUNT(*) as count FROM context WHERE run_id = :run_id"
             row = self.query(query, {"run_id": sint_run_id})[0]

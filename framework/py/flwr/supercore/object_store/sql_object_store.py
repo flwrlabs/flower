@@ -34,7 +34,11 @@ from .object_store import NoObjectInStoreError, ObjectStore
 class SqlObjectStore(ObjectStore, SqlMixin):
     """SQLAlchemy-based implementation of the ObjectStore interface."""
 
-    def __init__(self, database_path: str, verify: bool = True) -> None:
+    def __init__(
+        self,
+        database_path: str,
+        verify: bool = True,
+    ) -> None:
         super().__init__(database_path)
         self.verify = verify
 
@@ -45,13 +49,13 @@ class SqlObjectStore(ObjectStore, SqlMixin):
     def preregister(self, run_id: int, object_tree: ObjectTree) -> list[str]:
         """Identify and preregister missing objects in the `ObjectStore`."""
         new_objects = []
-        for tree_node in iterate_object_tree(object_tree):
-            obj_id = tree_node.object_id
-            if not is_valid_sha256_hash(obj_id):
-                raise ValueError(f"Invalid object ID format: {obj_id}")
+        with self.session():
+            for tree_node in iterate_object_tree(object_tree):
+                obj_id = tree_node.object_id
+                if not is_valid_sha256_hash(obj_id):
+                    raise ValueError(f"Invalid object ID format: {obj_id}")
 
-            child_ids = [child.object_id for child in tree_node.children]
-            with self.session():
+                child_ids = [child.object_id for child in tree_node.children]
                 # Insert new object if it doesn't exist (race-condition safe)
                 # RETURNING returns a row only if the insert succeeded
                 rows = self.query(

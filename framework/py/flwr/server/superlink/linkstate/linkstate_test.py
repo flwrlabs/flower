@@ -15,7 +15,6 @@
 """Tests all LinkState implemenations have to conform to."""
 # pylint: disable=invalid-name, too-many-lines, R0904, R0913
 
-
 import hashlib
 import multiprocessing
 import os
@@ -38,6 +37,7 @@ from flwr.app.user_config import UserConfig
 from flwr.common import DEFAULT_TTL, Context, Error, Message, RecordDict, now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
+    HEARTBEAT_PATIENCE,
     SUPERLINK_NODE_ID,
     ErrorCode,
     Status,
@@ -175,6 +175,27 @@ class StateTest(CoreStateTest):
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
+
+    def test_store_messages_rejects_stopped_run(self) -> None:
+        """Messages cannot be stored after a run is stopped."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
+        )
+        self.assertIsNotNone(state.store_message_ins(message=msg))
+        pulled = state.get_message_ins(node_id=node_id, limit=1)[0]
+        reply_msg = Message(RecordDict(), reply_to=pulled)
+
+        self.assertTrue(state.stop_run(run_id))
+
+        self.assertIsNone(state.store_message_ins(message=msg))
+        self.assertIsNone(state.store_message_res(message=reply_msg))
+        self.assertEqual(state.num_message_ins(), 0)
+        self.assertEqual(state.num_message_res(), 0)
 
     def test_get_run_info_without_filters_returns_all_runs(self) -> None:
         """Test get_run_info returns all runs when no filter is provided."""
@@ -384,7 +405,9 @@ class StateTest(CoreStateTest):
 
         # Execute
         # The run should be marked as failed after HEARTBEAT_DEFAULT_INTERVAL
-        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        patched_dt = now() + timedelta(
+            seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
+        )
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = patched_dt
@@ -433,6 +456,33 @@ class StateTest(CoreStateTest):
 
         # Assert
         state.federation_manager.report_run_usage.assert_called_once()
+
+    def test_usage_report_hook_called_on_stop_run(self) -> None:
+        """Test report_run_usage hook is called when a run is stopped."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        state.federation_manager.report_run_usage = Mock()  # type: ignore
+
+        assert state.stop_run(run_id)
+
+        state.federation_manager.report_run_usage.assert_called_once()
+
+    def test_stop_run_after_primary_task_finished(self) -> None:
+        """Stopping a run after primary task completion stops secondary tasks."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        primary_task_id = get_primary_task_id(state, run_id)
+        secondary_task_id = state.create_task(TaskType.SERVER_APP, run_id)
+        assert secondary_task_id is not None
+        assert state.claim_task(primary_task_id) is not None
+        assert state.activate_task(primary_task_id)
+        assert state.finish_task(primary_task_id, SubStatus.COMPLETED, "")
+
+        assert state.stop_run(run_id)
+
+        tasks = {task.task_id: task for task in state.get_tasks(run_ids=[run_id])}
+        assert tasks[primary_task_id].status.sub_status == SubStatus.COMPLETED
+        assert tasks[secondary_task_id].status.sub_status == SubStatus.STOPPED
 
     def test_usage_report_hook_not_called_on_non_primary_task_expired(self) -> None:
         """Test report_run_usage is not called when a non-primary task expires."""
@@ -1311,7 +1361,6 @@ class StateTest(CoreStateTest):
             msg_res_ttl,
             expected_store_result,
         ) in test_cases:
-
             # Prepare
             state: LinkState = self.state_factory()
             run_id = create_dummy_run(state)
@@ -1617,6 +1666,26 @@ class StateTest(CoreStateTest):
         # Assert
         assert init is None
         assert retrieved_context == context
+
+    def test_set_serverapp_context_after_finished_run(self) -> None:
+        """Context can be persisted after normal task completion."""
+        state: LinkState = self.state_factory()
+        run_id = create_dummy_run(state)
+        task_id = get_primary_task_id(state, run_id)
+        context = Context(
+            run_id=run_id,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={},
+            state=RecordDict(),
+            run_config={},
+        )
+
+        assert state.claim_task(task_id) is not None
+        assert state.activate_task(task_id)
+        assert state.finish_task(task_id, SubStatus.COMPLETED, "done")
+        state.set_serverapp_context(run_id, context)
+
+        assert state.get_serverapp_context(run_id) == context
 
     def test_set_context_invalid_run_id(self) -> None:
         """Test set_serverapp_context with invalid run_id."""
@@ -1996,13 +2065,13 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state = self.state_factory()
         run_id = create_dummy_run(state)
         task_id = get_primary_task_id(state, run_id)
-        assert state.claim_task(task_id) is not None
-        assert state.activate_task(task_id)
-        assert state.finish_task(task_id, SubStatus.COMPLETED, "done")
-
         extra_task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
         assert extra_task_id is not None
         assert state.claim_task(extra_task_id) is not None
+
+        assert state.claim_task(task_id) is not None
+        assert state.activate_task(task_id)
+        assert state.finish_task(task_id, SubStatus.COMPLETED, "done")
 
         # Execute: force token expiry and trigger cleanup
         patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
