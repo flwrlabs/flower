@@ -148,6 +148,9 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             objects_to_push |= set(store.preregister(run_id, object_tree))
             # Store message
             message_id: str | None = state.store_message_ins(message=message)
+            # This is temporary. We should consider a more robust cleanup
+            # mechanism that protects duplicate messages from premature deletion.
+            # Once that is in place, we can remove the run status check below.
             if (
                 message_id is None
                 and state.get_run_status({run_id})[run_id].status == Status.FINISHED
