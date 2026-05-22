@@ -112,6 +112,7 @@ class AppIoServicer(ABC):
             connector_ref=(
                 request.connector_ref if request.HasField("connector_ref") else None
             ),
+            requesting_task_id=task.task_id,
         )
         if created_task_id is None:
             context.abort(grpc.StatusCode.INTERNAL, "Failed to create task")

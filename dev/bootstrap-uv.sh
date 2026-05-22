@@ -4,7 +4,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -P)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." >/dev/null 2>&1 && pwd -P)"
 FRAMEWORK_ROOT="${REPO_ROOT}/framework"
-version=${1:-3.10.19}
+version=${1:-3.11.14}
 
 # Setup environment variables for development
 "${SCRIPT_DIR}/setup-envs.sh"

@@ -130,7 +130,7 @@ class TestAppIoServicer(unittest.TestCase):
         # Execute
         with patch(
             "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
-            return_value=Mock(run_id=123, type=TaskType.SERVER_APP),
+            return_value=Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
         ):
             response = self.servicer.CreateTask(request, Mock())
 
@@ -141,6 +141,7 @@ class TestAppIoServicer(unittest.TestCase):
             fab_hash=None,
             model_ref="models/abc",
             connector_ref=None,
+            requesting_task_id=789,
         )
         self.assertEqual(response.task_id, 456)
 
@@ -157,7 +158,9 @@ class TestAppIoServicer(unittest.TestCase):
                 # Execute
                 with patch(
                     "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
-                    return_value=Mock(run_id=123, type=requesting_task_type),
+                    return_value=Mock(
+                        task_id=789, run_id=123, type=requesting_task_type
+                    ),
                 ):
                     response = self.servicer.CreateTask(request, Mock())
 
@@ -168,6 +171,7 @@ class TestAppIoServicer(unittest.TestCase):
                     fab_hash=None,
                     model_ref="model",
                     connector_ref=None,
+                    requesting_task_id=789,
                 )
                 self.assertEqual(response.task_id, 456)
 
@@ -182,7 +186,7 @@ class TestAppIoServicer(unittest.TestCase):
         with (
             patch(
                 "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
-                return_value=Mock(run_id=123, type=TaskType.SERVER_APP),
+                return_value=Mock(task_id=789, run_id=123, type=TaskType.SERVER_APP),
             ),
             self.assertRaises(RuntimeError) as err,
         ):
@@ -202,6 +206,7 @@ class TestAppIoServicer(unittest.TestCase):
             fab_hash=None,
             model_ref="model",
             connector_ref=None,
+            requesting_task_id=789,
         )
 
     def test_create_task_aborts_if_required_field_is_missing(self) -> None:
@@ -230,7 +235,9 @@ class TestAppIoServicer(unittest.TestCase):
                 with (
                     patch(
                         "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
-                        return_value=Mock(run_id=123, type=TaskType.SERVER_APP),
+                        return_value=Mock(
+                            task_id=789, run_id=123, type=TaskType.SERVER_APP
+                        ),
                     ),
                     self.assertRaises(grpc.RpcError),
                 ):

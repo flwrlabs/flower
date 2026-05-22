@@ -20,7 +20,7 @@ from logging import DEBUG, ERROR, INFO
 import grpc
 
 from flwr.common import Message
-from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -67,6 +67,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     UnexpectedObjectContentError,
     get_all_nested_objects,
     get_object_tree,
+    iterate_object_tree,
     no_object_id_recompute,
 )
 from flwr.supercore.interceptors import get_authenticated_task
@@ -147,6 +148,16 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             objects_to_push |= set(store.preregister(run_id, object_tree))
             # Store message
             message_id: str | None = state.store_message_ins(message=message)
+            # This is temporary. We should consider a more robust cleanup
+            # mechanism that protects duplicate messages from premature deletion.
+            # Once that is in place, we can remove the run status check below.
+            if (
+                message_id is None
+                and state.get_run_status({run_id})[run_id].status == Status.FINISHED
+            ):
+                store.delete(object_tree.object_id)
+                for tree_node in iterate_object_tree(object_tree):
+                    objects_to_push.discard(tree_node.object_id)
             message_ids.append(message_id)
 
         return PushAppMessagesResponse(

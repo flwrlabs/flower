@@ -86,6 +86,7 @@ class CoreState(ABC):
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
+        requesting_task_id: int | None = None,
     ) -> int | None:
         """Create a new task.
 
@@ -101,6 +102,9 @@ class CoreState(ABC):
             Model reference associated with the task, if applicable.
         connector_ref : Optional[str] (default: None)
             Connector reference associated with the task, if applicable.
+        requesting_task_id : Optional[int] (default: None)
+            Task requesting creation of the new task. If set, task creation fails
+            when the requesting task does not exist or is already finished.
 
         Returns
         -------
