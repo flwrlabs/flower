@@ -451,6 +451,7 @@ class SqlCoreState(CoreState, SqlMixin):
                     """,
                     message_dict,
                 )
+                return bool(inserted)
             except IntegrityError:
                 return False
             if not inserted:
@@ -738,7 +739,7 @@ def _task_message_from_row(row: dict[str, Any]) -> Message:
         src_node_id=SUPERLINK_NODE_ID,
         dst_node_id=SUPERLINK_NODE_ID,
         reply_to_message_id=row["reply_to_message_id"] or "",
-        group_id="",
+        group_id="",  # Task messages don't have this field for now
         created_at=row["created_at"],
         ttl=row["ttl"],
         message_type=row["message_type"],
