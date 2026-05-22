@@ -330,10 +330,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         message_id = message.metadata.message_id
         if validate_task_message(message):
             return False
-        src_task_id = message.metadata.src_task_id
-        dst_task_id = message.metadata.dst_task_id
-        assert src_task_id is not None
-        assert dst_task_id is not None
+        src_task_id = cast(int, message.metadata.src_task_id)
+        dst_task_id = cast(int, message.metadata.dst_task_id)
 
         with self.lock_task_store, self.lock_task_message_store:
             self._cleanup_expired_task_tokens_locked()
