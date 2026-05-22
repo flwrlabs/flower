@@ -31,7 +31,6 @@ def create_task_message(  # pylint: disable=too-many-arguments
     *,
     created_at: float | None = None,
     ttl: float = 60.0,
-    group_id: str = "",
     message_type: str = "train",
     has_error: bool = False,
 ) -> Message:
@@ -42,7 +41,7 @@ def create_task_message(  # pylint: disable=too-many-arguments
         src_node_id=SUPERLINK_NODE_ID,
         dst_node_id=SUPERLINK_NODE_ID,
         reply_to_message_id="",
-        group_id=group_id,
+        group_id="",
         created_at=created_at if created_at is not None else now().timestamp(),
         ttl=ttl,
         message_type=message_type,

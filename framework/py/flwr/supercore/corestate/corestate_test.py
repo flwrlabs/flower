@@ -509,7 +509,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             src_task_id=src_task_id,
             dst_task_id=dst_task_id,
             run_id=run_id,
-            group_id="round-1",
         )
 
         stored = state.store_task_message(message)
@@ -524,7 +523,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             pulled_message.metadata.message_id, message.metadata.message_id
         )
         self.assertEqual(pulled_message.metadata.run_id, run_id)
-        self.assertEqual(pulled_message.metadata.group_id, "round-1")
         self.assertEqual(pulled_message.metadata.src_node_id, 0)
         self.assertEqual(pulled_message.metadata.dst_node_id, 0)
         self.assertEqual(pulled_message.metadata.src_task_id, src_task_id)
