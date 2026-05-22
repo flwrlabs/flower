@@ -27,6 +27,7 @@ from flwr.common import now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
+    SUPERLINK_NODE_ID,
     Status,
     SubStatus,
 )
@@ -498,33 +499,54 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertIsNone(state.get_task_by_token("missing-token"))
 
     def test_store_and_get_task_message(self) -> None:
-        """Task Messages should round-trip and be delivered once."""
+        """Task Messages should round-trip, filter, and be delivered once."""
         state = self.state_factory()
         run_id = self.task_run_id(state)
         src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
         dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
-        assert src_task_id is not None and dst_task_id is not None
+        other_dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert (
+            src_task_id is not None
+            and dst_task_id is not None
+            and other_dst_task_id is not None
+        )
 
         message = _create_task_message(
             src_task_id=src_task_id,
             dst_task_id=dst_task_id,
             run_id=run_id,
         )
+        expired = _create_task_message(
+            src_task_id,
+            dst_task_id,
+            run_id,
+            created_at=now().timestamp() - 2.0,
+            ttl=1.0,
+        )
+        other_destination = _create_task_message(
+            src_task_id, other_dst_task_id, run_id
+        )
 
-        stored = state.store_task_message(message)
+        self.assertTrue(state.store_task_message(message))
+        self.assertFalse(state.store_task_message(expired))
+        self.assertTrue(state.store_task_message(other_destination))
         pulled = state.get_task_message(dst_task_ids=[dst_task_id])
         pulled_again = state.get_task_message(dst_task_ids=[dst_task_id])
+        pulled_other = state.get_task_message(dst_task_ids=[other_dst_task_id])
 
-        self.assertTrue(stored)
         self.assertEqual(len(pulled), 1)
         self.assertEqual(pulled_again, [])
+        self.assertEqual(
+            [msg.metadata.message_id for msg in pulled_other],
+            [other_destination.metadata.message_id],
+        )
         pulled_message = pulled[0]
         self.assertEqual(
             pulled_message.metadata.message_id, message.metadata.message_id
         )
         self.assertEqual(pulled_message.metadata.run_id, run_id)
-        self.assertEqual(pulled_message.metadata.src_node_id, 0)
-        self.assertEqual(pulled_message.metadata.dst_node_id, 0)
+        self.assertEqual(pulled_message.metadata.src_node_id, SUPERLINK_NODE_ID)
+        self.assertEqual(pulled_message.metadata.dst_node_id, SUPERLINK_NODE_ID)
         self.assertEqual(pulled_message.metadata.src_task_id, src_task_id)
         self.assertEqual(pulled_message.metadata.dst_task_id, dst_task_id)
         self.assertTrue(pulled_message.has_content())
@@ -584,42 +606,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             state.get_task_message(dst_task_ids=[finished_dst_task_id]), []
         )
         self.assertEqual(state.get_task_message(), [])
-
-    def test_get_task_message_filters_destination_and_rejects_expired(self) -> None:
-        """Getting task Messages should filter by destination and reject expired."""
-        state = self.state_factory()
-        run_id = self.task_run_id(state)
-        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
-        other_dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
-        assert (
-            src_task_id is not None
-            and dst_task_id is not None
-            and other_dst_task_id is not None
-        )
-
-        current = now().timestamp()
-        expected = _create_task_message(src_task_id, dst_task_id, run_id)
-        expired = _create_task_message(
-            src_task_id, dst_task_id, run_id, ttl=1.0, created_at=current - 2.0
-        )
-        other_destination = _create_task_message(src_task_id, other_dst_task_id, run_id)
-
-        self.assertTrue(state.store_task_message(expected))
-        self.assertFalse(state.store_task_message(expired))
-        self.assertTrue(state.store_task_message(other_destination))
-
-        pulled = state.get_task_message(dst_task_ids=[dst_task_id])
-
-        self.assertEqual(len(pulled), 1)
-        self.assertEqual(pulled[0].metadata.message_id, expected.metadata.message_id)
-        self.assertEqual(
-            [
-                message.metadata.message_id
-                for message in state.get_task_message(dst_task_ids=[other_dst_task_id])
-            ],
-            [other_destination.metadata.message_id],
-        )
 
     def test_get_task_message_cleans_expired_messages(self) -> None:
         """Getting task Messages should remove expired undelivered Messages."""

@@ -25,10 +25,10 @@ from .utils import generate_rand_int_from_bytes, validate_task_message
 
 
 def create_task_message(  # pylint: disable=too-many-arguments
-    *,
-    run_id: int = 1,
     src_task_id: int | None = 1,
     dst_task_id: int | None = 2,
+    run_id: int = 1,
+    *,
     reply_to_message_id: str = "",
     created_at: float | None = None,
     ttl: float = 60.0,

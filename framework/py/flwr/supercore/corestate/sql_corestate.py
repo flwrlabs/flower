@@ -31,6 +31,7 @@ from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
+    SUPERLINK_NODE_ID,
     TASK_ID_NUM_BYTES,
     Status,
     SubStatus,
@@ -671,8 +672,8 @@ def _task_message_from_row(row: dict[str, Any]) -> Message:
     metadata = Metadata(
         run_id=int64_to_uint64(row["run_id"]),
         message_id=row["message_id"],
-        src_node_id=0,
-        dst_node_id=0,
+        src_node_id=SUPERLINK_NODE_ID,
+        dst_node_id=SUPERLINK_NODE_ID,
         reply_to_message_id=row["reply_to_message_id"] or "",
         group_id="",
         created_at=row["created_at"],
