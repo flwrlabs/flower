@@ -501,6 +501,7 @@ class SqlCoreState(CoreState, SqlMixin):
             )
 
         where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        order_clause = f"ORDER BY {order_by}" if order_by else ""
 
         if limit is not None:
             # Materialize limited candidates before deleting. Some backends can
@@ -508,14 +509,12 @@ class SqlCoreState(CoreState, SqlMixin):
             # `self.select_lock_sql` is an optional clause for backends that support
             # row-locking while selecting candidates. Keep it before LIMIT so locked
             # rows are skipped before limiting the result set.
-            order_clause = f"ORDER BY {order_by}" if order_by is not None else ""
             params["limit"] = limit
             query = f"""
                 WITH selected AS (
                     SELECT message_id
                     FROM task_message
-                    {where_clause}
-                    {order_clause}
+                    {where_clause} {order_clause}
                     {self.select_lock_sql}
                     LIMIT :limit
                 )
@@ -526,7 +525,7 @@ class SqlCoreState(CoreState, SqlMixin):
         else:
             query = f"""
                 DELETE FROM task_message
-                {where_clause}
+                {where_clause} {order_clause}
                 RETURNING *
             """
 
