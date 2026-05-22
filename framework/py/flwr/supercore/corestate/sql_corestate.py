@@ -427,7 +427,6 @@ class SqlCoreState(CoreState, SqlMixin):
 
         with self.session():
             self._cleanup_expired_task_tokens()
-            self._cleanup_invalid_task_messages()
             message_dict = _task_message_to_row(message)
             try:
                 inserted = self.query(
