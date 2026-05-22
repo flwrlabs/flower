@@ -31,8 +31,8 @@ rst_prolog = """
 .. |ubuntu_version| replace:: 24.04
 .. |setuptools_version| replace:: 82.0.0
 .. |pip_version| replace:: 26.0.1
-.. |python_version| replace:: 3.10
-.. |python_full_version| replace:: 3.10.19
+.. |python_version| replace:: 3.11
+.. |python_full_version| replace:: 3.11.14
 """
 
 # Sphinx redirects, implemented after the doc filename changes.

@@ -160,6 +160,7 @@ class SqlCoreState(CoreState, SqlMixin):
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
+        requesting_task_id: int | None = None,
     ) -> int | None:
         """Create a task and return its ID."""
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
@@ -170,10 +171,18 @@ class SqlCoreState(CoreState, SqlMixin):
             (task_id, type, run_id, fab_hash, model_ref, connector_ref, token,
              active_until, pending_at, starting_at, running_at, finished_at,
              sub_status, details)
-            VALUES
-            (:task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
+            SELECT
+             :task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
              :active_until, :pending_at, :starting_at, :running_at, :finished_at,
-             :sub_status, :details);
+             :sub_status, :details
+            WHERE :requesting_task_id IS NULL
+            OR EXISTS (
+                SELECT 1
+                FROM task
+                WHERE task_id = :requesting_task_id
+                AND finished_at IS NULL
+            )
+            RETURNING task_id;
         """
 
         params = {
@@ -191,12 +200,17 @@ class SqlCoreState(CoreState, SqlMixin):
             "finished_at": None,
             "sub_status": "",
             "details": "",
+            "requesting_task_id": (
+                uint64_to_int64(requesting_task_id)
+                if requesting_task_id is not None
+                else None
+            ),
         }
 
         with self.session():
             try:
-                self.query(insert_query, params)
-                return task_id
+                rows = self.query(insert_query, params)
+                return task_id if rows else None
             except IntegrityError:
                 return None
 
@@ -420,6 +434,7 @@ class SqlCoreState(CoreState, SqlMixin):
             SET token = NULL, finished_at = active_until, active_until = NULL,
                 sub_status = :sub_status, details = :details
             WHERE token IS NOT NULL AND active_until < :current
+            AND finished_at IS NULL
             RETURNING task_id, type, run_id, fab_hash, model_ref, connector_ref,
                       pending_at, starting_at, running_at, finished_at,
                       sub_status, details
