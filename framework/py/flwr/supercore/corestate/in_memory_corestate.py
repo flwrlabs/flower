@@ -391,27 +391,24 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
 
             # Filter by dst_task_id
             dst_task_id_set = set(dst_task_ids) if dst_task_ids is not None else None
-            candidate_ids = [
-                message_id
-                for message_id, message in self.task_message_store.items()
+            selected_messages = [
+                msg
+                for msg in self.task_message_store.values()
                 if dst_task_id_set is None
-                or message.metadata.dst_task_id in dst_task_id_set
+                or msg.metadata.dst_task_id in dst_task_id_set
             ]
 
             # Apply requested sort order
             if order_by == "created_at":
-                candidate_ids.sort(
-                    key=lambda msg_id: self.task_message_store[
-                        msg_id
-                    ].metadata.created_at
-                )
+                selected_messages.sort(key=lambda msg: msg.metadata.created_at)
 
-            selected_ids = candidate_ids[:limit] if limit is not None else candidate_ids
-            selected_messages = []
-            for message_id in selected_ids:
-                message = self.task_message_store[message_id]
-                del self.task_message_store[message_id]
-                selected_messages.append(message)
+            # Apply limit
+            if limit is not None:
+                selected_messages = selected_messages[:limit]
+
+            # Delete selected messages from storage
+            for msg in selected_messages:
+                del self.task_message_store[msg.metadata.message_id]
 
         return selected_messages
 
