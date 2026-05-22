@@ -514,7 +514,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         message = create_task_message(
             src_task_id=src_task_id,
             dst_task_id=dst_task_id,
-            run_id=0,
+            run_id=run_id,
         )
         expired = create_task_message(
             src_task_id,
@@ -523,7 +523,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             created_at=now().timestamp() - 2.0,
             ttl=1.0,
         )
-        other_destination = create_task_message(src_task_id, other_dst_task_id, 0)
+        other_destination = create_task_message(src_task_id, other_dst_task_id, run_id)
 
         self.assertTrue(state.store_task_message(message))
         self.assertFalse(state.store_task_message(expired))
@@ -540,7 +540,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(
             pulled_message.metadata.message_id, message.metadata.message_id
         )
-        self.assertEqual(pulled_message.metadata.run_id, 0)
+        self.assertEqual(pulled_message.metadata.run_id, run_id)
         self.assertEqual(pulled_message.metadata.src_node_id, SUPERLINK_NODE_ID)
         self.assertEqual(pulled_message.metadata.dst_node_id, SUPERLINK_NODE_ID)
         self.assertEqual(pulled_message.metadata.src_task_id, src_task_id)
@@ -590,6 +590,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             create_task_message(src_task_id, missing_task_id, run_id),
             create_task_message(src_task_id, other_run_task_id, run_id),
             create_task_message(src_task_id, finished_dst_task_id, run_id),
+            create_task_message(src_task_id, dst_task_id, 0),
             create_task_message(src_task_id, dst_task_id, other_run_id),
         ]
         finished_source_message = create_task_message(

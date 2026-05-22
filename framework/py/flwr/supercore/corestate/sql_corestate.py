@@ -445,13 +445,12 @@ class SqlCoreState(CoreState, SqlMixin):
                         ON dst.task_id = :dst_task_id
                         AND dst.run_id = src.run_id
                     WHERE src.task_id = :src_task_id
-                        AND (:run_id = 0 OR :run_id = src.run_id)
+                        AND :run_id = src.run_id
                         AND dst.finished_at IS NULL
                     RETURNING message_id
                     """,
                     message_dict,
                 )
-                return bool(inserted)
             except IntegrityError:
                 return False
             if not inserted:
@@ -576,7 +575,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 dst_task_id,
             )
             return
-        if message.metadata.run_id not in (0, src_run_id):
+        if message.metadata.run_id != src_run_id:
             log(
                 ERROR,
                 "Task Message %s run ID %d does not match task run ID %d.",

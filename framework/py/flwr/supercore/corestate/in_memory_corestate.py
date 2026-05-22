@@ -349,7 +349,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                     dst_task_id,
                 )
                 return False
-            if message.metadata.run_id not in (0, src_task.run_id):
+            if message.metadata.run_id != src_task.run_id:
                 log(
                     ERROR,
                     "Task Message %s run ID %d does not match task run ID %d.",
