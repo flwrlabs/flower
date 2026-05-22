@@ -241,18 +241,26 @@ def aggregate_qffl(
 
 
 def _compute_distances(weights: list[NDArrays]) -> NDArray:
-    """Compute distances between vectors.
+    """Compute pairwise squared distances between weight vectors.
+
+    Uses vectorized NumPy operations instead of element-wise Python loops
+    for significantly better performance with many clients.
+
+    Correctly handles both real and complex-valued weight vectors by using
+    conjugate transpose for the dot product, ensuring squared Euclidean
+    distances are always real-valued.
 
     Input: weights - list of weights vectors
     Output: distances - matrix distance_matrix of squared distances between the vectors
     """
     flat_w = np.array([np.concatenate(p, axis=None).ravel() for p in weights])
-    distance_matrix = np.zeros((len(weights), len(weights)))
-    for i, flat_w_i in enumerate(flat_w):
-        for j, flat_w_j in enumerate(flat_w):
-            delta = flat_w_i - flat_w_j
-            norm = np.linalg.norm(delta)
-            distance_matrix[i, j] = norm**2
+    # Vectorized pairwise squared distance: ||a - b||^2 = ||a||^2 + ||b||^2 - 2*Re(a·conj(b))
+    # Using conjugate handles both real arrays (where conj is a no-op) and complex arrays.
+    sq_norms = np.real(np.sum(flat_w * np.conj(flat_w), axis=1))
+    dot_products = np.real(flat_w @ np.conj(flat_w).T)
+    distance_matrix = sq_norms[:, np.newaxis] + sq_norms[np.newaxis, :] - 2 * dot_products
+    # Ensure non-negative (numerical precision can cause tiny negatives on diagonal)
+    np.maximum(distance_matrix, 0, out=distance_matrix)
     return distance_matrix
 
 
