@@ -263,8 +263,8 @@ class CoreState(ABC):
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
-        order_by: Literal["created_at"] | None = None,
         limit: int | None = None,
+        order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
         """Retrieve undelivered task-addressed Messages.
 
@@ -275,11 +275,11 @@ class CoreState(ABC):
         ----------
         dst_task_ids : Optional[Sequence[int]] (default: None)
             Sequence of destination task IDs to filter by.
-        order_by : Optional[Literal["created_at"]] (default: None)
-            If set to "created_at", matching messages are returned in ascending
-            creation-time order, using message ID as a tie-breaker.
         limit : Optional[int] (default: None)
             Maximum number of messages to return. If `None`, no limit is applied.
+        order_by : Optional[Literal["created_at"]] (default: None)
+            If set to "created_at", matching messages are returned in ascending
+            creation-time order.
 
         Returns
         -------

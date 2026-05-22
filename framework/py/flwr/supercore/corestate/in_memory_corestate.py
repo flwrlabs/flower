@@ -333,46 +333,45 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         if validate_task_message(message) or src_task_id is None or dst_task_id is None:
             return False
 
-        with self.lock_task_store:
+        with self.lock_task_store, self.lock_task_message_store:
             self._cleanup_expired_task_tokens_locked()
-            with self.lock_task_message_store:
-                self._cleanup_invalid_task_messages_locked(now().timestamp())
-                src_task = self.task_store.get(src_task_id)
-                dst_task = self.task_store.get(dst_task_id)
-                if src_task is None or dst_task is None:
-                    return False
-                if src_task.run_id != dst_task.run_id:
-                    log(
-                        ERROR,
-                        "Source task %d and destination task %d belong to "
-                        "different runs.",
-                        src_task_id,
-                        dst_task_id,
-                    )
-                    return False
-                if message.metadata.run_id not in (0, src_task.run_id):
-                    log(
-                        ERROR,
-                        "Task Message %s run ID %d does not match task run ID %d.",
-                        message_id,
-                        message.metadata.run_id,
-                        src_task.run_id,
-                    )
-                    return False
-                if dst_task.status.status == Status.FINISHED:
-                    return False
+            self._cleanup_invalid_task_messages_locked(now().timestamp())
+            src_task = self.task_store.get(src_task_id)
+            dst_task = self.task_store.get(dst_task_id)
+            if src_task is None or dst_task is None:
+                return False
+            if src_task.run_id != dst_task.run_id:
+                log(
+                    ERROR,
+                    "Source task %d and destination task %d belong to "
+                    "different runs.",
+                    src_task_id,
+                    dst_task_id,
+                )
+                return False
+            if message.metadata.run_id not in (0, src_task.run_id):
+                log(
+                    ERROR,
+                    "Task Message %s run ID %d does not match task run ID %d.",
+                    message_id,
+                    message.metadata.run_id,
+                    src_task.run_id,
+                )
+                return False
+            if dst_task.status.status == Status.FINISHED:
+                return False
 
-                if message_id in self.task_message_store:
-                    return False
-                self.task_message_store[message_id] = message
-                return True
+            if message_id in self.task_message_store:
+                return False
+            self.task_message_store[message_id] = message
+            return True
 
     def get_task_message(
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
-        order_by: Literal["created_at"] | None = None,
         limit: int | None = None,
+        order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
         """Retrieve undelivered task-addressed Messages."""
         if order_by not in (None, "created_at"):
@@ -384,35 +383,30 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         if dst_task_ids is not None and not dst_task_ids:
             return []
 
-        with self.lock_task_store:
+        with self.lock_task_store, self.lock_task_message_store:
             self._cleanup_expired_task_tokens_locked()
-            with self.lock_task_message_store:
-                current = now().timestamp()
-                self._cleanup_invalid_task_messages_locked(current)
-                dst_task_id_set = (
-                    set(dst_task_ids) if dst_task_ids is not None else None
+            current = now().timestamp()
+            self._cleanup_invalid_task_messages_locked(current)
+            dst_task_id_set = set(dst_task_ids) if dst_task_ids is not None else None
+            candidate_ids = [
+                message_id
+                for message_id, message in self.task_message_store.items()
+                if dst_task_id_set is None
+                or message.metadata.dst_task_id in dst_task_id_set
+            ]
+            if order_by == "created_at":
+                candidate_ids.sort(
+                    key=lambda msg_id: self.task_message_store[
+                        msg_id
+                    ].metadata.created_at
                 )
-                candidate_ids = [
-                    message_id
-                    for message_id, message in self.task_message_store.items()
-                    if dst_task_id_set is None
-                    or message.metadata.dst_task_id in dst_task_id_set
-                ]
-                if order_by == "created_at":
-                    candidate_ids.sort(
-                        key=lambda msg_id: self.task_message_store[
-                            msg_id
-                        ].metadata.created_at
-                    )
 
-                selected_ids = (
-                    candidate_ids[:limit] if limit is not None else candidate_ids
-                )
-                selected_messages = []
-                for message_id in selected_ids:
-                    message = self.task_message_store[message_id]
-                    del self.task_message_store[message_id]
-                    selected_messages.append(message)
+            selected_ids = candidate_ids[:limit] if limit is not None else candidate_ids
+            selected_messages = []
+            for message_id in selected_ids:
+                message = self.task_message_store[message_id]
+                del self.task_message_store[message_id]
+                selected_messages.append(message)
 
         return selected_messages
 
@@ -451,18 +445,16 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
     def _cleanup_invalid_task_messages_locked(self, current: float) -> None:
         """Remove expired Messages and Messages for invalid destination tasks."""
         for message_id, message in list(self.task_message_store.items()):
-            if not self._is_task_message_valid_locked(message, current):
+            dst_task_id = message.metadata.dst_task_id
+            dst_task = (
+                self.task_store.get(dst_task_id) if dst_task_id is not None else None
+            )
+            if (
+                dst_task is None
+                or dst_task.status.status == Status.FINISHED
+                or message.metadata.created_at + message.metadata.ttl <= current
+            ):
                 del self.task_message_store[message_id]
-
-    def _is_task_message_valid_locked(self, message: Message, current: float) -> bool:
-        """Return whether a stored task-addressed Message is still deliverable."""
-        dst_task_id = message.metadata.dst_task_id
-        if dst_task_id is None:
-            return False
-        dst_task = self.task_store.get(dst_task_id)
-        if dst_task is None or dst_task.status.status == Status.FINISHED:
-            return False
-        return message.metadata.created_at + message.metadata.ttl > current
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
         """Handle cleanup of expired task tokens.

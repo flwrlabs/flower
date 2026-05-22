@@ -464,8 +464,8 @@ class SqlCoreState(CoreState, SqlMixin):
         self,
         *,
         dst_task_ids: Sequence[int] | None = None,
-        order_by: Literal["created_at"] | None = None,
         limit: int | None = None,
+        order_by: Literal["created_at"] | None = None,
     ) -> Sequence[Message]:
         """Retrieve undelivered task-addressed Messages."""
         if order_by not in (None, "created_at"):
