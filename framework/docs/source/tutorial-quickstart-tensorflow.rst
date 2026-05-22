@@ -116,7 +116,6 @@ With default arguments you will see streamed output like this:
     INFO :      Final results:
     INFO :          ServerApp-side Evaluate Metrics:
     INFO :          {}
-    Saving final model to disk as final_model.keras...
 
 You can also override the parameters defined in the ``[tool.flwr.app.config]`` section
 in ``pyproject.toml`` like this:
@@ -337,12 +336,13 @@ invoking its |strategy_start_link|_ method. To it we pass:
             num_rounds=num_rounds,
         )
 
-        # Save the final model
-        ndarrays = result.arrays.to_numpy_ndarrays()
-        final_model_name = "final_model.keras"
-        print(f"Saving final model to disk as {final_model_name}...")
-        model.set_weights(ndarrays)
-        model.save(final_model_name)
+        if context.run_config["save-model"]:
+            # Save the final model
+            ndarrays = result.arrays.to_numpy_ndarrays()
+            final_model_name = "final_model.keras"
+            print(f"Saving final model to disk as {final_model_name}...")
+            model.set_weights(ndarrays)
+            model.save(final_model_name)
 
 Note the ``start`` method of the strategy returns a result object. This object contains
 all the relevant information about the FL process, including the final model weights as
