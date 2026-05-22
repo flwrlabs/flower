@@ -343,8 +343,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             if src_task.run_id != dst_task.run_id:
                 log(
                     ERROR,
-                    "Source task %d and destination task %d belong to "
-                    "different runs.",
+                    "Cannot store message: source task %d and destination task %d "
+                    "belong to different runs.",
                     src_task_id,
                     dst_task_id,
                 )
