@@ -343,8 +343,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             if src_task.run_id != dst_task.run_id:
                 log(
                     ERROR,
-                    "Source task %d and destination task %d belong to "
-                    "different runs.",
+                    "Cannot store message: source task %d and destination task %d "
+                    "belong to different runs.",
                     src_task_id,
                     dst_task_id,
                 )
@@ -352,7 +352,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             if message.metadata.run_id != src_task.run_id:
                 log(
                     ERROR,
-                    "Task Message %s run ID %d does not match task run ID %d.",
+                    "Cannot store message for task %s: message run ID %d does not match task run ID %d.",
                     message_id,
                     message.metadata.run_id,
                     src_task.run_id,
@@ -387,6 +387,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             self._cleanup_expired_task_tokens_locked()
             current = now().timestamp()
             self._cleanup_invalid_task_messages_locked(current)
+
+            # Filter by dst_task_id
             dst_task_id_set = set(dst_task_ids) if dst_task_ids is not None else None
             candidate_ids = [
                 message_id
@@ -394,6 +396,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 if dst_task_id_set is None
                 or message.metadata.dst_task_id in dst_task_id_set
             ]
+
+            # Apply requested sort order
             if order_by == "created_at":
                 candidate_ids.sort(
                     key=lambda msg_id: self.task_message_store[
