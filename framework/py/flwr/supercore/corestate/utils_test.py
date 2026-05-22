@@ -25,12 +25,10 @@ from .utils import generate_rand_int_from_bytes, validate_task_message
 
 
 def create_task_message(  # pylint: disable=too-many-arguments
-    *,
-    run_id: int = 1,
-    src_node_id: int = SUPERLINK_NODE_ID,
-    dst_node_id: int = SUPERLINK_NODE_ID,
     src_task_id: int | None = 1,
     dst_task_id: int | None = 2,
+    run_id: int = 1,
+    *,
     reply_to_message_id: str = "",
     created_at: float | None = None,
     ttl: float = 60.0,
@@ -42,8 +40,8 @@ def create_task_message(  # pylint: disable=too-many-arguments
     metadata = Metadata(
         run_id=run_id,
         message_id="",
-        src_node_id=src_node_id,
-        dst_node_id=dst_node_id,
+        src_node_id=SUPERLINK_NODE_ID,
+        dst_node_id=SUPERLINK_NODE_ID,
         reply_to_message_id=reply_to_message_id,
         group_id="",
         created_at=created_at if created_at is not None else now().timestamp(),
@@ -96,17 +94,21 @@ class UtilsTest(unittest.TestCase):
 
         _assert_has_error(errors, "metadata.message_id")
 
-    def test_validate_task_message_accepts_unset_run_id(self) -> None:
-        """Test that run_id is not required."""
+    def test_validate_task_message_rejects_unset_run_id(self) -> None:
+        """Test that run_id must be set."""
         message = create_task_message(run_id=0)
 
-        self.assertEqual(validate_task_message(message), [])
+        errors = validate_task_message(message)
 
-    def test_validate_task_message_accepts_missing_src_task_id(self) -> None:
-        """Test that source task ID is not required."""
+        _assert_has_error(errors, "metadata.run_id")
+
+    def test_validate_task_message_rejects_missing_src_task_id(self) -> None:
+        """Test that source task ID must be set."""
         message = create_task_message(src_task_id=None)
 
-        self.assertEqual(validate_task_message(message), [])
+        errors = validate_task_message(message)
+
+        _assert_has_error(errors, "metadata.src_task_id")
 
     def test_validate_task_message_rejects_missing_dst_task_id(self) -> None:
         """Test that destination task ID must be set."""
@@ -123,15 +125,6 @@ class UtilsTest(unittest.TestCase):
         errors = validate_task_message(message)
 
         _assert_has_error(errors, "must be different")
-
-    def test_validate_task_message_rejects_non_superlink_node_ids(self) -> None:
-        """Test that task messages currently route through SuperLink."""
-        message = create_task_message(src_node_id=123, dst_node_id=456)
-
-        errors = validate_task_message(message)
-
-        _assert_has_error(errors, "metadata.src_node_id")
-        _assert_has_error(errors, "metadata.dst_node_id")
 
     def test_validate_task_message_rejects_invalid_created_at(self) -> None:
         """Test that created_at must be a plausible timestamp."""

@@ -66,6 +66,12 @@ def validate_task_message(message: Message) -> list[str]:  # pylint: disable=R09
     if metadata.message_id == "":
         validation_errors.append("empty `metadata.message_id`")
 
+    if metadata.run_id == 0:
+        validation_errors.append("`metadata.run_id` is not set.")
+
+    if metadata.src_task_id is None:
+        validation_errors.append("`metadata.src_task_id` is not set.")
+
     if metadata.dst_task_id is None:
         validation_errors.append("`metadata.dst_task_id` is not set.")
 
