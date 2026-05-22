@@ -443,9 +443,9 @@ class SqlCoreState(CoreState, SqlMixin):
                     FROM task AS src
                     JOIN task AS dst
                         ON dst.task_id = :dst_task_id
-                        AND dst.run_id = src.run_id
                     WHERE src.task_id = :src_task_id
-                        AND :run_id = src.run_id
+                        AND src.run_id = :run_id
+                        AND dst.run_id = :run_id
                         AND dst.finished_at IS NULL
                     RETURNING message_id
                     """,
