@@ -85,7 +85,7 @@ def try_obtain_flwr_app_token(args: argparse.Namespace) -> str:
     if token is not None:
         token = token.strip()
         if not token:
-            sys.exit("Path argument `--token` does not contain a token.")
+            sys.exit("Argument `--token` does not contain a token.")
         return token
 
     token_file = cast(str | None, getattr(args, "token_file", None))
