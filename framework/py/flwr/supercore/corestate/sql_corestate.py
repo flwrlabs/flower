@@ -20,7 +20,6 @@ import json
 import secrets
 from collections.abc import Sequence
 from datetime import timedelta
-from logging import ERROR
 from typing import Any, Literal
 
 from sqlalchemy import MetaData
@@ -37,7 +36,6 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.logger import log
 from flwr.common.message import make_message
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
@@ -419,9 +417,7 @@ class SqlCoreState(CoreState, SqlMixin):
 
     def store_task_message(self, message: Message) -> bool:
         """Store one task-addressed Message."""
-        src_task_id = message.metadata.src_task_id
-        dst_task_id = message.metadata.dst_task_id
-        if validate_task_message(message) or src_task_id is None or dst_task_id is None:
+        if validate_task_message(message):
             return False
 
         with self.session():
@@ -453,11 +449,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 )
             except IntegrityError:
                 return False
-            if not inserted:
-                self._log_task_message_run_mismatch(message)
-                return False
-
-        return True
+            return bool(inserted)
 
     def get_task_message(
         self,
@@ -482,6 +474,7 @@ class SqlCoreState(CoreState, SqlMixin):
             rows = self._claim_task_message_rows(dst_task_ids, order_by, limit)
 
         if order_by == "created_at":
+            # DELETE ... RETURNING does not guarantee the CTE selection order.
             rows.sort(key=lambda row: row["created_at"])
         return [_task_message_from_row(row) for row in rows]
 
@@ -542,47 +535,6 @@ class SqlCoreState(CoreState, SqlMixin):
             RETURNING *
         """
         return self.query(query, params)
-
-    def _log_task_message_run_mismatch(self, message: Message) -> None:
-        """Log task-message run mismatch reasons, if present."""
-        src_task_id = message.metadata.src_task_id
-        dst_task_id = message.metadata.dst_task_id
-        if src_task_id is None or dst_task_id is None:
-            return
-
-        rows = self.query(
-            """
-            SELECT src.run_id AS src_run_id, dst.run_id AS dst_run_id
-            FROM task AS src
-            JOIN task AS dst ON dst.task_id = :dst_task_id
-            WHERE src.task_id = :src_task_id
-            """,
-            {
-                "src_task_id": uint64_to_int64(src_task_id),
-                "dst_task_id": uint64_to_int64(dst_task_id),
-            },
-        )
-        if not rows:
-            return
-
-        src_run_id = int64_to_uint64(rows[0]["src_run_id"])
-        dst_run_id = int64_to_uint64(rows[0]["dst_run_id"])
-        if src_run_id != dst_run_id:
-            log(
-                ERROR,
-                "Source task %d and destination task %d belong to different runs.",
-                src_task_id,
-                dst_task_id,
-            )
-            return
-        if message.metadata.run_id != src_run_id:
-            log(
-                ERROR,
-                "Task Message %s run ID %d does not match task run ID %d.",
-                message.metadata.message_id,
-                message.metadata.run_id,
-                src_run_id,
-            )
 
     def _cleanup_expired_task_tokens(self) -> None:
         """Remove expired task heartbeat records.

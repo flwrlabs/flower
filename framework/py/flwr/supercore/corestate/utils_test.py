@@ -102,11 +102,13 @@ class UtilsTest(unittest.TestCase):
 
         _assert_has_error(errors, "metadata.run_id")
 
-    def test_validate_task_message_accepts_missing_src_task_id(self) -> None:
-        """Test that source task ID is not required."""
+    def test_validate_task_message_rejects_missing_src_task_id(self) -> None:
+        """Test that source task ID must be set."""
         message = create_task_message(src_task_id=None)
 
-        self.assertEqual(validate_task_message(message), [])
+        errors = validate_task_message(message)
+
+        _assert_has_error(errors, "metadata.src_task_id")
 
     def test_validate_task_message_rejects_missing_dst_task_id(self) -> None:
         """Test that destination task ID must be set."""

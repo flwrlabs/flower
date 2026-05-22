@@ -328,10 +328,12 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
     def store_task_message(self, message: Message) -> bool:
         """Store one task-addressed Message."""
         message_id = message.metadata.message_id
+        if validate_task_message(message):
+            return False
         src_task_id = message.metadata.src_task_id
         dst_task_id = message.metadata.dst_task_id
-        if validate_task_message(message) or src_task_id is None or dst_task_id is None:
-            return False
+        assert src_task_id is not None
+        assert dst_task_id is not None
 
         with self.lock_task_store, self.lock_task_message_store:
             self._cleanup_expired_task_tokens_locked()
