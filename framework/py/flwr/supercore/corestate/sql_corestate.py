@@ -575,12 +575,6 @@ class SqlCoreState(CoreState, SqlMixin):
             """
             DELETE FROM task_message
             WHERE (created_at + ttl) <= :current
-                OR NOT EXISTS (
-                    SELECT 1
-                    FROM task
-                    WHERE task.task_id = task_message.dst_task_id
-                        AND task.finished_at IS NULL
-                )
             """,
             {"current": now().timestamp()},
         )

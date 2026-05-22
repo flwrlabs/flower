@@ -528,17 +528,23 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertTrue(state.store_task_message(message))
         self.assertFalse(state.store_task_message(expired))
         self.assertTrue(state.store_task_message(other_destination))
-        self.assertTrue(state.finish_task(other_dst_task_id, SubStatus.FAILED, "done"))
         pulled = state.get_task_message(dst_task_ids=[dst_task_id])
         pulled_again = state.get_task_message(dst_task_ids=[dst_task_id])
         pulled_other = state.get_task_message(dst_task_ids=[other_dst_task_id])
+        pulled_other_again = state.get_task_message(dst_task_ids=[other_dst_task_id])
 
         self.assertEqual(len(pulled), 1)
         self.assertEqual(pulled_again, [])
-        self.assertEqual(pulled_other, [])
+        self.assertEqual(len(pulled_other), 1)
+        self.assertEqual(pulled_other_again, [])
         pulled_message = pulled[0]
+        pulled_other_message = pulled_other[0]
         self.assertEqual(
             pulled_message.metadata.message_id, message.metadata.message_id
+        )
+        self.assertEqual(
+            pulled_other_message.metadata.message_id,
+            other_destination.metadata.message_id,
         )
         self.assertEqual(pulled_message.metadata.run_id, run_id)
         self.assertEqual(pulled_message.metadata.src_node_id, SUPERLINK_NODE_ID)
