@@ -22,6 +22,7 @@ import math
 from logging import INFO, WARNING
 
 import numpy as np
+from numpy.random import Generator
 
 from flwr.common import (
     EvaluateIns,
@@ -51,6 +52,27 @@ from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy.strategy import Strategy
 
 
+def _create_dp_rng(seed: int | None = None) -> Generator:
+    """Create a NumPy random Generator for DP noise generation.
+
+    Centralizes RNG construction for all DP adaptive clipping strategies to
+    ensure consistent seeding behavior and avoid duplication.
+
+    Parameters
+    ----------
+    seed : int or None, optional
+        If provided, creates a deterministic RNG for reproducible experiments.
+        If None, uses OS entropy for non-deterministic (but isolated) randomness.
+
+    Returns
+    -------
+    numpy.random.Generator
+        An isolated RNG instance that does not share state with the global
+        np.random module.
+    """
+    return np.random.default_rng(seed)
+
+
 class DifferentialPrivacyServerSideAdaptiveClipping(Strategy):
     """Strategy wrapper for central DP with server-side adaptive clipping.
 
@@ -73,6 +95,11 @@ class DifferentialPrivacyServerSideAdaptiveClipping(Strategy):
     clipped_count_stddev : float
         The standard deviation of the noise added to the count of updates below the estimate.
         Andrew et al. recommends to set to `expected_num_records/20`
+    seed : int or None, optional
+        Seed for the random number generator used in noise generation. If provided,
+        the strategy produces deterministic results for reproducible experiments.
+        If None (default), OS entropy is used. Note: this RNG is isolated from the
+        global np.random state, so np.random.seed() will not affect this strategy.
 
     Examples
     --------
@@ -84,6 +111,12 @@ class DifferentialPrivacyServerSideAdaptiveClipping(Strategy):
 
         dp_strategy = DifferentialPrivacyServerSideAdaptiveClipping(
             strategy, cfg.noise_multiplier, cfg.num_sampled_clients, ...
+        )
+
+    For reproducible experiments, pass a seed::
+
+        dp_strategy = DifferentialPrivacyServerSideAdaptiveClipping(
+            strategy, cfg.noise_multiplier, cfg.num_sampled_clients, seed=42
         )
     """
 
@@ -97,6 +130,7 @@ class DifferentialPrivacyServerSideAdaptiveClipping(Strategy):
         target_clipped_quantile: float = 0.5,
         clip_norm_lr: float = 0.2,
         clipped_count_stddev: float | None = None,
+        seed: int | None = None,
     ) -> None:
         super().__init__()
 
@@ -141,6 +175,7 @@ class DifferentialPrivacyServerSideAdaptiveClipping(Strategy):
         )
 
         self.current_round_params: NDArrays = []
+        self._rng = _create_dp_rng(seed)
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -209,7 +244,7 @@ class DifferentialPrivacyServerSideAdaptiveClipping(Strategy):
 
         # Noising the count
         noised_norm_bit_set_count = float(
-            np.random.normal(norm_bit_set_count, self.clipped_count_stddev)
+            self._rng.normal(norm_bit_set_count, self.clipped_count_stddev)
         )
         noised_norm_bit_set_fraction = noised_norm_bit_set_count / len(results)
         # Geometric update
@@ -285,6 +320,11 @@ class DifferentialPrivacyClientSideAdaptiveClipping(Strategy):
     clipped_count_stddev : float
         The stddev of the noise added to the count of updates currently below the estimate.
         Andrew et al. recommends to set to `expected_num_records/20`
+    seed : int or None, optional
+        Seed for the random number generator used in noise generation. If provided,
+        the strategy produces deterministic results for reproducible experiments.
+        If None (default), OS entropy is used. Note: this RNG is isolated from the
+        global np.random state, so np.random.seed() will not affect this strategy.
 
     Examples
     --------
@@ -296,6 +336,12 @@ class DifferentialPrivacyClientSideAdaptiveClipping(Strategy):
 
         dp_strategy = DifferentialPrivacyClientSideAdaptiveClipping(
             strategy, cfg.noise_multiplier, cfg.num_sampled_clients
+        )
+
+    For reproducible experiments, pass a seed::
+
+        dp_strategy = DifferentialPrivacyClientSideAdaptiveClipping(
+            strategy, cfg.noise_multiplier, cfg.num_sampled_clients, seed=42
         )
 
     On the client, add the `adaptiveclipping_mod` to the client-side mods::
@@ -315,6 +361,7 @@ class DifferentialPrivacyClientSideAdaptiveClipping(Strategy):
         target_clipped_quantile: float = 0.5,
         clip_norm_lr: float = 0.2,
         clipped_count_stddev: float | None = None,
+        seed: int | None = None,
     ) -> None:
         super().__init__()
 
@@ -356,6 +403,7 @@ class DifferentialPrivacyClientSideAdaptiveClipping(Strategy):
             num_sampled_clients,
             clipped_count_stddev,
         )
+        self._rng = _create_dp_rng(seed)
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -440,7 +488,7 @@ class DifferentialPrivacyClientSideAdaptiveClipping(Strategy):
                 norm_bit_set_count += 1
         # Add noise to the count
         noised_norm_bit_set_count = float(
-            np.random.normal(norm_bit_set_count, self.clipped_count_stddev)
+            self._rng.normal(norm_bit_set_count, self.clipped_count_stddev)
         )
 
         noised_norm_bit_set_fraction = noised_norm_bit_set_count / len(results)
