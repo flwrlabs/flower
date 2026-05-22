@@ -623,6 +623,39 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             [other_destination.metadata.message_id],
         )
 
+    def test_get_task_message_cleans_expired_messages(self) -> None:
+        """Getting task Messages should remove expired undelivered Messages."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert src_task_id is not None and dst_task_id is not None
+
+        current = now()
+        expired = _create_task_message(
+            src_task_id,
+            dst_task_id,
+            run_id,
+            created_at=current.timestamp(),
+            ttl=60.0,
+        )
+        replacement = _create_task_message(src_task_id, dst_task_id, run_id)
+        replacement.metadata.__dict__["_message_id"] = expired.metadata.message_id
+        self.assertTrue(state.store_task_message(expired))
+
+        future = current + timedelta(seconds=61)
+        with patch("flwr.supercore.corestate.in_memory_corestate.now") as memory_now:
+            with patch("flwr.supercore.corestate.sql_corestate.now") as sql_now:
+                memory_now.return_value = future
+                sql_now.return_value = future
+                self.assertEqual(state.get_task_message(dst_task_ids=[dst_task_id]), [])
+
+        self.assertTrue(state.store_task_message(replacement))
+        pulled = state.get_task_message(dst_task_ids=[dst_task_id])
+
+        self.assertEqual(len(pulled), 1)
+        self.assertEqual(pulled[0].metadata.message_id, expired.metadata.message_id)
+
     def test_get_task_message_limit(self) -> None:
         """Getting task Messages should respect the provided limit."""
         state = self.state_factory()

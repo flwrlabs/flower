@@ -395,6 +395,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                     if message.metadata.dst_task_id not in dst_task_id_set:
                         continue
                 if message.metadata.created_at + message.metadata.ttl <= current:
+                    del self.task_message_store[message_id]
                     continue
 
                 del self.task_message_store[message_id]
@@ -411,6 +412,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         Expired tasks are marked as finished with a failed status, and their
         tokens are removed.
         """
+        self._cleanup_expired_task_messages()
         current = now()
         expired_tasks: list[Task] = []
         for task_id, record in list(self.task_token_store.items()):
@@ -435,6 +437,14 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
 
         if expired_tasks:
             self._on_task_tokens_expired(expired_tasks)
+
+    def _cleanup_expired_task_messages(self) -> None:
+        """Remove expired task-addressed Messages."""
+        current = now().timestamp()
+        with self.lock_task_message_store:
+            for message_id, message in list(self.task_message_store.items()):
+                if message.metadata.created_at + message.metadata.ttl <= current:
+                    del self.task_message_store[message_id]
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
         """Handle cleanup of expired task tokens.

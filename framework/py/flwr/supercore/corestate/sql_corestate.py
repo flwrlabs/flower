@@ -554,6 +554,7 @@ class SqlCoreState(CoreState, SqlMixin):
         Expired tasks are marked as finished with a failed status, and their tokens are
         removed.
         """
+        self._cleanup_expired_task_messages()
         expired_at = now()
         # Expired task claims are terminal failures and lose their token.
         rows = self.query(
@@ -574,6 +575,16 @@ class SqlCoreState(CoreState, SqlMixin):
         )
         if rows:
             self._on_task_tokens_expired([task_from_row(row) for row in rows])
+
+    def _cleanup_expired_task_messages(self) -> None:
+        """Remove expired task-addressed Messages."""
+        self.query(
+            """
+            DELETE FROM task_message
+            WHERE (created_at + ttl) <= :current
+            """,
+            {"current": now().timestamp()},
+        )
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
         """Handle cleanup of expired task tokens.
