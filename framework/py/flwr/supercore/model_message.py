@@ -23,6 +23,7 @@ from typing import cast
 
 from flwr.app.message_type import MessageType
 from flwr.app.metadata import Metadata
+from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.message import Message
 from flwr.common.record import ConfigRecord, RecordDict
 from flwr.supercore.date import now
@@ -173,8 +174,8 @@ def _build_metadata_and_content(
     metadata = Metadata(
         run_id=0,
         message_id="",
-        src_node_id=0,
-        dst_node_id=0,
+        src_node_id=SUPERLINK_NODE_ID,
+        dst_node_id=SUPERLINK_NODE_ID,
         reply_to_message_id=reply_to_message_id,
         group_id="",
         created_at=now().timestamp(),
