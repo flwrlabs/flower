@@ -502,21 +502,24 @@ class SqlCoreState(CoreState, SqlMixin):
 
         where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
         order_clause = f"ORDER BY {order_by}" if order_by else ""
+        limit_clause = "LIMIT :limit" if limit is not None else ""
 
         if limit is not None:
-            # Materialize limited candidates before deleting. Some backends can
-            # otherwise re-evaluate same-table subqueries while DELETE scans rows.
+            params["limit"] = limit
+
+        if order_by is not None or limit is not None:
+            # Materialize candidates before deleting. Some backends can otherwise
+            # re-evaluate same-table subqueries while DELETE scans rows.
             # `self.select_lock_sql` is an optional clause for backends that support
             # row-locking while selecting candidates. Keep it before LIMIT so locked
             # rows are skipped before limiting the result set.
-            params["limit"] = limit
             query = f"""
                 WITH selected AS (
                     SELECT message_id
                     FROM task_message
                     {where_clause} {order_clause}
                     {self.select_lock_sql}
-                    LIMIT :limit
+                    {limit_clause}
                 )
                 DELETE FROM task_message
                 WHERE message_id IN (SELECT message_id FROM selected)
@@ -525,11 +528,19 @@ class SqlCoreState(CoreState, SqlMixin):
         else:
             query = f"""
                 DELETE FROM task_message
-                {where_clause} {order_clause}
+                {where_clause}
                 RETURNING *
             """
 
-        return self.query(query, params)
+        rows = self.query(query, params)
+
+        # Sort claimed rows in-memory if requested
+        # `ORDER BY` in the CTE determines which rows are claimed, but SQL does not
+        # guarantee that `DELETE ... RETURNING` returns them in that order.
+        if order_by is not None:
+            rows.sort(key=lambda row: row[order_by])
+
+        return rows
 
     def _cleanup_expired_task_tokens(self) -> None:
         """Remove expired task heartbeat records.
