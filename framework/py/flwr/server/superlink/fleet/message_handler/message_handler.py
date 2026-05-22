@@ -64,7 +64,6 @@ from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.utils import check_abort
 from flwr.supercore.inflatable.inflatable_object import (
     UnexpectedObjectContentError,
-    iterate_object_tree,
 )
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStore
 
