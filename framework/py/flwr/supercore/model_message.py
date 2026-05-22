@@ -52,7 +52,6 @@ class ModelRequest(Message):
         max_output_tokens: int | None = None,
         metadata: JSONObject | None = None,
         text: JSONObject | None = None,
-        reply_to_message_id: str = "",
         ttl: float = _DEFAULT_TASK_MESSAGE_TTL,
     ) -> None:
         payload: JSONObject = {
@@ -73,7 +72,7 @@ class ModelRequest(Message):
         message_metadata, content = _build_metadata_and_content(
             dst_task_id,
             payload,
-            reply_to_message_id,
+            "",
             ttl,
         )
         super().__init__(  # type: ignore[call-overload]

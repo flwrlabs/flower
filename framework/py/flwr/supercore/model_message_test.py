@@ -74,6 +74,7 @@ def test_model_messages_create_payloads() -> None:
     assert request.metadata.dst_node_id == SUPERLINK_NODE_ID
     assert request.metadata.src_task_id is None
     assert request.metadata.dst_task_id == 123
+    assert request.metadata.reply_to_message_id == ""
     assert request.metadata.ttl == 10.0
     assert request.payload == {
         "model": "gpt-5",
