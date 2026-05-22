@@ -396,6 +396,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 if dst_task_id_set is None
                 or message.metadata.dst_task_id in dst_task_id_set
             ]
+
+            # Apply requested sort order
             if order_by == "created_at":
                 candidate_ids.sort(
                     key=lambda msg_id: self.task_message_store[
