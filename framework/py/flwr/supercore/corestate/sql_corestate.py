@@ -71,6 +71,11 @@ class SqlCoreState(CoreState, SqlMixin):
         self._object_store = object_store
 
     @property
+    def select_lock_sql(self) -> str:
+        """Return the SQL clause for row-locking selected candidates."""
+        return ""
+
+    @property
     def object_store(self) -> ObjectStore:
         """Return the ObjectStore instance used by this CoreState."""
         return self._object_store
@@ -473,9 +478,6 @@ class SqlCoreState(CoreState, SqlMixin):
             self._cleanup_invalid_task_messages()
             rows = self._claim_task_message_rows(dst_task_ids, order_by, limit)
 
-        if order_by == "created_at":
-            # DELETE ... RETURNING does not guarantee the CTE selection order.
-            rows.sort(key=lambda row: row["created_at"])
         return [_task_message_from_row(row) for row in rows]
 
     def _claim_task_message_rows(
@@ -519,6 +521,7 @@ class SqlCoreState(CoreState, SqlMixin):
                     {where_clause}
                     {"ORDER BY created_at" if order_by == "created_at" else ""}
                     LIMIT :limit
+                    {self.select_lock_sql}
                 )
             """
             where_clause = """

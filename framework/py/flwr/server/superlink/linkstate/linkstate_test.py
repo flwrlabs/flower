@@ -1990,6 +1990,45 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
             state._claim_message_ins_rows(1, 3)  # pylint: disable=protected-access
         self.assertIn("FOR TEST LOCK", last_query)
 
+    def test_task_message_claim_can_append_select_lock_clause(self) -> None:
+        """Task Message claiming can append a row-locking clause before LIMIT."""
+        state = self.state_factory()
+        last_query = ""
+
+        # pylint: disable-next=unused-argument
+        def fake_query(query: str, data: Any = None) -> list[dict[str, Any]]:
+            nonlocal last_query
+            last_query = query
+            return []
+
+        state.query = fake_query  # type: ignore[method-assign]
+
+        state._claim_task_message_rows(  # pylint: disable=protected-access
+            None, "created_at", 3
+        )
+        self.assertNotIn("FOR TEST LOCK", last_query)
+
+        with patch.object(
+            type(state),
+            "select_lock_sql",
+            new_callable=PropertyMock,
+            return_value="FOR TEST LOCK",
+        ):
+            state._claim_task_message_rows(  # pylint: disable=protected-access
+                None, "created_at", 3
+            )
+
+        self.assertIn("ORDER BY created_at", last_query)
+        self.assertIn("FOR TEST LOCK", last_query)
+        self.assertLess(
+            last_query.index("ORDER BY created_at"),
+            last_query.index("LIMIT :limit"),
+        )
+        self.assertLess(
+            last_query.index("LIMIT :limit"),
+            last_query.index("FOR TEST LOCK"),
+        )
+
     def test_token_expiry_does_not_overwrite_finished_completed_run(self) -> None:
         """Ensure token cleanup doesn't mutate terminal COMPLETED status."""
         # Prepare
