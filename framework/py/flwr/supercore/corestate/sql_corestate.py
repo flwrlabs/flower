@@ -20,7 +20,7 @@ import json
 import secrets
 from collections.abc import Sequence
 from datetime import timedelta
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
@@ -646,14 +646,11 @@ def task_from_row(row: dict[str, Any]) -> Task:
 
 def _task_message_to_row(message: Message) -> dict[str, Any]:
     """Convert a task-addressed Message to database row values."""
-    src_task_id = message.metadata.src_task_id
-    dst_task_id = message.metadata.dst_task_id
-    assert src_task_id is not None and dst_task_id is not None
     return {
         "message_id": message.metadata.message_id,
         "run_id": uint64_to_int64(message.metadata.run_id),
-        "src_task_id": uint64_to_int64(src_task_id),
-        "dst_task_id": uint64_to_int64(dst_task_id),
+        "src_task_id": uint64_to_int64(cast(int, message.metadata.src_task_id)),
+        "dst_task_id": uint64_to_int64(cast(int, message.metadata.dst_task_id)),
         "reply_to_message_id": message.metadata.reply_to_message_id,
         "created_at": message.metadata.created_at,
         "ttl": message.metadata.ttl,
