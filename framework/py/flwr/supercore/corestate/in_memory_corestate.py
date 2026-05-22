@@ -447,7 +447,12 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
     def _cleanup_invalid_task_messages_locked(self, current: float) -> None:
         """Remove expired Messages and Messages for invalid destination tasks."""
         for message_id, message in list(self.task_message_store.items()):
-            dst_task = self.task_store.get(message.metadata.dst_task_id)
+            dst_task_id = message.metadata.dst_task_id
+            if dst_task_id is None:
+                del self.task_message_store[message_id]
+                continue
+
+            dst_task = self.task_store.get(dst_task_id)
             if (
                 dst_task is None
                 or dst_task.status.status == Status.FINISHED
