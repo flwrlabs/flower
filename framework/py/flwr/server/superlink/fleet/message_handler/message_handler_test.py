@@ -18,12 +18,15 @@
 from unittest.mock import MagicMock
 
 from flwr.common import Metadata, RecordDict, now
+from flwr.common.constant import Status
 from flwr.common.message import make_message
 from flwr.common.serde import message_to_proto
+from flwr.common.typing import RunStatus
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     PullMessagesRequest,
     PushMessagesRequest,
 )
+from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 
 from .message_handler import pull_messages, push_messages
@@ -119,3 +122,40 @@ def test_push_messages() -> None:
     state.store_message_res.assert_called_once()
     state.get_message_res.assert_not_called()
     state.store_traffic.assert_called_once()
+
+
+def test_push_messages_cleans_up_failed_message_objects() -> None:
+    """Test push_messages cleanup preregistered objects on message store failure."""
+    msg = make_message(
+        content=RecordDict(),
+        metadata=Metadata(
+            run_id=123,
+            message_id="",
+            group_id="",
+            src_node_id=0,
+            dst_node_id=0,
+            reply_to_message_id="",
+            created_at=now().timestamp(),
+            ttl=123,
+            message_type="query",
+        ),
+    )
+    object_tree = ObjectTree(object_id="object-id")
+    request = PushMessagesRequest(
+        messages_list=[message_to_proto(msg)],
+        message_object_trees=[object_tree],
+    )
+    state = MagicMock()
+    state.store_message_res.return_value = None
+    state.get_run_status.side_effect = [
+        {123: RunStatus(status=Status.RUNNING, sub_status="", details="")},
+        {123: RunStatus(status=Status.FINISHED, sub_status="", details="")},
+    ]
+    store = MagicMock()
+    store.preregister.return_value = ["object-id"]
+
+    response = push_messages(request=request, state=state, store=store)
+
+    store.delete.assert_called_once_with("object-id")
+    store.delete_objects_in_run.assert_not_called()
+    assert not response.objects_to_push
