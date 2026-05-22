@@ -325,7 +325,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             task.CopyFrom(self.task_store[task_id])
             return task
 
-    def store_task_message(self, message: Message) -> bool:
+    def store_task_message(  # pylint: disable=too-many-return-statements
+        self, message: Message
+    ) -> bool:
         """Store one task-addressed Message."""
         message_id = message.metadata.message_id
         if validate_task_message(message):
