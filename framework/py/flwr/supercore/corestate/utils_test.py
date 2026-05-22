@@ -24,16 +24,18 @@ from flwr.common.message import make_message
 from .utils import generate_rand_int_from_bytes, validate_task_message
 
 
-def _create_task_message(  # pylint: disable=too-many-arguments
+def create_task_message(  # pylint: disable=too-many-arguments
     *,
     run_id: int = 1,
     src_node_id: int = SUPERLINK_NODE_ID,
     dst_node_id: int = SUPERLINK_NODE_ID,
     src_task_id: int | None = 1,
     dst_task_id: int | None = 2,
+    reply_to_message_id: str = "",
     created_at: float | None = None,
     ttl: float = 60.0,
     message_type: str = "train",
+    content: RecordDict | None = None,
     has_error: bool = False,
 ) -> Message:
     """Create a task Message for testing."""
@@ -42,7 +44,7 @@ def _create_task_message(  # pylint: disable=too-many-arguments
         message_id="",
         src_node_id=src_node_id,
         dst_node_id=dst_node_id,
-        reply_to_message_id="",
+        reply_to_message_id=reply_to_message_id,
         group_id="",
         created_at=created_at if created_at is not None else now().timestamp(),
         ttl=ttl,
@@ -54,7 +56,10 @@ def _create_task_message(  # pylint: disable=too-many-arguments
     if has_error:
         msg = make_message(metadata=metadata, error=Error(0))
     else:
-        msg = make_message(metadata=metadata, content=RecordDict())
+        msg = make_message(
+            metadata=metadata,
+            content=content if content is not None else RecordDict(),
+        )
     msg.metadata.__dict__["_message_id"] = msg.object_id
     return msg
 
@@ -78,13 +83,13 @@ class UtilsTest(unittest.TestCase):
         """Test that a valid task message passes validation."""
         for has_error in [False, True]:
             with self.subTest(has_error=has_error):
-                message = _create_task_message(has_error=has_error)
+                message = create_task_message(has_error=has_error)
 
                 self.assertEqual(validate_task_message(message), [])
 
     def test_validate_task_message_rejects_missing_message_id(self) -> None:
         """Test that message_id must be set."""
-        message = _create_task_message()
+        message = create_task_message()
         message.metadata.__dict__["_message_id"] = ""
 
         errors = validate_task_message(message)
@@ -93,19 +98,19 @@ class UtilsTest(unittest.TestCase):
 
     def test_validate_task_message_accepts_unset_run_id(self) -> None:
         """Test that run_id is not required."""
-        message = _create_task_message(run_id=0)
+        message = create_task_message(run_id=0)
 
         self.assertEqual(validate_task_message(message), [])
 
     def test_validate_task_message_accepts_missing_src_task_id(self) -> None:
         """Test that source task ID is not required."""
-        message = _create_task_message(src_task_id=None)
+        message = create_task_message(src_task_id=None)
 
         self.assertEqual(validate_task_message(message), [])
 
     def test_validate_task_message_rejects_missing_dst_task_id(self) -> None:
         """Test that destination task ID must be set."""
-        message = _create_task_message(dst_task_id=None)
+        message = create_task_message(dst_task_id=None)
 
         errors = validate_task_message(message)
 
@@ -113,7 +118,7 @@ class UtilsTest(unittest.TestCase):
 
     def test_validate_task_message_rejects_same_task_ids(self) -> None:
         """Test that source and destination task IDs must differ."""
-        message = _create_task_message(src_task_id=1, dst_task_id=1)
+        message = create_task_message(src_task_id=1, dst_task_id=1)
 
         errors = validate_task_message(message)
 
@@ -121,7 +126,7 @@ class UtilsTest(unittest.TestCase):
 
     def test_validate_task_message_rejects_non_superlink_node_ids(self) -> None:
         """Test that task messages currently route through SuperLink."""
-        message = _create_task_message(src_node_id=123, dst_node_id=456)
+        message = create_task_message(src_node_id=123, dst_node_id=456)
 
         errors = validate_task_message(message)
 
@@ -130,7 +135,7 @@ class UtilsTest(unittest.TestCase):
 
     def test_validate_task_message_rejects_invalid_created_at(self) -> None:
         """Test that created_at must be a plausible timestamp."""
-        message = _create_task_message(created_at=0.0)
+        message = create_task_message(created_at=0.0)
 
         errors = validate_task_message(message)
 
@@ -138,7 +143,7 @@ class UtilsTest(unittest.TestCase):
 
     def test_validate_task_message_rejects_non_positive_ttl(self) -> None:
         """Test that ttl must be positive."""
-        message = _create_task_message(ttl=0.0)
+        message = create_task_message(ttl=0.0)
 
         errors = validate_task_message(message)
 
@@ -146,7 +151,7 @@ class UtilsTest(unittest.TestCase):
 
     def test_validate_task_message_rejects_expired_ttl(self) -> None:
         """Test that task messages must not be expired."""
-        message = _create_task_message(created_at=now().timestamp() - 10.0, ttl=1.0)
+        message = create_task_message(created_at=now().timestamp() - 10.0, ttl=1.0)
 
         errors = validate_task_message(message)
 
@@ -154,7 +159,7 @@ class UtilsTest(unittest.TestCase):
 
     def test_validate_task_message_rejects_missing_message_type(self) -> None:
         """Test that message_type must be set."""
-        message = _create_task_message()
+        message = create_task_message()
         message.metadata.__dict__["_message_type"] = ""
 
         errors = validate_task_message(message)
@@ -163,7 +168,7 @@ class UtilsTest(unittest.TestCase):
 
     def test_validate_task_message_rejects_missing_content_and_error(self) -> None:
         """Test that either content or error must be set."""
-        message = _create_task_message()
+        message = create_task_message()
         message.__dict__["_content"] = None
 
         errors = validate_task_message(message)
@@ -172,7 +177,7 @@ class UtilsTest(unittest.TestCase):
 
     def test_validate_task_message_rejects_content_and_error(self) -> None:
         """Test that content and error must not both be set."""
-        message = _create_task_message()
+        message = create_task_message()
         message.__dict__["_error"] = Error(0)
 
         errors = validate_task_message(message)

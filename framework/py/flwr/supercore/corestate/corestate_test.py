@@ -103,6 +103,26 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(task.running_at, "")
         self.assertEqual(task.finished_at, "")
 
+    def test_create_task_rejects_finished_requesting_task(self) -> None:
+        """Task creation should fail if the requesting task is already finished."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        requesting_task_id = state.create_task(
+            task_type=TaskType.SERVER_APP,
+            run_id=run_id,
+        )
+        assert requesting_task_id is not None
+        self.assertTrue(state.finish_task(requesting_task_id, SubStatus.STOPPED, ""))
+
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=run_id,
+            model_ref="model://test",
+            requesting_task_id=requesting_task_id,
+        )
+
+        self.assertIsNone(task_id)
+
     def test_get_tasks_missing_returns_empty(self) -> None:
         """Missing tasks should return an empty sequence."""
         state = self.state_factory()
