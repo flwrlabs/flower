@@ -347,7 +347,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 return False
             run_id = src_task.run_id
 
-        self._cleanup_expired_task_messages()
         message_copy = message_from_proto(message_to_proto(message))
         message_copy.metadata.__dict__["_run_id"] = run_id
         message_copy.metadata.__dict__["_group_id"] = ""
