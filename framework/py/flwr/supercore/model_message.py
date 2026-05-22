@@ -188,6 +188,8 @@ def _build_metadata_and_content(
 def _payload_to_content(payload: JSONObject) -> RecordDict:
     """Serialize a JSON object payload into message content."""
     try:
+        # Store compact, strict JSON without unnecessary whitespace;
+        # Python's NaN/Infinity extensions are invalid.
         encoded = json.dumps(payload, separators=(",", ":"), allow_nan=False)
     except (TypeError, ValueError) as err:
         raise ValueError("Payload must be JSON serializable.") from err
@@ -210,12 +212,13 @@ def _payload_from_content(content: RecordDict) -> JSONObject:
         raise ValueError("Expected payload JSON to be a string.")
 
     try:
+        # Reject Python's NaN/Infinity extensions while parsing inbound JSON.
         payload = json.loads(raw, parse_constant=_reject_non_finite_json_number)
     except ValueError as err:
         raise ValueError("Payload JSON is malformed.") from err
 
     if not isinstance(payload, dict):
-        raise ValueError("Payload JSON must be an object.")
+        raise ValueError("Payload JSON must be a JSON object.")
     return cast(JSONObject, payload)
 
 
@@ -225,82 +228,77 @@ def _validate_json_object_sequence_field(
     """Validate that a payload field is a sequence of JSON objects."""
     if field not in payload:
         if required:
-            raise ValueError(f"{owner} payload requires sequence field '{field}'.")
+            raise ValueError(f"{owner} payload requires field '{field}'.")
         return
 
     value = payload[field]
-    if not isinstance(value, Sequence) or isinstance(value, str):
-        if required:
-            raise ValueError(f"{owner} payload requires sequence field '{field}'.")
-        raise ValueError(f"{owner} payload field '{field}' must be a sequence.")
-    if not all(isinstance(item, dict) for item in value):
+    if (
+        not isinstance(value, Sequence)
+        or isinstance(value, str)
+        or not all(isinstance(item, dict) for item in value)
+    ):
         raise ValueError(
-            f"{owner} payload field '{field}' must be a sequence of objects."
+            f"{owner} payload field '{field}' must be a sequence of JSON objects."
         )
 
 
 def _validate_model_request_input_field(payload: JSONObject) -> None:
-    """Validate that a model request input is a string or sequence of objects."""
+    """Validate that a model request input is a string or sequence of JSON objects."""
     if "input" not in payload:
         raise ValueError("ModelRequest payload requires field 'input'.")
 
     value = payload["input"]
     if isinstance(value, str):
         return
-    if not isinstance(value, Sequence):
-        raise ValueError(
-            "ModelRequest payload field 'input' must be a string or sequence."
-        )
-    if not all(isinstance(item, dict) for item in value):
+    if not isinstance(value, Sequence) or not all(
+        isinstance(item, dict) for item in value
+    ):
         raise ValueError(
             "ModelRequest payload field 'input' must be a string or sequence "
-            "of objects."
+            "of JSON objects."
         )
 
 
 def _validate_model_request_payload(payload: JSONObject) -> None:
     """Validate the minimal Responses create-request shape."""
     if not isinstance(payload.get("model"), str):
-        raise ValueError("ModelRequest payload requires string field 'model'.")
+        raise ValueError("ModelRequest payload requires a string field 'model'.")
     _validate_model_request_input_field(payload)
     if "stream" in payload and not isinstance(payload["stream"], bool):
         raise ValueError("ModelRequest payload field 'stream' must be a bool.")
 
     _validate_json_object_sequence_field(payload, "tools", owner="ModelRequest")
     if "reasoning" in payload and not isinstance(payload["reasoning"], dict):
-        raise ValueError("ModelRequest payload field 'reasoning' must be an object.")
-    if "previous_response_id" in payload and not isinstance(
-        payload["previous_response_id"], str
-    ):
         raise ValueError(
-            "ModelRequest payload field 'previous_response_id' must be a string."
+            "ModelRequest payload field 'reasoning' must be a JSON object."
         )
-    if "instructions" in payload and not isinstance(payload["instructions"], str):
-        raise ValueError("ModelRequest payload field 'instructions' must be a string.")
+    for field in ("previous_response_id", "instructions"):
+        if field in payload and not isinstance(payload[field], str):
+            raise ValueError(f"ModelRequest payload field '{field}' must be a string.")
     if "max_output_tokens" in payload and not isinstance(
         payload["max_output_tokens"], int
     ):
         raise ValueError(
             "ModelRequest payload field 'max_output_tokens' must be an integer."
         )
-    if "metadata" in payload and not isinstance(payload["metadata"], dict):
-        raise ValueError("ModelRequest payload field 'metadata' must be an object.")
-    if "text" in payload and not isinstance(payload["text"], dict):
-        raise ValueError("ModelRequest payload field 'text' must be an object.")
+    for field in ("metadata", "text"):
+        if field in payload and not isinstance(payload[field], dict):
+            raise ValueError(
+                f"ModelRequest payload field '{field}' must be a JSON object."
+            )
 
 
 def _validate_model_response_payload(payload: JSONObject) -> None:
     """Validate the minimal OpenAI Responses object shape."""
     if payload.get("object") != "response":
-        raise ValueError("ModelResponse payload must be a Responses object.")
-    if "id" in payload and not isinstance(payload["id"], str):
-        raise ValueError("ModelResponse payload field 'id' must be a string.")
-    if "status" in payload and not isinstance(payload["status"], str):
-        raise ValueError("ModelResponse payload field 'status' must be a string.")
+        raise ValueError("ModelResponse payload field 'object' must be 'response'.")
+    for field in ("id", "status"):
+        if field in payload and not isinstance(payload[field], str):
+            raise ValueError(f"ModelResponse payload field '{field}' must be a string.")
     _validate_json_object_sequence_field(payload, "output", owner="ModelResponse")
     if (
         "error" in payload
         and payload["error"] is not None
         and not isinstance(payload["error"], dict)
     ):
-        raise ValueError("ModelResponse payload field 'error' must be an object.")
+        raise ValueError("ModelResponse payload field 'error' must be a JSON object.")

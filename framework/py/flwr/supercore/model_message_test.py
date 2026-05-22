@@ -16,6 +16,7 @@
 
 
 import json
+import re
 from collections.abc import Callable
 
 import pytest
@@ -273,4 +274,82 @@ def test_invalid_model_messages_raise(
 ) -> None:
     """Model messages should reject invalid public inputs."""
     with pytest.raises(ValueError, match=match):
+        build()
+
+
+@pytest.mark.parametrize(
+    ("build", "expected_message"),
+    [
+        (
+            lambda: ModelRequest.from_message(
+                _message_with_payload("[]", message_type=MessageType.QUERY)
+            ),
+            "Payload JSON must be a JSON object.",
+        ),
+        (
+            lambda: ModelRequest.from_message(
+                _message_with_payload(
+                    {"model": "gpt-5", "input": 1},
+                    message_type=MessageType.QUERY,
+                )
+            ),
+            "ModelRequest payload field 'input' must be a string or sequence "
+            "of JSON objects.",
+        ),
+        (
+            lambda: ModelRequest.from_message(
+                _message_with_payload(
+                    {"model": "gpt-5", "input": "Hello", "tools": ["web"]},
+                    message_type=MessageType.QUERY,
+                )
+            ),
+            "ModelRequest payload field 'tools' must be a sequence of JSON objects.",
+        ),
+        (
+            lambda: ModelRequest.from_message(
+                _message_with_payload(
+                    {"model": "gpt-5", "input": "Hello", "reasoning": []},
+                    message_type=MessageType.QUERY,
+                )
+            ),
+            "ModelRequest payload field 'reasoning' must be a JSON object.",
+        ),
+        (
+            lambda: ModelResponse.from_message(
+                _message_with_payload(
+                    {"object": "response", "output": ["message"]},
+                    message_type=MessageType.QUERY,
+                    reply_to_message_id="request-message-id",
+                )
+            ),
+            "ModelResponse payload field 'output' must be a sequence of JSON objects.",
+        ),
+        (
+            lambda: ModelResponse.from_message(
+                _message_with_payload(
+                    {"object": "response", "error": "failed"},
+                    message_type=MessageType.QUERY,
+                    reply_to_message_id="request-message-id",
+                )
+            ),
+            "ModelResponse payload field 'error' must be a JSON object.",
+        ),
+        (
+            lambda: ModelResponse.from_message(
+                _message_with_payload(
+                    {"object": "not_response"},
+                    message_type=MessageType.QUERY,
+                    reply_to_message_id="request-message-id",
+                )
+            ),
+            "ModelResponse payload field 'object' must be 'response'.",
+        ),
+    ],
+)
+def test_invalid_model_messages_describe_expected_json_shapes(
+    build: Callable[[], object],
+    expected_message: str,
+) -> None:
+    """Validation errors should name the expected JSON shape exactly."""
+    with pytest.raises(ValueError, match=re.escape(expected_message)):
         build()
