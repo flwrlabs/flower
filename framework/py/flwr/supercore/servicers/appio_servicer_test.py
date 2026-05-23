@@ -280,18 +280,15 @@ class TestAppIoServicer(unittest.TestCase):
             "Failed to create task",
         )
 
-    def test_push_task_message_normalizes_and_stores_message(self) -> None:
-        """PushTaskMessage should normalize metadata before storing."""
+    def test_push_task_message_stores_message_for_authenticated_task(self) -> None:
+        """PushTaskMessage should store metadata matching the authenticated task."""
         # Prepare
         self.state.store_task_message.return_value = True
         message = create_task_message(
-            run_id=999,
-            src_task_id=999,
+            run_id=789,
+            src_task_id=123,
             dst_task_id=456,
         )
-        message.metadata.__dict__["_message_id"] = ""
-        message.metadata.__dict__["_src_node_id"] = 111
-        message.metadata.__dict__["_dst_node_id"] = 222
         request = PushTaskMessageRequest(message=message_to_proto(message))
 
         # Execute
@@ -304,7 +301,6 @@ class TestAppIoServicer(unittest.TestCase):
         # Assert
         self.state.store_task_message.assert_called_once()
         stored_message = self.state.store_task_message.call_args.args[0]
-        self.assertNotEqual(response.message_id, "")
         self.assertEqual(response.message_id, stored_message.metadata.message_id)
         self.assertEqual(stored_message.metadata.run_id, 789)
         self.assertEqual(stored_message.metadata.src_node_id, SUPERLINK_NODE_ID)
@@ -316,7 +312,7 @@ class TestAppIoServicer(unittest.TestCase):
         """PushTaskMessage should abort when CoreState cannot store the message."""
         # Prepare
         self.state.store_task_message.return_value = False
-        message = create_task_message(dst_task_id=456)
+        message = create_task_message(run_id=789, src_task_id=123, dst_task_id=456)
         request = PushTaskMessageRequest(message=message_to_proto(message))
         context = Mock(spec=grpc.ServicerContext)
         context.abort.side_effect = grpc.RpcError()

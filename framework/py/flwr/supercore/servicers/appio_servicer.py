@@ -20,7 +20,7 @@ from logging import DEBUG
 
 import grpc
 
-from flwr.common.constant import SUPERLINK_NODE_ID, Status
+from flwr.common.constant import Status
 from flwr.common.logger import log
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
@@ -128,14 +128,31 @@ class AppIoServicer(ABC):
         log(DEBUG, "AppIoServicer.PushTaskMessage")
 
         task = get_authenticated_task()
-        message = message_from_proto(request.message)
-        message.metadata.__dict__["_run_id"] = task.run_id
-        message.metadata.__dict__["_src_node_id"] = SUPERLINK_NODE_ID
-        message.metadata.__dict__["_dst_node_id"] = SUPERLINK_NODE_ID
-        message.metadata.src_task_id = task.task_id
-        message.metadata.dst_task_id = request.message.metadata.dst_task_id
-        if message.metadata.message_id == "":
-            message.metadata.__dict__["_message_id"] = message.object_id
+        message_proto = request.message
+        metadata_proto = message_proto.metadata
+        if metadata_proto.run_id != task.run_id:
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "`Message.metadata.run_id` does not match the authenticated task.",
+            )
+
+        if (
+            not metadata_proto.HasField("src_task_id")
+            or metadata_proto.src_task_id != task.task_id
+        ):
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "`Message.metadata.src_task_id` does not match the authenticated task.",
+            )
+
+        if message_proto.HasField("content") == message_proto.HasField("error"):
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "Either `Message.content` or `Message.error` must be set, "
+                "but not both.",
+            )
+
+        message = message_from_proto(message_proto)
 
         state = self.state()
         stored = state.store_task_message(message)
