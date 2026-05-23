@@ -17,6 +17,7 @@
 
 import importlib
 import unittest
+from pathlib import Path
 from queue import Queue
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -174,3 +175,46 @@ def test_flwr_simulation_forwards_cli_args(
     assert captured["certificates"] is None
     assert captured["parent_pid"] == 321
     assert captured["runtime_dependency_install"] is True
+
+
+def test_flwr_simulation_forwards_token_file(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """The simulation CLI should read and forward token file contents."""
+    token_file = tmp_path / "token"
+    token_file.write_text("test-token\n", encoding="utf-8")
+    args = SimpleNamespace(
+        insecure=True,
+        serverappio_api_address="127.0.0.1:9091",
+        token=None,
+        token_file=str(token_file),
+        root_certificates=None,
+        parent_pid=321,
+        runtime_dependency_install=True,
+    )
+    captured: dict[str, object] = {}
+
+    class _Parser:
+        def parse_args(self) -> SimpleNamespace:
+            """Return a fixed namespace for CLI forwarding tests."""
+            return args
+
+    monkeypatch.setattr(
+        simulation_app_module, "_parse_args_run_flwr_simulation", _Parser
+    )
+    monkeypatch.setattr(
+        simulation_app_module,
+        "mirror_output_to_queue",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(simulation_app_module, "restore_output", lambda: None)
+    monkeypatch.setattr(
+        simulation_app_module,
+        "run_simulation_process",
+        lambda **kwargs: captured.update(kwargs),
+    )
+
+    simulation_app_module.flwr_simulation()
+
+    assert captured["token"] == "test-token"

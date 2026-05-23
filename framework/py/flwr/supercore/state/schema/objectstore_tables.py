@@ -49,6 +49,7 @@ def create_objectstore_metadata() -> MetaData:
         ),
         Column("ref_count", Integer, nullable=False, server_default="0"),
         CheckConstraint("is_available IN (0, 1)", name="ck_objects_is_available"),
+        CheckConstraint("ref_count >= 0", name="ck_objects_ref_count_nonnegative"),
     )
 
     # --------------------------------------------------------------------------

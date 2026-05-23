@@ -239,6 +239,7 @@ def _to_detail_table(run: RunRow) -> Table:
     table.add_row("App", f"@{run.fab_id}=={run.fab_version}")
     table.add_row("FAB Hash", f"{run.fab_hash[:8]}...{run.fab_hash[-8:]}")
     table.add_row("Status", f"[{status_style}]{run.status_text}[/{status_style}]")
+    table.add_row("Status Details", Text(run.details))
     table.add_row("Elapsed", f"[blue]{humanize_duration(run.elapsed)}[/blue]")
     table.add_row("Pending At", run.pending_at)
     table.add_row("Starting At", run.starting_at)
@@ -300,6 +301,7 @@ def _to_json(run_list: list[RunRow]) -> str:
                 "fab-version": row.fab_version,
                 "fab-hash": row.fab_hash,
                 "status": row.status_text,
+                "status-details": row.details,
                 "elapsed": row.elapsed,
                 "pending-at": row.pending_at,
                 "starting-at": row.starting_at,

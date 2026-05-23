@@ -208,6 +208,16 @@ def push_messages(
         objects_to_push |= set(store.preregister(run_id, object_tree))
     # Store Message in State
     message_id: str | None = state.store_message_res(message=msg)
+    # This is temporary. We should consider a more robust cleanup
+    # mechanism that protects duplicate messages from premature deletion.
+    # Once that is in place, we can remove the run status check below.
+    if (
+        message_id is None
+        and state.get_run_status({run_id})[run_id].status == Status.FINISHED
+    ):
+        # The request currently contains only one message and its object tree.
+        store.delete(request.message_object_trees[0].object_id)
+        objects_to_push.clear()
 
     # Build response
     response = PushMessagesResponse(

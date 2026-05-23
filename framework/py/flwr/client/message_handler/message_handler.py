@@ -27,7 +27,7 @@ from flwr.client.client import (
 )
 from flwr.client.numpy_client import NumPyClient
 from flwr.client.typing import ClientFnExt
-from flwr.common import ConfigRecord, Context, Message, Metadata, RecordDict, log
+from flwr.common import ConfigRecord, Context, Message, RecordDict, log
 from flwr.common.constant import MessageTypeLegacy
 from flwr.common.recorddict_compat import (
     evaluateres_to_recorddict,
@@ -157,21 +157,3 @@ def _reconnect(
     # Build DisconnectRes message
     disconnect_res = ClientMessage.DisconnectRes(reason=reason)
     return ClientMessage(disconnect_res=disconnect_res), sleep_duration
-
-
-def validate_out_message(out_message: Message, in_message_metadata: Metadata) -> bool:
-    """Validate the out message."""
-    out_meta = out_message.metadata
-    in_meta = in_message_metadata
-    if (  # pylint: disable-next=too-many-boolean-expressions
-        out_meta.run_id == in_meta.run_id
-        and out_meta.message_id == out_message.object_id  # Should match the object id
-        and out_meta.src_node_id == in_meta.dst_node_id
-        and out_meta.dst_node_id == in_meta.src_node_id
-        and out_meta.reply_to_message_id == in_meta.message_id
-        and out_meta.group_id == in_meta.group_id
-        and out_meta.message_type == in_meta.message_type
-        and out_meta.created_at > in_meta.created_at
-    ):
-        return True
-    return False

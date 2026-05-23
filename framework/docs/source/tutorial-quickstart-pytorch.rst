@@ -124,7 +124,6 @@ With default arguments you will see streamed output like this:
     INFO :      Final results:
     INFO :          Server-side Evaluate Metrics:
     INFO :          {}
-    Saving final model to disk...
 
 You can also override the parameters defined in the ``[tool.flwr.app.config]`` section
 in ``pyproject.toml`` like this:
@@ -407,10 +406,11 @@ invoking its |strategy_start_link|_ method. To it we pass:
             evaluate_fn=global_evaluate,
         )
 
-        # Save final model to disk
-        print("\nSaving final model to disk...")
-        state_dict = result.arrays.to_torch_state_dict()
-        torch.save(state_dict, "final_model.pt")
+        if context.run_config["save-model"]:
+            # Save final model to disk
+            print("\nSaving final model to disk...")
+            state_dict = result.arrays.to_torch_state_dict()
+            torch.save(state_dict, "final_model.pt")
 
 Note the ``start`` method of the strategy returns a |result_link|_ object. This object
 contains all the relevant information about the FL process, including the final model

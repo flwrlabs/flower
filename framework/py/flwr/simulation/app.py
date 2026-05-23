@@ -27,7 +27,7 @@ from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
 from flwr.common import EventType, event
-from flwr.common.args import add_args_flwr_app_common
+from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.config import (
     get_fused_config_from_dir,
     get_project_config,
@@ -38,8 +38,10 @@ from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
     SubStatus,
 )
+from flwr.common.context import Context
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import (
+    flush_logs,
     log,
     mirror_output_to_queue,
     restore_output,
@@ -107,6 +109,7 @@ def _run_simulation_settings(
 def flwr_simulation() -> None:
     """Run process-isolated Flower Simulation."""
     args = _parse_args_run_flwr_simulation().parse_args()
+    token = try_obtain_flwr_app_token(args)
 
     # Capture stdout/stderr
     log_queue: Queue[str | None] = Queue()
@@ -125,7 +128,7 @@ def flwr_simulation() -> None:
     run_simulation_process(
         serverappio_api_address=args.serverappio_api_address,
         log_queue=log_queue,
-        token=args.token,
+        token=token,
         insecure=args.insecure,
         certificates=certificates,
         parent_pid=args.parent_pid,
@@ -163,25 +166,13 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     heartbeat_sender = None
     sub_status = SubStatus.FAILED
     details = "Task failed with unknown error."
-    context = None
+    context: Context | None = None
     runtime_env_dir = None
     exit_code = ExitCode.SUCCESS
 
-    def on_exit() -> None:
-        # Stop heartbeat sender
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
-
-        # Stop log uploader for this run and upload final logs
-        if log_uploader:
-            stop_log_uploader(log_queue, log_uploader)
-
-        cleanup_app_runtime_environment(runtime_env_dir)
-
     register_signal_handlers(
         event_type=EventType.FLWR_SIMULATION_RUN_LEAVE,
-        exit_message="Run stopped by user.",
-        exit_handlers=[on_exit],
+        exit_message="Task stopped by user.",
     )
 
     try:
@@ -304,15 +295,34 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         exit_code = ExitCode.SIMULATION_EXCEPTION
     finally:
         log(DEBUG, "[flwr-simulation] Will push Simulation task output")
+
+        # Set Grpc max retries to 1 to avoid blocking on exit
+        conn._retry_invoker.max_tries = 1
+
+        # Upload any remaining logs before pushing final output
+        if log_uploader:
+            flush_logs(log_queue)
+
+        # Push final status and context (if available)
         out_req = PushTaskOutputRequest(
             context=context_to_proto(context) if context else None,
             sub_status=sub_status,
             details=details,
         )
         try:
-            _ = conn._stub.PushTaskOutput(out_req)
-        except grpc.RpcError:
-            pass
+            conn._stub.PushTaskOutput(out_req)
+        except grpc.RpcError as err:
+            log(ERROR, "Failed to push task output: %s", str(err))
+
+        # Stop log uploader for this run and upload final logs
+        if log_uploader:
+            stop_log_uploader(log_queue, log_uploader)
+
+        # Stop heartbeat sender
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+
+        cleanup_app_runtime_environment(runtime_env_dir)
 
     flwr_exit(
         code=exit_code,

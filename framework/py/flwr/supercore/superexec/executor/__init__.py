@@ -12,20 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower command line interface `federation` utilities."""
+"""Executor abstractions and implementations for SuperExec."""
 
+from .factory import get_executor
+from .subprocess_executor import SubprocessExecutor
+from .types import ExecutionSpec, Executor
 
-import click
-import grpc
-
-
-def handle_invite_grpc_error(error: grpc.RpcError) -> None:
-    """Raise ClickException with gRPC details for invite-related auth/precondition."""
-    if error.code() not in (
-        grpc.StatusCode.FAILED_PRECONDITION,
-        grpc.StatusCode.PERMISSION_DENIED,
-    ):
-        return
-
-    # pylint: disable-next=E1101
-    raise click.ClickException(error.details()) from None
+__all__ = [
+    "ExecutionSpec",
+    "Executor",
+    "SubprocessExecutor",
+    "get_executor",
+]

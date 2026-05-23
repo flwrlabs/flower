@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,8 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+"""Executor factory for SuperExec TaskExecutor processes."""
 
-set -e
-cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/../
+from flwr.supercore.constant import ExecutorType
 
-uv build --clear
+from .subprocess_executor import SubprocessExecutor
+from .types import Executor
+
+
+def get_executor(executor_type: ExecutorType) -> Executor:
+    """Return the executor for the configured executor type."""
+    if executor_type == ExecutorType.SUBPROCESS:
+        return SubprocessExecutor()
+
+    raise ValueError(f"Unsupported executor: {executor_type}")

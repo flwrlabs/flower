@@ -156,6 +156,10 @@ def metadata_to_proto(metadata: Metadata) -> ProtoMetadata:
         message_type=metadata.message_type,
         created_at=metadata.created_at,
     )
+    if metadata.src_task_id is not None:
+        proto.src_task_id = metadata.src_task_id
+    if metadata.dst_task_id is not None:
+        proto.dst_task_id = metadata.dst_task_id
     return proto
 
 
@@ -171,5 +175,15 @@ def metadata_from_proto(metadata_proto: ProtoMetadata) -> Metadata:
         created_at=metadata_proto.created_at,
         ttl=metadata_proto.ttl,
         message_type=metadata_proto.message_type,
+        src_task_id=(
+            metadata_proto.src_task_id
+            if metadata_proto.HasField("src_task_id")
+            else None
+        ),
+        dst_task_id=(
+            metadata_proto.dst_task_id
+            if metadata_proto.HasField("dst_task_id")
+            else None
+        ),
     )
     return metadata
