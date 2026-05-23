@@ -4,7 +4,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
 "POT-Creation-Date: 2026-05-16 00:24+0000\n"
 "PO-Revision-Date: 2026-05-23 06:55+0000\n"
-"Last-Translator: Hosted Weblate user 151928 <duguelea4@gmail.com>\n"
+"Last-Translator: Charles Beauville <charles@adap.com>\n"
 "Language-Team: French <https://hosted.weblate.org/projects/flower-docs/"
 "framework/fr/>\n"
 "Language: fr\n"
@@ -737,10 +737,10 @@ msgid ""
 "tests. For this purpose we are using the VSCode Remote Containers "
 "extension. What is it? Read the following quote:"
 msgstr ""
-"Lorsque nous travaillons sur Flower, nous voulons nous assurer que tous "
-"les contributeurs utilisent le même environnement de développement pour "
-"formater le code ou exécuter des tests. À cette fin, nous utilisons "
-"l'extension VSCode Remote Containers. Qu'est-ce que c'est ?"
+"Lorsque nous travaillons sur Flower, nous voulons nous assurer que tous les "
+"contributeurs utilisent le même environnement de développement pour formater "
+"le code ou exécuter des tests. À cette fin, nous utilisons l'extension "
+"VSCode Remote Containers. Qu'est-ce que c'est ?"
 
 #: ../../source/contributor-how-to-develop-in-vscode-dev-containers.rst:9
 #, fuzzy
@@ -971,9 +971,9 @@ msgid ""
 "Python packages can be installed from git repositories. Use one of the "
 "following commands to install the Flower directly from GitHub."
 msgstr ""
-"Les paquets Python peuvent être installés à partir des dépôts git. "
-"Utilise l'une des commandes suivantes pour installer Flower directement à"
-" partir de GitHub."
+"Les paquets Python peuvent être installés à partir des dépôts git. Utilise "
+"l'une des commandes suivantes pour installer Flower directement à partir de "
+"GitHub."
 
 #: ../../source/contributor-how-to-install-development-versions.rst:44
 msgid "Install ``flwr`` from the default GitHub branch (``main``):"
@@ -1633,9 +1633,8 @@ msgid ""
 "This guide is for people who want to get involved with Flower, but who "
 "are not used to contributing to GitHub projects."
 msgstr ""
-"Ce guide s'adresse aux personnes qui veulent participer au développement "
-"de Flower mais qui n'ont pas l'habitude de contribuer à des projets "
-"GitHub."
+"Ce guide s'adresse aux personnes qui veulent participer au développement de "
+"Flower mais qui n'ont pas l'habitude de contribuer à des projets GitHub."
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:8
 #, fuzzy
@@ -2495,8 +2494,7 @@ msgstr "(Optionnel) `pyenv <https://github.com/pyenv/pyenv>`_"
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:12
 msgid "(Optional) `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_"
 msgstr ""
-"(Optionnel) `pyenv-virtualenv <https://github.com/pyenv/pyenv-"
-"virtualenv>`_"
+"(Optionnel) `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_"
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:14
 #, fuzzy
@@ -2690,8 +2688,8 @@ msgid ""
 "The Flower default workflow would run by setting up the required Docker "
 "machines underneath."
 msgstr ""
-"Le workflow par défaut de Flower sera exécuté en configurant les machines"
-" Docker requises en arrière plan."
+"Le workflow par défaut de Flower sera exécuté en configurant les machines "
+"Docker requises en arrière plan."
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:164
 #, fuzzy
@@ -34975,9 +34973,9 @@ msgid ""
 "simulations using the Virtual Client Engine through Jupyter Notebook "
 "(incl. Google Colab)."
 msgstr ""
-"Un nouvel exemple de code (`quickstart_simulation`) démontre des "
-"simulations de Flower en utilisant le moteur de client virtuel via "
-"Jupyter Notebook (y compris Google Colab)."
+"Un nouvel exemple de code (`quickstart_simulation`) démontre des simulations "
+"de Flower en utilisant le moteur de client virtuel via Jupyter Notebook (y "
+"compris Google Colab)."
 
 #: ../../source/ref-changelog.md:2444
 #, fuzzy
