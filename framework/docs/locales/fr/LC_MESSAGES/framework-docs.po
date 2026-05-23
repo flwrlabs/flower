@@ -1,18 +1,18 @@
-
 msgid ""
 msgstr ""
 "Project-Id-Version: Flower Docs\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-05-22 00:28+0000\n"
-"PO-Revision-Date: 2025-02-05 10:02+0000\n"
-"Last-Translator: lco <Leandro.COLLIER@student.umons.ac.be>\n"
+"POT-Creation-Date: 2026-05-16 00:24+0000\n"
+"PO-Revision-Date: 2026-05-23 03:11+0000\n"
+"Last-Translator: Hosted Weblate user 151928 <duguelea4@gmail.com>\n"
+"Language-Team: French <https://hosted.weblate.org/projects/flower-docs/"
+"framework/fr/>\n"
 "Language: fr\n"
-"Language-Team: French <https://hosted.weblate.org/projects/flower-"
-"docs/framework/fr/>\n"
-"Plural-Forms: nplurals=2; plural=n > 1;\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=n > 1;\n"
+"X-Generator: Weblate 2026.6.dev0\n"
 "Generated-By: Babel 2.18.0\n"
 
 #: ../../source/build.rst:-1
@@ -237,7 +237,7 @@ msgstr ""
 
 #: ../../source/contributor-explanation-public-and-private-apis.rst:72
 msgid "Therefore, as a Flower user:"
-msgstr ""
+msgstr "Par conséquent, en tant qu'utilisateur de Flower :"
 
 #: ../../source/contributor-explanation-public-and-private-apis.rst:74
 msgid "``from flwr import client`` ✅ Ok, you're importing a public API."
@@ -272,7 +272,7 @@ msgstr ""
 
 #: ../../source/contributor-explanation-public-and-private-apis.rst:101
 msgid "Therefore:"
-msgstr ""
+msgstr "Par conséquent :"
 
 #: ../../source/contributor-explanation-public-and-private-apis.rst:103
 msgid ""
@@ -613,7 +613,7 @@ msgstr ""
 
 #: ../../source/contributor-how-to-build-docker-images.rst:143
 msgid "After creating the image, we can test whether the image is working:"
-msgstr ""
+msgstr "Après avoir créé l'image, nous pouvons tester si l'image fonctionne :"
 
 #: ../../source/contributor-how-to-build-docker-images.rst:151
 #, fuzzy
@@ -682,7 +682,7 @@ msgstr ""
 
 #: ../../source/contributor-how-to-contribute-translations.rst:43
 msgid "This is what the interface looks like:"
-msgstr ""
+msgstr "C'est à ça que l'interface ressemble :"
 
 #: ../../source/contributor-how-to-contribute-translations.rst:47
 msgid ""
@@ -719,7 +719,7 @@ msgstr ""
 
 #: ../../source/contributor-how-to-contribute-translations.rst:67
 msgid "Add new languages"
-msgstr ""
+msgstr "Ajouter de nouvelles langues"
 
 #: ../../source/contributor-how-to-contribute-translations.rst:69
 msgid ""
@@ -2073,6 +2073,7 @@ msgstr ""
 #: ../../source/contributor-tutorial-contribute-on-github.rst:222
 msgid "It is important to follow the instructions described in comments."
 msgstr ""
+"Il est important de suivre les instructions décrites dans les commentaires."
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:224
 msgid ""
@@ -2907,7 +2908,7 @@ msgstr ""
 
 #: ../../source/docker/enable-tls.rst
 msgid "directory."
-msgstr ""
+msgstr "répertoire."
 
 #: ../../source/docker/enable-tls.rst:70
 msgid "``<superlink-image>``: The name of your SuperLink image to be run."
@@ -2973,7 +2974,7 @@ msgstr ""
 
 #: ../../source/docker/enable-tls.rst
 msgid "the network."
-msgstr ""
+msgstr "le réseau."
 
 #: ../../source/docker/enable-tls.rst:87
 #, fuzzy
@@ -3098,7 +3099,7 @@ msgstr "Démarrer le serveur"
 #: ../../source/how-to-enable-tls-connections.rst
 #: ../../source/how-to-run-flower-with-deployment-engine.rst
 msgid "Understand the command"
-msgstr ""
+msgstr "Comprendre la commande"
 
 #: ../../source/docker/enable-tls.rst:189
 msgid "``<serverapp-image>``: The name of your ServerApp image to be run."
@@ -3575,7 +3576,7 @@ msgstr ""
 #: ../../source/docker/tutorial-quickstart-docker.rst:19
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:26
 msgid "Before you start, make sure that:"
-msgstr ""
+msgstr "Avant de commencer, assurez-vous que :"
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:26
 #: ../../source/docker/tutorial-deploy-on-multiple-machines.rst:28
@@ -3648,7 +3649,7 @@ msgstr ""
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:112
 msgid "After that, you can repeat the steps above."
-msgstr ""
+msgstr "Après cela, vous pouvez répéter les étapes au-dessus."
 
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:116
 #: ../../source/docker/run-quickstart-examples-docker-compose.rst:122
@@ -3809,6 +3810,7 @@ msgstr ""
 #: ../../source/docker/tutorial-deploy-on-multiple-machines.rst:26
 msgid "Before you begin, make sure you have the following prerequisites:"
 msgstr ""
+"Avant de commencer, assurez-vous que vous avez les pré-requis suivants :"
 
 #: ../../source/docker/tutorial-deploy-on-multiple-machines.rst:29
 msgid "The Docker daemon is running on your local machine and the remote machine."
@@ -4582,7 +4584,7 @@ msgstr "Nous pouvons déjà démarrer le *serveur* :"
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:151
 msgid "If you haven't made any changes, you can skip this step."
-msgstr ""
+msgstr "Si vous n'avez fait aucun changement, vous pouvez sauter cette étape."
 
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:153
 msgid "Run the following command to rebuild and restart the services:"
@@ -5720,7 +5722,7 @@ msgstr ""
 
 #: ../../source/explanation-flower-strategy-abstraction.rst:152
 msgid "The following diagram illustrates the flow."
-msgstr ""
+msgstr "Le diagramme suivant illustre le flux."
 
 #: ../../source/explanation-flower-strategy-abstraction.rst:156
 msgid ""
@@ -6165,7 +6167,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:99
 msgid "License Key"
-msgstr ""
+msgstr "Clé de Licence"
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:101
 msgid ""

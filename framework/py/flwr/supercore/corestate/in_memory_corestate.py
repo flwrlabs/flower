@@ -21,8 +21,9 @@ from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from logging import ERROR
 from threading import Lock
-from typing import Literal
+from typing import Literal, cast
 
 from flwr.common import now
 from flwr.common.constant import (
@@ -33,12 +34,14 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.common.logger import log
+from flwr.common.message import Message
 from flwr.common.typing import Fab
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import generate_rand_int_from_bytes
+from .utils import generate_rand_int_from_bytes, validate_task_message
 
 
 @dataclass
@@ -66,6 +69,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.task_logs: dict[int, list[tuple[float, str]]] = {}
         self.log_lock = Lock()
         self.lock_task_store = Lock()
+        self.task_message_store: dict[str, Message] = {}
+        self.lock_task_message_store = Lock()
 
     @property
     def object_store(self) -> ObjectStore:
@@ -329,6 +334,95 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             task.CopyFrom(self.task_store[task_id])
             return task
 
+    def store_task_message(  # pylint: disable=too-many-return-statements
+        self, message: Message
+    ) -> bool:
+        """Store one task-addressed Message."""
+        message_id = message.metadata.message_id
+        if validate_task_message(message):
+            return False
+        src_task_id = cast(int, message.metadata.src_task_id)
+        dst_task_id = cast(int, message.metadata.dst_task_id)
+
+        with self.lock_task_store, self.lock_task_message_store:
+            self._cleanup_expired_task_tokens_locked()
+            self._cleanup_invalid_task_messages_locked(now().timestamp())
+            src_task = self.task_store.get(src_task_id)
+            dst_task = self.task_store.get(dst_task_id)
+            if src_task is None or dst_task is None:
+                return False
+            if src_task.run_id != dst_task.run_id:
+                log(
+                    ERROR,
+                    "Cannot store message: source task %d and destination task %d "
+                    "belong to different runs.",
+                    src_task_id,
+                    dst_task_id,
+                )
+                return False
+            if message.metadata.run_id != src_task.run_id:
+                log(
+                    ERROR,
+                    "Cannot store message for task %s: message run ID %d "
+                    "does not match task run ID %d.",
+                    message_id,
+                    message.metadata.run_id,
+                    src_task.run_id,
+                )
+                return False
+            if dst_task.status.status == Status.FINISHED:
+                return False
+
+            if message_id in self.task_message_store:
+                return False
+            self.task_message_store[message_id] = message
+            return True
+
+    def get_task_message(
+        self,
+        *,
+        dst_task_ids: Sequence[int] | None = None,
+        limit: int | None = None,
+        order_by: Literal["created_at"] | None = None,
+    ) -> Sequence[Message]:
+        """Retrieve undelivered task-addressed Messages."""
+        if order_by not in (None, "created_at"):
+            raise AssertionError("`order_by` must be 'created_at' or None")
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if limit == 0:
+            return []
+        if dst_task_ids is not None and not dst_task_ids:
+            return []
+
+        with self.lock_task_store, self.lock_task_message_store:
+            self._cleanup_expired_task_tokens_locked()
+            current = now().timestamp()
+            self._cleanup_invalid_task_messages_locked(current)
+
+            # Filter by dst_task_id
+            dst_task_id_set = set(dst_task_ids) if dst_task_ids is not None else None
+            selected_messages = [
+                msg
+                for msg in self.task_message_store.values()
+                if dst_task_id_set is None
+                or msg.metadata.dst_task_id in dst_task_id_set
+            ]
+
+            # Apply requested sort order
+            if order_by == "created_at":
+                selected_messages.sort(key=lambda msg: msg.metadata.created_at)
+
+            # Apply limit
+            if limit is not None:
+                selected_messages = selected_messages[:limit]
+
+            # Delete selected messages from storage
+            for msg in selected_messages:
+                del self.task_message_store[msg.metadata.message_id]
+
+        return selected_messages
+
     def _cleanup_expired_task_tokens_locked(self) -> None:
         """Remove expired task tokens.
 
@@ -360,6 +454,22 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
 
         if expired_tasks:
             self._on_task_tokens_expired(expired_tasks)
+
+    def _cleanup_invalid_task_messages_locked(self, current: float) -> None:
+        """Remove expired Messages and Messages for invalid destination tasks."""
+        for message_id, message in list(self.task_message_store.items()):
+            dst_task_id = message.metadata.dst_task_id
+            if dst_task_id is None:
+                del self.task_message_store[message_id]
+                continue
+
+            dst_task = self.task_store.get(dst_task_id)
+            if (
+                dst_task is None
+                or dst_task.status.status == Status.FINISHED
+                or message.metadata.created_at + message.metadata.ttl <= current
+            ):
+                del self.task_message_store[message_id]
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
         """Handle cleanup of expired task tokens.
