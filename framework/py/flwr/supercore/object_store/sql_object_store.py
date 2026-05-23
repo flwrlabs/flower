@@ -195,7 +195,39 @@ class SqlObjectStore(ObjectStore, SqlMixin):
     def delete(self, object_id: str) -> None:
         """Delete an object and its unreferenced descendants from the store."""
         with self.session():
-            self._delete_unreferenced(object_id)
+            rows = self.query(
+                "SELECT 1 FROM objects WHERE object_id = :object_id AND ref_count = 0",
+                {"object_id": object_id},
+            )
+            if not rows:
+                return
+
+            children = self.query(
+                "SELECT child_id FROM object_children WHERE parent_id = :parent_id",
+                {"parent_id": object_id},
+            )
+            child_ids = [child["child_id"] for child in children]
+
+            rows = self.query(
+                "DELETE FROM objects "
+                "WHERE object_id = :object_id AND ref_count = 0 "
+                "RETURNING object_id",
+                {"object_id": object_id},
+            )
+            if not rows:
+                return
+
+            if child_ids:
+                placeholders = ", ".join(f":cid{i}" for i in range(len(child_ids)))
+                params = {f"cid{i}": cid for i, cid in enumerate(child_ids)}
+                self.query(
+                    "UPDATE objects SET ref_count = ref_count - 1 "
+                    f"WHERE object_id IN ({placeholders}) AND ref_count > 0",
+                    params,
+                )
+
+            for child_id in child_ids:
+                self.delete(child_id)
 
     def delete_objects_in_run(self, run_id: int) -> None:
         """Delete all objects that were registered in a specific run."""
@@ -210,43 +242,7 @@ class SqlObjectStore(ObjectStore, SqlMixin):
                 {"run_id": run_id_sint},
             )
             for obj in objs:
-                self._delete_unreferenced(obj["object_id"])
-
-    def _delete_unreferenced(self, object_id: str) -> None:
-        """Delete an object if unreferenced, then check each direct child."""
-        rows = self.query(
-            "SELECT 1 FROM objects WHERE object_id = :object_id AND ref_count = 0",
-            {"object_id": object_id},
-        )
-        if not rows:
-            return
-
-        children = self.query(
-            "SELECT child_id FROM object_children WHERE parent_id = :parent_id",
-            {"parent_id": object_id},
-        )
-        child_ids = [child["child_id"] for child in children]
-
-        rows = self.query(
-            "DELETE FROM objects "
-            "WHERE object_id = :object_id AND ref_count = 0 "
-            "RETURNING object_id",
-            {"object_id": object_id},
-        )
-        if not rows:
-            return
-
-        if child_ids:
-            placeholders = ", ".join(f":cid{i}" for i in range(len(child_ids)))
-            params = {f"cid{i}": cid for i, cid in enumerate(child_ids)}
-            self.query(
-                "UPDATE objects SET ref_count = ref_count - 1 "
-                f"WHERE object_id IN ({placeholders}) AND ref_count > 0",
-                params,
-            )
-
-        for child_id in child_ids:
-            self._delete_unreferenced(child_id)
+                self.delete(obj["object_id"])
 
     def clear(self) -> None:
         """Clear the store."""
