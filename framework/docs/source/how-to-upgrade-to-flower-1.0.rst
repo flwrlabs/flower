@@ -31,8 +31,8 @@ Here's how to update an existing installation to Flower 1.0 using either pip or 
   - ``python -m pip install -U flwr`` (when using ``start_server`` and ``start_client``)
   - ``python -m pip install -U 'flwr[simulation]'`` (when using ``start_simulation``)
 
-- uv: update the ``flwr`` dependency in ``pyproject.toml`` and then reinstall with ``uv
-  sync``.
+- uv: update the ``flwr`` dependency in ``pyproject.toml`` and then sync the environment
+  with ``uv sync``.
 
   - ``flwr = "^1.0.0"`` (when using ``start_server`` and ``start_client``)
   - ``flwr = { version = "^1.0.0", extras = ["simulation"] }`` (when using

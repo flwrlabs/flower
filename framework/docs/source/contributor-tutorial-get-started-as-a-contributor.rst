@@ -9,7 +9,6 @@
 - `Python 3.11 <https://docs.python.org/3.11/>`_ or above
 - `uv 0.10.7 <https://docs.astral.sh/uv/>`_ or above
 - (Optional) `pyenv <https://github.com/pyenv/pyenv>`_
-- (Optional) `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_
 
 Flower uses ``pyproject.toml`` to manage dependencies and configure development tools
 (the ones which support it). ``uv`` is used for dependency management, build, and
@@ -56,29 +55,20 @@ Create Flower Dev Environment
            $ git clone git@github.com:flwrlabs/flower.git
            $ cd flower
 
-2. Create and activate a Python virtual environment for development. See `Set up a
-   virtual env <contributor-how-to-set-up-a-virtual-env.rst>`_ for detailed
-   instructions.
-
-   One way to do this is by using `pyenv <https://github.com/pyenv/pyenv>`_ and
-   `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_. You can also
-   optionally install a specific Python version using pyenv if you haven't already
-   installed your desired version:
+2. Install uv by following the `uv installation instructions
+   <https://docs.astral.sh/uv/getting-started/installation/>`_.
+3. Bootstrap the framework development environment:
 
        ::
 
-           $ pyenv install <your-python-version>
-           $ pyenv virtualenv <your-python-version> <your-env-name>
-           $ pyenv activate <your-env-name>
+           $ ./dev/bootstrap.sh
 
-3. Install ``uv``, which is used to manage dependencies and development workflows.
-4. Navigate to the ``framework`` directory and install the Flower project in development
-   mode, including all optional dependencies:
+   The bootstrap script creates ``framework/.venv`` using the Python version pinned by
+   the repository. Pass a Python version as the first argument to use a different one:
 
        ::
 
-           (your-env-name) $ cd framework
-           (your-env-name) $ uv sync --locked --all-extras --all-groups
+           $ ./dev/bootstrap.sh 3.11.14
 
 *********************
  Convenience Scripts
