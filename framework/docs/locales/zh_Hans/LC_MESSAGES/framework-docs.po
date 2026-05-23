@@ -9,7 +9,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-05-22 00:28+0000\n"
 "PO-Revision-Date: 2026-05-23 06:56+0000\n"
-"Last-Translator: Anonymous <noreply@weblate.org>\n"
+"Last-Translator: Yan Gao <y.gaogy@gmail.com>\n"
 "Language-Team: Chinese (Simplified Han script) <https://hosted.weblate.org/"
 "projects/flower-docs/framework/zh_Hans/>\n"
 "Language: zh_Hans\n"
@@ -93,7 +93,9 @@ msgstr "说明"
 msgid ""
 "Understanding-oriented concept guides explain and discuss key topics and "
 "underlying ideas behind Flower and collaborative AI."
-msgstr "以理解为导向的概念指南解释并讨论了Flower和协作式人工智能背后的关键主题和基本思想。"
+msgstr ""
+"以理解为导向的概念指南解释并讨论了Flower和协作式人工智能背后的关键主题和基本"
+"思想。"
 
 #: ../../source/contribute.rst:58
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:365
@@ -668,8 +670,9 @@ msgid ""
 " profile settings can be found `here "
 "<https://docs.weblate.org/en/latest/user/profile.html>`_."
 msgstr ""
-"您需要做的第一件事就是在本`网页<https://hosted.weblate.org/accounts/register/>`_上创建一个免费的Weblate帐户。有关个人资料设置的更多信息，请参阅`这里"
-" <https://docs.weblate.org/en/latest/user/profile.html>`_。"
+"您需要做的第一件事就是在本`网页<https://hosted.weblate.org/accounts/"
+"register/>`_上创建一个免费的Weblate帐户。有关个人资料设置的更多信息，请参"
+"阅`这里 <https://docs.weblate.org/en/latest/user/profile.html>`_。"
 
 #: ../../source/contributor-how-to-contribute-translations.rst:30
 msgid ""
@@ -678,9 +681,9 @@ msgid ""
 "docs/framework/>`_. Here, you should see the different existing languages"
 " that can be found on the website."
 msgstr ""
-"登录到Weblate后，您可以导航到 \"Flower Framework "
-"\"项目<https://hosted.weblate.org/projects/flower-"
-"docs/framework/>`_。在这里，您可以看到网站上现有的各种语言。"
+"登录到Weblate后，您可以导航到 \"Flower Framework \"项目<https://"
+"hosted.weblate.org/projects/flower-docs/framework/>`_。在这里，您可以看到网站"
+"上现有的各种语言。"
 
 #: ../../source/contributor-how-to-contribute-translations.rst:34
 msgid ""
@@ -694,7 +697,9 @@ msgid ""
 "button on the top right (in the ``Translation status`` section). This "
 "will automatically bring you to the translation interface for "
 "untranslated strings."
-msgstr "最简单的方法是点击右上角（\"翻译状态 \"部分）的 \"翻译 \"按钮。这将自动带您进入未翻译字符串的翻译界面。"
+msgstr ""
+"最简单的方法是点击右上角（\"翻译状态 \"部分）的 \"翻译 \"按钮。这将自动带您进"
+"入未翻译字符串的翻译界面。"
 
 #: ../../source/contributor-how-to-contribute-translations.rst:43
 msgid "This is what the interface looks like:"
@@ -723,15 +728,18 @@ msgid ""
 "translations in ``Other languages``, and the ``History`` of translations "
 "for this string."
 msgstr ""
-"为了帮助翻译，您可以在底部看到 \"邻近字符串\"、\"评论\"（来自其他贡献者）、\"自动建议\"（来自机器翻译引擎）、\"其他语言 "
-"\"中的翻译以及该字符串的 \"历史翻译\"。"
+"为了帮助翻译，您可以在底部看到 \"邻近字符串\"、\"评论\"（来自其他贡献者）"
+"、\"自动建议\"（来自机器翻译引擎）、\"其他语言 \"中的翻译以及该字符串的 \"历"
+"史翻译\"。"
 
 #: ../../source/contributor-how-to-contribute-translations.rst:58
 msgid ""
 "On the right, under the ``String information`` section, you can also "
 "click the link under ``Source string location`` in order to view the "
 "source of the doc file containing the string."
-msgstr "在右侧的 \"字符串信息 \"部分，您还可以单击 \"源字符串位置 \"下的链接，以查看包含字符串的 doc 文件的源文件。"
+msgstr ""
+"在右侧的 \"字符串信息 \"部分，您还可以单击 \"源字符串位置 \"下的链接，以查看"
+"包含字符串的 doc 文件的源文件。"
 
 #: ../../source/contributor-how-to-contribute-translations.rst:62
 msgid ""
@@ -739,8 +747,8 @@ msgid ""
 "this `in-depth guide "
 "<https://docs.weblate.org/en/latest/user/translating.html>`_."
 msgstr ""
-"有关使用 Weblate 进行翻译的更多信息，您可以查看本 \"深入指南 "
-"<https://docs.weblate.org/en/latest/user/translating.html>`_\"。"
+"有关使用 Weblate 进行翻译的更多信息，您可以查看本 \"深入指南 <https://"
+"docs.weblate.org/en/latest/user/translating.html>`_\"。"
 
 #: ../../source/contributor-how-to-contribute-translations.rst:67
 msgid "Add new languages"
@@ -768,8 +776,8 @@ msgid ""
 "tests. For this purpose we are using the VSCode Remote Containers "
 "extension. What is it? Read the following quote:"
 msgstr ""
-"在开发 Flower 框架时，我们希望确保所有贡献者使用相同的开发环境来格式化代码或运行测试。为此，我们使用了 VSCode "
-"远程容器扩展。这是什么？请阅读下面这段话："
+"在开发 Flower 框架时，我们希望确保所有贡献者使用相同的开发环境来格式化代码或"
+"运行测试。为此，我们使用了 VSCode 远程容器扩展。这是什么？请阅读下面这段话："
 
 #: ../../source/contributor-how-to-develop-in-vscode-dev-containers.rst:9
 #, fuzzy
@@ -796,7 +804,10 @@ msgid ""
 "container, where they have full access to the tools, platform, and file "
 "system. This means that you can seamlessly switch your entire development"
 " environment just by connecting to a different container."
-msgstr "工作区文件从本地文件系统加载，或复制或克隆到容器中。扩展在容器内安装和运行，在容器内它们可以完全访问工具、平台和文件系统。这意味着，只需连接到不同的容器，就能无缝切换整个开发环境。"
+msgstr ""
+"工作区文件从本地文件系统加载，或复制或克隆到容器中。扩展在容器内安装和运行，"
+"在容器内它们可以完全访问工具、平台和文件系统。这意味着，只需连接到不同的容器"
+"，就能无缝切换整个开发环境。"
 
 #: ../../source/contributor-how-to-develop-in-vscode-dev-containers.rst:23
 #, fuzzy
@@ -836,8 +847,10 @@ msgid ""
 "area in the bottom left corner of your VSCode window and select the "
 "option *(Re)Open Folder in Container*."
 msgstr ""
-"现在你应该可以开始了。启动 VSCode 时，它会要求你在容器环境中运行，如果你确认，它会自动构建容器并使用它。要手动指示 VSCode 使用 "
-"devcontainer，可以在安装扩展后，点击 VSCode 窗口左下角的绿色区域，然后选择 \"*（重新）在容器中打开文件夹*\"选项。"
+"现在你应该可以开始了。启动 VSCode 时，它会要求你在容器环境中运行，如果你确认"
+"，它会自动构建容器并使用它。要手动指示 VSCode 使用 devcontainer，可以在安装扩"
+"展后，点击 VSCode 窗口左下角的绿色区域，然后选择 \"*（重新）在容器中打开文件"
+"夹*\"选项。"
 
 #: ../../source/contributor-how-to-develop-in-vscode-dev-containers.rst:43
 msgid ""
@@ -892,7 +905,9 @@ msgstr ""
 msgid ""
 "``flwr = { version = \"1.0.0a0\", allow-prereleases = true }`` (without "
 "extras)"
-msgstr "``flwr = { version = \"1.0.0a0\", allow-prereleases = true }`` （不含额外内容）"
+msgstr ""
+"``flwr = { version = \"1.0.0a0\", allow-prereleases = true }`` （不含额外内容"
+"）"
 
 #: ../../source/contributor-how-to-install-development-versions.rst:16
 #, python-brace-format
@@ -920,8 +935,8 @@ msgid ""
 "``flwr = { path = \"../../\", develop = true, extras = [\"simulation\"] "
 "}`` (with extras)"
 msgstr ""
-"``flwr = { path = \"../../\", develop = true, extras = [\"simulation\"] "
-"}`` (包含额外内容)"
+"``flwr = { path = \"../../\", develop = true, extras = [\"simulation\"] }`` "
+"(包含额外内容)"
 
 #: ../../source/contributor-how-to-install-development-versions.rst:24
 msgid "Install ``flwr`` from a local wheel file via ``pyproject.toml``:"
@@ -1279,8 +1294,8 @@ msgid ""
 "<https://packaging.python.org/en/latest/guides/distributing-packages-"
 "using-setuptools/#choosing-a-versioning-scheme>`_"
 msgstr ""
-"`PyPA 选择版本控制方案 <https://packaging.python.org/en/latest/guides"
-"/distributing-packages-using-setuptools/#choosing-a-versioning-scheme>`_"
+"`PyPA 选择版本控制方案 <https://packaging.python.org/en/latest/guides/"
+"distributing-packages-using-setuptools/#choosing-a-versioning-scheme>`_"
 
 #: ../../source/contributor-how-to-release-flower.rst:69
 msgid ""
@@ -1289,9 +1304,9 @@ msgid ""
 "<https://semver.org/spec/v2.0.0.html#spec-item-11>`_ (specifically item "
 "11 on precedence)."
 msgstr ""
-"请注意，PyPA 所定义的方法与 SemVer 2.0.0 "
-"规范不兼容，详情请查阅《语义版本规范》<https://semver.org/spec/v2.0.0.html#spec-"
-"item-11>`_（特别是关于优先级的第 11 项）。"
+"请注意，PyPA 所定义的方法与 SemVer 2.0.0 规范不兼容，详情请查阅《语义版本规范"
+"》<https://semver.org/spec/v2.0.0.html#spec-item-11>`_（特别是关于优先级的第 "
+"11 项）。"
 
 #: ../../source/contributor-how-to-release-flower.rst:75
 msgid "Pre-release classification"
@@ -1306,7 +1321,9 @@ msgid ""
 "RC: feature complete, no known issues (apart from issues that are "
 "classified as \"won't fix\" for the next stable release) - if no issues "
 "surface this will become the next stable release"
-msgstr "RC：功能完整，无已知问题（除了下一个稳定版中被列为 \"不会修复 \"的问题）--如果没有问题出现，这将成为下一个稳定版"
+msgstr ""
+"RC：功能完整，无已知问题（除了下一个稳定版中被列为 \"不会修复 \"的问题）--如"
+"果没有问题出现，这将成为下一个稳定版"
 
 #: ../../source/contributor-how-to-release-flower.rst:82
 msgid "Beta: feature complete, allowed to have known issues"
@@ -1348,8 +1365,8 @@ msgid ""
 "most `Python 3.11 <https://docs.python.org/3.11/>`_ for running Flower "
 "simulations."
 msgstr ""
-"由于已知与 `ray <https://docs.ray.io/en/latest/>`_ 不兼容，我们目前建议最多使用 `Python 3.11"
-" <https://docs.python.org/3.11/>`_ 运行 Flower 仿真。"
+"由于已知与 `ray <https://docs.ray.io/en/latest/>`_ 不兼容，我们目前建议最多使"
+"用 `Python 3.11 <https://docs.python.org/3.11/>`_ 运行 Flower 仿真。"
 
 #: ../../source/contributor-how-to-set-up-a-virtual-env.rst:24
 #, fuzzy
@@ -1372,7 +1389,9 @@ msgstr ""
 msgid ""
 "Once Pyenv is set up, you can use it to install `Python Version 3.10 "
 "<https://docs.python.org/3.10/>`_ or above:"
-msgstr "一旦设置好 Pyenv，就可以用它来安装 `Python 3.10 <https://docs.python.org/3.10/>`_ 或更高版本："
+msgstr ""
+"一旦设置好 Pyenv，就可以用它来安装 `Python 3.10 <https://docs.python.org/"
+"3.10/>`_ 或更高版本："
 
 #: ../../source/contributor-how-to-set-up-a-virtual-env.rst:38
 msgid "Create the virtualenv with:"
@@ -1498,8 +1517,8 @@ msgid ""
 "where to start to increase your chances of getting your PR accepted into "
 "the Flower codebase."
 msgstr ""
-"我们欢迎为Flower做出代码贡献！然而，要知道从哪里开始并非易事。因此，我们提出了一些建议，告诉您从哪里开始，以增加您的 PR 被 Flower"
-" 代码库接受的机会。"
+"我们欢迎为Flower做出代码贡献！然而，要知道从哪里开始并非易事。因此，我们提出"
+"了一些建议，告诉您从哪里开始，以增加您的 PR 被 Flower 代码库接受的机会。"
 
 #: ../../source/contributor-ref-good-first-contributions.rst:11
 msgid "Where to start"
@@ -1633,7 +1652,9 @@ msgid ""
 "GitHub, itself, is a code hosting platform for version control and "
 "collaboration. It allows for everyone to collaborate and work from "
 "anywhere on remote repositories."
-msgstr "GitHub 本身是一个用于版本控制和协作的代码托管平台。它允许每个人在任何地方对远程仓库进行协作和工作。"
+msgstr ""
+"GitHub 本身是一个用于版本控制和协作的代码托管平台。它允许每个人在任何地方对远"
+"程仓库进行协作和工作。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:27
 msgid ""
@@ -1648,8 +1669,8 @@ msgid ""
 "locally and keep track of them using Git and then you upload your new "
 "history back to GitHub."
 msgstr ""
-"通用的 Git 和 GitHub 工作流程背后的理念可以归结为：从 GitHub 上的远程仓库下载代码，在本地进行修改并使用 Git "
-"进行跟踪，然后将新的历史记录上传回 GitHub。"
+"通用的 Git 和 GitHub 工作流程背后的理念可以归结为：从 GitHub 上的远程仓库下载"
+"代码，在本地进行修改并使用 Git 进行跟踪，然后将新的历史记录上传回 GitHub。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:33
 msgid "**Forking the Flower repository**"
@@ -1674,8 +1695,9 @@ msgid ""
 "(i.e., in your own list of repositories). Once created, you should see on"
 " the top left corner that you are looking at your own version of Flower."
 msgstr ""
-"您可以更改名称，但没有必要，因为这个版本的 Flower "
-"将是您自己的，并位于您自己的账户中（即，在您自己的版本库列表中）。创建完成后，您会在左上角看到自己的 Flower 版本。"
+"您可以更改名称，但没有必要，因为这个版本的 Flower 将是您自己的，并位于您自己"
+"的账户中（即，在您自己的版本库列表中）。创建完成后，您会在左上角看到自己的 "
+"Flower 版本。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:47
 msgid "**Cloning your forked repository**"
@@ -1688,14 +1710,16 @@ msgid ""
 "first click on the ``Code`` button on the right, this will give you the "
 "ability to copy the HTTPS link of the repository."
 msgstr ""
-"下一步是在你的机器上下载分叉版本库，以便对其进行修改。在分叉版本库页面上，首先点击右侧的 \"代码 \"按钮，这样就能复制版本库的 HTTPS "
-"链接。"
+"下一步是在你的机器上下载分叉版本库，以便对其进行修改。在分叉版本库页面上，首"
+"先点击右侧的 \"代码 \"按钮，这样就能复制版本库的 HTTPS 链接。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:55
 msgid ""
 "Once you copied the \\<URL\\>, you can open a terminal on your machine, "
 "navigate to the place you want to download the repository to and type:"
-msgstr "一旦复制了 （<URL\\>），你就可以在你的机器上打开一个终端，导航到你想下载软件源的地方，然后键入："
+msgstr ""
+"一旦复制了 （<URL\\>），你就可以在你的机器上打开一个终端，导航到你想下载软件"
+"源的地方，然后键入："
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:62
 #, fuzzy
@@ -1721,8 +1745,9 @@ msgid ""
 "previously mentioned by going to our fork repository on our GitHub "
 "account and copying the link."
 msgstr ""
-"在这里，我们需要为我们的版本库添加一个 origin。origin 是远程 fork 仓库的 "
-"\\<URL/>。要获得它，我们可以像前面提到的那样，访问 GitHub 账户上的分叉仓库并复制链接。"
+"在这里，我们需要为我们的版本库添加一个 origin。origin 是远程 fork 仓库的 \\"
+"<URL/>。要获得它，我们可以像前面提到的那样，访问 GitHub 账户上的分叉仓库并复"
+"制链接。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:78
 msgid ""
@@ -1755,14 +1780,17 @@ msgid ""
 "remote address of the forked repository we created, i.e. the copy (fork) "
 "in our own account."
 msgstr ""
-"上游是父版本库（这里是 Flower）的 GitHub 远程地址，即我们最终要贡献的版本库，因此需要最新的历史记录。origin "
-"只是我们创建的分叉仓库的 GitHub 远程地址，即我们自己账户中的副本（分叉）。"
+"上游是父版本库（这里是 Flower）的 GitHub 远程地址，即我们最终要贡献的版本库，"
+"因此需要最新的历史记录。origin 只是我们创建的分叉仓库的 GitHub 远程地址，即我"
+"们自己账户中的副本（分叉）。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:100
 msgid ""
 "To make sure our local version of the fork is up-to-date with the latest "
 "changes from the Flower repository, we can execute the following command:"
-msgstr "为了确保本地版本的分叉程序与 Flower 代码库的最新更改保持一致，我们可以执行以下命令："
+msgstr ""
+"为了确保本地版本的分叉程序与 Flower 代码库的最新更改保持一致，我们可以执行以"
+"下命令："
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:109
 msgid "Setting up the coding environment"
@@ -1802,7 +1830,9 @@ msgid ""
 "To make the history cleaner and easier to work with, it is good practice "
 "to create a new branch for each feature/project that needs to be "
 "implemented."
-msgstr "为了使历史记录更简洁、更易于操作，为每个需要实现的功能/项目创建一个新分支是个不错的做法。"
+msgstr ""
+"为了使历史记录更简洁、更易于操作，为每个需要实现的功能/项目创建一个新分支是个"
+"不错的做法。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:136
 msgid ""
@@ -1827,7 +1857,9 @@ msgid ""
 "Don't forget to test and format your code! Otherwise your code won't be "
 "able to be merged into the Flower repository. This is done so the "
 "codebase stays consistent and easy to understand."
-msgstr "不要忘记测试和格式化您的代码！否则您的代码将无法并入 Flower 代码库。这样做是为了使代码库保持一致并易于理解。"
+msgstr ""
+"不要忘记测试和格式化您的代码！否则您的代码将无法并入 Flower 代码库。这样做是"
+"为了使代码库保持一致并易于理解。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:148
 msgid "To do so, we have written a few scripts that you can execute:"
@@ -1887,7 +1919,9 @@ msgid ""
 "Once we have committed our changes, we have effectively updated our local"
 " history, but GitHub has no way of knowing this unless we push our "
 "changes to our origin's remote address:"
-msgstr "一旦提交了修改，我们就有效地更新了本地历史记录，但除非我们将修改推送到原点的远程地址，否则 GitHub 无法得知："
+msgstr ""
+"一旦提交了修改，我们就有效地更新了本地历史记录，但除非我们将修改推送到原点的"
+"远程地址，否则 GitHub 无法得知："
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:187
 msgid ""
@@ -1930,7 +1964,9 @@ msgid ""
 "In this example you can see that the request is to merge the branch "
 "``doc-fixes`` from my forked repository to branch ``main`` from the "
 "Flower repository."
-msgstr "在这个例子中，你可以看到请求将我分叉的版本库中的分支 ``doc-fixes`` 合并到 Flower 版本库中的分支 ``main``。"
+msgstr ""
+"在这个例子中，你可以看到请求将我分叉的版本库中的分支 ``doc-fixes`` 合并到 "
+"Flower 版本库中的分支 ``main``。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:214
 #, fuzzy
@@ -1939,8 +1975,8 @@ msgid ""
 "guidelines, otherwise it won't be possible to merge the PR. So in this "
 "case, a correct title might be ``docs(framework:skip) Fix typos``."
 msgstr ""
-"应该修改标题以符合 :ref:`pr_title_format` 准则，否则将无法合并 PR。因此，在这种情况下，正确的标题可能是 "
-"``docs(framework:skip)修复错字``。"
+"应该修改标题以符合 :ref:`pr_title_format` 准则，否则将无法合并 PR。因此，在这"
+"种情况下，正确的标题可能是 ``docs(framework:skip)修复错字``。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:218
 msgid ""
@@ -1948,7 +1984,9 @@ msgid ""
 "does and to link it to existing issues. We have placed comments (that "
 "won't be rendered once the PR is opened) to guide you through the "
 "process."
-msgstr "中间的输入框供您描述 PR 的作用，并将其与现有问题联系起来。我们在此放置了注释（一旦 PR 打开，注释将不会显示），以指导您完成整个过程。"
+msgstr ""
+"中间的输入框供您描述 PR 的作用，并将其与现有问题联系起来。我们在此放置了注释"
+"（一旦 PR 打开，注释将不会显示），以指导您完成整个过程。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:222
 #, fuzzy
@@ -1960,13 +1998,17 @@ msgid ""
 "At the bottom you will find the button to open the PR. This will notify "
 "reviewers that a new PR has been opened and that they should look over it"
 " to merge or to request changes."
-msgstr "在底部，您可以找到打开 PR 的按钮。这将通知审核人员新的 PR 已经打开，他们应该查看该 PR 以进行合并或要求修改。"
+msgstr ""
+"在底部，您可以找到打开 PR 的按钮。这将通知审核人员新的 PR 已经打开，他们应该"
+"查看该 PR 以进行合并或要求修改。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:228
 msgid ""
 "If your PR is not yet ready for review, and you don't want to notify "
 "anyone, you have the option to create a draft pull request:"
-msgstr "如果您的 PR 尚未准备好接受审核，而且您不想通知任何人，您可以选择创建一个草案拉取请求："
+msgstr ""
+"如果您的 PR 尚未准备好接受审核，而且您不想通知任何人，您可以选择创建一个草案"
+"拉取请求："
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:232
 msgid "**Making new changes**"
@@ -1977,7 +2019,9 @@ msgid ""
 "Once the PR has been opened (as draft or not), you can still push new "
 "commits to it the same way we did before, by making changes to the branch"
 " associated with the PR."
-msgstr "一旦 PR 被打开（无论是否作为草案），你仍然可以像以前一样，通过修改与 PR 关联的分支来推送新的提交。"
+msgstr ""
+"一旦 PR 被打开（无论是否作为草案），你仍然可以像以前一样，通过修改与 PR 关联"
+"的分支来推送新的提交。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:236
 msgid "**Review the PR**"
@@ -2023,13 +2067,17 @@ msgstr "**一旦 PR 被合并**"
 msgid ""
 "If all the automatic tests have passed and reviewers have no more changes"
 " to request, they can approve the PR and merge it."
-msgstr "如果所有自动测试都已通过，且审核员不再需要修改，他们就可以批准 PR 并将其合并。"
+msgstr ""
+"如果所有自动测试都已通过，且审核员不再需要修改，他们就可以批准 PR 并将其合并"
+"。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:265
 msgid ""
 "Once it is merged, you can delete the branch on GitHub (a button should "
 "appear to do so) and also delete it locally by doing:"
-msgstr "合并后，您可以在 GitHub 上删除该分支（会出现一个删除按钮），也可以在本地删除该分支："
+msgstr ""
+"合并后，您可以在 GitHub 上删除该分支（会出现一个删除按钮），也可以在本地删除"
+"该分支："
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:273
 msgid "Then you should update your forked repository by doing:"
@@ -2063,7 +2111,9 @@ msgstr ""
 msgid ""
 "Most of our guides do not follow this new format yet, and changing their "
 "title is (unfortunately) more involved than one might think."
-msgstr "我们的大多数指南还没有采用这种新格式，而更改其标题（不幸的是）比人们想象的要复杂得多。"
+msgstr ""
+"我们的大多数指南还没有采用这种新格式，而更改其标题（不幸的是）比人们想象的要"
+"复杂得多。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:296
 #, fuzzy
@@ -2134,8 +2184,9 @@ msgid ""
 "is **very important** to avoid that, breaking links can harm our search "
 "engine ranking."
 msgstr ""
-"您可能已经注意到，文件名仍然反映了旧的措辞。如果我们只是更改文件，那么就会破坏与该文件的所有现有链接--"
-"避免这种情况是***重要的，破坏链接会损害我们的搜索引擎排名。"
+"您可能已经注意到，文件名仍然反映了旧的措辞。如果我们只是更改文件，那么就会破"
+"坏与该文件的所有现有链接--避免这种情况是***重要的，破坏链接会损害我们的搜索引"
+"擎排名。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:325
 #, fuzzy
@@ -2200,7 +2251,9 @@ msgstr "将更改推送到分叉"
 msgid ""
 "Open a PR (as shown above) with title ``docs(framework) Update how-to "
 "guide title``"
-msgstr "打开一个 PR（如上图所示），标题为\"`docs(framework) Update how-to guide title```\"。"
+msgstr ""
+"打开一个 PR（如上图所示），标题为\"`docs(framework) Update how-to guide "
+"title```\"。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:349
 msgid "Wait for it to be approved!"
@@ -2267,7 +2320,8 @@ msgid ""
 msgstr ""
 "其中 ``<type>`` 需要使用 ``{ci, fix, feat, docs, refactor, break}``, "
 "``<project>`` 应该使用 ``{framework, baselines, datasets, examples, 或者 '*' "
-"当修改多个项目时需要使用 ':skip'标记}``, 并且 ``<subject>`` 应该以一个大写的动词开始。"
+"当修改多个项目时需要使用 ':skip'标记}``, 并且 ``<subject>`` 应该以一个大写的"
+"动词开始。"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:384
 #, fuzzy
@@ -2325,8 +2379,8 @@ msgstr "feat(框架) 添加 flwr 构建 CLI 命令。"
 #, fuzzy
 msgid "``Add flwr build CLI command.`` (missing ``<type>(<project>)``)"
 msgstr ""
-"``添加 flwr build CLI 命令.``（缺少``<type>(<project>)``） ``Add flwr build CLI "
-"command.`` (missing ``<type>(<project>)``)"
+"``添加 flwr build CLI 命令.``（缺少``<type>(<project>)``） ``Add flwr build "
+"CLI command.`` (missing ``<type>(<project>)``)"
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:3
 msgid "Get started as a contributor"
@@ -2395,7 +2449,9 @@ msgstr "适用于 macOS"
 msgid ""
 "Install `homebrew <https://brew.sh/>`_. Don't forget the post-"
 "installation actions to add `brew` to your PATH."
-msgstr "安装 `homebrew <https://brew.sh/>`_。别忘了安装后的操作，将 `brew` 添加到你的 PATH。"
+msgstr ""
+"安装 `homebrew <https://brew.sh/>`_。别忘了安装后的操作，将 `brew` 添加到你"
+"的 PATH。"
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:32
 #, fuzzy
@@ -2532,14 +2588,18 @@ msgid ""
 "For developers who prefer not to install the hook permanently, it is "
 "possible to execute a one-time check prior to committing changes by using"
 " the following command:"
-msgstr "对于不想永久安装钩子的开发人员，可以使用以下命令在提交更改之前执行一次性检查："
+msgstr ""
+"对于不想永久安装钩子的开发人员，可以使用以下命令在提交更改之前执行一次性检查"
+"："
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:144
 #, fuzzy
 msgid ""
 "This executes the formatting and linting checks/tests on all the files "
 "without modifying the default behavior of ``git commit``."
-msgstr "这将在不修改 ``git commit`` 默认行为的情况下对所有文件执行格式化和词排检查/测试。"
+msgstr ""
+"这将在不修改 ``git commit`` 默认行为的情况下对所有文件执行格式化和词排检查/测"
+"试。"
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:148
 msgid "Run Github Actions (CI) locally"
@@ -4730,7 +4790,9 @@ msgid ""
 "breakthroughs and provides important business insights. However, such "
 "data is also sensitive and there is a risk of compromising individual "
 "privacy."
-msgstr "医疗保健、金融交易、用户偏好等数据集中的信息非常宝贵，有可能带来科学突破并提供重要的商业见解。然而，这些数据也是敏感数据，存在泄露个人隐私的风险。"
+msgstr ""
+"医疗保健、金融交易、用户偏好等数据集中的信息非常宝贵，有可能带来科学突破并提"
+"供重要的商业见解。然而，这些数据也是敏感数据，存在泄露个人隐私的风险。"
 
 #: ../../source/explanation-differential-privacy.rst:14
 #, fuzzy
@@ -4739,7 +4801,9 @@ msgid ""
 "attacks like Re-identification and Data Linkage. That's where "
 "differential privacy comes in. It provides the possibility of analyzing "
 "data while ensuring the privacy of individuals."
-msgstr "单靠匿名等传统方法是行不通的，因为会受到重新识别和数据链接等攻击。这就是差异化隐私的用武之地。它提供了在分析数据的同时确保个人隐私的可能性。"
+msgstr ""
+"单靠匿名等传统方法是行不通的，因为会受到重新识别和数据链接等攻击。这就是差异"
+"化隐私的用武之地。它提供了在分析数据的同时确保个人隐私的可能性。"
 
 #: ../../source/explanation-differential-privacy.rst:22
 #, fuzzy
@@ -4751,9 +4815,10 @@ msgid ""
 "preserves group patterns while obscuring individual details, ensuring the"
 " individual's information remains hidden in the crowd."
 msgstr ""
-"试想一下，两个数据集除了一条记录（例如 Alice "
-"的数据）之外完全相同。差分隐私（DP）可以保证任何分析（M），比如计算平均收入，对两个数据集都会产生几乎相同的结果（O 和 O' "
-"将是相似的）。这既保留了群体模式，又掩盖了个人细节，确保个人的信息隐藏在人群中。"
+"试想一下，两个数据集除了一条记录（例如 Alice 的数据）之外完全相同。差分隐私（"
+"DP）可以保证任何分析（M），比如计算平均收入，对两个数据集都会产生几乎相同的结"
+"果（O 和 O' 将是相似的）。这既保留了群体模式，又掩盖了个人细节，确保个人的信"
+"息隐藏在人群中。"
 
 #: ../../source/explanation-differential-privacy.rst:28
 #, fuzzy
@@ -4767,7 +4832,9 @@ msgid ""
 "noise to the output of the analysis to mask the contribution of each "
 "individual in the data while preserving the overall accuracy of the "
 "analysis."
-msgstr "实现 DP 的最常用机制之一是在分析输出中加入足够的噪音，以掩盖数据中每个个体的贡献，同时保持分析的整体准确性。"
+msgstr ""
+"实现 DP 的最常用机制之一是在分析输出中加入足够的噪音，以掩盖数据中每个个体的"
+"贡献，同时保持分析的整体准确性。"
 
 #: ../../source/explanation-differential-privacy.rst:38
 #, fuzzy
@@ -4786,10 +4853,11 @@ msgid ""
 "databases, D :sub:`1` and D :sub:`2`, that differ in only a single "
 "record, and for all possible outputs S ⊆ Range(A):"
 msgstr ""
-"差分隐私（Differential "
-"Privacy，DP）针对对手通过随机算法的输出所能推断出的信息提供统计保证。它为单个个体通过添加噪声对算法输出的影响提供了一个无条件的上限[1]。如果任意两个相邻的数据库D"
-" :sub:`1`和D :sub:`2`只有一条记录不同，并且对于所有可能的输出S ⊆ "
-"Range(A)，随机化机制M提供（:math:`epsilon`，:math:`\\delta`）差异隐私："
+"差分隐私（Differential Privacy，DP）针对对手通过随机算法的输出所能推断出的信"
+"息提供统计保证。它为单个个体通过添加噪声对算法输出的影响提供了一个无条件的上"
+"限[1]。如果任意两个相邻的数据库D :sub:`1`和D :sub:`2`只有一条记录不同，并且对"
+"于所有可能的输出S ⊆ Range(A)，随机化机制M提供（:math:`epsilon`，:math:`\\d"
+"elta`）差异隐私："
 
 #: ../../source/explanation-differential-privacy.rst:48
 #, fuzzy, python-brace-format
@@ -4812,8 +4880,10 @@ msgid ""
 "proportional to the sensitivity of the output, which measures the maximum"
 " change in the output due to the inclusion or removal of a single record."
 msgstr ""
-":math:`\\epsilon`参数也称为隐私预算，是衡量隐私损失的指标。较低的 :math:`\\epsilon` "
-"值表示较高的隐私级别，但也可能降低效用。:math:`\\delta`参数考虑了:math:`\\epsilon`上限不成立的小概率。实现差异化隐私所需的噪声量与输出的灵敏度成正比，而输出的灵敏度是指由于包含或删除一条记录而导致的输出的最大变化。"
+":math:`\\epsilon`参数也称为隐私预算，是衡量隐私损失的指标。较低的 :math:`\\e"
+"psilon` 值表示较高的隐私级别，但也可能降低效用。:math:`\\delta`参数考虑"
+"了:math:`\\epsilon`上限不成立的小概率。实现差异化隐私所需的噪声量与输出的灵敏"
+"度成正比，而输出的灵敏度是指由于包含或删除一条记录而导致的输出的最大变化。"
 
 #: ../../source/explanation-differential-privacy.rst:63
 #, fuzzy
@@ -4835,10 +4905,11 @@ msgid ""
 "model training. Additionally, such noise can be incorporated into the "
 "model's output."
 msgstr ""
-"机器学习中可以利用 DP "
-"来保护训练数据的隐私。差分保密机器学习算法的设计方式是防止算法学习到任何单个数据点的任何特定信息，从而防止模型泄露敏感信息。根据引入噪声的阶段，有多种方法可将"
-" DP "
-"应用于机器学习算法。一种方法是在训练数据（特征或标签）中添加噪声，另一种方法是在模型训练过程中向损失函数的梯度注入噪声。此外，这种噪声还可以被纳入模型的输出中。"
+"机器学习中可以利用 DP 来保护训练数据的隐私。差分保密机器学习算法的设计方式是"
+"防止算法学习到任何单个数据点的任何特定信息，从而防止模型泄露敏感信息。根据引"
+"入噪声的阶段，有多种方法可将 DP 应用于机器学习算法。一种方法是在训练数据（特"
+"征或标签）中添加噪声，另一种方法是在模型训练过程中向损失函数的梯度注入噪声。"
+"此外，这种噪声还可以被纳入模型的输出中。"
 
 #: ../../source/explanation-differential-privacy.rst:77
 #, fuzzy
@@ -4855,7 +4926,11 @@ msgid ""
 " about the local data. These leaks can be exploited by attacks such as "
 "membership inference and property inference attacks, or model inversion "
 "attacks."
-msgstr "联合学习是一种数据最小化方法，允许多方在不共享原始数据的情况下合作训练一个模型。然而，联合学习也带来了新的隐私挑战。各方与中央服务器之间的模型更新可能会泄露本地数据信息。这些泄漏信息可能会被攻击利用，如成员推断攻击、属性推断攻击或模型反转攻击。"
+msgstr ""
+"联合学习是一种数据最小化方法，允许多方在不共享原始数据的情况下合作训练一个模"
+"型。然而，联合学习也带来了新的隐私挑战。各方与中央服务器之间的模型更新可能会"
+"泄露本地数据信息。这些泄漏信息可能会被攻击利用，如成员推断攻击、属性推断攻击"
+"或模型反转攻击。"
 
 #: ../../source/explanation-differential-privacy.rst:86
 #, fuzzy
@@ -4873,8 +4948,9 @@ msgid ""
 " learning based on where the noise is added: at the server (also known as"
 " the center) or at the client (also known as the local)."
 msgstr ""
-"根据提供隐私的粒度或添加噪声的位置，联合学习中存在不同形式的 DP。在本说明中，我们将根据添加噪声的位置，重点介绍联合学习中利用 DP "
-"的两种方法：在服务器（也称为中心）或客户端（也称为本地）。"
+"根据提供隐私的粒度或添加噪声的位置，联合学习中存在不同形式的 DP。在本说明中，"
+"我们将根据添加噪声的位置，重点介绍联合学习中利用 DP 的两种方法：在服务器（也"
+"称为中心）或客户端（也称为本地）。"
 
 #: ../../source/explanation-differential-privacy.rst:94
 #, fuzzy
@@ -4882,7 +4958,9 @@ msgid ""
 "**Central Differential Privacy**: DP is applied by the server and the "
 "goal is to prevent the aggregated model from leaking information about "
 "each client's data."
-msgstr "**中央差分隐私**： DP 由服务器应用，目标是防止聚合模型泄露每个客户的数据信息。"
+msgstr ""
+"**中央差分隐私**： DP 由服务器应用，目标是防止聚合模型泄露每个客户的数据信息"
+"。"
 
 #: ../../source/explanation-differential-privacy.rst:96
 #, fuzzy
@@ -4891,7 +4969,9 @@ msgid ""
 "sending any information to the server and the goal is to prevent the "
 "updates that are sent to the server from leaking any information about "
 "the client's data."
-msgstr "**本地差分隐私**： 在向服务器发送任何信息之前，在客户端应用 DP，目的是防止向服务器发送的更新泄露任何有关客户端数据的信息。"
+msgstr ""
+"**本地差分隐私**： 在向服务器发送任何信息之前，在客户端应用 DP，目的是防止向"
+"服务器发送的更新泄露任何有关客户端数据的信息。"
 
 #: ../../source/explanation-differential-privacy.rst:101
 #: ../../source/explanation-differential-privacy.rst:107
@@ -4906,7 +4986,9 @@ msgid ""
 "In this approach, which is also known as user-level DP, the central "
 "server is responsible for adding noise to the globally aggregated "
 "parameters. It should be noted that trust in the server is required."
-msgstr "在这种方法（也称为用户级 DP）中，中央服务器负责在全局汇总参数中添加噪声。需要注意的是，这需要对服务器的信任。"
+msgstr ""
+"在这种方法（也称为用户级 DP）中，中央服务器负责在全局汇总参数中添加噪声。需要"
+"注意的是，这需要对服务器的信任。"
 
 #: ../../source/explanation-differential-privacy.rst:112
 #, fuzzy
@@ -4923,8 +5005,12 @@ msgid ""
 " by restricting the `L2` norm of the clients' model updates, ensuring "
 "that larger updates are scaled down to fit within the norm `S`."
 msgstr ""
-"虽然在联合学习中实现中央数据处理的方法有很多种，但我们将重点放在[2]和[3]提出的算法上。总体方法是剪辑客户端发送的模型更新，并在聚合模型中添加一定量的噪声。在每次迭代中，以特定概率随机选择一组客户端进行训练。每个客户端对自己的数据进行局部训练。然后，每个客户端的更新会被某个值`S`（灵敏度`S`）剪切。这将限制任何单个客户端的影响，这对隐私至关重要，通常也有利于稳健性。实现这一点的常用方法是限制客户机模型更新的"
-" `L2` 准则，确保较大的更新被缩减以适应 `S` 准则。"
+"虽然在联合学习中实现中央数据处理的方法有很多种，但我们将重点放在[2]和[3]提出"
+"的算法上。总体方法是剪辑客户端发送的模型更新，并在聚合模型中添加一定量的噪声"
+"。在每次迭代中，以特定概率随机选择一组客户端进行训练。每个客户端对自己的数据"
+"进行局部训练。然后，每个客户端的更新会被某个值`S`（灵敏度`S`）剪切。这将限制"
+"任何单个客户端的影响，这对隐私至关重要，通常也有利于稳健性。实现这一点的常用"
+"方法是限制客户机模型更新的 `L2` 准则，确保较大的更新被缩减以适应 `S` 准则。"
 
 #: ../../source/explanation-differential-privacy.rst:123
 #, fuzzy
@@ -4940,8 +5026,9 @@ msgid ""
 "mechanism is used with a noise sampled from `N (0, σ²)` where `σ = ( "
 "noise_scale * S ) / (number of sampled clients)`."
 msgstr ""
-"然后，使用高斯机制添加噪声，以扭曲所有客户端的更新总和。噪声量与灵敏度值成正比，以获得隐私保证。高斯机制的噪声采样范围为 `N (0, σ²)` "
-"，其中 σ = ( 噪声规模 * S ) / (采样客户数)`。"
+"然后，使用高斯机制添加噪声，以扭曲所有客户端的更新总和。噪声量与灵敏度值成正"
+"比，以获得隐私保证。高斯机制的噪声采样范围为 `N (0, σ²)` ，其中 σ = ( 噪声规"
+"模 * S ) / (采样客户数)`。"
 
 #: ../../source/explanation-differential-privacy.rst:134
 #, fuzzy
@@ -4961,7 +5048,9 @@ msgid ""
 "**Fixed Clipping** : A predefined fix threshold is set for the magnitude "
 "of clients' updates. Any update exceeding this threshold is clipped back "
 "to the threshold value."
-msgstr "** 固定削波** ： 为客户端更新的大小设置了一个预定义的固定阈值。任何超过该阈值的更新都会被剪切回阈值。"
+msgstr ""
+"** 固定削波** ： 为客户端更新的大小设置了一个预定义的固定阈值。任何超过该阈值"
+"的更新都会被剪切回阈值。"
 
 #: ../../source/explanation-differential-privacy.rst:141
 #, fuzzy
@@ -4970,7 +5059,9 @@ msgid ""
 "on the observed update distribution [4]. It means that the clipping value"
 " is tuned during the rounds with respect to the quantile of the update "
 "norm distribution."
-msgstr "** 自适应削波** ： 削波阈值根据观察到的更新分布动态调整[4]。这意味着，在各轮中，会根据更新规范分布的量化值调整削波值。"
+msgstr ""
+"** 自适应削波** ： 削波阈值根据观察到的更新分布动态调整[4]。这意味着，在各轮"
+"中，会根据更新规范分布的量化值调整削波值。"
 
 #: ../../source/explanation-differential-privacy.rst:145
 #, fuzzy
@@ -4978,7 +5069,9 @@ msgid ""
 "The choice between fixed and adaptive clipping depends on various factors"
 " such as privacy requirements, data distribution, model complexity, and "
 "others."
-msgstr "在固定剪切和自适应剪切之间做出选择取决于各种因素，如隐私要求、数据分布、模型复杂性等。"
+msgstr ""
+"在固定剪切和自适应剪切之间做出选择取决于各种因素，如隐私要求、数据分布、模型"
+"复杂性等。"
 
 #: ../../source/explanation-differential-privacy.rst:149
 #: ../../source/explanation-differential-privacy.rst:155
@@ -4995,8 +5088,9 @@ msgid ""
 "that local DP leads to a decrease in accuracy but better privacy in "
 "comparison to central DP."
 msgstr ""
-"在这种方法中，每个客户端都负责执行 DP。本地 DP 避免了对完全可信的聚合器的需求，但需要注意的是，与中央 DP 相比，本地 DP "
-"会降低准确性，但却能更好地保护隐私。"
+"在这种方法中，每个客户端都负责执行 DP。本地 DP 避免了对完全可信的聚合器的需求"
+"，但需要注意的是，与中央 DP 相比，本地 DP 会降低准确性，但却能更好地保护隐私"
+"。"
 
 #: ../../source/explanation-differential-privacy.rst:160
 #, fuzzy
@@ -5011,8 +5105,9 @@ msgid ""
 "the sensitivity of the local model to be ∆, Gaussian noise is applied "
 "with a noise scale of σ where:"
 msgstr ""
-"每个客户端在向服务器发送本地更新之前，都会在本地更新中加入噪声。为了实现（:math:`\\epsilon`, "
-":math:`\\delta`）-DP，考虑到本地模型的灵敏度为 ∆，应用了高斯噪声，噪声尺度为 σ，其中："
+"每个客户端在向服务器发送本地更新之前，都会在本地更新中加入噪声。为了实现"
+"（:math:`\\epsilon`, :math:`\\delta`）-DP，考虑到本地模型的灵敏度为 ∆，应用了"
+"高斯噪声，噪声尺度为 σ，其中："
 
 #: ../../source/explanation-differential-privacy.rst:166
 #, fuzzy
@@ -5032,7 +5127,9 @@ msgid ""
 "Each client adds noise to the gradients of the model during the local "
 "training (DP-SGD). More specifically, in this approach, gradients are "
 "clipped and an amount of calibrated noise is injected into the gradients."
-msgstr "在局部训练过程中，每个客户端都会向模型的梯度添加噪声（DP-SGD）。更具体地说，在这种方法中，梯度会被剪切，并在梯度中注入一定量的校准噪声。"
+msgstr ""
+"在局部训练过程中，每个客户端都会向模型的梯度添加噪声（DP-SGD）。更具体地说，"
+"在这种方法中，梯度会被剪切，并在梯度中注入一定量的校准噪声。"
 
 #: ../../source/explanation-differential-privacy.rst:175
 #, fuzzy
@@ -5093,7 +5190,9 @@ msgid ""
 "There are two main approaches to evaluating models in federated learning "
 "systems: centralized (or server-side) evaluation and federated (or "
 "client-side) evaluation."
-msgstr "评估联合学习系统中的模型主要有两种方法：集中（或服务器端）评估和联邦（或客户端）评估。"
+msgstr ""
+"评估联合学习系统中的模型主要有两种方法：集中（或服务器端）评估和联邦（或客户"
+"端）评估。"
 
 #: ../../source/explanation-federated-evaluation.rst:14
 msgid "Centralized Evaluation"
@@ -5109,7 +5208,9 @@ msgid ""
 "evaluation function during initialization. An evaluation function is any "
 "function that can take the current global model parameters as input and "
 "return evaluation results:"
-msgstr "所有内置策略都通过在初始化过程中提供一个评估函数来支持集中评估。评估函数是任何可以将当前全局模型参数作为输入并返回评估结果的函数："
+msgstr ""
+"所有内置策略都通过在初始化过程中提供一个评估函数来支持集中评估。评估函数是任"
+"何可以将当前全局模型参数作为输入并返回评估结果的函数："
 
 #: ../../source/explanation-federated-evaluation.rst:78
 msgid "Custom Strategies"
@@ -10001,8 +10102,9 @@ msgid ""
 "communication is done in a secure manner, using trusted communication "
 "methods."
 msgstr ""
-"系统的安全性依赖于超级链接和每个超级节点的凭证。因此，必须保护和安全存储凭证，以避免公钥基础设施 (PKI) "
-"假冒攻击等安全风险。节点验证机制还涉及人机交互，因此请确保使用可信的通信方法，以安全的方式进行所有通信。"
+"系统的安全性依赖于超级链接和每个超级节点的凭证。因此，必须保护和安全存储凭证"
+"，以避免公钥基础设施 (PKI) 假冒攻击等安全风险。节点验证机制还涉及人机交互，因"
+"此请确保使用可信的通信方法，以安全的方式进行所有通信。"
 
 #: ../../source/how-to-authenticate-supernodes.rst:304
 #: ../../source/how-to-enable-tls-connections.rst:244
@@ -15060,8 +15162,9 @@ msgid ""
 "series releases), there are a few breaking changes that make it necessary"
 " to change the code of existing 0.x-series projects."
 msgstr ""
-"Flower 1.0 正式发布。除了新功能，Flower 1.0 还为未来的发展奠定了稳定的基础。与 Flower 0.19（以及其他 0.x "
-"系列版本）相比，有一些破坏性改动需要修改现有 0.x 系列项目的代码。"
+"Flower 1.0 正式发布。除了新功能，Flower 1.0 还为未来的发展奠定了稳定的基础。"
+"与 Flower 0.19（以及其他 0.x 系列版本）相比，有一些破坏性改动需要修改现有 "
+"0.x 系列项目的代码。"
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:25
 #: ../../source/how-to-upgrade-to-flower-1.13.rst:55
@@ -15113,8 +15216,8 @@ msgid ""
 "``flwr = { version = \"^1.0.0\", extras = [\"simulation\"] }`` (when "
 "using ``start_simulation``)"
 msgstr ""
-"``flwr = { version = \"^1.0.0\", extras = [\"simulation\"] "
-"}``（当使用``start_simulation``时）"
+"``flwr = { version = \"^1.0.0\", extras = [\"simulation\"] }``（当使"
+"用``start_simulation``时）"
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:43
 #: ../../source/how-to-upgrade-to-flower-1.13.rst:95
@@ -15139,7 +15242,8 @@ msgstr "将所有参数作为关键字参数传递（而不是位置参数）。
 msgid ""
 "Flower 0.19 (positional arguments): ``start_client(\"127.0.0.1:8080\", "
 "FlowerClient())``"
-msgstr "Flower 0.19 (位置参数)： ``start_client(\"127.0.0.1:8080\", FlowerClient())``"
+msgstr ""
+"Flower 0.19 (位置参数)： ``start_client(\"127.0.0.1:8080\", FlowerClient())``"
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:54
 msgid ""
@@ -15159,16 +15263,16 @@ msgid ""
 "Subclasses of ``NumPyClient``: change ``def get_parameters(self):``` to "
 "``def get_parameters(self, config):``"
 msgstr ""
-"NumPyClient的子类：将``def get_parameters(self):```改为``def "
-"get_parameters(self,config):``"
+"NumPyClient的子类：将``def get_parameters(self):```改为``def get_parameters"
+"(self,config):``"
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:62
 msgid ""
 "Subclasses of ``Client``: change ``def get_parameters(self):``` to ``def "
 "get_parameters(self, ins: GetParametersIns):``"
 msgstr ""
-"客户端 \"的子类：将 \"get_parameters(self): \"改为 \"get_parameters(self, ins: "
-"GetParametersIns):\""
+"客户端 \"的子类：将 \"get_parameters(self): \"改为 \"get_parameters(self, "
+"ins: GetParametersIns):\""
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:66
 msgid "Strategies / ``start_server`` / ``start_simulation``"
@@ -15197,15 +15301,16 @@ msgid ""
 "config=flwr.server.ServerConfig(num_rounds=3, round_timeout=600.0), "
 "...)``"
 msgstr ""
-"Flower 1.0: ``start_server(..., "
-"config=flwr.server.ServerConfig(num_rounds=3, round_timeout=600.0), "
-"...)``"
+"Flower 1.0: ``start_server(..., config=flwr.server.ServerConfig"
+"(num_rounds=3, round_timeout=600.0), ...)``"
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:76
 msgid ""
 "Replace ``num_rounds=1`` in ``start_simulation`` with the new "
 "``config=ServerConfig(...)`` (see previous item)"
-msgstr "将`start_simulation``中的`num_rounds=1``替换为新的`config=ServerConfig(...)`（参见前一项）"
+msgstr ""
+"将`start_simulation``中的`num_rounds=1``替换为新的`config=ServerConfig(...)"
+"`（参见前一项）"
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:78
 msgid ""
@@ -15214,8 +15319,9 @@ msgid ""
 " configuring the strategy to sample all clients for evaluation after the "
 "last round of training."
 msgstr ""
-"删除调用 ``start_server`` 时的 ``force_final_distributed_eval` "
-"参数。可以通过配置策略，在最后一轮训练后对所有客户端进行抽样评估，从而启用对所有客户端的分布式评估。"
+"删除调用 ``start_server`` 时的 ``force_final_distributed_eval` 参数。可以通过"
+"配置策略，在最后一轮训练后对所有客户端进行抽样评估，从而启用对所有客户端的分"
+"布式评估。"
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:81
 msgid "Rename parameter/ndarray conversion functions:"
@@ -15238,10 +15344,11 @@ msgid ""
 "without passing a strategy instance) should now manually initialize "
 "FedAvg with ``fraction_fit`` and ``fraction_evaluate`` set to ``0.1``."
 msgstr ""
-"策略初始化：如果策略依赖于 ``fraction_fit`` 和 ``fraction_evaluate`` 的默认值，请手动将 "
-"``fraction_fit`` 和 ``fraction_evaluate`` 设置为 ``0.1``。未手动创建策略的项目（调用 "
-"``start_server` 或 ``start_simulation` 时未传递策略实例）现在应手动初始化 FedAvg，并将 "
-"`fraction_fit` 和 `fraction_evaluate` 设为 `0.1``。"
+"策略初始化：如果策略依赖于 ``fraction_fit`` 和 ``fraction_evaluate`` 的默认值"
+"，请手动将 ``fraction_fit`` 和 ``fraction_evaluate`` 设置为 ``0.1``。未手动创"
+"建策略的项目（调用 ``start_server` 或 ``start_simulation` 时未传递策略实例）"
+"现在应手动初始化 FedAvg，并将 `fraction_fit` 和 `fraction_evaluate` 设为 "
+"`0.1``。"
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:92
 msgid "Rename built-in strategy parameters (e.g., ``FedAvg``):"
@@ -15266,8 +15373,8 @@ msgid ""
 "``configure_evaluate``, ``aggregate_evaluate``, and ``evaluate_fn``."
 msgstr ""
 "将 `rnd` 更名为 `server_round`。这会影响多个方法和函数，例如 "
-"``configure_fit``、``aggregate_fit``、``configure_evaluate``、`aggregate_evaluate``"
-" 和 ``evaluate_fn``。"
+"``configure_fit``、``aggregate_fit``、``configure_evaluate``、`aggregate_evaluate`` "
+"和 ``evaluate_fn``。"
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:101
 msgid "Add ``server_round`` and ``config`` to ``evaluate_fn``:"
@@ -15278,8 +15385,8 @@ msgid ""
 "Flower 0.19: ``def evaluate(parameters: NDArrays) -> "
 "Optional[Tuple[float, Dict[str, Scalar]]]:``"
 msgstr ""
-"Flower 0.19: ``def evaluate(parameters: NDArrays) -> "
-"Optional[Tuple[float, Dict[str, Scalar]]]:``"
+"Flower 0.19: ``def evaluate(parameters: NDArrays) -> Optional[Tuple[float, "
+"Dict[str, Scalar]]]:``"
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:105
 msgid ""
@@ -15287,9 +15394,8 @@ msgid ""
 "config: Dict[str, Scalar]) -> Optional[Tuple[float, Dict[str, "
 "Scalar]]]:``"
 msgstr ""
-"Flower 1.0: ``def evaluate(server_round: int, parameters: NDArrays, "
-"config: Dict[str, Scalar]) -> Optional[Tuple[float, Dict[str, "
-"Scalar]]]:``"
+"Flower 1.0: ``def evaluate(server_round: int, parameters: NDArrays, config: "
+"Dict[str, Scalar]) -> Optional[Tuple[float, Dict[str, Scalar]]]:``"
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:109
 msgid "Custom strategies"
@@ -15303,16 +15409,18 @@ msgid ""
 "``List[Union[Tuple[ClientProxy, EvaluateRes], BaseException]]`` (in "
 "``aggregate_evaluate``)"
 msgstr ""
-"参数``failures``的类型已从``List[BaseException]``变为``List[Union[Tuple[ClientProxy,"
-" FitRes], "
-"BaseException]]``（在``agregate_fit``中）和``List[Union[Tuple[ClientProxy, "
-"EvaluateRes], BaseException]]``（在``agregate_evaluate``中）"
+"参数``failures``的类型已从``List[BaseException]``变"
+"为``List[Union[Tuple[ClientProxy, FitRes], BaseException]]``（"
+"在``agregate_fit``中）和``List[Union[Tuple[ClientProxy, EvaluateRes], "
+"BaseException]]``（在``agregate_evaluate``中）"
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:115
 msgid ""
 "The ``Strategy`` method ``evaluate`` now receives the current round of "
 "federated learning/evaluation as the first parameter:"
-msgstr "``Strategy``方法 的``evaluate``现在会接收当前一轮联邦学习/评估作为第一个参数："
+msgstr ""
+"``Strategy``方法 的``evaluate``现在会接收当前一轮联邦学习/评估作为第一个参数"
+"："
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:118
 msgid ""
@@ -15357,8 +15465,7 @@ msgid ""
 "round_timeout=600.0), ...)``"
 msgstr ""
 "通过 ``start_simulation`` 配置循环超时： ``start_simulation(..., "
-"config=flwr.server.ServerConfig(num_rounds=3, round_timeout=600.0), "
-"...)``"
+"config=flwr.server.ServerConfig(num_rounds=3, round_timeout=600.0), ...)``"
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:140
 #, fuzzy
@@ -16184,8 +16291,8 @@ msgid ""
 "allow us to perform operations before and after a task is processed in "
 "the ``ClientApp``."
 msgstr ""
-"在本教程中，我们将学习如何利用内置模块来增强 ``ClientApp`` 的行为。修改器（有时也称为修改器）允许我们在 ``ClientApp``"
-" 处理任务之前和之后执行操作。"
+"在本教程中，我们将学习如何利用内置模块来增强 ``ClientApp`` 的行为。修改器（有"
+"时也称为修改器）允许我们在 ``ClientApp`` 处理任务之前和之后执行操作。"
 
 #: ../../source/how-to-use-built-in-mods.rst:20
 #, fuzzy
@@ -16199,8 +16306,8 @@ msgid ""
 "or inspect the incoming ``Message`` and the resulting outgoing "
 "``Message``. The signature for a ``Mod`` is as follows:"
 msgstr ""
-"Mod 是包裹在 ``ClientApp`` 周围的可调用程序。它可以操作或检查传入的 ``Message`` 和由此产生的传出的 "
-"``Message`` 。一个 ``Mod`` 的签名如下："
+"Mod 是包裹在 ``ClientApp`` 周围的可调用程序。它可以操作或检查传入的 "
+"``Message`` 和由此产生的传出的 ``Message`` 。一个 ``Mod`` 的签名如下："
 
 #: ../../source/how-to-use-built-in-mods.rst:31
 #, fuzzy
@@ -16254,7 +16361,9 @@ msgstr "3. 用模块创建 ``ClientApp``"
 msgid ""
 "Create your ``ClientApp`` and pass the mods as a list to the ``mods`` "
 "argument. The order in which you provide the mods matters:"
-msgstr "创建您的 ``ClientApp`` 并将 mods 作为列表传递给 ``mods`` 参数。提供 mod 的顺序很重要："
+msgstr ""
+"创建您的 ``ClientApp`` 并将 mods 作为列表传递给 ``mods`` 参数。提供 mod 的顺"
+"序很重要："
 
 #: ../../source/how-to-use-built-in-mods.rst:89
 msgid "2. Registering Function-specific Mods"
@@ -16313,7 +16422,9 @@ msgid ""
 "Each mod has a chance to inspect and modify the incoming ``Message`` "
 "before passing it to the next mod, and likewise with the outgoing "
 "``Message`` before returning it up the stack."
-msgstr "每个模块都有机会检查和修改传入的 \"信息\"，然后再将其传递给下一个模块，同样，也有机会检查和修改传出的 \"信息\"，然后再将其返回堆栈。"
+msgstr ""
+"每个模块都有机会检查和修改传入的 \"信息\"，然后再将其传递给下一个模块，同样，"
+"也有机会检查和修改传出的 \"信息\"，然后再将其返回堆栈。"
 
 #: ../../source/how-to-use-built-in-mods.rst:135
 #, fuzzy
@@ -16391,8 +16502,8 @@ msgid ""
 "enhance your ``ClientApp``'s functionality. Remember that the order of "
 "mods is crucial and affects how the input and output are processed."
 msgstr ""
-"通过本指南，您已学会如何有效地使用 mod 来增强您的 ``ClientApp`` 的功能。请记住，mod "
-"的顺序至关重要，它会影响输入和输出的处理方式。"
+"通过本指南，您已学会如何有效地使用 mod 来增强您的 ``ClientApp`` 的功能。请记"
+"住，mod 的顺序至关重要，它会影响输入和输出的处理方式。"
 
 #: ../../source/how-to-use-built-in-mods.rst:181
 #, fuzzy
@@ -16592,8 +16703,8 @@ msgid ""
 "Flower framework. If you are not yet familiar with differential privacy, "
 "you can refer to :doc:`explanation-differential-privacy`."
 msgstr ""
-"本指南解释了如何在 Flower 框架中使用差分隐私。如果您还不熟悉差分隐私，可以参考 :doc:`explanation-"
-"differential-privacy` 。"
+"本指南解释了如何在 Flower 框架中使用差分隐私。如果您还不熟悉差分隐私，可以参"
+"考 :doc:`explanation-differential-privacy` 。"
 
 #: ../../source/how-to-use-differential-privacy.rst:47
 #, fuzzy
@@ -16603,8 +16714,8 @@ msgid ""
 " contact us to discuss your requirements and to receive guidance on how "
 "to best use these features."
 msgstr ""
-"Flower "
-"中的差异隐私处于预览阶段。如果您计划在生产环境中使用这些敏感数据功能，请随时联系我们，讨论您的需求，并获得如何最好地使用这些功能的指导。"
+"Flower 中的差异隐私处于预览阶段。如果您计划在生产环境中使用这些敏感数据功能，"
+"请随时联系我们，讨论您的需求，并获得如何最好地使用这些功能的指导。"
 
 #: ../../source/how-to-use-differential-privacy.rst:55
 #, fuzzy
@@ -16626,8 +16737,9 @@ msgid ""
 "disadvantage of increasing the computational load on the server due to "
 "the need to perform the clipping operation for all clients."
 msgstr ""
-"** 服务器端剪切**： "
-"这种方法的优点是服务器可对所有客户端的更新执行统一的剪切，并减少剪切值的通信开销。不过，这种方法也有缺点，那就是需要为所有客户端执行剪切操作，从而增加了服务器的计算负荷。"
+"** 服务器端剪切**： 这种方法的优点是服务器可对所有客户端的更新执行统一的剪切"
+"，并减少剪切值的通信开销。不过，这种方法也有缺点，那就是需要为所有客户端执行"
+"剪切操作，从而增加了服务器的计算负荷。"
 
 #: ../../source/how-to-use-differential-privacy.rst:64
 #, fuzzy
@@ -16636,7 +16748,9 @@ msgid ""
 " computational overhead on the server. However, it also has the "
 "disadvantage of lacking centralized control, as the server has less "
 "control over the clipping process."
-msgstr "**客户端剪切**： 这种方法的优点是可以减少服务器的计算开销。不过，它也有缺乏集中控制的缺点，因为服务器对剪切过程的控制较少。"
+msgstr ""
+"**客户端剪切**： 这种方法的优点是可以减少服务器的计算开销。不过，它也有缺乏集"
+"中控制的缺点，因为服务器对剪切过程的控制较少。"
 
 #: ../../source/how-to-use-differential-privacy.rst:69
 #, fuzzy
@@ -16763,7 +16877,9 @@ msgid ""
 "parameters, is important when using multiple modifiers. Typically, "
 "differential privacy (DP) modifiers should be the last to operate on "
 "parameters."
-msgstr "请注意，在使用多个修改器时，修改器（尤其是修改参数的修改器）的顺序非常重要。通常情况下，差分隐私 (DP) 修改器应最后对参数进行操作。"
+msgstr ""
+"请注意，在使用多个修改器时，修改器（尤其是修改参数的修改器）的顺序非常重要。"
+"通常情况下，差分隐私 (DP) 修改器应最后对参数进行操作。"
 
 #: ../../source/how-to-use-differential-privacy.rst:193
 #, fuzzy
@@ -17077,7 +17193,9 @@ msgid ""
 "The Flower Community is growing quickly - we're a friendly group of "
 "researchers, engineers, students, professionals, academics, and other "
 "enthusiasts."
-msgstr "Flower 社区发展迅速--我们是一个由研究人员、工程师、学生、专业人士、学者和其他爱好者组成的友好团体。"
+msgstr ""
+"Flower 社区发展迅速--我们是一个由研究人员、工程师、学生、专业人士、学者和其他"
+"爱好者组成的友好团体。"
 
 #: ../../source/index.rst:18
 msgid "Join us on Slack"
@@ -18674,7 +18792,9 @@ msgid ""
 "Note that a small amount of Bytes might also be included in this counting"
 " that correspond to metadata of the serialized object (e.g. of NumPy "
 "array) needed for deseralization."
-msgstr "请注意，该计数中还可能包含少量字节，这些字节与序列化对象（如 NumPy 数组）的元数据相对应，需要进行去eralization。"
+msgstr ""
+"请注意，该计数中还可能包含少量字节，这些字节与序列化对象（如 NumPy 数组）的元"
+"数据相对应，需要进行去eralization。"
 
 #: flwr.common.record.arrayrecord.ArrayRecord.inflate:3 of
 #, fuzzy
@@ -19037,7 +19157,9 @@ msgstr ""
 msgid ""
 "Holds records either sent by another entity (e.g. sent by the server-side"
 " logic to a client, or vice-versa) or that will be sent to it."
-msgstr "保存由其他实体发送的记录（如由服务器端逻辑发送到客户端，反之亦然）或将发送到该实体的记录。"
+msgstr ""
+"保存由其他实体发送的记录（如由服务器端逻辑发送到客户端，反之亦然）或将发送到"
+"该实体的记录。"
 
 #: flwr.common.message.Message:9 of
 #, fuzzy
@@ -19226,8 +19348,9 @@ msgid ""
 "follows the equation:  ttl = msg.meta.ttl - (reply.meta.created_at - "
 "msg.meta.created_at)"
 msgstr ""
-"该信息的有效时间（秒）。如果未设置，则将根据收到的信息过期前的剩余时间来设置。其计算公式为：ttl = msg.meta.ttl - "
-"(reply.meta.created_at - msg.meta.created_at)"
+"该信息的有效时间（秒）。如果未设置，则将根据收到的信息过期前的剩余时间来设置"
+"。其计算公式为：ttl = msg.meta.ttl - (reply.meta.created_at - "
+"msg.meta.created_at)"
 
 #: flwr.common.message.Message.create_error_reply:5
 #: flwr.common.message.Message.create_reply:9 of
@@ -19236,7 +19359,9 @@ msgid ""
 "Time-to-live for this message in seconds. If unset, it will be set based "
 "on the remaining time for the received message before it expires. This "
 "follows the equation:"
-msgstr "该信息的有效时间（秒）。如果未设置，则将根据接收到的信息过期前的剩余时间来设置。其计算公式如下"
+msgstr ""
+"该信息的有效时间（秒）。如果未设置，则将根据接收到的信息过期前的剩余时间来设"
+"置。其计算公式如下"
 
 #: flwr.common.message.Message.create_error_reply:9
 #: flwr.common.message.Message.create_reply:13 of
@@ -20477,7 +20602,9 @@ msgid ""
 "This method sends a list of messages to their destination node IDs and "
 "then waits for the replies. It continues to pull replies until either all"
 " replies are received or the specified timeout duration is exceeded."
-msgstr "该方法会向目标节点 ID 发送信息列表，然后等待回复。它会继续提取回复，直到收到所有回复或超过指定的超时时间。"
+msgstr ""
+"该方法会向目标节点 ID 发送信息列表，然后等待回复。它会继续提取回复，直到收到"
+"所有回复或超过指定的超时时间。"
 
 #: flwr.server.grid.grid.Grid.send_and_receive:9 of
 #, fuzzy
@@ -20485,7 +20612,9 @@ msgid ""
 "The timeout duration in seconds. If specified, the method will wait for "
 "replies for this duration. If `None`, there is no time limit and the "
 "method will wait until replies for all messages are received."
-msgstr "超时时间（秒）。如果指定，该方法将在此期限内等待回复。如果指定为 \"无\"，则没有时间限制，该方法将等待直到收到所有信息的回复。"
+msgstr ""
+"超时时间（秒）。如果指定，该方法将在此期限内等待回复。如果指定为 \"无\"，则没"
+"有时间限制，该方法将等待直到收到所有信息的回复。"
 
 #: flwr.server.grid.grid.Grid.send_and_receive:14 of
 #, fuzzy
@@ -21310,9 +21439,9 @@ msgid ""
 "happen on the client-side, usually by using the built-in "
 "`adaptiveclipping_mod`."
 msgstr ""
-"与在服务器端执行剪切的 `DifferentialPrivacyServerSideAdaptiveClipping` "
-"相比，`DifferentialPrivacyClientSideAdaptiveClipping` 希望在客户端进行剪切，通常使用内置的 "
-"`adaptiveclipping_mod`。"
+"与在服务器端执行剪切的 `DifferentialPrivacyServerSideAdaptiveClipping` 相比"
+"，`DifferentialPrivacyClientSideAdaptiveClipping` 希望在客户端进行剪切，通常"
+"使用内置的 `adaptiveclipping_mod`。"
 
 #: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:11
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:10
@@ -21364,7 +21493,9 @@ msgstr "剪切规范适应的学习率。默认为 0.2。安德鲁等人建议�
 msgid ""
 "The stddev of the noise added to the count of updates currently below the"
 " estimate. Andrew et al. recommends to set to `expected_num_records/20`"
-msgstr "添加到当前低于估计值的更新计数中的噪声的 stddev。安德鲁等人建议设置为 \"expected_num_records/20"
+msgstr ""
+"添加到当前低于估计值的更新计数中的噪声的 stddev。安德鲁等人建议设置为 "
+"\"expected_num_records/20"
 
 #: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:32
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:22
@@ -21496,9 +21627,9 @@ msgid ""
 "`DifferentialPrivacyClientSideFixedClipping` expects clipping to happen "
 "on the client-side, usually by using the built-in `fixedclipping_mod`."
 msgstr ""
-"与在服务器端执行剪切的 \"DifferentialPrivacyServerSideFixedClipping "
-"\"相比，\"DifferentialPrivacyClientSideFixedClipping \"希望在客户端进行剪切，通常是使用内置的 "
-"\"fixedclipping_mod\"。"
+"与在服务器端执行剪切的 \"DifferentialPrivacyServerSideFixedClipping \"相比"
+"，\"DifferentialPrivacyClientSideFixedClipping \"希望在客户端进行剪切，通常是"
+"使用内置的 \"fixedclipping_mod\"。"
 
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:12
 #: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:5
@@ -22216,8 +22347,8 @@ msgid ""
 "regularization will be used (that is, the client parameters will need to "
 "be closer to the server parameters during training)."
 msgstr ""
-"优化中使用的近端项权重。0.0 使该策略等同于 "
-"FedAvg，系数越大，使用的正则化就越多（也就是说，在训练过程中，客户端参数需要更接近服务器参数）。"
+"优化中使用的近端项权重。0.0 使该策略等同于 FedAvg，系数越大，使用的正则化就越"
+"多（也就是说，在训练过程中，客户端参数需要更接近服务器参数）。"
 
 #: flwr.serverapp.strategy.fedavg.FedAvg.aggregate_evaluate:1:<autosummary>:1
 #: of
@@ -23101,7 +23232,9 @@ msgstr "感谢我们的贡献者"
 msgid ""
 "We would like to give our special thanks to all the contributors who made"
 " the new version of Flower possible (in `git shortlog` order):"
-msgstr "在此，我们要特别感谢所有为 Flower 的新版本做出贡献的人员（按 `git shortlog` 顺序排列）："
+msgstr ""
+"在此，我们要特别感谢所有为 Flower 的新版本做出贡献的人员（按 `git shortlog` "
+"顺序排列）："
 
 #: ../../source/ref-changelog.md:11
 #, fuzzy
@@ -31733,11 +31866,13 @@ msgid ""
 " line of code. The best part? It's fully compatible with existing Flower "
 "projects that use `Strategy`, `NumPyClient` & co."
 msgstr ""
-"Flower Next 高级应用程序接口已经稳定！Flower Next 是 Flower 的未来 - 所有新功能（如 Flower "
-"Mods）都将构建在它之上。您可以使用 `ServerApp` 和 `ClientApp` 开始将现有项目迁移到 Flower Next（请查看 "
-"`quickstart-pytorch` 或 `quickstart-tensorflow` ，详细的迁移指南将在不久后发布）。Flower "
-"Next 允许您同时运行多个项目（我们称之为多重运行），并在模拟环境或部署环境中执行同一项目，而无需更改任何代码。最棒的是什么？它与使用 "
-"`Strategy`、`NumPyClient` 等的现有 Flower 项目完全兼容。"
+"Flower Next 高级应用程序接口已经稳定！Flower Next 是 Flower 的未来 - 所有新功"
+"能（如 Flower Mods）都将构建在它之上。您可以使用 `ServerApp` 和 `ClientApp` "
+"开始将现有项目迁移到 Flower Next（请查看 `quickstart-pytorch` 或 `quickstart-"
+"tensorflow` ，详细的迁移指南将在不久后发布）。Flower Next 允许您同时运行多个"
+"项目（我们称之为多重运行），并在模拟环境或部署环境中执行同一项目，而无需更改"
+"任何代码。最棒的是什么？它与使用 `Strategy`、`NumPyClient` 等的现有 Flower 项"
+"目完全兼容。"
 
 #: ../../source/ref-changelog.md:1674
 #, fuzzy
@@ -31768,13 +31903,15 @@ msgid ""
 "metrics, stateful computations on the client node and implementations of "
 "custom SMPC protocols, to name just a few."
 msgstr ""
-"除了使用 \"Strategy\"、\"NumPyClient \"等的 Flower Next 高级应用程序接口外，Flower 1.8 "
-"还提供了新的 Flower Next "
-"低级应用程序接口的预览版。低级应用程序接口允许通过向/从客户端节点发送/接收单个消息，对学习过程的各个方面进行细粒度控制。新的 "
-"\"ServerApp \"支持注册一个自定义的 \"main \"函数，允许为异步FL、循环训练或联合分析等方法编写自定义训练循环。新的 "
-"\"ClientApp \"支持注册 \"训练\"、\"评估 \"和 \"查询 \"函数，这些函数可以访问从 \"ServerApp "
-"\"接收到的原始信息。新的抽象（如 \"RecordSet\"、\"Message \"和 "
-"\"Context\"）进一步支持发送多个模型、多套配置值和指标、客户端节点上的有状态计算以及自定义 SMPC 协议的实现等。"
+"除了使用 \"Strategy\"、\"NumPyClient \"等的 Flower Next 高级应用程序接口外，"
+"Flower 1.8 还提供了新的 Flower Next 低级应用程序接口的预览版。低级应用程序接"
+"口允许通过向/从客户端节点发送/接收单个消息，对学习过程的各个方面进行细粒度控"
+"制。新的 \"ServerApp \"支持注册一个自定义的 \"main \"函数，允许为异步FL、循环"
+"训练或联合分析等方法编写自定义训练循环。新的 \"ClientApp \"支持注册 \"训"
+"练\"、\"评估 \"和 \"查询 \"函数，这些函数可以访问从 \"ServerApp \"接收到的原"
+"始信息。新的抽象（如 \"RecordSet\"、\"Message \"和 \"Context\"）进一步支持发"
+"送多个模型、多套配置值和指标、客户端节点上的有状态计算以及自定义 SMPC 协议的"
+"实现等。"
 
 #: ../../source/ref-changelog.md:1678
 #, fuzzy
@@ -31800,10 +31937,11 @@ msgid ""
 "SecAgg+. The Flower Mods API is released as a preview, but researchers "
 "can already use it to experiment with arbirtrary SMPC protocols."
 msgstr ""
-"Flower Modifiers（我们称之为 "
-"Mods）可以拦截信息，并直接对其进行分析、编辑或处理。修改器可用于开发可在不同项目中使用的可插拔模块。Flower 1.8 "
-"已经包含了记录信息大小、通过网络发送的参数数量、固定剪切和自适应剪切的差分隐私、本地差分隐私以及安全聚合协议 SecAgg 和 SecAgg+ 的"
-" Mods。Flower Mods API 作为预览版发布，但研究人员已经可以用它来试验任意的 SMPC 协议。"
+"Flower Modifiers（我们称之为 Mods）可以拦截信息，并直接对其进行分析、编辑或处"
+"理。修改器可用于开发可在不同项目中使用的可插拔模块。Flower 1.8 已经包含了记录"
+"信息大小、通过网络发送的参数数量、固定剪切和自适应剪切的差分隐私、本地差分隐"
+"私以及安全聚合协议 SecAgg 和 SecAgg+ 的 Mods。Flower Mods API 作为预览版发布"
+"，但研究人员已经可以用它来试验任意的 SMPC 协议。"
 
 #: ../../source/ref-changelog.md:1682
 #, fuzzy
@@ -31833,10 +31971,11 @@ msgid ""
 "Federated LLM Fine-tuning with Flower](https://flower.ai/blog/2024-03-14"
 "-llm-flowertune-federated-llm-finetuning-with-flower/) for more details."
 msgstr ""
-"我们将介绍 LLM FlowerTune，这是一个介绍性示例，演示了在 Alpaca-GPT4 数据集上对预先训练好的 Llama2 模型进行联合"
-" LLM 微调。该示例可轻松调整以使用不同的模型和/或数据集。请阅读我们的博文 [LLM FlowerTune: Federated LLM "
-"Fine-tuning with Flower](https://flower.ai/blog/2024-03-14-llm-"
-"flowertune-federated-llm-finetuning-with-flower/) 了解更多详情。"
+"我们将介绍 LLM FlowerTune，这是一个介绍性示例，演示了在 Alpaca-GPT4 数据集上"
+"对预先训练好的 Llama2 模型进行联合 LLM 微调。该示例可轻松调整以使用不同的模型"
+"和/或数据集。请阅读我们的博文 [LLM FlowerTune: Federated LLM Fine-tuning "
+"with Flower](https://flower.ai/blog/2024-03-14-llm-flowertune-federated-llm-"
+"finetuning-with-flower/) 了解更多详情。"
 
 #: ../../source/ref-changelog.md:1686
 #, fuzzy
@@ -31904,9 +32043,10 @@ msgid ""
 "combine Federated Learning, Differential Privacy and Secure Aggregation "
 "in the same project."
 msgstr ""
-"内置安全聚合功能！Flower 现在支持不同的安全聚合协议。最棒的是什么？只需几行代码，您就可以将安全聚合添加到 Flower "
-"项目中。在这个初始版本中，我们包含了对 SecAgg 和 SecAgg+ "
-"的支持，但更多协议将很快实现。我们还将添加详细的文档，解释安全聚合以及如何在 Flower 中使用它。您可以查看新的代码示例，了解如何使用 "
+"内置安全聚合功能！Flower 现在支持不同的安全聚合协议。最棒的是什么？只需几行代"
+"码，您就可以将安全聚合添加到 Flower 项目中。在这个初始版本中，我们包含了对 "
+"SecAgg 和 SecAgg+ 的支持，但更多协议将很快实现。我们还将添加详细的文档，解释"
+"安全聚合以及如何在 Flower 中使用它。您可以查看新的代码示例，了解如何使用 "
 "Flower 在同一项目中轻松结合联合学习、差分隐私和安全聚合。"
 
 #: ../../source/ref-changelog.md:1694
@@ -31934,7 +32074,9 @@ msgstr ""
 msgid ""
 "A new `flwr` CLI command allows creating new Flower projects (`flwr new`)"
 " and then running them using the Simulation Engine (`flwr run`)."
-msgstr "新的 `flwr` CLI 命令允许创建新的 Flower 项目（`flwr new`），然后使用仿真引擎运行它们（`flwr run`）。"
+msgstr ""
+"新的 `flwr` CLI 命令允许创建新的 Flower 项目（`flwr new`），然后使用仿真引擎"
+"运行它们（`flwr run`）。"
 
 #: ../../source/ref-changelog.md:1698
 #, fuzzy
@@ -31965,8 +32107,8 @@ msgid ""
 "notebook environments, there's also a new `run_simulation` function that "
 "can run `ServerApp` and `ClientApp`."
 msgstr ""
-"Flower 模拟引擎现在可以运行 Flower Next 项目。对于笔记本环境，还有一个新的 `run_simulation` 函数，可以运行 "
-"`ServerApp` 和 `ClientApp`。"
+"Flower 模拟引擎现在可以运行 Flower Next 项目。对于笔记本环境，还有一个新的 "
+"`run_simulation` 函数，可以运行 `ServerApp` 和 `ClientApp`。"
 
 #: ../../source/ref-changelog.md:1702
 #, fuzzy
@@ -31988,8 +32130,9 @@ msgid ""
 "wait-time` defines the time before the SuperNode gives up trying to "
 "reconnect to the SuperLink."
 msgstr ""
-"如果出现连接错误，超级节点现在会尝试无限期地重新连接超级链接。现在可以向 `flower-client-app` 命令传递参数 `-ax-"
-"retries` 和 `-max-wait-time`。最大重试次数 \"将定义客户端在放弃重新连接超级链接之前的重试次数，而 \"最大等待时间 "
+"如果出现连接错误，超级节点现在会尝试无限期地重新连接超级链接。现在可以向 "
+"`flower-client-app` 命令传递参数 `-ax-retries` 和 `-max-wait-time`。最大重试"
+"次数 \"将定义客户端在放弃重新连接超级链接之前的重试次数，而 \"最大等待时间 "
 "\"则定义超级节点放弃重新连接超级链接之前的等待时间。"
 
 #: ../../source/ref-changelog.md:1706
@@ -32012,8 +32155,8 @@ msgid ""
 "There's a new [FedStar](https://flower.ai/docs/baselines/fedstar.html) "
 "baseline. Several other baselined have been updated as well."
 msgstr ""
-"有一条新的 [FedStar](https://flower.ai/docs/baselines/fedstar.html) "
-"基准线。其他几条基准线也已更新。"
+"有一条新的 [FedStar](https://flower.ai/docs/baselines/fedstar.html) 基准线。"
+"其他几条基准线也已更新。"
 
 #: ../../source/ref-changelog.md:1710
 #, fuzzy
@@ -32056,8 +32199,9 @@ msgid ""
 "documentation. A special thank you goes to [Sebastian van der "
 "Voort](https://github.com/svdvoort) for landing a big documentation PR!"
 msgstr ""
-"像往常一样，我们合并了许多对文档的较大和较小的改进。特别要感谢 [Sebastian van der "
-"Voort](https://github.com/svdvoort)，他为我们带来了一份重要的文档 PR！"
+"像往常一样，我们合并了许多对文档的较大和较小的改进。特别要感谢 [Sebastian "
+"van der Voort](https://github.com/svdvoort)，他为我们带来了一份重要的文档 PR"
+"！"
 
 #: ../../source/ref-changelog.md:1714
 #, fuzzy
@@ -32092,9 +32236,10 @@ msgid ""
 " new Flower Next `ServerApp` and `ClientApp`. Many other examples "
 "received considerable updates as well."
 msgstr ""
-"两个新示例展示了视觉转换器（ViT）的联合训练，以及使用流行的 MONAI 库在医疗环境中进行的联合学习。quickstart-pytorch "
-"\"和 \"quickstart-tensorflow \"展示了新的 Flower Next \"ServerApp \"和 "
-"\"ClientApp\"。许多其他示例也得到了大量更新。"
+"两个新示例展示了视觉转换器（ViT）的联合训练，以及使用流行的 MONAI 库在医疗环"
+"境中进行的联合学习。quickstart-pytorch \"和 \"quickstart-tensorflow \"展示了"
+"新的 Flower Next \"ServerApp \"和 \"ClientApp\"。许多其他示例也得到了大量更新"
+"。"
 
 #: ../../source/ref-changelog.md:1718
 #, fuzzy
@@ -32273,11 +32418,12 @@ msgid ""
 "different rounds of execution to enable stateful computations in a "
 "unified way across simulation and deployment."
 msgstr ""
-"客户端 \"和 \"NumPyClient \"的子类现在可以存储保留在客户端上的本地状态。让我们先从亮点开始：这一新功能与模拟客户端（通过 "
-"`start_simulation`）和网络客户端（通过 `start_client`）兼容。这也是 `Context` 和 "
-"`RecordSet` 等新抽象的首次预览。客户端可以通过 `state.RecordSet` 访问 `RecordSet` 类型的状态： "
-"RecordSet = self.context.state`。对该 `RecordSet` "
-"的更改会在不同轮执行中保留，以便在模拟和部署中以统一的方式进行有状态计算。"
+"客户端 \"和 \"NumPyClient \"的子类现在可以存储保留在客户端上的本地状态。让我"
+"们先从亮点开始：这一新功能与模拟客户端（通过 `start_simulation`）和网络客户端"
+"（通过 `start_client`）兼容。这也是 `Context` 和 `RecordSet` 等新抽象的首次预"
+"览。客户端可以通过 `state.RecordSet` 访问 `RecordSet` 类型的状态： RecordSet "
+"= self.context.state`。对该 `RecordSet` 的更改会在不同轮执行中保留，以便在模"
+"拟和部署中以统一的方式进行有状态计算。"
 
 #: ../../source/ref-changelog.md:1738
 #, fuzzy
@@ -32295,8 +32441,9 @@ msgid ""
 "which results in significant speedups, especially when the client-side "
 "training time is short."
 msgstr ""
-"Flower 的速度比以往更快。所有源于 `FedAvg` 的策略现在都使用就地聚合，以减少内存消耗。Flower "
-"客户端序列化/解序列化已从头开始重写，从而显著提高了速度，尤其是在客户端训练时间较短的情况下。"
+"Flower 的速度比以往更快。所有源于 `FedAvg` 的策略现在都使用就地聚合，以减少内"
+"存消耗。Flower 客户端序列化/解序列化已从头开始重写，从而显著提高了速度，尤其"
+"是在客户端训练时间较短的情况下。"
 
 #: ../../source/ref-changelog.md:1742
 #, fuzzy
@@ -32314,8 +32461,8 @@ msgid ""
 "MLX](https://ml-explore.github.io/mlx) via the new `quickstart-mlx` code "
 "example."
 msgstr ""
-"通过新的 `quickstart-mlx` 代码示例，Flower 正式支持使用 [Apple MLX](https://ml-"
-"explore.github.io/mlx)的联合学习。"
+"通过新的 `quickstart-mlx` 代码示例，Flower 正式支持使用 [Apple MLX](https://"
+"ml-explore.github.io/mlx)的联合学习。"
 
 #: ../../source/ref-changelog.md:1746
 #, fuzzy
@@ -32336,9 +32483,10 @@ msgid ""
 "comprehensive` now also supports simulation mode. With this, Flower "
 "offers best-in-class XGBoost support."
 msgstr ""
-"名为 `FedXgbCyclic` 的新策略支持逐个客户端的训练风格（通常称为循环）。xgboost-comprehensive "
-"\"代码示例展示了如何在一个完整的项目中使用它。除此之外，`xgboost-comprehensive` 现在还支持模拟模式。由此，Flower "
-"提供了同类最佳的 XGBoost 支持。"
+"名为 `FedXgbCyclic` 的新策略支持逐个客户端的训练风格（通常称为循环）。"
+"xgboost-comprehensive \"代码示例展示了如何在一个完整的项目中使用它。除此之外"
+"，`xgboost-comprehensive` 现在还支持模拟模式。由此，Flower 提供了同类最佳的 "
+"XGBoost 支持。"
 
 #: ../../source/ref-changelog.md:1750
 #, fuzzy
@@ -32352,7 +32500,9 @@ msgstr "** 支持 Python 3.10** ([#1320](https://github.com/adap/flower/pull/132
 msgid ""
 "Framework tests now run on Python 3.8, 3.9, 3.10, and 3.11. This will "
 "ensure better support for users using more recent Python versions."
-msgstr "框架测试现在可在 Python 3.8、3.9、3.10 和 3.11 上运行。这将确保为使用最新 Python 版本的用户提供更好的支持。"
+msgstr ""
+"框架测试现在可在 Python 3.8、3.9、3.10 和 3.11 上运行。这将确保为使用最新 "
+"Python 版本的用户提供更好的支持。"
 
 #: ../../source/ref-changelog.md:1754
 #, fuzzy
@@ -32398,9 +32548,9 @@ msgid ""
 "Docker](https://flower.ai/docs/framework/how-to-run-flower-using-"
 "docker.html). An official Flower client Docker image will follow."
 msgstr ""
-"现在可以使用官方 Docker 映像运行 Flower 服务器了。新的操作指南介绍了 [如何使用 Docker 运行 "
-"Flower](https://flower.ai/docs/framework/how-to-run-flower-using-"
-"docker.html)。Flower 客户端 Docker 官方镜像将随后发布。"
+"现在可以使用官方 Docker 映像运行 Flower 服务器了。新的操作指南介绍了 [如何使"
+"用 Docker 运行 Flower](https://flower.ai/docs/framework/how-to-run-flower-"
+"using-docker.html)。Flower 客户端 Docker 官方镜像将随后发布。"
 
 #: ../../source/ref-changelog.md:1762
 #, fuzzy
@@ -32443,7 +32593,9 @@ msgstr ""
 msgid ""
 "Several code examples were updated to use [Flower "
 "Datasets](https://flower.ai/docs/datasets/)."
-msgstr "更新了多个代码示例，以使用 [Flower Datasets](https://flower.ai/docs/datasets/) 。"
+msgstr ""
+"更新了多个代码示例，以使用 [Flower Datasets](https://flower.ai/docs/"
+"datasets/) 。"
 
 #: ../../source/ref-changelog.md:1772
 #, fuzzy
@@ -32588,7 +32740,9 @@ msgstr ""
 msgid ""
 "The Flower testing and development infrastructure has received "
 "substantial updates. This makes Flower 1.7 the most tested release ever."
-msgstr "Flower 测试和开发基础架构已得到大幅更新。这使得 Flower 1.7 成为有史以来经过最多测试的版本。"
+msgstr ""
+"Flower 测试和开发基础架构已得到大幅更新。这使得 Flower 1.7 成为有史以来经过最"
+"多测试的版本。"
 
 #: ../../source/ref-changelog.md:1791
 #, fuzzy
@@ -32711,10 +32865,11 @@ msgid ""
 "object to `start_client`. The examples and the documentation have been "
 "updated accordingly."
 msgstr ""
-"到目前为止，\"NumPyClient \"类型的客户端需要通过 \"start_numpy_client \"启动。为了整合框架 "
-"API，我们引入了一些变化，现在所有客户端类型都应通过 `start_client` 启动。要继续使用 `NumPyClient` "
-"客户端，只需首先调用 `.to_client()` 方法，然后将返回的 `Client` 对象传递给 "
-"`start_client`。示例和文档已相应更新。"
+"到目前为止，\"NumPyClient \"类型的客户端需要通过 \"start_numpy_client \"启动"
+"。为了整合框架 API，我们引入了一些变化，现在所有客户端类型都应通过 "
+"`start_client` 启动。要继续使用 `NumPyClient` 客户端，只需首先调用 "
+"`.to_client()` 方法，然后将返回的 `Client` 对象传递给 `start_client`。示例和"
+"文档已相应更新。"
 
 #: ../../source/ref-changelog.md:1801
 #, fuzzy
@@ -32729,7 +32884,9 @@ msgid ""
 "Legacy DP wrapper classes are deprecated, but still functional. This is "
 "in preparation for an all-new pluggable version of differential privacy "
 "support in Flower."
-msgstr "传统的 DP 封装类已废弃，但仍可正常使用。这是为 Flower 中的全新可插拔差分隐私支持版本做准备。"
+msgstr ""
+"传统的 DP 封装类已废弃，但仍可正常使用。这是为 Flower 中的全新可插拔差分隐私"
+"支持版本做准备。"
 
 #: ../../source/ref-changelog.md:1805
 #, fuzzy
@@ -32785,8 +32942,8 @@ msgid ""
 "[archived on GitHub](https://github.com/apache/mxnet). Existing MXNet "
 "examples won't receive updates."
 msgstr ""
-"MXNet fremework 的开发工作已经结束，该项目现已[归档于 "
-"GitHub](https://github.com/apache/mxnet)。现有的 MXNet 示例不会收到更新。"
+"MXNet fremework 的开发工作已经结束，该项目现已[归档于 GitHub](https://"
+"github.com/apache/mxnet)。现有的 MXNet 示例不会收到更新。"
 
 #: ../../source/ref-changelog.md:1817
 #, fuzzy
@@ -32805,10 +32962,10 @@ msgid ""
 msgstr ""
 "`Aashish Kolluri`, `Adam Narozniak`, `Alessio Mora`, `Barathwaja S`, "
 "`Charles Beauville`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Gabriel "
-"Mota`, `Heng Pan`, `Ivan Agarský`, `JS.KIM`, `Javier`, `Marius Schlegel`,"
-" `Navin Chandra`, `Nic Lane`, `Peterpan828`, `Qinbin Li`, `Shaz-hash`, "
-"`Steve Laskaridis`, `Taner Topal`, `William Lindskog`, `Yan Gao`, "
-"`cnxdeveloper`, `k3nfalt` <!---TOKEN_v1.6.0-->"
+"Mota`, `Heng Pan`, `Ivan Agarský`, `JS.KIM`, `Javier`, `Marius Schlegel`, "
+"`Navin Chandra`, `Nic Lane`, `Peterpan828`, `Qinbin Li`, `Shaz-hash`, `Steve "
+"Laskaridis`, `Taner Topal`, `William Lindskog`, `Yan Gao`, `cnxdeveloper`, "
+"`k3nfalt` <!---TOKEN_v1.6.0-->"
 
 #: ../../source/ref-changelog.md:1827
 #, fuzzy
@@ -32843,8 +33000,8 @@ msgid ""
 "We have added a new `xgboost-quickstart` example alongside a new "
 "`xgboost-comprehensive` example that goes more in-depth."
 msgstr ""
-"我们添加了一个新的 \"xgboost-quickstart \"示例和一个新的 \"xgboost-comprehensive "
-"\"示例，后者更加深入。"
+"我们添加了一个新的 \"xgboost-quickstart \"示例和一个新的 \"xgboost-"
+"comprehensive \"示例，后者更加深入。"
 
 #: ../../source/ref-changelog.md:1833
 #, fuzzy
@@ -32863,9 +33020,9 @@ msgid ""
 "dataset](https://www.kaggle.com/competitions/titanic/data) alongside a "
 "tutorial (in the README)."
 msgstr ""
-"我们收到了许多关于使用 Flower 进行垂直联合学习的问题，因此我们决定在 [Titanic "
-"数据集](https://www.kaggle.com/competitions/titanic/data) 上添加一个简单的示例，并附上教程（在"
-" README 中）。"
+"我们收到了许多关于使用 Flower 进行垂直联合学习的问题，因此我们决定在 "
+"[Titanic 数据集](https://www.kaggle.com/competitions/titanic/data) 上添加一个"
+"简单的示例，并附上教程（在 README 中）。"
 
 #: ../../source/ref-changelog.md:1837
 #, fuzzy
@@ -32936,9 +33093,10 @@ msgid ""
 "an HTTPS-enabled server or requires opt-out via passing `--insecure` to "
 "enable insecure HTTP connections."
 msgstr ""
-"Flower 默认使用 HTTPS。新的 \"flower-server \"需要通过\"--证书\"，但用户可以启用\"--不安全 \"来使用 "
-"HTTP 进行原型开发。这同样适用于 `flower-client`，它可以使用用户提供的凭证或 gRPC 绑定证书连接到支持 HTTPS "
-"的服务器，也可以通过传递 `--insecure`来启用不安全的 HTTP 连接。"
+"Flower 默认使用 HTTPS。新的 \"flower-server \"需要通过\"--证书\"，但用户可以"
+"启用\"--不安全 \"来使用 HTTP 进行原型开发。这同样适用于 `flower-client`，它可"
+"以使用用户提供的凭证或 gRPC 绑定证书连接到支持 HTTPS 的服务器，也可以通过传"
+"递 `--insecure`来启用不安全的 HTTP 连接。"
 
 #: ../../source/ref-changelog.md:1853
 #, fuzzy
@@ -32947,8 +33105,8 @@ msgid ""
 "will still start in insecure mode by default. In a future release, "
 "insecure connections will require user opt-in by passing `insecure=True`."
 msgstr ""
-"为了向后兼容，`start_client()` 和 `start_numpy_client()` "
-"默认仍以不安全模式启动。在未来的版本中，不安全连接将需要用户通过传递 `insecure=True` 进行选择。"
+"为了向后兼容，`start_client()` 和 `start_numpy_client()` 默认仍以不安全模式启"
+"动。在未来的版本中，不安全连接将需要用户通过传递 `insecure=True` 进行选择。"
 
 #: ../../source/ref-changelog.md:1855
 #, fuzzy
@@ -32989,7 +33147,9 @@ msgstr ""
 msgid ""
 "The new `Bulyan` strategy implements Bulyan by [El Mhamdi et al., "
 "2018](https://arxiv.org/abs/1802.07927)"
-msgstr "新的 \"Bulyan\"策略通过[El Mhamdi 等人，2018]（https://arxiv.org/abs/1802.07927）实现"
+msgstr ""
+"新的 \"Bulyan\"策略通过[El Mhamdi 等人，2018]（https://arxiv.org/abs/"
+"1802.07927）实现"
 
 #: ../../source/ref-changelog.md:1863
 #, fuzzy
@@ -33242,7 +33402,9 @@ msgstr ""
 msgid ""
 "Python 3.7 support was deprecated in Flower 1.5, and this release removes"
 " support. Flower now requires Python 3.8."
-msgstr "在 Flower 1.5 中，Python 3.7 支持已被弃用，本版本将删除该支持。Flower 现在需要 Python 3.8。"
+msgstr ""
+"在 Flower 1.5 中，Python 3.7 支持已被弃用，本版本将删除该支持。Flower 现在需"
+"要 Python 3.8。"
 
 #: ../../source/ref-changelog.md:1911
 #, fuzzy
@@ -33259,8 +33421,8 @@ msgid ""
 "and `start_numpy_client`. Use `transport=\"rest\"` to opt into the "
 "experimental REST API instead."
 msgstr ""
-"删除了 `start_client` 和 `start_numpy_client` 中的参数 `rest`（仍属试验性质）。请使用 "
-"`transport=\"rest\"` 来选择使用试验性 REST API。"
+"删除了 `start_client` 和 `start_numpy_client` 中的参数 `rest`（仍属试验性质）"
+"。请使用 `transport=\"rest\"` 来选择使用试验性 REST API。"
 
 #: ../../source/ref-changelog.md:1915
 msgid "v1.5.0 (2023-08-31)"
@@ -33300,8 +33462,9 @@ msgid ""
 "transparently adapt to different settings to scale simulation in CPU-"
 "only, CPU+GPU, multi-GPU, or multi-node multi-GPU environments."
 msgstr ""
-"新的模拟引擎从头开始重新编写，但仍完全向后兼容。它的稳定性和内存处理能力大大提高，尤其是在使用 GPU 时。仿真可透明地适应不同的设置，以在仅 "
-"CPU、CPU+GPU、多 GPU 或多节点多 GPU 环境中扩展模拟。"
+"新的模拟引擎从头开始重新编写，但仍完全向后兼容。它的稳定性和内存处理能力大大"
+"提高，尤其是在使用 GPU 时。仿真可透明地适应不同的设置，以在仅 CPU、CPU+GPU、"
+"多 GPU 或多节点多 GPU 环境中扩展模拟。"
 
 #: ../../source/ref-changelog.md:1929
 msgid ""
@@ -33400,8 +33563,8 @@ msgid ""
 " on iOS is improving, and alongside the Swift SDK and code example, there"
 " is now also an iOS quickstart tutorial."
 msgstr ""
-"这是 Flower Swift SDK 的首个预览版。Flower 对 iOS 的支持正在不断改进，除了 Swift SDK "
-"和代码示例外，现在还有 iOS 快速入门教程。"
+"这是 Flower Swift SDK 的首个预览版。Flower 对 iOS 的支持正在不断改进，除了 "
+"Swift SDK 和代码示例外，现在还有 iOS 快速入门教程。"
 
 #: ../../source/ref-changelog.md:1939
 #, fuzzy
@@ -33418,8 +33581,8 @@ msgid ""
 "support on Android is improving, and alongside the Kotlin SDK and code "
 "example, there is now also an Android quickstart tutorial."
 msgstr ""
-"这是 Flower Kotlin SDK 的首个预览版。Flower 对 Android 的支持正在不断改进，除了 Kotlin SDK "
-"和代码示例，现在还有 Android 快速入门教程。"
+"这是 Flower Kotlin SDK 的首个预览版。Flower 对 Android 的支持正在不断改进，除"
+"了 Kotlin SDK 和代码示例，现在还有 Android 快速入门教程。"
 
 #: ../../source/ref-changelog.md:1943
 #, fuzzy
@@ -33470,7 +33633,9 @@ msgstr "** 过时的 Python 3.7**"
 msgid ""
 "Since Python 3.7 reached its end of life (EOL) on 2023-06-27, support for"
 " Python 3.7 is now deprecated and will be removed in an upcoming release."
-msgstr "由于 Python 3.7 已于 2023-06-27 弃用 (EOL)，对 Python 3.7 的支持现已废弃，并将在即将发布的版本中移除。"
+msgstr ""
+"由于 Python 3.7 已于 2023-06-27 弃用 (EOL)，对 Python 3.7 的支持现已废弃，并"
+"将在即将发布的版本中移除。"
 
 #: ../../source/ref-changelog.md:1951
 #, fuzzy
@@ -33487,8 +33652,8 @@ msgid ""
 "The new `FedTrimmedAvg` strategy implements Trimmed Mean by [Dong Yin, "
 "2018](https://arxiv.org/abs/1803.01498)."
 msgstr ""
-"新的 \"FedTrimmedAvg \"策略实现了[Dong Yin, "
-"2018]（https://arxiv.org/abs/1803.01498）的 \"Trimmed Mean\"。"
+"新的 \"FedTrimmedAvg \"策略实现了[Dong Yin, 2018]（https://arxiv.org/abs/"
+"1803.01498）的 \"Trimmed Mean\"。"
 
 #: ../../source/ref-changelog.md:1955
 #, fuzzy
@@ -33505,9 +33670,9 @@ msgid ""
 " the `mt-pytorch` code example to see a working example using "
 "`start_driver`."
 msgstr ""
-"除了 `start_server` 和使用原始驱动 API 之外，还有一个新的 `start_driver` 函数，只需修改一行代码，就能将 "
-"`start_server` 脚本作为 Flower 驱动程序运行。请查看 `mt-pytorch` 代码示例，了解使用 "
-"`start_driver` 的工作示例。"
+"除了 `start_server` 和使用原始驱动 API 之外，还有一个新的 `start_driver` 函数"
+"，只需修改一行代码，就能将 `start_server` 脚本作为 Flower 驱动程序运行。请查"
+"看 `mt-pytorch` 代码示例，了解使用 `start_driver` 的工作示例。"
 
 #: ../../source/ref-changelog.md:1959
 #, fuzzy
@@ -33525,8 +33690,8 @@ msgid ""
 "aligned to demonstrate both the low-level way and the high-level way of "
 "building server-side logic."
 msgstr ""
-"`mt-pytorch`示例展示了如何在编写驱动程序脚本时聚合参数。附带的 `driver.py` 和 `server.py` "
-"已经进行了调整，以演示构建服务器端逻辑的低级方法和高级方法。"
+"`mt-pytorch`示例展示了如何在编写驱动程序脚本时聚合参数。附带的 `driver.py` "
+"和 `server.py` 已经进行了调整，以演示构建服务器端逻辑的低级方法和高级方法。"
 
 #: ../../source/ref-changelog.md:1963
 #, fuzzy
@@ -33543,8 +33708,8 @@ msgid ""
 "[FastAPI](https://fastapi.tiangolo.com/), but it has now been migrated to"
 " use [Starlette](https://www.starlette.io/) directly."
 msgstr ""
-"REST API（试验性）曾在 [FastAPI](https://fastapi.tiangolo.com/) 中实现，但现在已迁移到直接使用 "
-"[Starlette](https://www.starlette.io/) 。"
+"REST API（试验性）曾在 [FastAPI](https://fastapi.tiangolo.com/) 中实现，但现"
+"在已迁移到直接使用 [Starlette](https://www.starlette.io/) 。"
 
 #: ../../source/ref-changelog.md:1967
 msgid ""
@@ -33568,8 +33733,8 @@ msgid ""
 "and the experimental REST API, there is now a new gRPC API that uses a "
 "request-response model to communicate with client nodes."
 msgstr ""
-"除了现有的 gRPC 应用程序接口（基于双向流）和试验性 REST 应用程序接口外，现在还有一个新的 gRPC "
-"应用程序接口，它使用请求-响应模型与客户端节点通信。"
+"除了现有的 gRPC 应用程序接口（基于双向流）和试验性 REST 应用程序接口外，现在"
+"还有一个新的 gRPC 应用程序接口，它使用请求-响应模型与客户端节点通信。"
 
 #: ../../source/ref-changelog.md:1973
 msgid ""
@@ -33595,8 +33760,10 @@ msgid ""
 "All code should migrate to the new argument `transport`. The deprecated "
 "argument `rest` will be removed in a future release."
 msgstr ""
-"已废弃（试验性的）`start_client`参数`rest`，改用新参数`transport`。`start_client(transport=\"rest\")`将产生与以前的`start_client(rest=True)`相同的行为。所有代码都应迁移到新参数"
-" `transport`。过时的参数 `rest` 将在今后的版本中删除。"
+"已废弃（试验性的）`start_client`参数`rest`，改用新参"
+"数`transport`。`start_client(transport=\"rest\")`将产生与以前的`start_client"
+"(rest=True)`相同的行为。所有代码都应迁移到新参数 `transport`。过时的参数 "
+"`rest` 将在今后的版本中删除。"
 
 #: ../../source/ref-changelog.md:1979
 #, fuzzy
@@ -33613,8 +33780,8 @@ msgid ""
 " option set to 0 by default. This prevents the clients from sending "
 "keepalive pings when there is no outstanding stream."
 msgstr ""
-"现在我们启动一个 gRPC 服务器，并将 `grpc.keepalive_permit_without_calls` 选项默认设置为 "
-"0。这将防止客户端在没有未处理数据流时发送 keepalive pings。"
+"现在我们启动一个 gRPC 服务器，并将 `grpc.keepalive_permit_without_calls` 选项"
+"默认设置为 0。这将防止客户端在没有未处理数据流时发送 keepalive pings。"
 
 #: ../../source/ref-changelog.md:1983
 #, fuzzy
@@ -33660,9 +33827,9 @@ msgid ""
 " major upgrade is that all code examples now have a `requirements.txt` "
 "(in addition to `pyproject.toml`)."
 msgstr ""
-"许多示例都进行了重大更新，包括简化了 advanced-tensorflow 和 advanced-pytorch 示例，改进了 "
-"TensorFlow 示例的 macOS 兼容性，以及模拟代码示例。一项重大升级是所有代码示例现在都有了 "
-"\"requirements.txt\"（除 \"pyproject.toml \"外）。"
+"许多示例都进行了重大更新，包括简化了 advanced-tensorflow 和 advanced-pytorch "
+"示例，改进了 TensorFlow 示例的 macOS 兼容性，以及模拟代码示例。一项重大升级是"
+"所有代码示例现在都有了 \"requirements.txt\"（除 \"pyproject.toml \"外）。"
 
 #: ../../source/ref-changelog.md:1991
 #, fuzzy
@@ -33694,11 +33861,11 @@ msgid ""
 "`Steve Laskaridis`, `Steven Hé (Sīchàng)`, `Taner Topal`"
 msgstr ""
 "`Adam Narozniak`, `Alexander Viala Bellander`, `Charles Beauville`, "
-"`Chenyang Ma (Danny)`, `Daniel J. Beutel`, `Edoardo`, `Gautam Jajoo`, "
-"`Iacob-Alexandru-Andrei`, `JDRanpariya`, `Jean Charle Yaacoub`, `Kunal "
-"Sarkhel`, `L. Jiang`, `Lennart Behme`, `Max Kapsecker`, `Michał`, `Nic "
-"Lane`, `Nikolaos Episkopos`, `Ragy`, `Saurav Maheshkar`, `Semo Yang`, "
-"`Steve Laskaridis`, `Steven Hé (Sīchàng)`, `Taner Topal`"
+"`Chenyang Ma (Danny)`, `Daniel J. Beutel`, `Edoardo`, `Gautam Jajoo`, `Iacob-"
+"Alexandru-Andrei`, `JDRanpariya`, `Jean Charle Yaacoub`, `Kunal Sarkhel`, "
+"`L. Jiang`, `Lennart Behme`, `Max Kapsecker`, `Michał`, `Nic Lane`, "
+"`Nikolaos Episkopos`, `Ragy`, `Saurav Maheshkar`, `Semo Yang`, `Steve "
+"Laskaridis`, `Steven Hé (Sīchàng)`, `Taner Topal`"
 
 #: ../../source/ref-changelog.md:2009
 #, fuzzy
@@ -33825,8 +33992,9 @@ msgid ""
 "Benchmark for Federated Settings (Caldas et al., "
 "2018)](https://arxiv.org/abs/1812.01097)."
 msgstr ""
-"这一新Baseline复现了论文[LEAF: A Benchmark for Federated Settings（Caldas 等人，2018 "
-"年）](https://arxiv.org/abs/1812.01097)中评估 FedAvg 算法在 FEMNIST 数据集上性能的实验。"
+"这一新Baseline复现了论文[LEAF: A Benchmark for Federated Settings（Caldas 等"
+"人，2018 年）](https://arxiv.org/abs/1812.01097)中评估 FedAvg 算法在 FEMNIST "
+"数据集上性能的实验。"
 
 #: ../../source/ref-changelog.md:2029
 #, fuzzy
@@ -33852,7 +34020,9 @@ msgid ""
 "A new REST API has been introduced as an alternative to the gRPC-based "
 "communication stack. In this initial version, the REST API only supports "
 "anonymous clients."
-msgstr "作为基于 gRPC 的通信栈的替代方案，我们引入了新的 REST API。在初始版本中，REST API 仅支持匿名客户端。"
+msgstr ""
+"作为基于 gRPC 的通信栈的替代方案，我们引入了新的 REST API。在初始版本中，"
+"REST API 仅支持匿名客户端。"
 
 #: ../../source/ref-changelog.md:2033
 msgid ""
@@ -33891,9 +34061,10 @@ msgid ""
 "results) that have been delivered will now be deleted. This greatly "
 "improves the memory efficiency of a long-running Flower server."
 msgstr ""
-"驱动程序应用程序接口（Driver API）仍是一项试验性功能，但这一版本引入了一些重大升级。主要改进之一是引入了 SQLite "
-"数据库，将服务器状态存储在磁盘上（而不是内存中）。另一项改进是，已交付的任务（指令或结果）现在将被删除。这大大提高了长期运行的 Flower "
-"服务器的内存效率。"
+"驱动程序应用程序接口（Driver API）仍是一项试验性功能，但这一版本引入了一些重"
+"大升级。主要改进之一是引入了 SQLite 数据库，将服务器状态存储在磁盘上（而不是"
+"内存中）。另一项改进是，已交付的任务（指令或结果）现在将被删除。这大大提高了"
+"长期运行的 Flower 服务器的内存效率。"
 
 #: ../../source/ref-changelog.md:2039
 #, fuzzy
@@ -33909,7 +34080,9 @@ msgid ""
 "While running long simulations, `ray` was sometimes spilling huge amounts"
 " of data that would make the training unable to continue. This is now "
 "fixed! 🎉"
-msgstr "在运行长时间模拟时，`ray` 有时会溢出大量数据，导致训练无法继续。现在这个问题已经解决！🎉"
+msgstr ""
+"在运行长时间模拟时，`ray` 有时会溢出大量数据，导致训练无法继续。现在这个问题"
+"已经解决！🎉"
 
 #: ../../source/ref-changelog.md:2043
 #, fuzzy
@@ -33960,8 +34133,8 @@ msgid ""
 "metrics, but previous releases did not save the results in the `History` "
 "object. This is now the case!"
 msgstr ""
-"`fit_metrics_aggregation_fn`可用于汇总训练指标，但以前的版本不会将结果保存在 \"History "
-"\"对象中。现在可以了！"
+"`fit_metrics_aggregation_fn`可用于汇总训练指标，但以前的版本不会将结果保存在 "
+"\"History \"对象中。现在可以了！"
 
 #: ../../source/ref-changelog.md:2055
 #, fuzzy
@@ -34059,8 +34232,8 @@ msgid ""
 "`Adam Narozniak`, `Alexander Viala Bellander`, `Charles Beauville`, "
 "`Daniel J. Beutel`, `JDRanpariya`, `Lennart Behme`, `Taner Topal`"
 msgstr ""
-"`Adam Narozniak`, `Alexander Viala Bellander`, `Charles Beauville`, "
-"`Daniel J. Beutel`, `JDRanpariya`, `Lennart Behme`, `Taner Topal`"
+"`Adam Narozniak`, `Alexander Viala Bellander`, `Charles Beauville`, `Daniel "
+"J. Beutel`, `JDRanpariya`, `Lennart Behme`, `Taner Topal`"
 
 #: ../../source/ref-changelog.md:2073
 #, fuzzy
@@ -34079,9 +34252,9 @@ msgid ""
 "training round. Both the `workload_id` and `group_id` enable client nodes"
 " to decide whether they want to handle a task or not."
 msgstr ""
-"驱动程序 API（试验性）现在支持 `workload_id`，可用于识别任务所属的工作量。它还支持新的 "
-"`group_id`，例如，可用于指示当前的训练轮次。通过 `workload_id` 和 `group_id` "
-"客户端节点可以决定是否要处理某个任务。"
+"驱动程序 API（试验性）现在支持 `workload_id`，可用于识别任务所属的工作量。它"
+"还支持新的 `group_id`，例如，可用于指示当前的训练轮次。通过 `workload_id` 和 "
+"`group_id` 客户端节点可以决定是否要处理某个任务。"
 
 #: ../../source/ref-changelog.md:2077
 #, fuzzy
@@ -34098,8 +34271,9 @@ msgid ""
 "can now configure the server address of both Driver API (via `--driver-"
 "api-address`) and Fleet API (via `--fleet-api-address`) when starting:"
 msgstr ""
-"长期运行的 Flower 服务器（Driver API 和 Fleet API）现在可以在启动时配置 Driver API（通过 "
-"`--driver-api-address`）和 Fleet API（通过 `-fleet-api-address`）的服务器地址："
+"长期运行的 Flower 服务器（Driver API 和 Fleet API）现在可以在启动时配置 "
+"Driver API（通过 `--driver-api-address`）和 Fleet API（通过 `-fleet-api-"
+"address`）的服务器地址："
 
 #: ../../source/ref-changelog.md:2081
 #, fuzzy
@@ -34152,8 +34326,8 @@ msgid ""
 "refresh, and the project is updated to be compatible with newer Android "
 "tooling."
 msgstr ""
-"Android 代码示例已进行了大幅更新：项目兼容 Flower 1.0（及更高版本），用户界面已全面刷新，项目已更新为兼容较新的 Android"
-" 工具。"
+"Android 代码示例已进行了大幅更新：项目兼容 Flower 1.0（及更高版本），用户界面"
+"已全面刷新，项目已更新为兼容较新的 Android 工具。"
 
 #: ../../source/ref-changelog.md:2093
 #, fuzzy
@@ -34320,7 +34494,9 @@ msgid ""
 "As usual, the documentation has improved quite a bit. It is another step "
 "in our effort to make the Flower documentation the best documentation of "
 "any project. Stay tuned and as always, feel free to provide feedback!"
-msgstr "和往常一样，我们的文档有了很大的改进。这是我们努力使 Flower 文档成为所有项目中最好文档的又一步骤。请继续关注，并随时提供反馈意见！"
+msgstr ""
+"和往常一样，我们的文档有了很大的改进。这是我们努力使 Flower 文档成为所有项目"
+"中最好文档的又一步骤。请继续关注，并随时提供反馈意见！"
 
 #: ../../source/ref-changelog.md:2121
 msgid "v1.2.0 (2023-01-13)"
@@ -34331,8 +34507,8 @@ msgid ""
 "`Adam Narozniak`, `Charles Beauville`, `Daniel J. Beutel`, `Edoardo`, `L."
 " Jiang`, `Ragy`, `Taner Topal`, `dannymcy`"
 msgstr ""
-"`Adam Narozniak`, `Charles Beauville`, `Daniel J. Beutel`, `Edoardo`, `L."
-" Jiang`, `Ragy`, `Taner Topal`, `dannymcy`"
+"`Adam Narozniak`, `Charles Beauville`, `Daniel J. Beutel`, `Edoardo`, `L. "
+"Jiang`, `Ragy`, `Taner Topal`, `dannymcy`"
 
 #: ../../source/ref-changelog.md:2131
 #, fuzzy
@@ -34375,8 +34551,9 @@ msgid ""
 "lessons from scaling simulations in GPU cluster environments. New "
 "defaults make running GPU-based simulations substantially more robust."
 msgstr ""
-"基于 Ray 的虚拟客户端引擎 (`start_simulation`)已更新，以改进对 GPU 的支持。此次更新包含了在 GPU "
-"集群环境中扩展模拟的一些经验教训。新的默认设置使基于 GPU 的模拟运行更加稳健。"
+"基于 Ray 的虚拟客户端引擎 (`start_simulation`)已更新，以改进对 GPU 的支持。此"
+"次更新包含了在 GPU 集群环境中扩展模拟的一些经验教训。新的默认设置使基于 GPU "
+"的模拟运行更加稳健。"
 
 #: ../../source/ref-changelog.md:2139
 #, fuzzy
@@ -34394,8 +34571,8 @@ msgid ""
 "use on GPU instances. We listened and made improvements to all of our "
 "Jupyter notebooks! Check out the updated notebooks here:"
 msgstr ""
-"一些用户报告说，在 GPU 实例上使用 Jupyter 笔记本并不是很方便。我们听取了他们的意见，并对所有 Jupyter "
-"笔记本进行了改进！点击这里查看更新后的笔记本："
+"一些用户报告说，在 GPU 实例上使用 Jupyter 笔记本并不是很方便。我们听取了他们"
+"的意见，并对所有 Jupyter 笔记本进行了改进！点击这里查看更新后的笔记本："
 
 #: ../../source/ref-changelog.md:2143
 msgid ""
@@ -34494,9 +34671,10 @@ msgid ""
 " will be the abstraction that many upcoming features will be built on - "
 "and you can start building those things now, too."
 msgstr ""
-"Flower 现在有了一个新的（试验性的）驱动程序应用程序接口（Driver "
-"API），它将支持完全可编程、异步和多租户的联邦学习（Federated Learning）和联邦分析（Federated "
-"Analytics）应用程序。展望未来，Driver API 将成为许多即将推出的功能的抽象基础，您现在就可以开始构建这些功能。"
+"Flower 现在有了一个新的（试验性的）驱动程序应用程序接口（Driver API），它将支"
+"持完全可编程、异步和多租户的联邦学习（Federated Learning）和联邦分析（"
+"Federated Analytics）应用程序。展望未来，Driver API 将成为许多即将推出的功能"
+"的抽象基础，您现在就可以开始构建这些功能。"
 
 #: ../../source/ref-changelog.md:2158
 msgid ""
@@ -34505,8 +34683,9 @@ msgid ""
 "start and stop their execution independent of the server. This is "
 "especially useful for users who want to deploy Flower in production."
 msgstr ""
-"驱动程序应用程序接口还支持一种新的执行模式，在这种模式下，服务器可无限期运行。多个单独的工作负载可以同时运行，并独立于服务器启动和停止执行。这对于希望在生产中部署"
-" Flower 的用户来说尤其有用。"
+"驱动程序应用程序接口还支持一种新的执行模式，在这种模式下，服务器可无限期运行"
+"。多个单独的工作负载可以同时运行，并独立于服务器启动和停止执行。这对于希望在"
+"生产中部署 Flower 的用户来说尤其有用。"
 
 #: ../../source/ref-changelog.md:2160
 msgid ""
@@ -34557,8 +34736,9 @@ msgid ""
 "contributed a new `Krum` strategy that enables users to easily use Krum "
 "and MultiKrum in their workloads."
 msgstr ""
-"罗马萨皮恩扎大学（Sapienza University）计算机科学专业的学生埃多尔多（Edoardo）提出了一种新的 \"Krum "
-"\"策略，使用户能够在其工作负载中轻松使用 Krum 和 MultiKrum。"
+"罗马萨皮恩扎大学（Sapienza University）计算机科学专业的学生埃多尔多（Edoardo"
+"）提出了一种新的 \"Krum \"策略，使用户能够在其工作负载中轻松使用 Krum 和 "
+"MultiKrum。"
 
 #: ../../source/ref-changelog.md:2172
 #, fuzzy
@@ -34644,7 +34824,9 @@ msgstr "v1.1.0 (2022-10-31)"
 msgid ""
 "We would like to give our **special thanks** to all the contributors who "
 "made the new version of Flower possible (in `git shortlog` order):"
-msgstr "在此，我们向所有促成 Flower 新版本的贡献者致以**特别的谢意（按 \"git shortlog \"顺序排列）："
+msgstr ""
+"在此，我们向所有促成 Flower 新版本的贡献者致以**特别的谢意（按 \"git "
+"shortlog \"顺序排列）："
 
 #: ../../source/ref-changelog.md:2196
 msgid ""
@@ -34655,8 +34837,8 @@ msgid ""
 msgstr ""
 "`Akis Linardos`, `Christopher S`, `Daniel J. Beutel`, `George`, `Jan "
 "Schlicht`, `Mohammad Fares`, `Pedro Porto Buarque de Gusmão`, `Philipp "
-"Wiesner`, `Rob Luke`, `Taner Topal`, `VasundharaAgarwal`, "
-"`danielnugraha`, `edogab33`"
+"Wiesner`, `Rob Luke`, `Taner Topal`, `VasundharaAgarwal`, `danielnugraha`, "
+"`edogab33`"
 
 #: ../../source/ref-changelog.md:2200
 #, fuzzy
@@ -34676,8 +34858,9 @@ msgid ""
 "strategy-agnostic usage of both client-side DP and server-side DP. Head "
 "over to the Flower docs, a new explainer goes into more detail."
 msgstr ""
-"可插拔差分隐私封装器的首个（实验性）预览版可轻松配置和使用差分隐私（DP）。可插拔的差分隐私封装器可实现客户端差分隐私和服务器端差分隐私的框架无关**以及**策略无关的使用。请访问"
-" Flower 文档，新的解释器会提供更多细节。"
+"可插拔差分隐私封装器的首个（实验性）预览版可轻松配置和使用差分隐私（DP）。可"
+"插拔的差分隐私封装器可实现客户端差分隐私和服务器端差分隐私的框架无关**以"
+"及**策略无关的使用。请访问 Flower 文档，新的解释器会提供更多细节。"
 
 #: ../../source/ref-changelog.md:2204
 #, fuzzy
@@ -34695,8 +34878,9 @@ msgid ""
 "components that can be used for many tasks, and one task example running "
 "on CoreML."
 msgstr ""
-"Flower 进入 iOS！大量新代码示例展示了如何为 iOS 构建 Flower 客户端。该代码示例包含可用于多种任务的 Flower iOS "
-"SDK 组件，以及在 CoreML 上运行的一个任务示例。"
+"Flower 进入 iOS！大量新代码示例展示了如何为 iOS 构建 Flower 客户端。该代码示"
+"例包含可用于多种任务的 Flower iOS SDK 组件，以及在 CoreML 上运行的一个任务示"
+"例。"
 
 #: ../../source/ref-changelog.md:2208
 #, fuzzy
@@ -34710,8 +34894,8 @@ msgid ""
 "The new `FedMedian` strategy implements Federated Median (FedMedian) by "
 "[Yin et al., 2018](https://arxiv.org/pdf/1803.01498v1.pdf)."
 msgstr ""
-"新的 \"FedMedian \"战略实现了[Yin "
-"等人，2018]的联邦中值（FedMedian）(https://arxiv.org/pdf/1803.01498v1.pdf)。"
+"新的 \"FedMedian \"战略实现了[Yin 等人，2018]的联邦中值（FedMedian）(https://"
+"arxiv.org/pdf/1803.01498v1.pdf)。"
 
 #: ../../source/ref-changelog.md:2212
 #, fuzzy
@@ -34727,7 +34911,9 @@ msgid ""
 "All `Client` exceptions happening in the VCE are now logged by default "
 "and not just exposed to the configured `Strategy` (via the `failures` "
 "argument)."
-msgstr "VCE 中发生的所有 \"客户端 \"异常现在都会被默认记录下来，而不只是暴露给配置的 `Strategy`（通过 `failures`参数）。"
+msgstr ""
+"VCE 中发生的所有 \"客户端 \"异常现在都会被默认记录下来，而不只是暴露给配置的 "
+"`Strategy`（通过 `failures`参数）。"
 
 #: ../../source/ref-changelog.md:2216
 #, fuzzy
@@ -34746,8 +34932,8 @@ msgid ""
 " dictionary changed to `float` to allow fractions of resources to be "
 "allocated."
 msgstr ""
-"虚拟客户端引擎的部分内部结构已进行了修改。VCE 现在使用 Ray 2.0，\"client_resources \"字典的值类型改为 "
-"\"float\"，以允许分配分数资源。"
+"虚拟客户端引擎的部分内部结构已进行了修改。VCE 现在使用 Ray "
+"2.0，\"client_resources \"字典的值类型改为 \"float\"，以允许分配分数资源。"
 
 #: ../../source/ref-changelog.md:2220
 msgid ""
@@ -34777,8 +34963,9 @@ msgid ""
 "packages that use `flwr` by enabling them to improve their code using "
 "static type checkers like `mypy`."
 msgstr ""
-"软件包 `flwr` 现在捆绑了一个 `py.typed` 文件，表明该软件包是类型化的。这样，使用 `flwr` 的项目或软件包就可以使用 "
-"`mypy` 等静态类型检查器改进代码，从而获得类型支持。"
+"软件包 `flwr` 现在捆绑了一个 `py.typed` 文件，表明该软件包是类型化的。这样，"
+"使用 `flwr` 的项目或软件包就可以使用 `mypy` 等静态类型检查器改进代码，从而获"
+"得类型支持。"
 
 #: ../../source/ref-changelog.md:2228
 #, fuzzy
@@ -34794,7 +34981,9 @@ msgstr ""
 msgid ""
 "The code examples covering scikit-learn and PyTorch Lightning have been "
 "updated to work with the latest version of Flower."
-msgstr "涵盖 scikit-learn 和 PyTorch Lightning 的代码示例已更新，以便与最新版本的 Flower 配合使用。"
+msgstr ""
+"涵盖 scikit-learn 和 PyTorch Lightning 的代码示例已更新，以便与最新版本的 "
+"Flower 配合使用。"
 
 #: ../../source/ref-changelog.md:2232
 #, fuzzy
@@ -34848,7 +35037,9 @@ msgid ""
 "The documentation has been restructured to make it easier to navigate. "
 "This is just the first step in a larger effort to make the Flower "
 "documentation the best documentation of any project ever. Stay tuned!"
-msgstr "我们对文档进行了重组，使其更易于浏览。这只是让 Flower 文档成为所有项目中最好文档的第一步。敬请期待！"
+msgstr ""
+"我们对文档进行了重组，使其更易于浏览。这只是让 Flower 文档成为所有项目中最好"
+"文档的第一步。敬请期待！"
 
 #: ../../source/ref-changelog.md:2240
 #, fuzzy
@@ -34864,8 +35055,9 @@ msgid ""
 "machine, you can now use and learn about Flower in your browser, it's "
 "only a single click away."
 msgstr ""
-"Flower 联邦学习教程的四个部分现在都带有一个新的 \"在 Colab 中打开 "
-"\"按钮。现在，您无需在本地计算机上安装任何软件，只需点击一下，就可以在浏览器中使用和学习 Flower。"
+"Flower 联邦学习教程的四个部分现在都带有一个新的 \"在 Colab 中打开 \"按钮。现"
+"在，您无需在本地计算机上安装任何软件，只需点击一下，就可以在浏览器中使用和学"
+"习 Flower。"
 
 #: ../../source/ref-changelog.md:2244
 #, fuzzy
@@ -34891,8 +35083,9 @@ msgid ""
 "`NumPyClient`. The existing parts one and two have also been improved "
 "(many small changes and fixes)."
 msgstr ""
-"Flower 联邦学习教程有两个全新的部分，涉及自定义策略（仍处于 WIP 阶段）和 `Client` 与 `NumPyClient` "
-"之间的区别。现有的第一和第二部分也得到了改进（许多小改动和修正）。"
+"Flower 联邦学习教程有两个全新的部分，涉及自定义策略（仍处于 WIP 阶段）和 "
+"`Client` 与 `NumPyClient` 之间的区别。现有的第一和第二部分也得到了改进（许多"
+"小改动和修正）。"
 
 #: ../../source/ref-changelog.md:2252
 msgid "v1.0.0 (2022-07-28)"
@@ -35014,9 +35207,10 @@ msgid ""
 "`start_client(server_address=\"127.0.0.1:8080\", "
 "client=FlowerClient())`)."
 msgstr ""
-"以关键字参数传递所有参数，不再支持位置参数。使用位置参数的代码（例如，`start_client(\"127.0.0.1:8080\", "
-"FlowerClient())`）必须为每个位置参数添加关键字（例如，`start_client(server_address=\"127.0.0.1:8080\","
-" client=FlowerClient())`）。"
+"以关键字参数传递所有参数，不再支持位置参数。使用位置参数的代码（例如"
+"，`start_client(\"127.0.0.1:8080\", FlowerClient())`）必须为每个位置参数添加"
+"关键字（例如，`start_client(server_address=\"127.0.0.1:8080\", "
+"client=FlowerClient())`）。"
 
 #: ../../source/ref-changelog.md:2273
 #, fuzzy
@@ -35037,10 +35231,10 @@ msgid ""
 " arguments that as the previous config dict, but it makes writing type-"
 "safe code easier and the default parameters values more transparent."
 msgstr ""
-"并非配置字典`{\"num_rounds\"： 3, \"round_timeout\"： 600.0}`, `start_server`和 "
-"`start_simulation`现在用一个类型为 "
-"`flwr.server.ServerConfig`的配置对象。`ServerConfig`接收的参数与之前的 config dict "
-"相同，但它使编写类型安全代码变得更容易，默认参数值也更加透明。"
+"并非配置字典`{\"num_rounds\"： 3, \"round_timeout\"： 600.0}`, "
+"`start_server`和 `start_simulation`现在用一个类型为 "
+"`flwr.server.ServerConfig`的配置对象。`ServerConfig`接收的参数与之前的 "
+"config dict 相同，但它使编写类型安全代码变得更容易，默认参数值也更加透明。"
 
 #: ../../source/ref-changelog.md:2277
 #, fuzzy
@@ -35082,8 +35276,9 @@ msgid ""
 "(`server_round`), (2) the model parameters to evaluate (`parameters`), "
 "and (3) a config dictionary (`config`)."
 msgstr ""
-"传递给内置策略（如 `FedAvg`）的 `evaluate_fn` 现在需要三个参数：(1) 当前一轮联邦学习/评估 "
-"(`server_round`)，(2) 要评估的模型参数 (`parameters`)，(3) 配置字典 (`config`)。"
+"传递给内置策略（如 `FedAvg`）的 `evaluate_fn` 现在需要三个参数：(1) 当前一轮"
+"联邦学习/评估 (`server_round`)，(2) 要评估的模型参数 (`parameters`)，(3) 配置"
+"字典 (`config`)。"
 
 #: ../../source/ref-changelog.md:2289
 #, fuzzy
@@ -35102,8 +35297,9 @@ msgid ""
 "the previous default values can get the previous behaviour by "
 "initializing the strategy in the following way:"
 msgstr ""
-"所有内置策略现在都使用 \"fraction_fit=1.0 \"和 "
-"\"fraction_evaluate=1.0\"，这意味着它们会选择*所有*当前可用的客户端进行训练和评估。依赖以前默认值的项目可以通过以下方式初始化策略，获得以前的行为："
+"所有内置策略现在都使用 \"fraction_fit=1.0 \"和 \"fraction_evaluate=1.0\"，这"
+"意味着它们会选择*所有*当前可用的客户端进行训练和评估。依赖以前默认值的项目可"
+"以通过以下方式初始化策略，获得以前的行为："
 
 #: ../../source/ref-changelog.md:2293
 msgid "`strategy = FedAvg(fraction_fit=0.1, fraction_evaluate=0.1)`"
@@ -35126,9 +35322,10 @@ msgid ""
 "To improve reaability and avoid confusion with *random*, this parameter "
 "has been renamed from `rnd` to `server_round`."
 msgstr ""
-"几个 Flower "
-"方法和函数（`evaluate_fn`、`configure_fit`、`aggregate_fit`、`configure_evaluate`、`aggregate_evaluate`）的第一个参数是当前一轮的联邦学习/评估。为提高可重复性并避免与"
-" *random* 混淆，该参数已从 `rnd` 更名为 `server_round`。"
+"几个 Flower 方法和函数"
+"（`evaluate_fn`、`configure_fit`、`aggregate_fit`、`configure_evaluate`、`aggregate_evaluate`）"
+"的第一个参数是当前一轮的联邦学习/评估。为提高可重复性并避免与 *random* 混淆，"
+"该参数已从 `rnd` 更名为 `server_round`。"
 
 #: ../../source/ref-changelog.md:2299
 #, fuzzy
@@ -35169,7 +35366,9 @@ msgstr ""
 msgid ""
 "`flwr.common.Weights` was renamed to `flwr.common.NDArrays` to better "
 "capture what this type is all about."
-msgstr "flwr.common.Weights \"更名为 \"flwr.common.NDArrays\"，以更好地反映该类型的含义。"
+msgstr ""
+"flwr.common.Weights \"更名为 \"flwr.common.NDArrays\"，以更好地反映该类型的含"
+"义。"
 
 #: ../../source/ref-changelog.md:2311
 #, fuzzy
@@ -35186,8 +35385,8 @@ msgid ""
 "The `start_server` parameter `force_final_distributed_eval` has long been"
 " a historic artefact, in this release it is finally gone for good."
 msgstr ""
-"start_server \"参数 \"force_final_distributed_eval "
-"\"长期以来一直是个历史遗留问题，在此版本中终于永远消失了。"
+"start_server \"参数 \"force_final_distributed_eval \"长期以来一直是个历史遗留"
+"问题，在此版本中终于永远消失了。"
 
 #: ../../source/ref-changelog.md:2315
 #, fuzzy
@@ -35241,7 +35440,9 @@ msgstr "** 支持 Python 3.10** ([#1320](https://github.com/adap/flower/pull/132
 msgid ""
 "The previous Flower release introduced experimental support for Python "
 "3.10, this release declares Python 3.10 support as stable."
-msgstr "上一个 Flower 版本引入了对 Python 3.10 的实验支持，而本版本则宣布对 Python 3.10 的支持为稳定支持。"
+msgstr ""
+"上一个 Flower 版本引入了对 Python 3.10 的实验支持，而本版本则宣布对 Python "
+"3.10 的支持为稳定支持。"
 
 #: ../../source/ref-changelog.md:2329
 #, fuzzy
@@ -35262,8 +35463,8 @@ msgid ""
 "implement `evaluate` when using centralized evaluation!"
 msgstr ""
 "`Client`/`NumPyClient`的 \"get_properties\"、\"get_parameters\"、\"fit \"和 "
-"\"evaluate \"方法都是可选的。这样就可以编写只实现 `fit` 而不实现其他方法的客户端。使用集中评估时，无需实现 "
-"`evaluate`！"
+"\"evaluate \"方法都是可选的。这样就可以编写只实现 `fit` 而不实现其他方法的客"
+"户端。使用集中评估时，无需实现 `evaluate`！"
 
 #: ../../source/ref-changelog.md:2333
 msgid ""
@@ -35272,8 +35473,9 @@ msgid ""
 "eperiments and opens the door to running, for example, async FL using the"
 " Virtual Client Engine."
 msgstr ""
-"与 `start_server` 类似，`start_simulation` 现在也接受一个完整的 `Server` "
-"实例。这使得用户可以对实验的执行进行大量自定义，并为使用虚拟客户端引擎运行异步 FL 等打开了大门。"
+"与 `start_server` 类似，`start_simulation` 现在也接受一个完整的 `Server` 实例"
+"。这使得用户可以对实验的执行进行大量自定义，并为使用虚拟客户端引擎运行异步 "
+"FL 等打开了大门。"
 
 #: ../../source/ref-changelog.md:2335
 #, fuzzy
@@ -35365,8 +35567,9 @@ msgid ""
 "based documentation, migrates the changelog from `.rst` to `.md`, and "
 "fixes a number of smaller details!"
 msgstr ""
-"其中一个实质性的文档更新修复了多个较小的渲染问题，使标题更加简洁以改善导航，删除了一个已废弃的库，更新了文档依赖关系，在 API 参考中包含了 "
-"`flwr.common` 模块，包含了对基于 markdown 的文档的支持，将更新日志从 `.rst` 移植到了 "
+"其中一个实质性的文档更新修复了多个较小的渲染问题，使标题更加简洁以改善导航，"
+"删除了一个已废弃的库，更新了文档依赖关系，在 API 参考中包含了 `flwr.common` "
+"模块，包含了对基于 markdown 的文档的支持，将更新日志从 `.rst` 移植到了 "
 "`.md`，并修复了一些较小的细节！"
 
 #: ../../source/ref-changelog.md:2354 ../../source/ref-changelog.md:2408
@@ -35456,8 +35659,8 @@ msgid ""
 "includes a Flower client SDK and a quickstart code example that "
 "demonstrates a simple C++ client using the SDK."
 msgstr ""
-"预览版支持用 C++ 编写的 Flower 客户端。C++ 预览版包括一个 Flower 客户端 SDK 和一个快速入门代码示例，使用 SDK "
-"演示了一个简单的 C++ 客户端。"
+"预览版支持用 C++ 编写的 Flower 客户端。C++ 预览版包括一个 Flower 客户端 SDK "
+"和一个快速入门代码示例，使用 SDK 演示了一个简单的 C++ 客户端。"
 
 #: ../../source/ref-changelog.md:2372
 #, fuzzy
@@ -35474,8 +35677,8 @@ msgid ""
 " to be released in October. This Flower release adds experimental support"
 " for both Python versions."
 msgstr ""
-"Python 3.10 是 Python 的最新稳定版本，Python 3.11 将于 10 月份发布。Flower 版本增加了对这两个 "
-"Python 版本的实验支持。"
+"Python 3.10 是 Python 的最新稳定版本，Python 3.11 将于 10 月份发布。Flower 版"
+"本增加了对这两个 Python 版本的实验支持。"
 
 #: ../../source/ref-changelog.md:2376
 #, fuzzy
@@ -35493,8 +35696,9 @@ msgid ""
 "`fit_metrics_aggregation_fn` and `evaluate_metrics_aggregation_fn`, that "
 "allow passing custom metric aggregation functions."
 msgstr ""
-"现在无需定制策略即可聚合自定义度量（如`准确度`）。内置策略支持两个新参数：`fit_metrics_aggregation_fn` "
-"和`evaluate_metrics_aggregation_fn`，允许传递自定义度量聚合函数。"
+"现在无需定制策略即可聚合自定义度量（如`准确度`）。内置策略支持两个新参数"
+"：`fit_metrics_aggregation_fn` 和`evaluate_metrics_aggregation_fn`，允许传递"
+"自定义度量聚合函数。"
 
 #: ../../source/ref-changelog.md:2380
 #, fuzzy
@@ -35511,8 +35715,9 @@ msgid ""
 "server will wait *at least* `round_timeout` seconds before it closes the "
 "connection."
 msgstr ""
-"新的配置值允许为 `start_server` 和 `start_simulation` 设置回合超时。如果 `config` 字典中包含一个 "
-"`round_timeout` 键（以秒为单位的 `float`值），服务器将至少等待 ** `round_timeout` 秒后才关闭连接。"
+"新的配置值允许为 `start_server` 和 `start_simulation` 设置回合超时。如果 "
+"`config` 字典中包含一个 `round_timeout` 键（以秒为单位的 `float`值），服务器"
+"将至少等待 ** `round_timeout` 秒后才关闭连接。"
 
 #: ../../source/ref-changelog.md:2384
 #, fuzzy
@@ -35531,8 +35736,8 @@ msgid ""
 "round. Federated evaluation can be disabled by setting `fraction_eval` to"
 " `0.0`."
 msgstr ""
-"内置策略现在可以在同一轮中同时执行联邦评估（即客户端）和集中评估（即服务器端）。可以通过将 `fraction_eval` 设置为 "
-"`0.0`来禁用联邦评估。"
+"内置策略现在可以在同一轮中同时执行联邦评估（即客户端）和集中评估（即服务器端"
+"）。可以通过将 `fraction_eval` 设置为 `0.0`来禁用联邦评估。"
 
 #: ../../source/ref-changelog.md:2388
 #, fuzzy
@@ -35547,7 +35752,9 @@ msgstr ""
 msgid ""
 "Two Jupyter Notebook tutorials (compatible with Google Colab) explain "
 "basic and intermediate Flower features:"
-msgstr "两本 Jupyter Notebook 教程（与 Google Colab 兼容）介绍了 Flower 的基本和中级功能："
+msgstr ""
+"两本 Jupyter Notebook 教程（与 Google Colab 兼容）介绍了 Flower 的基本和中级"
+"功能："
 
 #: ../../source/ref-changelog.md:2392
 #, fuzzy
@@ -35615,7 +35822,9 @@ msgstr ""
 msgid ""
 "A new code example (`jax_from_centralized_to_federated`) shows federated "
 "learning with JAX and Flower."
-msgstr "新代码示例（`jax_from_centralized_to_federated`）展示了使用 JAX 和 Flower 的联邦学习。"
+msgstr ""
+"新代码示例（`jax_from_centralized_to_federated`）展示了使用 JAX 和 Flower 的"
+"联邦学习。"
 
 #: ../../source/ref-changelog.md:2410
 #, fuzzy
@@ -35767,8 +35976,8 @@ msgid ""
 "simulations using the Virtual Client Engine through Jupyter Notebook "
 "(incl. Google Colab)."
 msgstr ""
-"新代码示例（`quickstart_simulation`）通过 Jupyter Notebook（包括 Google "
-"Colab）演示了使用虚拟客户端引擎进行 Flower 模拟。"
+"新代码示例（`quickstart_simulation`）通过 Jupyter Notebook（包括 Google Colab"
+"）演示了使用虚拟客户端引擎进行 Flower 模拟。"
 
 #: ../../source/ref-changelog.md:2444
 #, fuzzy
@@ -35781,7 +35990,9 @@ msgstr "**客户端属性（功能预览）** ([#795](https://github.com/adap/fl
 msgid ""
 "Clients can implement a new method `get_properties` to enable server-side"
 " strategies to query client properties."
-msgstr "客户端可以实现一个新方法 `get_properties`，以启用服务器端策略来查询客户端属性。"
+msgstr ""
+"客户端可以实现一个新方法 `get_properties`，以启用服务器端策略来查询客户端属性"
+"。"
 
 #: ../../source/ref-changelog.md:2448
 #, fuzzy
@@ -35799,8 +36010,8 @@ msgid ""
 "client platforms and with this release, using Flower on Android has "
 "become a lot easier."
 msgstr ""
-"`main`终于支持 Android 了！Flower 的设计与客户端和框架无关。我们可以集成任意客户端平台，有了这个版本，在安卓系统上使用 "
-"Flower 就变得更容易了。"
+"`main`终于支持 Android 了！Flower 的设计与客户端和框架无关。我们可以集成任意"
+"客户端平台，有了这个版本，在安卓系统上使用 Flower 就变得更容易了。"
 
 #: ../../source/ref-changelog.md:2452
 msgid ""
@@ -35811,8 +36022,8 @@ msgid ""
 " functionality from `FedAvgAndroid`."
 msgstr ""
 "该示例在客户端使用了 TFLite 以及新的 `FedAvgAndroid`策略。Android 客户端和 "
-"`FedAvgAndroid`仍处于试验阶段，但这是向成熟的 Android SDK 和集成了 `FedAvgAndroid`新功能的统一 "
-"`FedAvg`实现迈出的第一步。"
+"`FedAvgAndroid`仍处于试验阶段，但这是向成熟的 Android SDK 和集成了 "
+"`FedAvgAndroid`新功能的统一 `FedAvg`实现迈出的第一步。"
 
 #: ../../source/ref-changelog.md:2454
 #, fuzzy
@@ -35830,8 +36041,8 @@ msgid ""
 "Microsoft Azure). Users can configure the keepalive time to customize the"
 " gRPC stack based on specific requirements."
 msgstr ""
-"为提高 Flower 与更多云环境（如 Microsoft Azure）的兼容性，缩短了默认 gRPC 保持时间。用户可以根据具体要求配置 "
-"keepalive 时间，自定义 gRPC 堆栈。"
+"为提高 Flower 与更多云环境（如 Microsoft Azure）的兼容性，缩短了默认 gRPC 保"
+"持时间。用户可以根据具体要求配置 keepalive 时间，自定义 gRPC 堆栈。"
 
 #: ../../source/ref-changelog.md:2458
 #, fuzzy
@@ -35846,7 +36057,9 @@ msgstr ""
 msgid ""
 "A new code example (`opacus`) demonstrates differentially-private "
 "federated learning with Opacus, PyTorch, and Flower."
-msgstr "一个新的代码示例（\"opacus\"）演示了使用 Opacus、PyTorch 和 Flower 进行差分隐私的联邦学习。"
+msgstr ""
+"一个新的代码示例（\"opacus\"）演示了使用 Opacus、PyTorch 和 Flower 进行差分隐"
+"私的联邦学习。"
 
 #: ../../source/ref-changelog.md:2462
 #, fuzzy
@@ -35861,7 +36074,9 @@ msgstr ""
 msgid ""
 "A new code example (`quickstart_huggingface`) demonstrates usage of "
 "Hugging Face Transformers with Flower."
-msgstr "新的代码示例(`quickstart_huggingface`)证明了结合Flower和Hugging Face Transformers的实用性。"
+msgstr ""
+"新的代码示例(`quickstart_huggingface`)证明了结合Flower和Hugging Face "
+"Transformers的实用性。"
 
 #: ../../source/ref-changelog.md:2466
 #, fuzzy
@@ -35945,8 +36160,8 @@ msgid ""
 "identifiers."
 msgstr ""
 "现在可以使用客户端 ID 列表（`clients_ids`，类型：`List[str]`）调用 "
-"`start_simulation`。每当需要初始化客户端时，这些 ID 就会被传递到 `client_fn` 中，这样就能更轻松地加载无法通过 "
-"`int` 标识符访问的数据分区。"
+"`start_simulation`。每当需要初始化客户端时，这些 ID 就会被传递到 `client_fn` "
+"中，这样就能更轻松地加载无法通过 `int` 标识符访问的数据分区。"
 
 #: ../../source/ref-changelog.md:2484
 #, fuzzy
@@ -36026,9 +36241,10 @@ msgid ""
 "tensorflow`, `http-logger`, `ops`) are now no-op and will be removed in "
 "an upcoming release."
 msgstr ""
-"自 Flower 0.12.0 起，软件包 `flwr_example` 和 `flwr_experimental` 已被弃用，它们不再包含在 "
-"Flower 的发布版本中。相关的额外包（`baseline`, `examples-pytorch`, `examples-"
-"tensorflow`, `http-logger`, `ops`）现在已不再使用，并将在即将发布的版本中移除。"
+"自 Flower 0.12.0 起，软件包 `flwr_example` 和 `flwr_experimental` 已被弃用，"
+"它们不再包含在 Flower 的发布版本中。相关的额外包（`baseline`, `examples-"
+"pytorch`, `examples-tensorflow`, `http-logger`, `ops`）现在已不再使用，并将在"
+"即将发布的版本中移除。"
 
 #: ../../source/ref-changelog.md:2498
 msgid "v0.17.0 (2021-09-24)"
@@ -36054,9 +36270,10 @@ msgid ""
 "The easiest way to test the new functionality is to look at the two new "
 "code examples called `quickstart_simulation` and `simulation_pytorch`."
 msgstr ""
-"Flower 的目标之一是实现大规模研究。这一版本首次（试验性地）展示了代号为 \"虚拟客户端引擎 "
-"\"的重要新功能。虚拟客户端可以在单台机器或计算集群上对大量客户端进行模拟。测试新功能的最简单方法是查看名为 "
-"\"quickstart_simulation \"和 \"simulation_pytorch \"的两个新代码示例。"
+"Flower 的目标之一是实现大规模研究。这一版本首次（试验性地）展示了代号为 \"虚"
+"拟客户端引擎 \"的重要新功能。虚拟客户端可以在单台机器或计算集群上对大量客户端"
+"进行模拟。测试新功能的最简单方法是查看名为 \"quickstart_simulation \"和 "
+"\"simulation_pytorch \"的两个新代码示例。"
 
 #: ../../source/ref-changelog.md:2506
 msgid ""
@@ -36065,8 +36282,9 @@ msgid ""
 "known caveats. However, those who are curious are encouraged to try it "
 "out and share their thoughts."
 msgstr ""
-"该功能仍处于试验阶段，因此无法保证 API "
-"的稳定性。此外，它还没有完全准备好进入黄金时间，并有一些已知的注意事项。不过，我们鼓励好奇的用户尝试使用并分享他们的想法。"
+"该功能仍处于试验阶段，因此无法保证 API 的稳定性。此外，它还没有完全准备好进入"
+"黄金时间，并有一些已知的注意事项。不过，我们鼓励好奇的用户尝试使用并分享他们"
+"的想法。"
 
 #: ../../source/ref-changelog.md:2508
 #, fuzzy
@@ -36082,13 +36300,17 @@ msgstr ""
 msgid ""
 "FedYogi - Federated learning strategy using Yogi on server-side. "
 "Implementation based on https://arxiv.org/abs/2003.00295"
-msgstr "FedYogi - 在服务器端使用 Yogi 的联邦学习策略。基于 https://arxiv.org/abs/2003.00295 实现"
+msgstr ""
+"FedYogi - 在服务器端使用 Yogi 的联邦学习策略。基于 https://arxiv.org/abs/"
+"2003.00295 实现"
 
 #: ../../source/ref-changelog.md:2511
 msgid ""
 "FedAdam - Federated learning strategy using Adam on server-side. "
 "Implementation based on https://arxiv.org/abs/2003.00295"
-msgstr "FedAdam - 在服务器端使用 Adam 的联邦学习策略。基于 https://arxiv.org/abs/2003.00295 实现"
+msgstr ""
+"FedAdam - 在服务器端使用 Adam 的联邦学习策略。基于 https://arxiv.org/abs/"
+"2003.00295 实现"
 
 #: ../../source/ref-changelog.md:2513
 #, fuzzy
@@ -36183,8 +36405,9 @@ msgid ""
 "server-side evaluation). The prior behaviour can be enabled by passing "
 "`force_final_distributed_eval=True` to `start_server`."
 msgstr ""
-"之前的行为是在所有连接的客户端上执行最后一轮分布式评估，而这通常是不需要的（例如，在使用服务器端评估时）。可以通过向 `start_server`"
-" 传递 `force_final_distributed_eval=True` 来启用之前的行为。"
+"之前的行为是在所有连接的客户端上执行最后一轮分布式评估，而这通常是不需要的（"
+"例如，在使用服务器端评估时）。可以通过向 `start_server` 传递 "
+"`force_final_distributed_eval=True` 来启用之前的行为。"
 
 #: ../../source/ref-changelog.md:2535
 #, fuzzy
@@ -36224,8 +36447,9 @@ msgid ""
 " existing example was kept for reference purposes, but it might be "
 "removed in the future."
 msgstr ""
-"该示例已被新示例取代。新示例基于试验性虚拟客户端引擎，它将成为在 Flower "
-"中进行大多数类型大规模模拟的新的默认方式。现有示例将作为参考保留，但将来可能会删除。"
+"该示例已被新示例取代。新示例基于试验性虚拟客户端引擎，它将成为在 Flower 中进"
+"行大多数类型大规模模拟的新的默认方式。现有示例将作为参考保留，但将来可能会删"
+"除。"
 
 #: ../../source/ref-changelog.md:2543
 msgid "v0.16.0 (2021-05-11)"
@@ -36257,8 +36481,9 @@ msgid ""
 "new warning messages often provide details on how to migrate to more "
 "recent APIs, thus easing the transition from one release to another."
 msgstr ""
-"Flower 早期版本通常会迁移到新的应用程序接口，同时保持与旧版应用程序接口的兼容。如果检测到使用了过时的 "
-"API，本版本将引入详细的警告信息。新的警告信息通常会详细说明如何迁移到更新的 API，从而简化从一个版本到另一个版本的过渡。"
+"Flower 早期版本通常会迁移到新的应用程序接口，同时保持与旧版应用程序接口的兼容"
+"。如果检测到使用了过时的 API，本版本将引入详细的警告信息。新的警告信息通常会"
+"详细说明如何迁移到更新的 API，从而简化从一个版本到另一个版本的过渡。"
 
 #: ../../source/ref-changelog.md:2556
 #, fuzzy
@@ -36305,8 +36530,9 @@ msgid ""
 "dictionary containing custom metrics from client to server. As of this "
 "release, custom metrics replace task-specific metrics on the server."
 msgstr ""
-"Flower 服务器现在完全与任务无关，所有剩余的任务特定度量（如 \"准确度\"）都已被自定义度量字典取代。Flower 0.15 "
-"引入了从客户端向服务器传递包含自定义指标的字典的功能。从本版本开始，自定义指标将取代服务器上的特定任务指标。"
+"Flower 服务器现在完全与任务无关，所有剩余的任务特定度量（如 \"准确度\"）都已"
+"被自定义度量字典取代。Flower 0.15 引入了从客户端向服务器传递包含自定义指标的"
+"字典的功能。从本版本开始，自定义指标将取代服务器上的特定任务指标。"
 
 #: ../../source/ref-changelog.md:2568
 msgid ""
@@ -36338,7 +36564,9 @@ msgstr ""
 msgid ""
 "Flower 0.15-style return types are deprecated (but still supported), "
 "compatibility will be removed in a future release."
-msgstr "Flower 0.15 风格的返回类型已被弃用（但仍受支持），兼容性将在未来的版本中移除。"
+msgstr ""
+"Flower 0.15 风格的返回类型已被弃用（但仍受支持），兼容性将在未来的版本中移除"
+"。"
 
 #: ../../source/ref-changelog.md:2574
 #, fuzzy
@@ -36367,9 +36595,10 @@ msgid ""
 "these byte arrays should be interpreted (e.g., for "
 "serialization/deserialization)."
 msgstr ""
-"Flower 服务器现在完全不依赖序列化。之前使用的 `Weights` 类（以反序列化的 NumPy ndarrays 表示参数）已被 "
-"`Parameters` 类取代（例如在 `Strategy`中）。参数 "
-"\"对象与序列化完全无关，它以字节数组的形式表示参数，\"tensor_type \"属性表示如何解释这些字节数组（例如，用于序列化/反序列化）。"
+"Flower 服务器现在完全不依赖序列化。之前使用的 `Weights` 类（以反序列化的 "
+"NumPy ndarrays 表示参数）已被 `Parameters` 类取代（例如在 `Strategy`中）。参"
+"数 \"对象与序列化完全无关，它以字节数组的形式表示参数，\"tensor_type \"属性表"
+"示如何解释这些字节数组（例如，用于序列化/反序列化）。"
 
 #: ../../source/ref-changelog.md:2580
 #, fuzzy
@@ -36402,8 +36631,8 @@ msgid ""
 "parameter initialization works via a new `Strategy` method called "
 "`initialize_parameters`."
 msgstr ""
-"现在可以在服务器端初始化模型参数。服务器端参数初始化通过名为 \"initialize_parameters \"的新 \"Strategy "
-"\"方法进行。"
+"现在可以在服务器端初始化模型参数。服务器端参数初始化通过名为 "
+"\"initialize_parameters \"的新 \"Strategy \"方法进行。"
 
 #: ../../source/ref-changelog.md:2590
 msgid ""
@@ -36412,8 +36641,8 @@ msgid ""
 "will provide these initial parameters to the server on startup and then "
 "delete them to free the memory afterwards."
 msgstr ""
-"内置策略支持名为 \"initial_parameters "
-"\"的新构造函数参数，用于设置初始参数。内置策略会在启动时向服务器提供这些初始参数，然后删除它们以释放内存。"
+"内置策略支持名为 \"initial_parameters \"的新构造函数参数，用于设置初始参数。"
+"内置策略会在启动时向服务器提供这些初始参数，然后删除它们以释放内存。"
 
 #: ../../source/ref-changelog.md:2609
 msgid ""
@@ -36421,7 +36650,9 @@ msgid ""
 "continue to use the current behaviour (namely, it will ask one of the "
 "connected clients for its parameters and use these as the initial global "
 "parameters)."
-msgstr "如果没有向策略提供初始参数，服务器将继续使用当前行为（即向其中一个已连接的客户端询问参数，并将这些参数用作初始全局参数）。"
+msgstr ""
+"如果没有向策略提供初始参数，服务器将继续使用当前行为（即向其中一个已连接的客"
+"户端询问参数，并将这些参数用作初始全局参数）。"
 
 #: ../../source/ref-changelog.md:2613
 msgid ""
@@ -36455,8 +36686,8 @@ msgid ""
 "and make use of them on the server side!"
 msgstr ""
 "客户端现在可以返回一个额外的字典，将 `str` 键映射为以下类型的值： "
-"bool`、`bytes`、`float`、`int`、`str`。这意味着我们可以从 `fit`/`evaluate` "
-"返回几乎任意的值，并在服务器端使用它们！"
+"bool`、`bytes`、`float`、`int`、`str`。这意味着我们可以从 `fit`/`evaluate` 返"
+"回几乎任意的值，并在服务器端使用它们！"
 
 #: ../../source/ref-changelog.md:2623
 msgid ""
@@ -36465,8 +36696,9 @@ msgid ""
 "dict)` representing the loss, number of examples, and a dictionary "
 "holding arbitrary problem-specific values like accuracy."
 msgstr ""
-"这一改进还使 `fit` 和 `evaluate` 之间的返回类型更加一致：`evaluate` 现在应返回一个元组`(float, int, "
-"dict)`，代表损失、示例数和一个包含特定问题任意值（如准确度）的字典。"
+"这一改进还使 `fit` 和 `evaluate` 之间的返回类型更加一致：`evaluate` 现在应返"
+"回一个元组`(float, int, dict)`，代表损失、示例数和一个包含特定问题任意值（如"
+"准确度）的字典。"
 
 #: ../../source/ref-changelog.md:2625
 msgid ""
@@ -36477,15 +36709,18 @@ msgid ""
 "`evaluate`: `float, int, Dict[str, Scalar]`). See the example below for "
 "details."
 msgstr ""
-"如果你想知道：此功能与现有项目兼容，额外的字典返回值是可选的。不过，新代码应迁移到新的返回类型，以便与即将发布的 Flower "
-"版本兼容（`fit`: `List[np.ndarray], int, Dict[str, Scalar]`，`evaluate`: "
-"`float, int, Dict[str, Scalar]`）。详见下面的示例。"
+"如果你想知道：此功能与现有项目兼容，额外的字典返回值是可选的。不过，新代码应"
+"迁移到新的返回类型，以便与即将发布的 Flower 版本兼容（`fit`: "
+"`List[np.ndarray], int, Dict[str, Scalar]`，`evaluate`: `float, int, "
+"Dict[str, Scalar]`）。详见下面的示例。"
 
 #: ../../source/ref-changelog.md:2627
 msgid ""
 "*Code example:* note the additional dictionary return values in both "
 "`FlwrClient.fit` and `FlwrClient.evaluate`:"
-msgstr "*代码示例：* 注意 `FlwrClient.fit` 和 `FlwrClient.evaluate` 中的附加字典返回值："
+msgstr ""
+"*代码示例：* 注意 `FlwrClient.fit` 和 `FlwrClient.evaluate` 中的附加字典返回"
+"值："
 
 #: ../../source/ref-changelog.md:2642
 #, fuzzy
@@ -36503,8 +36738,8 @@ msgid ""
 "generalizes this to enable values of the following types: `bool`, "
 "`bytes`, `float`, `int`, `str`."
 msgstr ""
-"`config`参数曾是 \"字典[str, str]\"类型，这意味着字典值应是字符串。新版本将其扩展为以下类型的值： "
-"bool`、`bytes`、`float`、`int`、`str`。"
+"`config`参数曾是 \"字典[str, str]\"类型，这意味着字典值应是字符串。新版本将其"
+"扩展为以下类型的值： bool`、`bytes`、`float`、`int`、`str`。"
 
 #: ../../source/ref-changelog.md:2646
 msgid ""
@@ -36512,14 +36747,16 @@ msgid ""
 "using the `config` dictionary. Yay, no more `str(epochs)` on the server-"
 "side and `int(config[\"epochs\"])` on the client side!"
 msgstr ""
-"这意味着现在可以使用 `config` 字典向 `fit`/`evaluate` 传递几乎任意的值。耶，服务器端不再需要 "
-"`str(epochs)`，客户端不再需要 `int(config[\"epochs\"])`！"
+"这意味着现在可以使用 `config` 字典向 `fit`/`evaluate` 传递几乎任意的值。耶，"
+"服务器端不再需要 `str(epochs)`，客户端不再需要 `int(config[\"epochs\"])`！"
 
 #: ../../source/ref-changelog.md:2648
 msgid ""
 "*Code example:* note that the `config` dictionary now contains non-`str` "
 "values in both `Client.fit` and `Client.evaluate`:"
-msgstr "*代码示例：* 注意 `config` 字典现在在 `Client.fit` 和 `Client.evaluate` 中都包含非 `str` 值："
+msgstr ""
+"*代码示例：* 注意 `config` 字典现在在 `Client.fit` 和 `Client.evaluate` 中都"
+"包含非 `str` 值："
 
 #: ../../source/ref-changelog.md:2665
 msgid "v0.13.0 (2021-01-08)"
@@ -36713,9 +36950,9 @@ msgid ""
 "frameworks such as `PyTorch <https://pytorch.org/>`_ or `TensorFlow "
 "<https://www.tensorflow.org/>`_."
 msgstr ""
-"Flower 附带了许多使用示例。这些示例演示了如何使用 Flower 联邦不同类型的现有机器学习形式，通常是利用流行的机器学习框架，如 "
-"`PyTorch <https://pytorch.org/>`_ 或 `TensorFlow "
-"<https://www.tensorflow.org/>`_。"
+"Flower 附带了许多使用示例。这些示例演示了如何使用 Flower 联邦不同类型的现有机"
+"器学习形式，通常是利用流行的机器学习框架，如 `PyTorch <https://pytorch.org/>"
+"`_ 或 `TensorFlow <https://www.tensorflow.org/>`_。"
 
 #: ../../source/ref-example-projects.rst:10
 #, fuzzy
@@ -36731,7 +36968,9 @@ msgstr "快速入门 TensorFlow"
 msgid ""
 "The TensorFlow/Keras quickstart example shows CIFAR-10 image "
 "classification with MobileNetV2:"
-msgstr "TensorFlow/Keras 快速入门示例展示了使用 MobileNetV2 进行的 CIFAR-10 图像分类："
+msgstr ""
+"TensorFlow/Keras 快速入门示例展示了使用 MobileNetV2 进行的 CIFAR-10 图像分类"
+"："
 
 #: ../../source/ref-example-projects.rst:19
 #, fuzzy
@@ -36814,7 +37053,9 @@ msgstr "树莓派和 Nvidia Jetson 上的联邦学习"
 msgid ""
 "This example shows how Flower can be used to build a federated learning "
 "system that run across Raspberry Pi and Nvidia Jetson:"
-msgstr "本示例展示了如何利用 Flower 建立一个跨 Raspberry Pi 和 Nvidia Jetson 运行的联邦学习系统："
+msgstr ""
+"本示例展示了如何利用 Flower 建立一个跨 Raspberry Pi 和 Nvidia Jetson 运行的联"
+"邦学习系统："
 
 #: ../../source/ref-example-projects.rst:52
 #, fuzzy
@@ -37749,16 +37990,16 @@ msgid ""
 "`Flower meets Nevermined GitHub Repository <https://github.com"
 "/nevermined-io/fl-demo/tree/master/image-classification-flower>`_."
 msgstr ""
-"`Flower meets Nevermined GitHub Repository <https://github.com"
-"/nevermined-io/fl-demo/tree/master/image-classification-flower>`_."
+"`Flower meets Nevermined GitHub Repository <https://github.com/nevermined-io/"
+"fl-demo/tree/master/image-classification-flower>`_."
 
 #: ../../source/ref-faq.rst:27
 msgid ""
 "`Flower meets Nevermined YouTube video "
 "<https://www.youtube.com/watch?v=A0A9hSlPhKI>`_."
 msgstr ""
-"`Flower meets Nevermined YouTube 视频 "
-"<https://www.youtube.com/watch?v=A0A9hSlPhKI>`_."
+"`Flower meets Nevermined YouTube 视频 <https://www.youtube.com/"
+"watch?v=A0A9hSlPhKI>`_."
 
 #: ../../source/ref-faq.rst:28
 #, fuzzy
@@ -37776,16 +38017,16 @@ msgid ""
 "ayari/?trackingId=971oIlxLQ9%2BA9RB0IQ73XQ%3D%3D>`_ ."
 msgstr ""
 "`Flower meets Talan博文 <https://www.linkedin.com/pulse/federated-learning-"
-"same-mask-different-faces-imen-"
-"ayari/?trackingId=971oIlxLQ9%2BA9RB0IQ73XQ%3D%3D>`_ 。"
+"same-mask-different-faces-imen-ayari/"
+"?trackingId=971oIlxLQ9%2BA9RB0IQ73XQ%3D%3D>`_ 。"
 
 #: ../../source/ref-faq.rst:30
 msgid ""
 "`Flower meets Talan GitHub Repository "
 "<https://gitlab.com/Talan_Innovation_Factory/food-waste-prevention>`_ ."
 msgstr ""
-"`Flower meets Talan GitHub Repository "
-"<https://gitlab.com/Talan_Innovation_Factory/food-waste-prevention>`_ ."
+"`Flower meets Talan GitHub Repository <https://gitlab.com/"
+"Talan_Innovation_Factory/food-waste-prevention>`_ ."
 
 #: ../../source/ref-faq.rst
 msgid ""
@@ -38854,15 +39095,17 @@ msgid ""
 "Flower team to understand how Flower is used and what challenges users "
 "might face."
 msgstr ""
-"Flower 开源项目收集**匿名**使用指标，以便在充分知情的情况下做出改进 Flower 的决定。这样做能让 Flower 团队了解 "
-"Flower 的使用情况以及用户可能面临的挑战。"
+"Flower 开源项目收集**匿名**使用指标，以便在充分知情的情况下做出改进 Flower 的"
+"决定。这样做能让 Flower 团队了解 Flower 的使用情况以及用户可能面临的挑战。"
 
 #: ../../source/ref-telemetry.md:5
 msgid ""
 "**Flower is a friendly framework for collaborative AI and data science.**"
 " Staying true to this statement, Flower makes it easy to disable "
 "telemetry for users that do not want to share anonymous usage metrics."
-msgstr "**Flower 是一个用于协作式人工智能和数据科学的友好框架。** Flower 遵循这一声明，让不想分享匿名使用指标的用户可以轻松禁用遥测技术。"
+msgstr ""
+"**Flower 是一个用于协作式人工智能和数据科学的友好框架。** Flower 遵循这一声明"
+"，让不想分享匿名使用指标的用户可以轻松禁用遥测技术。"
 
 #: ../../source/ref-telemetry.md:7
 msgid "Principles"
@@ -38876,7 +39119,9 @@ msgstr "我们遵循严格的匿名使用指标收集原则："
 msgid ""
 "**Optional:** You will always be able to disable telemetry; read on to "
 "learn “[How to opt-out](#how-to-opt-out)”."
-msgstr "**可选：** 您始终可以禁用遥测功能；请继续阅读\"[如何退出](#how-to-opt-out)\"。"
+msgstr ""
+"**可选：** 您始终可以禁用遥测功能；请继续阅读\"[如何退出](#how-to-opt-out)"
+"\"。"
 
 #: ../../source/ref-telemetry.md:12
 msgid ""
@@ -38885,8 +39130,8 @@ msgid ""
 "metrics](#collected-metrics)” to understand what metrics are being "
 "reported."
 msgstr ""
-"**匿名：** 报告的使用指标是匿名的，不包含任何个人身份信息 (PII)。请参阅\"[收集的指标](#collected-metrics) "
-"\"了解报告的指标。"
+"**匿名：** 报告的使用指标是匿名的，不包含任何个人身份信息 (PII)。请参阅\"[收"
+"集的指标](#collected-metrics) \"了解报告的指标。"
 
 #: ../../source/ref-telemetry.md:13
 msgid ""
@@ -38894,15 +39139,17 @@ msgid ""
 "reported; see the section “[How to inspect what is being reported](#how-"
 "to-inspect-what-is-being-reported)”"
 msgstr ""
-"**透明：** 您可以轻松查看正在报告的匿名指标；请参阅\"[如何查看正在报告的指标]（#how-to-inspect-what-is-"
-"being-reported）\"部分"
+"**透明：** 您可以轻松查看正在报告的匿名指标；请参阅\"[如何查看正在报告的指"
+"标]（#how-to-inspect-what-is-being-reported）\"部分"
 
 #: ../../source/ref-telemetry.md:14
 msgid ""
 "**Open for feedback:** You can always reach out to us if you have "
 "feedback; see the section “[How to contact us](#how-to-contact-us)” for "
 "details."
-msgstr "**欢迎反馈：** 如果您有反馈意见，可以随时联系我们；详情请参见\"[如何联系我们](#how-to-contact-us) \"部分。"
+msgstr ""
+"**欢迎反馈：** 如果您有反馈意见，可以随时联系我们；详情请参见\"[如何联系我们]"
+"(#how-to-contact-us) \"部分。"
 
 #: ../../source/ref-telemetry.md:16
 msgid "How to opt-out"
@@ -38916,8 +39163,8 @@ msgid ""
 "client, simply do so by prepending your command as in:"
 msgstr ""
 "Flower 启动时，会检查环境变量 `FLWR_TELEMETRY_ENABLED` 是否存在。通过设置 "
-"`FLWR_TELEMETRY_ENABLED=0` 可以轻松禁用遥测功能。假设你启动的是 Flower "
-"服务器或客户端，只需在命令前添加以下内容即可："
+"`FLWR_TELEMETRY_ENABLED=0` 可以轻松禁用遥测功能。假设你启动的是 Flower 服务器"
+"或客户端，只需在命令前添加以下内容即可："
 
 #: ../../source/ref-telemetry.md:24
 msgid ""
@@ -38925,8 +39172,8 @@ msgid ""
 " `.bashrc` (or whatever configuration file applies to your environment) "
 "to disable Flower telemetry permanently."
 msgstr ""
-"或者，你也可以在 `.bashrc`（或任何适用于你的环境的配置文件）中导出 `FLWR_TELEMETRY_ENABLED=0` 来永久禁用 "
-"Flower telemetry。"
+"或者，你也可以在 `.bashrc`（或任何适用于你的环境的配置文件）中导出 "
+"`FLWR_TELEMETRY_ENABLED=0` 来永久禁用 Flower telemetry。"
 
 #: ../../source/ref-telemetry.md:26
 msgid "Collected metrics"
@@ -38942,13 +39189,17 @@ msgid ""
 "being used. This helps us to decide whether we should invest effort into "
 "releasing a patch version for an older version of Flower or instead use "
 "the bandwidth to build new features."
-msgstr "**了解目前使用的 Flower 版本。这有助于我们决定是否应该投入精力为旧版本的 Flower 发布补丁版本，还是利用带宽来构建新功能。"
+msgstr ""
+"**了解目前使用的 Flower 版本。这有助于我们决定是否应该投入精力为旧版本的 "
+"Flower 发布补丁版本，还是利用带宽来构建新功能。"
 
 #: ../../source/ref-telemetry.md:32
 msgid ""
 "**Operating system.** Enables us to answer questions such as: *Should we "
 "create more guides for Linux, macOS, or Windows?*"
-msgstr "**操作系统**使我们能够回答以下问题： *我们应该为 Linux、macOS 还是 Windows 创建更多指南？*"
+msgstr ""
+"**操作系统**使我们能够回答以下问题： *我们应该为 Linux、macOS 还是 Windows 创"
+"建更多指南？*"
 
 #: ../../source/ref-telemetry.md:34
 msgid ""
@@ -38956,21 +39207,27 @@ msgid ""
 "decide whether we should invest effort into supporting old versions of "
 "Python or stop supporting them and start taking advantage of new Python "
 "features."
-msgstr "**例如，了解 Python 版本有助于我们决定是否应该投入精力支持旧版本的 Python，还是停止支持这些版本并开始利用新的 Python 功能。"
+msgstr ""
+"**例如，了解 Python 版本有助于我们决定是否应该投入精力支持旧版本的 Python，还"
+"是停止支持这些版本并开始利用新的 Python 功能。"
 
 #: ../../source/ref-telemetry.md:36
 msgid ""
 "**Hardware properties.** Understanding the hardware environment that "
 "Flower is being used in helps to decide whether we should, for example, "
 "put more effort into supporting low-resource environments."
-msgstr "**硬件属性** 了解 Flower 的硬件使用环境，有助于决定我们是否应在支持低资源环境等方面投入更多精力。"
+msgstr ""
+"**硬件属性** 了解 Flower 的硬件使用环境，有助于决定我们是否应在支持低资源环境"
+"等方面投入更多精力。"
 
 #: ../../source/ref-telemetry.md:38
 msgid ""
 "**Execution mode.** Knowing what execution mode Flower starts in enables "
 "us to understand how heavily certain features are being used and better "
 "prioritize based on that."
-msgstr "** 执行模式** 了解 Flower 的启动执行模式，能让我们了解某些功能的使用率，并据此更好地确定优先级。"
+msgstr ""
+"** 执行模式** 了解 Flower 的启动执行模式，能让我们了解某些功能的使用率，并据"
+"此更好地确定优先级。"
 
 #: ../../source/ref-telemetry.md:40
 msgid ""
@@ -38979,8 +39236,8 @@ msgid ""
 "types not only start Flower workloads but also successfully complete "
 "them."
 msgstr ""
-"**每次 Flower 工作负载启动时，Flower 遥测都会随机分配一个内存集群 ID。这样，我们就能了解哪些设备类型不仅启动了 Flower "
-"工作负载，而且还成功完成了它们。"
+"**每次 Flower 工作负载启动时，Flower 遥测都会随机分配一个内存集群 ID。这样，"
+"我们就能了解哪些设备类型不仅启动了 Flower 工作负载，而且还成功完成了它们。"
 
 #: ../../source/ref-telemetry.md:42
 msgid ""
@@ -38993,8 +39250,10 @@ msgid ""
 "in order to reproduce the issue, multiple workloads must be started at "
 "the same time."
 msgstr ""
-"**Source.** Flower 遥测会在第一次生成遥测事件时，尝试在 `~/.flwr/source` 中存储一个随机源 ID。源 ID "
-"对于识别问题是否反复出现或问题是否由多个集群同时运行触发（这在模拟中经常发生）非常重要。例如，如果设备同时运行多个工作负载并导致问题，那么为了重现问题，必须同时启动多个工作负载。"
+"**Source.** Flower 遥测会在第一次生成遥测事件时，尝试在 `~/.flwr/source` 中存"
+"储一个随机源 ID。源 ID 对于识别问题是否反复出现或问题是否由多个集群同时运行触"
+"发（这在模拟中经常发生）非常重要。例如，如果设备同时运行多个工作负载并导致问"
+"题，那么为了重现问题，必须同时启动多个工作负载。"
 
 #: ../../source/ref-telemetry.md:44
 msgid ""
@@ -39015,15 +39274,18 @@ msgid ""
 "any changes to the metrics collected and publish changes in the "
 "changelog."
 msgstr ""
-"我们不会收集任何个人身份信息。如果您认为所收集的任何指标可能以任何方式被滥用，请[与我们联系]（#how-to-contact-"
-"us）。我们将更新本页面，以反映对所收集指标的任何更改，并在更新日志中公布更改内容。"
+"我们不会收集任何个人身份信息。如果您认为所收集的任何指标可能以任何方式被滥用"
+"，请[与我们联系]（#how-to-contact-us）。我们将更新本页面，以反映对所收集指标"
+"的任何更改，并在更新日志中公布更改内容。"
 
 #: ../../source/ref-telemetry.md:48
 msgid ""
 "If you think other metrics would be helpful for us to better guide our "
 "decisions, please let us know! We will carefully review them; if we are "
 "confident that they do not compromise user privacy, we may add them."
-msgstr "如果您认为其他指标有助于我们更好地指导决策，请告诉我们！我们将仔细审查这些指标；如果我们确信它们不会损害用户隐私，我们可能会添加这些指标。"
+msgstr ""
+"如果您认为其他指标有助于我们更好地指导决策，请告诉我们！我们将仔细审查这些指"
+"标；如果我们确信它们不会损害用户隐私，我们可能会添加这些指标。"
 
 #: ../../source/ref-telemetry.md:50
 msgid "How to inspect what is being reported"
@@ -39038,9 +39300,10 @@ msgid ""
 "`FLWR_TELEMETRY_ENABLED` so that you can inspect the telemetry feature "
 "without sending any metrics."
 msgstr ""
-"我们希望能让您轻松查看所报告的匿名使用指标。通过设置环境变量 `FLWR_TELEMETRY_LOGGING=1` "
-"可以查看所有报告的遥测信息。日志记录默认为禁用。您可以不使用 `FLWR_TELEMETRY_ENABLED` "
-"而单独使用日志记录，这样就可以在不发送任何指标的情况下检查遥测功能。"
+"我们希望能让您轻松查看所报告的匿名使用指标。通过设置环境变量 "
+"`FLWR_TELEMETRY_LOGGING=1` 可以查看所有报告的遥测信息。日志记录默认为禁用。您"
+"可以不使用 `FLWR_TELEMETRY_ENABLED` 而单独使用日志记录，这样就可以在不发送任"
+"何指标的情况下检查遥测功能。"
 
 #: ../../source/ref-telemetry.md:58
 #, fuzzy
@@ -39635,7 +39898,9 @@ msgstr ""
 msgid ""
 "Read this Federated Learning quickstart tutorial for creating an iOS app "
 "using Flower to train a neural network on MNIST."
-msgstr "阅读本联邦学习快速入门教程，了解如何使用 Flower 创建 iOS 应用程序，并在 MNIST 上训练神经网络。"
+msgstr ""
+"阅读本联邦学习快速入门教程，了解如何使用 Flower 创建 iOS 应用程序，并在 "
+"MNIST 上训练神经网络。"
 
 #: ../../source/tutorial-quickstart-ios.rst:5
 msgid "Quickstart iOS"
@@ -39658,7 +39923,9 @@ msgstr ""
 msgid ""
 "In this tutorial we will learn how to train a Neural Network on MNIST "
 "using Flower and CoreML on iOS devices."
-msgstr "在本教程中，我们将学习如何在 iOS 设备上使用 Flower 和 CoreML 在 MNIST 上训练神经网络。"
+msgstr ""
+"在本教程中，我们将学习如何在 iOS 设备上使用 Flower 和 CoreML 在 MNIST 上训练"
+"神经网络。"
 
 #: ../../source/tutorial-quickstart-ios.rst:21
 #, fuzzy
@@ -39676,7 +39943,9 @@ msgstr ""
 msgid ""
 "Our example consists of one Python *server* and two iPhone *clients* that"
 " all have the same model."
-msgstr "我们的示例包括一个 Python *服务器*和两个 iPhone *客户端*，它们都具有相同的模型。"
+msgstr ""
+"我们的示例包括一个 Python *服务器*和两个 iPhone *客户端*，它们都具有相同的模"
+"型。"
 
 #: ../../source/tutorial-quickstart-ios.rst:29
 msgid ""
@@ -39685,14 +39954,19 @@ msgid ""
 "the *server* which will aggregate them to produce a better model. "
 "Finally, the *server* sends this improved version of the model back to "
 "each *client*. A complete cycle of weight updates is called a *round*."
-msgstr "*客户端*负责根据其本地数据集为模型生成独立的模型参数。然后，这些参数更新会被发送到*服务器*，由*服务器*汇总后生成一个更好的模型。最后，*服务器*将改进后的模型发送回每个*客户端*。一个完整的参数更新周期称为一*轮*。"
+msgstr ""
+"*客户端*负责根据其本地数据集为模型生成独立的模型参数。然后，这些参数更新会被"
+"发送到*服务器*，由*服务器*汇总后生成一个更好的模型。最后，*服务器*将改进后的"
+"模型发送回每个*客户端*。一个完整的参数更新周期称为一*轮*。"
 
 #: ../../source/tutorial-quickstart-ios.rst:35
 msgid ""
 "Now that we have a rough idea of what is going on, let's get started to "
 "setup our Flower server environment. We first need to install Flower. You"
 " can do this by using pip:"
-msgstr "现在我们已经有了一个大致的概念，让我们开始设置 Flower 服务器环境吧。首先，我们需要安装 Flower。你可以使用 pip 来安装："
+msgstr ""
+"现在我们已经有了一个大致的概念，让我们开始设置 Flower 服务器环境吧。首先，我"
+"们需要安装 Flower。你可以使用 pip 来安装："
 
 #: ../../source/tutorial-quickstart-ios.rst:42
 msgid "Or uv:"
@@ -39710,9 +39984,9 @@ msgid ""
 "Flower client with CoreML, that has been implemented and stored inside "
 "the Swift SDK. The client implementation can be seen below:"
 msgstr ""
-"现在我们已经安装了所有依赖项，让我们使用 CoreML 作为本地训练框架和 MNIST "
-"作为数据集，运行一个简单的分布式训练。为了简单起见，我们将使用 CoreML 的完整 Flower 客户端，该客户端已在 Swift SDK "
-"中实现并存储。客户端实现如下："
+"现在我们已经安装了所有依赖项，让我们使用 CoreML 作为本地训练框架和 MNIST 作为"
+"数据集，运行一个简单的分布式训练。为了简单起见，我们将使用 CoreML 的完整 "
+"Flower 客户端，该客户端已在 Swift SDK 中实现并存储。客户端实现如下："
 
 #: ../../source/tutorial-quickstart-ios.rst:90
 #, fuzzy
@@ -39819,7 +40093,9 @@ msgid ""
 "With both client and server ready, we can now run everything and see "
 "federated learning in action. FL systems usually have a server and "
 "multiple clients. We therefore have to start the server first:"
-msgstr "客户端和服务器都已准备就绪，我们现在可以运行一切，看看联邦学习的实际效果。FL 系统通常有一个服务器和多个客户端。因此，我们必须先启动服务器："
+msgstr ""
+"客户端和服务器都已准备就绪，我们现在可以运行一切，看看联邦学习的实际效果。FL "
+"系统通常有一个服务器和多个客户端。因此，我们必须先启动服务器："
 
 #: ../../source/tutorial-quickstart-ios.rst:184
 msgid ""
@@ -39830,10 +40106,10 @@ msgid ""
 "<https://developer.apple.com/documentation/xcode/running-your-app-in-"
 "simulator-or-on-a-device>`_."
 msgstr ""
-"服务器运行后，我们就可以在不同的终端启动客户端。通过 Xcode 构建并运行客户端，一个通过 Xcode 模拟器，另一个通过部署到 "
-"iPhone。要了解更多有关如何将应用程序部署到 iPhone 或模拟器的信息，请访问 `此处 "
-"<https://developer.apple.com/documentation/xcode/running-your-app-in-"
-"simulator-or-on-a-device>`_。"
+"服务器运行后，我们就可以在不同的终端启动客户端。通过 Xcode 构建并运行客户端，"
+"一个通过 Xcode 模拟器，另一个通过部署到 iPhone。要了解更多有关如何将应用程序"
+"部署到 iPhone 或模拟器的信息，请访问 `此处 <https://developer.apple.com/"
+"documentation/xcode/running-your-app-in-simulator-or-on-a-device>`_。"
 
 #: ../../source/tutorial-quickstart-ios.rst:190
 #, fuzzy
@@ -41255,7 +41531,9 @@ msgid ""
 "congratulations! You're now well equipped to understand the rest of the "
 "documentation. There are many topics we didn't cover in the tutorial, we "
 "recommend the following resources:"
-msgstr "这暂时是 Flower 教程的最后一部分，恭喜您！您现在已经具备了理解其余文档的能力。本教程还有许多内容没有涉及，我们推荐您参考以下资源："
+msgstr ""
+"这暂时是 Flower 教程的最后一部分，恭喜您！您现在已经具备了理解其余文档的能力"
+"。本教程还有许多内容没有涉及，我们推荐您参考以下资源："
 
 #: ../../source/tutorial-series-customize-the-client-pytorch.rst:352
 msgid "`Read Flower Docs <https://flower.ai/docs/>`__"
@@ -41981,7 +42259,11 @@ msgid ""
 "aggregated model after each round of training without having to send the "
 "model to clients. We're also fortunate in the sense that our entire "
 "evaluation dataset is available at all times."
-msgstr "**集中评估**（或*服务器端评估*）在概念上很简单：它的工作方式与集中式机器学习中的评估方式相同。如果有一个服务器端数据集可用于评估目的，那就太好了。我们可以在每一轮训练后对新聚合的模型进行评估，而无需将模型发送给客户端。我们也很幸运，因为我们的整个评估数据集随时可用。"
+msgstr ""
+"**集中评估**（或*服务器端评估*）在概念上很简单：它的工作方式与集中式机器学习"
+"中的评估方式相同。如果有一个服务器端数据集可用于评估目的，那就太好了。我们可"
+"以在每一轮训练后对新聚合的模型进行评估，而无需将模型发送给客户端。我们也很幸"
+"运，因为我们的整个评估数据集随时可用。"
 
 #: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:175
 msgid ""
@@ -41997,7 +42279,14 @@ msgid ""
 "also change over consecutive rounds. This can lead to evaluation results "
 "that are not stable, so even if we would not change the model, we'd see "
 "our evaluation results fluctuate over consecutive rounds."
-msgstr "**联邦评估**（或*客户端评估*）更为复杂，但也更为强大：它不需要集中的数据集，允许我们在更大的数据集上对模型进行评估，这通常会产生更真实的评估结果。事实上，如果我们想得到有代表性的评估结果，很多情况下都需要使用**联邦评估**。但是，这种能力是有代价的：一旦我们开始在客户端进行评估，我们就应该意识到，如果这些客户端并不总是可用，我们的评估数据集可能会在连续几轮学习中发生变化。此外，每个客户端所拥有的数据集也可能在连续几轮学习中发生变化。这可能会导致评估结果不稳定，因此即使我们不改变模型，也会看到评估结果在连续几轮中波动。"
+msgstr ""
+"**联邦评估**（或*客户端评估*）更为复杂，但也更为强大：它不需要集中的数据集，"
+"允许我们在更大的数据集上对模型进行评估，这通常会产生更真实的评估结果。事实上"
+"，如果我们想得到有代表性的评估结果，很多情况下都需要使用**联邦评估**。但是，"
+"这种能力是有代价的：一旦我们开始在客户端进行评估，我们就应该意识到，如果这些"
+"客户端并不总是可用，我们的评估数据集可能会在连续几轮学习中发生变化。此外，每"
+"个客户端所拥有的数据集也可能在连续几轮学习中发生变化。这可能会导致评估结果不"
+"稳定，因此即使我们不改变模型，也会看到评估结果在连续几轮中波动。"
 
 #: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:186
 #, fuzzy
@@ -42237,8 +42526,9 @@ msgid ""
 "parts of the tutorial, you will be able to build advanced federated "
 "learning systems that approach the current state of the art in the field."
 msgstr ""
-"在本教程中，你将了解什么是联邦学习，用 Flower "
-"搭建第一个系统，并逐步对其进行扩展。如果你能完成本教程的所有部分，你就能构建高级的联邦学习系统，从而接近该领域当前的技术水平。"
+"在本教程中，你将了解什么是联邦学习，用 Flower 搭建第一个系统，并逐步对其进行"
+"扩展。如果你能完成本教程的所有部分，你就能构建高级的联邦学习系统，从而接近该"
+"领域当前的技术水平。"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:12
 #, fuzzy
@@ -42271,14 +42561,18 @@ msgid ""
 "In machine learning, we have a model, and we have data. The model could "
 "be a neural network (as depicted here), or something else, like classical"
 " linear regression."
-msgstr "在机器学习中，我们有一个模型和数据。模型可以是一个神经网络（如图所示），也可以是其他东西，比如经典的线性回归。"
+msgstr ""
+"在机器学习中，我们有一个模型和数据。模型可以是一个神经网络（如图所示），也可"
+"以是其他东西，比如经典的线性回归。"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:46
 msgid ""
 "We train the model using the data to perform a useful task. A task could "
 "be to detect objects in images, transcribe an audio recording, or play a "
 "game like Go."
-msgstr "我们使用数据来训练模型，以完成一项有用的任务。任务可以是检测图像中的物体、转录音频或玩围棋等游戏。"
+msgstr ""
+"我们使用数据来训练模型，以完成一项有用的任务。任务可以是检测图像中的物体、转"
+"录音频或玩围棋等游戏。"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:55
 #, fuzzy
@@ -42325,7 +42619,9 @@ msgid ""
 "Once all the data is collected in one place, we can finally use machine "
 "learning algorithms to train our model on the data. This is the machine "
 "learning approach that we've basically always relied on."
-msgstr "一旦所有数据都收集到一处，我们最终就可以使用机器学习算法在数据上训练我们的模型。这就是我们基本上一直依赖的机器学习方法。"
+msgstr ""
+"一旦所有数据都收集到一处，我们最终就可以使用机器学习算法在数据上训练我们的模"
+"型。这就是我们基本上一直依赖的机器学习方法。"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:105
 msgid "Challenges of classical machine learning"
@@ -42347,7 +42643,9 @@ msgid ""
 "But the approach can not be used in many other cases. Cases, where the "
 "data is not available on a centralized server, or cases where the data "
 "available on one server is not enough to train a good model."
-msgstr "但这种方法并不适用于许多其他情况。例如，集中服务器上没有数据，或者一台服务器上的数据不足以训练出一个好的模型。"
+msgstr ""
+"但这种方法并不适用于许多其他情况。例如，集中服务器上没有数据，或者一台服务器"
+"上的数据不足以训练出一个好的模型。"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:129
 #, fuzzy
@@ -42388,8 +42686,10 @@ msgid ""
 "company that developed that keyboard, do you? In fact, that use case was "
 "the reason federated learning was invented in the first place."
 msgstr ""
-"**用户偏好**： "
-"除了法规之外，在一些使用案例中，用户只是希望数据永远不会离开他们的设备。如果你在手机的数字键盘上输入密码和信用卡信息，你不会希望这些密码最终出现在开发该键盘的公司的服务器上吧？事实上，这种用例正是联邦学习发明的初衷。"
+"**用户偏好**： 除了法规之外，在一些使用案例中，用户只是希望数据永远不会离开他"
+"们的设备。如果你在手机的数字键盘上输入密码和信用卡信息，你不会希望这些密码最"
+"终出现在开发该键盘的公司的服务器上吧？事实上，这种用例正是联邦学习发明的初衷"
+"。"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:144
 msgid ""
@@ -42402,8 +42702,11 @@ msgid ""
 "incredibly powerful and exceedingly expensive infrastructure to process "
 "and store. And most of the data isn't even useful."
 msgstr ""
-"**数据量**： "
-"有些传感器（如摄像头）产生的数据量很大，收集所有数据既不可行，也不经济（例如，由于带宽或通信效率的原因）。试想一下全国铁路服务，全国有数百个火车站。如果每个火车站都安装了许多安全摄像头，那么它们所产生的大量原始设备数据就需要功能强大且极其昂贵的基础设施来处理和存储。而大部分数据甚至都是无用的。"
+"**数据量**： 有些传感器（如摄像头）产生的数据量很大，收集所有数据既不可行，也"
+"不经济（例如，由于带宽或通信效率的原因）。试想一下全国铁路服务，全国有数百个"
+"火车站。如果每个火车站都安装了许多安全摄像头，那么它们所产生的大量原始设备数"
+"据就需要功能强大且极其昂贵的基础设施来处理和存储。而大部分数据甚至都是无用的"
+"。"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:152
 msgid "Examples where centralized machine learning does not work include:"
@@ -42515,7 +42818,9 @@ msgid ""
 "We start by initializing the model on the server. This is exactly the "
 "same in classic centralized learning: we initialize the model parameters,"
 " either randomly or from a previously saved checkpoint."
-msgstr "我们首先在服务器上初始化模型。这与经典的集中式学习完全相同：我们随机或从先前保存的检查点初始化模型参数。"
+msgstr ""
+"我们首先在服务器上初始化模型。这与经典的集中式学习完全相同：我们随机或从先前"
+"保存的检查点初始化模型参数。"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:208
 msgid ""
@@ -42553,8 +42858,10 @@ msgid ""
 "This could be as little as one epoch on the local data, or even just a "
 "few steps (mini-batches)."
 msgstr ""
-"现在，所有（选定的）客户端节点都有了最新版本的全局模型参数，它们开始进行本地训练。它们使用自己的本地数据集来训练自己的本地模型。它们不会一直训练到模型完全收敛为止，而只是训练一小段时间。这可能只是本地数据上的一个遍历，甚至只是几个步骤"
-"（mini-batches）。"
+"现在，所有（选定的）客户端节点都有了最新版本的全局模型参数，它们开始进行本地"
+"训练。它们使用自己的本地数据集来训练自己的本地模型。它们不会一直训练到模型完"
+"全收敛为止，而只是训练一小段时间。这可能只是本地数据上的一个遍历，甚至只是几"
+"个步骤（mini-batches）。"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:238
 msgid "Step 3: Return model updates back to the server"
@@ -42569,7 +42876,11 @@ msgid ""
 "server. The model updates they send can either be the full model "
 "parameters or just the gradients that were accumulated during local "
 "training."
-msgstr "经过本地训练后，每个客户节点最初收到的模型参数都会略有不同。参数之所以不同，是因为每个客户端节点的本地数据集中都有不同的数据。然后，客户端节点将这些模型更新发回服务器。它们发送的模型更新既可以是完整的模型参数，也可以只是本地训练过程中积累的梯度。"
+msgstr ""
+"经过本地训练后，每个客户节点最初收到的模型参数都会略有不同。参数之所以不同，"
+"是因为每个客户端节点的本地数据集中都有不同的数据。然后，客户端节点将这些模型"
+"更新发回服务器。它们发送的模型更新既可以是完整的模型参数，也可以只是本地训练"
+"过程中积累的梯度。"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:253
 msgid "Step 4: Aggregate model updates into a new global model"
@@ -42583,8 +42894,9 @@ msgid ""
 "But didn't we want to have one model that contains the learnings from the"
 " data of all 100 client nodes?"
 msgstr ""
-"服务器从选定的客户端节点接收模型更新。如果服务器选择了 100 个客户端节点，那么它现在就拥有 100 "
-"个略有不同的原始全局模型版本，每个版本都是根据一个客户端的本地数据训练出来的。难道我们不希望有一个包含所有 100 个客户节点数据的模型吗？"
+"服务器从选定的客户端节点接收模型更新。如果服务器选择了 100 个客户端节点，那么"
+"它现在就拥有 100 个略有不同的原始全局模型版本，每个版本都是根据一个客户端的本"
+"地数据训练出来的。难道我们不希望有一个包含所有 100 个客户节点数据的模型吗？"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:260
 #, fuzzy
@@ -42624,8 +42936,9 @@ msgid ""
 "updated models to the server (step 3), and the server then aggregates the"
 " model updates to get a new version of the global model (step 4)."
 msgstr ""
-"步骤 1 至 4 就是我们所说的单轮联邦学习。全局模型参数被发送到参与的客户端节点（第 1 步），客户端节点对其本地数据进行训练（第 2 "
-"步），然后将更新后的模型发送到服务器（第 3 步），服务器汇总模型更新，得到新版本的全局模型（第 4 步）。"
+"步骤 1 至 4 就是我们所说的单轮联邦学习。全局模型参数被发送到参与的客户端节点"
+"（第 1 步），客户端节点对其本地数据进行训练（第 2 步），然后将更新后的模型发"
+"送到服务器（第 3 步），服务器汇总模型更新，得到新版本的全局模型（第 4 步）。"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:289
 msgid ""
@@ -42637,8 +42950,10 @@ msgid ""
 "eventually arrive at a fully trained model that performs well across the "
 "data of all client nodes."
 msgstr ""
-"在一轮迭代中，每个参与迭代的客户节点只训练一小段时间。这意味着，在聚合步骤（步骤 "
-"4）之后，我们的模型已经在所有参与的客户节点的所有数据上训练过了，但只训练了一小会儿。然后，我们必须一次又一次地重复这一训练过程，最终得到一个经过全面训练的模型，该模型在所有客户节点的数据中都表现良好。"
+"在一轮迭代中，每个参与迭代的客户节点只训练一小段时间。这意味着，在聚合步骤（"
+"步骤 4）之后，我们的模型已经在所有参与的客户节点的所有数据上训练过了，但只训"
+"练了一小会儿。然后，我们必须一次又一次地重复这一训练过程，最终得到一个经过全"
+"面训练的模型，该模型在所有客户节点的数据中都表现良好。"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:299
 msgid ""
@@ -42650,8 +42965,10 @@ msgid ""
 "aggregate model updates? How can we handle failing client nodes "
 "(stragglers)?"
 msgstr ""
-"恭喜您，现在您已经了解了联邦学习的基础知识。当然，要讨论的内容还有很多，但这只是联邦学习的一个缩影。在本教程的后半部分，我们将进行更详细的介绍。有趣的问题包括"
-" 我们如何选择最好的客户端节点参与下一轮学习？聚合模型更新的最佳方法是什么？如何处理失败的客户端节点（落伍者）？"
+"恭喜您，现在您已经了解了联邦学习的基础知识。当然，要讨论的内容还有很多，但这"
+"只是联邦学习的一个缩影。在本教程的后半部分，我们将进行更详细的介绍。有趣的问"
+"题包括 我们如何选择最好的客户端节点参与下一轮学习？聚合模型更新的最佳方法是什"
+"么？如何处理失败的客户端节点（落伍者）？"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:308
 msgid ""
@@ -42661,8 +42978,9 @@ msgid ""
 "abbreviated as FE. In fact, federated evaluation is an integral part of "
 "most federated learning systems."
 msgstr ""
-"就像我们可以在不同客户节点的分散数据上训练一个模型一样，我们也可以在这些数据上对模型进行评估，以获得有价值的指标。这就是所谓的联邦评估，有时简称为"
-" FE。事实上，联邦评估是大多数联邦学习系统不可或缺的一部分。"
+"就像我们可以在不同客户节点的分散数据上训练一个模型一样，我们也可以在这些数据"
+"上对模型进行评估，以获得有价值的指标。这就是所谓的联邦评估，有时简称为 FE。事"
+"实上，联邦评估是大多数联邦学习系统不可或缺的一部分。"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:314
 #, fuzzy
@@ -42679,7 +42997,11 @@ msgid ""
 "conjunction with other privacy-enhancing technologies like secure "
 "aggregation to prevent the server from seeing the results submitted by "
 "individual client nodes."
-msgstr "在很多情况下，机器学习并不是从数据中获取价值的必要条件。数据分析可以产生有价值的见解，但同样，往往没有足够的数据来获得明确的答案。人们患某种健康疾病的平均年龄是多少？联邦分析可以通过多个客户端节点进行此类查询。它通常与安全聚合等其他隐私增强技术结合使用，以防止服务器看到单个客户端节点提交的结果。"
+msgstr ""
+"在很多情况下，机器学习并不是从数据中获取价值的必要条件。数据分析可以产生有价"
+"值的见解，但同样，往往没有足够的数据来获得明确的答案。人们患某种健康疾病的平"
+"均年龄是多少？联邦分析可以通过多个客户端节点进行此类查询。它通常与安全聚合等"
+"其他隐私增强技术结合使用，以防止服务器看到单个客户端节点提交的结果。"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:327
 #, fuzzy
@@ -42711,9 +43033,10 @@ msgid ""
 " federated learning, analytics, and evaluation. It allows the user to "
 "federate any workload, any ML framework, and any programming language."
 msgstr ""
-"联邦学习、联邦评估和联邦分析需要基础框架来来回移动机器学习模型，在本地数据上对其进行训练和评估，然后汇总更新的模型。Flower "
-"提供的基础架构正是以简单、可扩展和安全的方式实现这些目标的。简而言之，Flower "
-"为联邦学习、分析和评估提供了一种统一的方法。它允许用户联邦化任何工作负载、任何 ML 框架和任何编程语言。"
+"联邦学习、联邦评估和联邦分析需要基础框架来来回移动机器学习模型，在本地数据上"
+"对其进行训练和评估，然后汇总更新的模型。Flower 提供的基础架构正是以简单、可扩"
+"展和安全的方式实现这些目标的。简而言之，Flower 为联邦学习、分析和评估提供了一"
+"种统一的方法。它允许用户联邦化任何工作负载、任何 ML 框架和任何编程语言。"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:357
 #, fuzzy
@@ -42724,7 +43047,9 @@ msgstr "结束语"
 msgid ""
 "Congratulations, you just learned the basics of federated learning and "
 "how it relates to the classic (centralized) machine learning!"
-msgstr "恭喜您，您刚刚了解了联邦学习的基础知识，以及它与传统（集中式）机器学习的关系！"
+msgstr ""
+"恭喜您，您刚刚了解了联邦学习的基础知识，以及它与传统（集中式）机器学习的关系"
+"！"
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:362
 msgid ""
