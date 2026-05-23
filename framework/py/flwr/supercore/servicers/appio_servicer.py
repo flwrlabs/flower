@@ -128,15 +128,6 @@ class AppIoServicer(ABC):
         log(DEBUG, "AppIoServicer.PushTaskMessage")
 
         task = get_authenticated_task()
-        if not request.HasField("message"):
-            context.abort(grpc.StatusCode.FAILED_PRECONDITION, "`message` is required.")
-
-        message_proto = request.message
-        if not message_proto.HasField("metadata"):
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION, "`Message.metadata` is required."
-            )
-
         message = message_from_proto(request.message)
         message.metadata.__dict__["_run_id"] = task.run_id
         message.metadata.__dict__["_src_node_id"] = SUPERLINK_NODE_ID
