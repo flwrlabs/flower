@@ -60,7 +60,11 @@ curl --fail --location --silent --show-error "${tar_url}" --output "framework/di
 # to uv as separate arguments even if they contain special shell characters.
 publish_args=(--username "${PYPI_REPOSITORY_USERNAME}" --password "${PYPI_REPOSITORY_PASSWORD}")
 if [[ -n "${PYPI_REPOSITORY_URL:-}" ]]; then
+  # When a repository URL is configured, publish there instead of using uv's
+  # default PyPI endpoint.
   publish_args=(--publish-url "${PYPI_REPOSITORY_URL}" "${publish_args[@]}")
 fi
 
-uv publish "${publish_args[@]}" "framework/dist/${wheel_name}" "framework/dist/${tar_name}"
+# Run uv from the framework directory because pyproject.toml lives there. This
+# publishes the downloaded artifacts from dist instead of rebuilding them.
+(cd framework && uv publish "${publish_args[@]}" "dist/${wheel_name}" "dist/${tar_name}")

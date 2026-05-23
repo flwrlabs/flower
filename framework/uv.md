@@ -31,11 +31,5 @@ uv run --no-sync --python=3.11.14 ./dev/test.sh
 ## Build
 
 ```
-./dev/build-uv.sh
-```
-
-For comparison, build using Poetry:
-
-```
-./dev/build.sh
+uv run --no-sync --python=3.11.14 ./dev/build.sh
 ```
