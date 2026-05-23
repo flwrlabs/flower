@@ -4,7 +4,7 @@ Installation
 Python Version
 --------------
 
-Flower Datasets requires `Python 3.10 <https://docs.python.org/3.10/>`_ or above.
+Flower Datasets requires `Python 3.11 <https://docs.python.org/3.11/>`_ or above.
 
 
 Install stable release (pip)

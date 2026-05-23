@@ -25,47 +25,47 @@ root `AGENTS.md`.
 ## Environment and commands
 
 Run framework commands from `framework/` unless a command is explicitly shown from
-the repository root. Use Python `3.10.19` for local agent commands; CI also checks
-newer Python versions, but project tooling targets Python 3.10 syntax.
+the repository root. Use Python `3.11.14` for local agent commands; CI also checks
+newer Python versions, but project tooling targets Python 3.11 syntax.
 
 Preferred local agent form:
 
 ```bash
 cd framework
-uv run --no-sync --python=3.10.19 <command>
+uv run --no-sync --python=3.11.14 <command>
 ```
 
 If the environment is missing or dependencies changed, synchronize intentionally:
 
 ```bash
 cd framework
-uv sync --locked --python=3.10.19 --all-extras --all-groups
+uv sync --locked --python=3.11.14 --all-extras --all-groups
 ```
 
 CI installs with uv, so when reproducing CI setup exactly use:
 
 ```bash
 cd framework
-uv sync --locked --python=3.10.19 --all-extras --all-groups
+uv sync --locked --python=3.11.14 --all-extras --all-groups
 ```
 
 Useful checks:
 
 ```bash
 # Fast package-only quality gate, skips e2e/docs/copyright extras in dev/test.sh
-uv run --no-sync --python=3.10.19 ./dev/test.sh false
+uv run --no-sync --python=3.11.14 ./dev/test.sh false
 
 # Full framework quality gate used by pre-commit/CI
-uv run --no-sync --python=3.10.19 ./dev/test.sh
+uv run --no-sync --python=3.11.14 ./dev/test.sh
 
 # Narrow tests
-uv run --no-sync --python=3.10.19 python -m pytest py/flwr/path/to_test.py
-uv run --no-sync --python=3.10.19 python -m pytest py/flwr -k "name"
+uv run --no-sync --python=3.11.14 python -m pytest py/flwr/path/to_test.py
+uv run --no-sync --python=3.11.14 python -m pytest py/flwr -k "name"
 
 # Targeted type/lint checks
-uv run --no-sync --python=3.10.19 python -m mypy py
-uv run --no-sync --python=3.10.19 python -m ruff check py/flwr --no-respect-gitignore
-uv run --no-sync --python=3.10.19 python -m pylint --ignore=py/flwr/proto py/flwr
+uv run --no-sync --python=3.11.14 python -m mypy py
+uv run --no-sync --python=3.11.14 python -m ruff check py/flwr --no-respect-gitignore
+uv run --no-sync --python=3.11.14 python -m pylint --ignore=py/flwr/proto py/flwr
 ```
 
 `dev/test.sh` sets `RAY_ENABLE_UV_RUN_RUNTIME_ENV=0` for pytest because Ray's uv
@@ -75,7 +75,7 @@ debugging Ray/simulation tests directly.
 Format broadly only when appropriate:
 
 ```bash
-uv run --no-sync --python=3.10.19 ./dev/format.sh
+uv run --no-sync --python=3.11.14 ./dev/format.sh
 ```
 
 For narrow edits, prefer targeted `isort`, `black`, and `ruff`
@@ -121,7 +121,7 @@ Flower's Python public API is defined by recursively following `__all__` from
 - Regenerate Python protobuf outputs with:
 
 ```bash
-uv run --no-sync --python=3.10.19 ./dev/protoc.sh
+uv run --no-sync --python=3.11.14 ./dev/protoc.sh
 ```
 
 - CI runs `./framework/dev/check-protos.sh` from the repository root. That script
@@ -146,7 +146,7 @@ a normal SQLAlchemy metadata change.
 
 ```bash
 cd framework
-uv run --no-sync --python=3.10.19 python -m dev.generate_migration "Describe schema change"
+uv run --no-sync --python=3.11.14 python -m dev.generate_migration "Describe schema change"
 ```
 
 After generation:
@@ -159,7 +159,7 @@ After generation:
 - Run the migration check when schema work is involved:
 
 ```bash
-uv run --no-sync --python=3.10.19 ./dev/check-migrations.sh
+uv run --no-sync --python=3.11.14 ./dev/check-migrations.sh
 ```
 
 ## Tests and e2e
@@ -188,7 +188,7 @@ python simulation.py
 - Build docs with:
 
 ```bash
-uv run --no-sync --python=3.10.19 ./dev/build-docs.sh
+uv run --no-sync --python=3.11.14 ./dev/build-docs.sh
 ```
 
 Docs builds require system `pandoc`. Do not commit `docs/build/` output.
@@ -196,12 +196,12 @@ Docs builds require system `pandoc`. Do not commit `docs/build/` output.
 - Build and check release artifacts with:
 
 ```bash
-uv run --no-sync --python=3.10.19 ./dev/build.sh
-uv run --no-sync --python=3.10.19 ./dev/test-wheel.sh
+uv run --no-sync --python=3.11.14 ./dev/build.sh
+uv run --no-sync --python=3.11.14 ./dev/test-wheel.sh
 ```
 
 Do not commit `dist/` artifacts.
 
 - If dependency constraints change, update `pyproject.toml` and `uv.lock`
-  intentionally. CI checks `uv.lock` freshness, while framework CI still
-  installs with Poetry.
+  intentionally. CI checks `uv.lock` freshness, and framework CI installs
+  with uv.

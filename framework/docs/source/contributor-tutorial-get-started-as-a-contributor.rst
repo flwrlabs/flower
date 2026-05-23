@@ -6,7 +6,7 @@
  Prerequisites
 ***************
 
-- `Python 3.10 <https://docs.python.org/3.10/>`_ or above
+- `Python 3.11 <https://docs.python.org/3.11/>`_ or above
 - `uv 0.10.7 <https://docs.astral.sh/uv/>`_ or above
 - (Optional) `pyenv <https://github.com/pyenv/pyenv>`_
 - (Optional) `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_
