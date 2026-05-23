@@ -42,7 +42,7 @@ Python services with databases use Alembic:
 
 ```bash
 cd framework
-uv run --no-sync --python=3.10.19 python -m dev.generate_migration "Description"
+uv run --no-sync --python=3.11.14 python -m dev.generate_migration "Description"
 ```
 
 For Alembic-backed services, do not write a new migration file from scratch when
@@ -57,12 +57,12 @@ head. The default branch head is `flwr@head`; these commands are equivalent:
 
 ```bash
 cd framework
-uv run --no-sync --python=3.10.19 python -m dev.generate_migration "Widen integer columns"
+uv run --no-sync --python=3.11.14 python -m dev.generate_migration "Widen integer columns"
 ```
 
 ```bash
 cd framework
-uv run --no-sync --python=3.10.19 python -m dev.generate_migration --head flwr@head "Widen integer columns"
+uv run --no-sync --python=3.11.14 python -m dev.generate_migration --head flwr@head "Widen integer columns"
 ```
 
 After autogeneration:

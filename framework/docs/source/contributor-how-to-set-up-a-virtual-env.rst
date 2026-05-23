@@ -11,7 +11,7 @@ setup.
  Python Version
 ****************
 
-Flower requires at least `Python 3.10 <https://docs.python.org/3.10/>`_.
+Flower requires at least `Python 3.11 <https://docs.python.org/3.11/>`_.
 
 .. note::
 
@@ -28,24 +28,24 @@ One of the recommended virtual environment is `pyenv
 <https://github.com/pyenv/pyenv-virtualenv>`_. Please see `Flower examples
 <https://github.com/flwrlabs/flower/tree/main/examples/>`_ for details.
 
-Once Pyenv is set up, you can use it to install `Python Version 3.10
-<https://docs.python.org/3.10/>`_ or above:
+Once Pyenv is set up, you can use it to install `Python Version 3.11
+<https://docs.python.org/3.11/>`_ or above:
 
 .. code-block:: shell
 
-    pyenv install 3.10.19
+    pyenv install 3.11.14
 
 Create the virtualenv with:
 
 .. code-block:: shell
 
-    pyenv virtualenv 3.10.19 flower-3.10.19
+    pyenv virtualenv 3.11.14 flower-3.11.14
 
 Activate the virtualenv by running the following command:
 
 .. code-block:: shell
 
-    echo flower-3.10.19 > .python-version
+    echo flower-3.11.14 > .python-version
 
 ********************
  Virtualenv with uv
@@ -68,10 +68,10 @@ package. After setting it up you can create a virtual environment with:
 
 .. code-block:: shell
 
-    conda create -n flower-3.10.19 python=3.10.19
+    conda create -n flower-3.11.14 python=3.11.14
 
 and activate the virtual environment with:
 
 .. code-block:: shell
 
-    conda activate flower-3.10.19
+    conda activate flower-3.11.14

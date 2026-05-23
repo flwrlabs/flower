@@ -142,9 +142,18 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
+        requesting_task_id: int | None = None,
     ) -> int | None:
         """Create a task and return its ID."""
         with self.lock_task_store:
+            if requesting_task_id is not None:
+                requesting_task = self.task_store.get(requesting_task_id)
+                if (
+                    requesting_task is None
+                    or requesting_task.status.status == Status.FINISHED
+                ):
+                    return None
+
             task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
 
             task = Task(
@@ -325,7 +334,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             task.CopyFrom(self.task_store[task_id])
             return task
 
-    def store_task_message(self, message: Message) -> bool:
+    def store_task_message(  # pylint: disable=too-many-return-statements
+        self, message: Message
+    ) -> bool:
         """Store one task-addressed Message."""
         message_id = message.metadata.message_id
         if validate_task_message(message):
@@ -391,27 +402,24 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
 
             # Filter by dst_task_id
             dst_task_id_set = set(dst_task_ids) if dst_task_ids is not None else None
-            candidate_ids = [
-                message_id
-                for message_id, message in self.task_message_store.items()
+            selected_messages = [
+                msg
+                for msg in self.task_message_store.values()
                 if dst_task_id_set is None
-                or message.metadata.dst_task_id in dst_task_id_set
+                or msg.metadata.dst_task_id in dst_task_id_set
             ]
 
             # Apply requested sort order
             if order_by == "created_at":
-                candidate_ids.sort(
-                    key=lambda msg_id: self.task_message_store[
-                        msg_id
-                    ].metadata.created_at
-                )
+                selected_messages.sort(key=lambda msg: msg.metadata.created_at)
 
-            selected_ids = candidate_ids[:limit] if limit is not None else candidate_ids
-            selected_messages = []
-            for message_id in selected_ids:
-                message = self.task_message_store[message_id]
-                del self.task_message_store[message_id]
-                selected_messages.append(message)
+            # Apply limit
+            if limit is not None:
+                selected_messages = selected_messages[:limit]
+
+            # Delete selected messages from storage
+            for msg in selected_messages:
+                del self.task_message_store[msg.metadata.message_id]
 
         return selected_messages
 
@@ -451,9 +459,11 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         """Remove expired Messages and Messages for invalid destination tasks."""
         for message_id, message in list(self.task_message_store.items()):
             dst_task_id = message.metadata.dst_task_id
-            dst_task = (
-                self.task_store.get(dst_task_id) if dst_task_id is not None else None
-            )
+            if dst_task_id is None:
+                del self.task_message_store[message_id]
+                continue
+
+            dst_task = self.task_store.get(dst_task_id)
             if (
                 dst_task is None
                 or dst_task.status.status == Status.FINISHED

@@ -20,7 +20,7 @@ import json
 import secrets
 from collections.abc import Sequence
 from datetime import timedelta
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
@@ -174,6 +174,7 @@ class SqlCoreState(CoreState, SqlMixin):
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
+        requesting_task_id: int | None = None,
     ) -> int | None:
         """Create a task and return its ID."""
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
@@ -184,10 +185,18 @@ class SqlCoreState(CoreState, SqlMixin):
             (task_id, type, run_id, fab_hash, model_ref, connector_ref, token,
              active_until, pending_at, starting_at, running_at, finished_at,
              sub_status, details)
-            VALUES
-            (:task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
+            SELECT
+             :task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
              :active_until, :pending_at, :starting_at, :running_at, :finished_at,
-             :sub_status, :details);
+             :sub_status, :details
+            WHERE :requesting_task_id IS NULL
+            OR EXISTS (
+                SELECT 1
+                FROM task
+                WHERE task_id = :requesting_task_id
+                AND finished_at IS NULL
+            )
+            RETURNING task_id;
         """
 
         params = {
@@ -205,12 +214,17 @@ class SqlCoreState(CoreState, SqlMixin):
             "finished_at": None,
             "sub_status": "",
             "details": "",
+            "requesting_task_id": (
+                uint64_to_int64(requesting_task_id)
+                if requesting_task_id is not None
+                else None
+            ),
         }
 
         with self.session():
             try:
-                self.query(insert_query, params)
-                return task_id
+                rows = self.query(insert_query, params)
+                return task_id if rows else None
             except IntegrityError:
                 return None
 
@@ -427,7 +441,6 @@ class SqlCoreState(CoreState, SqlMixin):
 
         with self.session():
             self._cleanup_expired_task_tokens()
-            self._cleanup_invalid_task_messages()
             message_dict = _task_message_to_row(message)
             try:
                 inserted = self.query(
@@ -444,9 +457,9 @@ class SqlCoreState(CoreState, SqlMixin):
                     FROM task AS src
                     JOIN task AS dst
                         ON dst.task_id = :dst_task_id
-                        AND dst.run_id = src.run_id
                     WHERE src.task_id = :src_task_id
-                        AND :run_id = src.run_id
+                        AND src.run_id = :run_id
+                        AND dst.run_id = :run_id
                         AND dst.finished_at IS NULL
                     RETURNING message_id
                     """,
@@ -487,57 +500,61 @@ class SqlCoreState(CoreState, SqlMixin):
         limit: int | None,
     ) -> list[dict[str, Any]]:
         """Atomically claim eligible task Messages."""
-        params: dict[str, Any] = {"current": now().timestamp()}
-        conditions = [
-            "(created_at + ttl) > :current",
-            """
-            EXISTS (
-                SELECT 1 FROM task AS dst
-                WHERE dst.task_id = task_message.dst_task_id
-                    AND dst.finished_at IS NULL
-            )
-            """,
-        ]
+        conditions: list[str] = []
+        params: dict[str, Any] = {}
+
+        # Filter by destination task IDs
         if dst_task_ids is not None:
-            sint64_dst_task_ids = [uint64_to_int64(task_id) for task_id in dst_task_ids]
+            sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
             placeholders = ",".join(
-                [f":dst_tid_{i}" for i in range(len(sint64_dst_task_ids))]
+                f":dtid_{i}" for i in range(len(sint64_dst_task_ids))
             )
             conditions.append(f"dst_task_id IN ({placeholders})")
             params.update(
-                {
-                    f"dst_tid_{i}": task_id
-                    for i, task_id in enumerate(sint64_dst_task_ids)
-                }
+                {f"dtid_{i}": tid for i, tid in enumerate(sint64_dst_task_ids)}
             )
 
-        candidate_cte = ""
-        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        order_clause = f"ORDER BY {order_by}" if order_by else ""
+        limit_clause = "LIMIT :limit" if limit is not None else ""
+
         if limit is not None:
-            candidate_cte = f"""
-                WITH candidate_task_messages AS (
-                    SELECT message_id
-                    FROM task_message
-                    {where_clause}
-                    {"ORDER BY created_at" if order_by == "created_at" else ""}
-                    LIMIT :limit
-                    {self.select_lock_sql}
-                )
-            """
-            where_clause = """
-                WHERE message_id IN (
-                    SELECT message_id FROM candidate_task_messages
-                )
-            """
             params["limit"] = limit
 
-        query = f"""
-            {candidate_cte}
-            DELETE FROM task_message
-            {where_clause}
-            RETURNING *
-        """
-        return self.query(query, params)
+        if order_by is not None or limit is not None:
+            # Materialize candidates before deleting. Some backends can otherwise
+            # re-evaluate same-table subqueries while DELETE scans rows.
+            # `self.select_lock_sql` is an optional clause for backends that support
+            # row-locking while selecting candidates. Keep it before LIMIT so locked
+            # rows are skipped before limiting the result set.
+            query = f"""
+                WITH selected AS (
+                    SELECT message_id
+                    FROM task_message
+                    {where_clause} {order_clause}
+                    {self.select_lock_sql}
+                    {limit_clause}
+                )
+                DELETE FROM task_message
+                WHERE message_id IN (SELECT message_id FROM selected)
+                RETURNING *
+            """
+        else:
+            query = f"""
+                DELETE FROM task_message
+                {where_clause}
+                RETURNING *
+            """
+
+        rows = self.query(query, params)
+
+        # Sort claimed rows in-memory if requested
+        # `ORDER BY` in the CTE determines which rows are claimed, but SQL does not
+        # guarantee that `DELETE ... RETURNING` returns them in that order.
+        if order_by is not None:
+            rows.sort(key=lambda row: row[order_by])
+
+        return rows
 
     def _cleanup_expired_task_tokens(self) -> None:
         """Remove expired task heartbeat records.
@@ -553,6 +570,7 @@ class SqlCoreState(CoreState, SqlMixin):
             SET token = NULL, finished_at = active_until, active_until = NULL,
                 sub_status = :sub_status, details = :details
             WHERE token IS NOT NULL AND active_until < :current
+            AND finished_at IS NULL
             RETURNING task_id, type, run_id, fab_hash, model_ref, connector_ref,
                       pending_at, starting_at, running_at, finished_at,
                       sub_status, details
@@ -572,11 +590,6 @@ class SqlCoreState(CoreState, SqlMixin):
             """
             DELETE FROM task_message
             WHERE (created_at + ttl) <= :current
-                OR NOT EXISTS (
-                    SELECT 1 FROM task AS dst
-                    WHERE dst.task_id = task_message.dst_task_id
-                        AND dst.finished_at IS NULL
-                )
             """,
             {"current": now().timestamp()},
         )
@@ -654,14 +667,11 @@ def task_from_row(row: dict[str, Any]) -> Task:
 
 def _task_message_to_row(message: Message) -> dict[str, Any]:
     """Convert a task-addressed Message to database row values."""
-    src_task_id = message.metadata.src_task_id
-    dst_task_id = message.metadata.dst_task_id
-    assert src_task_id is not None and dst_task_id is not None
     return {
         "message_id": message.metadata.message_id,
         "run_id": uint64_to_int64(message.metadata.run_id),
-        "src_task_id": uint64_to_int64(src_task_id),
-        "dst_task_id": uint64_to_int64(dst_task_id),
+        "src_task_id": uint64_to_int64(cast(int, message.metadata.src_task_id)),
+        "dst_task_id": uint64_to_int64(cast(int, message.metadata.dst_task_id)),
         "reply_to_message_id": message.metadata.reply_to_message_id,
         "created_at": message.metadata.created_at,
         "ttl": message.metadata.ttl,

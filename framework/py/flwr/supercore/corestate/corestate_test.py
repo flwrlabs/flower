@@ -105,6 +105,26 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(task.running_at, "")
         self.assertEqual(task.finished_at, "")
 
+    def test_create_task_rejects_finished_requesting_task(self) -> None:
+        """Task creation should fail if the requesting task is already finished."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        requesting_task_id = state.create_task(
+            task_type=TaskType.SERVER_APP,
+            run_id=run_id,
+        )
+        assert requesting_task_id is not None
+        self.assertTrue(state.finish_task(requesting_task_id, SubStatus.STOPPED, ""))
+
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=run_id,
+            model_ref="model://test",
+            requesting_task_id=requesting_task_id,
+        )
+
+        self.assertIsNone(task_id)
+
     def test_get_tasks_missing_returns_empty(self) -> None:
         """Missing tasks should return an empty sequence."""
         state = self.state_factory()
@@ -528,17 +548,23 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertTrue(state.store_task_message(message))
         self.assertFalse(state.store_task_message(expired))
         self.assertTrue(state.store_task_message(other_destination))
-        self.assertTrue(state.finish_task(other_dst_task_id, SubStatus.FAILED, "done"))
         pulled = state.get_task_message(dst_task_ids=[dst_task_id])
         pulled_again = state.get_task_message(dst_task_ids=[dst_task_id])
         pulled_other = state.get_task_message(dst_task_ids=[other_dst_task_id])
+        pulled_other_again = state.get_task_message(dst_task_ids=[other_dst_task_id])
 
         self.assertEqual(len(pulled), 1)
         self.assertEqual(pulled_again, [])
-        self.assertEqual(pulled_other, [])
+        self.assertEqual(len(pulled_other), 1)
+        self.assertEqual(pulled_other_again, [])
         pulled_message = pulled[0]
+        pulled_other_message = pulled_other[0]
         self.assertEqual(
             pulled_message.metadata.message_id, message.metadata.message_id
+        )
+        self.assertEqual(
+            pulled_other_message.metadata.message_id,
+            other_destination.metadata.message_id,
         )
         self.assertEqual(pulled_message.metadata.run_id, run_id)
         self.assertEqual(pulled_message.metadata.src_node_id, SUPERLINK_NODE_ID)
