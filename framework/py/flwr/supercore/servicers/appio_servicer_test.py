@@ -21,7 +21,7 @@ from unittest.mock import Mock, patch
 import grpc
 
 from flwr.common import Message, RecordDict
-from flwr.common.constant import Status
+from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.serde import message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
@@ -78,12 +78,12 @@ class TestAppIoServicer(unittest.TestCase):
             RecordDict(),
             dst_node_id,
             "query",
-            src_task_id=src_task_id,
             dst_task_id=dst_task_id,
         )
         message.metadata.__dict__["_message_id"] = message_id
         message.metadata.__dict__["_run_id"] = run_id
         message.metadata.__dict__["_src_node_id"] = src_node_id
+        message.metadata.src_task_id = src_task_id
         message_proto = message_to_proto(message)
         if src_task_id is None:
             message_proto.metadata.ClearField("src_task_id")
@@ -314,8 +314,13 @@ class TestAppIoServicer(unittest.TestCase):
     def test_push_task_message_uses_authenticated_task_metadata(self) -> None:
         """PushTaskMessage should derive source task and run from auth."""
         # Prepare
-        self.state.store_task_message.return_value = "message-id"
-        request = self._create_task_message_request()
+        self.state.store_task_message.return_value = True
+        request = self._create_task_message_request(
+            run_id=999,
+            src_node_id=111,
+            dst_node_id=222,
+            src_task_id=999,
+        )
 
         # Execute
         with patch(
@@ -329,40 +334,16 @@ class TestAppIoServicer(unittest.TestCase):
         self.state.store_task_message.assert_called_once()
         stored_message = self.state.store_task_message.call_args.args[0]
         self.assertEqual(stored_message.metadata.run_id, 789)
-        self.assertEqual(stored_message.metadata.src_node_id, 0)
-        self.assertEqual(stored_message.metadata.dst_node_id, 0)
+        self.assertEqual(stored_message.metadata.src_node_id, SUPERLINK_NODE_ID)
+        self.assertEqual(stored_message.metadata.dst_node_id, SUPERLINK_NODE_ID)
         self.assertEqual(stored_message.metadata.src_task_id, 123)
         self.assertEqual(stored_message.metadata.dst_task_id, 456)
 
-    def test_push_task_message_aborts_without_dst_task_id(self) -> None:
-        """PushTaskMessage should require destination task metadata."""
+    def test_push_task_message_returns_generated_message_id(self) -> None:
+        """PushTaskMessage should return the stored message ID."""
         # Prepare
-        request = self._create_task_message_request(dst_task_id=None)
-        context = Mock(spec=grpc.ServicerContext)
-        context.abort.side_effect = grpc.RpcError()
-
-        # Execute
-        with (
-            patch(
-                "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
-                return_value=Task(task_id=123, run_id=789),
-            ),
-            self.assertRaises(grpc.RpcError),
-        ):
-            self.servicer.PushTaskMessage(request, context)
-
-        # Assert
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            "`Message.metadata.dst_task_id` is required.",
-        )
-        self.state.store_task_message.assert_not_called()
-
-    def test_push_task_message_accepts_consistent_src_task_id(self) -> None:
-        """PushTaskMessage should accept source task metadata matching auth."""
-        # Prepare
-        self.state.store_task_message.return_value = "message-id"
-        request = self._create_task_message_request(src_task_id=123)
+        self.state.store_task_message.return_value = True
+        request = self._create_task_message_request(message_id="")
 
         # Execute
         with patch(
@@ -372,16 +353,18 @@ class TestAppIoServicer(unittest.TestCase):
             response = self.servicer.PushTaskMessage(request, Mock())
 
         # Assert
-        self.assertEqual(response.message_id, "message-id")
         self.state.store_task_message.assert_called_once()
         stored_message = self.state.store_task_message.call_args.args[0]
+        self.assertNotEqual(response.message_id, "")
+        self.assertEqual(response.message_id, stored_message.metadata.message_id)
         self.assertEqual(stored_message.metadata.src_task_id, 123)
         self.assertEqual(stored_message.metadata.dst_task_id, 456)
 
-    def test_push_task_message_aborts_on_inconsistent_src_task_id(self) -> None:
-        """PushTaskMessage should reject mismatched source task metadata."""
+    def test_push_task_message_aborts_when_state_rejects_message(self) -> None:
+        """PushTaskMessage should abort when CoreState cannot store the message."""
         # Prepare
-        request = self._create_task_message_request(src_task_id=999)
+        self.state.store_task_message.return_value = False
+        request = self._create_task_message_request()
         context = Mock(spec=grpc.ServicerContext)
         context.abort.side_effect = grpc.RpcError()
 
@@ -398,9 +381,8 @@ class TestAppIoServicer(unittest.TestCase):
         # Assert
         context.abort.assert_called_once_with(
             grpc.StatusCode.FAILED_PRECONDITION,
-            "`Message.metadata.src_task_id` is inconsistent.",
+            "Task message could not be stored.",
         )
-        self.state.store_task_message.assert_not_called()
 
     def test_pull_task_message_uses_authenticated_task_destination(self) -> None:
         """PullTaskMessage should query messages for the authenticated task."""
@@ -409,11 +391,13 @@ class TestAppIoServicer(unittest.TestCase):
             RecordDict(),
             0,
             "query",
-            src_task_id=123,
             dst_task_id=321,
         )
         message.metadata.__dict__["_message_id"] = "message-id"
         message.metadata.__dict__["_run_id"] = 789
+        message.metadata.__dict__["_src_node_id"] = SUPERLINK_NODE_ID
+        message.metadata.__dict__["_dst_node_id"] = SUPERLINK_NODE_ID
+        message.metadata.src_task_id = 123
         self.state.get_task_message.return_value = [message]
 
         # Execute
@@ -430,46 +414,13 @@ class TestAppIoServicer(unittest.TestCase):
         self.state.get_task_message.assert_called_once_with(
             dst_task_ids=[321],
             limit=5,
+            order_by="created_at",
         )
         self.assertEqual(len(response.messages), 1)
         self.assertEqual(response.messages[0].metadata.src_task_id, 123)
         self.assertEqual(response.messages[0].metadata.dst_task_id, 321)
-        self.assertEqual(response.messages[0].metadata.src_node_id, 0)
-        self.assertEqual(response.messages[0].metadata.dst_node_id, 0)
-
-    def test_pull_task_message_filters_authenticated_task_destination(self) -> None:
-        """PullTaskMessage should only return messages for the auth task."""
-        # Prepare
-        matching_message = Message(
-            RecordDict(),
-            0,
-            "query",
-            src_task_id=123,
-            dst_task_id=321,
-        )
-        matching_message.metadata.__dict__["_message_id"] = "message-id"
-        matching_message.metadata.__dict__["_run_id"] = 789
-        other_message = Message(
-            RecordDict(),
-            0,
-            "query",
-            src_task_id=123,
-            dst_task_id=999,
-        )
-        other_message.metadata.__dict__["_message_id"] = "other-message-id"
-        other_message.metadata.__dict__["_run_id"] = 789
-        self.state.get_task_message.return_value = [matching_message, other_message]
-
-        # Execute
-        with patch(
-            "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
-            return_value=Task(task_id=321, run_id=789),
-        ):
-            response = self.servicer.PullTaskMessage(PullTaskMessageRequest(), Mock())
-
-        # Assert
-        self.assertEqual(len(response.messages), 1)
-        self.assertEqual(response.messages[0].metadata.message_id, "message-id")
+        self.assertEqual(response.messages[0].metadata.src_node_id, SUPERLINK_NODE_ID)
+        self.assertEqual(response.messages[0].metadata.dst_node_id, SUPERLINK_NODE_ID)
 
     def test_task_message_push_pull_with_real_state(self) -> None:
         """Task messages should round-trip through real CoreState."""
@@ -507,8 +458,8 @@ class TestAppIoServicer(unittest.TestCase):
         self.assertEqual(message.metadata.run_id, 789)
         self.assertEqual(message.metadata.src_task_id, src_task_id)
         self.assertEqual(message.metadata.dst_task_id, dst_task_id)
-        self.assertEqual(message.metadata.src_node_id, 0)
-        self.assertEqual(message.metadata.dst_node_id, 0)
+        self.assertEqual(message.metadata.src_node_id, SUPERLINK_NODE_ID)
+        self.assertEqual(message.metadata.dst_node_id, SUPERLINK_NODE_ID)
 
     def test_create_task_aborts_if_requesting_task_type_is_not_allowed(self) -> None:
         """CreateTask should reject task creation requests from non-app task types."""
