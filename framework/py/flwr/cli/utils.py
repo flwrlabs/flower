@@ -448,7 +448,10 @@ def flwr_cli_grpc_exc_handler(  # pylint: disable=too-many-branches
                 ) from None
             raise click.ClickException(details) from None
         if e.code() == grpc.StatusCode.PERMISSION_DENIED:
-            raise click.ClickException(f"Permission denied.\n{details}") from None
+            # Skip showing "Permission denied." when details already contain
+            # a user-friendly message.
+            msg = "Permission denied." if details == "" else f"{details}"
+            raise click.ClickException(msg) from None
         if e.code() == grpc.StatusCode.UNAVAILABLE:
             raise click.ClickException(
                 "Connection to the SuperLink is unavailable. Please check your network "
