@@ -7,17 +7,16 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-05-22 00:28+0000\n"
+"POT-Creation-Date: 2026-05-24 00:26+0000\n"
 "PO-Revision-Date: 2026-05-23 06:54+0000\n"
 "Last-Translator: Gustavo Bertoli <gubertoli@gmail.com>\n"
-"Language-Team: Portuguese (Brazil) <https://hosted.weblate.org/projects/"
-"flower-docs/framework/pt_BR/>\n"
 "Language: pt_BR\n"
+"Language-Team: Portuguese (Brazil) <https://hosted.weblate.org/projects"
+"/flower-docs/framework/pt_BR/>\n"
+"Plural-Forms: nplurals=2; plural=n > 1;\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=2; plural=n > 1;\n"
-"X-Generator: Weblate 2026.6.dev0\n"
 "Generated-By: Babel 2.18.0\n"
 
 #: ../../source/build.rst:-1
@@ -307,12 +306,12 @@ msgid ""
 " this guide, we will explain what images exist and how to build them "
 "locally."
 msgstr ""
-"Flower disponibiliza imagens docker em `Docker Hub <https://hub.docker.com/r/"
-"flwr/server/tags>`_ que incluem todas as dependências necesárias para "
-"executar o servidor. Você pode também compilar suas próprias imagens docker "
-"customizadas do zero com uma versão diferente do Python ou do Ubuntu se isso "
-"for o que você precisa. Neste guia, explicaremos quais imagens existem e "
-"como compilar localmente."
+"Flower disponibiliza imagens docker em `Docker Hub "
+"<https://hub.docker.com/r/flwr/server/tags>`_ que incluem todas as "
+"dependências necesárias para executar o servidor. Você pode também "
+"compilar suas próprias imagens docker customizadas do zero com uma versão"
+" diferente do Python ou do Ubuntu se isso for o que você precisa. Neste "
+"guia, explicaremos quais imagens existem e como compilar localmente."
 
 #: ../../source/contributor-how-to-build-docker-images.rst:11
 msgid ""
@@ -339,8 +338,8 @@ msgid ""
 "``framework/docker``."
 msgstr ""
 "As instruções de compilação que montam as imagens estão localizadas nos "
-"respectivos Dockerfiles. Você pode encontrá-los nos subdiretórios ``src/"
-"docker```."
+"respectivos Dockerfiles. Você pode encontrá-los nos subdiretórios "
+"``src/docker```."
 
 #: ../../source/contributor-how-to-build-docker-images.rst:25
 #, fuzzy
@@ -353,14 +352,14 @@ msgid ""
 "available build arguments for each image are listed in one of the tables "
 "below."
 msgstr ""
-"Ambas, imagens base e do servidor são configuradas através dos argumentos de "
-"compilação. Através dos argumentos de compilação, podemos tornar nossa "
-"compilação mais flexível. Por exemplo, na imagem base, podemos especificar a "
-"versão do Python para instalar usando o argumento de compilação "
-"`PYTHON_VERSION`. Alguns dos argumentos de compilação têm valores padrão, "
-"outros devem ser especificados ao compilar a imagem. Todos os argumentos de "
-"compilação disponíveis para cada imagem estão listados em uma das tabelas "
-"abaixo."
+"Ambas, imagens base e do servidor são configuradas através dos argumentos"
+" de compilação. Através dos argumentos de compilação, podemos tornar "
+"nossa compilação mais flexível. Por exemplo, na imagem base, podemos "
+"especificar a versão do Python para instalar usando o argumento de "
+"compilação `PYTHON_VERSION`. Alguns dos argumentos de compilação têm "
+"valores padrão, outros devem ser especificados ao compilar a imagem. "
+"Todos os argumentos de compilação disponíveis para cada imagem estão "
+"listados em uma das tabelas abaixo."
 
 #: ../../source/contributor-how-to-build-docker-images.rst:34
 #, fuzzy
@@ -552,8 +551,8 @@ msgid ""
 "tag can be adapted to your needs. These values serve as examples only."
 msgstr ""
 "O nome da imagem é ``flwr_base`` com a tag ``0.1.0``. Lembre-se que os "
-"argumentos de construção assim como o nome e a tag podem ser adaptados de "
-"acordo com suas necessidades. Estes valores servem apenas como exemplo."
+"argumentos de construção assim como o nome e a tag podem ser adaptados de"
+" acordo com suas necessidades. Estes valores servem apenas como exemplo."
 
 #: ../../source/contributor-how-to-build-docker-images.rst:101
 #, fuzzy
@@ -600,11 +599,12 @@ msgid ""
 "base image, all you need to do is set the ``BASE_REPOSITORY`` build "
 "argument to ``flwr_base`` (as we've specified above)."
 msgstr ""
-"Se você quiser usar sua própria imagem base ao invés da imagem oficial base "
-"do Flower, tudo que você precisa fazer é definir os argumentos "
+"Se você quiser usar sua própria imagem base ao invés da imagem oficial "
+"base do Flower, tudo que você precisa fazer é definir os argumentos "
 "``BASE_REPOSITORY`` e ``BASE_IMAGE_TAG`` como parte do comando de "
-"compilação. O valor de ``BASE_REPOSITORY`` deve corresponder ao nome da sua "
-"imagem e o valor de ``BASE_IMAGE_TAG`` deve corresponder à tag da sua imagem."
+"compilação. O valor de ``BASE_REPOSITORY`` deve corresponder ao nome da "
+"sua imagem e o valor de ``BASE_IMAGE_TAG`` deve corresponder à tag da sua"
+" imagem."
 
 #: ../../source/contributor-how-to-build-docker-images.rst:143
 msgid "After creating the image, we can test whether the image is working:"
@@ -629,14 +629,15 @@ msgid ""
 "also be a great opportunity for those wanting to become open source "
 "contributors with little prerequisites."
 msgstr ""
-"Desde o `Flower 1.5 <https://flower.ai/docs/framework/ref-changelog.html#v1-"
-"5-0-2023-08-31>`_ nós introduzimos traduções para nossas páginas de "
-"documentação, mas, como você pode ter notado, as traduções são muitas vezes "
-"imperfeitas. Se você fala línguas diferentes do inglês, você pode ser capaz "
-"de nos ajudar neste esforço para tornar o aprendizado federado acessível a "
-"tantas pessoas quanto possível, contribuindo para essas traduções! Isso "
-"também pode ser uma grande oportunidade para aqueles que querem se tornar "
-"contribuintes de código aberto com poucos pré-requisitos."
+"Desde o `Flower 1.5 <https://flower.ai/docs/framework/ref-"
+"changelog.html#v1-5-0-2023-08-31>`_ nós introduzimos traduções para "
+"nossas páginas de documentação, mas, como você pode ter notado, as "
+"traduções são muitas vezes imperfeitas. Se você fala línguas diferentes "
+"do inglês, você pode ser capaz de nos ajudar neste esforço para tornar o "
+"aprendizado federado acessível a tantas pessoas quanto possível, "
+"contribuindo para essas traduções! Isso também pode ser uma grande "
+"oportunidade para aqueles que querem se tornar contribuintes de código "
+"aberto com poucos pré-requisitos."
 
 #: ../../source/contributor-how-to-contribute-translations.rst:14
 #, fuzzy
@@ -645,9 +646,9 @@ msgid ""
 "<https://hosted.weblate.org/projects/flower-docs/framework/>`_, this "
 "where most of the work will happen."
 msgstr ""
-"Nosso projeto de tradução está disponível publicamente em `Weblate <https://"
-"hosted.weblate.org/projects/flower-docs/framework/>`_, onde a maioria do "
-"trabalho acontecerá."
+"Nosso projeto de tradução está disponível publicamente em `Weblate "
+"<https://hosted.weblate.org/projects/flower-docs/framework/>`_, onde a "
+"maioria do trabalho acontecerá."
 
 #: ../../source/contributor-how-to-contribute-translations.rst:20
 #, fuzzy
@@ -662,10 +663,11 @@ msgid ""
 " profile settings can be found `here "
 "<https://docs.weblate.org/en/latest/user/profile.html>`_."
 msgstr ""
-"A primeira coisa que você precisa fazer para contribuir é criar uma conta "
-"Weblate gratuita nesta `página <https://hosted.weblate.org/accounts/"
-"register/>`_. Mais informações sobre as configurações de perfil podem ser "
-"encontradas `aqui <https://docs.weblate.org/en/latest/user/profile.html>`_."
+"A primeira coisa que você precisa fazer para contribuir é criar uma conta"
+" Weblate gratuita nesta `página "
+"<https://hosted.weblate.org/accounts/register/>`_. Mais informações sobre"
+" as configurações de perfil podem ser encontradas `aqui "
+"<https://docs.weblate.org/en/latest/user/profile.html>`_."
 
 #: ../../source/contributor-how-to-contribute-translations.rst:30
 msgid ""
@@ -675,17 +677,17 @@ msgid ""
 " that can be found on the website."
 msgstr ""
 "Uma vez que você esteja conectado ao Weblate, você pode navegar até o "
-"projeto `Flower Framework <https://hosted.weblate.org/projects/flower-docs/"
-"framework/>`_. Aqui, você deve ver os diferentes idiomas existentes que "
-"podem ser encontrados no site."
+"projeto `Flower Framework <https://hosted.weblate.org/projects/flower-"
+"docs/framework/>`_. Aqui, você deve ver os diferentes idiomas existentes "
+"que podem ser encontrados no site."
 
 #: ../../source/contributor-how-to-contribute-translations.rst:34
 msgid ""
 "Once you have selected the language you want to contribute to, you should"
 " see a similar interface to this:"
 msgstr ""
-"Uma vez que você tenha selecionado o idioma que deseja contribuir, você deve "
-"ver uma interface semelhante a esta:"
+"Uma vez que você tenha selecionado o idioma que deseja contribuir, você "
+"deve ver uma interface semelhante a esta:"
 
 #: ../../source/contributor-how-to-contribute-translations.rst:39
 msgid ""
@@ -694,9 +696,10 @@ msgid ""
 "will automatically bring you to the translation interface for "
 "untranslated strings."
 msgstr ""
-"A opção mais direta aqui é clicar no botão ``Translate`` no canto superior "
-"direito (na seção ``Translation status``). Isso te levará automaticamente "
-"para a interface de tradução de strings ainda não traduzidas."
+"A opção mais direta aqui é clicar no botão ``Translate`` no canto "
+"superior direito (na seção ``Translation status``). Isso te levará "
+"automaticamente para a interface de tradução de strings ainda não "
+"traduzidas."
 
 #: ../../source/contributor-how-to-contribute-translations.rst:43
 #, fuzzy
@@ -715,10 +718,10 @@ msgstr ""
 "Você insire sua tradução na caixa de texto no topo e depois, uma vez que "
 "você está satisfeito com ela, você pressiona ``Save and continue`` (para "
 "salvar a tradução e ir para a próxima string não traduzida), ``Save and "
-"stay`` (para salvar a tradução e ficar na mesma página), ``Suggest`` (para "
-"adicionar sua tradução para sugestões para outros usuários verem), ou "
-"``Skip`` (para ir para a próxima string não traduzida sem salvar nada na "
-"atual)."
+"stay`` (para salvar a tradução e ficar na mesma página), ``Suggest`` "
+"(para adicionar sua tradução para sugestões para outros usuários verem), "
+"ou ``Skip`` (para ir para a próxima string não traduzida sem salvar nada "
+"na atual)."
 
 #: ../../source/contributor-how-to-contribute-translations.rst:53
 msgid ""
@@ -732,7 +735,8 @@ msgstr ""
 "strings`` (strings próximas), o ``Comments`` (comentários de outros "
 "contribuidores), o ``Automatic suggestions`` (sugestões atuomáticas de "
 "sistemas de tradução automática), as traduções em ``Other languages`` "
-"(outras línguas), e o ``History`` (histórico) de traduções para esta string."
+"(outras línguas), e o ``History`` (histórico) de traduções para esta "
+"string."
 
 #: ../../source/contributor-how-to-contribute-translations.rst:58
 msgid ""
@@ -740,9 +744,9 @@ msgid ""
 "click the link under ``Source string location`` in order to view the "
 "source of the doc file containing the string."
 msgstr ""
-"À direita, sob a seção ``String information``, você também pode clicar no "
-"link sob ``Source string location`` para visualizar a fonte do arquivo doc "
-"que contém a string."
+"À direita, sob a seção ``String information``, você também pode clicar no"
+" link sob ``Source string location`` para visualizar a fonte do arquivo "
+"doc que contém a string."
 
 #: ../../source/contributor-how-to-contribute-translations.rst:62
 msgid ""
@@ -750,9 +754,9 @@ msgid ""
 "this `in-depth guide "
 "<https://docs.weblate.org/en/latest/user/translating.html>`_."
 msgstr ""
-"Para obter mais informações sobre como traduzir usando o Weblate, você pode "
-"conferir este `guia detalhado <https://docs.weblate.org/en/latest/user/"
-"translating.html>`_."
+"Para obter mais informações sobre como traduzir usando o Weblate, você "
+"pode conferir este `guia detalhado "
+"<https://docs.weblate.org/en/latest/user/translating.html>`_."
 
 #: ../../source/contributor-how-to-contribute-translations.rst:67
 #, fuzzy
@@ -766,9 +770,10 @@ msgid ""
 "either on `Slack <https://flower.ai/join-slack>`_, or by opening an issue"
 " on our `GitHub repo <https://github.com/flwrlabs/flower>`_."
 msgstr ""
-"Se você quiser adicionar uma nova língua, primeiro você terá que entrar em "
-"contato conosco, no `Slack <https://flower.ai/join-slack>`_, ou abrindo uma "
-"issue no nosso `repositório GitHub <https://github.com/adap/flower>`_."
+"Se você quiser adicionar uma nova língua, primeiro você terá que entrar "
+"em contato conosco, no `Slack <https://flower.ai/join-slack>`_, ou "
+"abrindo uma issue no nosso `repositório GitHub "
+"<https://github.com/adap/flower>`_."
 
 #: ../../source/contributor-how-to-develop-in-vscode-dev-containers.rst:3
 msgid "Develop in VSCode Dev Containers"
@@ -867,118 +872,102 @@ msgstr ""
 
 #: ../../source/contributor-how-to-install-development-versions.rst:12
 msgid ""
-"Install a ``flwr`` pre-release from PyPI: update the ``flwr`` dependency "
-"in ``pyproject.toml`` and then reinstall with ``uv sync``."
+"Install a ``flwr`` pre-release from PyPI with ``uv add``, which updates "
+"``pyproject.toml`` and syncs the environment:"
 msgstr ""
 
 #: ../../source/contributor-how-to-install-development-versions.rst:15
-#, python-brace-format
-msgid ""
-"``flwr = { version = \"1.0.0a0\", allow-prereleases = true }`` (without "
-"extras)"
+msgid "``uv add --prerelease=allow \"flwr==1.0.0a0\"`` (without extras)"
 msgstr ""
 
 #: ../../source/contributor-how-to-install-development-versions.rst:16
-#, python-brace-format
-msgid ""
-"``flwr = { version = \"1.0.0a0\", allow-prereleases = true, extras = "
-"[\"simulation\"] }`` (with extras)"
+msgid "``uv add --prerelease=allow \"flwr[simulation]==1.0.0a0\"`` (with extras)"
 msgstr ""
 
-#: ../../source/contributor-how-to-install-development-versions.rst:19
-msgid ""
-"Install ``flwr`` from a local copy of the Flower source code via "
-"``pyproject.toml``:"
+#: ../../source/contributor-how-to-install-development-versions.rst:18
+msgid "Install ``flwr`` from a local copy of the Flower source code:"
+msgstr ""
+
+#: ../../source/contributor-how-to-install-development-versions.rst:20
+msgid "``uv add --editable \"../../\"`` (without extras)"
 msgstr ""
 
 #: ../../source/contributor-how-to-install-development-versions.rst:21
-#, python-brace-format
-msgid "``flwr = { path = \"../../\", develop = true }`` (without extras)"
+msgid "``uv add --editable \"../../\" --extra simulation`` (with extras)"
 msgstr ""
 
-#: ../../source/contributor-how-to-install-development-versions.rst:22
-#, python-brace-format
-msgid ""
-"``flwr = { path = \"../../\", develop = true, extras = [\"simulation\"] "
-"}`` (with extras)"
+#: ../../source/contributor-how-to-install-development-versions.rst:23
+msgid "Install ``flwr`` from a local wheel file:"
 msgstr ""
 
-#: ../../source/contributor-how-to-install-development-versions.rst:24
-msgid "Install ``flwr`` from a local wheel file via ``pyproject.toml``:"
+#: ../../source/contributor-how-to-install-development-versions.rst:25
+msgid "``uv add \"../../dist/flwr-1.8.0-py3-none-any.whl\"`` (without extras)"
 msgstr ""
 
 #: ../../source/contributor-how-to-install-development-versions.rst:26
-#, python-brace-format
 msgid ""
-"``flwr = { path = \"../../dist/flwr-1.8.0-py3-none-any.whl\" }`` (without"
-" extras)"
+"``uv add \"../../dist/flwr-1.8.0-py3-none-any.whl\" --extra simulation`` "
+"(with extras)"
 msgstr ""
 
-#: ../../source/contributor-how-to-install-development-versions.rst:27
-#, python-brace-format
-msgid ""
-"``flwr = { path = \"../../dist/flwr-1.8.0-py3-none-any.whl\", extras = "
-"[\"simulation\"] }`` (with extras)"
-msgstr ""
-
-#: ../../source/contributor-how-to-install-development-versions.rst:30
+#: ../../source/contributor-how-to-install-development-versions.rst:28
 msgid ""
 "Please refer to the uv documentation for further details: `Managing "
 "dependencies with uv "
 "<https://docs.astral.sh/uv/concepts/projects/dependencies/>`_"
 msgstr ""
 
-#: ../../source/contributor-how-to-install-development-versions.rst:34
+#: ../../source/contributor-how-to-install-development-versions.rst:32
 msgid "Using pip (recommended on Colab)"
 msgstr ""
 
-#: ../../source/contributor-how-to-install-development-versions.rst:36
+#: ../../source/contributor-how-to-install-development-versions.rst:34
 msgid "Install a ``flwr`` pre-release from PyPI:"
 msgstr ""
 
-#: ../../source/contributor-how-to-install-development-versions.rst:38
+#: ../../source/contributor-how-to-install-development-versions.rst:36
 msgid "``pip install -U --pre flwr`` (without extras)"
 msgstr ""
 
-#: ../../source/contributor-how-to-install-development-versions.rst:39
+#: ../../source/contributor-how-to-install-development-versions.rst:37
 msgid "``pip install -U --pre 'flwr[simulation]'`` (with extras)"
 msgstr ""
 
-#: ../../source/contributor-how-to-install-development-versions.rst:41
+#: ../../source/contributor-how-to-install-development-versions.rst:39
 msgid ""
 "Python packages can be installed from git repositories. Use one of the "
 "following commands to install the Flower directly from GitHub."
 msgstr ""
 
-#: ../../source/contributor-how-to-install-development-versions.rst:44
+#: ../../source/contributor-how-to-install-development-versions.rst:42
 msgid "Install ``flwr`` from the default GitHub branch (``main``):"
 msgstr ""
 
-#: ../../source/contributor-how-to-install-development-versions.rst:46
+#: ../../source/contributor-how-to-install-development-versions.rst:44
 msgid ""
 "``pip install "
 "flwr@git+https://github.com/flwrlabs/flower.git#subdirectory=framework`` "
 "(without extras)"
 msgstr ""
 
-#: ../../source/contributor-how-to-install-development-versions.rst:48
+#: ../../source/contributor-how-to-install-development-versions.rst:46
 msgid ""
 "``pip install "
 "'flwr[simulation]@git+https://github.com/flwrlabs/flower.git#subdirectory=framework'``"
 " (with extras)"
 msgstr ""
 
-#: ../../source/contributor-how-to-install-development-versions.rst:52
+#: ../../source/contributor-how-to-install-development-versions.rst:50
 msgid "Install ``flwr`` from a specific GitHub branch (``branch-name``):"
 msgstr ""
 
-#: ../../source/contributor-how-to-install-development-versions.rst:54
+#: ../../source/contributor-how-to-install-development-versions.rst:52
 msgid ""
 "``pip install flwr@git+https://github.com/flwrlabs/flower.git@branch-"
 "name#subdirectory=framework`` (without extras)"
 msgstr ""
 
-#: ../../source/contributor-how-to-install-development-versions.rst:57
+#: ../../source/contributor-how-to-install-development-versions.rst:55
 msgid ""
 "``pip install "
 "'flwr[simulation]@git+https://github.com/flwrlabs/flower.git@branch-"
@@ -1268,9 +1257,10 @@ msgstr ""
 #: ../../source/contributor-how-to-set-up-a-virtual-env.rst:5
 msgid ""
 "It is recommended to run your Python setup within a virtual environment. "
-"This guide shows three different examples how to create a virtual "
-"environment with pyenv virtualenv, uv, or Anaconda. You can follow the "
-"instructions or choose your preferred setup."
+"For framework development, uv creates and manages the virtual environment"
+" from the project lockfile. Tools such as pyenv or Anaconda can still "
+"provide the Python interpreter, but they do not need to create a separate"
+" project environment."
 msgstr ""
 
 #: ../../source/contributor-how-to-set-up-a-virtual-env.rst:12
@@ -1279,7 +1269,7 @@ msgstr ""
 
 #: ../../source/contributor-how-to-set-up-a-virtual-env.rst:14
 #: ../../source/how-to-install-flower.rst:13
-msgid "Flower requires at least `Python 3.10 <https://docs.python.org/3.10/>`_."
+msgid "Flower requires at least `Python 3.11 <https://docs.python.org/3.11/>`_."
 msgstr ""
 
 #: ../../source/contributor-how-to-set-up-a-virtual-env.rst:18
@@ -1291,55 +1281,53 @@ msgid ""
 msgstr ""
 
 #: ../../source/contributor-how-to-set-up-a-virtual-env.rst:24
-msgid "Virtualenv with Pyenv/Virtualenv"
-msgstr ""
-
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:26
-msgid ""
-"One of the recommended virtual environment is `pyenv "
-"<https://github.com/pyenv/pyenv>`_/`virtualenv <https://github.com/pyenv"
-"/pyenv-virtualenv>`_. Please see `Flower examples "
-"<https://github.com/flwrlabs/flower/tree/main/examples/>`_ for details."
-msgstr ""
-
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:31
-msgid ""
-"Once Pyenv is set up, you can use it to install `Python Version 3.10 "
-"<https://docs.python.org/3.10/>`_ or above:"
-msgstr ""
-
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:38
-msgid "Create the virtualenv with:"
-msgstr ""
-
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:44
-msgid "Activate the virtualenv by running the following command:"
-msgstr ""
-
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:52
 msgid "Virtualenv with uv"
 msgstr ""
 
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:54
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:26
+msgid "From the repository root, run the bootstrap script:"
+msgstr ""
+
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:32
 msgid ""
-"The Flower examples use `uv <https://docs.astral.sh/uv/>`_ to manage "
-"dependencies. After installing ``uv`` you can install dependencies with:"
+"This creates ``framework/.venv`` with the repository's default Python "
+"version and installs all framework dependencies from "
+"``framework/uv.lock``. To use a specific Python version, pass it as the "
+"first argument:"
 msgstr ""
 
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:63
-msgid "Virtualenv with Anaconda"
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:40
+msgid "Activate the created virtual environment with:"
 msgstr ""
 
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:65
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:46
+msgid "You can also run uv directly from the ``framework`` directory:"
+msgstr ""
+
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:55
+msgid "Python Versions with Pyenv"
+msgstr ""
+
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:57
 msgid ""
-"If you prefer to use Anaconda for your virtual environment then install "
-"and setup the `conda <https://docs.conda.io/projects/conda/en/latest"
-"/user-guide/install/index.html>`_ package. After setting it up you can "
-"create a virtual environment with:"
+"If you use `pyenv <https://github.com/pyenv/pyenv>`_, install the Python "
+"version you want uv to use:"
 msgstr ""
 
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:73
-msgid "and activate the virtual environment with:"
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:64
+msgid "Then pass that version to the bootstrap script:"
+msgstr ""
+
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:72
+msgid "Python Versions with Anaconda"
+msgstr ""
+
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:74
+msgid ""
+"If you prefer conda, create and activate a Python environment, then let "
+"uv create the framework project environment. See the `conda installation "
+"guide <https://docs.conda.io/projects/conda/en/latest/user-"
+"guide/install/index.html>`_ for installation instructions."
 msgstr ""
 
 #: ../../source/contributor-how-to-write-documentation.rst:3
@@ -2148,7 +2136,7 @@ msgid "Prerequisites"
 msgstr ""
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:9
-msgid "`Python 3.10 <https://docs.python.org/3.10/>`_ or above"
+msgid "`Python 3.11 <https://docs.python.org/3.11/>`_ or above"
 msgstr ""
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:10
@@ -2159,97 +2147,83 @@ msgstr ""
 msgid "(Optional) `pyenv <https://github.com/pyenv/pyenv>`_"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:12
-msgid "(Optional) `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_"
-msgstr ""
-
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:14
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:13
 msgid ""
 "Flower uses ``pyproject.toml`` to manage dependencies and configure "
 "development tools (the ones which support it). ``uv`` is used for "
 "dependency management, build, and publishing workflows."
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:20
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:19
 msgid "Developer Machine Setup"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:23
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:22
 msgid "Preliminaries"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:25
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:24
 msgid "Some system-wide dependencies are needed."
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:28
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:27
 msgid "For macOS"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:30
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:29
 msgid ""
 "Install `homebrew <https://brew.sh/>`_. Don't forget the post-"
 "installation actions to add `brew` to your PATH."
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:32
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:31
 msgid ""
 "Install `xz` (to install different Python versions) and `pandoc` to build"
 " the docs:"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:39
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:38
 msgid "For Ubuntu"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:41
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:40
 msgid ""
 "Ensure you system (Ubuntu 22.04+) is up-to-date, and you have all "
 "necessary packages:"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:50
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:49
 msgid "Create Flower Dev Environment"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:52
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:51
 msgid ""
 "Clone the `Flower repository <https://github.com/flwrlabs/flower>`_ from "
 "GitHub:"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:59
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:58
 msgid ""
-"Create and activate a Python virtual environment for development. See "
-"`Set up a virtual env <contributor-how-to-set-up-a-virtual-env.rst>`_ for"
-" detailed instructions."
+"Install uv by following the `uv installation instructions "
+"<https://docs.astral.sh/uv/getting-started/installation/>`_."
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:63
-msgid ""
-"One way to do this is by using `pyenv <https://github.com/pyenv/pyenv>`_ "
-"and `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_. You "
-"can also optionally install a specific Python version using pyenv if you "
-"haven't already installed your desired version:"
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:60
+msgid "Bootstrap the framework development environment:"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:74
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:66
 msgid ""
-"Install ``uv``, which is used to manage dependencies and development "
-"workflows."
+"The bootstrap script creates ``framework/.venv`` using the Python version"
+" pinned by the repository. Pass a Python version as the first argument to"
+" use a different one:"
 msgstr ""
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:75
-msgid ""
-"Navigate to the ``framework`` directory and install the Flower project in"
-" development mode, including all optional dependencies:"
-msgstr ""
-
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:85
 msgid "Convenience Scripts"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:87
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:77
 msgid ""
 "The Flower repository contains a number of convenience scripts to make "
 "recurring development tasks easier and less error-prone. See the ``/dev``"
@@ -2257,23 +2231,23 @@ msgid ""
 " important ones:"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:92
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:82
 msgid "Compile ProtoBuf Definitions"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:99
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:89
 msgid "Auto-Format Code"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:106
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:96
 msgid "Run Linters and Tests"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:113
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:103
 msgid "Add a pre-commit hook"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:115
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:105
 msgid ""
 "Developers may integrate a pre-commit hook into their workflow utilizing "
 "the `pre-commit <https://pre-commit.com/#install>`_ library. The pre-"
@@ -2281,44 +2255,44 @@ msgid ""
 "``./framework/dev/format.sh`` and ``./framework/dev/test.sh`` scripts."
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:120
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:110
 msgid "There are multiple ways developers can use this:"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:122
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:112
 msgid "Install the pre-commit hook to your local git directory by simply running:"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:128
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:118
 msgid ""
 "Each ``git commit`` will trigger the execution of formatting and "
 "linting/test scripts."
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:130
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:120
 msgid ""
 "If in a hurry, bypass the hook using ``--no-verify`` with the ``git "
 "commit`` command."
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:137
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:127
 msgid ""
 "For developers who prefer not to install the hook permanently, it is "
 "possible to execute a one-time check prior to committing changes by using"
 " the following command:"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:144
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:134
 msgid ""
 "This executes the formatting and linting checks/tests on all the files "
 "without modifying the default behavior of ``git commit``."
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:148
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:138
 msgid "Run Github Actions (CI) locally"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:150
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:140
 msgid ""
 "Developers could run the full set of Github Actions workflows under their"
 " local environment by using `Act <https://github.com/nektos/act>`_. "
@@ -2326,43 +2300,43 @@ msgid ""
 " and run the next command under Flower main cloned repository folder:"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:159
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:149
 msgid ""
 "The Flower default workflow would run by setting up the required Docker "
 "machines underneath."
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:164
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:154
 msgid "Build Release"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:166
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:156
 msgid ""
 "Flower uses ``uv`` to build releases. The necessary command is wrapped in"
 " a simple script:"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:173
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:163
 msgid ""
 "The resulting ``.whl`` and ``.tar.gz`` releases will be stored in the "
 "``./framework/dist`` subdirectory."
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:178
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:168
 msgid "Build Documentation"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:180
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:170
 msgid ""
 "Flower's documentation uses `Sphinx <https://www.sphinx-doc.org/>`_. To "
 "build the documentation locally, run the following script:"
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:187
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:177
 msgid "This will generate HTML documentation in ``./framework/doc/build/html``."
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:189
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:179
 msgid ""
 "Note that, in order to build the documentation locally, `Pandoc "
 "<https://pandoc.org/installing.html>`_ needs to be installed on the "
@@ -14240,8 +14214,8 @@ msgstr ""
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:34
 msgid ""
-"uv: update the ``flwr`` dependency in ``pyproject.toml`` and then "
-"reinstall with ``uv sync``."
+"uv: update the ``flwr`` dependency in ``pyproject.toml`` and then sync "
+"the environment with ``uv sync``."
 msgstr ""
 
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:37
@@ -16699,114 +16673,104 @@ msgstr ""
 msgid "Classes"
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 msgid ":py:obj:`Array <flwr.app.Array>`\\ \\(\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.common.record.array.Array:1 of
 msgid "Array type."
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 msgid ":py:obj:`ArrayRecord <flwr.app.ArrayRecord>`\\ \\(\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.common.record.arrayrecord.ArrayRecord:1 of
 msgid "Array record."
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 msgid ""
 ":py:obj:`ConfigRecord <flwr.app.ConfigRecord>`\\ \\(\\[config\\_dict\\, "
 "keep\\_input\\]\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.common.record.configrecord.ConfigRecord:1 of
 msgid "Config record."
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 msgid ""
 ":py:obj:`Context <flwr.app.Context>`\\ \\(run\\_id\\, node\\_id\\, "
 "node\\_config\\, state\\, ...\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.common.context.Context:1 of
 msgid "Context of your run."
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 msgid ":py:obj:`Error <flwr.app.Error>`\\ \\(code\\[\\, reason\\]\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1 flwr.app.error.Error:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1 flwr.app.error.Error:1
 #: of
 msgid "The class storing information about an error that occurred."
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 msgid ":py:obj:`Message <flwr.app.Message>`\\ \\(\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.common.message.Message:1 of
 msgid "Represents a message exchanged between ClientApp and ServerApp."
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 msgid ":py:obj:`MessageType <flwr.app.MessageType>`\\ \\(\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.app.message_type.MessageType:1 of
 msgid "Message type."
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 msgid ""
 ":py:obj:`Metadata <flwr.app.Metadata>`\\ \\(run\\_id\\, message\\_id\\, "
 "src\\_node\\_id\\, ...\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.app.metadata.Metadata:1 of
 msgid "The class representing metadata associated with the current message."
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 msgid ""
 ":py:obj:`MetricRecord <flwr.app.MetricRecord>`\\ \\(\\[metric\\_dict\\, "
 "keep\\_input\\]\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.common.record.metricrecord.MetricRecord:1 of
 msgid "Metric record."
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 msgid ""
 ":py:obj:`RecordDict <flwr.app.RecordDict>`\\ \\(\\[records\\, "
 "parameters\\_records\\, ...\\]\\)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.common.record.recorddict.RecordDict:1 of
 msgid "RecordDict stores groups of arrays, metrics and configs."
-msgstr ""
-
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
-msgid ":py:obj:`UserConfig <flwr.app.UserConfig>`\\"
-msgstr ""
-
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
-msgid ""
-"alias of :py:class:`dict`\\ [:py:class:`str`, :py:class:`bool` | "
-":py:class:`float` | :py:class:`int` | :py:class:`str`]"
 msgstr ""
 
 #: ../../source/ref-api/flwr.app.Array.rst:2
@@ -18440,10 +18404,6 @@ msgstr ""
 
 #: flwr.app.RecordDict.parameters_records:3 of
 msgid "Use ``array_records`` instead."
-msgstr ""
-
-#: ../../source/ref-api/flwr.app.UserConfig.rst:2
-msgid "UserConfig"
 msgstr ""
 
 #: ../../source/ref-api/flwr.clientapp.rst:2
@@ -76394,3 +76354,170 @@ msgstr ""
 #~ " the global model NumPy arrays using"
 #~ " ``np.savez()`` as shown above."
 #~ msgstr ""
+
+#~ msgid ""
+#~ "Install a ``flwr`` pre-release from "
+#~ "PyPI: update the ``flwr`` dependency in"
+#~ " ``pyproject.toml`` and then reinstall with"
+#~ " ``uv sync``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``flwr = { version = \"1.0.0a0\", "
+#~ "allow-prereleases = true }`` (without "
+#~ "extras)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``flwr = { version = \"1.0.0a0\", "
+#~ "allow-prereleases = true, extras = "
+#~ "[\"simulation\"] }`` (with extras)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Install ``flwr`` from a local copy "
+#~ "of the Flower source code via "
+#~ "``pyproject.toml``:"
+#~ msgstr ""
+
+#~ msgid "``flwr = { path = \"../../\", develop = true }`` (without extras)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``flwr = { path = \"../../\", "
+#~ "develop = true, extras = "
+#~ "[\"simulation\"] }`` (with extras)"
+#~ msgstr ""
+
+#~ msgid "Install ``flwr`` from a local wheel file via ``pyproject.toml``:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``flwr = { path = "
+#~ "\"../../dist/flwr-1.8.0-py3-none-any.whl\" }`` "
+#~ "(without extras)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``flwr = { path = "
+#~ "\"../../dist/flwr-1.8.0-py3-none-any.whl\", extras ="
+#~ " [\"simulation\"] }`` (with extras)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "It is recommended to run your "
+#~ "Python setup within a virtual "
+#~ "environment. This guide shows three "
+#~ "different examples how to create a "
+#~ "virtual environment with pyenv virtualenv, "
+#~ "uv, or Anaconda. You can follow "
+#~ "the instructions or choose your "
+#~ "preferred setup."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Flower requires at least `Python 3.10"
+#~ " <https://docs.python.org/3.10/>`_."
+#~ msgstr ""
+
+#~ msgid "Virtualenv with Pyenv/Virtualenv"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "One of the recommended virtual "
+#~ "environment is `pyenv "
+#~ "<https://github.com/pyenv/pyenv>`_/`virtualenv "
+#~ "<https://github.com/pyenv/pyenv-virtualenv>`_. Please "
+#~ "see `Flower examples "
+#~ "<https://github.com/flwrlabs/flower/tree/main/examples/>`_ for"
+#~ " details."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Once Pyenv is set up, you can "
+#~ "use it to install `Python Version "
+#~ "3.10 <https://docs.python.org/3.10/>`_ or above:"
+#~ msgstr ""
+
+#~ msgid "Create the virtualenv with:"
+#~ msgstr ""
+
+#~ msgid "Activate the virtualenv by running the following command:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The Flower examples use `uv "
+#~ "<https://docs.astral.sh/uv/>`_ to manage "
+#~ "dependencies. After installing ``uv`` you "
+#~ "can install dependencies with:"
+#~ msgstr ""
+
+#~ msgid "Virtualenv with Anaconda"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "If you prefer to use Anaconda for"
+#~ " your virtual environment then install "
+#~ "and setup the `conda "
+#~ "<https://docs.conda.io/projects/conda/en/latest/user-"
+#~ "guide/install/index.html>`_ package. After setting"
+#~ " it up you can create a virtual"
+#~ " environment with:"
+#~ msgstr ""
+
+#~ msgid "and activate the virtual environment with:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "(Optional) `pyenv-virtualenv "
+#~ "<https://github.com/pyenv/pyenv-virtualenv>`_"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Create and activate a Python virtual "
+#~ "environment for development. See `Set up"
+#~ " a virtual env <contributor-how-"
+#~ "to-set-up-a-virtual-env.rst>`_ for detailed"
+#~ " instructions."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "One way to do this is by "
+#~ "using `pyenv <https://github.com/pyenv/pyenv>`_ and"
+#~ " `pyenv-virtualenv <https://github.com/pyenv/pyenv-"
+#~ "virtualenv>`_. You can also optionally "
+#~ "install a specific Python version using"
+#~ " pyenv if you haven't already "
+#~ "installed your desired version:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Install ``uv``, which is used to "
+#~ "manage dependencies and development workflows."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Navigate to the ``framework`` directory "
+#~ "and install the Flower project in "
+#~ "development mode, including all optional "
+#~ "dependencies:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "uv: update the ``flwr`` dependency in"
+#~ " ``pyproject.toml`` and then reinstall with"
+#~ " ``uv sync``."
+#~ msgstr ""
+
+#~ msgid ":py:obj:`UserConfig <flwr.app.UserConfig>`\\"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "alias of :py:class:`dict`\\ [:py:class:`str`, "
+#~ ":py:class:`bool` | :py:class:`float` | "
+#~ ":py:class:`int` | :py:class:`str`]"
+#~ msgstr ""
+
+#~ msgid "UserConfig"
+#~ msgstr ""
+
