@@ -95,7 +95,7 @@ class ExecPlugin(ABC):
 
         Returns
         -------
-        LaunchResult | None
+        Optional[LaunchResult]
             The immediate launch outcome, or ``None`` if no launch was attempted.
         """
 
