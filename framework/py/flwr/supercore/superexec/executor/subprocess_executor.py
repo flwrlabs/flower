@@ -39,7 +39,13 @@ class SubprocessExecutor:
                 spec.token,
             ]
         except KeyError:
-            return LaunchResult.failed(f"Unsupported task type: {spec.task_type}")
+            supported_task_types = ", ".join(
+                task_type.value for task_type in TASK_TYPE_TO_COMMAND
+            )
+            return LaunchResult.failed(
+                f"Unsupported task type: {spec.task_type.value}. "
+                f"Supported task types: {supported_task_types}"
+            )
 
         if spec.insecure:
             args.append("--insecure")
