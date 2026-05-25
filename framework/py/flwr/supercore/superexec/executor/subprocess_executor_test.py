@@ -42,6 +42,16 @@ def _execution_spec(**overrides: Any) -> ExecutionSpec:
     return ExecutionSpec(**base)
 
 
+def test_wait_for_capacity_is_noop() -> None:
+    """Test subprocess executor does not block or launch while waiting for capacity."""
+    popen_mock = Mock()
+
+    with patch.object(subprocess, "Popen", popen_mock):
+        SubprocessExecutor().wait_for_capacity()
+
+    popen_mock.assert_not_called()
+
+
 def test_launch_renders_insecure_clientapp_args() -> None:
     """Test subprocess executor renders insecure ClientApp args."""
     with patch.object(subprocess, "Popen") as popen_mock:
