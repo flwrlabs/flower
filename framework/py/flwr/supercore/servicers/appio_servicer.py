@@ -127,10 +127,10 @@ class AppIoServicer(ABC):
         """Push a task message."""
         log(DEBUG, "AppIoServicer.PushTaskMessage")
 
-        message_proto = request.message
-        metadata_proto = message_proto.metadata
         task = get_authenticated_task()
-        if metadata_proto.src_task_id != task.task_id:
+
+        message_proto = request.message
+        if message_proto.metadata.src_task_id != task.task_id:
             context.abort(
                 grpc.StatusCode.FAILED_PRECONDITION,
                 "`Message.metadata.src_task_id` does not match the authenticated task.",
