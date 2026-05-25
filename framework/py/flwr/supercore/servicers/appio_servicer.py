@@ -22,6 +22,7 @@ import grpc
 
 from flwr.common.constant import Status
 from flwr.common.logger import log
+from flwr.common.message import MessageInitializationError
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
@@ -127,29 +128,16 @@ class AppIoServicer(ABC):
         """Push a task message."""
         log(DEBUG, "AppIoServicer.PushTaskMessage")
 
-        task = get_authenticated_task()
         message_proto = request.message
         metadata_proto = message_proto.metadata
-        if metadata_proto.run_id != task.run_id:
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION,
-                "`Message.metadata.run_id` does not match the authenticated task.",
-            )
-
+        task = get_authenticated_task()
         if (
-            not metadata_proto.HasField("src_task_id")
-            or metadata_proto.src_task_id != task.task_id
+            metadata_proto.HasField("src_task_id")
+            and metadata_proto.src_task_id != task.task_id
         ):
             context.abort(
                 grpc.StatusCode.FAILED_PRECONDITION,
                 "`Message.metadata.src_task_id` does not match the authenticated task.",
-            )
-
-        if message_proto.HasField("content") == message_proto.HasField("error"):
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION,
-                "Either `Message.content` or `Message.error` must be set, "
-                "but not both.",
             )
 
         message = message_from_proto(message_proto)
