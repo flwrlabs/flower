@@ -131,10 +131,7 @@ class AppIoServicer(ABC):
         message_proto = request.message
         metadata_proto = message_proto.metadata
         task = get_authenticated_task()
-        if (
-            metadata_proto.HasField("src_task_id")
-            and metadata_proto.src_task_id != task.task_id
-        ):
+        if metadata_proto.src_task_id != task.task_id:
             context.abort(
                 grpc.StatusCode.FAILED_PRECONDITION,
                 "`Message.metadata.src_task_id` does not match the authenticated task.",
