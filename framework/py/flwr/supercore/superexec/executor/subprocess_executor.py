@@ -30,22 +30,13 @@ class SubprocessExecutor:
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Start the TaskExecutor process described by the execution spec."""
-        try:
-            args = [
-                TASK_TYPE_TO_COMMAND[spec.task_type],
-                TASK_TYPE_TO_APPIO_API_ADDRESS_ARG[spec.task_type],
-                spec.appio_api_address,
-                "--token",
-                spec.token,
-            ]
-        except KeyError:
-            supported_task_types = ", ".join(
-                task_type.value for task_type in TASK_TYPE_TO_COMMAND
-            )
-            return LaunchResult.failed(
-                f"Unsupported task type: {spec.task_type.value}. "
-                f"Supported task types: {supported_task_types}"
-            )
+        args = [
+            TASK_TYPE_TO_COMMAND[spec.task_type],
+            TASK_TYPE_TO_APPIO_API_ADDRESS_ARG[spec.task_type],
+            spec.appio_api_address,
+            "--token",
+            spec.token,
+        ]
 
         if spec.insecure:
             args.append("--insecure")
@@ -58,17 +49,14 @@ class SubprocessExecutor:
         if spec.runtime_dependency_install:
             args.append("--allow-runtime-dependency-installation")
 
-        try:
-            if spec.suppress_output:
-                subprocess.Popen(  # pylint: disable=consider-using-with
-                    args,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                return LaunchResult.accepted()
+        if spec.suppress_output:
+            subprocess.Popen(  # pylint: disable=consider-using-with
+                args,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return LaunchResult.accepted()
 
-            subprocess.Popen(args)  # pylint: disable=consider-using-with
-        except OSError as exc:
-            return LaunchResult.failed(f"Failed to start TaskExecutor: {exc}")
+        subprocess.Popen(args)  # pylint: disable=consider-using-with
 
         return LaunchResult.accepted()

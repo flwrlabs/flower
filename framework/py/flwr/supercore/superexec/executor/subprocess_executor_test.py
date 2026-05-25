@@ -19,6 +19,8 @@ import subprocess
 from typing import Any
 from unittest.mock import Mock, patch
 
+import pytest
+
 from flwr.supercore.constant import TaskType
 
 from .subprocess_executor import SubprocessExecutor
@@ -152,22 +154,17 @@ def test_launch_does_not_suppress_output_by_default() -> None:
     assert "stderr" not in popen_mock.call_args.kwargs
 
 
-def test_launch_returns_failed_when_subprocess_cannot_start() -> None:
-    """Test subprocess executor returns failed when Popen raises."""
+def test_launch_raises_when_subprocess_cannot_start() -> None:
+    """Test subprocess executor preserves Popen failure semantics."""
     with patch.object(subprocess, "Popen", side_effect=OSError("missing binary")):
-        result = SubprocessExecutor().launch(_execution_spec())
-
-    assert result.status == LaunchResultStatus.FAILED
-    assert result.message == "Failed to start TaskExecutor: missing binary"
+        with pytest.raises(OSError, match="missing binary"):
+            SubprocessExecutor().launch(_execution_spec())
 
 
-def test_launch_returns_failed_for_unsupported_task_type() -> None:
-    """Test subprocess executor returns failed for unsupported task types."""
+def test_launch_raises_for_unsupported_task_type() -> None:
+    """Test subprocess executor preserves unsupported task type failures."""
     with patch.object(subprocess, "Popen") as popen_mock:
-        result = SubprocessExecutor().launch(
-            _execution_spec(task_type=TaskType.AGENT_APP)
-        )
+        with pytest.raises(KeyError):
+            SubprocessExecutor().launch(_execution_spec(task_type=TaskType.AGENT_APP))
 
     popen_mock.assert_not_called()
-    assert result.status == LaunchResultStatus.FAILED
-    assert result.message == f"Unsupported task type: {TaskType.AGENT_APP}"
