@@ -129,14 +129,13 @@ class AppIoServicer(ABC):
 
         task = get_authenticated_task()
 
-        message_proto = request.message
-        if message_proto.metadata.src_task_id != task.task_id:
+        if request.message.metadata.src_task_id != task.task_id:
             context.abort(
                 grpc.StatusCode.FAILED_PRECONDITION,
                 "`Message.metadata.src_task_id` does not match the authenticated task.",
             )
 
-        message = message_from_proto(message_proto)
+        message = message_from_proto(request.message)
 
         state = self.state()
         stored = state.store_task_message(message)
