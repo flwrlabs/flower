@@ -15,6 +15,7 @@
 """Executor types for SuperExec TaskExecutor processes."""
 
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Protocol
 
 from flwr.supercore.constant import TaskType
@@ -34,12 +35,49 @@ class ExecutionSpec:  # pylint: disable=too-many-instance-attributes
     suppress_output: bool
 
 
+class LaunchResultStatus(StrEnum):
+    """Immediate outcome of an executor launch attempt."""
+
+    ACCEPTED = "accepted"
+    CAPACITY_REJECTED = "capacity_rejected"
+    FAILED = "failed"
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True)
+class LaunchResult:
+    """Structured result returned by an executor launch attempt."""
+
+    status: LaunchResultStatus
+    message: str | None = None
+
+    @classmethod
+    def accepted(cls) -> "LaunchResult":
+        """Return a result for a launch accepted by the backend."""
+        return cls(status=LaunchResultStatus.ACCEPTED)
+
+    @classmethod
+    def capacity_rejected(cls, message: str | None = None) -> "LaunchResult":
+        """Return a result for capacity rejection after launch was attempted."""
+        return cls(status=LaunchResultStatus.CAPACITY_REJECTED, message=message)
+
+    @classmethod
+    def failed(cls, message: str | None = None) -> "LaunchResult":
+        """Return a result for a known launch failure."""
+        return cls(status=LaunchResultStatus.FAILED, message=message)
+
+    @classmethod
+    def unknown(cls, message: str | None = None) -> "LaunchResult":
+        """Return a result for an ambiguous launch outcome."""
+        return cls(status=LaunchResultStatus.UNKNOWN, message=message)
+
+
 class Executor(Protocol):
     """SuperExec component that starts TaskExecutor processes from an ExecutionSpec.
 
-    An executor only starts processes; it does not wait, monitor, terminate,
-    reconcile, or report task status.
+    An executor only starts processes and reports the immediate launch outcome;
+    it does not wait, monitor, terminate, reconcile, or report task status.
     """
 
-    def launch(self, spec: ExecutionSpec) -> None:
+    def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Start the TaskExecutor process described by the execution spec."""
