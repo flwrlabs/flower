@@ -234,6 +234,8 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
 
             # If a task was selected, claim it
             if task is not None:
+                executor.wait_for_capacity()
+
                 claim_req = ClaimTaskRequest(task_id=task.task_id)
                 claim_res = stub.ClaimTask(claim_req)
 
