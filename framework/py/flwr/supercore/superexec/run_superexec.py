@@ -93,7 +93,7 @@ def _handle_launch_result(result: LaunchResult, task: Task) -> None:
 
     raise RuntimeError(
         f"Executor returned unrecognized launch result '{result.status}' "
-        f"for task_id {task.task_id}: {message}"
+        f"for task_id {task.task_id}. Reason: {message}"
     )
 
 
