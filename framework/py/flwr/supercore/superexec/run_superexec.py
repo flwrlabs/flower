@@ -250,7 +250,15 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
                         plugin.cleanup_before_launch = cleanup_auth_secret
 
                     launch_result = plugin.launch_task(token=claim_res.token, task=task)
-                    _handle_launch_result(launch_result, task)
+                    if isinstance(launch_result, LaunchResult):
+                        _handle_launch_result(launch_result, task)
+                    else:
+                        log(
+                            WARNING,
+                            "SuperExec plugin did not return a launch result for "
+                            "task_id %d. Existing task expiry handling will apply.",
+                            task.task_id,
+                        )
 
             # Sleep for a while before checking again
             time.sleep(1)
