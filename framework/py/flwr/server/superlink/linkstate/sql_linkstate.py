@@ -18,7 +18,7 @@
 
 import json
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from logging import ERROR, WARNING
 from typing import Any, Literal
 
@@ -85,11 +85,6 @@ PRIMARY_TASK_STATUS_CONDITIONS = {
 
 class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     """SQLAlchemy-based LinkState implementation."""
-
-    @property
-    def select_lock_sql(self) -> str:
-        """Return the SQL clause for row-locking, which is overridable by subclasses."""
-        return ""
 
     def __init__(
         self,
@@ -828,7 +823,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 "offline": NodeStatus.OFFLINE,
                 # Convert epoch seconds to a UTC ISO-8601 string
                 "last_deactivated_at": datetime.fromtimestamp(
-                    row["online_until"], tz=timezone.utc
+                    row["online_until"], tz=UTC
                 ).isoformat(),
                 "node_id": row["node_id"],
                 "online": NodeStatus.ONLINE,

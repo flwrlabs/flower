@@ -23,9 +23,7 @@ from collections.abc import (
     MutableMapping,
     ValuesView,
 )
-from typing import Generic, TypeVar, cast
-
-from typing_extensions import Self
+from typing import Generic, Self, TypeVar, cast
 
 K = TypeVar("K")  # Key type
 V = TypeVar("V")  # Value type
