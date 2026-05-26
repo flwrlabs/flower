@@ -16,6 +16,7 @@
 
 
 import time
+from logging import ERROR, WARNING
 from typing import Any
 
 import grpc
@@ -23,6 +24,7 @@ import grpc
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
+from flwr.common.logger import log
 from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.common.serde import run_from_proto
 from flwr.common.telemetry import EventType
@@ -34,6 +36,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import ExecutorType
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
@@ -47,9 +50,56 @@ from flwr.supercore.interceptors.superexec_auth_interceptor import (
 )
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
-from .executor import get_executor
+from .executor import LaunchResult, LaunchResultStatus, get_executor
 from .plugin import ExecPlugin
 from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
+
+
+def _handle_launch_result(result: LaunchResult | None, task: Task) -> None:
+    """Handle the immediate outcome of a TaskExecutor launch attempt."""
+    # Temporary: ephemeral plugins may not return a LaunchResult.
+    # Remove this once ephemeral plugins are removed.
+    if result is None:
+        return
+
+    if result.status == LaunchResultStatus.ACCEPTED:
+        return
+
+    message = result.message or "Not provided by executor."
+    if result.status == LaunchResultStatus.CAPACITY_REJECTED:
+        log(
+            WARNING,
+            "Executor rejected launch for task_id %d due to capacity. Reason: %s "
+            "Existing task expiry handling will apply.",
+            task.task_id,
+            message,
+        )
+        return
+
+    if result.status == LaunchResultStatus.FAILED:
+        log(
+            ERROR,
+            "Executor failed to launch task_id %d. Reason: %s "
+            "Existing task expiry handling will apply.",
+            task.task_id,
+            message,
+        )
+        return
+
+    if result.status == LaunchResultStatus.UNKNOWN:
+        log(
+            WARNING,
+            "Executor launch outcome is unknown for task_id %d. Reason: %s "
+            "Existing task expiry handling will apply.",
+            task.task_id,
+            message,
+        )
+        return
+
+    raise RuntimeError(
+        f"Executor returned unrecognized launch result '{result.status}' "
+        f"for task_id {task.task_id}. Reason: {message}"
+    )
 
 
 def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
@@ -204,7 +254,8 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
 
                         plugin.cleanup_before_launch = cleanup_auth_secret
 
-                    plugin.launch_task(token=claim_res.token, task=task)
+                    launch_result = plugin.launch_task(token=claim_res.token, task=task)
+                    _handle_launch_result(launch_result, task)
 
             # Sleep for a while before checking again
             time.sleep(1)

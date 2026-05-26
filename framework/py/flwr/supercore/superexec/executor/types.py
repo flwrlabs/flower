@@ -14,6 +14,9 @@
 # ==============================================================================
 """Executor types for SuperExec TaskExecutor processes."""
 
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
@@ -52,22 +55,22 @@ class LaunchResult:
     message: str | None = None
 
     @classmethod
-    def accepted(cls) -> "LaunchResult":
+    def accepted(cls) -> LaunchResult:
         """Return a result for a launch accepted by the backend."""
         return cls(status=LaunchResultStatus.ACCEPTED)
 
     @classmethod
-    def capacity_rejected(cls, message: str | None = None) -> "LaunchResult":
+    def capacity_rejected(cls, message: str | None = None) -> LaunchResult:
         """Return a result for capacity rejection after launch was attempted."""
         return cls(status=LaunchResultStatus.CAPACITY_REJECTED, message=message)
 
     @classmethod
-    def failed(cls, message: str | None = None) -> "LaunchResult":
+    def failed(cls, message: str | None = None) -> LaunchResult:
         """Return a result for a known launch failure."""
         return cls(status=LaunchResultStatus.FAILED, message=message)
 
     @classmethod
-    def unknown(cls, message: str | None = None) -> "LaunchResult":
+    def unknown(cls, message: str | None = None) -> LaunchResult:
         """Return a result for an ambiguous launch outcome."""
         return cls(status=LaunchResultStatus.UNKNOWN, message=message)
 
