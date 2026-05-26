@@ -97,6 +97,20 @@ def _handle_launch_result(result: LaunchResult, task: Task) -> None:
     )
 
 
+def _handle_plugin_launch_result(launch_result: object, task: Task) -> None:
+    """Handle launch results returned by plugins."""
+    if isinstance(launch_result, LaunchResult):
+        _handle_launch_result(launch_result, task)
+        return
+
+    log(
+        WARNING,
+        "SuperExec plugin did not return a launch result for "
+        "task_id %d. Existing task expiry handling will apply.",
+        task.task_id,
+    )
+
+
 def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
     plugin_class: type[ExecPlugin],
     stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
@@ -250,15 +264,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
                         plugin.cleanup_before_launch = cleanup_auth_secret
 
                     launch_result = plugin.launch_task(token=claim_res.token, task=task)
-                    if isinstance(launch_result, LaunchResult):
-                        _handle_launch_result(launch_result, task)
-                    else:
-                        log(
-                            WARNING,
-                            "SuperExec plugin did not return a launch result for "
-                            "task_id %d. Existing task expiry handling will apply.",
-                            task.task_id,
-                        )
+                    _handle_plugin_launch_result(launch_result, task)
 
             # Sleep for a while before checking again
             time.sleep(1)
