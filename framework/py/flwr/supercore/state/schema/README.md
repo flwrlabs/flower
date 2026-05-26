@@ -126,7 +126,6 @@ erDiagram
     BIGINT item_index
     VARCHAR item_json
     VARCHAR item_ref "nullable"
-    VARCHAR item_type
     VARCHAR parent_item_ref "nullable"
     BIGINT run_id "nullable"
     BIGINT task_id "nullable"

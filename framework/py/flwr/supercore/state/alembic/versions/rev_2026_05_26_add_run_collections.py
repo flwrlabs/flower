@@ -63,7 +63,6 @@ def upgrade() -> None:
         sa.Column("collection_id", sa.String(), nullable=False),
         sa.Column("flwr_aid", sa.String(), nullable=False),
         sa.Column("item_index", sa.BigInteger(), nullable=False),
-        sa.Column("item_type", sa.String(), nullable=False),
         sa.Column("item_json", sa.String(), nullable=False),
         sa.Column("created_at", sa.Float(), nullable=False),
         sa.Column("run_id", sa.BigInteger(), nullable=True),

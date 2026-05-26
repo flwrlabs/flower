@@ -184,7 +184,6 @@ def create_linkstate_metadata() -> MetaData:
         Column("collection_id", String, nullable=False),
         Column("flwr_aid", String, nullable=False),
         Column("item_index", BigInteger, nullable=False),
-        Column("item_type", String, nullable=False),
         Column("item_json", String, nullable=False),
         Column("created_at", Float, nullable=False),
         Column("run_id", BigInteger, nullable=True),
