@@ -161,8 +161,8 @@ see how we can evaluate the aggregated model parameters on the server side.
 To do so, we use the ``global_evaluate`` function defined in ``server_app.py``. This
 function is a callback that will be passed to the |strategy_start_link|_ method of our
 strategy. This means that the strategy will call this function after every round of
-federated learning passing two arguments: the current round of federated learning and the
-aggregated model parameters.
+federated learning passing two arguments: the current round of federated learning and
+the aggregated model parameters.
 
 Our ``global_evaluate`` function performs the following steps:
 
@@ -196,8 +196,8 @@ Our ``global_evaluate`` function performs the following steps:
 
 Remember we mentioned this ``global_evaluate`` will be called by the strategy. To do so
 we need to pass it to the strategy's ``start`` method as shown below. The quickstart app
-already does this, so make sure this part remains in ``server_app.py`` after switching to
-``FedAdagrad``.
+already does this, so make sure this part remains in ``server_app.py`` after switching
+to ``FedAdagrad``.
 
 .. code-block:: python
     :emphasize-lines: 12
@@ -281,7 +281,24 @@ see how this looks in code. Create a new file called ``custom_strategy.py`` in t
             return super().configure_train(server_round, arrays, config, grid)
 
 Next, we use this new strategy in our ``ServerApp`` by importing it in your
-``server_app.py`` and use it instead of the standard ``FedAdagrad``.
+``server_app.py`` and using it instead of the standard ``FedAdagrad``:
+
+.. code-block:: python
+    :emphasize-lines: 1,11
+
+    from pytorchexample.custom_strategy import CustomFedAdagrad
+
+
+    @app.main()
+    def main(grid: Grid, context: Context) -> None:
+        """Main entry point for the ServerApp."""
+
+        # ... unchanged
+
+        # Initialize custom FedAdagrad strategy
+        strategy = CustomFedAdagrad(fraction_evaluate=fraction_evaluate)
+
+        # ... rest unchanged
 
 Run locally again, this time increasing the number of rounds to 15 to see the learning
 rate decay in action.

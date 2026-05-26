@@ -354,8 +354,8 @@ After starting the run you will notice two things:
    can visualize the metrics logged during the run.
 
 Congratulations! You've successfully created a custom Flower strategy by overriding the
-|strategy_start_link|_ method. You've also learned how to log metrics to Weights & Biases
-and how to save model checkpoints to disk.
+|strategy_start_link|_ method. You've also learned how to log metrics to Weights &
+Biases and how to save model checkpoints to disk.
 
 *******
  Recap

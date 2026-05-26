@@ -200,6 +200,9 @@ serialize it to bytes. In this case, we can use the ``pickle`` module from the P
 standard library. We can then send the serialized object in a ``ConfigRecord`` in the
 ``Message`` reply. Let's see how this would look like in code:
 
+The example below focuses on the additional metadata logic; keep the model and data
+setup from your existing ``train`` function unchanged.
+
 .. warning::
 
     The following code is for demonstration purposes only. In real-world applications,
@@ -219,15 +222,14 @@ standard library. We can then send the serialized object in a ``ConfigRecord`` i
         """Train the model on local data."""
 
         # ... prepare model, load data, train locally
-        # The train function returns a TrainProcessMetadata object
-        train_metadata = train_fn(...)
-        # For example:
-
-        # TrainProcessMetadata(
-        #     training_time=123.45,
-        #     converged=True,
-        #     training_losses={"epoch1": 0.56, "epoch2": 0.34}
-        # )
+        # The train function returns the training loss
+        train_loss = train_fn(...)
+        # Construct a TrainProcessMetadata object
+        train_metadata = TrainProcessMetadata(
+            training_time=time.time() - start_time,
+            converged=True,
+            training_losses={"final": train_loss},
+        )
 
         # Serialize the TrainProcessMetadata object to bytes
         train_meta_bytes = pickle.dumps(train_metadata)
