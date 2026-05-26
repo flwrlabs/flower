@@ -16,11 +16,13 @@
 
 from .factory import get_executor
 from .subprocess_executor import SubprocessExecutor
-from .types import ExecutionSpec, Executor
+from .types import ExecutionSpec, Executor, LaunchResult, LaunchResultStatus
 
 __all__ = [
     "ExecutionSpec",
     "Executor",
+    "LaunchResult",
+    "LaunchResultStatus",
     "SubprocessExecutor",
     "get_executor",
 ]

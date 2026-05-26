@@ -22,13 +22,13 @@ from flwr.supercore.constant import (
     TASK_TYPE_TO_COMMAND,
 )
 
-from .types import ExecutionSpec
+from .types import ExecutionSpec, LaunchResult
 
 
 class SubprocessExecutor:
     """Run TaskExecutor processes as local subprocesses."""
 
-    def launch(self, spec: ExecutionSpec) -> None:
+    def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Start the TaskExecutor process described by the execution spec."""
         args = [
             TASK_TYPE_TO_COMMAND[spec.task_type],
@@ -55,6 +55,8 @@ class SubprocessExecutor:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            return
+            return LaunchResult.accepted()
 
         subprocess.Popen(args)  # pylint: disable=consider-using-with
+
+        return LaunchResult.accepted()
