@@ -264,6 +264,52 @@ data that the SuperNode it runs on (e.g. an edge device, a server in a data cent
 laptop) has access to. In this tutorial such action is to train and evaluate the small
 CNN model defined earlier using the local training and validation data.
 
+Loading the data
+----------------
+
+This app trains a small convolutional neural network on CIFAR-10. Since the tutorial
+uses the Simulation Runtime, all data starts from one centralized dataset and is split
+into partitions, one for each simulated SuperNode.
+
+The ``load_data()`` function in ``task.py`` uses `Flower Datasets
+<https://flower.ai/docs/datasets/>`_ to load one partition, split it into training and
+validation data, apply the PyTorch transforms, and return two ``DataLoader`` objects:
+
+.. code-block:: python
+
+    def load_data(partition_id: int, num_partitions: int, batch_size: int):
+        """Load partition CIFAR10 data."""
+        # Only initialize `FederatedDataset` once
+        global fds
+        if fds is None:
+            partitioner = IidPartitioner(num_partitions=num_partitions)
+            fds = FederatedDataset(
+                dataset="uoft-cs/cifar10",
+                partitioners={"train": partitioner},
+            )
+        partition = fds.load_partition(partition_id)
+        # Divide data on each SuperNode: 80% train, 20% test
+        partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
+        pytorch_transforms = Compose(
+            [ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+        )
+
+        def apply_transforms(batch):
+            """Apply transforms to the partition from FederatedDataset."""
+            batch["img"] = [pytorch_transforms(img) for img in batch["img"]]
+            return batch
+
+        partition_train_test = partition_train_test.with_transform(apply_transforms)
+        trainloader = DataLoader(
+            partition_train_test["train"], batch_size=batch_size, shuffle=True
+        )
+        testloader = DataLoader(partition_train_test["test"], batch_size=batch_size)
+        return trainloader, testloader
+
+This partitioning is only needed for simulation. In deployment, each SuperNode would
+usually load its own local data directly, for example from a path provided through
+``--node-config``.
+
 Training
 --------
 
