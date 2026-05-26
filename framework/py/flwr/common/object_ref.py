@@ -94,7 +94,11 @@ def validate(
         sys.path.remove(str(project_dir))
 
     if module and module.origin:
-        if not _find_attribute_in_module(module.origin, attributes_str):
+        # For dotted attributes (e.g. "wrapper.app"), static AST analysis cannot
+        # reliably verify the full chain without importing the module, so only
+        # the first segment is checked against the module's top-level names.
+        root_attribute = attributes_str.split(".")[0]
+        if not _find_attribute_in_module(module.origin, root_attribute):
             return (
                 False,
                 f"Unable to find attribute {attributes_str} in module {module_str}"

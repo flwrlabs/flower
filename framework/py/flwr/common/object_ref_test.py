@@ -196,3 +196,26 @@ def test_load_app_leaves_project_dir_importable(tmp_path: Path) -> None:
     # Assert
     assert str(tmp_path.absolute()) in sys.path
     assert "object_ref_importable_app" in sys.modules
+
+
+def test_validate_dotted_attribute(tmp_path: Path) -> None:
+    """Test that validate accepts a dotted attribute when the root name exists.
+
+    Static AST analysis cannot verify the full attribute chain without importing
+    the module, so only the first segment is checked.
+    """
+    # Prepare: module defines `wrapper`; `wrapper.app` is only resolvable at runtime
+    _write_module(
+        tmp_path,
+        "object_ref_dotted_valid",
+        "class _Wrapper:\n    app = object()\nwrapper = _Wrapper()\n",
+    )
+
+    # Execute
+    is_valid, error = validate(
+        "object_ref_dotted_valid:wrapper.app", project_dir=tmp_path
+    )
+
+    # Assert
+    assert is_valid
+    assert error is None
