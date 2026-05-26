@@ -14,27 +14,20 @@
 
 .. _fedadagrad_link: ref-api/flwr.serverapp.strategy.FedAdagrad.html
 
-Welcome to the third part of the Flower federated learning tutorial. In previous parts
-of this tutorial, we introduced federated learning with PyTorch and the Flower framework
-(:doc:`part 1 <tutorial-series-get-started-with-flower-pytorch>`) and we learned how
-strategies can be used to customize the execution on both the server and the clients
-(:doc:`part 2 <tutorial-series-use-a-federated-learning-strategy-pytorch>`).
+Welcome to the next part of the Flower collaborative AI tutorial!
 
-In this tutorial, we'll continue to customize the federated learning system we built
-previously by creating a much more customized version of ``FedAdagrad``.
+In the previous tutorials, you created a simulated federation on SuperGrid, ran and
+customized Flower Apps, moved from the NumPy demo to the PyTorch quickstart app, and
+then customized that PyTorch app by changing and extending its strategy. In this
+tutorial, you'll go one step further and create a more customized version of
+``FedAdagrad``.
 
 .. tip::
 
     `Star Flower on GitHub <https://github.com/flwrlabs/flower>`__ ⭐️ and join the
-    Flower community on Flower Discuss and the Flower Slack to connect, ask questions,
-    and get help:
-
-    - `Join Flower Discuss <https://discuss.flower.ai/>`__ We'd love to hear from you in
-      the ``Introduction`` topic! If anything is unclear, post in ``Flower Help -
-      Beginners``.
-    - `Join Flower Slack <https://flower.ai/join-slack>`__ We'd love to hear from you in
-      the ``#introductions`` channel! If anything is unclear, head over to the
-      ``#questions`` channel.
+    Flower community on `Flower Discuss <https://discuss.flower.ai/>`__ or `Flower Slack
+    <https://flower.ai/join-slack>`__ to introduce yourself, ask questions, and get
+    help.
 
 Let's build a new ``Strategy`` with a customized |strategy_start_link|_ method that:
 
@@ -45,53 +38,31 @@ Let's build a new ``Strategy`` with a customized |strategy_start_link|_ method t
  Preparation
 *************
 
-Before we begin with the actual code, let's make sure that we have everything we need.
+This tutorial continues from the :doc:`previous tutorial
+<tutorial-series-use-a-federated-learning-strategy-pytorch>`. If you completed it, open
+the existing ``quickstart-pytorch`` directory and continue from there.
 
 Installing dependencies
 =======================
 
-.. note::
-
-    If you've completed part 1 and 2 of the tutorial, you can skip this step. But
-    remember to include ``wandb`` as a dependency in your ``pyproject.toml`` file and
-    install it in your environment.
-
-First, we install the Flower package ``flwr``:
+If you are starting here directly, first create the app as shown in the previous
+tutorial:
 
 .. code-block:: shell
 
-    # In a new Python environment
+    # Install Flower
     $ pip install -U "flwr[simulation]"
-
-Then, run the command below:
-
-.. code-block:: shell
-
+    # Create a new Flower App using the PyTorch quickstart template
     $ flwr new @flwrlabs/quickstart-pytorch
 
-After running it you'll notice a new directory named ``quickstart-pytorch`` has been
-created. It should have the following structure:
-
-.. code-block:: shell
-
-    quickstart-pytorch
-    ├── pytorchexample
-    │   ├── __init__.py
-    │   ├── client_app.py   # Defines your ClientApp
-    │   ├── server_app.py   # Defines your ServerApp
-    │   └── task.py         # Defines your model, training and data loading
-    ├── pyproject.toml      # Project metadata like dependencies and configs
-    └── README.md
-
-Next, add the `wandb` dependency to the project by editing the ``pyproject.toml`` file
-located in the root of the project. Add the following line to the list of dependencies:
+In this tutorial, you'll use Weights & Biases to log strategy metrics. Add ``wandb`` to
+the dependency list in ``pyproject.toml``:
 
 .. code-block:: shell
 
     "wandb>=0.17.8"
 
-Next, we install the project and its dependencies, which are specified in the
-``pyproject.toml`` file:
+Then install the updated project dependencies:
 
 .. code-block:: shell
 
@@ -113,11 +84,11 @@ Next, we install the project and its dependencies, which are specified in the
 **********************************************
 
 Flower strategies have a number of methods that can be overridden to customize their
-behavior. In part 2, you learned how to customize the ``configure_train`` method to
-perform learning rate decay and communicate the updated learning rate as part of the
-|configrecord_link|_ sent to the clients in the ``Message``. In this tutorial you'll
-learn how to customize the |strategy_start_link|_ method. If you inspect the `source
-code
+behavior. In the previous strategy tutorial, you learned how to customize the
+``configure_train`` method to perform learning rate decay and communicate the updated
+learning rate as part of the |configrecord_link|_ sent to the clients in the
+``Message``. In this tutorial you'll learn how to customize the |strategy_start_link|_
+method. If you inspect the `source code
 <https://github.com/flwrlabs/flower/blob/main/framework/py/flwr/serverapp/strategy/strategy.py#L135>`_
 of this method you'll see that it contains a for loop where each iteration represents a
 federated learning round. Each round consists of three distinct stages:
@@ -127,7 +98,7 @@ federated learning round. Each round consists of three distinct stages:
 2. An evaluation stage, where a subset of clients is selected to evaluate the updated
    global model on their local validation sets.
 3. An optional stage to evaluate the global model on the server side. Note that this is
-   what you enabled in part 2 of this tutorial by means of the ``central_evaluate``
+   what you enabled in the previous tutorial by means of the ``global_evaluate``
    callback.
 
 Let's extend the ``CustomFedAdagrad`` strategy we created earlier and introduce:
@@ -137,7 +108,7 @@ Let's extend the ``CustomFedAdagrad`` strategy we created earlier and introduce:
 2. ``set_save_path``: An auxiliary method to set the path where ``wandb`` logs and model
    checkpoints will be saved. This method will be called from the ``server_app.py``
    after instantiating the strategy.
-3. A customized |strategy_start_link|_ method to log metrics to Weight & Biases (`W&B
+3. A customized |strategy_start_link|_ method to log metrics to Weights & Biases (`W&B
    <https://wandb.ai/site>`__) and save the model checkpoints to disk.
 
 .. code-block:: python
@@ -362,14 +333,16 @@ run`` a new directory will be used. Let's see how this looks in code:
 
         # ... rest unchanged
 
-Finally, let's run the ``FlowerApp``:
+Finally, let's run the Flower App locally. This tutorial writes model checkpoints to
+your working directory and logs metrics to Weights & Biases, so a local run makes it
+easy to inspect the outputs.
 
 .. code-block:: shell
 
-    $ flwr run . --stream
+    $ flwr run . local --stream
 
-Plain ``flwr run .`` submits the run, prints the run ID, and returns without streaming
-logs. See :doc:`how-to-run-flower-locally` for the full local workflow.
+Plain ``flwr run . local`` submits the run, prints the run ID, and returns without
+streaming logs. See :doc:`how-to-run-flower-locally` for the full local workflow.
 
 After starting the run you will notice two things:
 
@@ -381,8 +354,8 @@ After starting the run you will notice two things:
    can visualize the metrics logged during the run.
 
 Congratulations! You've successfully created a custom Flower strategy by overriding the
-|strategy_start_link|_ method. You've also learned how to log metrics to Weight & Biases
-and how to save model checkpoints to disk.
+|strategy_start_link|_ method. You've also learned how to log metrics to Weights &
+Biases and how to save model checkpoints to disk.
 
 *******
  Recap
@@ -391,11 +364,10 @@ and how to save model checkpoints to disk.
 In this tutorial, we've seen how to customize the |strategy_start_link|_ method of a
 Flower strategy. This method is the main entry point of any strategy and contains the
 logic to execute the federated learning process. In this tutorial, you learned how to
-log the metrics to Weight & Biases and how to save model checkpoints to disk.
+log the metrics to Weights & Biases and how to save model checkpoints to disk.
 
-In the next tutorial, we're going to cover how to communicate arbitrary Python objects
-between the ``ClientApp`` and the ``ServerApp`` by serializing them and send them in a
-``Message`` as a ``ConfigRecord``.
+In the next tutorial, you'll communicate additional information between the
+``ClientApp`` and the ``ServerApp`` by serializing it and sending it in a ``Message``.
 
 ************
  Next steps
@@ -407,3 +379,7 @@ Flower Discuss <https://discuss.flower.ai>`__) and on Slack (`Join Slack
 
 There's a dedicated ``#questions`` Slack channel if you need help, but we'd also love to
 hear who you are in ``#introductions``!
+
+The :doc:`Flower Collaborative AI Tutorial - Part 6: Communicate custom Messages
+<tutorial-series-customize-the-client-pytorch>` shows how to customize what the
+``ClientApp`` sends back to the ``ServerApp``.
