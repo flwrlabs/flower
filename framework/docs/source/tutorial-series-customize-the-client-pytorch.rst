@@ -224,10 +224,7 @@ setup from your existing ``train`` function unchanged.
 
         # ... prepare model, load data, train locally
         # The train function returns the training loss
-<<<<<<< supergrid-basic-how-tos
-=======
         start_time = time.time()
->>>>>>> main
         train_loss = train_fn(...)
         # Construct a TrainProcessMetadata object
         train_metadata = TrainProcessMetadata(
