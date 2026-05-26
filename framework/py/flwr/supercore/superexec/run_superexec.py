@@ -64,7 +64,7 @@ def _handle_launch_result(result: LaunchResult, task: Task) -> None:
     if result.status == LaunchResultStatus.CAPACITY_REJECTED:
         log(
             WARNING,
-            "Executor rejected launch for task_id %d due to capacity: %s "
+            "Executor rejected launch for task_id %d due to capacity. Reason: %s "
             "Existing task expiry handling will apply.",
             task.task_id,
             message,
