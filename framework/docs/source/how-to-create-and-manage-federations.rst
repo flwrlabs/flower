@@ -22,8 +22,8 @@ SuperGrid supports two federation types:
 
 .. note::
 
-    Deployment federations require SuperGrid access. Contact hello@flower.ai to request
-    access.
+    Deployment federations require deployment access. Contact hello@flower.ai to request
+    it.
 
 All federation members can see runs launched by other members. They can also launch new
 runs in the federation.

@@ -13,9 +13,8 @@ SuperNode can participate in runs submitted to federations that include it.
 .. note::
 
     This guide assumes you already have a Flower account on `flower.ai
-    <https://flower.ai/>`__ and can access SuperGrid. To be able to connect a SuperNode
-    to SuperGrid, you might need to first ask for access. Contact hello@flower.ai to
-    request access.
+    <https://flower.ai/>`__ and can access SuperGrid. Connecting SuperNodes may require
+    additional access. Contact hello@flower.ai to request it.
 
 You will need:
 
@@ -45,7 +44,7 @@ Create a key pair for the first SuperNode:
 This creates two files:
 
 - ``~/.flwr/supernodes/supernode-1``: the private key, used when starting the SuperNode.
-  Never share the private key or upload it anywhere. This key should be only used to
+  Never share the private key or upload it anywhere. This key should only be used to
   start the SuperNode.
 - ``~/.flwr/supernodes/supernode-1.pub``: the public key, used when registering the
   SuperNode in SuperGrid.
@@ -114,7 +113,7 @@ Start the SuperNode:
 
 Keep this process running for as long as you want the SuperNode to remain connected.
 
-Your SuperNode should show as ``online``:
+Your SuperNode should appear as ``online``:
 
 .. image:: ./_static/supernode_is_online.png
     :alt: SuperNodes page showing an online SuperNode
@@ -143,7 +142,7 @@ installing Flower directly in a Python environment.
  Add a SuperNode to a Deployment Federation
 ********************************************
 
-After connecting a SuperNode to SuperGrid, you can add it to any deployment federation
+After registering a SuperNode in SuperGrid, you can add it to any deployment federation
 you are a member of. The SuperNode can then participate in runs launched in that
 federation.
 
