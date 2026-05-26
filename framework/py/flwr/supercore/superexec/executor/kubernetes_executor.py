@@ -155,7 +155,7 @@ def build_taskexecutor_pod(
                 "name": "appio-credentials",
                 "secret": {
                     "secretName": _credential_secret_name(spec),
-                    "defaultMode": 0o400,
+                    "defaultMode": 0o444,
                 },
             }
         ],

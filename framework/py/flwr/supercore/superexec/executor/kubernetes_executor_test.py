@@ -113,7 +113,7 @@ def test_build_taskexecutor_pod_uses_secret_files_for_credentials() -> None:
             "name": "appio-credentials",
             "secret": {
                 "secretName": "flwr-taskexecutor-123-appio",
-                "defaultMode": 0o400,
+                "defaultMode": 0o444,
             },
         }
     ]
