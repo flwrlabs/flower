@@ -159,7 +159,7 @@ def test_run_superexec_logs_non_accepted_launch_result(
     assert log.call_args.args[2] == 123
 
 
-def test_run_superexec_warns_when_plugin_returns_no_launch_result(
+def test_run_superexec_continues_when_plugin_returns_no_launch_result(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """SuperExec should not crash if a plugin returns no launch result."""
@@ -167,10 +167,7 @@ def test_run_superexec_warns_when_plugin_returns_no_launch_result(
 
     stub.ClaimTask.assert_called_once()
     plugin.launch_task.assert_called_once()
-    log.assert_called_once()
-    assert log.call_args.args[0] == WARNING
-    assert "did not return a launch result" in log.call_args.args[1]
-    assert log.call_args.args[2] == 123
+    log.assert_not_called()
 
 
 def test_handle_launch_result_handles_all_statuses() -> None:

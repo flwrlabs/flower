@@ -55,12 +55,17 @@ from .plugin import ExecPlugin
 from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
 
 
-def _handle_launch_result(result: LaunchResult, task: Task) -> None:
+def _handle_launch_result(result: LaunchResult | None, task: Task) -> None:
     """Handle the immediate outcome of a TaskExecutor launch attempt."""
+    # Temporary: ephemeral plugins may not return a LaunchResult.
+    # Remove this once ephemeral plugins are removed.
+    if result is None:
+        return
+
     if result.status == LaunchResultStatus.ACCEPTED:
         return
 
-    message = result.message or "No details provided."
+    message = result.message or "Not provided by executor."
     if result.status == LaunchResultStatus.CAPACITY_REJECTED:
         log(
             WARNING,
@@ -94,20 +99,6 @@ def _handle_launch_result(result: LaunchResult, task: Task) -> None:
     raise RuntimeError(
         f"Executor returned unrecognized launch result '{result.status}' "
         f"for task_id {task.task_id}. Reason: {message}"
-    )
-
-
-def _handle_plugin_launch_result(launch_result: object, task: Task) -> None:
-    """Handle launch results returned by plugins."""
-    if isinstance(launch_result, LaunchResult):
-        _handle_launch_result(launch_result, task)
-        return
-
-    log(
-        WARNING,
-        "SuperExec plugin did not return a launch result for "
-        "task_id %d. Existing task expiry handling will apply.",
-        task.task_id,
     )
 
 
@@ -264,7 +255,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
                         plugin.cleanup_before_launch = cleanup_auth_secret
 
                     launch_result = plugin.launch_task(token=claim_res.token, task=task)
-                    _handle_plugin_launch_result(launch_result, task)
+                    _handle_launch_result(launch_result, task)
 
             # Sleep for a while before checking again
             time.sleep(1)
