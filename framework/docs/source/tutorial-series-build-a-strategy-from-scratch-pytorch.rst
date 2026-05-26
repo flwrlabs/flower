@@ -45,6 +45,16 @@ the existing ``quickstart-pytorch`` directory and continue from there.
 Installing dependencies
 =======================
 
+If you are starting here directly, first create the app as shown in the previous
+tutorial:
+
+.. code-block:: shell
+
+    # Install Flower
+    $ pip install -U "flwr[simulation]"
+    # Create a new Flower App using the PyTorch quickstart template
+    $ flwr new @flwrlabs/quickstart-pytorch
+
 In this tutorial, you'll use Weights & Biases to log strategy metrics. Add ``wandb`` to
 the dependency list in ``pyproject.toml``:
 
@@ -58,16 +68,6 @@ Then install the updated project dependencies:
 
     $ cd quickstart-pytorch
     $ pip install -e .
-
-If you are starting here directly, first create the app as shown in the previous
-tutorial:
-
-.. code-block:: shell
-
-    # Install Flower
-    $ pip install -U "flwr[simulation]"
-    # Create a new Flower App using the PyTorch quickstart template
-    $ flwr new @flwrlabs/quickstart-pytorch
 
 .. note::
 
