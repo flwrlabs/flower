@@ -65,8 +65,8 @@ dependencies = [
 
 [project.optional-dependencies]
 simulation = [
-    "ray==2.51.1; python_version >= '3.11' and python_version < '3.13'",
-    "ray==2.51.1; python_version == '3.13' and sys_platform != 'win32'",
+    "ray==2.55.1; python_version >= '3.11' and python_version < '3.13'",
+    "ray==2.55.1; python_version >= '3.13' and python_version < '3.15' and sys_platform != 'win32'",
 ]
 rest = ["starlette>=0.50.0,<0.51.0", "uvicorn[standard]>=0.40.0,<0.41.0"]
 
