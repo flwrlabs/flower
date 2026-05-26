@@ -318,7 +318,7 @@ object in the ``ClientApp``, you should see output similar to this:
 .. code-block:: console
 
     INFO :      [ROUND 1/3]
-    INFO :      configure_train: Sampled 5 nodes (out of 50)
+    INFO :      configure_train: Sampled 5 SuperNodes (out of 50)
     {'training_time': 123.45, 'converged': True, 'training_losses': {'epoch1': 0.56, 'epoch2': 0.34}}
     {'training_time': 130.67, 'converged': False, 'training_losses': {'epoch1': 0.60, 'epoch2': 0.40}}
     ...

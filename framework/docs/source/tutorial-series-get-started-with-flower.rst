@@ -32,15 +32,15 @@ The only prerequisite for this tutorial is to have an account for SuperGrid. Sig
 *********************
 
 On SuperGrid, all collaborative AI workloads happen within a federation and are run as
-Flower Apps. A federation is a collection of users and their nodes that collaborate
-towards a common goal. For example, you can train an AI model across all nodes in the
-federation, each with its own data. Only members of a federation can run Flower Apps
-across those nodes.
+Flower Apps. A federation is a collection of users and their SuperNodes that collaborate
+towards a common goal. For example, you can train an AI model across all SuperNodes in
+the federation, each with its own data. Only members of a federation can run Flower Apps
+across those SuperNodes.
 
-In this tutorial, you'll create a federation with simulated nodes. This is ideal because
-it lets you get started without registering and connecting real nodes, called SuperNodes
-in Flower terminology. In a future tutorial, you'll learn how to connect real nodes to
-your federation and run apps across them.
+In this tutorial, you'll create a federation with simulated SuperNodes. This is ideal
+because it lets you get started without registering and connecting real SuperNodes. In a
+future tutorial, you'll learn how to connect real SuperNodes to your federation and run
+apps across them.
 
 Go to `the Federations page <https://flower.ai/federations/>`__ and click ``New
 Federation``. Select ``Simulation``, give your federation a name, set it to 10
@@ -72,8 +72,8 @@ With your federation created, you can now run a Flower App across the simulated
 SuperNodes in your federation. First, you need a Flower App. A Flower App is a Python
 project that defines the logic of your collaborative AI workload. More details will be
 covered in the next tutorial, but for now you can think of a Flower App as the code that
-defines what happens on the server (SuperGrid) and client nodes (SuperNodes) during your
-collaborative AI workload.
+defines what happens on the server (SuperGrid) and SuperNodes during your collaborative
+AI workload.
 
 `Flower Hub <https://flower.ai/apps/>`__ is a collection of open-source Flower Apps that
 you can use and learn from. In this tutorial, you'll use the `@flwrlabs/demo
@@ -104,10 +104,10 @@ execution of your app.
     :target: ./_static/run_started_dashboard.png
 
 If you click the ``Logs`` tab, you'll see the logs from the app execution. This demo app
-ran for three rounds and sampled all 10 nodes in each round. In each round, the server
-aggregated different metrics received from the clients. You can see these in the logs
-under the ``'random_metric'`` key. At the end, the logs show the aggregated results from
-all rounds.
+ran for three rounds and sampled all 10 SuperNodes in each round. In each round, the
+server aggregated different metrics received from the clients. You can see these in the
+logs under the ``'random_metric'`` key. At the end, the logs show the aggregated results
+from all rounds.
 
 .. image:: ./_static/run_logs_dashboard.png
     :alt: Logs tab showing logs from the app execution
@@ -120,7 +120,7 @@ all rounds.
 
 Congratulations, you have successfully run your first Flower App on SuperGrid! You've
 taken your first step into the world of collaborative AI with Flower. In this tutorial,
-you created a federation with simulated nodes and ran an existing Flower App across
+you created a federation with simulated SuperNodes and ran an existing Flower App across
 them. You also explored the SuperGrid dashboard to monitor your app's progress and view
 its logs.
 

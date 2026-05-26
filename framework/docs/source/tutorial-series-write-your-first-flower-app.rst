@@ -5,9 +5,9 @@
 Welcome to the second part of the Flower collaborative AI tutorial!
 
 In the previous tutorial, you created your first federation on SuperGrid using the
-simulation runtime. This allowed you to experiment with simulated nodes, run an existing
-Flower App on SuperGrid, and explore the dashboard to follow its progress and view its
-logs.
+simulation runtime. This allowed you to experiment with simulated SuperNodes, run an
+existing Flower App on SuperGrid, and explore the dashboard to follow its progress and
+view its logs.
 
 In this tutorial, you'll pull the `@flwrlabs/demo
 <https://flower.ai/apps/flwrlabs/demo/>`__ app from Flower Hub and run it on SuperGrid
@@ -192,21 +192,21 @@ components of a Flower App are:
   setup, it defines how the run starts, which initial model is used, which strategy
   controls the federated learning process, and how many rounds to execute. A Flower App
   can also be built with a custom strategy or no strategy at all.
-- ``ClientApp``: the code that runs on each client node. It defines what should happen
-  when a node receives instructions from the server side, for example "train this model
-  on your local data" or "evaluate this model on your local data" or, in general, "do x
-  with your local data".
+- ``ClientApp``: the code that runs on each client (SuperNode). It defines what should
+  happen when a SuperNode receives instructions from the server side, for example "train
+  this model on your local data" or "evaluate this model on your local data" or, in
+  general, "do x with your local data".
 - ``pyproject.toml``: the app configuration file. It declares project metadata and
   dependencies, tells Flower where to import the ``ServerApp`` and ``ClientApp`` from,
   and stores run configuration (e.g. hyperparameters) that the app can read at runtime.
 
 In summary, you can think of the ``ServerApp`` as the place where the federated run is
 launched, the ``Strategy`` as the algorithm that coordinates each round, and the
-``ClientApp`` as the code each participating node executes. The ``ServerApp`` and
+``ClientApp`` as the code each participating SuperNode executes. The ``ServerApp`` and
 ``ClientApp`` exchange ``Message`` objects through SuperGrid. Depending on the logic of
 the app, these messages can contain instructions or queries, model parameters, training
 metrics, or any other information that needs to be communicated between the server and
-client nodes during the run.
+SuperNodes during the run.
 
 How the demo app uses these components
 ======================================
@@ -222,7 +222,7 @@ entry point with ``@app.main()``. When a run starts, this function:
    ``quickstart_numpy/task.py``; For simplicity, the model is just a list of a single
    NumPy array, but in a real app it could be a more complex object such as a PyTorch
    model.
-3. wraps the model arrays in an ``ArrayRecord`` so Flower can send them to client nodes;
+3. wraps the model arrays in an ``ArrayRecord`` so Flower can send them to SuperNodes;
 4. creates a ``FedAvg`` strategy;
 5. launches the strategy by calling ``strategy.start()``.
 
@@ -272,7 +272,7 @@ configuration values such as learning rate, batch size, and more.
 
 Congratulations, you have successfully run your first custom Flower App on SuperGrid!
 You have also learned about the main components of a Flower App and how they work
-together to enable collaborative AI workloads across a federation of nodes.
+together to enable collaborative AI workloads across a federation of SuperNodes.
 
 In the next tutorial, you will take a look at a more complex Flower App that uses
 PyTorch and real training and evaluation logic. You will also learn how to run a Flower
