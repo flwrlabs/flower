@@ -20,7 +20,7 @@ from __future__ import annotations
 from logging import WARN
 from typing import cast, get_args
 
-from flwr.common.typing import ConfigRecordValues, ConfigScalar
+from flwr.app.typing import ConfigRecordValues, ConfigScalar
 
 # pylint: disable=E0611
 from flwr.proto.recorddict_pb2 import ConfigRecord as ProtoConfigRecord
@@ -86,8 +86,8 @@ class ConfigRecord(TypedDict[str, ConfigRecordValues], InflatableObject):
     ----------
     config_dict : Optional[Dict[str, ConfigRecordValues]]
         A dictionary that stores basic types (i.e. `str`, `int`, `float`, `bytes` as
-        defined in `ConfigsScalar`) and lists of such types (see
-        `ConfigsScalarList`).
+        defined in `ConfigScalar`) and lists of such types (see
+        `ConfigScalarList`).
     keep_input : bool (default: True)
         A boolean indicating whether config passed should be deleted from the input
         dictionary immediately after adding them to the record. When set
@@ -100,7 +100,7 @@ class ConfigRecord(TypedDict[str, ConfigRecordValues], InflatableObject):
     telling the target node how to perform a certain action (e.g. train/evaluate a model
     ). You can use standard Python built-in types such as :code:`float`, :code:`str`
     , :code:`bytes`. All types allowed are defined in
-    :code:`flwr.common.ConfigRecordValues`. While lists are supported, we
+    :code:`flwr.app.ConfigRecordValues`. While lists are supported, we
     encourage you to use a :code:`ArrayRecord` instead if these are of high
     dimensionality.
 
