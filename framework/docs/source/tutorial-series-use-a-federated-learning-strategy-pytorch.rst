@@ -370,8 +370,8 @@ experimentation:
 
     [tool.flwr.app.config]
     num-server-rounds = 3
-    fraction-train = 0.1  # <-- new
-    fraction-evaluate = 0.2 # <-- updated
+    fraction-train = 0.1     # <-- new
+    fraction-evaluate = 0.2  # <-- updated
     local-epochs = 3
     learning-rate = 0.1
     batch-size = 32
@@ -391,8 +391,8 @@ following:
         strategy = CustomFedAdagrad(
             fraction_train=fraction_train,
             fraction_evaluate=fraction_evaluate,
-            min_train_nodes=5,  # Optional config
-            min_evaluate_nodes=10,  # Optional config
+            min_train_nodes=5,       # Optional config
+            min_evaluate_nodes=10,   # Optional config
             min_available_nodes=50,  # Optional config
         )
 
