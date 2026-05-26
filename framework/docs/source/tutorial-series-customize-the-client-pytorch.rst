@@ -212,9 +212,10 @@ setup from your existing ``train`` function unchanged.
     complex. ``pickle`` is used here solely for simplicity.
 
 .. code-block:: python
-    :emphasize-lines: 1,10,20,22,35
+    :emphasize-lines: 1-2,11,21,23,36
 
     import pickle
+    import time
 
 
     @app.train()
@@ -223,6 +224,10 @@ setup from your existing ``train`` function unchanged.
 
         # ... prepare model, load data, train locally
         # The train function returns the training loss
+<<<<<<< supergrid-basic-how-tos
+=======
+        start_time = time.time()
+>>>>>>> main
         train_loss = train_fn(...)
         # Construct a TrainProcessMetadata object
         train_metadata = TrainProcessMetadata(

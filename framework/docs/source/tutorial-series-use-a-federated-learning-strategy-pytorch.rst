@@ -370,8 +370,8 @@ experimentation:
 
     [tool.flwr.app.config]
     num-server-rounds = 3
-    fraction-train = 0.1  # <-- new
-    fraction-evaluate = 0.2 # <-- updated
+    fraction-train = 0.1     # <-- new
+    fraction-evaluate = 0.2  # <-- updated
     local-epochs = 3
     learning-rate = 0.1
     batch-size = 32

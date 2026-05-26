@@ -45,6 +45,7 @@ the existing ``quickstart-pytorch`` directory and continue from there.
 Installing dependencies
 =======================
 
+<<<<<<< supergrid-basic-how-tos
 In this tutorial, you'll use Weights & Biases to log strategy metrics. Add ``wandb`` to
 the dependency list in ``pyproject.toml``:
 
@@ -53,14 +54,32 @@ the dependency list in ``pyproject.toml``:
     "wandb>=0.17.8"
 
 Then install the updated project dependencies:
+=======
+If you are starting here directly, first create the app as shown in the previous
+tutorial:
+
+.. code-block:: shell
+
+    # Install Flower
+    $ pip install -U "flwr[simulation]"
+    # Create a new Flower App using the PyTorch quickstart template
+    $ flwr new @flwrlabs/quickstart-pytorch
+
+In this tutorial, you'll use Weights & Biases to log strategy metrics. Add ``wandb`` to
+the dependency list in ``pyproject.toml``:
+>>>>>>> main
 
 .. code-block:: shell
 
     $ cd quickstart-pytorch
     $ pip install -e .
 
+<<<<<<< supergrid-basic-how-tos
 If you are starting here directly, first create the app as shown in the previous
 tutorial:
+=======
+Then install the updated project dependencies:
+>>>>>>> main
 
 .. code-block:: shell
 
