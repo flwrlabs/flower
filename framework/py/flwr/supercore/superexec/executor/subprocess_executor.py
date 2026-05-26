@@ -29,7 +29,7 @@ class SubprocessExecutor:
     """Run TaskExecutor processes as local subprocesses."""
 
     def wait_for_capacity(self) -> None:
-        """Block until the executor can accept one default TaskExecutor launch."""
+        """Return immediately because subprocess launches have no capacity gate."""
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Start the TaskExecutor process described by the execution spec."""

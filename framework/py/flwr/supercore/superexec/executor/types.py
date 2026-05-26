@@ -84,7 +84,7 @@ class Executor(Protocol):
     """
 
     def wait_for_capacity(self) -> None:
-        """Block until the executor can accept one default TaskExecutor launch."""
+        """Wait until the executor can accept one TaskExecutor launch."""
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Start the TaskExecutor process described by the execution spec."""
