@@ -108,7 +108,7 @@ Let's extend the ``CustomFedAdagrad`` strategy we created earlier and introduce:
 2. ``set_save_path``: An auxiliary method to set the path where ``wandb`` logs and model
    checkpoints will be saved. This method will be called from the ``server_app.py``
    after instantiating the strategy.
-3. A customized |strategy_start_link|_ method to log metrics to Weight & Biases (`W&B
+3. A customized |strategy_start_link|_ method to log metrics to Weights & Biases (`W&B
    <https://wandb.ai/site>`__) and save the model checkpoints to disk.
 
 .. code-block:: python
@@ -333,7 +333,7 @@ run`` a new directory will be used. Let's see how this looks in code:
 
         # ... rest unchanged
 
-Finally, let's run the ``FlowerApp`` locally. This tutorial writes model checkpoints to
+Finally, let's run the Flower App locally. This tutorial writes model checkpoints to
 your working directory and logs metrics to Weights & Biases, so a local run makes it
 easy to inspect the outputs.
 
@@ -354,7 +354,7 @@ After starting the run you will notice two things:
    can visualize the metrics logged during the run.
 
 Congratulations! You've successfully created a custom Flower strategy by overriding the
-|strategy_start_link|_ method. You've also learned how to log metrics to Weight & Biases
+|strategy_start_link|_ method. You've also learned how to log metrics to Weights & Biases
 and how to save model checkpoints to disk.
 
 *******
@@ -364,7 +364,7 @@ and how to save model checkpoints to disk.
 In this tutorial, we've seen how to customize the |strategy_start_link|_ method of a
 Flower strategy. This method is the main entry point of any strategy and contains the
 logic to execute the federated learning process. In this tutorial, you learned how to
-log the metrics to Weight & Biases and how to save model checkpoints to disk.
+log the metrics to Weights & Biases and how to save model checkpoints to disk.
 
 In the next tutorial, you'll communicate additional information between the
 ``ClientApp`` and the ``ServerApp`` by serializing it and sending it in a ``Message``.

@@ -16,15 +16,15 @@
 
 .. |message_link| replace:: ``Message``
 
-.. _message_link: ref-api/flwr.common.Message.html
+.. _message_link: ref-api/flwr.app.Message.html
 
 .. |metricrecord_link| replace:: ``MetricRecord``
 
-.. _metricrecord_link: ref-api/flwr.common.MetricRecord.html
+.. _metricrecord_link: ref-api/flwr.app.MetricRecord.html
 
 .. |configrecord_link| replace:: ``ConfigRecord``
 
-.. _configrecord_link: ref-api/flwr.common.ConfigRecord.html
+.. _configrecord_link: ref-api/flwr.app.ConfigRecord.html
 
 .. |strategy_start_link| replace:: ``start``
 
@@ -158,16 +158,16 @@ We've seen how federated evaluation works on the client side (i.e., by implement
 function wrapped with the ``@app.evaluate`` decorator in your ``ClientApp``). Now let's
 see how we can evaluate the aggregated model parameters on the server side.
 
-To do so, we need to create a new function in ``task.py`` that we can name
-``global_evaluate``. This function is a callback that will be passed to the
-|strategy_start_link|_ method of our strategy. This means that the strategy will call
-this function after every round of federated learning passing two arguments: the current
-round of federated learning and the aggregated model parameters.
+To do so, we use the ``global_evaluate`` function defined in ``server_app.py``. This
+function is a callback that will be passed to the |strategy_start_link|_ method of our
+strategy. This means that the strategy will call this function after every round of
+federated learning passing two arguments: the current round of federated learning and the
+aggregated model parameters.
 
 Our ``global_evaluate`` function performs the following steps:
 
 1. Load the aggregated model parameters into a PyTorch model
-2. Load the entire CIFAR10 test dataset
+2. Load the entire CIFAR-10 test dataset
 3. Evaluate the model on the test dataset
 4. Return the evaluation metrics as a |metricrecord_link|_
 
@@ -195,13 +195,12 @@ Our ``global_evaluate`` function performs the following steps:
         return MetricRecord({"accuracy": test_acc, "loss": test_loss})
 
 Remember we mentioned this ``global_evaluate`` will be called by the strategy. To do so
-we need to pass it to the strategy's ``start`` method as shown below.
+we need to pass it to the strategy's ``start`` method as shown below. The quickstart app
+already does this, so make sure this part remains in ``server_app.py`` after switching to
+``FedAdagrad``.
 
 .. code-block:: python
-    :emphasize-lines: 1,16
-
-    from pytorchexample.task import global_evaluate
-
+    :emphasize-lines: 12
 
     @app.main()
     def main(grid: Grid, context: Context) -> None:
@@ -243,10 +242,10 @@ Also, at the end of the run, note the ``ServerApp-side Evaluate Metrics`` shown:
 ***************************************************
 
 In some situations, we want to configure client-side execution (training, evaluation)
-from the server side. One example of this is the server asking the clients to train for
-with a different learning rate based on the current round number. Flower provides a way
-to send configuration values from the server to the clients as part of the
-|message_link|_ that the ``ClientApp`` receives. Let's see how we can do this.
+from the server side. One example of this is the server asking the clients to train with
+a different learning rate based on the current round number. Flower provides a way to
+send configuration values from the server to the clients as part of the |message_link|_
+that the ``ClientApp`` receives. Let's see how we can do this.
 
 To the |strategy_start_link|_ method of our strategy we are already passing a
 |configrecord_link|_ specifying the initial learning rate. This ``ConfigRecord`` will be
@@ -257,7 +256,7 @@ and embed such logic.
 
 To do so, we create a new class inheriting from |fedadagrad_link|_ and override the
 ``configure_train`` method. We then use this new strategy in our ``ServerApp``. Let's
-see how this looks like in code. Create a new file called ``custom_strategy.py`` in the
+see how this looks in code. Create a new file called ``custom_strategy.py`` in the
 ``pytorchexample`` directory and add the following code:
 
 .. code-block:: python

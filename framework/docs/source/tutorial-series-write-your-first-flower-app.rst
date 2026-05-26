@@ -123,7 +123,7 @@ reflect in the logs and make it your own!
 
 Now that you have the app running on SuperGrid, you can start customizing it. In this
 tutorial you'll make a small customization to the ``ServerApp`` to print a message
-before the federated learning begins and just before the app exists. Open the ``demo``
+before the federated learning begins and just before the app exits. Open the ``demo``
 directory in your code editor of choice and open the ``quickstart_numpy/server_app.py``.
 Then, add the following two lines to the ``main()`` function:
 
@@ -171,8 +171,8 @@ and open the logs of the new run, you should see the new printed messages from t
     :target: ./_static/run_with_custom_app_logs.png
 
 You did it! You have successfully customized an existing Flower App and run it on
-SuperGrid. So far you have learn about two powerful Flower commands (`flwr new` and
-`flwr run`) that allow you to pull existing apps from the Flower Hub, run them on
+SuperGrid. So far you have learned about two powerful Flower commands (``flwr new`` and
+``flwr run``) that allow you to pull existing apps from the Flower Hub and run them on
 SuperGrid. ``flwr new`` is a great way to get started with a new app that you can
 customize for your needs.
 

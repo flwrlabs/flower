@@ -289,7 +289,7 @@ metrics of interest.
 
 .. code-block:: python
 
-    from flower_tutorial.task import train as train_fn
+    from pytorchexample.task import train as train_fn
 
     # Flower ClientApp
     app = ClientApp()
@@ -353,7 +353,7 @@ typically includes a ``RecordDict`` with two records:
     because strategies such as |fedavg_link|_ used by the ``ServerApp`` rely on this key
     to aggregate both models and metrics by default, unless you override the
     ``weighted_by_key`` argument (for example:
-    ``FedAvg(weighted_by="my-different-key")``).
+    ``FedAvg(weighted_by_key="my-different-key")``).
 
 After constructing the reply ``Message``, the ``ClientApp`` returns it. Flower then
 handles sending the reply back to the server automatically.
@@ -373,7 +373,7 @@ evaluation). Here's how the ``evaluate`` function looks like:
 
 .. code-block:: python
 
-    from flower_tutorial.task import test as test_fn
+    from pytorchexample.task import test as test_fn
 
 
     @app.evaluate()
