@@ -4,11 +4,11 @@
 
 .. |message_link| replace:: ``Message``
 
-.. _message_link: ref-api/flwr.common.Message.html
+.. _message_link: ref-api/flwr.app.Message.html
 
 .. |metricrecord_link| replace:: ``MetricRecord``
 
-.. _metricrecord_link: ref-api/flwr.common.MetricRecord.html
+.. _metricrecord_link: ref-api/flwr.app.MetricRecord.html
 
 .. |configrecord_link| replace:: ``ConfigRecord``
 
@@ -204,9 +204,9 @@ standard library. We can then send the serialized object in a ``ConfigRecord`` i
 
     The following code is for demonstration purposes only. In real-world applications,
     since `pickle <https://docs.python.org/3/library/pickle.html>`_ can execute
-    arbitrary code during unpickling, you should use a **SAFE** serialization method
-    than ``pickle``, such as ``json`` or a simple custom solution if the object is not
-    too complex. ``pickle`` is used here solely for simplicity.
+    arbitrary code during unpickling, you should use a safer serialization method than
+    ``pickle``, such as ``json`` or a simple custom solution if the object is not too
+    complex. ``pickle`` is used here solely for simplicity.
 
 .. code-block:: python
     :emphasize-lines: 1,10,20,22,35

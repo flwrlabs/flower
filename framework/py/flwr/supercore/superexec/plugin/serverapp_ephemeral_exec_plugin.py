@@ -29,7 +29,7 @@ class ServerAppEphemeralExecPlugin(BaseEphemeralExecPlugin):
 
     appio_api_address_arg = "--serverappio-api-address"
 
-    def launch_task(self, token: str, task: Task) -> None:
+    def launch_task(self, token: str, task: Task) -> None:  # type: ignore[override]
         """Launch the process to execute the given task using the given token."""
         # Determine the command to launch based on the task type
         if task.type == TaskType.SERVER_APP:

@@ -137,6 +137,14 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """Get all instruction Message IDs for the given run_id."""
 
     @abc.abstractmethod
+    def stop_run(self, run_id: int) -> bool:
+        """Stop a run and clean up run-scoped messages and objects.
+
+        Returns True if at least one unfinished task in the run transitioned to
+        stopped, otherwise False.
+        """
+
+    @abc.abstractmethod
     def create_node(
         self,
         owner_aid: str,
