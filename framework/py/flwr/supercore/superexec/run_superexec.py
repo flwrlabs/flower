@@ -84,7 +84,7 @@ def _handle_launch_result(result: LaunchResult, task: Task) -> None:
     if result.status == LaunchResultStatus.UNKNOWN:
         log(
             WARNING,
-            "Executor launch outcome is unknown for task_id %d: %s "
+            "Executor launch outcome is unknown for task_id %d. Reason: %s "
             "Existing task expiry handling will apply.",
             task.task_id,
             message,
