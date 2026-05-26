@@ -148,4 +148,66 @@ def create_linkstate_metadata() -> MetaData:
         Column("error", LargeBinary, nullable=True),
     )
 
+    # --------------------------------------------------------------------------
+    #  Table: run_collection
+    # --------------------------------------------------------------------------
+    run_collection = Table(
+        "run_collection",
+        metadata,
+        Column("id", BigInteger, primary_key=True, nullable=False),
+        Column("collection_id", String, nullable=False),
+        Column("flwr_aid", String, nullable=False),
+        Column("title", String, nullable=True),
+        Column("metadata_json", String, nullable=False),
+        Column("created_at", Float, nullable=False),
+        Column("updated_at", Float, nullable=False),
+        Column("last_run_id", BigInteger, nullable=True),
+        UniqueConstraint(
+            "flwr_aid",
+            "collection_id",
+            name="uq_run_collection_flwr_aid_collection_id",
+        ),
+    )
+    Index(
+        "idx_run_collection_flwr_aid_created_at",
+        run_collection.c.flwr_aid,
+        run_collection.c.created_at,
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: run_collection_item
+    # --------------------------------------------------------------------------
+    run_collection_item = Table(
+        "run_collection_item",
+        metadata,
+        Column("id", BigInteger, primary_key=True, nullable=False),
+        Column("collection_id", String, nullable=False),
+        Column("flwr_aid", String, nullable=False),
+        Column("item_index", BigInteger, nullable=False),
+        Column("item_type", String, nullable=False),
+        Column("item_json", String, nullable=False),
+        Column("created_at", Float, nullable=False),
+        Column("run_id", BigInteger, nullable=True),
+        Column("task_id", BigInteger, nullable=True),
+        Column("item_ref", String, nullable=True),
+        Column("parent_item_ref", String, nullable=True),
+        UniqueConstraint(
+            "flwr_aid",
+            "collection_id",
+            "item_index",
+            name="uq_run_collection_item_flwr_aid_collection_id_item_index",
+        ),
+    )
+    Index(
+        "idx_run_collection_item_flwr_aid_collection_id_item_index",
+        run_collection_item.c.flwr_aid,
+        run_collection_item.c.collection_id,
+        run_collection_item.c.item_index,
+    )
+    Index(
+        "idx_run_collection_item_flwr_aid_item_ref",
+        run_collection_item.c.flwr_aid,
+        run_collection_item.c.item_ref,
+    )
+
     return metadata

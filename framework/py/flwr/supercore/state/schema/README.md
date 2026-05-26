@@ -107,6 +107,31 @@ erDiagram
     VARCHAR usage_reported_at
   }
 
+  run_collection {
+    BIGINT id PK
+    VARCHAR collection_id
+    FLOAT created_at
+    VARCHAR flwr_aid
+    BIGINT last_run_id "nullable"
+    VARCHAR metadata_json
+    VARCHAR title "nullable"
+    FLOAT updated_at
+  }
+
+  run_collection_item {
+    BIGINT id PK
+    VARCHAR collection_id
+    FLOAT created_at
+    VARCHAR flwr_aid
+    BIGINT item_index
+    VARCHAR item_json
+    VARCHAR item_ref "nullable"
+    VARCHAR item_type
+    VARCHAR parent_item_ref "nullable"
+    BIGINT run_id "nullable"
+    BIGINT task_id "nullable"
+  }
+
   run_objects {
     VARCHAR object_id PK,FK
     BIGINT run_id PK
