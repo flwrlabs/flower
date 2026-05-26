@@ -43,7 +43,7 @@ class KubernetesClient(Protocol):
 class KubernetesExecutorConfig:
     """Configuration needed to build one TaskExecutor Pod and Secret.
 
-    appio_root_certificates contains PEM data mounted as ca.crt.
+    appio_root_certificates contains optional PEM data mounted as ca.crt.
     """
 
     namespace: str
@@ -134,7 +134,7 @@ def build_taskexecutor_pod(
         "name": "taskexecutor",
         "image": config.image,
         "command": [TASK_TYPE_TO_COMMAND[spec.task_type]],
-        "args": _taskexecutor_args(spec),
+        "args": _taskexecutor_args(spec, config),
         "volumeMounts": [
             {
                 "name": "appio-credentials",
@@ -153,7 +153,10 @@ def build_taskexecutor_pod(
         "volumes": [
             {
                 "name": "appio-credentials",
-                "secret": {"secretName": _credential_secret_name(spec)},
+                "secret": {
+                    "secretName": _credential_secret_name(spec),
+                    "defaultMode": 0o400,
+                },
             }
         ],
     }
@@ -172,7 +175,9 @@ def build_taskexecutor_pod(
     }
 
 
-def _taskexecutor_args(spec: ExecutionSpec) -> list[str]:
+def _taskexecutor_args(
+    spec: ExecutionSpec, config: KubernetesExecutorConfig
+) -> list[str]:
     """Build TaskExecutor arguments with file-based credential delivery."""
     args = [
         TASK_TYPE_TO_APPIO_API_ADDRESS_ARG[spec.task_type],
@@ -183,7 +188,7 @@ def _taskexecutor_args(spec: ExecutionSpec) -> list[str]:
 
     if spec.insecure:
         args.append("--insecure")
-    else:
+    elif config.appio_root_certificates is not None:
         args.extend(["--root-certificates", APPIO_ROOT_CERTIFICATES_FILE_PATH])
 
     if spec.runtime_dependency_install:
@@ -202,11 +207,6 @@ def _validate_kubernetes_spec(
         raise ValueError("Kubernetes executor requires an AppIo API address.")
     if not spec.token.strip():
         raise ValueError("Kubernetes executor requires a task token.")
-    if not spec.insecure and config.appio_root_certificates is None:
-        raise ValueError(
-            "Kubernetes executor requires AppIo root certificates for secure "
-            "connections."
-        )
 
 
 def _pod_name(spec: ExecutionSpec) -> str:

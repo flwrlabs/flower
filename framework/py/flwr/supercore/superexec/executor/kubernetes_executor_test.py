@@ -111,7 +111,10 @@ def test_build_taskexecutor_pod_uses_secret_files_for_credentials() -> None:
     assert pod["spec"]["volumes"] == [
         {
             "name": "appio-credentials",
-            "secret": {"secretName": "flwr-taskexecutor-123-appio"},
+            "secret": {
+                "secretName": "flwr-taskexecutor-123-appio",
+                "defaultMode": 0o400,
+            },
         }
     ]
     assert pod["spec"]["automountServiceAccountToken"] is False
@@ -132,6 +135,22 @@ def test_build_taskexecutor_pod_supports_clientapp_insecure_args() -> None:
         "--token-file",
         APPIO_TOKEN_FILE_PATH,
         "--insecure",
+    ]
+
+
+def test_build_taskexecutor_pod_supports_secure_default_trust_store() -> None:
+    """Test secure Pod args can rely on container default trust store."""
+    config = _executor_config(appio_root_certificates=None)
+
+    secret = build_appio_credentials_secret(_execution_spec(), config)
+    pod = build_taskexecutor_pod(_execution_spec(), config)
+
+    assert secret["stringData"] == {"token": "task-token"}
+    assert pod["spec"]["containers"][0]["args"] == [
+        "--serverappio-api-address",
+        "appio.example.com:9092",
+        "--token-file",
+        APPIO_TOKEN_FILE_PATH,
     ]
 
 
@@ -219,16 +238,12 @@ def test_launch_returns_failed_if_spec_is_invalid() -> None:
     """Test launch returns failed for local spec validation errors."""
     client = Mock()
 
-    result = KubernetesExecutor(
-        client=client,
-        config=_executor_config(appio_root_certificates=None),
-    ).launch(_execution_spec(insecure=False))
+    result = KubernetesExecutor(client=client, config=_executor_config()).launch(
+        _execution_spec(token="")
+    )
 
     assert result.status == LaunchResultStatus.FAILED
-    assert result.message == (
-        "ValueError: Kubernetes executor requires AppIo root certificates "
-        "for secure connections."
-    )
+    assert result.message == "ValueError: Kubernetes executor requires a task token."
     client.create_namespaced_secret.assert_not_called()
     client.create_namespaced_pod.assert_not_called()
 
