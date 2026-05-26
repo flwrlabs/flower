@@ -119,14 +119,14 @@ Before running the app, it helps to know what each file is responsible for:
 
 The important idea is the same as before: the ``ServerApp`` starts the run, ``FedAvg``
 coordinates each federated learning round, and each ``ClientApp`` trains or evaluates
-the model using the data available on its node.
+the model using the data available on its SuperNode.
 
 This app uses `Flower Datasets <https://flower.ai/docs/datasets/>`__ to download
 CIFAR-10 and split it into partitions, one for each simulated client. This is ideal for
 simulations because it lets you experiment with federated learning even when you start
 from a single centralized dataset. In a typical Flower App that runs outside of
 simulation, you usually do not create artificial partitions. Instead, each ``ClientApp``
-loads the data already available on the client node where it runs.
+loads the data already available on the SuperNode where it runs.
 
 **************************
  Run the App on SuperGrid
@@ -212,11 +212,12 @@ The streamed output should include logs similar to this:
 
     INFO :      Starting FedAvg strategy:
     INFO :          ├── Number of rounds: 3
+    INFO :      ...
     INFO :      [ROUND 1/3]
-    INFO :      configure_train: Sampled 5 nodes (out of 10)
+    INFO :      configure_train: Sampled 5 SuperNodes (out of 10)
     INFO :      aggregate_train: Received 5 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'train_loss': 2.149280}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
+    INFO :      configure_evaluate: Sampled 10 SuperNodes (out of 10)
     INFO :      aggregate_evaluate: Received 10 results and 0 failures
     INFO :          └──> Aggregated MetricRecord: {'eval_loss': 2.31319, 'eval_acc': 0.13004}
     INFO :      [ROUND 2/3]
@@ -254,12 +255,12 @@ sends just the gradients back to the server, not the full model parameters).
 Define the Flower ClientApp
 ===========================
 
-Federated learning systems consist of a server and multiple nodes or clients. In Flower,
-we create a |serverapp_link|_ and a |clientapp_link|_ to run the server-side and
+Federated learning systems consist of a server and multiple clients (SuperNodes). In
+Flower, we create a |serverapp_link|_ and a |clientapp_link|_ to run the server-side and
 client-side code, respectively.
 
 The core functionality of the ``ClientApp`` is to perform some action with the local
-data that the node it runs from (e.g. an edge device, a server in a data center, or a
+data that the SuperNode it runs on (e.g. an edge device, a server in a data center, or a
 laptop) has access to. In this tutorial such action is to train and evaluate the small
 CNN model defined earlier using the local training and validation data.
 
@@ -272,7 +273,7 @@ use it to train the model on the local data. The function always expects two arg
 
 - A |message_link|_: The message received from the server. It contains the model
   parameters and any other configuration information sent by the server.
-- A |context_link|_: The context object that contains information about the node
+- A |context_link|_: The context object that contains information about the SuperNode
   executing the ``ClientApp`` and about the current run.
 
 Through the context you can retrieve the config settings defined in the
@@ -329,6 +330,15 @@ metrics of interest.
         metric_record = MetricRecord(metrics)
         content = RecordDict({"arrays": model_record, "metrics": metric_record})
         return Message(content=content, reply_to=msg)
+
+.. note::
+
+    The ``partition-id`` and ``num-partitions`` values shown above are provided by the
+    :doc:`Simulation Runtime <how-to-run-simulations>`. In a deployment setting, the
+    ``ClientApp`` would usually load data that already exists on the SuperNode. For
+    example, you could pass the path to that data when starting the SuperNode with
+    ``--node-config "data-path=/path/to/data"`` and then call ``load_data`` with
+    ``context.node_config["data-path"]``.
 
 Note that the ``train_fn`` is simply an alias name pointing to the train function
 defined earlier in this tutorial (where we defined the PyTorch training loop and
@@ -424,12 +434,12 @@ learning approach/algorithm, for example, *Federated Averaging* (FedAvg). Flower
 number of built-in strategies, but we can also use our own strategy implementations to
 customize nearly all aspects of the federated learning approach. For this tutorial, we
 use the built-in ``FedAvg`` implementation and customize it slightly by specifying the
-fraction of connected nodes to involve in a round of training.
+fraction of connected SuperNodes to involve in a round of training.
 
 To construct a |serverapp_link|_, we define its ``@app.main()`` method. This method
 receives as input arguments:
 
-- a ``Grid`` object that will be used to interface with the nodes running the
+- a ``Grid`` object that will be used to interface with the SuperNodes running the
   ``ClientApp`` to involve them in a round of train/evaluate/query or other.
 - a |context_link|_ object that provides access to the run configuration.
 
@@ -496,8 +506,8 @@ configure the simulation runtime to use 10 clients. Each will run an instance of
 ``ClientApp`` we defined earlier.
 
 The local SuperLink then starts the ``ServerApp`` and asks it to issue instructions to
-those nodes using the ``FedAvg`` strategy. In this example, ``FedAvg`` is configured
-with two key parameters:
+those SuperNodes using the ``FedAvg`` strategy. In this example, ``FedAvg`` is
+configured with two key parameters:
 
 - ``fraction-train=0.5`` → select 50% of the available clients for training
 - ``fraction-evaluate=1.0`` → select 100% of the available clients for evaluation
