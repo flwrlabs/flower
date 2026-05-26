@@ -102,7 +102,7 @@ def _handle_launch_result(result: LaunchResult | None, task: Task) -> None:
     )
 
 
-def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
+def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     plugin_class: type[ExecPlugin],
     stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
     appio_api_address: str,
@@ -234,6 +234,8 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
 
             # If a task was selected, claim it
             if task is not None:
+                executor.wait_for_capacity()
+
                 claim_req = ClaimTaskRequest(task_id=task.task_id)
                 claim_res = stub.ClaimTask(claim_req)
 
