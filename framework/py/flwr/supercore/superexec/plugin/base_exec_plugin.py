@@ -72,11 +72,13 @@ class BaseExecPlugin(ExecPlugin):
             return None
         return candidate_tasks[0]
 
-    def launch_task(self, token: str, task: Task) -> LaunchResult | None:
+    def launch_task(self, token: str, task: Task) -> LaunchResult:
         """Launch the process to execute the given task using the given token."""
         task_type = self._get_supported_task_type(task)
         if task_type is None:
-            return None
+            return LaunchResult.failed(
+                f"Unknown task type '{task.type}' for task_id {task.task_id}."
+            )
         return self.executor.launch(
             self._build_execution_spec(token=token, task_type=task_type)
         )

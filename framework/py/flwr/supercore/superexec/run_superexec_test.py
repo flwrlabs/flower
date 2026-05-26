@@ -25,7 +25,7 @@ from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
     SuperExecAuthClientInterceptor,
 )
-from flwr.supercore.superexec.executor import LaunchResult
+from flwr.supercore.superexec.executor import LaunchResult, LaunchResultStatus
 
 from . import run_superexec as run_superexec_module
 
@@ -53,7 +53,8 @@ def _run_superexec_one_launch(
     monkeypatch.setattr(run_superexec_module, "get_executor", Mock())
     monkeypatch.setattr(run_superexec_module, "log", log)
     monkeypatch.setattr(
-        run_superexec_module.time, "sleep", Mock(side_effect=KeyboardInterrupt())
+        "flwr.supercore.superexec.run_superexec.time.sleep",
+        Mock(side_effect=KeyboardInterrupt()),
     )
 
     with pytest.raises(KeyboardInterrupt):
@@ -156,3 +157,14 @@ def test_run_superexec_logs_non_accepted_launch_result(
     assert log.call_args.args[0] == expected_level
     assert expected_message in log.call_args.args[1]
     assert log.call_args.args[2] == 123
+
+
+def test_handle_launch_result_handles_all_statuses() -> None:
+    """All defined launch result statuses should be handled explicitly."""
+    task = Mock()
+    task.task_id = 123
+
+    for status in LaunchResultStatus:
+        run_superexec_module._handle_launch_result(  # pylint: disable=protected-access
+            LaunchResult(status=status), task
+        )

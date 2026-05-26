@@ -55,9 +55,9 @@ from .plugin import ExecPlugin
 from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
 
 
-def _handle_launch_result(result: LaunchResult | None, task: Task) -> None:
+def _handle_launch_result(result: LaunchResult, task: Task) -> None:
     """Handle the immediate outcome of a TaskExecutor launch attempt."""
-    if result is None or result.status == LaunchResultStatus.ACCEPTED:
+    if result.status == LaunchResultStatus.ACCEPTED:
         return
 
     message = result.message or "No details provided."
@@ -91,13 +91,9 @@ def _handle_launch_result(result: LaunchResult | None, task: Task) -> None:
         )
         return
 
-    log(
-        WARNING,
-        "Executor returned unrecognized launch result '%s' for task_id %d: %s "
-        "Existing task expiry handling will apply.",
-        result.status,
-        task.task_id,
-        message,
+    raise RuntimeError(
+        f"Executor returned unrecognized launch result '{result.status}' "
+        f"for task_id {task.task_id}: {message}"
     )
 
 

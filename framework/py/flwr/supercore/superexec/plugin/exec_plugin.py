@@ -79,7 +79,7 @@ class ExecPlugin(ABC):
         """
 
     @abstractmethod
-    def launch_task(self, token: str, task: Task) -> LaunchResult | None:
+    def launch_task(self, token: str, task: Task) -> LaunchResult:
         """Launch the process to execute the given task using the given token.
 
         This method starts the TaskExecutor process using the given `token`.
@@ -95,8 +95,8 @@ class ExecPlugin(ABC):
 
         Returns
         -------
-        Optional[LaunchResult]
-            The immediate launch outcome, or ``None`` if no launch was attempted.
+        LaunchResult
+            The immediate launch outcome.
         """
 
     # This method is optional to implement
