@@ -15,15 +15,6 @@
 """Public Flower App APIs."""
 
 
-from .constants import DEFAULT_TTL
-from .typing import (
-    ConfigRecordValues,
-    ConfigScalar,
-    ConfigScalarList,
-    MetricRecordValues,
-    MetricScalar,
-    MetricScalarList,
-)
 from flwr.common.context import Context
 from flwr.common.message import Message
 from flwr.common.record import (
@@ -34,9 +25,18 @@ from flwr.common.record import (
     RecordDict,
 )
 
+from .constants import DEFAULT_TTL
 from .error import Error
 from .message_type import MessageType
 from .metadata import Metadata
+from .typing import (
+    ConfigRecordValues,
+    ConfigScalar,
+    ConfigScalarList,
+    MetricRecordValues,
+    MetricScalar,
+    MetricScalarList,
+)
 from .user_config import UserConfig, UserConfigValue
 
 __all__ = [
