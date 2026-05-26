@@ -1,6 +1,6 @@
 [build-system]
-requires = ["poetry-core>=2.1.3"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv-build>=0.11.15,<0.12"]
+build-backend = "uv_build"
 
 [project]
 name = "flwr"
@@ -151,12 +151,10 @@ default-groups = ["dev"]
 [tool.uv.sources]
 devtool = { path = "../dev", editable = true }
 
-[tool.poetry]
-packages = [{ include = "flwr", from = "py" }]
-exclude = ["py/**/*_test.py"]
-
-[tool.poetry.group.dev.dependencies]
-devtool = { path = "../dev", develop = true }
+[tool.uv.build-backend]
+module-name = "flwr"
+module-root = "py"
+source-exclude = ["py/**/*_test.py"]
 
 [tool.devtool.protoc]
 proto_root = "proto"
