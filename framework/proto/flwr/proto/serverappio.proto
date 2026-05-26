@@ -54,6 +54,10 @@ service ServerAppIo {
   // Push task outputs
   rpc PushTaskOutput(PushTaskOutputRequest) returns (PushTaskOutputResponse) {}
 
+  // Push run collection items
+  rpc PushRunCollectionItems(PushRunCollectionItemsRequest)
+      returns (PushRunCollectionItemsResponse) {}
+
   /////////////////////////////////////////////////////////////////////////////
   // Specific endpoints shared by ServerAppIo and ClientAppIo
   /////////////////////////////////////////////////////////////////////////////

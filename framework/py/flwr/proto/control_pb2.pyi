@@ -24,6 +24,7 @@ import flwr.proto.federation_config_pb2
 import flwr.proto.federation_pb2
 import flwr.proto.node_pb2
 import flwr.proto.run_pb2
+import flwr.proto.runcollection_pb2
 import flwr.proto.transport_pb2
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
@@ -59,8 +60,10 @@ class StartRunRequest(google.protobuf.message.Message):
     OVERRIDE_FEDERATION_CONFIG_FIELD_NUMBER: builtins.int
     APP_SPEC_FIELD_NUMBER: builtins.int
     FEDERATION_FIELD_NUMBER: builtins.int
+    COLLECTION_ID_FIELD_NUMBER: builtins.int
     app_spec: builtins.str
     federation: builtins.str
+    collection_id: builtins.str
     @property
     def fab(self) -> flwr.proto.fab_pb2.Fab: ...
     @property
@@ -75,9 +78,11 @@ class StartRunRequest(google.protobuf.message.Message):
         override_federation_config: flwr.proto.federation_config_pb2.SimulationConfig | None = ...,
         app_spec: builtins.str = ...,
         federation: builtins.str = ...,
+        collection_id: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["fab", b"fab", "override_federation_config", b"override_federation_config"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["app_spec", b"app_spec", "fab", b"fab", "federation", b"federation", "override_config", b"override_config", "override_federation_config", b"override_federation_config"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_collection_id", b"_collection_id", "collection_id", b"collection_id", "fab", b"fab", "override_federation_config", b"override_federation_config"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_collection_id", b"_collection_id", "app_spec", b"app_spec", "collection_id", b"collection_id", "fab", b"fab", "federation", b"federation", "override_config", b"override_config", "override_federation_config", b"override_federation_config"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_collection_id", b"_collection_id"]) -> typing.Literal["collection_id"] | None: ...
 
 global___StartRunRequest = StartRunRequest
 
@@ -87,16 +92,21 @@ class StartRunResponse(google.protobuf.message.Message):
 
     RUN_ID_FIELD_NUMBER: builtins.int
     NOTE_FIELD_NUMBER: builtins.int
+    COLLECTION_ID_FIELD_NUMBER: builtins.int
     run_id: builtins.int
     note: builtins.str
+    collection_id: builtins.str
     def __init__(
         self,
         *,
         run_id: builtins.int | None = ...,
         note: builtins.str | None = ...,
+        collection_id: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_note", b"_note", "_run_id", b"_run_id", "note", b"note", "run_id", b"run_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_note", b"_note", "_run_id", b"_run_id", "note", b"note", "run_id", b"run_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_collection_id", b"_collection_id", "_note", b"_note", "_run_id", b"_run_id", "collection_id", b"collection_id", "note", b"note", "run_id", b"run_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_collection_id", b"_collection_id", "_note", b"_note", "_run_id", b"_run_id", "collection_id", b"collection_id", "note", b"note", "run_id", b"run_id"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_collection_id", b"_collection_id"]) -> typing.Literal["collection_id"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_note", b"_note"]) -> typing.Literal["note"] | None: ...
     @typing.overload
@@ -199,6 +209,176 @@ class ListRunsResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["now", b"now", "run_dict", b"run_dict"]) -> None: ...
 
 global___ListRunsResponse = ListRunsResponse
+
+@typing.final
+class ListRunCollectionsRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AFTER_COLLECTION_ID_FIELD_NUMBER: builtins.int
+    LIMIT_FIELD_NUMBER: builtins.int
+    after_collection_id: builtins.str
+    limit: builtins.int
+    def __init__(
+        self,
+        *,
+        after_collection_id: builtins.str | None = ...,
+        limit: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_after_collection_id", b"_after_collection_id", "_limit", b"_limit", "after_collection_id", b"after_collection_id", "limit", b"limit"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_after_collection_id", b"_after_collection_id", "_limit", b"_limit", "after_collection_id", b"after_collection_id", "limit", b"limit"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_after_collection_id", b"_after_collection_id"]) -> typing.Literal["after_collection_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
+
+global___ListRunCollectionsRequest = ListRunCollectionsRequest
+
+@typing.final
+class RunCollectionSummary(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    COLLECTION_ID_FIELD_NUMBER: builtins.int
+    CREATED_AT_FIELD_NUMBER: builtins.int
+    UPDATED_AT_FIELD_NUMBER: builtins.int
+    TITLE_FIELD_NUMBER: builtins.int
+    LAST_RUN_ID_FIELD_NUMBER: builtins.int
+    NEXT_ITEM_INDEX_FIELD_NUMBER: builtins.int
+    LAST_ITEM_PREVIEW_FIELD_NUMBER: builtins.int
+    collection_id: builtins.str
+    created_at: builtins.str
+    updated_at: builtins.str
+    title: builtins.str
+    last_run_id: builtins.int
+    next_item_index: builtins.int
+    last_item_preview: builtins.str
+    def __init__(
+        self,
+        *,
+        collection_id: builtins.str = ...,
+        created_at: builtins.str = ...,
+        updated_at: builtins.str = ...,
+        title: builtins.str | None = ...,
+        last_run_id: builtins.int | None = ...,
+        next_item_index: builtins.int | None = ...,
+        last_item_preview: builtins.str | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_last_item_preview", b"_last_item_preview", "_last_run_id", b"_last_run_id", "_next_item_index", b"_next_item_index", "_title", b"_title", "last_item_preview", b"last_item_preview", "last_run_id", b"last_run_id", "next_item_index", b"next_item_index", "title", b"title"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_last_item_preview", b"_last_item_preview", "_last_run_id", b"_last_run_id", "_next_item_index", b"_next_item_index", "_title", b"_title", "collection_id", b"collection_id", "created_at", b"created_at", "last_item_preview", b"last_item_preview", "last_run_id", b"last_run_id", "next_item_index", b"next_item_index", "title", b"title", "updated_at", b"updated_at"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_last_item_preview", b"_last_item_preview"]) -> typing.Literal["last_item_preview"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_last_run_id", b"_last_run_id"]) -> typing.Literal["last_run_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_next_item_index", b"_next_item_index"]) -> typing.Literal["next_item_index"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_title", b"_title"]) -> typing.Literal["title"] | None: ...
+
+global___RunCollectionSummary = RunCollectionSummary
+
+@typing.final
+class ListRunCollectionsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENTRIES_FIELD_NUMBER: builtins.int
+    NEXT_COLLECTION_ID_FIELD_NUMBER: builtins.int
+    next_collection_id: builtins.str
+    @property
+    def entries(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RunCollectionSummary]: ...
+    def __init__(
+        self,
+        *,
+        entries: collections.abc.Iterable[global___RunCollectionSummary] | None = ...,
+        next_collection_id: builtins.str | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_next_collection_id", b"_next_collection_id", "next_collection_id", b"next_collection_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_next_collection_id", b"_next_collection_id", "entries", b"entries", "next_collection_id", b"next_collection_id"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_next_collection_id", b"_next_collection_id"]) -> typing.Literal["next_collection_id"] | None: ...
+
+global___ListRunCollectionsResponse = ListRunCollectionsResponse
+
+@typing.final
+class GetRunCollectionRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    COLLECTION_ID_FIELD_NUMBER: builtins.int
+    AFTER_ITEM_INDEX_FIELD_NUMBER: builtins.int
+    LIMIT_FIELD_NUMBER: builtins.int
+    collection_id: builtins.str
+    after_item_index: builtins.int
+    limit: builtins.int
+    def __init__(
+        self,
+        *,
+        collection_id: builtins.str = ...,
+        after_item_index: builtins.int | None = ...,
+        limit: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_after_item_index", b"_after_item_index", "_limit", b"_limit", "after_item_index", b"after_item_index", "limit", b"limit"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_after_item_index", b"_after_item_index", "_limit", b"_limit", "after_item_index", b"after_item_index", "collection_id", b"collection_id", "limit", b"limit"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_after_item_index", b"_after_item_index"]) -> typing.Literal["after_item_index"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
+
+global___GetRunCollectionRequest = GetRunCollectionRequest
+
+@typing.final
+class GetRunCollectionResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    COLLECTION_FIELD_NUMBER: builtins.int
+    ITEMS_FIELD_NUMBER: builtins.int
+    NEXT_ITEM_INDEX_FIELD_NUMBER: builtins.int
+    next_item_index: builtins.int
+    @property
+    def collection(self) -> flwr.proto.runcollection_pb2.RunCollection: ...
+    @property
+    def items(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.runcollection_pb2.RunCollectionItem]: ...
+    def __init__(
+        self,
+        *,
+        collection: flwr.proto.runcollection_pb2.RunCollection | None = ...,
+        items: collections.abc.Iterable[flwr.proto.runcollection_pb2.RunCollectionItem] | None = ...,
+        next_item_index: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_next_item_index", b"_next_item_index", "collection", b"collection", "next_item_index", b"next_item_index"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_next_item_index", b"_next_item_index", "collection", b"collection", "items", b"items", "next_item_index", b"next_item_index"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_next_item_index", b"_next_item_index"]) -> typing.Literal["next_item_index"] | None: ...
+
+global___GetRunCollectionResponse = GetRunCollectionResponse
+
+@typing.final
+class DeleteRunCollectionRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    COLLECTION_ID_FIELD_NUMBER: builtins.int
+    collection_id: builtins.str
+    def __init__(
+        self,
+        *,
+        collection_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["collection_id", b"collection_id"]) -> None: ...
+
+global___DeleteRunCollectionRequest = DeleteRunCollectionRequest
+
+@typing.final
+class DeleteRunCollectionResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SUCCESS_FIELD_NUMBER: builtins.int
+    DELETED_ITEM_COUNT_FIELD_NUMBER: builtins.int
+    success: builtins.bool
+    deleted_item_count: builtins.int
+    def __init__(
+        self,
+        *,
+        success: builtins.bool = ...,
+        deleted_item_count: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["deleted_item_count", b"deleted_item_count", "success", b"success"]) -> None: ...
+
+global___DeleteRunCollectionResponse = DeleteRunCollectionResponse
 
 @typing.final
 class GetLoginDetailsRequest(google.protobuf.message.Message):

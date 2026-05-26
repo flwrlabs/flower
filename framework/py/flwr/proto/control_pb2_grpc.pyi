@@ -57,6 +57,24 @@ class ControlStub:
     ]
     """flwr ls command"""
 
+    ListRunCollections: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListRunCollectionsRequest,
+        flwr.proto.control_pb2.ListRunCollectionsResponse,
+    ]
+    """List run collections"""
+
+    GetRunCollection: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.GetRunCollectionRequest,
+        flwr.proto.control_pb2.GetRunCollectionResponse,
+    ]
+    """Get run collection"""
+
+    DeleteRunCollection: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.DeleteRunCollectionRequest,
+        flwr.proto.control_pb2.DeleteRunCollectionResponse,
+    ]
+    """Delete run collection"""
+
     GetLoginDetails: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.GetLoginDetailsRequest,
         flwr.proto.control_pb2.GetLoginDetailsResponse,
@@ -206,6 +224,24 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.ListRunsResponse,
     ]
     """flwr ls command"""
+
+    ListRunCollections: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListRunCollectionsRequest,
+        flwr.proto.control_pb2.ListRunCollectionsResponse,
+    ]
+    """List run collections"""
+
+    GetRunCollection: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.GetRunCollectionRequest,
+        flwr.proto.control_pb2.GetRunCollectionResponse,
+    ]
+    """Get run collection"""
+
+    DeleteRunCollection: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.DeleteRunCollectionRequest,
+        flwr.proto.control_pb2.DeleteRunCollectionResponse,
+    ]
+    """Delete run collection"""
 
     GetLoginDetails: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.GetLoginDetailsRequest,
@@ -364,6 +400,30 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.ListRunsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListRunsResponse]]:
         """flwr ls command"""
+
+    @abc.abstractmethod
+    def ListRunCollections(
+        self,
+        request: flwr.proto.control_pb2.ListRunCollectionsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListRunCollectionsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListRunCollectionsResponse]]:
+        """List run collections"""
+
+    @abc.abstractmethod
+    def GetRunCollection(
+        self,
+        request: flwr.proto.control_pb2.GetRunCollectionRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.GetRunCollectionResponse, collections.abc.Awaitable[flwr.proto.control_pb2.GetRunCollectionResponse]]:
+        """Get run collection"""
+
+    @abc.abstractmethod
+    def DeleteRunCollection(
+        self,
+        request: flwr.proto.control_pb2.DeleteRunCollectionRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.DeleteRunCollectionResponse, collections.abc.Awaitable[flwr.proto.control_pb2.DeleteRunCollectionResponse]]:
+        """Delete run collection"""
 
     @abc.abstractmethod
     def GetLoginDetails(

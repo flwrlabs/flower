@@ -54,6 +54,21 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.ListRunsRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.ListRunsResponse.FromString,
                 _registered_method=True)
+        self.ListRunCollections = channel.unary_unary(
+                '/flwr.proto.Control/ListRunCollections',
+                request_serializer=flwr_dot_proto_dot_control__pb2.ListRunCollectionsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.ListRunCollectionsResponse.FromString,
+                _registered_method=True)
+        self.GetRunCollection = channel.unary_unary(
+                '/flwr.proto.Control/GetRunCollection',
+                request_serializer=flwr_dot_proto_dot_control__pb2.GetRunCollectionRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.GetRunCollectionResponse.FromString,
+                _registered_method=True)
+        self.DeleteRunCollection = channel.unary_unary(
+                '/flwr.proto.Control/DeleteRunCollection',
+                request_serializer=flwr_dot_proto_dot_control__pb2.DeleteRunCollectionRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_control__pb2.DeleteRunCollectionResponse.FromString,
+                _registered_method=True)
         self.GetLoginDetails = channel.unary_unary(
                 '/flwr.proto.Control/GetLoginDetails',
                 request_serializer=flwr_dot_proto_dot_control__pb2.GetLoginDetailsRequest.SerializeToString,
@@ -182,6 +197,27 @@ class ControlServicer(object):
 
     def ListRuns(self, request, context):
         """flwr ls command
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListRunCollections(self, request, context):
+        """List run collections
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetRunCollection(self, request, context):
+        """Get run collection
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteRunCollection(self, request, context):
+        """Delete run collection
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -353,6 +389,21 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.ListRuns,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.ListRunsRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.ListRunsResponse.SerializeToString,
+            ),
+            'ListRunCollections': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListRunCollections,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.ListRunCollectionsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.ListRunCollectionsResponse.SerializeToString,
+            ),
+            'GetRunCollection': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetRunCollection,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.GetRunCollectionRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.GetRunCollectionResponse.SerializeToString,
+            ),
+            'DeleteRunCollection': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteRunCollection,
+                    request_deserializer=flwr_dot_proto_dot_control__pb2.DeleteRunCollectionRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_control__pb2.DeleteRunCollectionResponse.SerializeToString,
             ),
             'GetLoginDetails': grpc.unary_unary_rpc_method_handler(
                     servicer.GetLoginDetails,
@@ -563,6 +614,87 @@ class Control(object):
             '/flwr.proto.Control/ListRuns',
             flwr_dot_proto_dot_control__pb2.ListRunsRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.ListRunsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListRunCollections(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/ListRunCollections',
+            flwr_dot_proto_dot_control__pb2.ListRunCollectionsRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.ListRunCollectionsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetRunCollection(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/GetRunCollection',
+            flwr_dot_proto_dot_control__pb2.GetRunCollectionRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.GetRunCollectionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteRunCollection(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.Control/DeleteRunCollection',
+            flwr_dot_proto_dot_control__pb2.DeleteRunCollectionRequest.SerializeToString,
+            flwr_dot_proto_dot_control__pb2.DeleteRunCollectionResponse.FromString,
             options,
             channel_credentials,
             insecure,

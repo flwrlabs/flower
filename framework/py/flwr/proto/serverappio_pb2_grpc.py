@@ -68,6 +68,11 @@ class ServerAppIoStub(object):
                 request_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputResponse.FromString,
                 _registered_method=True)
+        self.PushRunCollectionItems = channel.unary_unary(
+                '/flwr.proto.ServerAppIo/PushRunCollectionItems',
+                request_serializer=flwr_dot_proto_dot_appio__pb2.PushRunCollectionItemsRequest.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_appio__pb2.PushRunCollectionItemsResponse.FromString,
+                _registered_method=True)
         self.PushObject = channel.unary_unary(
                 '/flwr.proto.ServerAppIo/PushObject',
                 request_serializer=flwr_dot_proto_dot_message__pb2.PushObjectRequest.SerializeToString,
@@ -173,6 +178,13 @@ class ServerAppIoServicer(object):
 
     def PushTaskOutput(self, request, context):
         """Push task outputs
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def PushRunCollectionItems(self, request, context):
+        """Push run collection items
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -295,6 +307,11 @@ def add_ServerAppIoServicer_to_server(servicer, server):
                     servicer.PushTaskOutput,
                     request_deserializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_appio__pb2.PushTaskOutputResponse.SerializeToString,
+            ),
+            'PushRunCollectionItems': grpc.unary_unary_rpc_method_handler(
+                    servicer.PushRunCollectionItems,
+                    request_deserializer=flwr_dot_proto_dot_appio__pb2.PushRunCollectionItemsRequest.FromString,
+                    response_serializer=flwr_dot_proto_dot_appio__pb2.PushRunCollectionItemsResponse.SerializeToString,
             ),
             'PushObject': grpc.unary_unary_rpc_method_handler(
                     servicer.PushObject,
@@ -514,6 +531,33 @@ class ServerAppIo(object):
             '/flwr.proto.ServerAppIo/PushTaskOutput',
             flwr_dot_proto_dot_appio__pb2.PushTaskOutputRequest.SerializeToString,
             flwr_dot_proto_dot_appio__pb2.PushTaskOutputResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PushRunCollectionItems(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/flwr.proto.ServerAppIo/PushRunCollectionItems',
+            flwr_dot_proto_dot_appio__pb2.PushRunCollectionItemsRequest.SerializeToString,
+            flwr_dot_proto_dot_appio__pb2.PushRunCollectionItemsResponse.FromString,
             options,
             channel_credentials,
             insecure,

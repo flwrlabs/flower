@@ -83,6 +83,12 @@ class ServerAppIoStub:
     ]
     """Push task outputs"""
 
+    PushRunCollectionItems: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushRunCollectionItemsRequest,
+        flwr.proto.appio_pb2.PushRunCollectionItemsResponse,
+    ]
+    """Push run collection items"""
+
     PushObject: grpc.UnaryUnaryMultiCallable[
         flwr.proto.message_pb2.PushObjectRequest,
         flwr.proto.message_pb2.PushObjectResponse,
@@ -205,6 +211,12 @@ class ServerAppIoAsyncStub:
         flwr.proto.appio_pb2.PushTaskOutputResponse,
     ]
     """Push task outputs"""
+
+    PushRunCollectionItems: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushRunCollectionItemsRequest,
+        flwr.proto.appio_pb2.PushRunCollectionItemsResponse,
+    ]
+    """Push run collection items"""
 
     PushObject: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.message_pb2.PushObjectRequest,
@@ -340,6 +352,14 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.appio_pb2.PushTaskOutputResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushTaskOutputResponse]]:
         """Push task outputs"""
+
+    @abc.abstractmethod
+    def PushRunCollectionItems(
+        self,
+        request: flwr.proto.appio_pb2.PushRunCollectionItemsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.PushRunCollectionItemsResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushRunCollectionItemsResponse]]:
+        """Push run collection items"""
 
     @abc.abstractmethod
     def PushObject(

@@ -26,54 +26,59 @@ from flwr.proto import message_pb2 as flwr_dot_proto_dot_message__pb2
 from flwr.proto import fab_pb2 as flwr_dot_proto_dot_fab__pb2
 from flwr.proto import federation_config_pb2 as flwr_dot_proto_dot_federation__config__pb2
 from flwr.proto import run_pb2 as flwr_dot_proto_dot_run__pb2
+from flwr.proto import runcollection_pb2 as flwr_dot_proto_dot_runcollection__pb2
 from flwr.proto import task_pb2 as flwr_dot_proto_dot_task__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x66lwr/proto/appio.proto\x12\nflwr.proto\x1a\x18\x66lwr/proto/message.proto\x1a\x14\x66lwr/proto/fab.proto\x1a\"flwr/proto/federation_config.proto\x1a\x14\x66lwr/proto/run.proto\x1a\x15\x66lwr/proto/task.proto\"\x19\n\x17PullPendingTasksRequest\";\n\x18PullPendingTasksResponse\x12\x1f\n\x05tasks\x18\x01 \x03(\x0b\x32\x10.flwr.proto.Task\"#\n\x10\x43laimTaskRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\x04\"1\n\x11\x43laimTaskResponse\x12\x12\n\x05token\x18\x01 \x01(\tH\x00\x88\x01\x01\x42\x08\n\x06_token\"\x1a\n\x18SendTaskHeartbeatRequest\",\n\x19SendTaskHeartbeatResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\"z\n\x16PushAppMessagesRequest\x12*\n\rmessages_list\x18\x02 \x03(\x0b\x32\x13.flwr.proto.Message\x12\x34\n\x14message_object_trees\x18\x03 \x03(\x0b\x32\x16.flwr.proto.ObjectTree\"G\n\x17PushAppMessagesResponse\x12\x13\n\x0bmessage_ids\x18\x01 \x03(\t\x12\x17\n\x0fobjects_to_push\x18\x02 \x03(\t\"-\n\x16PullAppMessagesRequest\x12\x13\n\x0bmessage_ids\x18\x02 \x03(\t\"{\n\x17PullAppMessagesResponse\x12*\n\rmessages_list\x18\x01 \x03(\x0b\x32\x13.flwr.proto.Message\x12\x34\n\x14message_object_trees\x18\x02 \x03(\x0b\x32\x16.flwr.proto.ObjectTree\">\n\x16PushTaskMessageRequest\x12$\n\x07message\x18\x01 \x01(\x0b\x32\x13.flwr.proto.Message\"-\n\x17PushTaskMessageResponse\x12\x12\n\nmessage_id\x18\x01 \x01(\t\"6\n\x16PullTaskMessageRequest\x12\x12\n\x05limit\x18\x01 \x01(\x04H\x00\x88\x01\x01\x42\x08\n\x06_limit\"@\n\x17PullTaskMessageResponse\x12%\n\x08messages\x18\x01 \x03(\x0b\x32\x13.flwr.proto.Message\"\x16\n\x14PullTaskInputRequest\"\xc3\x01\n\x15PullTaskInputResponse\x12$\n\x07\x63ontext\x18\x01 \x01(\x0b\x32\x13.flwr.proto.Context\x12\x1c\n\x03run\x18\x02 \x01(\x0b\x32\x0f.flwr.proto.Run\x12\x1c\n\x03\x66\x61\x62\x18\x03 \x01(\x0b\x32\x0f.flwr.proto.Fab\x12\x37\n\x11\x66\x65\x64\x65ration_config\x18\x04 \x01(\x0b\x32\x1c.flwr.proto.SimulationConfig\x12\x0f\n\x07task_id\x18\x05 \x01(\x04\"b\n\x15PushTaskOutputRequest\x12$\n\x07\x63ontext\x18\x01 \x01(\x0b\x32\x13.flwr.proto.Context\x12\x12\n\nsub_status\x18\x02 \x01(\t\x12\x0f\n\x07\x64\x65tails\x18\x03 \x01(\t\"\x18\n\x16PushTaskOutputResponse\"\x99\x01\n\x11\x43reateTaskRequest\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\x15\n\x08\x66\x61\x62_hash\x18\x02 \x01(\tH\x00\x88\x01\x01\x12\x16\n\tmodel_ref\x18\x03 \x01(\tH\x01\x88\x01\x01\x12\x1a\n\rconnector_ref\x18\x04 \x01(\tH\x02\x88\x01\x01\x42\x0b\n\t_fab_hashB\x0c\n\n_model_refB\x10\n\x0e_connector_ref\"6\n\x12\x43reateTaskResponse\x12\x14\n\x07task_id\x18\x01 \x01(\x04H\x00\x88\x01\x01\x42\n\n\x08_task_idb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16\x66lwr/proto/appio.proto\x12\nflwr.proto\x1a\x18\x66lwr/proto/message.proto\x1a\x14\x66lwr/proto/fab.proto\x1a\"flwr/proto/federation_config.proto\x1a\x14\x66lwr/proto/run.proto\x1a\x1e\x66lwr/proto/runcollection.proto\x1a\x15\x66lwr/proto/task.proto\"\x19\n\x17PullPendingTasksRequest\";\n\x18PullPendingTasksResponse\x12\x1f\n\x05tasks\x18\x01 \x03(\x0b\x32\x10.flwr.proto.Task\"#\n\x10\x43laimTaskRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\x04\"1\n\x11\x43laimTaskResponse\x12\x12\n\x05token\x18\x01 \x01(\tH\x00\x88\x01\x01\x42\x08\n\x06_token\"\x1a\n\x18SendTaskHeartbeatRequest\",\n\x19SendTaskHeartbeatResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\"z\n\x16PushAppMessagesRequest\x12*\n\rmessages_list\x18\x02 \x03(\x0b\x32\x13.flwr.proto.Message\x12\x34\n\x14message_object_trees\x18\x03 \x03(\x0b\x32\x16.flwr.proto.ObjectTree\"G\n\x17PushAppMessagesResponse\x12\x13\n\x0bmessage_ids\x18\x01 \x03(\t\x12\x17\n\x0fobjects_to_push\x18\x02 \x03(\t\"-\n\x16PullAppMessagesRequest\x12\x13\n\x0bmessage_ids\x18\x02 \x03(\t\"{\n\x17PullAppMessagesResponse\x12*\n\rmessages_list\x18\x01 \x03(\x0b\x32\x13.flwr.proto.Message\x12\x34\n\x14message_object_trees\x18\x02 \x03(\x0b\x32\x16.flwr.proto.ObjectTree\">\n\x16PushTaskMessageRequest\x12$\n\x07message\x18\x01 \x01(\x0b\x32\x13.flwr.proto.Message\"-\n\x17PushTaskMessageResponse\x12\x12\n\nmessage_id\x18\x01 \x01(\t\"6\n\x16PullTaskMessageRequest\x12\x12\n\x05limit\x18\x01 \x01(\x04H\x00\x88\x01\x01\x42\x08\n\x06_limit\"@\n\x17PullTaskMessageResponse\x12%\n\x08messages\x18\x01 \x03(\x0b\x32\x13.flwr.proto.Message\"\x16\n\x14PullTaskInputRequest\"\xc3\x01\n\x15PullTaskInputResponse\x12$\n\x07\x63ontext\x18\x01 \x01(\x0b\x32\x13.flwr.proto.Context\x12\x1c\n\x03run\x18\x02 \x01(\x0b\x32\x0f.flwr.proto.Run\x12\x1c\n\x03\x66\x61\x62\x18\x03 \x01(\x0b\x32\x0f.flwr.proto.Fab\x12\x37\n\x11\x66\x65\x64\x65ration_config\x18\x04 \x01(\x0b\x32\x1c.flwr.proto.SimulationConfig\x12\x0f\n\x07task_id\x18\x05 \x01(\x04\"b\n\x15PushTaskOutputRequest\x12$\n\x07\x63ontext\x18\x01 \x01(\x0b\x32\x13.flwr.proto.Context\x12\x12\n\nsub_status\x18\x02 \x01(\t\x12\x0f\n\x07\x64\x65tails\x18\x03 \x01(\t\"\x18\n\x16PushTaskOutputResponse\"T\n\x1dPushRunCollectionItemsRequest\x12\x33\n\x05items\x18\x01 \x03(\x0b\x32$.flwr.proto.RunCollectionItemPayload\"6\n\x1ePushRunCollectionItemsResponse\x12\x14\n\x0citem_indices\x18\x01 \x03(\x04\"\x99\x01\n\x11\x43reateTaskRequest\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\x15\n\x08\x66\x61\x62_hash\x18\x02 \x01(\tH\x00\x88\x01\x01\x12\x16\n\tmodel_ref\x18\x03 \x01(\tH\x01\x88\x01\x01\x12\x1a\n\rconnector_ref\x18\x04 \x01(\tH\x02\x88\x01\x01\x42\x0b\n\t_fab_hashB\x0c\n\n_model_refB\x10\n\x0e_connector_ref\"6\n\x12\x43reateTaskResponse\x12\x14\n\x07task_id\x18\x01 \x01(\x04H\x00\x88\x01\x01\x42\n\n\x08_task_idb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'flwr.proto.appio_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_PULLPENDINGTASKSREQUEST']._serialized_start=167
-  _globals['_PULLPENDINGTASKSREQUEST']._serialized_end=192
-  _globals['_PULLPENDINGTASKSRESPONSE']._serialized_start=194
-  _globals['_PULLPENDINGTASKSRESPONSE']._serialized_end=253
-  _globals['_CLAIMTASKREQUEST']._serialized_start=255
-  _globals['_CLAIMTASKREQUEST']._serialized_end=290
-  _globals['_CLAIMTASKRESPONSE']._serialized_start=292
-  _globals['_CLAIMTASKRESPONSE']._serialized_end=341
-  _globals['_SENDTASKHEARTBEATREQUEST']._serialized_start=343
-  _globals['_SENDTASKHEARTBEATREQUEST']._serialized_end=369
-  _globals['_SENDTASKHEARTBEATRESPONSE']._serialized_start=371
-  _globals['_SENDTASKHEARTBEATRESPONSE']._serialized_end=415
-  _globals['_PUSHAPPMESSAGESREQUEST']._serialized_start=417
-  _globals['_PUSHAPPMESSAGESREQUEST']._serialized_end=539
-  _globals['_PUSHAPPMESSAGESRESPONSE']._serialized_start=541
-  _globals['_PUSHAPPMESSAGESRESPONSE']._serialized_end=612
-  _globals['_PULLAPPMESSAGESREQUEST']._serialized_start=614
-  _globals['_PULLAPPMESSAGESREQUEST']._serialized_end=659
-  _globals['_PULLAPPMESSAGESRESPONSE']._serialized_start=661
-  _globals['_PULLAPPMESSAGESRESPONSE']._serialized_end=784
-  _globals['_PUSHTASKMESSAGEREQUEST']._serialized_start=786
-  _globals['_PUSHTASKMESSAGEREQUEST']._serialized_end=848
-  _globals['_PUSHTASKMESSAGERESPONSE']._serialized_start=850
-  _globals['_PUSHTASKMESSAGERESPONSE']._serialized_end=895
-  _globals['_PULLTASKMESSAGEREQUEST']._serialized_start=897
-  _globals['_PULLTASKMESSAGEREQUEST']._serialized_end=951
-  _globals['_PULLTASKMESSAGERESPONSE']._serialized_start=953
-  _globals['_PULLTASKMESSAGERESPONSE']._serialized_end=1017
-  _globals['_PULLTASKINPUTREQUEST']._serialized_start=1019
-  _globals['_PULLTASKINPUTREQUEST']._serialized_end=1041
-  _globals['_PULLTASKINPUTRESPONSE']._serialized_start=1044
-  _globals['_PULLTASKINPUTRESPONSE']._serialized_end=1239
-  _globals['_PUSHTASKOUTPUTREQUEST']._serialized_start=1241
-  _globals['_PUSHTASKOUTPUTREQUEST']._serialized_end=1339
-  _globals['_PUSHTASKOUTPUTRESPONSE']._serialized_start=1341
-  _globals['_PUSHTASKOUTPUTRESPONSE']._serialized_end=1365
-  _globals['_CREATETASKREQUEST']._serialized_start=1368
-  _globals['_CREATETASKREQUEST']._serialized_end=1521
-  _globals['_CREATETASKRESPONSE']._serialized_start=1523
-  _globals['_CREATETASKRESPONSE']._serialized_end=1577
+  _globals['_PULLPENDINGTASKSREQUEST']._serialized_start=199
+  _globals['_PULLPENDINGTASKSREQUEST']._serialized_end=224
+  _globals['_PULLPENDINGTASKSRESPONSE']._serialized_start=226
+  _globals['_PULLPENDINGTASKSRESPONSE']._serialized_end=285
+  _globals['_CLAIMTASKREQUEST']._serialized_start=287
+  _globals['_CLAIMTASKREQUEST']._serialized_end=322
+  _globals['_CLAIMTASKRESPONSE']._serialized_start=324
+  _globals['_CLAIMTASKRESPONSE']._serialized_end=373
+  _globals['_SENDTASKHEARTBEATREQUEST']._serialized_start=375
+  _globals['_SENDTASKHEARTBEATREQUEST']._serialized_end=401
+  _globals['_SENDTASKHEARTBEATRESPONSE']._serialized_start=403
+  _globals['_SENDTASKHEARTBEATRESPONSE']._serialized_end=447
+  _globals['_PUSHAPPMESSAGESREQUEST']._serialized_start=449
+  _globals['_PUSHAPPMESSAGESREQUEST']._serialized_end=571
+  _globals['_PUSHAPPMESSAGESRESPONSE']._serialized_start=573
+  _globals['_PUSHAPPMESSAGESRESPONSE']._serialized_end=644
+  _globals['_PULLAPPMESSAGESREQUEST']._serialized_start=646
+  _globals['_PULLAPPMESSAGESREQUEST']._serialized_end=691
+  _globals['_PULLAPPMESSAGESRESPONSE']._serialized_start=693
+  _globals['_PULLAPPMESSAGESRESPONSE']._serialized_end=816
+  _globals['_PUSHTASKMESSAGEREQUEST']._serialized_start=818
+  _globals['_PUSHTASKMESSAGEREQUEST']._serialized_end=880
+  _globals['_PUSHTASKMESSAGERESPONSE']._serialized_start=882
+  _globals['_PUSHTASKMESSAGERESPONSE']._serialized_end=927
+  _globals['_PULLTASKMESSAGEREQUEST']._serialized_start=929
+  _globals['_PULLTASKMESSAGEREQUEST']._serialized_end=983
+  _globals['_PULLTASKMESSAGERESPONSE']._serialized_start=985
+  _globals['_PULLTASKMESSAGERESPONSE']._serialized_end=1049
+  _globals['_PULLTASKINPUTREQUEST']._serialized_start=1051
+  _globals['_PULLTASKINPUTREQUEST']._serialized_end=1073
+  _globals['_PULLTASKINPUTRESPONSE']._serialized_start=1076
+  _globals['_PULLTASKINPUTRESPONSE']._serialized_end=1271
+  _globals['_PUSHTASKOUTPUTREQUEST']._serialized_start=1273
+  _globals['_PUSHTASKOUTPUTREQUEST']._serialized_end=1371
+  _globals['_PUSHTASKOUTPUTRESPONSE']._serialized_start=1373
+  _globals['_PUSHTASKOUTPUTRESPONSE']._serialized_end=1397
+  _globals['_PUSHRUNCOLLECTIONITEMSREQUEST']._serialized_start=1399
+  _globals['_PUSHRUNCOLLECTIONITEMSREQUEST']._serialized_end=1483
+  _globals['_PUSHRUNCOLLECTIONITEMSRESPONSE']._serialized_start=1485
+  _globals['_PUSHRUNCOLLECTIONITEMSRESPONSE']._serialized_end=1539
+  _globals['_CREATETASKREQUEST']._serialized_start=1542
+  _globals['_CREATETASKREQUEST']._serialized_end=1695
+  _globals['_CREATETASKRESPONSE']._serialized_start=1697
+  _globals['_CREATETASKRESPONSE']._serialized_end=1751
 # @@protoc_insertion_point(module_scope)

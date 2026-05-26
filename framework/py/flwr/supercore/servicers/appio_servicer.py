@@ -32,6 +32,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullPendingTasksResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
+    PushRunCollectionItemsRequest,
+    PushRunCollectionItemsResponse,
     PushTaskMessageRequest,
     PushTaskMessageResponse,
     SendTaskHeartbeatRequest,
@@ -120,6 +122,18 @@ class AppIoServicer(ABC):
             raise RuntimeError("This line should never be reached.")
 
         return CreateTaskResponse(task_id=created_task_id)
+
+    def PushRunCollectionItems(
+        self, request: PushRunCollectionItemsRequest, context: grpc.ServicerContext
+    ) -> PushRunCollectionItemsResponse:
+        """Push run collection items."""
+        log(DEBUG, "AppIoServicer.PushRunCollectionItems")
+
+        context.abort(
+            grpc.StatusCode.UNIMPLEMENTED,
+            "PushRunCollectionItems is not implemented.",
+        )
+        raise RuntimeError("This line should never be reached.")
 
     def PushTaskMessage(
         self, request: PushTaskMessageRequest, context: grpc.ServicerContext

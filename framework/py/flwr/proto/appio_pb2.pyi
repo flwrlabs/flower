@@ -23,6 +23,7 @@ import flwr.proto.fab_pb2
 import flwr.proto.federation_config_pb2
 import flwr.proto.message_pb2
 import flwr.proto.run_pb2
+import flwr.proto.runcollection_pb2
 import flwr.proto.task_pb2
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
@@ -350,6 +351,40 @@ class PushTaskOutputResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___PushTaskOutputResponse = PushTaskOutputResponse
+
+@typing.final
+class PushRunCollectionItemsRequest(google.protobuf.message.Message):
+    """PushRunCollectionItems messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ITEMS_FIELD_NUMBER: builtins.int
+    @property
+    def items(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.runcollection_pb2.RunCollectionItemPayload]: ...
+    def __init__(
+        self,
+        *,
+        items: collections.abc.Iterable[flwr.proto.runcollection_pb2.RunCollectionItemPayload] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["items", b"items"]) -> None: ...
+
+global___PushRunCollectionItemsRequest = PushRunCollectionItemsRequest
+
+@typing.final
+class PushRunCollectionItemsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ITEM_INDICES_FIELD_NUMBER: builtins.int
+    @property
+    def item_indices(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]: ...
+    def __init__(
+        self,
+        *,
+        item_indices: collections.abc.Iterable[builtins.int] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["item_indices", b"item_indices"]) -> None: ...
+
+global___PushRunCollectionItemsResponse = PushRunCollectionItemsResponse
 
 @typing.final
 class CreateTaskRequest(google.protobuf.message.Message):

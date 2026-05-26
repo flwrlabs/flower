@@ -45,6 +45,9 @@ SERVERAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ServerAppIo/SendTaskHeartbeat": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PullTaskInput": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PushTaskOutput": MethodTokenPolicy.token_required(),
+    "/flwr.proto.ServerAppIo/PushRunCollectionItems": (
+        MethodTokenPolicy.token_required()
+    ),
     "/flwr.proto.ServerAppIo/PushObject": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PullObject": MethodTokenPolicy.token_required(),
     # pylint: disable-next=line-too-long

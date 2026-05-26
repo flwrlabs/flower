@@ -23,10 +23,16 @@ import grpc
 
 from flwr.common.typing import AccountInfo
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
+    DeleteRunCollectionRequest,
+    DeleteRunCollectionResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
+    GetRunCollectionRequest,
+    GetRunCollectionResponse,
+    ListRunCollectionsRequest,
+    ListRunCollectionsResponse,
     StartRunRequest,
     StartRunResponse,
     StreamLogsRequest,
@@ -35,7 +41,13 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.superlink.auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
 
 Request = (
-    StartRunRequest | StreamLogsRequest | GetLoginDetailsRequest | GetAuthTokensRequest
+    StartRunRequest
+    | StreamLogsRequest
+    | GetLoginDetailsRequest
+    | GetAuthTokensRequest
+    | ListRunCollectionsRequest
+    | GetRunCollectionRequest
+    | DeleteRunCollectionRequest
 )
 
 Response = (
@@ -43,6 +55,9 @@ Response = (
     | StreamLogsResponse
     | GetLoginDetailsResponse
     | GetAuthTokensResponse
+    | ListRunCollectionsResponse
+    | GetRunCollectionResponse
+    | DeleteRunCollectionResponse
 )
 
 

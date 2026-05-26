@@ -67,16 +67,22 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationResponse,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    DeleteRunCollectionRequest,
+    DeleteRunCollectionResponse,
     GetAuthTokensRequest,
     GetAuthTokensResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
+    GetRunCollectionRequest,
+    GetRunCollectionResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
     ListInvitationsResponse,
     ListNodesRequest,
     ListNodesResponse,
+    ListRunCollectionsRequest,
+    ListRunCollectionsResponse,
     ListRunsRequest,
     ListRunsResponse,
     PullArtifactsRequest,
@@ -379,6 +385,42 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             run_dict={run.run_id: run_to_proto(run) for run in runs},
             now=now().isoformat(),
         )
+
+    def ListRunCollections(
+        self, request: ListRunCollectionsRequest, context: grpc.ServicerContext
+    ) -> ListRunCollectionsResponse:
+        """List run collections."""
+        log(INFO, self.ListRunCollections.__qualname__)
+
+        context.abort(
+            grpc.StatusCode.UNIMPLEMENTED,
+            "ListRunCollections is not implemented.",
+        )
+        raise RuntimeError("This line should never be reached.")
+
+    def GetRunCollection(
+        self, request: GetRunCollectionRequest, context: grpc.ServicerContext
+    ) -> GetRunCollectionResponse:
+        """Get a run collection."""
+        log(INFO, self.GetRunCollection.__qualname__)
+
+        context.abort(
+            grpc.StatusCode.UNIMPLEMENTED,
+            "GetRunCollection is not implemented.",
+        )
+        raise RuntimeError("This line should never be reached.")
+
+    def DeleteRunCollection(
+        self, request: DeleteRunCollectionRequest, context: grpc.ServicerContext
+    ) -> DeleteRunCollectionResponse:
+        """Delete a run collection."""
+        log(INFO, self.DeleteRunCollection.__qualname__)
+
+        context.abort(
+            grpc.StatusCode.UNIMPLEMENTED,
+            "DeleteRunCollection is not implemented.",
+        )
+        raise RuntimeError("This line should never be reached.")
 
     def StopRun(
         self, request: StopRunRequest, context: grpc.ServicerContext
