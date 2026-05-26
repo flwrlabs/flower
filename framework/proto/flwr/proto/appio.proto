@@ -80,6 +80,14 @@ message PushTaskOutputRequest {
 }
 message PushTaskOutputResponse {}
 
+// PushRunEvents messages
+message RunEvent {
+  string event = 1;
+  string data = 2;
+}
+message PushRunEventsRequest { repeated RunEvent events = 1; }
+message PushRunEventsResponse { uint32 stored_count = 1; }
+
 // CreateTask messages
 message CreateTaskRequest {
   string type = 1;

@@ -81,6 +81,9 @@ service ClientAppIo {
   // Push task logs
   rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
 
+  // Push run events
+  rpc PushRunEvents(PushRunEventsRequest) returns (PushRunEventsResponse) {}
+
   /////////////////////////////////////////////////////////////////////////////
   // Specific endpoints for ClientAppIo
   /////////////////////////////////////////////////////////////////////////////
