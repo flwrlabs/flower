@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for SuperExec Kubernetes executor."""
 
-
 from typing import Any
 from unittest.mock import Mock, call
 
@@ -73,8 +72,8 @@ def test_build_appio_credentials_secret_contains_token_and_ca() -> None:
             "labels": {
                 "app.kubernetes.io/name": "flower",
                 "app.kubernetes.io/component": "taskexecutor",
-                "flwr.ai/superexec-task-id": "123",
-                "flwr.ai/task-type": "flwr-serverapp",
+                "flower.ai/superexec-task-id": "123",
+                "flower.ai/task-type": "flwr-serverapp",
             },
         },
         "type": "Opaque",
@@ -216,19 +215,28 @@ def test_launch_returns_failed_if_pod_create_fails() -> None:
     client.create_namespaced_pod.assert_called_once()
 
 
+def test_launch_returns_failed_if_spec_is_invalid() -> None:
+    """Test launch returns failed for local spec validation errors."""
+    client = Mock()
+
+    result = KubernetesExecutor(
+        client=client,
+        config=_executor_config(appio_root_certificates=None),
+    ).launch(_execution_spec(insecure=False))
+
+    assert result.status == LaunchResultStatus.FAILED
+    assert result.message == (
+        "ValueError: Kubernetes executor requires AppIo root certificates "
+        "for secure connections."
+    )
+    client.create_namespaced_secret.assert_not_called()
+    client.create_namespaced_pod.assert_not_called()
+
+
 def test_build_rejects_invalid_task_id() -> None:
     """Test Kubernetes object construction rejects invalid task IDs."""
     with pytest.raises(ValueError, match="positive integer task_id"):
         build_taskexecutor_pod(
             _execution_spec(task_id=0),
             _executor_config(),
-        )
-
-
-def test_build_rejects_missing_ca_for_secure_connection() -> None:
-    """Test secure Kubernetes object construction requires root certificate material."""
-    with pytest.raises(ValueError, match="root certificates"):
-        build_taskexecutor_pod(
-            _execution_spec(insecure=False),
-            _executor_config(appio_root_certificates=None),
         )

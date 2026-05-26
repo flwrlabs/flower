@@ -41,7 +41,10 @@ class KubernetesClient(Protocol):
 
 @dataclass(frozen=True)
 class KubernetesExecutorConfig:
-    """Configuration needed to build one TaskExecutor Pod and Secret."""
+    """Configuration needed to build one TaskExecutor Pod and Secret.
+
+    appio_root_certificates contains PEM data mounted as ca.crt.
+    """
 
     namespace: str
     image: str
@@ -88,10 +91,9 @@ class KubernetesExecutor:
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Submit the TaskExecutor Pod and credential Secret."""
-        secret = build_appio_credentials_secret(spec, self._config)
-        pod = build_taskexecutor_pod(spec, self._config)
-
         try:
+            secret = build_appio_credentials_secret(spec, self._config)
+            pod = build_taskexecutor_pod(spec, self._config)
             self._client.create_namespaced_secret(self._config.namespace, secret)
             self._client.create_namespaced_pod(self._config.namespace, pod)
         except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -222,6 +224,6 @@ def _labels(spec: ExecutionSpec) -> dict[str, str]:
     return {
         "app.kubernetes.io/name": "flower",
         "app.kubernetes.io/component": "taskexecutor",
-        "flwr.ai/superexec-task-id": str(spec.task_id),
-        "flwr.ai/task-type": spec.task_type.value,
+        "flower.ai/superexec-task-id": str(spec.task_id),
+        "flower.ai/task-type": spec.task_type.value,
     }
