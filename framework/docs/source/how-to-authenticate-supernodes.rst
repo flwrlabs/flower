@@ -48,6 +48,12 @@ enabled:
     :doc:`how-to-enable-tls-connections` guide and extends it to introduce node
     authentication to the SuperLink ↔ SuperNode connection.
 
+.. note::
+
+    This guide covers CLI-managed SuperNode authentication for a self-hosted SuperLink.
+    To register SuperNodes in the SuperGrid dashboard and add them to a deployment
+    federation, see :doc:`how-to-connect-supernodes-to-supergrid`.
+
 .. tip::
 
     Checkout the `Flower Authentication
