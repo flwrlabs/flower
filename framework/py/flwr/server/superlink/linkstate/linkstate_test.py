@@ -2224,6 +2224,82 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             # Assert
             assert sum(len(res) for res in results if res is not None) == 1
 
+    def test_get_message_ins_redelivers_after_lease_expires(self) -> None:
+        """Ensure an unacknowledged instruction can be redelivered."""
+        # Prepare
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg = create_ins_message_obj(
+            src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+        )
+        msg_id = state.store_message_ins(message=msg)
+        assert msg_id
+
+        # Execute and assert
+        assert len(state.get_message_ins(node_id=node_id, limit=1)) == 1
+        assert len(state.get_message_ins(node_id=node_id, limit=1)) == 0
+
+        state.query(
+            """
+            UPDATE message_ins
+            SET lease_expires_at = :expired
+            WHERE message_id = :message_id
+            """,
+            {"expired": now().timestamp() - 1, "message_id": msg_id},
+        )
+        assert len(state.get_message_ins(node_id=node_id, limit=1)) == 1
+
+        state.acknowledge_message(msg_id)
+        state.query(
+            """
+            UPDATE message_ins
+            SET lease_expires_at = :expired
+            WHERE message_id = :message_id
+            """,
+            {"expired": now().timestamp() - 1, "message_id": msg_id},
+        )
+        assert len(state.get_message_ins(node_id=node_id, limit=1)) == 0
+
+    def test_get_message_res_redelivers_after_lease_expires(self) -> None:
+        """Ensure an unacknowledged reply can be redelivered."""
+        # Prepare
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg_id = state.store_message_ins(
+            create_ins_message_obj(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=node_id,
+                run_id=run_id,
+            )
+        )
+        assert msg_id
+        pulled_ins = state.get_message_ins(node_id=node_id, limit=1)[0]
+
+        msg_res = Message(RecordDict(), reply_to=pulled_ins)
+        msg_res.metadata.__dict__["_message_id"] = str(uuid4())
+        res_id = state.store_message_res(msg_res)
+        assert res_id
+
+        # Execute and assert
+        assert len(state.get_message_res({msg_id})) == 1
+        assert len(state.get_message_res({msg_id})) == 0
+
+        state.query(
+            """
+            UPDATE message_res
+            SET lease_expires_at = :expired
+            WHERE message_id = :message_id
+            """,
+            {"expired": now().timestamp() - 1, "message_id": res_id},
+        )
+        assert len(state.get_message_res({msg_id})) == 1
+
+        state.acknowledge_message(res_id)
+        assert state.num_message_ins() == 0
+        assert state.num_message_res() == 0
+
     # pylint: disable-next=too-many-locals
     def test_get_message_ins_distributes_available_work_under_contention(self) -> None:
         """Ensure two replicas can each claim work when two Messages are available."""

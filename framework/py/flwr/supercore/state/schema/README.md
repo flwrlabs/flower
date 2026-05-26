@@ -32,7 +32,9 @@ erDiagram
     BIGINT run_id FK "nullable"
     BLOB content "nullable"
     FLOAT created_at "nullable"
+    VARCHAR acknowledged_at
     VARCHAR delivered_at "nullable"
+    FLOAT lease_expires_at
     BIGINT dst_node_id "nullable"
     BLOB error "nullable"
     VARCHAR group_id "nullable"
@@ -48,6 +50,7 @@ erDiagram
     BLOB content "nullable"
     FLOAT created_at "nullable"
     VARCHAR delivered_at "nullable"
+    FLOAT lease_expires_at
     BIGINT dst_node_id "nullable"
     BLOB error "nullable"
     VARCHAR group_id "nullable"

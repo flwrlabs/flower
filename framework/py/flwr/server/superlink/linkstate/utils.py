@@ -14,7 +14,6 @@
 # ==============================================================================
 """Utility functions for State."""
 
-
 from typing import Any
 
 from flwr.common import ConfigRecord, Context, Error, Message, Metadata, now, serde
@@ -363,7 +362,11 @@ def dict_to_message(message_dict: dict[str, Any]) -> Message:
 
     # Metadata constructor doesn't allow passing created_at. We set it later
     metadata = Metadata(
-        **{k: v for k, v in message_dict.items() if k not in ["delivered_at"]}
+        **{
+            k: v
+            for k, v in message_dict.items()
+            if k not in ["delivered_at", "lease_expires_at", "acknowledged_at"]
+        }
     )
     msg = make_message(metadata=metadata, content=content, error=error)
     msg.metadata.delivered_at = message_dict.get("delivered_at", "")

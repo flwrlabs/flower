@@ -360,6 +360,8 @@ def confirm_message_received(
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
 
+    state.acknowledge_message(request.message_object_id)
+
     # Delete the message object
     store.delete(request.message_object_id)
 

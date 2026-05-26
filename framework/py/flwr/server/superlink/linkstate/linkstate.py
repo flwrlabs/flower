@@ -14,7 +14,6 @@
 # ==============================================================================
 """Abstract base class LinkState."""
 
-
 import abc
 from collections.abc import Sequence
 from typing import Literal
@@ -26,6 +25,8 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.superlink.federation import FederationManager
+
+MESSAGE_DELIVERY_LEASE_SECONDS = 60.0
 
 
 class LinkState(CoreState):  # pylint: disable=R0904
@@ -131,6 +132,10 @@ class LinkState(CoreState):  # pylint: disable=R0904
             A set of Message IDs. For each ID in the set, the corresponding
             Message and its associated reply Message will be deleted.
         """
+
+    @abc.abstractmethod
+    def acknowledge_message(self, message_id: str) -> None:
+        """Mark a delivered Message as durably received."""
 
     @abc.abstractmethod
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
