@@ -111,13 +111,7 @@ def create_linkstate_metadata() -> MetaData:
         Column("sequence_number", Integer, nullable=False),
         Column("event", String, nullable=False),
         Column("data", String, nullable=False),
-        Index("idx_run_event_run_id", "run_id"),
-        Index(
-            "uq_run_event_run_id_sequence_number",
-            "run_id",
-            "sequence_number",
-            unique=True,
-        ),
+        UniqueConstraint("run_id", "sequence_number"),
     )
 
     # --------------------------------------------------------------------------
