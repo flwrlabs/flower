@@ -19,8 +19,6 @@ from __future__ import annotations
 
 from typing import cast
 
-from .constants import DEFAULT_TTL as DEFAULT_TTL
-
 MESSAGE_INIT_ERROR_MESSAGE = (
     "Invalid arguments for Message. Expected one of the documented "
     "signatures: Message(content: RecordDict, dst_node_id: int, message_type: str,"

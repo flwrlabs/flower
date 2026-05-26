@@ -23,12 +23,6 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from flwr.app.typing import ConfigRecordValues as ConfigRecordValues
-from flwr.app.typing import ConfigScalar as ConfigScalar
-from flwr.app.typing import ConfigScalarList as ConfigScalarList
-from flwr.app.typing import MetricRecordValues as MetricRecordValues
-from flwr.app.typing import MetricScalar as MetricScalar
-from flwr.app.typing import MetricScalarList as MetricScalarList
 from flwr.app.user_config import UserConfig
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Member  # pylint: disable=E0611
