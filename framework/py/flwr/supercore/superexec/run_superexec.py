@@ -74,7 +74,7 @@ def _handle_launch_result(result: LaunchResult, task: Task) -> None:
     if result.status == LaunchResultStatus.FAILED:
         log(
             ERROR,
-            "Executor failed to launch task_id %d: %s "
+            "Executor failed to launch task_id %d. Reason: %s "
             "Existing task expiry handling will apply.",
             task.task_id,
             message,
