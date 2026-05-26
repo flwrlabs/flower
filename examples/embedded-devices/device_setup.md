@@ -48,11 +48,11 @@ exec "$SHELL"
 Now all is ready to create a virtualenvironment. But first, let's install a recent version of Python:
 
 ```shell
-# Install python 3.10+
-pyenv install 3.10.14
+# Install python 3.11+
+pyenv install 3.11.14
 
 # Then create a virtual environment
-pyenv virtualenv 3.10.14 my-env
+pyenv virtualenv 3.11.14 my-env
 ```
 
 Finally, activate your environment and install the dependencies for your project:

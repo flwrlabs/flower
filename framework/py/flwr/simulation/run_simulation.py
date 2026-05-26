@@ -27,13 +27,26 @@ from flwr.app.user_config import UserConfig
 from flwr.cli.utils import get_sha256_hash
 from flwr.common import Context, EventType, RecordDict, event, log, now
 from flwr.common.constant import Status
+from typing import cast
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.typing import Run, RunStatus
+from flwr.clientapp import ClientApp
+from flwr.common import Context, EventType, RecordDict, event, log
+from flwr.common.constant import RUN_ID_NUM_BYTES, TASK_ID_NUM_BYTES
+from flwr.common.exit import ExitCode, flwr_exit
+from flwr.common.logger import (
+    set_logger_propagation,
+    update_console_handler,
+    warn_deprecated_feature,
+    warn_deprecated_feature_with_example,
+)
+from flwr.common.typing import Run
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.grid import Grid, InMemoryGrid
 from flwr.server.run_serverapp import run as _run
 from flwr.server.superlink.fleet import vce
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
-from flwr.server.superlink.linkstate import LinkStateFactory
+from flwr.server.superlink.linkstate import InMemoryLinkState, LinkStateFactory
 from flwr.server.superlink.linkstate.in_memory_linkstate import RunRecord
 from flwr.simulation.ray_transport.utils import (
     enable_tf_gpu_growth as enable_gpu_growth,
@@ -155,12 +168,14 @@ def _main_loop(
         )
     updated_context = server_app_context
     try:
-        # Register run
+        # Use InMemoryLinkState to pre-register the run with its primary task
         log(DEBUG, "Pre-registering run with id %s", run.run_id)
-        run.status = RunStatus(Status.RUNNING, "", "")
-        run.starting_at = now().isoformat()
-        run.running_at = run.starting_at
-        state_factory.state().run_ids[run.run_id] = RunRecord(run=run)  # type: ignore
+        state = cast(InMemoryLinkState, state_factory.state())
+        state.run_ids[run.run_id] = RunRecord(run=run)
+        primary_task_id = cast(int, run.primary_task_id)
+        state.task_store[primary_task_id] = Task(
+            task_id=primary_task_id, run_id=run.run_id
+        )
 
         # Initialize Grid
         grid = InMemoryGrid(state_factory=state_factory)

@@ -19,21 +19,31 @@ import hashlib
 import json
 import secrets
 from collections.abc import Sequence
-from typing import Any, Literal
+from datetime import timedelta
+from typing import Any, Literal, cast
 
-from sqlalchemy import MetaData, text
+from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
 
-from flwr.common import now
+from flwr.app.metadata import Metadata
+from flwr.common import Message, now
 from flwr.common.constant import (
-    FLWR_APP_TOKEN_LENGTH,
+    FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
+    SUPERLINK_NODE_ID,
     TASK_ID_NUM_BYTES,
     Status,
     SubStatus,
 )
+from flwr.common.message import make_message
+from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
+from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.common.typing import Fab
+from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
+
+# pylint: disable-next=E0611
+from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
@@ -41,7 +51,7 @@ from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import generate_rand_int_from_bytes
+from .utils import generate_rand_int_from_bytes, timestamp_to_iso, validate_task_message
 
 # Define SQL conditions for task statuses to ensure consistency across queries
 STATUS_CONDITIONS = {
@@ -59,6 +69,11 @@ class SqlCoreState(CoreState, SqlMixin):
     def __init__(self, database_path: str, object_store: ObjectStore) -> None:
         super().__init__(database_path)
         self._object_store = object_store
+
+    @property
+    def select_lock_sql(self) -> str:
+        """Return the SQL clause for row-locking selected candidates."""
+        return ""
 
     @property
     def object_store(self) -> ObjectStore:
@@ -108,6 +123,50 @@ class SqlCoreState(CoreState, SqlMixin):
             verifications=json.loads(row["verifications"]),
         )
 
+    def add_task_log(self, task_id: int, log_message: str) -> None:
+        """Add a log entry to the task logs for the specified `task_id`."""
+        sint64_task_id = uint64_to_int64(task_id)
+
+        try:
+            self.query(
+                """
+                INSERT INTO task_logs (timestamp, task_id, log)
+                VALUES (:current_ts, :task_id, :log)
+                """,
+                {
+                    "current_ts": now().timestamp(),
+                    "task_id": sint64_task_id,
+                    "log": log_message,
+                },
+            )
+        except IntegrityError:
+            raise ValueError(f"Task {task_id} not found") from None
+
+    def get_task_log(
+        self, task_id: int, after_timestamp: float | None
+    ) -> tuple[str, float]:
+        """Get task logs for the specified `task_id`."""
+        sint64_task_id = uint64_to_int64(task_id)
+
+        # We don't check if the task exists before querying logs
+        # because the task_id is validated by the authz layer
+
+        if after_timestamp is None:
+            after_timestamp = 0.0
+
+        # Polling is strict-after: entries at the checkpoint timestamp have
+        # already been delivered.
+        rows = self.query(
+            """
+            SELECT log, timestamp FROM task_logs
+            WHERE task_id = :task_id AND timestamp > :after_timestamp
+            ORDER BY timestamp
+            """,
+            {"task_id": sint64_task_id, "after_timestamp": after_timestamp},
+        )
+        latest_timestamp = rows[-1]["timestamp"] if rows else 0.0
+        return "".join(row["log"] for row in rows), latest_timestamp
+
     def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         task_type: str,
@@ -115,6 +174,7 @@ class SqlCoreState(CoreState, SqlMixin):
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
+        requesting_task_id: int | None = None,
     ) -> int | None:
         """Create a task and return its ID."""
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
@@ -125,10 +185,18 @@ class SqlCoreState(CoreState, SqlMixin):
             (task_id, type, run_id, fab_hash, model_ref, connector_ref, token,
              active_until, pending_at, starting_at, running_at, finished_at,
              sub_status, details)
-            VALUES
-            (:task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
+            SELECT
+             :task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
              :active_until, :pending_at, :starting_at, :running_at, :finished_at,
-             :sub_status, :details);
+             :sub_status, :details
+            WHERE :requesting_task_id IS NULL
+            OR EXISTS (
+                SELECT 1
+                FROM task
+                WHERE task_id = :requesting_task_id
+                AND finished_at IS NULL
+            )
+            RETURNING task_id;
         """
 
         params = {
@@ -140,18 +208,23 @@ class SqlCoreState(CoreState, SqlMixin):
             "connector_ref": connector_ref,
             "token": None,
             "active_until": None,
-            "pending_at": now().isoformat(),
+            "pending_at": now(),
             "starting_at": None,
             "running_at": None,
             "finished_at": None,
             "sub_status": "",
             "details": "",
+            "requesting_task_id": (
+                uint64_to_int64(requesting_task_id)
+                if requesting_task_id is not None
+                else None
+            ),
         }
 
         with self.session():
             try:
-                self.query(insert_query, params)
-                return task_id
+                rows = self.query(insert_query, params)
+                return task_id if rows else None
             except IntegrityError:
                 return None
 
@@ -223,7 +296,10 @@ class SqlCoreState(CoreState, SqlMixin):
             query += " LIMIT :limit"
             params["limit"] = limit
 
-        rows = self.query(query, params)
+        with self.session():
+            # Clean up expired task tokens before querying tasks
+            self._cleanup_expired_task_tokens()
+            rows = self.query(query, params)
 
         result: list[Task] = []
         for row in rows:
@@ -236,9 +312,9 @@ class SqlCoreState(CoreState, SqlMixin):
 
     def claim_task(self, task_id: int) -> str | None:
         """Atomically claim a pending task."""
-        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
+        token = secrets.token_hex(FLWR_TASK_TOKEN_LENGTH)
         claimed_at = now()
-        active_until = int(claimed_at.timestamp()) + HEARTBEAT_DEFAULT_INTERVAL
+        active_until = claimed_at + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
         sint64_task_id = uint64_to_int64(task_id)
         try:
             # The conditional UPDATE is the atomic claim: exactly one caller can
@@ -257,7 +333,7 @@ class SqlCoreState(CoreState, SqlMixin):
                     "task_id": sint64_task_id,
                     "token": token,
                     "active_until": active_until,
-                    "starting_at": claimed_at.isoformat(),
+                    "starting_at": claimed_at,
                 },
             )
             if not rows:
@@ -283,7 +359,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 WHERE task_id = :task_id AND {STATUS_CONDITIONS[Status.STARTING]}
                 RETURNING task_id
                 """,
-                {"task_id": uint64_to_int64(task_id), "running_at": now().isoformat()},
+                {"task_id": uint64_to_int64(task_id), "running_at": now()},
             )
         return len(rows) > 0
 
@@ -311,7 +387,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 """,
                 {
                     "task_id": sint64_task_id,
-                    "finished_at": now().isoformat(),
+                    "finished_at": now(),
                     "sub_status": sub_status,
                     "details": details,
                 },
@@ -325,7 +401,8 @@ class SqlCoreState(CoreState, SqlMixin):
         """Extend heartbeat state for the claimed task."""
         # Heartbeats are accepted only for active, unexpired task claims.
         with self.session():
-            current = int(now().timestamp())
+            current = now()
+            ttl = timedelta(seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL)
             self._cleanup_expired_task_tokens()
             rows = self.query(
                 """
@@ -339,9 +416,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 {
                     "task_id": uint64_to_int64(task_id),
                     "current": current,
-                    "active_until": (
-                        current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-                    ),
+                    "active_until": current + ttl,
                 },
             )
         return len(rows) > 0
@@ -353,11 +428,133 @@ class SqlCoreState(CoreState, SqlMixin):
             SELECT * FROM task
             WHERE token = :token AND active_until >= :current AND finished_at IS NULL
             """,
-            {"token": token, "current": int(now().timestamp())},
+            {"token": token, "current": now()},
         )
         if not rows:
             return None
         return task_from_row(rows[0])
+
+    def store_task_message(self, message: Message) -> bool:
+        """Store one task-addressed Message."""
+        if validate_task_message(message):
+            return False
+
+        with self.session():
+            self._cleanup_expired_task_tokens()
+            message_dict = _task_message_to_row(message)
+            try:
+                inserted = self.query(
+                    """
+                    INSERT INTO task_message (
+                        message_id, run_id, src_task_id, dst_task_id,
+                        reply_to_message_id, created_at, ttl, message_type,
+                        content, error
+                    )
+                    SELECT
+                        :message_id, :run_id, :src_task_id, :dst_task_id,
+                        :reply_to_message_id, :created_at, :ttl, :message_type,
+                        :content, :error
+                    FROM task AS src
+                    JOIN task AS dst
+                        ON dst.task_id = :dst_task_id
+                    WHERE src.task_id = :src_task_id
+                        AND src.run_id = :run_id
+                        AND dst.run_id = :run_id
+                        AND dst.finished_at IS NULL
+                    RETURNING message_id
+                    """,
+                    message_dict,
+                )
+            except IntegrityError:
+                return False
+            return bool(inserted)
+
+    def get_task_message(
+        self,
+        *,
+        dst_task_ids: Sequence[int] | None = None,
+        limit: int | None = None,
+        order_by: Literal["created_at"] | None = None,
+    ) -> Sequence[Message]:
+        """Retrieve undelivered task-addressed Messages."""
+        if order_by not in (None, "created_at"):
+            raise AssertionError("`order_by` must be 'created_at' or None")
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if limit == 0:
+            return []
+        if dst_task_ids is not None and not dst_task_ids:
+            return []
+
+        with self.session():
+            self._cleanup_expired_task_tokens()
+            self._cleanup_invalid_task_messages()
+            rows = self._claim_task_message_rows(dst_task_ids, order_by, limit)
+
+        return [_task_message_from_row(row) for row in rows]
+
+    def _claim_task_message_rows(
+        self,
+        dst_task_ids: Sequence[int] | None,
+        order_by: Literal["created_at"] | None,
+        limit: int | None,
+    ) -> list[dict[str, Any]]:
+        """Atomically claim eligible task Messages."""
+        conditions: list[str] = []
+        params: dict[str, Any] = {}
+
+        # Filter by destination task IDs
+        if dst_task_ids is not None:
+            sint64_dst_task_ids = [uint64_to_int64(t) for t in dst_task_ids]
+            placeholders = ",".join(
+                f":dtid_{i}" for i in range(len(sint64_dst_task_ids))
+            )
+            conditions.append(f"dst_task_id IN ({placeholders})")
+            params.update(
+                {f"dtid_{i}": tid for i, tid in enumerate(sint64_dst_task_ids)}
+            )
+
+        where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        order_clause = f"ORDER BY {order_by}" if order_by else ""
+        limit_clause = "LIMIT :limit" if limit is not None else ""
+
+        if limit is not None:
+            params["limit"] = limit
+
+        if order_by is not None or limit is not None:
+            # Materialize candidates before deleting. Some backends can otherwise
+            # re-evaluate same-table subqueries while DELETE scans rows.
+            # `self.select_lock_sql` is an optional clause for backends that support
+            # row-locking while selecting candidates. Keep it before LIMIT so locked
+            # rows are skipped before limiting the result set.
+            query = f"""
+                WITH selected AS (
+                    SELECT message_id
+                    FROM task_message
+                    {where_clause} {order_clause}
+                    {self.select_lock_sql}
+                    {limit_clause}
+                )
+                DELETE FROM task_message
+                WHERE message_id IN (SELECT message_id FROM selected)
+                RETURNING *
+            """
+        else:
+            query = f"""
+                DELETE FROM task_message
+                {where_clause}
+                RETURNING *
+            """
+
+        rows = self.query(query, params)
+
+        # Sort claimed rows in-memory if requested
+        # `ORDER BY` in the CTE determines which rows are claimed, but SQL does not
+        # guarantee that `DELETE ... RETURNING` returns them in that order.
+        if order_by is not None:
+            rows.sort(key=lambda row: row[order_by])
+
+        return rows
 
     def _cleanup_expired_task_tokens(self) -> None:
         """Remove expired task heartbeat records.
@@ -366,60 +563,46 @@ class SqlCoreState(CoreState, SqlMixin):
         removed.
         """
         expired_at = now()
-        current = int(expired_at.timestamp())
         # Expired task claims are terminal failures and lose their token.
-        self.query(
+        rows = self.query(
             """
             UPDATE task
-            SET token = NULL,
-                active_until = NULL,
-                finished_at = :finished_at,
-                sub_status = :sub_status,
-                details = :details
+            SET token = NULL, finished_at = active_until, active_until = NULL,
+                sub_status = :sub_status, details = :details
             WHERE token IS NOT NULL AND active_until < :current
+            AND finished_at IS NULL
+            RETURNING task_id, type, run_id, fab_hash, model_ref, connector_ref,
+                      pending_at, starting_at, running_at, finished_at,
+                      sub_status, details
             """,
             {
-                "current": current,
-                "finished_at": expired_at.isoformat(),
+                "current": expired_at,
                 "sub_status": SubStatus.FAILED,
                 "details": "No heartbeat received from the task",
             },
         )
+        if rows:
+            self._on_task_tokens_expired([task_from_row(row) for row in rows])
 
-    def _cleanup_expired_tokens(self) -> None:
-        """Remove expired tokens and perform additional cleanup.
-
-        This method is called before token operations to ensure integrity.
-        Subclasses can override `_on_tokens_expired` to add custom cleanup logic.
-        """
-        current = now().timestamp()
-
-        with self.session() as session:
-            # Delete expired tokens and get their run_ids and active_until timestamps
-            query = """
-                DELETE FROM token_store
-                WHERE active_until < :current
-                RETURNING run_id, active_until;
+    def _cleanup_invalid_task_messages(self) -> None:
+        """Remove expired Messages and Messages for invalid destination tasks."""
+        self.query(
             """
-            rows = session.execute(text(query), {"current": current}).mappings().all()
-            expired_records = [
-                (int64_to_uint64(row["run_id"]), row["active_until"]) for row in rows
-            ]
+            DELETE FROM task_message
+            WHERE (created_at + ttl) <= :current
+            """,
+            {"current": now().timestamp()},
+        )
 
-            # Hook for subclasses
-            if expired_records:
-                self._on_tokens_expired(expired_records)
-
-    def _on_tokens_expired(self, expired_records: list[tuple[int, float]]) -> None:
-        """Handle cleanup of expired tokens.
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+        """Handle cleanup of expired task tokens.
 
         Override in subclasses to add custom cleanup logic.
 
         Parameters
         ----------
-        expired_records : list[tuple[int, float]]
-            List of tuples containing (run_id, active_until timestamp)
-            for expired tokens.
+        tasks : list[Task]
+            Tasks whose claims expired and were marked FINISHED:FAILED.
         """
 
     def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:
@@ -471,12 +654,60 @@ def task_from_row(row: dict[str, Any]) -> Task:
         task_id=int64_to_uint64(row["task_id"]),
         type=row["type"],
         run_id=int64_to_uint64(row["run_id"]),
-        pending_at=row["pending_at"],
-        starting_at=row["starting_at"],
-        running_at=row["running_at"],
-        finished_at=row["finished_at"],
+        pending_at=timestamp_to_iso(row["pending_at"]),
+        starting_at=timestamp_to_iso(row["starting_at"]),
+        running_at=timestamp_to_iso(row["running_at"]),
+        finished_at=timestamp_to_iso(row["finished_at"]),
         status=determine_task_status(row),
         fab_hash=row["fab_hash"],
         model_ref=row["model_ref"],
         connector_ref=row["connector_ref"],
     )
+
+
+def _task_message_to_row(message: Message) -> dict[str, Any]:
+    """Convert a task-addressed Message to database row values."""
+    return {
+        "message_id": message.metadata.message_id,
+        "run_id": uint64_to_int64(message.metadata.run_id),
+        "src_task_id": uint64_to_int64(cast(int, message.metadata.src_task_id)),
+        "dst_task_id": uint64_to_int64(cast(int, message.metadata.dst_task_id)),
+        "reply_to_message_id": message.metadata.reply_to_message_id,
+        "created_at": message.metadata.created_at,
+        "ttl": message.metadata.ttl,
+        "message_type": message.metadata.message_type,
+        "content": (
+            recorddict_to_proto(message.content).SerializeToString()
+            if message.has_content()
+            else None
+        ),
+        "error": (
+            error_to_proto(message.error).SerializeToString()
+            if message.has_error()
+            else None
+        ),
+    }
+
+
+def _task_message_from_row(row: dict[str, Any]) -> Message:
+    """Convert a task_message row to a Message."""
+    content, error = None, None
+    if row["content"] is not None:
+        content = recorddict_from_proto(ProtoRecordDict.FromString(row["content"]))
+    if row["error"] is not None:
+        error = error_from_proto(ProtoError.FromString(row["error"]))
+
+    metadata = Metadata(
+        run_id=int64_to_uint64(row["run_id"]),
+        message_id=row["message_id"],
+        src_node_id=SUPERLINK_NODE_ID,
+        dst_node_id=SUPERLINK_NODE_ID,
+        reply_to_message_id=row["reply_to_message_id"] or "",
+        group_id="",  # Task messages don't have this field for now
+        created_at=row["created_at"],
+        ttl=row["ttl"],
+        message_type=row["message_type"],
+        src_task_id=int64_to_uint64(row["src_task_id"]),
+        dst_task_id=int64_to_uint64(row["dst_task_id"]),
+    )
+    return make_message(metadata=metadata, content=content, error=error)

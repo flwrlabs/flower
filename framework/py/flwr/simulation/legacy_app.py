@@ -260,7 +260,7 @@ def start_simulation(
 
     # Initialize Ray
     ray.init(**ray_init_args)
-    cluster_resources = ray.cluster_resources()
+    cluster_resources = ray.cluster_resources()  # type: ignore[no-untyped-call]
     log(
         INFO,
         "Flower VCE: Ray initialized with resources: %s",

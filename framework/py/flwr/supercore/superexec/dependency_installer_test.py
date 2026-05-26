@@ -54,7 +54,7 @@ def _fake_run_cmd(
 def test_exclude_flwr_dependencies_handles_extras_and_markers() -> None:
     """Ensure only the Flower package itself gets filtered out."""
     dependencies = [
-        "flwr[simulation]>=1.0.0; python_version >= '3.10'",
+        "flwr[simulation]>=1.0.0; python_version >= '3.11'",
         "numpy>=1.26.0",
         "flwr @ file:///tmp/flwr.whl",
         "flwr-datasets>=0.5.0",

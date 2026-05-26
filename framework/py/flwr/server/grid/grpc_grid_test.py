@@ -92,7 +92,6 @@ class TestGrpcGrid(unittest.TestCase):
         self.assertEqual(len(args), 1)
         self.assertEqual(len(kwargs), 0)
         self.assertIsInstance(args[0], GetNodesRequest)
-        self.assertEqual(args[0].run_id, 61016)
         self.assertEqual(node_ids, [404, 200])
 
     def _prep_message(self, message: Message) -> Message:

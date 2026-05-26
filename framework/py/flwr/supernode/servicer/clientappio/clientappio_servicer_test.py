@@ -48,7 +48,11 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     iterate_object_tree,
 )
-from flwr.supernode.runtime.run_clientapp import pull_task_input, push_task_output
+from flwr.supernode.runtime.run_clientapp import (
+    pull_task_input,
+    push_message,
+    push_task_output,
+)
 
 from .clientappio_servicer import ClientAppIoServicer
 
@@ -158,9 +162,9 @@ class TestClientAppIoServicer(unittest.TestCase):
         self.mock_stub.PushObject.side_effect = mock_push_object
 
         # Execute
-        _ = push_task_output(
+        push_message(self.mock_stub, message, context)
+        push_task_output(
             stub=self.mock_stub,
-            message=message,
             context=context,
             sub_status=sub_status,
             details=details,
@@ -214,7 +218,6 @@ class TestClientAppIoServicer(unittest.TestCase):
 
     def test_servicer_push_task_output_finishes_task(self) -> None:
         """PushTaskOutput should finish the authenticated task."""
-        token = "test-token"
         run_id = 61016
         task_id = 123
         app_context = Context(
@@ -225,7 +228,6 @@ class TestClientAppIoServicer(unittest.TestCase):
             run_config={"runconfig1": 6.1},
         )
         request = PushTaskOutputRequest(
-            token=token,
             context=context_to_proto(app_context),
             sub_status=SubStatus.COMPLETED,
         )

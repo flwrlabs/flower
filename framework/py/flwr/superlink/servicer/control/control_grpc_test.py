@@ -28,10 +28,16 @@ def test_run_control_api_grpc_adds_runtime_version_interceptor() -> None:
     """Control API server should observe runtime-version metadata."""
     grpc_server = Mock()
     grpc_server.bound_address = "127.0.0.1:9093"
-    with patch(
-        "flwr.superlink.servicer.control.control_grpc.generic_create_grpc_server",
-        return_value=grpc_server,
-    ) as create_grpc_server:
+    with (
+        patch(
+            "flwr.superlink.servicer.control.control_grpc.get_license_plugin",
+            return_value=None,
+        ),
+        patch(
+            "flwr.superlink.servicer.control.control_grpc.generic_create_grpc_server",
+            return_value=grpc_server,
+        ) as create_grpc_server,
+    ):
         run_control_api_grpc(
             address="127.0.0.1:9093",
             state_factory=Mock(),

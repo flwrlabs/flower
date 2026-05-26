@@ -235,6 +235,9 @@ def start_client_internal(
 
     # Launch the SuperExec if the isolation mode is `subprocess`
     if isolation == ISOLATION_MODE_SUBPROCESS:
+        # `bound_address` contains the actual address when the port is set to :0
+        # which means let the OS choose a free port.
+        appio_address = resolve_bind_address(clientappio_server.bound_address)
         command = ["flower-superexec"]
         command += get_client_tls_args(
             insecure=clientappio_certificates is None,
@@ -242,7 +245,7 @@ def start_client_internal(
         )
         command += [
             "--appio-api-address",
-            resolve_bind_address(clientappio_api_address),
+            appio_address,
         ]
         command += ["--plugin-type", ExecPluginType.CLIENT_APP]
         command += ["--parent-pid", str(os.getpid())]

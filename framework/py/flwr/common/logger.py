@@ -444,6 +444,22 @@ def stop_log_uploader(
     log_uploader.join(timeout=timeout)
 
 
+def flush_logs(log_queue: Queue[str | None], timeout: float = 3.0) -> bool:
+    """Wait until queued logs have been consumed by the uploader."""
+    deadline = time.monotonic() + timeout
+    while not log_queue.empty():
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        time.sleep(min(LOG_UPLOAD_INTERVAL, remaining))
+
+    remaining = deadline - time.monotonic()
+    if remaining > 0:
+        # Allow the PushLogs call to complete
+        time.sleep(min(1, remaining))
+    return True
+
+
 def _remove_emojis(text: str) -> str:
     """Remove emojis from the provided text."""
     emoji_pattern = re.compile(

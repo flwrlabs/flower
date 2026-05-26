@@ -179,6 +179,8 @@ def test_create_reply(
                 "message_id": "msg_456",
                 "src_node_id": 1,
                 "dst_node_id": 2,
+                "src_task_id": None,
+                "dst_task_id": None,
                 "reply_to_message_id": "reply_789",
                 "group_id": "group_xyz",
                 "created_at": 1234567890.0,
@@ -279,7 +281,24 @@ def test_create_ins_message_success(
     assert msg.metadata.run_id == 0  # Should be unset
     assert msg.metadata.message_id == ""  # Should be unset
     assert msg.metadata.src_node_id == 0  # Should be unset
+    assert msg.metadata.src_task_id is None
+    assert msg.metadata.dst_task_id is None
     assert msg.metadata.reply_to_message_id == ""  # Should be unset
+
+
+def test_create_ins_message_with_dst_task_id_success() -> None:
+    """Test creating an instruction message with a destination task ID."""
+    # Execute
+    msg = Message(
+        content=RecordDict(),
+        dst_node_id=123,
+        message_type="query",
+        dst_task_id=789,
+    )
+
+    # Assert
+    assert msg.metadata.src_task_id is None
+    assert msg.metadata.dst_task_id == 789
 
 
 @pytest.mark.parametrize(
@@ -292,6 +311,8 @@ def test_create_reply_message_success(
     """Test creating a reply message."""
     # Prepare
     msg = make_message(content=RecordDict(), metadata=RecordMaker(1).metadata())
+    msg.metadata.src_task_id = 123
+    msg.metadata.dst_task_id = 456
     current_time = msg.metadata.created_at
 
     # Execute
@@ -301,6 +322,8 @@ def test_create_reply_message_success(
     assert reply.metadata.run_id == msg.metadata.run_id
     assert reply.metadata.src_node_id == msg.metadata.dst_node_id
     assert reply.metadata.dst_node_id == msg.metadata.src_node_id
+    assert reply.metadata.src_task_id == msg.metadata.dst_task_id
+    assert reply.metadata.dst_task_id == msg.metadata.src_task_id
     assert reply.metadata.reply_to_message_id == msg.metadata.message_id
     assert reply.metadata.group_id == msg.metadata.group_id
     assert current_time < reply.metadata.created_at < now().timestamp()
@@ -344,6 +367,7 @@ def test_create_reply_message_success(
         ((RecordDict(), 123, "query"), {"ttl": "wrong type"}),
         ((RecordDict(), 123, "query"), {"group_id": 123}),
         ((RecordDict(), 123, "query"), {"group_id": 123.0}),
+        ((RecordDict(), 123, "query"), {"dst_task_id": "wrong type"}),
     ],
 )
 def test_create_ins_message_failure(args: Any, kwargs: dict[str, Any]) -> None:
@@ -373,6 +397,7 @@ def test_create_ins_message_failure(args: Any, kwargs: dict[str, Any]) -> None:
         ((Error(0),), {"message_type": "query"}),
         ((RecordDict(),), {"group_id": "group_xyz"}),
         ((Error(0),), {"group_id": "group_xyz"}),
+        ((Error(0),), {"dst_task_id": 456}),
         # Use invalid arg types
         (("wrong type",), {}),
         ((123,), {}),

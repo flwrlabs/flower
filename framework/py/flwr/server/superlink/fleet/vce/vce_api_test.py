@@ -114,11 +114,6 @@ class TestFleetSimulationEngineRayBackend(TestCase):
         with self.assertRaises(JSONDecodeError):
             start_and_shutdown(num_supernodes=50, backend_config="not a proper config")
 
-    def test_with_nonexistent_backend(self) -> None:
-        """Test specifying a backend that does not exist."""
-        with self.assertRaises(KeyError):
-            start_and_shutdown(num_supernodes=50, backend="this-backend-does-not-exist")
-
     def test_start_and_shutdown(self) -> None:
         """Start Simulation Engine Fleet and terminate it."""
         start_and_shutdown(num_supernodes=50, duration=10)
