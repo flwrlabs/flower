@@ -78,9 +78,13 @@ class LaunchResult:
 class Executor(Protocol):
     """SuperExec component that starts TaskExecutor processes from an ExecutionSpec.
 
-    An executor only starts processes and reports the immediate launch outcome;
-    it does not wait, monitor, terminate, reconcile, or report task status.
+    An executor gates capacity, starts processes, and reports the immediate
+    launch outcome; it does not monitor, terminate, reconcile, or report task
+    status.
     """
+
+    def wait_for_capacity(self) -> None:
+        """Wait until the executor can accept one TaskExecutor launch."""
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Start the TaskExecutor process described by the execution spec."""

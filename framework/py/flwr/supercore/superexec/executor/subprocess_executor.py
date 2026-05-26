@@ -28,6 +28,9 @@ from .types import ExecutionSpec, LaunchResult
 class SubprocessExecutor:
     """Run TaskExecutor processes as local subprocesses."""
 
+    def wait_for_capacity(self) -> None:
+        """Return immediately because subprocess launches have no capacity gate."""
+
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Start the TaskExecutor process described by the execution spec."""
         args = [
