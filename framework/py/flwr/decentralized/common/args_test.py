@@ -1,4 +1,4 @@
-# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Inria (cyrille kenfack & davide frey). All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -109,7 +109,7 @@ class TestParseArgsNodes:
     def _parser(self):
         from flwr.decentralized.common.args import _parse_args_nodes
         import argparse
-        
+
         parser = argparse.ArgumentParser()
         _parse_args_nodes(parser)
 
@@ -123,9 +123,7 @@ class TestParseArgsNodes:
     def test_all_expected_args_present(self):
         parser = self._parser()
         option_strings = {
-            a.option_strings[0]
-            for a in parser._actions
-            if a.option_strings
+            a.option_strings[0] for a in parser._actions if a.option_strings
         }
         for flag in (
             "--config",
@@ -164,9 +162,7 @@ class TestParseArgsNodes:
 
         parser = argparse.ArgumentParser()
         _parse_args_nodes(parser)
-        args = parser.parse_args(
-            ["--context", "cls", "--port", "9100"]
-        )
+        args = parser.parse_args(["--context", "cls", "--port", "9100"])
         assert args.context == "cls"
         assert args.port == 9100
 
@@ -314,9 +310,12 @@ class TestGetArgsNodes:
 
         node = get_args_nodes(
             [
-                "--context", "fl",
-                "--address", "192.168.1.1",
-                "--port", "8888",
+                "--context",
+                "fl",
+                "--address",
+                "192.168.1.1",
+                "--port",
+                "8888",
                 "--tcp",
                 "--no-udp",
             ]
@@ -331,8 +330,11 @@ class TestGetArgsNodes:
 
         node = get_args_nodes(
             [
-                "--context", "cls",
-                "--bootnodes", "127.0.0.1:9001", "127.0.0.1:9002",
+                "--context",
+                "cls",
+                "--bootnodes",
+                "127.0.0.1:9001",
+                "127.0.0.1:9002",
             ]
         )
         assert node.bootnodes == ["127.0.0.1:9001", "127.0.0.1:9002"]
@@ -357,9 +359,12 @@ class TestGetArgsNodes:
         with pytest.raises(SystemExit):
             get_args_nodes(
                 [
-                    "--context", "cls",
-                    "--topology-mode", "static",
-                    "--topology-file", str(f),
+                    "--context",
+                    "cls",
+                    "--topology-mode",
+                    "static",
+                    "--topology-file",
+                    str(f),
                     # --node-name missing
                 ]
             )
@@ -372,10 +377,14 @@ class TestGetArgsNodes:
         f.write_text("---")
         node = get_args_nodes(
             [
-                "--context", "cls",
-                "--topology-mode", "static",
-                "--topology-file", str(f),
-                "--node-name", "node_0",
+                "--context",
+                "cls",
+                "--topology-mode",
+                "static",
+                "--topology-file",
+                str(f),
+                "--node-name",
+                "node_0",
             ]
         )
         assert node.context == "cls"
@@ -407,11 +416,14 @@ class TestLoadNodeConfigYaml:
     def test_minimal_yaml(self, _mock_dyn, tmp_path):
         from flwr.decentralized.common.node_config import load_node_config_yaml
 
-        p = self._write(tmp_path, """\
+        p = self._write(
+            tmp_path,
+            """\
             context: classification
             address: 0.0.0.0
             port: 9100
-        """)
+        """,
+        )
         node = load_node_config_yaml(p)
         assert node.context == "classification"
         assert node.address == "0.0.0.0"
@@ -439,12 +451,15 @@ class TestLoadNodeConfigYaml:
     def test_bootnodes(self, _mock_dyn, tmp_path):
         from flwr.decentralized.common.node_config import load_node_config_yaml
 
-        p = self._write(tmp_path, textwrap.dedent("""\
+        p = self._write(
+            tmp_path,
+            textwrap.dedent("""\
             context: cls
             bootnodes:
               - "127.0.0.1:9001"
               - "127.0.0.1:9002"
-        """))
+        """),
+        )
         node = load_node_config_yaml(p)
         assert node.bootnodes == ["127.0.0.1:9001", "127.0.0.1:9002"]
 
@@ -453,12 +468,15 @@ class TestLoadNodeConfigYaml:
         from flwr.decentralized.common.node_config import load_node_config_yaml
         from flwr.decentralized.common.network import NetworkSettings
 
-        p = self._write(tmp_path, textwrap.dedent("""\
+        p = self._write(
+            tmp_path,
+            textwrap.dedent("""\
             context: cls
             network:
               idle_connection_timeout_secs: 30
               enable_mdns: false
-        """))
+        """),
+        )
         node = load_node_config_yaml(p)
         assert isinstance(node.network_settings, NetworkSettings)
         assert node.network_settings.idle_connection_timeout_secs == 30
@@ -469,7 +487,9 @@ class TestLoadNodeConfigYaml:
         from flwr.decentralized.common.node_config import load_node_config_yaml
         from flwr.decentralized.common.sampling import Configuration
 
-        p = self._write(tmp_path, textwrap.dedent("""\
+        p = self._write(
+            tmp_path,
+            textwrap.dedent("""\
             context: cls
             sampling:
               algorithm: gbps
@@ -482,7 +502,8 @@ class TestLoadNodeConfigYaml:
                 propagation_policy: pushpull
                 delay: 5
                 age: 1
-        """))
+        """),
+        )
         node = load_node_config_yaml(p)
         assert isinstance(node.sampling_conf, Configuration)
 
@@ -491,7 +512,9 @@ class TestLoadNodeConfigYaml:
         from flwr.decentralized.common.node_config import load_node_config_yaml
         from flwr.decentralized.common.sampling import Configuration
 
-        p = self._write(tmp_path, textwrap.dedent("""\
+        p = self._write(
+            tmp_path,
+            textwrap.dedent("""\
             context: cls
             sampling:
               algorithm: brahams
@@ -501,7 +524,8 @@ class TestLoadNodeConfigYaml:
                 alpha: 0.45
                 beta: 0.45
                 delay: 3
-        """))
+        """),
+        )
         node = load_node_config_yaml(p)
         assert isinstance(node.sampling_conf, Configuration)
 
@@ -510,7 +534,9 @@ class TestLoadNodeConfigYaml:
         from flwr.decentralized.common.node_config import load_node_config_yaml
         from flwr.decentralized.common.sampling import Configuration
 
-        p = self._write(tmp_path, textwrap.dedent("""\
+        p = self._write(
+            tmp_path,
+            textwrap.dedent("""\
             context: cls
             sampling:
               algorithm: basalt
@@ -518,7 +544,8 @@ class TestLoadNodeConfigYaml:
                 view_size: 6
                 refresh: 3
                 delay: 4
-        """))
+        """),
+        )
         node = load_node_config_yaml(p)
         assert isinstance(node.sampling_conf, Configuration)
 
@@ -526,14 +553,17 @@ class TestLoadNodeConfigYaml:
     def test_unknown_sampling_algorithm_raises(self, _mock_dyn, tmp_path):
         from flwr.decentralized.common.node_config import load_node_config_yaml
 
-        p = self._write(tmp_path, textwrap.dedent("""\
+        p = self._write(
+            tmp_path,
+            textwrap.dedent("""\
             context: cls
             sampling:
               algorithm: unknown_algo
               params:
                 view_size: 5
                 delay: 1
-        """))
+        """),
+        )
         with pytest.raises(ValueError, match="Unknown sampling algorithm"):
             load_node_config_yaml(p)
 
@@ -543,25 +573,28 @@ class TestLoadNodeConfigYaml:
 
         topo = tmp_path / "topo.yaml"
         topo.write_text("---")
-        p = self._write(tmp_path, textwrap.dedent(f"""\
+        p = self._write(
+            tmp_path,
+            textwrap.dedent(f"""\
             context: cls
             topology:
               mode: static
               node_name: node_0
               file: {topo}
-        """))
+        """),
+        )
         node = load_node_config_yaml(p)
         assert node.topology_mode is _STATIC_MODE
 
     @_PATCH_STATIC
     @_PATCH_GENERATE
-    def test_static_topology_auto_generate(
-        self, _mock_gen, _mock_static, tmp_path
-    ):
+    def test_static_topology_auto_generate(self, _mock_gen, _mock_static, tmp_path):
         from flwr.decentralized.common.node_config import load_node_config_yaml
 
         out = tmp_path / "gen_topo.yaml"
-        p = self._write(tmp_path, textwrap.dedent(f"""\
+        p = self._write(
+            tmp_path,
+            textwrap.dedent(f"""\
             context: cls
             topology:
               mode: static
@@ -570,7 +603,8 @@ class TestLoadNodeConfigYaml:
                 node_count: 4
                 kind: ring
                 output_path: {out}
-        """))
+        """),
+        )
         node = load_node_config_yaml(p)
         assert node.topology_mode is _STATIC_MODE
         _mock_gen.assert_called_once()
@@ -609,7 +643,7 @@ class TestLoadNodeConfigToml:
         from flwr.decentralized.common.node_config import load_node_config_toml
 
         p = tmp_path / "node.toml"
-        p.write_text("context = \"original\"\nport = 9100\n")
+        p.write_text('context = "original"\nport = 9100\n')
         node = load_node_config_toml(p, overrides={"context": "overridden"})
         assert node.context == "overridden"
 
@@ -669,7 +703,7 @@ class TestGetArgsNodesWithConfig:
         from flwr.decentralized.common.args import get_args_nodes
 
         cfg = tmp_path / "node.toml"
-        cfg.write_text("context = \"toml_ctx\"\nport = 8100\n")
+        cfg.write_text('context = "toml_ctx"\nport = 8100\n')
         node = get_args_nodes(["--config", str(cfg)])
         assert node.context == "toml_ctx"
         assert node.port == 8100

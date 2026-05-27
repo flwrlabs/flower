@@ -1,3 +1,17 @@
+# Copyright 2026 Inria (cyrille kenfack & davide frey). All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
 """Unit tests for decentralized node orchestration."""
 
 from types import SimpleNamespace
@@ -10,10 +24,14 @@ def test_dnode_dynamic_without_sampling_logs_warning_and_sets_no_config_path() -
     """Dynamic topology without sampling should continue with `config_path=None`."""
     dynamic_mode = object()
 
-    with patch("flwr.decentralized.node.TopologyMode") as topology_mode, patch(
-        "flwr.decentralized.node.Node.__init__",
-        return_value=None,
-    ) as node_init, patch("flwr.decentralized.node.log") as logger:
+    with (
+        patch("flwr.decentralized.node.TopologyMode") as topology_mode,
+        patch(
+            "flwr.decentralized.node.Node.__init__",
+            return_value=None,
+        ) as node_init,
+        patch("flwr.decentralized.node.log") as logger,
+    ):
         topology_mode.dynamic.return_value = dynamic_mode
 
         DNode(

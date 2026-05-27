@@ -1,3 +1,17 @@
+# Copyright 2026 Inria (cyrille kenfack & davide frey). All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
 """NodeApp API for decentralized applications.
 
 `NodeApp` provides a decorator-based API similar to `ClientApp`/`ServerApp`:
@@ -93,6 +107,35 @@ class NodeApp(App):
         node_name: Optional[str] = None,
         timeout: int = 30,
     ) -> None:
+        """Initialize a NodeApp instance.
+
+        Parameters
+        ----------
+        subject : str
+            Logical topic/application name. This value is used as `App.name`.
+        initial_arrays : ArrayRecord | None, default=None
+            Initial arrays for the NodeApp. Represents model parameters or other stateful arrays to be used in training/evaluation.
+        data_config : ConfigRecord | None, default=None
+            Data configuration for the NodeApp.
+        strategy : Strategy | None, default=None
+            Strategy for the NodeApp.
+        run_config : DLRunConfig | Dict[str, Any] | None, default=None
+            Run configuration for the NodeApp.
+        train_config : Optional[ConfigRecord], default=None
+            Training configuration for the NodeApp.
+        eval_config : Optional[ConfigRecord], default=None
+            Evaluation configuration for the NodeApp.
+        mods : list[Mod] | None, default=None
+            List of mods for the NodeApp.
+        elapsed_time : int, default=2
+            Elapsed time for the NodeApp.
+        id : Optional[str], default=None
+            ID for the NodeApp.
+        node_name : Optional[str], default=None
+            Node name for the NodeApp.
+        timeout : int, default=30
+            Timeout for the NodeApp.
+        """
         if isinstance(run_config, dict):
             dl_fields = {field.name for field in dataclasses.fields(DLRunConfig)}
             runtime_run_config = {
@@ -204,6 +247,11 @@ class NodeApp(App):
     def train(self, *, mods: list[Mod] | None = None) -> Callable[[NodeFn], NodeFn]:
         """Register the function handling `train` events.
 
+        Parameters
+        ----------
+        mods : list[Mod] | None, optional
+            List of mods to apply to the train function, by default None.
+
         Returns
         -------
         Callable[[NodeFn], NodeFn]
@@ -218,6 +266,11 @@ class NodeApp(App):
 
     def evaluate(self, *, mods: list[Mod] | None = None) -> Callable[[NodeFn], NodeFn]:
         """Register the function handling `evaluate` events.
+
+        Parameters
+        ----------
+        mods : list[Mod] | None, optional
+            List of mods to apply to the evaluate function, by default None.
 
         Returns
         -------
@@ -236,7 +289,20 @@ class NodeApp(App):
         message_type: str,
         config: ConfigRecord,
     ) -> Message:
-        """Create a Flower `Message` for a NodeApp callback."""
+        """Create a Flower `Message` for a NodeApp callback.
+
+        Parameters
+        ----------
+        message_type : str
+            Type of the message (e.g., "train" or "evaluate").
+        config : ConfigRecord
+            Configuration to include in the message content.
+
+        Returns
+        -------
+        Message
+            A Flower `Message` instance containing the provided configuration and current arrays.
+        """
         record = RecordDict(
             {
                 self.strategy.arrayrecord_key: self.arrays,
@@ -258,7 +324,22 @@ class NodeApp(App):
         state: Optional[RecordDict] = None,
         run_config: Optional[ConfigRecord] = None,
     ) -> Context:
-        """Create a Flower `Context` for a NodeApp callback."""
+        """Create a Flower `Context` for a NodeApp callback.
+
+        Parameters
+        ----------
+        run_id : int, optional
+            The run ID, by default 0.
+        state : Optional[RecordDict], optional
+            The state to include in the context, by default None.
+        run_config : Optional[ConfigRecord], optional
+            The run configuration to include in the context, by default None.
+
+        Returns
+        -------
+        Context
+            A Flower `Context` instance containing the provided configuration and state.
+        """
         resolved_node_config: UserConfig = self.data_config
         if self.id is not None:
             resolved_node_config["node-id"] = self.id
@@ -275,7 +356,18 @@ class NodeApp(App):
     def _parse_run_config(
         run_config: DLRunConfig | Dict[str, Any] | None,
     ) -> DLRunConfig:
-        """Parse a DLRunConfig from a dict or return it if already a DLRunConfig."""
+        """Parse a DLRunConfig from a dict or return it if already a DLRunConfig.
+
+        Parameters
+        ----------
+        run_config : DLRunConfig | Dict[str, Any] | None
+            The run configuration to parse. Can be a DLRunConfig instance, a dict containing DLRunConfig fields, or None.
+
+        Returns
+        -------
+        DLRunConfig
+            A parsed DLRunConfig instance.
+        """
         if run_config is None:
             return DLRunConfig(rounds=1)
 
@@ -305,7 +397,24 @@ class NodeApp(App):
         round_number: int,
         msg: Message | None = None,
     ) -> AggregateRequest:
-        """Create an `AggregateRequest` for peer-to-peer communication."""
+        """Create an `AggregateRequest` for peer-to-peer communication.
+
+        Parameters
+        ----------
+        action : Action
+            The action to perform.
+        source_node_id : str
+            The ID of the source node.
+        round_number : int
+            The round number.
+        msg : Message | None, optional
+            The message to include, by default None.
+
+        Returns
+        -------
+        AggregateRequest
+            The created aggregate request.
+        """
         return AggregateRequest(
             action=action,
             source_node_id=source_node_id,
@@ -356,7 +465,32 @@ class NodeApp(App):
         payload: str | None = None,
         node_id: Optional[str] = None,
     ) -> Message:
-        """Invoke a callback with new-style or legacy arguments."""
+        """Invoke a callback with new-style or legacy arguments.
+
+        If the callback supports the new signature (message, context), it will be called with a
+        constructed Message and Context. Otherwise, it will be called with the legacy signature
+        (message, node_id, run_config, subject, app).
+
+        Parameters
+        ----------
+        callback : NodeFn
+            The callback function to invoke.
+        message_type : str
+            The type of message to create if using the new signature.
+        config : ConfigRecord
+            The configuration to include in the message if using the new signature.
+        context : Optional[Context], optional
+            The context to pass if using the new signature. If None, a context will be created from the config.
+        payload : Optional[str], optional
+            The raw message payload to pass if using the legacy signature, by default None.
+        node_id : Optional[str], optional
+            The node ID to pass if using the legacy signature, by default None.
+
+        Returns
+        -------
+        Message
+            The message returned by the callback, or a newly created message if the callback uses the legacy signature.
+        """
         if self._supports_message_context_signature(callback):
             msg = self.create_message(
                 message_type=message_type,
@@ -522,7 +656,21 @@ class NodeApp(App):
         return False
 
     def handle_message(self, message: str, node_id: Optional[str] = None) -> None:
-        """Route incoming message to the registered `train` or `evaluate` callback."""
+        """Route incoming message to the registered `train` or `evaluate` callback.
+
+        This method first attempts to parse the message as an `AggregateRequest` for peer-to-peer
+        communication. If successful, it validates the request and routes it to the appropriate
+        handler based on the action and protocol. If the message is not an `AggregateRequest`,
+        it falls back to parsing it as a regular event message (e.g., "train" or "evaluate") and
+        invokes the corresponding callback.
+
+        Parameters
+        ----------
+        message : str
+            The raw message payload received by the NodeApp.
+        node_id : Optional[str], optional
+            The ID of the node that sent the message, if available. This is used for legacy callback signatures that require node_id.
+        """
         parsed_aggregate_message: AggregateRequest | None = None
         try:
             parsed_aggregate_message = self.aggregate_request_from_str(message)
@@ -592,7 +740,22 @@ class NodeApp(App):
         )
 
     def periodic_run(self, view: list[str], node_id: Optional[str] = None) -> None:
-        """Default periodic behavior: call registered `train` callback if present."""
+        """Default periodic behavior: call registered `train` callback if present.
+
+        This method is called by the nodemanager framework at intervals defined by `elapsed_time`.
+        It determines the current round and step within the round based on `count_steps` and the
+        configured number of steps per round. If it's the first step of a new round, it invokes
+        the `_training_round` method to execute the training logic. For subsequent steps within
+        the same round, it calls `_try_communication` to potentially send messages to peers based
+        on the current view and communication probability defined in the run configuration.
+
+        Parameters
+        ----------
+        view : list[str]
+            List of peer node IDs currently in view for communication.
+        node_id : Optional[str], optional
+            The ID of this node, if available. This can be used for logging or callback invocation
+        """
 
         if self.node_name is None:
             self.node_name = self.id
@@ -713,9 +876,7 @@ class NodeApp(App):
             )
 
     @staticmethod
-    def _average_array_records(
-        local: ArrayRecord, peer: ArrayRecord
-    ) -> ArrayRecord:
+    def _average_array_records(local: ArrayRecord, peer: ArrayRecord) -> ArrayRecord:
         """Return an equal-weight average of two ``ArrayRecord``s.
 
         This is a lightweight P2P-specific helper that avoids the central-FL
@@ -1009,18 +1170,3 @@ def create_nodeapps_from_pyproject(
         apps[subject] = app
 
     return apps
-
-# def _get_decorator(
-#     app: NodeApp, category: str, action: str, mods: list[Mod] | None
-# ) -> Callable[[NodeFn], NodeFn]:
-#     """Get the decorator for the given category and action."""
-
-#     def decorator(fn: NodeFn) -> NodeFn:
-#         # Register provided function with the NodeApp object
-#         app._registered_funcs[full_name] = make_ffn(fn, app._mods + (mods or []))
-
-#         # Return provided function unmodified
-#         return fn
-
-#     # pylint: enable=protected-access
-#     return decorator

@@ -1,4 +1,4 @@
-# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Inria (cyrille kenfack & davide frey). All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,4 +18,3 @@ This package provides transport-agnostic abstractions to run decentralized
 federated learning with Flower. A future nodemanager integration can be added
 by implementing `DecentralizedRuntime`.
 """
-

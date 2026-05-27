@@ -1,4 +1,4 @@
-# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Inria (cyrille kenfack & davide frey). All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -119,10 +119,10 @@ from flwr.decentralized.common.sampling import (
 )
 from flwr.decentralized.common.typing import DEFAULT_IP_ADDRESS, DEFAULT_PORT
 
-
 # ---------------------------------------------------------------------------
 # Internal builders
 # ---------------------------------------------------------------------------
+
 
 def _build_sampling(sampling_cfg: Dict[str, Any]) -> Configuration:
     """Build a :class:`~flwr.decentralized.common.sampling.Configuration`
@@ -152,9 +152,7 @@ def _build_sampling(sampling_cfg: Dict[str, Any]) -> Configuration:
             view_size=params["view_size"],
             heal=params["heal"],
             swap=params["swap"],
-            selection_policy=SelectionPolicy(
-                params.get("selection_policy", "rand")
-            ),
+            selection_policy=SelectionPolicy(params.get("selection_policy", "rand")),
             propagation_policy=PropagationPolicy(
                 params.get("propagation_policy", "pushpull")
             ),
@@ -203,9 +201,7 @@ def _build_network_settings(net_cfg: Dict[str, Any]) -> NetworkSettings:
     mdns_cfg = net_cfg.get("mdns", {})
 
     return NetworkSettings(
-        idle_connection_timeout_secs=net_cfg.get(
-            "idle_connection_timeout_secs", 60
-        ),
+        idle_connection_timeout_secs=net_cfg.get("idle_connection_timeout_secs", 60),
         max_negotiating_inbound_streams=net_cfg.get(
             "max_negotiating_inbound_streams", 25
         ),
@@ -238,9 +234,7 @@ def _build_network_settings(net_cfg: Dict[str, Any]) -> NetworkSettings:
             query_interval_secs=mdns_cfg.get("query_interval_secs", 300),
             ttl_secs=mdns_cfg.get("ttl_secs", 360),
             enable_ipv6=mdns_cfg.get("enable_ipv6", False),
-            idle_discovery_timeout_secs=mdns_cfg.get(
-                "idle_discovery_timeout_secs", -1
-            ),
+            idle_discovery_timeout_secs=mdns_cfg.get("idle_discovery_timeout_secs", -1),
         ),
     )
 
@@ -274,9 +268,7 @@ def _resolve_topology(
         provided, or if ``node_name`` is missing for static mode.
     """
     mode = topology_cfg.get("mode", "dynamic")
-    resolved_node_name: Optional[str] = node_name or topology_cfg.get(
-        "node_name"
-    )
+    resolved_node_name: Optional[str] = node_name or topology_cfg.get("node_name")
 
     if mode == "dynamic":
         return topology_mode_dynamic()
@@ -314,6 +306,7 @@ def _resolve_topology(
 # ---------------------------------------------------------------------------
 # Public loaders
 # ---------------------------------------------------------------------------
+
 
 def load_node_config_yaml(
     path: Union[str, Path],
@@ -412,6 +405,7 @@ def load_node_config_toml(
 # Core builder
 # ---------------------------------------------------------------------------
 
+
 def _build_runtime_node(
     data: Dict[str, Any],
     overrides: Dict[str, Any],
@@ -429,9 +423,14 @@ def _build_runtime_node(
     -------
     RuntimeNode
     """
+
     def _get(key: str, default: Any = None) -> Any:
         """Override > file > default."""
-        return overrides.get(key) if overrides.get(key) is not None else data.get(key, default)
+        return (
+            overrides.get(key)
+            if overrides.get(key) is not None
+            else data.get(key, default)
+        )
 
     context: str = _get("context", "")
     address: str = _get("address", DEFAULT_IP_ADDRESS)

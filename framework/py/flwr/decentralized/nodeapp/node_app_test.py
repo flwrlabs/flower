@@ -1,3 +1,17 @@
+# Copyright 2026 Inria (cyrille kenfack & davide frey). All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
 """Unit tests for decentralized NodeApp."""
 
 from __future__ import annotations
@@ -15,7 +29,6 @@ from flwr.decentralized.nodeapp import (
 from flwr.decentralized.common.message import AggregateRequest
 from flwr.decentralized.common.typing import Action
 from flwr.decentralized.nodeapp.node_app import _load_handler, _load_object
-
 
 TRAIN_CALLS: list[str] = []
 EVAL_CALLS: list[str] = []
@@ -117,7 +130,7 @@ def test_load_nodeapp_configs_from_pyproject(tmp_path: Path) -> None:
                 "default-timeout = 33",
                 "",
                 "[tool.flwr.nodeapp.apps.trainer]",
-                "subject = \"trainer\"",
+                'subject = "trainer"',
                 "timeout = 20",
                 "",
                 "[tool.flwr.nodeapp.apps.trainer.config]",
@@ -125,7 +138,7 @@ def test_load_nodeapp_configs_from_pyproject(tmp_path: Path) -> None:
                 "lr = 0.1",
                 "",
                 "[tool.flwr.nodeapp.apps.evaluator]",
-                "subject = \"evaluator\"",
+                'subject = "evaluator"',
                 "",
                 "[tool.flwr.nodeapp.apps.evaluator.config]",
                 "batch-size = 64",
@@ -152,7 +165,7 @@ def test_create_nodeapps_from_pyproject(tmp_path: Path) -> None:
                 "default-timeout = 30",
                 "",
                 "[tool.flwr.nodeapp.apps.subject_a]",
-                "subject = \"subject_a\"",
+                'subject = "subject_a"',
                 "",
                 "[tool.flwr.nodeapp.apps.subject_a.config]",
                 "rounds = 5",
@@ -180,9 +193,9 @@ def test_create_nodeapps_from_pyproject_with_handler_mapping(tmp_path: Path) -> 
                 "default-timeout = 30",
                 "",
                 "[tool.flwr.nodeapp.apps.subject_a]",
-                "subject = \"subject_a\"",
-                "train = \"flwr.decentralized.nodeapp.node_app_test:mapped_train_handler\"",
-                "evaluate = \"flwr.decentralized.nodeapp.node_app_test:mapped_evaluate_handler\"",
+                'subject = "subject_a"',
+                'train = "flwr.decentralized.nodeapp.node_app_test:mapped_train_handler"',
+                'evaluate = "flwr.decentralized.nodeapp.node_app_test:mapped_evaluate_handler"',
             ]
         )
     )
@@ -204,8 +217,8 @@ def test_create_nodeapps_from_pyproject_components_style(tmp_path: Path) -> None
         "\n".join(
             [
                 "[tool.flwr.app.components]",
-                "nodeapp1 = \"flwr.decentralized.nodeapp.node_app_test:COMPONENT_APP1\"",
-                "nodeapp2 = \"flwr.decentralized.nodeapp.node_app_test:COMPONENT_APP2\"",
+                'nodeapp1 = "flwr.decentralized.nodeapp.node_app_test:COMPONENT_APP1"',
+                'nodeapp2 = "flwr.decentralized.nodeapp.node_app_test:COMPONENT_APP2"',
             ]
         )
     )
@@ -226,7 +239,7 @@ def test_create_nodeapps_from_pyproject_components_style_invalid_type(
         "\n".join(
             [
                 "[tool.flwr.app.components]",
-                "nodeapp1 = \"pathlib:Path\"",
+                'nodeapp1 = "pathlib:Path"',
             ]
         )
     )

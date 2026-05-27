@@ -1,3 +1,17 @@
+# Copyright 2026 Inria (cyrille kenfack & davide frey). All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
 """Unit tests for `flower_super_dnode` CLI module."""
 
 from __future__ import annotations
@@ -28,8 +42,7 @@ def test_load_nodeapps_from_existing_pyproject_calls_factory(tmp_path: Path) -> 
 
     fake_app = MagicMock(name="app")
     with patch(
-        "flwr.decentralized.superdnode.config.helper."
-        "create_nodeapps_from_pyproject",
+        "flwr.decentralized.superdnode.config.helper." "create_nodeapps_from_pyproject",
         return_value={"a": fake_app},
     ) as factory:
         out = _load_nodeapps_from_pyproject(cfg)
@@ -51,20 +64,28 @@ def test_run_deploy_registers_loaded_apps_and_runs(tmp_path: Path) -> None:
     )
 
     runtime_node = MagicMock(name="runtime_node")
-    runtime_node.to_dnode_kwargs.return_value = {"context": "ctx", "address": "0", "port": 1}
+    runtime_node.to_dnode_kwargs.return_value = {
+        "context": "ctx",
+        "address": "0",
+        "port": 1,
+    }
 
     dnode = MagicMock(name="dnode")
 
-    with patch(
-        "flwr.decentralized.superdnode.cli.flower_super_dnode.get_args_nodes",
-        return_value=runtime_node,
-    ), patch(
-        "flwr.decentralized.superdnode.cli.flower_super_dnode.DNode",
-        return_value=dnode,
-    ), patch(
-        "flwr.decentralized.superdnode.cli.flower_super_dnode."
-        "_load_nodeapps_from_pyproject",
-        return_value=[app_a, app_b],
+    with (
+        patch(
+            "flwr.decentralized.superdnode.cli.flower_super_dnode.get_args_nodes",
+            return_value=runtime_node,
+        ),
+        patch(
+            "flwr.decentralized.superdnode.cli.flower_super_dnode.DNode",
+            return_value=dnode,
+        ),
+        patch(
+            "flwr.decentralized.superdnode.cli.flower_super_dnode."
+            "_load_nodeapps_from_pyproject",
+            return_value=[app_a, app_b],
+        ),
     ):
         _run_deploy(args, ["--context", "ctx", "--port", "1"])
 
@@ -86,20 +107,28 @@ def test_run_deploy_skips_autoload_when_disabled(tmp_path: Path) -> None:
     )
 
     runtime_node = MagicMock(name="runtime_node")
-    runtime_node.to_dnode_kwargs.return_value = {"context": "ctx", "address": "0", "port": 1}
+    runtime_node.to_dnode_kwargs.return_value = {
+        "context": "ctx",
+        "address": "0",
+        "port": 1,
+    }
 
     dnode = MagicMock(name="dnode")
 
-    with patch(
-        "flwr.decentralized.superdnode.cli.flower_super_dnode.get_args_nodes",
-        return_value=runtime_node,
-    ), patch(
-        "flwr.decentralized.superdnode.cli.flower_super_dnode.DNode",
-        return_value=dnode,
-    ), patch(
-        "flwr.decentralized.superdnode.cli.flower_super_dnode."
-        "_load_nodeapps_from_pyproject",
-    ) as loader:
+    with (
+        patch(
+            "flwr.decentralized.superdnode.cli.flower_super_dnode.get_args_nodes",
+            return_value=runtime_node,
+        ),
+        patch(
+            "flwr.decentralized.superdnode.cli.flower_super_dnode.DNode",
+            return_value=dnode,
+        ),
+        patch(
+            "flwr.decentralized.superdnode.cli.flower_super_dnode."
+            "_load_nodeapps_from_pyproject",
+        ) as loader,
+    ):
         _run_deploy(args, ["--context", "ctx", "--port", "1"])
 
     loader.assert_not_called()
@@ -169,14 +198,18 @@ def test_run_simulation_respects_network_config_mode_override(tmp_path: Path) ->
         sampling_period=1000,
     )
 
-    with patch(
-        "flwr.decentralized.superdnode.cli.flower_super_dnode.build_sim_config",
-        return_value=MagicMock(name="sim_config"),
-    ), patch(
-        "flwr.decentralized.superdnode.cli.flower_super_dnode.build_sampling_config",
-        return_value=MagicMock(name="sampling_config"),
-    ) as build_sampling, patch(
-        "flwr.decentralized.superdnode.cli.flower_super_dnode.run_nodeapp_simulation"
+    with (
+        patch(
+            "flwr.decentralized.superdnode.cli.flower_super_dnode.build_sim_config",
+            return_value=MagicMock(name="sim_config"),
+        ),
+        patch(
+            "flwr.decentralized.superdnode.cli.flower_super_dnode.build_sampling_config",
+            return_value=MagicMock(name="sampling_config"),
+        ) as build_sampling,
+        patch(
+            "flwr.decentralized.superdnode.cli.flower_super_dnode.run_nodeapp_simulation"
+        ),
     ):
         _run_simulation(args)
 

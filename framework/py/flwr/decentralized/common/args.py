@@ -1,4 +1,4 @@
-# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Inria (cyrille kenfack & davide frey). All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -150,8 +150,6 @@ def _parse_args_nodes(parser: argparse.ArgumentParser) -> None:
             "Required when --topology-mode is 'static'."
         ),
     )
-
-    # return parser
 
 
 def validate_node_args(

@@ -88,7 +88,7 @@ flwr-serverapp = "flwr.server.serverapp:flwr_serverapp"
 flwr-clientapp = "flwr.supernode.cli:flwr_clientapp"
 flwr-agentapp = "flwr.supercore.cli:flwr_agentapp"
 flwr-model = "flwr.supercore.cli:flwr_model"
-
+# DNode CLI for decentralized learning
 flower-super-dnode = "flwr.decentralized.superdnode.cli.flower_super_dnode:flower_super_dnode"
 flwr-super-dnode = "flwr.decentralized.superdnode.cli.flower_super_dnode:flower_super_dnode"
 

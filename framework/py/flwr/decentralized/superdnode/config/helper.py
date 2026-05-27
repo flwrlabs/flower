@@ -1,3 +1,17 @@
+# Copyright 2026 Inria (cyrille kenfack & davide frey). All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
 import argparse
 from pathlib import Path
 from typing import Any, Sequence
@@ -34,7 +48,9 @@ def _load_simulation_config_file(path: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         return {}
 
-    simulation = data.get("simulation", {}) if isinstance(data.get("simulation"), dict) else {}
+    simulation = (
+        data.get("simulation", {}) if isinstance(data.get("simulation"), dict) else {}
+    )
     latency = data.get("latency", {}) if isinstance(data.get("latency"), dict) else {}
     disconnection = (
         data.get("disconnection", {})
@@ -47,30 +63,46 @@ def _load_simulation_config_file(path: Path) -> dict[str, Any]:
         else {}
     )
     network = data.get("network", {}) if isinstance(data.get("network"), dict) else {}
-    sampling = network.get("sampling", {}) if isinstance(network.get("sampling"), dict) else {}
-    topology = network.get("topology", {}) if isinstance(network.get("topology"), dict) else {}
-    random_topology = topology.get("random", {}) if isinstance(topology.get("random"), dict) else {}
+    sampling = (
+        network.get("sampling", {}) if isinstance(network.get("sampling"), dict) else {}
+    )
+    topology = (
+        network.get("topology", {}) if isinstance(network.get("topology"), dict) else {}
+    )
+    random_topology = (
+        topology.get("random", {}) if isinstance(topology.get("random"), dict) else {}
+    )
 
     flattened: dict[str, Any] = {
         "nb_nodes": simulation.get("nb_nodes", data.get("nb_nodes")),
         "sim_timeout": simulation.get("timeout", data.get("sim_timeout")),
         "max_sim_time": simulation.get("max_sim_time", data.get("max_sim_time")),
         "time_step_ms": simulation.get("time_step_ms", data.get("time_step_ms")),
-        "real_time_factor": simulation.get("real_time_factor", data.get("real_time_factor")),
+        "real_time_factor": simulation.get(
+            "real_time_factor", data.get("real_time_factor")
+        ),
         "multi_thread": simulation.get("multi_thread", data.get("multi_thread")),
         "verbose_sim": simulation.get("verbose", data.get("verbose_sim")),
         "sampling_period": network.get("sampling_period", data.get("sampling_period")),
         "enable_sampling": network.get("enable_sampling", data.get("enable_sampling")),
-        "sampling_config_file": sampling.get("config_file", data.get("sampling_config_file")),
+        "sampling_config_file": sampling.get(
+            "config_file", data.get("sampling_config_file")
+        ),
         "sampling_algorithm": sampling.get("algorithm", data.get("sampling_algorithm")),
         "sampling_view_size": sampling.get("view_size", data.get("sampling_view_size")),
         "sampling_heal": sampling.get("heal", data.get("sampling_heal")),
         "sampling_swap": sampling.get("swap", data.get("sampling_swap")),
-        "sampling_selection_policy": sampling.get("selection_policy", data.get("sampling_selection_policy")),
-        "sampling_propagation_policy": sampling.get("propagation_policy", data.get("sampling_propagation_policy")),
+        "sampling_selection_policy": sampling.get(
+            "selection_policy", data.get("sampling_selection_policy")
+        ),
+        "sampling_propagation_policy": sampling.get(
+            "propagation_policy", data.get("sampling_propagation_policy")
+        ),
         "sampling_delay": sampling.get("delay", data.get("sampling_delay")),
         "sampling_age": sampling.get("age", data.get("sampling_age")),
-        "sampling_sampler_size": sampling.get("sampler_size", data.get("sampling_sampler_size")),
+        "sampling_sampler_size": sampling.get(
+            "sampler_size", data.get("sampling_sampler_size")
+        ),
         "sampling_alpha": sampling.get("alpha", data.get("sampling_alpha")),
         "sampling_beta": sampling.get("beta", data.get("sampling_beta")),
         "sampling_refresh": sampling.get("refresh", data.get("sampling_refresh")),
@@ -78,17 +110,33 @@ def _load_simulation_config_file(path: Path) -> dict[str, Any]:
         "topology_seed": topology.get("seed", data.get("topology_seed")),
         "random_mode": random_topology.get("mode", data.get("random_mode")),
         "random_send_to": random_topology.get("send_to", data.get("random_send_to")),
-        "random_receive_from": random_topology.get("receive_from", data.get("random_receive_from")),
-        "random_min_send_to": random_topology.get("min_send_to", data.get("random_min_send_to")),
-        "random_max_send_to": random_topology.get("max_send_to", data.get("random_max_send_to")),
-        "random_min_receive_from": random_topology.get("min_receive_from", data.get("random_min_receive_from")),
-        "random_max_receive_from": random_topology.get("max_receive_from", data.get("random_max_receive_from")),
+        "random_receive_from": random_topology.get(
+            "receive_from", data.get("random_receive_from")
+        ),
+        "random_min_send_to": random_topology.get(
+            "min_send_to", data.get("random_min_send_to")
+        ),
+        "random_max_send_to": random_topology.get(
+            "max_send_to", data.get("random_max_send_to")
+        ),
+        "random_min_receive_from": random_topology.get(
+            "min_receive_from", data.get("random_min_receive_from")
+        ),
+        "random_max_receive_from": random_topology.get(
+            "max_receive_from", data.get("random_max_receive_from")
+        ),
         "base_latency_ms": latency.get("base_latency_ms", data.get("base_latency_ms")),
         "jitter_factor": latency.get("jitter_factor", data.get("jitter_factor")),
-        "failure_probability": disconnection.get("failure_probability", data.get("failure_probability")),
+        "failure_probability": disconnection.get(
+            "failure_probability", data.get("failure_probability")
+        ),
         "recovery_time": disconnection.get("recovery_time", data.get("recovery_time")),
-        "sync_node_count": synchronization.get("sync_node_count", data.get("sync_node_count")),
-        "sync_interval_ms": synchronization.get("sync_interval_ms", data.get("sync_interval_ms")),
+        "sync_node_count": synchronization.get(
+            "sync_node_count", data.get("sync_node_count")
+        ),
+        "sync_interval_ms": synchronization.get(
+            "sync_interval_ms", data.get("sync_interval_ms")
+        ),
         "max_drift_ms": synchronization.get("max_drift_ms", data.get("max_drift_ms")),
     }
 
@@ -114,9 +162,7 @@ def _apply_simulation_config_overrides(
         parser.error(str(exc))
 
     provided_option_strings = {
-        token.split("=", 1)[0]
-        for token in raw_argv
-        if token.startswith("-")
+        token.split("=", 1)[0] for token in raw_argv if token.startswith("-")
     }
     provided_dests = {
         action.dest
@@ -132,6 +178,7 @@ def _apply_simulation_config_overrides(
             setattr(args, key, value)
 
     return args
+
 
 def _strip_superdnode_only_args(argv: Sequence[str]) -> list[str]:
     """Return argv without SuperDNode-only CLI flags.
