@@ -126,8 +126,8 @@ def _check_mapping_from_recordscalartype_to_scalar(
         if not isinstance(value, get_args(Scalar)):
             raise TypeError(
                 "There is not a 1:1 mapping between `common.Scalar` types and those "
-                "supported in `app.ConfigRecordValues` or "
-                "`app.MetricRecordValues`. Consider casting your values to a type "
+                "supported in `flwr.app.ConfigRecordValues` or "
+                "`flwr.app.MetricRecordValues`. Consider casting your values to a type "
                 "supported by the `common.RecordDict` infrastructure. "
                 f"You used type: {type(value)}"
             )
