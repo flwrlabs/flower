@@ -35,6 +35,14 @@ from .kubernetes_executor import (
 from .types import ExecutionSpec, LaunchResultStatus
 
 
+class _KubernetesApiError(Exception):
+    """Minimal Kubernetes client error used by executor tests."""
+
+    def __init__(self, status: int, reason: str) -> None:
+        super().__init__(reason)
+        self.status = status
+
+
 def _execution_spec(**overrides: Any) -> ExecutionSpec:
     base: dict[str, Any] = {
         "task_type": TaskType.SERVER_APP,
@@ -71,6 +79,20 @@ def _appio_root_certificates(
 ) -> str | None:
     """Return AppIo root certificates for object-building tests."""
     return _get_appio_root_certificates(spec, config)
+
+
+def _contains_value(value: Any, needle: str) -> bool:
+    """Return true if a nested Kubernetes object contains a value."""
+    if value == needle:
+        return True
+    if isinstance(value, dict):
+        return any(
+            _contains_value(nested_key, needle) or _contains_value(nested_value, needle)
+            for nested_key, nested_value in value.items()
+        )
+    if isinstance(value, list):
+        return any(_contains_value(item, needle) for item in value)
+    return False
 
 
 def test_build_appio_credentials_secret_contains_token_and_ca() -> None:
@@ -280,6 +302,156 @@ def test_build_taskexecutor_pod_supports_optional_container_config() -> None:
     assert pod["spec"]["serviceAccountName"] == "flower-superexec"
 
 
+def test_build_taskexecutor_pod_supports_resources_and_placement() -> None:
+    """Test Pod construction includes resource and placement inputs."""
+    resources = {
+        "requests": {"cpu": "500m", "memory": "1Gi"},
+        "limits": {"cpu": "1", "memory": "2Gi"},
+    }
+    node_selector = {"flower.ai/node-pool": "taskexecutors"}
+    tolerations = [
+        {
+            "key": "flower.ai/taskexecutor",
+            "operator": "Equal",
+            "value": "true",
+            "effect": "NoSchedule",
+        }
+    ]
+    affinity: dict[str, Any] = {
+        "podAntiAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": []}
+    }
+
+    pod = _as_dict(
+        _build_taskexecutor_pod(
+            _execution_spec(),
+            _executor_config(
+                resources=resources,
+                node_selector=node_selector,
+                tolerations=tolerations,
+                affinity=affinity,
+                priority_class_name="taskexecutor-priority",
+            ),
+            "root-ca",
+        )
+    )
+
+    assert pod["spec"]["containers"][0]["resources"] == resources
+    assert pod["spec"]["nodeSelector"] == node_selector
+    assert pod["spec"]["tolerations"] == tolerations
+    assert pod["spec"]["affinity"] == affinity
+    assert pod["spec"]["priorityClassName"] == "taskexecutor-priority"
+
+
+def test_build_taskexecutor_pod_supports_labels_annotations_and_security() -> None:
+    """Test Pod construction includes object metadata and security fields."""
+    pod_security_context = {
+        "runAsNonRoot": True,
+        "seccompProfile": {"type": "RuntimeDefault"},
+    }
+    container_security_context = {
+        "allowPrivilegeEscalation": False,
+        "capabilities": {"drop": ["ALL"]},
+    }
+    config = _executor_config(
+        labels={"flower.ai/team": "platform"},
+        annotations={"flower.ai/owner": "superexec"},
+        resource_pool="gpu-pool",
+        pod_security_context=pod_security_context,
+        container_security_context=container_security_context,
+    )
+
+    spec = _execution_spec()
+    appio_root_certificates = _appio_root_certificates(spec, config)
+    secret = _as_dict(
+        _build_appio_credentials_secret(spec, config, appio_root_certificates)
+    )
+    pod = _as_dict(_build_taskexecutor_pod(spec, config, appio_root_certificates))
+
+    expected_labels = {
+        "app.kubernetes.io/name": "flower",
+        "app.kubernetes.io/component": "taskexecutor",
+        "flower.ai/superexec-task-id": "123",
+        "flower.ai/task-type": "flwr-serverapp",
+        "flower.ai/resource-pool": "gpu-pool",
+        "flower.ai/team": "platform",
+    }
+    assert secret["metadata"]["labels"] == expected_labels
+    assert secret["metadata"]["annotations"] == {"flower.ai/owner": "superexec"}
+    assert pod["metadata"]["labels"] == expected_labels
+    assert pod["metadata"]["annotations"] == {"flower.ai/owner": "superexec"}
+    assert pod["spec"]["securityContext"] == pod_security_context
+    assert pod["spec"]["containers"][0]["securityContext"] == container_security_context
+
+
+def test_build_taskexecutor_pod_never_exposes_token_in_container_spec() -> None:
+    """Test task token is mounted by file and never in command, args, or env."""
+    spec = _execution_spec()
+    config = _executor_config()
+    pod = _as_dict(
+        _build_taskexecutor_pod(spec, config, _appio_root_certificates(spec, config))
+    )
+    container = pod["spec"]["containers"][0]
+
+    assert "env" not in container
+    assert not _contains_value(container["command"], "task-token")
+    assert not _contains_value(container["args"], "task-token")
+
+
+def test_config_rejects_extra_labels_that_override_stable_labels() -> None:
+    """Test extra labels cannot replace executor-owned stable labels."""
+    with pytest.raises(ValueError, match="must not override stable labels"):
+        _executor_config(labels={"flower.ai/superexec-task-id": "999"})
+
+
+def test_config_rejects_empty_annotation_entries() -> None:
+    """Test annotation entries must be explicit non-empty strings."""
+    with pytest.raises(ValueError, match="Kubernetes annotations"):
+        _executor_config(annotations={"flower.ai/owner": ""})
+
+
+def test_config_rejects_non_string_node_selector_entries() -> None:
+    """Test node selector entries must be strings."""
+    with pytest.raises(ValueError, match="Node selector entries must be strings"):
+        _executor_config(node_selector={"flower.ai/gpu": True})
+
+
+def test_config_freezes_extra_labels_after_validation() -> None:
+    """Test validated labels cannot be mutated after config construction."""
+    labels = {"flower.ai/team": "platform"}
+    config = _executor_config(labels=labels)
+    labels["flower.ai/superexec-task-id"] = "999"
+
+    spec = _execution_spec()
+    secret = _as_dict(
+        _build_appio_credentials_secret(
+            spec, config, _appio_root_certificates(spec, config)
+        )
+    )
+
+    assert secret["metadata"]["labels"]["flower.ai/team"] == "platform"
+    assert secret["metadata"]["labels"]["flower.ai/superexec-task-id"] == "123"
+    assert config.labels is not None
+    with pytest.raises(TypeError):
+        config.labels["flower.ai/other"] = "value"
+
+
+def test_config_freezes_nested_json_config_after_validation() -> None:
+    """Test nested JSON config cannot be mutated after config construction."""
+    resources = {"requests": {"cpu": "500m", "memory": "1Gi"}}
+    tolerations = [{"key": "flower.ai/taskexecutor", "value": "true"}]
+    config = _executor_config(resources=resources, tolerations=tolerations)
+    resources["requests"]["cpu"] = "4"
+    tolerations[0]["value"] = "false"
+
+    pod = _as_dict(_build_taskexecutor_pod(_execution_spec(), config, "root-ca"))
+
+    assert pod["spec"]["containers"][0]["resources"]["requests"]["cpu"] == "500m"
+    assert pod["spec"]["tolerations"][0]["value"] == "true"
+    assert config.resources is not None
+    with pytest.raises(TypeError):
+        cast(dict[str, Any], config.resources["requests"])["cpu"] = "4"
+
+
 def test_launch_submits_secret_before_pod_and_returns_accepted() -> None:
     """Test launch creates the Secret before the Pod and returns accepted."""
     client = Mock()
@@ -300,31 +472,68 @@ def test_launch_submits_secret_before_pod_and_returns_accepted() -> None:
     ]
 
 
-def test_launch_returns_failed_if_secret_create_fails() -> None:
-    """Test launch fails without creating the Pod if Secret creation fails."""
+def test_launch_returns_capacity_rejected_if_secret_create_hits_quota() -> None:
+    """Test launch maps Secret quota rejection without creating the Pod."""
     client = Mock()
-    client.create_namespaced_secret.side_effect = RuntimeError("secret denied")
+    client.create_namespaced_secret.side_effect = _KubernetesApiError(
+        403, "exceeded quota: object-counts"
+    )
 
     result = KubernetesExecutor(client=client, config=_executor_config()).launch(
         _execution_spec()
     )
 
-    assert result.status == LaunchResultStatus.FAILED
-    assert result.message == "RuntimeError: secret denied"
+    assert result.status == LaunchResultStatus.CAPACITY_REJECTED
+    assert result.message == "_KubernetesApiError: exceeded quota: object-counts"
     client.create_namespaced_pod.assert_not_called()
 
 
-def test_launch_returns_failed_if_pod_create_fails() -> None:
-    """Test launch fails after Secret creation if Pod creation fails."""
+def test_launch_returns_capacity_rejected_if_pod_create_is_rate_limited() -> None:
+    """Test launch maps Pod capacity rejection after Secret creation."""
     client = Mock()
-    client.create_namespaced_pod.side_effect = RuntimeError("pod denied")
+    client.create_namespaced_pod.side_effect = _KubernetesApiError(
+        429, "too many requests"
+    )
+
+    result = KubernetesExecutor(client=client, config=_executor_config()).launch(
+        _execution_spec()
+    )
+
+    assert result.status == LaunchResultStatus.CAPACITY_REJECTED
+    assert result.message == "_KubernetesApiError: too many requests"
+    client.create_namespaced_secret.assert_called_once()
+    client.create_namespaced_pod.assert_called_once()
+
+
+def test_launch_returns_failed_for_clear_non_capacity_failure() -> None:
+    """Test launch maps clear non-capacity API failures to failed."""
+    client = Mock()
+    client.create_namespaced_secret.side_effect = _KubernetesApiError(
+        401, "unauthorized"
+    )
 
     result = KubernetesExecutor(client=client, config=_executor_config()).launch(
         _execution_spec()
     )
 
     assert result.status == LaunchResultStatus.FAILED
-    assert result.message == "RuntimeError: pod denied"
+    assert result.message == "_KubernetesApiError: unauthorized"
+    client.create_namespaced_pod.assert_not_called()
+
+
+def test_launch_returns_unknown_for_ambiguous_server_failure() -> None:
+    """Test launch maps ambiguous server failures to unknown."""
+    client = Mock()
+    client.create_namespaced_pod.side_effect = _KubernetesApiError(
+        503, "service unavailable"
+    )
+
+    result = KubernetesExecutor(client=client, config=_executor_config()).launch(
+        _execution_spec()
+    )
+
+    assert result.status == LaunchResultStatus.UNKNOWN
+    assert result.message == "_KubernetesApiError: service unavailable"
     client.create_namespaced_secret.assert_called_once()
     client.create_namespaced_pod.assert_called_once()
 

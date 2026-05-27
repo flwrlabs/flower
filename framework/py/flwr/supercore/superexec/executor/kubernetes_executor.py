@@ -14,9 +14,11 @@
 # ==============================================================================
 """Kubernetes executor for SuperExec TaskExecutor processes."""
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from types import MappingProxyType
+from typing import Protocol, cast
 
 from flwr.supercore.constant import (
     TASK_TYPE_TO_APPIO_API_ADDRESS_ARG,
@@ -42,7 +44,7 @@ class KubernetesClient(Protocol):
 
 
 @dataclass(frozen=True)
-class KubernetesExecutorConfig:
+class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
     """Configuration needed to build one TaskExecutor Pod and Secret.
 
     appio_root_certificates contains optional PEM data mounted as ca.crt. If unset,
@@ -53,6 +55,16 @@ class KubernetesExecutorConfig:
     image: str
     appio_root_certificates: str | None = None
     image_pull_policy: str | None = None
+    labels: dict[str, str] | None = None
+    annotations: dict[str, str] | None = None
+    resource_pool: str | None = None
+    resources: JSONObject | None = None
+    node_selector: dict[str, str] | None = None
+    tolerations: list[JSONObject] | None = None
+    affinity: JSONObject | None = None
+    priority_class_name: str | None = None
+    pod_security_context: JSONObject | None = None
+    container_security_context: JSONObject | None = None
     # Optional Pod field only; service account policy/RBAC is decided elsewhere.
     service_account_name: str | None = None
 
@@ -72,6 +84,19 @@ class KubernetesExecutorConfig:
             self.service_account_name.strip()
         ):
             raise ValueError("Service account name must not be empty.")
+        if self.resource_pool is not None and not self.resource_pool.strip():
+            raise ValueError("Resource pool must not be empty.")
+        if self.priority_class_name is not None and not (
+            self.priority_class_name.strip()
+        ):
+            raise ValueError("Priority class name must not be empty.")
+        if self.labels is not None:
+            _validate_labels(self.labels)
+        if self.annotations is not None:
+            _validate_string_map("Kubernetes annotations", self.annotations)
+        if self.node_selector is not None:
+            _validate_string_map("Node selector", self.node_selector)
+        _freeze_mutable_config(self)
 
 
 class KubernetesExecutor:
@@ -103,7 +128,7 @@ class KubernetesExecutor:
             self._client.create_namespaced_secret(self._config.namespace, secret)
             self._client.create_namespaced_pod(self._config.namespace, pod)
         except Exception as exc:  # pylint: disable=broad-exception-caught
-            return LaunchResult.failed(f"{type(exc).__name__}: {exc}")
+            return _launch_result_from_exception(exc)
 
         return LaunchResult.accepted()
 
@@ -121,11 +146,7 @@ def _build_appio_credentials_secret(
     return {
         "apiVersion": "v1",
         "kind": "Secret",
-        "metadata": {
-            "name": _credential_secret_name(spec),
-            "namespace": config.namespace,
-            "labels": _labels(spec),
-        },
+        "metadata": _metadata(_credential_secret_name(spec), spec, config),
         "type": "Opaque",
         "stringData": data,
     }
@@ -152,6 +173,12 @@ def _build_taskexecutor_pod(
     }
     if config.image_pull_policy is not None:
         container["imagePullPolicy"] = config.image_pull_policy
+    if config.resources is not None:
+        container["resources"] = _copy_json_object(config.resources)
+    if config.container_security_context is not None:
+        container["securityContext"] = _copy_json_object(
+            config.container_security_context
+        )
 
     pod_spec: JSONObject = {
         "automountServiceAccountToken": False,
@@ -169,15 +196,23 @@ def _build_taskexecutor_pod(
     }
     if config.service_account_name is not None:
         pod_spec["serviceAccountName"] = config.service_account_name
+    if config.node_selector is not None:
+        pod_spec["nodeSelector"] = cast(JSONObject, dict(config.node_selector))
+    if config.tolerations is not None:
+        pod_spec["tolerations"] = [
+            _copy_json_object(toleration) for toleration in config.tolerations
+        ]
+    if config.affinity is not None:
+        pod_spec["affinity"] = _copy_json_object(config.affinity)
+    if config.priority_class_name is not None:
+        pod_spec["priorityClassName"] = config.priority_class_name
+    if config.pod_security_context is not None:
+        pod_spec["securityContext"] = _copy_json_object(config.pod_security_context)
 
     return {
         "apiVersion": "v1",
         "kind": "Pod",
-        "metadata": {
-            "name": _pod_name(spec),
-            "namespace": config.namespace,
-            "labels": _labels(spec),
-        },
+        "metadata": _metadata(_pod_name(spec), spec, config),
         "spec": pod_spec,
     }
 
@@ -227,11 +262,165 @@ def _credential_secret_name(spec: ExecutionSpec) -> str:
     return f"{_pod_name(spec)}-appio"
 
 
-def _labels(spec: ExecutionSpec) -> JSONObject:
+def _metadata(
+    name: str, spec: ExecutionSpec, config: KubernetesExecutorConfig
+) -> JSONObject:
+    """Return Kubernetes object metadata."""
+    metadata: JSONObject = {
+        "name": name,
+        "namespace": config.namespace,
+        "labels": _labels(spec, config),
+    }
+    if config.annotations is not None:
+        metadata["annotations"] = cast(JSONObject, dict(config.annotations))
+    return metadata
+
+
+def _labels(spec: ExecutionSpec, config: KubernetesExecutorConfig) -> JSONObject:
     """Return stable labels for Kubernetes objects."""
-    return {
+    labels: JSONObject = {
         "app.kubernetes.io/name": "flower",
         "app.kubernetes.io/component": "taskexecutor",
         "flower.ai/superexec-task-id": str(spec.task_id),
         "flower.ai/task-type": spec.task_type.value,
     }
+    if config.resource_pool is not None:
+        labels["flower.ai/resource-pool"] = config.resource_pool
+    if config.labels is not None:
+        labels.update(config.labels)
+    return labels
+
+
+def _validate_labels(labels: dict[str, str]) -> None:
+    """Validate that caller-provided labels do not replace stable labels."""
+    stable_label_names = {
+        "app.kubernetes.io/name",
+        "app.kubernetes.io/component",
+        "flower.ai/superexec-task-id",
+        "flower.ai/task-type",
+        "flower.ai/resource-pool",
+    }
+    conflicts = sorted(stable_label_names.intersection(labels))
+    if conflicts:
+        raise ValueError(
+            f"Kubernetes labels must not override stable labels: {conflicts}"
+        )
+    _validate_string_map("Kubernetes labels", labels)
+
+
+def _validate_string_map(name: str, values: dict[str, str]) -> None:
+    """Validate that mapping entries are non-empty strings."""
+    for key, value in values.items():
+        if not isinstance(key, str) or not isinstance(value, str):
+            raise ValueError(f"{name} entries must be strings.")
+        if not key.strip() or not value.strip():
+            raise ValueError(f"{name} entries must not be empty.")
+
+
+def _freeze_mutable_config(config: KubernetesExecutorConfig) -> None:
+    """Replace mutable config inputs with immutable defensive copies."""
+    if config.labels is not None:
+        object.__setattr__(config, "labels", MappingProxyType(dict(config.labels)))
+    if config.annotations is not None:
+        object.__setattr__(
+            config, "annotations", MappingProxyType(dict(config.annotations))
+        )
+    if config.resources is not None:
+        object.__setattr__(config, "resources", _freeze_json_object(config.resources))
+    if config.node_selector is not None:
+        object.__setattr__(
+            config, "node_selector", MappingProxyType(dict(config.node_selector))
+        )
+    if config.tolerations is not None:
+        object.__setattr__(
+            config,
+            "tolerations",
+            tuple(_freeze_json_object(toleration) for toleration in config.tolerations),
+        )
+    if config.affinity is not None:
+        object.__setattr__(config, "affinity", _freeze_json_object(config.affinity))
+    if config.pod_security_context is not None:
+        object.__setattr__(
+            config,
+            "pod_security_context",
+            _freeze_json_object(config.pod_security_context),
+        )
+    if config.container_security_context is not None:
+        object.__setattr__(
+            config,
+            "container_security_context",
+            _freeze_json_object(config.container_security_context),
+        )
+
+
+def _freeze_json_object(value: JSONObject) -> Mapping[str, object]:
+    """Return an immutable copy of a JSON object."""
+    return cast(Mapping[str, object], _freeze_json_value(value))
+
+
+def _freeze_json_value(value: object) -> object:
+    """Return an immutable copy of a JSON-compatible value."""
+    if isinstance(value, Mapping):
+        return MappingProxyType(
+            {key: _freeze_json_value(nested) for key, nested in value.items()}
+        )
+    if isinstance(value, Sequence) and not isinstance(value, str):
+        return tuple(_freeze_json_value(nested) for nested in value)
+    return value
+
+
+def _copy_json_object(value: object) -> JSONObject:
+    """Return a mutable plain-dict copy of a frozen JSON object."""
+    return cast(JSONObject, _copy_json_value(value))
+
+
+def _copy_json_value(value: object) -> object:
+    """Return a mutable copy of a JSON-compatible value."""
+    if isinstance(value, Mapping):
+        return {key: _copy_json_value(nested) for key, nested in value.items()}
+    if isinstance(value, Sequence) and not isinstance(value, str):
+        return [_copy_json_value(nested) for nested in value]
+    return value
+
+
+def _launch_result_from_exception(exc: Exception) -> LaunchResult:
+    """Map immediate Kubernetes API exceptions to launch results."""
+    message = f"{type(exc).__name__}: {exc}"
+    status = _exception_status(exc)
+    lower_message = message.lower()
+
+    if isinstance(exc, (ConnectionError, TimeoutError)):
+        return LaunchResult.unknown(message)
+
+    if status == 429 or _is_capacity_message(lower_message):
+        return LaunchResult.capacity_rejected(message)
+
+    if status is not None and (status == 408 or status >= 500):
+        return LaunchResult.unknown(message)
+
+    return LaunchResult.failed(message)
+
+
+def _exception_status(exc: Exception) -> int | None:
+    """Return an HTTP-like status from Kubernetes client exceptions."""
+    status = getattr(exc, "status", None)
+    if isinstance(status, int):
+        return status
+    if isinstance(status, str) and status.isdigit():
+        return int(status)
+    return None
+
+
+def _is_capacity_message(message: str) -> bool:
+    """Return true for quota/admission capacity rejection messages."""
+    capacity_markers = (
+        "exceeded quota",
+        "resourcequota",
+        "quota exceeded",
+        "too many requests",
+        "rate limit",
+        "insufficient cpu",
+        "insufficient memory",
+        "insufficient pods",
+    )
+    return any(marker in message for marker in capacity_markers)
