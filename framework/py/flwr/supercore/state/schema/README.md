@@ -111,6 +111,7 @@ erDiagram
   run_series {
     TIMESTAMP created_at
     VARCHAR description "nullable"
+    VARCHAR federation
     VARCHAR flwr_aid
     BIGINT last_run_id "nullable"
     VARCHAR series_id PK

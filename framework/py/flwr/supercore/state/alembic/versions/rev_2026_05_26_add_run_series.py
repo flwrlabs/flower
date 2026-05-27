@@ -43,6 +43,7 @@ def upgrade() -> None:
         "run_series",
         sa.Column("series_id", sa.String(), nullable=False),
         sa.Column("flwr_aid", sa.String(), nullable=False),
+        sa.Column("federation", sa.String(), nullable=False),
         sa.Column("description", sa.String(), nullable=True),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("updated_at", sa.TIMESTAMP(timezone=True), nullable=False),
