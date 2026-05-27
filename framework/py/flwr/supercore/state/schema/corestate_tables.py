@@ -64,17 +64,11 @@ def create_corestate_metadata() -> MetaData:
         "run_series",
         metadata,
         Column("series_id", String, primary_key=True, nullable=False),
-        Column("flwr_aid", String, nullable=False),
         Column("federation", String, nullable=False),
         Column("description", String, nullable=True),
         Column("created_at", TIMESTAMP(timezone=True), nullable=False),
         Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
         Column("last_run_id", BigInteger, nullable=True),
-    )
-    Index(
-        "idx_run_series_flwr_aid_updated_at",
-        run_series.c.flwr_aid,
-        run_series.c.updated_at,
     )
 
     # --------------------------------------------------------------------------
