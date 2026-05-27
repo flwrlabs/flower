@@ -252,4 +252,5 @@ message StreamRunEventsResponse {
   string event = 1;
   string data = 2;
   uint64 id = 3;
+  uint64 task_id = 4;
 }

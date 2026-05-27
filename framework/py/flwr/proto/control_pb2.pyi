@@ -821,16 +821,19 @@ class StreamRunEventsResponse(google.protobuf.message.Message):
     EVENT_FIELD_NUMBER: builtins.int
     DATA_FIELD_NUMBER: builtins.int
     ID_FIELD_NUMBER: builtins.int
+    TASK_ID_FIELD_NUMBER: builtins.int
     event: builtins.str
     data: builtins.str
     id: builtins.int
+    task_id: builtins.int
     def __init__(
         self,
         *,
         event: builtins.str = ...,
         data: builtins.str = ...,
         id: builtins.int = ...,
+        task_id: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["data", b"data", "event", b"event", "id", b"id"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "event", b"event", "id", b"id", "task_id", b"task_id"]) -> None: ...
 
 global___StreamRunEventsResponse = StreamRunEventsResponse
