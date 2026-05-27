@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "simulation-static-graph-sampling-decentralized-pytorch"
+version = "0.1.0"
+description = "Flower decentralized simulation example with static graph + sampling (PyTorch)"
+dependencies = [
+  "flwr[decentralized]>=1.30.0",
+  "flwr-datasets[vision]>=0.6.0",
+  "torch==2.8.0",
+  "torchvision==0.23.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["quickstart_decentralized_pytorch"]
+
+[project.scripts]
+run-simulation-static-graph-sampling-decentralized-pytorch = "quickstart_decentralized_pytorch.run:simulation_static_graph_sampling"
+
+[tool.flwr.app.components]
+nodeapp1 = "quickstart_decentralized_pytorch.node_apps:app"
