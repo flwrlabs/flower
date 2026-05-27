@@ -17,137 +17,89 @@
 from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
+from flwr.app.constants import DEFAULT_TTL as DEFAULT_TTL
+from flwr.app.message_type import MessageType as MessageType
+from flwr.app.typing import ConfigRecordValues as ConfigRecordValues
+from flwr.app.typing import ConfigScalar as ConfigScalar
+from flwr.app.typing import ConfigScalarList as ConfigScalarList
+from flwr.app.typing import MetricRecordValues as MetricRecordValues
+from flwr.app.typing import MetricScalar as MetricScalar
+from flwr.app.typing import MetricScalarList as MetricScalarList
+
+from ..app.error import Error as Error
+from ..app.metadata import Metadata as Metadata
+from ..supercore.date import now as now
+from .constant import MessageTypeLegacy as MessageTypeLegacy
+from .grpc import GRPC_MAX_MESSAGE_LENGTH
+from .logger import configure as configure
+from .logger import log as log
+from .parameter import bytes_to_ndarray as bytes_to_ndarray
+from .parameter import ndarray_to_bytes as ndarray_to_bytes
+from .parameter import ndarrays_to_parameters as ndarrays_to_parameters
+from .parameter import parameters_to_ndarrays as parameters_to_ndarrays
+from .telemetry import EventType as EventType
+from .telemetry import event as event
+from .typing import ClientMessage as ClientMessage
+from .typing import Code as Code
+from .typing import Config as Config
+from .typing import DisconnectRes as DisconnectRes
+from .typing import EvaluateIns as EvaluateIns
+from .typing import EvaluateRes as EvaluateRes
+from .typing import FitIns as FitIns
+from .typing import FitRes as FitRes
+from .typing import GetParametersIns as GetParametersIns
+from .typing import GetParametersRes as GetParametersRes
+from .typing import GetPropertiesIns as GetPropertiesIns
+from .typing import GetPropertiesRes as GetPropertiesRes
+from .typing import Metrics as Metrics
+from .typing import MetricsAggregationFn as MetricsAggregationFn
+from .typing import NDArray as NDArray
+from .typing import NDArrays as NDArrays
+from .typing import Parameters as Parameters
+from .typing import Properties as Properties
+from .typing import ReconnectIns as ReconnectIns
+from .typing import Scalar as Scalar
+from .typing import ServerMessage as ServerMessage
+from .typing import Status as Status
+
 if TYPE_CHECKING:
-    from flwr.app import Error, MessageType, Metadata
-    from flwr.app.constants import DEFAULT_TTL
-    from flwr.app.message import (
-        Array,
-        ArrayRecord,
-        ConfigRecord,
-        Context,
-        Message,
-        MetricRecord,
-        RecordDict,
-    )
-    from flwr.app.typing import (
-        ConfigRecordValues,
-        ConfigScalar,
-        ConfigScalarList,
-        MetricRecordValues,
-        MetricScalar,
-        MetricScalarList,
-    )
-    from flwr.common.constant import MessageTypeLegacy
-    from flwr.common.grpc import GRPC_MAX_MESSAGE_LENGTH
-    from flwr.common.logger import configure, log
-    from flwr.common.parameter import (
-        bytes_to_ndarray,
-        ndarray_to_bytes,
-        ndarrays_to_parameters,
-        parameters_to_ndarrays,
-    )
-    from flwr.common.record.conversion_utils import array_from_numpy
-    from flwr.common.telemetry import EventType, event
-    from flwr.common.typing import (
-        ClientMessage,
-        Code,
-        Config,
-        DisconnectRes,
-        EvaluateIns,
-        EvaluateRes,
-        FitIns,
-        FitRes,
-        GetParametersIns,
-        GetParametersRes,
-        GetPropertiesIns,
-        GetPropertiesRes,
-        Metrics,
-        MetricsAggregationFn,
-        NDArray,
-        NDArrays,
-        Parameters,
-        Properties,
-        ReconnectIns,
-        Scalar,
-        ServerMessage,
-        Status,
-    )
-    from flwr.compat.common.record import (
-        ConfigsRecord,
-        MetricsRecord,
-        ParametersRecord,
-        RecordSet,
-    )
-    from flwr.supercore.date import now
+    from ..app.message import Array as Array
+    from ..app.message import ArrayRecord as ArrayRecord
+    from ..app.message import ConfigRecord as ConfigRecord
+    from ..app.message import Context as Context
+    from ..app.message import Message as Message
+    from ..app.message import MetricRecord as MetricRecord
+    from ..app.message import RecordDict as RecordDict
+    from ..compat.common.record import ConfigsRecord as ConfigsRecord
+    from ..compat.common.record import MetricsRecord as MetricsRecord
+    from ..compat.common.record import ParametersRecord as ParametersRecord
+    from ..compat.common.record import RecordSet as RecordSet
+    from .record import array_from_numpy as array_from_numpy
 
 _LAZY_EXPORTS = {
     "Array": ("flwr.app.message", "Array"),
     "ArrayRecord": ("flwr.app.message", "ArrayRecord"),
-    "ClientMessage": ("flwr.common.typing", "ClientMessage"),
-    "Code": ("flwr.common.typing", "Code"),
-    "Config": ("flwr.common.typing", "Config"),
     "ConfigRecord": ("flwr.app.message", "ConfigRecord"),
-    "ConfigRecordValues": ("flwr.app", "ConfigRecordValues"),
-    "ConfigScalar": ("flwr.app", "ConfigScalar"),
-    "ConfigScalarList": ("flwr.app", "ConfigScalarList"),
     "ConfigsRecord": ("flwr.compat.common.record", "ConfigsRecord"),
     "Context": ("flwr.app.message", "Context"),
-    "DEFAULT_TTL": ("flwr.app", "DEFAULT_TTL"),
-    "DisconnectRes": ("flwr.common.typing", "DisconnectRes"),
-    "Error": ("flwr.app", "Error"),
-    "EvaluateIns": ("flwr.common.typing", "EvaluateIns"),
-    "EvaluateRes": ("flwr.common.typing", "EvaluateRes"),
-    "EventType": ("flwr.common.telemetry", "EventType"),
-    "FitIns": ("flwr.common.typing", "FitIns"),
-    "FitRes": ("flwr.common.typing", "FitRes"),
-    "GRPC_MAX_MESSAGE_LENGTH": ("flwr.common.grpc", "GRPC_MAX_MESSAGE_LENGTH"),
-    "GetParametersIns": ("flwr.common.typing", "GetParametersIns"),
-    "GetParametersRes": ("flwr.common.typing", "GetParametersRes"),
-    "GetPropertiesIns": ("flwr.common.typing", "GetPropertiesIns"),
-    "GetPropertiesRes": ("flwr.common.typing", "GetPropertiesRes"),
     "Message": ("flwr.app.message", "Message"),
-    "MessageType": ("flwr.app", "MessageType"),
-    "MessageTypeLegacy": ("flwr.common.constant", "MessageTypeLegacy"),
-    "Metadata": ("flwr.app", "Metadata"),
     "MetricRecord": ("flwr.app.message", "MetricRecord"),
-    "MetricRecordValues": ("flwr.app", "MetricRecordValues"),
-    "MetricScalar": ("flwr.app", "MetricScalar"),
-    "MetricScalarList": ("flwr.app", "MetricScalarList"),
-    "Metrics": ("flwr.common.typing", "Metrics"),
-    "MetricsAggregationFn": ("flwr.common.typing", "MetricsAggregationFn"),
     "MetricsRecord": ("flwr.compat.common.record", "MetricsRecord"),
-    "NDArray": ("flwr.common.typing", "NDArray"),
-    "NDArrays": ("flwr.common.typing", "NDArrays"),
-    "Parameters": ("flwr.common.typing", "Parameters"),
     "ParametersRecord": ("flwr.compat.common.record", "ParametersRecord"),
-    "Properties": ("flwr.common.typing", "Properties"),
-    "ReconnectIns": ("flwr.common.typing", "ReconnectIns"),
     "RecordDict": ("flwr.app.message", "RecordDict"),
     "RecordSet": ("flwr.compat.common.record", "RecordSet"),
-    "Scalar": ("flwr.common.typing", "Scalar"),
-    "ServerMessage": ("flwr.common.typing", "ServerMessage"),
-    "Status": ("flwr.common.typing", "Status"),
     "array_from_numpy": ("flwr.common.record.conversion_utils", "array_from_numpy"),
-    "bytes_to_ndarray": ("flwr.common.parameter", "bytes_to_ndarray"),
-    "configure": ("flwr.common.logger", "configure"),
-    "event": ("flwr.common.telemetry", "event"),
-    "log": ("flwr.common.logger", "log"),
-    "ndarray_to_bytes": ("flwr.common.parameter", "ndarray_to_bytes"),
-    "ndarrays_to_parameters": ("flwr.common.parameter", "ndarrays_to_parameters"),
-    "now": ("flwr.supercore.date", "now"),
-    "parameters_to_ndarrays": ("flwr.common.parameter", "parameters_to_ndarrays"),
 }
 
 
 def __getattr__(name: str) -> Any:
-    """Lazily resolve compatibility exports."""
+    """Lazily resolve compatibility exports that depend on app.message."""
     if name not in _LAZY_EXPORTS:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     module_name, attr_name = _LAZY_EXPORTS[name]
     value = getattr(import_module(module_name), attr_name)
     globals()[name] = value
     return value
-
 
 __all__ = [
     "Array",
