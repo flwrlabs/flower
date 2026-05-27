@@ -18,8 +18,7 @@
 from __future__ import annotations
 
 import os
-import sys
-from enum import Enum
+from enum import StrEnum
 
 from flwr.common.constant import (
     FLWR_DIR,
@@ -28,22 +27,6 @@ from flwr.common.constant import (
     TIMESTAMP_TOLERANCE,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
-
-if sys.version_info >= (3, 11):
-    from enum import StrEnum
-else:
-
-    class StrEnum(str, Enum):
-        """Python 3.10-compatible fallback for enum.StrEnum.
-
-        Preserves StrEnum behavior by returning the member value from str(). Remove this
-        fallback once Python 3.10 support is dropped.
-        """
-
-        def __str__(self) -> str:
-            """Return the member value."""
-            return str(self.value)
-
 
 # Constants for Inflatable
 HEAD_BODY_DIVIDER = b"\x00"

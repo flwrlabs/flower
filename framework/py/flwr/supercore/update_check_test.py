@@ -16,7 +16,7 @@
 
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
@@ -111,7 +111,7 @@ def test_warn_if_flwr_update_available_prints_cached_message(
         lambda process_name=None: None,
     )
 
-    now = datetime(2026, 3, 18, 15, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 3, 18, 15, 0, tzinfo=UTC)
     monkeypatch.setattr(update_check_module, "utcnow", lambda: now)
     _write_update_check_cache(
         tmp_path,
@@ -150,7 +150,7 @@ def test_warn_if_flwr_update_available_suppresses_recent_cached_message(
         lambda process_name=None: None,
     )
 
-    now = datetime(2026, 3, 18, 15, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 3, 18, 15, 0, tzinfo=UTC)
     monkeypatch.setattr(update_check_module, "utcnow", lambda: now)
     _write_update_check_cache(
         tmp_path,
@@ -185,7 +185,7 @@ def test_warn_if_flwr_update_available_renders_brackets_as_plain_text(
         lambda process_name=None: None,
     )
 
-    now = datetime(2026, 3, 18, 15, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 3, 18, 15, 0, tzinfo=UTC)
     monkeypatch.setattr(update_check_module, "utcnow", lambda: now)
     _write_update_check_cache(
         tmp_path,
@@ -215,7 +215,7 @@ def test_warn_if_flwr_update_available_skips_refresh_if_checked_today(
     monkeypatch.setattr(update_check_module, "get_flwr_home", lambda: tmp_path)
     start_thread = Mock()
 
-    now = datetime(2026, 3, 18, 15, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 3, 18, 15, 0, tzinfo=UTC)
     monkeypatch.setattr(update_check_module, "utcnow", lambda: now)
     monkeypatch.setattr(
         update_check_module, "_start_flwr_update_check_refresh_thread", start_thread
@@ -226,9 +226,7 @@ def test_warn_if_flwr_update_available_skips_refresh_if_checked_today(
             "package_name": "flwr",
             "flwr_version": "1.28.0",
             "update_available": False,
-            "last_checked_at": datetime(
-                2026, 3, 18, 1, 0, tzinfo=timezone.utc
-            ).isoformat(),
+            "last_checked_at": datetime(2026, 3, 18, 1, 0, tzinfo=UTC).isoformat(),
         },
     )
     monkeypatch.setattr(update_check_module, "flwr_package_name", "flwr")
@@ -248,7 +246,7 @@ def test_warn_if_flwr_update_available_refreshes_on_new_utc_day(
     monkeypatch.setattr(update_check_module, "get_flwr_home", lambda: tmp_path)
     start_thread = Mock()
 
-    now = datetime(2026, 3, 18, 0, 30, tzinfo=timezone.utc)
+    now = datetime(2026, 3, 18, 0, 30, tzinfo=UTC)
     monkeypatch.setattr(update_check_module, "utcnow", lambda: now)
     monkeypatch.setattr(
         update_check_module, "_start_flwr_update_check_refresh_thread", start_thread
@@ -259,9 +257,7 @@ def test_warn_if_flwr_update_available_refreshes_on_new_utc_day(
             "package_name": "flwr",
             "flwr_version": "1.28.0",
             "update_available": False,
-            "last_checked_at": datetime(
-                2026, 3, 17, 23, 30, tzinfo=timezone.utc
-            ).isoformat(),
+            "last_checked_at": datetime(2026, 3, 17, 23, 30, tzinfo=UTC).isoformat(),
         },
     )
     monkeypatch.setattr(update_check_module, "flwr_package_name", "flwr")

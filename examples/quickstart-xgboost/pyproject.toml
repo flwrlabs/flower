@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-xgboost"
-version = "1.1.2"
+version = "1.1.3"
 description = "Federated Learning with XGBoost and Flower (Quickstart Example)"
 license = {file = "LICENSE"}
 dependencies = [
@@ -30,6 +30,7 @@ num-server-rounds = 3
 fraction-train = 0.1
 fraction-evaluate = 0.1
 local-epochs = 1
+save-model = false
 
 # XGBoost parameters
 params.objective = "binary:logistic"
@@ -40,4 +41,3 @@ params.nthread = 16
 params.num-parallel-tree = 1
 params.subsample = 1
 params.tree-method = "hist"
-

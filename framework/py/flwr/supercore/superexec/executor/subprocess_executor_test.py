@@ -19,10 +19,12 @@ import subprocess
 from typing import Any
 from unittest.mock import Mock, patch
 
+import pytest
+
 from flwr.supercore.constant import TaskType
 
 from .subprocess_executor import SubprocessExecutor
-from .types import ExecutionSpec
+from .types import ExecutionSpec, LaunchResultStatus
 
 
 def _execution_spec(**overrides: Any) -> ExecutionSpec:
@@ -43,7 +45,7 @@ def _execution_spec(**overrides: Any) -> ExecutionSpec:
 def test_launch_renders_insecure_clientapp_args() -> None:
     """Test subprocess executor renders insecure ClientApp args."""
     with patch.object(subprocess, "Popen") as popen_mock:
-        SubprocessExecutor().launch(_execution_spec())
+        result = SubprocessExecutor().launch(_execution_spec())
 
     popen_mock.assert_called_once_with(
         [
@@ -55,6 +57,8 @@ def test_launch_renders_insecure_clientapp_args() -> None:
             "--insecure",
         ]
     )
+    assert result.status == LaunchResultStatus.ACCEPTED
+    assert result.message is None
 
 
 def test_launch_renders_root_certificates_args() -> None:
@@ -100,7 +104,7 @@ def test_launch_renders_parent_pid_flag() -> None:
 def test_launch_suppresses_output_when_requested() -> None:
     """Test subprocess executor suppresses output when requested."""
     with patch.object(subprocess, "Popen") as popen_mock:
-        SubprocessExecutor().launch(
+        result = SubprocessExecutor().launch(
             _execution_spec(
                 task_type=TaskType.SERVER_APP,
                 suppress_output=True,
@@ -119,6 +123,7 @@ def test_launch_suppresses_output_when_requested() -> None:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
+    assert result.status == LaunchResultStatus.ACCEPTED
 
 
 def test_launch_renders_simulation_args() -> None:
@@ -147,3 +152,19 @@ def test_launch_does_not_suppress_output_by_default() -> None:
 
     assert "stdout" not in popen_mock.call_args.kwargs
     assert "stderr" not in popen_mock.call_args.kwargs
+
+
+def test_launch_raises_when_subprocess_cannot_start() -> None:
+    """Test subprocess executor preserves Popen failure semantics."""
+    with patch.object(subprocess, "Popen", side_effect=OSError("missing binary")):
+        with pytest.raises(OSError, match="missing binary"):
+            SubprocessExecutor().launch(_execution_spec())
+
+
+def test_launch_raises_for_unsupported_task_type() -> None:
+    """Test subprocess executor preserves unsupported task type failures."""
+    with patch.object(subprocess, "Popen") as popen_mock:
+        with pytest.raises(KeyError):
+            SubprocessExecutor().launch(_execution_spec(task_type=TaskType.AGENT_APP))
+
+    popen_mock.assert_not_called()

@@ -31,8 +31,8 @@ rst_prolog = """
 .. |ubuntu_version| replace:: 24.04
 .. |setuptools_version| replace:: 82.0.0
 .. |pip_version| replace:: 26.0.1
-.. |python_version| replace:: 3.10
-.. |python_full_version| replace:: 3.10.19
+.. |python_version| replace:: 3.11
+.. |python_full_version| replace:: 3.11.14
 """
 
 # Sphinx redirects, implemented after the doc filename changes.
@@ -41,6 +41,7 @@ redirects = {
     **redirects,  # Keep existing redirects from conf_base.py
     # Renamed pages
     "how-to-authenticate-users": "how-to-authenticate-accounts.html",
+    "tutorial-get-started-with-flower-pytorch.html": "tutorial-series-write-your-first-flower-app-pytorch.html",
     # Restructuring: contributor references
     "secagg": "explanation-ref-secure-aggregation-protocols.html",
 }

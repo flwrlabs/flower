@@ -27,7 +27,7 @@ from flwr.app.exception import AppExitException
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
-from flwr.common.args import add_args_flwr_app_common
+from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.config import (
     get_fused_config_from_dir,
     get_project_config,
@@ -74,6 +74,7 @@ from flwr.supercore.tls import validate_and_resolve_root_certificates
 def flwr_serverapp() -> None:
     """Run process-isolated Flower ServerApp."""
     args = _parse_args_run_flwr_serverapp().parse_args()
+    token = try_obtain_flwr_app_token(args)
 
     # Capture stdout/stderr
     log_queue: Queue[str | None] = Queue()
@@ -89,7 +90,7 @@ def flwr_serverapp() -> None:
     run_serverapp(
         serverappio_api_address=args.serverappio_api_address,
         log_queue=log_queue,
-        token=args.token,
+        token=token,
         insecure=args.insecure,
         certificates=validate_and_resolve_root_certificates(
             args.root_certificates, args.insecure
