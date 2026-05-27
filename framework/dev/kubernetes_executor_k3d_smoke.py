@@ -502,7 +502,7 @@ def _load_kubernetes() -> tuple[Any, Any]:
     except ImportError as exc:
         raise SkipSmoke(
             "Optional Python package 'kubernetes' is missing. Run through "
-            "`uv run --no-sync --with kubernetes ...` or install it locally."
+            "`uv run --no-dev --with kubernetes ...` or install it locally."
         ) from exc
     return client, config
 

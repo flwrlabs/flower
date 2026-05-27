@@ -15,7 +15,7 @@ command -v k3d >/dev/null 2>&1 || skip "k3d is required for the optional Kuberne
 command -v kubectl >/dev/null 2>&1 || skip "kubectl is required for the optional Kubernetes executor smoke harness."
 
 if command -v uv >/dev/null 2>&1; then
-    PYTHONPATH=py uv run --no-sync --with kubernetes python dev/kubernetes_executor_k3d_smoke.py "$@"
+    PYTHONPATH=py uv run --no-dev --with kubernetes python dev/kubernetes_executor_k3d_smoke.py "$@"
 else
     echo "uv not found; using the current Python environment."
     echo "If this skips because the Kubernetes Python client is missing, run with uv or install the optional 'kubernetes' package locally."
