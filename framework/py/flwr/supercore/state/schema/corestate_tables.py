@@ -26,7 +26,6 @@ from sqlalchemy import (
     MetaData,
     String,
     Table,
-    UniqueConstraint,
     text,
 )
 
@@ -64,13 +63,12 @@ def create_corestate_metadata() -> MetaData:
     run_series = Table(
         "run_series",
         metadata,
-        Column("series_id", String, nullable=False),
+        Column("series_id", String, primary_key=True, nullable=False),
         Column("flwr_aid", String, nullable=False),
         Column("description", String, nullable=True),
         Column("created_at", TIMESTAMP(timezone=True), nullable=False),
         Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
         Column("last_run_id", BigInteger, nullable=True),
-        UniqueConstraint("series_id", name="uq_run_series_series_id"),
     )
     Index(
         "idx_run_series_flwr_aid_updated_at",

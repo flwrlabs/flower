@@ -51,7 +51,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("updated_at", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("last_run_id", sa.BigInteger(), nullable=True),
-        sa.UniqueConstraint("series_id", name="uq_run_series_series_id"),
+        sa.PrimaryKeyConstraint("series_id"),
     )
     with op.batch_alter_table("run_series", schema=None) as batch_op:
         batch_op.create_index(

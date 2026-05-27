@@ -114,7 +114,7 @@ erDiagram
     VARCHAR description "nullable"
     VARCHAR flwr_aid
     BIGINT last_run_id "nullable"
-    VARCHAR series_id UK
+    VARCHAR series_id PK
     TIMESTAMP updated_at
   }
 
