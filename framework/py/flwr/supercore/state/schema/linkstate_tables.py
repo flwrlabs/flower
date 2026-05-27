@@ -78,7 +78,7 @@ def create_linkstate_metadata() -> MetaData:
         Column("primary_task_id", BigInteger, nullable=False),
         Column("federation_config", String),
         Column("run_type", String, nullable=False, server_default=RunType.SERVER_APP),
-        Column("series_id", String, nullable=True),
+        Column("series_id", BigInteger, nullable=True),
         Column("flwr_aid", String),
         Column("bytes_sent", BigInteger, server_default="0"),
         Column("bytes_recv", BigInteger, server_default="0"),

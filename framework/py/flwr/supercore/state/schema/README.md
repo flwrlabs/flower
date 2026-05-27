@@ -104,7 +104,7 @@ erDiagram
     BIGINT primary_task_id
     BIGINT run_id UK "nullable"
     VARCHAR run_type
-    VARCHAR series_id "nullable"
+    BIGINT series_id "nullable"
     VARCHAR usage_reported_at
   }
 
@@ -113,12 +113,12 @@ erDiagram
     VARCHAR description "nullable"
     VARCHAR federation
     BIGINT last_run_id "nullable"
-    VARCHAR series_id PK
+    BIGINT series_id PK
     TIMESTAMP updated_at
   }
 
   series_context {
-    VARCHAR series_id PK
+    BIGINT series_id PK
     BLOB context "nullable"
   }
 
