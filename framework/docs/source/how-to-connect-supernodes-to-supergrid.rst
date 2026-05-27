@@ -131,21 +131,29 @@ key into the container, then pass the key path to ``flower-supernode``:
 
     $ docker run --rm \
         --user "$(id -u):$(id -g)" \
-        -e FLWR_HOME=/flwr-home \
-        -v "$HOME/.flwr:/flwr-home" \
+        -e FLWR_HOME=/tmp/flwr-home \
         -v "$HOME/.flwr/supernodes:/keys:ro" \
         flwr/supernode:|stable_flwr_version| \
         --superlink fleet-supergrid.flower.ai:443 \
         --auth-supernode-private-key /keys/supernode-1
 
-.. note::
+.. dropdown:: Understand the command
 
-    Flower Docker images run as a non-root user by default. The ``--user "$(id -u):$(id
-    -g)"`` option keeps the container non-root while running it as the host user that
-    owns the mounted private key. This lets the SuperNode process read keys created by
-    ``ssh-keygen`` without changing their file permissions. Setting ``FLWR_HOME`` to
-    ``/flwr-home`` gives the SuperNode a writable location to store Flower Apps received
-    during runs.
+    * ``--rm``: Remove the container after it exits.
+    * ``--user "$(id -u):$(id -g)"``: Run the container as the host user that owns the
+      mounted private key. Flower Docker images run as a non-root user by default; this
+      keeps the container non-root while allowing it to read keys created by
+      ``ssh-keygen`` without changing their file permissions.
+    * ``-e FLWR_HOME=/tmp/flwr-home``: Set Flower's home directory to a
+      container-local writable location. The SuperNode uses this directory to store
+      Flower Apps received during runs.
+    * ``-v "$HOME/.flwr/supernodes:/keys:ro"``: Mount the host directory containing the
+      SuperNode private key into the container as read-only. You may need to adjust the path if your key has a different name or is in a different location.
+    * ``flwr/supernode:XYZ``: Use the official SuperNode Docker image.
+    * ``--superlink fleet-supergrid.flower.ai:443``: Connect the SuperNode to
+      SuperGrid.
+    * ``--auth-supernode-private-key /keys/supernode-1``: Use the mounted private key to
+      authenticate this SuperNode. You may need to adjust the path if your key has a different name or is in a different location.
 
 Use this form when you prefer to run SuperNodes from a container image instead of
 installing Flower directly in a Python environment.
