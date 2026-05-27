@@ -41,6 +41,7 @@ redirects = {
     **redirects,  # Keep existing redirects from conf_base.py
     # Renamed pages
     "how-to-authenticate-users": "how-to-authenticate-accounts.html",
+    "tutorial-get-started-with-flower-pytorch.html": "tutorial-series-write-your-first-flower-app-pytorch.html",
     # Restructuring: contributor references
     "secagg": "explanation-ref-secure-aggregation-protocols.html",
 }

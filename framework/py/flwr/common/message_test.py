@@ -25,6 +25,7 @@ from typing import Any
 
 import pytest
 
+from flwr.app import DEFAULT_TTL
 from flwr.supercore.inflatable.inflatable_object import (
     get_object_body,
     get_object_children_ids_from_object_content,
@@ -37,7 +38,6 @@ from ..supercore.date import now
 from . import ConfigRecord, RecordDict
 from .constant import MESSAGE_TTL_TOLERANCE
 from .message import (
-    DEFAULT_TTL,
     Message,
     MessageInitializationError,
     make_message,
