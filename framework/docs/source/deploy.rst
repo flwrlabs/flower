@@ -28,3 +28,5 @@ Problem-oriented how-to guides show step-by-step how to achieve a specific goal.
     how-to-manage-flower-federations
     docker/index
     helm/index
+    how-to-create-and-manage-federations
+    how-to-connect-supernodes-to-supergrid

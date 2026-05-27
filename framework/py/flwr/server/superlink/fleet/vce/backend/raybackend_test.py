@@ -190,7 +190,7 @@ class TestRayBackend(TestCase):
         RayBackend(
             backend_config=backend_config_4,
         )
-        nodes = ray.nodes()
+        nodes = ray.nodes()  # type: ignore[no-untyped-call]
 
         assert nodes[0]["Resources"]["CPU"] == backend_config_4["init_args"]["num_cpus"]
 
@@ -199,7 +199,7 @@ class TestRayBackend(TestCase):
         RayBackend(
             backend_config=backend_config_2,
         )
-        nodes = ray.nodes()
+        nodes = ray.nodes()  # type: ignore[no-untyped-call]
 
         assert nodes[0]["Resources"]["CPU"] == backend_config_2["init_args"]["num_cpus"]
 
@@ -212,7 +212,7 @@ class TestRayBackend(TestCase):
             # Mock ray.nodes() to return both head node and worker node
             original_nodes = ray.nodes
 
-            head_node = ray.nodes()[0].copy()
+            head_node = ray.nodes()[0].copy()  # type: ignore[no-untyped-call]
 
             ray.nodes = lambda: [
                 head_node,  # Head node initialized with no cpu
