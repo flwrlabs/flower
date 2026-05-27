@@ -26,8 +26,6 @@ from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.superlink.federation import FederationManager
 
-MESSAGE_DELIVERY_LEASE_SECONDS = 60.0
-
 
 class LinkState(CoreState):  # pylint: disable=R0904
     """Abstract LinkState."""

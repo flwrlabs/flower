@@ -38,10 +38,7 @@ from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
-from flwr.server.superlink.linkstate.linkstate import (
-    MESSAGE_DELIVERY_LEASE_SECONDS,
-    LinkState,
-)
+from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.utils import validate_message
 from flwr.supercore.constant import NodeStatus
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
@@ -49,6 +46,7 @@ from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.superlink.federation import FederationManager
 
 from .utils import (
+    MESSAGE_DELIVERY_LEASE_SECONDS,
     check_node_availability_for_in_message,
     generate_rand_int_from_bytes,
     primary_task_type_from_run_type,

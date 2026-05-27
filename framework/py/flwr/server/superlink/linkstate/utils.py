@@ -46,6 +46,7 @@ NODE_UNAVAILABLE_ERROR_REASON = (
     "Error: Node Unavailable — The destination node failed to report a heartbeat "
     f"within {HEARTBEAT_PATIENCE} × its expected interval."
 )
+MESSAGE_DELIVERY_LEASE_SECONDS = 60.0
 
 
 def primary_task_type_from_run_type(run_type: str) -> TaskType:

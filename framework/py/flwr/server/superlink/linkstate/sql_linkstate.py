@@ -56,8 +56,9 @@ from flwr.supercore.utils import (
 )
 from flwr.superlink.federation import FederationManager
 
-from .linkstate import MESSAGE_DELIVERY_LEASE_SECONDS, LinkState
+from .linkstate import LinkState
 from .utils import (
+    MESSAGE_DELIVERY_LEASE_SECONDS,
     check_node_availability_for_in_message,
     context_from_bytes,
     context_to_bytes,
