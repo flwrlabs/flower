@@ -53,8 +53,6 @@ from flwr.proto.transport_pb2 import (
     Status,
 )
 
-# pylint: enable=E0611
-
 from . import typing
 from .constant import INT64_MAX_VALUE
 from .serde_utils import (
@@ -65,6 +63,9 @@ from .serde_utils import (
     record_value_dict_from_proto,
     record_value_dict_to_proto,
 )
+
+# pylint: enable=E0611
+
 
 #  === Parameters message ===
 
