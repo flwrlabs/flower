@@ -32,8 +32,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullPendingTasksResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
-    PushRunEventsRequest,
-    PushRunEventsResponse,
+    PushTaskEventsRequest,
+    PushTaskEventsResponse,
     PushTaskMessageRequest,
     PushTaskMessageResponse,
     SendTaskHeartbeatRequest,
@@ -149,12 +149,12 @@ class AppIoServicer(ABC):
 
         return PushTaskMessageResponse(message_id=message.metadata.message_id)
 
-    def PushRunEvents(
-        self, request: PushRunEventsRequest, context: grpc.ServicerContext
-    ) -> PushRunEventsResponse:
-        """Push run events."""
-        log(DEBUG, "AppIoServicer.PushRunEvents")
-        raise NotImplementedError("PushRunEvents is not implemented yet.")
+    def PushTaskEvents(
+        self, request: PushTaskEventsRequest, context: grpc.ServicerContext
+    ) -> PushTaskEventsResponse:
+        """Push task events."""
+        log(DEBUG, "AppIoServicer.PushTaskEvents")
+        raise NotImplementedError("PushTaskEvents is not implemented yet.")
 
     def PullTaskMessage(
         self, request: PullTaskMessageRequest, context: grpc.ServicerContext

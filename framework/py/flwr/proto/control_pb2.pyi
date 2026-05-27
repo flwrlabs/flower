@@ -796,11 +796,6 @@ global___ConfigureSimulationFederationResponse = ConfigureSimulationFederationRe
 
 @typing.final
 class StreamRunEventsRequest(google.protobuf.message.Message):
-    """##############
-    Unused for now
-    ##############
-    """
-
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RUN_ID_FIELD_NUMBER: builtins.int

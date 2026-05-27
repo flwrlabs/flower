@@ -238,8 +238,8 @@ class PushTaskMessageResponse(google.protobuf.message.Message):
 global___PushTaskMessageResponse = PushTaskMessageResponse
 
 @typing.final
-class RunEvent(google.protobuf.message.Message):
-    """PushRunEvents messages"""
+class TaskEvent(google.protobuf.message.Message):
+    """PushTaskEvents messages"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -255,26 +255,26 @@ class RunEvent(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["data", b"data", "event", b"event"]) -> None: ...
 
-global___RunEvent = RunEvent
+global___TaskEvent = TaskEvent
 
 @typing.final
-class PushRunEventsRequest(google.protobuf.message.Message):
+class PushTaskEventsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     EVENTS_FIELD_NUMBER: builtins.int
     @property
-    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___RunEvent]: ...
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___TaskEvent]: ...
     def __init__(
         self,
         *,
-        events: collections.abc.Iterable[global___RunEvent] | None = ...,
+        events: collections.abc.Iterable[global___TaskEvent] | None = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
 
-global___PushRunEventsRequest = PushRunEventsRequest
+global___PushTaskEventsRequest = PushTaskEventsRequest
 
 @typing.final
-class PushRunEventsResponse(google.protobuf.message.Message):
+class PushTaskEventsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     STORED_COUNT_FIELD_NUMBER: builtins.int
@@ -286,7 +286,7 @@ class PushRunEventsResponse(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["stored_count", b"stored_count"]) -> None: ...
 
-global___PushRunEventsResponse = PushRunEventsResponse
+global___PushTaskEventsResponse = PushTaskEventsResponse
 
 @typing.final
 class PullTaskMessageRequest(google.protobuf.message.Message):
