@@ -108,23 +108,23 @@ erDiagram
     VARCHAR usage_reported_at
   }
 
+  run_objects {
+    VARCHAR object_id PK,FK
+    BIGINT run_id PK
+  }
+
   run_series {
+    BIGINT series_id PK
     TIMESTAMP created_at
     VARCHAR description "nullable"
     VARCHAR federation
     BIGINT last_run_id "nullable"
-    BIGINT series_id PK
     TIMESTAMP updated_at
   }
 
   series_context {
     BIGINT series_id PK
     BLOB context "nullable"
-  }
-
-  run_objects {
-    VARCHAR object_id PK,FK
-    BIGINT run_id PK
   }
 
   task {
