@@ -17,6 +17,7 @@
 
 from typing import Any, cast
 
+from flwr.app.typing import ConfigRecordValues, MetricRecordValues
 from flwr.app.user_config import UserConfig, UserConfigValue
 
 # pylint: disable=E0611
@@ -431,7 +432,7 @@ def metric_record_from_proto(record_proto: ProtoMetricRecord) -> MetricRecord:
     protos = {item.key: item.value for item in record_proto.items}
     return MetricRecord(
         metric_dict=cast(
-            dict[str, typing.MetricRecordValues],
+            dict[str, MetricRecordValues],
             record_value_dict_from_proto(protos),
         ),
         keep_input=False,
@@ -455,7 +456,7 @@ def config_record_from_proto(record_proto: ProtoConfigRecord) -> ConfigRecord:
     protos = {item.key: item.value for item in record_proto.items}
     return ConfigRecord(
         config_dict=cast(
-            dict[str, typing.ConfigRecordValues],
+            dict[str, ConfigRecordValues],
             record_value_dict_from_proto(protos),
         ),
         keep_input=False,

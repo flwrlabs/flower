@@ -25,18 +25,13 @@ from unittest.mock import Mock, PropertyMock, patch
 import numpy as np
 import pytest
 
+from flwr.app.typing import ConfigRecordValues, MetricRecordValues
 from flwr.common.parameter import ndarrays_to_parameters, parameters_to_ndarrays
 from flwr.common.recorddict_compat import (
     arrayrecord_to_parameters,
     parameters_to_arrayrecord,
 )
-from flwr.common.typing import (
-    ConfigRecordValues,
-    MetricRecordValues,
-    NDArray,
-    NDArrays,
-    Parameters,
-)
+from flwr.common.typing import NDArray, NDArrays, Parameters
 from flwr.supercore.inflatable.inflatable_object import (
     get_object_body,
     get_object_type_from_object_content,

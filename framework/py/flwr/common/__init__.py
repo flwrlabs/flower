@@ -15,7 +15,10 @@
 """Common components shared between server and client."""
 
 
+from flwr.app.constants import DEFAULT_TTL as DEFAULT_TTL
 from flwr.app.message_type import MessageType as MessageType
+from flwr.app.typing import ConfigRecordValues as ConfigRecordValues
+from flwr.app.typing import MetricRecordValues as MetricRecordValues
 
 from ..app.error import Error as Error
 from ..app.metadata import Metadata as Metadata
@@ -25,7 +28,6 @@ from .context import Context as Context
 from .grpc import GRPC_MAX_MESSAGE_LENGTH
 from .logger import configure as configure
 from .logger import log as log
-from .message import DEFAULT_TTL
 from .message import Message as Message
 from .parameter import bytes_to_ndarray as bytes_to_ndarray
 from .parameter import ndarray_to_bytes as ndarray_to_bytes
@@ -46,7 +48,6 @@ from .telemetry import event as event
 from .typing import ClientMessage as ClientMessage
 from .typing import Code as Code
 from .typing import Config as Config
-from .typing import ConfigRecordValues as ConfigRecordValues
 from .typing import DisconnectRes as DisconnectRes
 from .typing import EvaluateIns as EvaluateIns
 from .typing import EvaluateRes as EvaluateRes
@@ -56,7 +57,6 @@ from .typing import GetParametersIns as GetParametersIns
 from .typing import GetParametersRes as GetParametersRes
 from .typing import GetPropertiesIns as GetPropertiesIns
 from .typing import GetPropertiesRes as GetPropertiesRes
-from .typing import MetricRecordValues as MetricRecordValues
 from .typing import Metrics as Metrics
 from .typing import MetricsAggregationFn as MetricsAggregationFn
 from .typing import NDArray as NDArray
