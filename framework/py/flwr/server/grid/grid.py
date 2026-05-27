@@ -71,7 +71,7 @@ class Grid(ABC):
             Time-to-live for the round trip of this message, i.e., the time from sending
             this message to receiving a reply. It specifies in seconds the duration for
             which the message and its potential reply are considered valid. If unset,
-            the default TTL (i.e., ``common.DEFAULT_TTL``) will be used.
+            the default TTL (i.e., ``flwr.app.DEFAULT_TTL``) will be used.
 
         Returns
         -------
