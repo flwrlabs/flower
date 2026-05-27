@@ -17,9 +17,9 @@
 
 from typing import Any
 
+from flwr.app.message import make_message
 from flwr.common import ConfigRecord, Context, Error, Message, Metadata, now, serde
 from flwr.common.constant import HEARTBEAT_PATIENCE, SUPERLINK_NODE_ID, ErrorCode
-from flwr.common.message import make_message
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
 

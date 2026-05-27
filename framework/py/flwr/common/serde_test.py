@@ -22,9 +22,9 @@ from typing import Any, TypeVar, cast
 
 import pytest
 
+from flwr.app.message import make_message
 from flwr.app.user_config import UserConfig
 from flwr.common.constant import SUPERLINK_NODE_ID
-from flwr.common.message import make_message
 
 # pylint: disable=E0611
 from flwr.proto import transport_pb2 as pb2

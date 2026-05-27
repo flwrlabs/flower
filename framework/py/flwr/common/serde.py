@@ -17,6 +17,17 @@
 
 from typing import Any, cast
 
+# pylint: enable=E0611
+from flwr.app.message import (
+    Array,
+    ArrayRecord,
+    ConfigRecord,
+    Context,
+    Message,
+    MetricRecord,
+    RecordDict,
+    make_message,
+)
 from flwr.app.typing import ConfigRecordValues, MetricRecordValues
 from flwr.app.user_config import UserConfig, UserConfigValue
 
@@ -43,18 +54,8 @@ from flwr.proto.transport_pb2 import (
     Status,
 )
 
-# pylint: enable=E0611
-from . import (
-    Array,
-    ArrayRecord,
-    ConfigRecord,
-    Context,
-    MetricRecord,
-    RecordDict,
-    typing,
-)
+from . import typing
 from .constant import INT64_MAX_VALUE
-from .message import Message, make_message
 from .serde_utils import (
     error_from_proto,
     error_to_proto,
