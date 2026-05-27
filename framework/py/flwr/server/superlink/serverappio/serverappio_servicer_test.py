@@ -566,12 +566,14 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert self.state.num_message_ins() == 1
         assert self.state.num_message_res() == 1
 
-        request = ConfirmMessageReceivedRequest(
+        confirm_request = ConfirmMessageReceivedRequest(
             node=Node(node_id=self.node_id),
             run_id=run_id,
             message_object_id=reply_msg.object_id,
         )
-        response, call = self._confirm_message_received.with_call(request=request)
+        response, call = self._confirm_message_received.with_call(
+            request=confirm_request
+        )
 
         assert isinstance(response, ConfirmMessageReceivedResponse)
         assert grpc.StatusCode.OK == call.code()

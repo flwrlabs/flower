@@ -533,14 +533,16 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 AND (delivered_at = '' OR lease_expires_at <= :current)
                 RETURNING *
             """
-            params = {
+            reply_params: dict[str, str | float] = {
                 "current": current,
                 "delivered_at": delivered_at,
                 "lease_expires_at": claimed_until.timestamp()
                 + MESSAGE_DELIVERY_LEASE_SECONDS,
             }
-            params.update({f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)})
-            rows = self.query(query, params)
+            reply_params.update(
+                {f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)}
+            )
+            rows = self.query(query, reply_params)
             for row in rows:
                 convert_sint64_values_in_dict_to_uint64(
                     row, ["run_id", "src_node_id", "dst_node_id"]
