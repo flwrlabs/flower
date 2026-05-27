@@ -22,6 +22,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Index,
+    Integer,
     LargeBinary,
     MetaData,
     String,
@@ -81,6 +82,22 @@ def create_corestate_metadata() -> MetaData:
     Index("idx_task_run_id", task.c.run_id)
     Index("idx_task_token", task.c.token)
     Index("idx_task_active_until", task.c.active_until)
+
+    # --------------------------------------------------------------------------
+    #  Table: task_event
+    # --------------------------------------------------------------------------
+    task_event = Table(
+        "task_event",
+        metadata,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("timestamp", TIMESTAMP(timezone=True), nullable=False),
+        Column("run_id", BigInteger, nullable=False),
+        Column("task_id", BigInteger, ForeignKey("task.task_id"), nullable=False),
+        Column("event", String, nullable=False),
+        Column("data", String, nullable=False),
+    )
+    Index("idx_task_event_run_id_id", task_event.c.run_id, task_event.c.id)
+    Index("idx_task_event_task_id", task_event.c.task_id)
 
     # --------------------------------------------------------------------------
     #  Table: task_message
