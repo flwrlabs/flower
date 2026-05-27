@@ -57,7 +57,7 @@ public key is with the ``cat`` command:
     $ cat ~/.flwr/supernodes/supernode-1.pub
 
     # It should print something like this:
-    ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNoYTItbmlzdHAzODQAAAAIbmlzdHAzODQAAABhBG3KQOoXxA8WvLOCAHU4gkOdLn0FgtTUFWM2E2NVN691uCqMOwY3uWTOW27tlGCUX/79ABD5Xj9Bc3dvwpcKs16iN2uzo7HozGpakcvsBpHu5NzrnYrxlJbNiDGwQ4YEVw== peter123@macbook.local
+    ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNX/7....rxlJbNiDGwQ4YEVw== <username>@<hostname>
 
 Copy the full key printed in the terminal, including the key type at the beginning and
 the optional comment at the end.
@@ -123,9 +123,9 @@ Your SuperNode should appear as ``online``:
 Start with Docker
 =================
 
-You can also run the SuperNode with the official Docker image. Mount the directory
-containing the private key into the container, then pass the key path to
-``flower-supernode``:
+You can also run the SuperNode with the official `flwr/supernode Docker image
+<https://hub.docker.com/r/flwr/supernode>`__. Mount the directory containing the private
+key into the container, then pass the key path to ``flower-supernode``:
 
 .. code-block:: shell
 
