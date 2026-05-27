@@ -443,6 +443,25 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert task.type == TaskType.MODEL
         assert task.model_ref == "models/abc"
 
+    def test_push_task_output_stores_simulation_metrics(self) -> None:
+        """PushTaskOutput should persist Simulation Runtime usage metrics."""
+        request = PushTaskOutputRequest(
+            sub_status="completed",
+            details="",
+            bytes_sent=123,
+            bytes_recv=456,
+            clientapp_runtime=7.89,
+        )
+
+        response, call = self._push_task_output.with_call(request=request)
+
+        assert isinstance(response, PushTaskOutputResponse)
+        assert grpc.StatusCode.OK == call.code()
+        run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
+        assert run.bytes_sent == 123
+        assert run.bytes_recv == 456
+        assert run.clientapp_runtime == 7.89
+
     def test_get_node(self) -> None:
         """Test `GetNode` success."""
         # Prepare
