@@ -107,15 +107,6 @@ erDiagram
     VARCHAR usage_reported_at
   }
 
-  run_event {
-    INTEGER id PK
-    BIGINT run_id FK
-    VARCHAR data
-    VARCHAR event
-    INTEGER sequence_number
-    FLOAT timestamp
-  }
-
   run_objects {
     VARCHAR object_id PK,FK
     BIGINT run_id PK
@@ -136,6 +127,15 @@ erDiagram
     BIGINT task_id UK
     VARCHAR token "nullable"
     VARCHAR type
+  }
+
+  task_event {
+    INTEGER id PK
+    BIGINT task_id FK
+    VARCHAR data
+    VARCHAR event
+    BIGINT run_id
+    FLOAT timestamp
   }
 
   task_logs {
@@ -163,8 +163,8 @@ erDiagram
   run ||--o{ message_res : run_id
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
-  run ||--o{ run_event : run_id
   objects ||--o| run_objects : object_id
+  task ||--o{ task_event : task_id
   task ||--o{ task_logs : task_id
   task ||--o{ task_message : src_task_id
   task ||--o{ task_message : dst_task_id
