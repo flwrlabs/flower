@@ -77,13 +77,7 @@ def create_corestate_metadata() -> MetaData:
     Table(
         "series_context",
         metadata,
-        Column(
-            "series_id",
-            String,
-            ForeignKey("run_series.series_id"),
-            primary_key=True,
-            nullable=False,
-        ),
+        Column("series_id", String, primary_key=True, nullable=False),
         Column("context", LargeBinary),
     )
 

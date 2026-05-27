@@ -54,7 +54,6 @@ def upgrade() -> None:
         "series_context",
         sa.Column("series_id", sa.String(), nullable=False),
         sa.Column("context", sa.LargeBinary(), nullable=True),
-        sa.ForeignKeyConstraint(["series_id"], ["run_series.series_id"]),
         sa.PrimaryKeyConstraint("series_id"),
     )
 

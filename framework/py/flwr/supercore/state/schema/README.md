@@ -118,7 +118,7 @@ erDiagram
   }
 
   series_context {
-    VARCHAR series_id PK,FK
+    VARCHAR series_id PK
     BLOB context "nullable"
   }
 
@@ -164,7 +164,6 @@ erDiagram
   }
 
   run ||--o| context : run_id
-  run_series ||--o| series_context : series_id
   run ||--o{ logs : run_id
   run ||--o{ message_ins : run_id
   run ||--o{ message_res : run_id
