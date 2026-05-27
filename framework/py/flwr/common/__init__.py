@@ -20,11 +20,7 @@ from typing import TYPE_CHECKING, Any
 from flwr.app.constants import DEFAULT_TTL as DEFAULT_TTL
 from flwr.app.message_type import MessageType as MessageType
 from flwr.app.typing import ConfigRecordValues as ConfigRecordValues
-from flwr.app.typing import ConfigScalar as ConfigScalar
-from flwr.app.typing import ConfigScalarList as ConfigScalarList
 from flwr.app.typing import MetricRecordValues as MetricRecordValues
-from flwr.app.typing import MetricScalar as MetricScalar
-from flwr.app.typing import MetricScalarList as MetricScalarList
 
 from ..app.error import Error as Error
 from ..app.metadata import Metadata as Metadata
@@ -109,8 +105,6 @@ __all__ = [
     "Config",
     "ConfigRecord",
     "ConfigRecordValues",
-    "ConfigScalar",
-    "ConfigScalarList",
     "ConfigsRecord",
     "Context",
     "DEFAULT_TTL",
@@ -132,8 +126,6 @@ __all__ = [
     "Metadata",
     "MetricRecord",
     "MetricRecordValues",
-    "MetricScalar",
-    "MetricScalarList",
     "Metrics",
     "MetricsAggregationFn",
     "MetricsRecord",
