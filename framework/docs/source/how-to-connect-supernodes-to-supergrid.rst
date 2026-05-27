@@ -137,6 +137,7 @@ You can also run the SuperNode with the official `flwr/supernode Docker image
 key into the container, then pass the key path to ``flower-supernode``:
 
 .. code-block:: shell
+    :substitutions:
 
     $ docker run --rm \
         --user "$(id -u):$(id -g)" \
