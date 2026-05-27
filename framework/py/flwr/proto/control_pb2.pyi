@@ -804,13 +804,18 @@ class StreamRunEventsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RUN_ID_FIELD_NUMBER: builtins.int
+    AFTER_ID_FIELD_NUMBER: builtins.int
     run_id: builtins.int
+    after_id: builtins.int
     def __init__(
         self,
         *,
         run_id: builtins.int = ...,
+        after_id: builtins.int | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["run_id", b"run_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_after_id", b"_after_id", "after_id", b"after_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_after_id", b"_after_id", "after_id", b"after_id", "run_id", b"run_id"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_after_id", b"_after_id"]) -> typing.Literal["after_id"] | None: ...
 
 global___StreamRunEventsRequest = StreamRunEventsRequest
 
@@ -820,14 +825,17 @@ class StreamRunEventsResponse(google.protobuf.message.Message):
 
     EVENT_FIELD_NUMBER: builtins.int
     DATA_FIELD_NUMBER: builtins.int
+    ID_FIELD_NUMBER: builtins.int
     event: builtins.str
     data: builtins.str
+    id: builtins.int
     def __init__(
         self,
         *,
         event: builtins.str = ...,
         data: builtins.str = ...,
+        id: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["data", b"data", "event", b"event"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "event", b"event", "id", b"id"]) -> None: ...
 
 global___StreamRunEventsResponse = StreamRunEventsResponse

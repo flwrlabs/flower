@@ -58,6 +58,14 @@ message PullAppMessagesResponse {
 message PushTaskMessageRequest { Message message = 1; }
 message PushTaskMessageResponse { string message_id = 1; }
 
+// PushRunEvents messages
+message RunEvent {
+  string event = 1;
+  string data = 2;
+}
+message PushRunEventsRequest { repeated RunEvent events = 1; }
+message PushRunEventsResponse { uint32 stored_count = 1; }
+
 // PullTaskMessage messages
 message PullTaskMessageRequest { optional uint64 limit = 1; }
 message PullTaskMessageResponse { repeated Message messages = 1; }
