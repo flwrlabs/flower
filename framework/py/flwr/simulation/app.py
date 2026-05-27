@@ -47,6 +47,7 @@ from flwr.common.logger import (
     restore_output,
     start_log_uploader,
     stop_log_uploader,
+    update_console_handler,
 )
 from flwr.common.serde import (
     context_from_proto,
@@ -252,6 +253,10 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             enable_tf_gpu_growth,
         ) = _run_simulation_settings(res.federation_config)
 
+        # Set logging level
+        if verbose:
+            update_console_handler(level=DEBUG, timestamps=True, colored=True)
+
         run_id_hash = get_sha256_hash(run.run_id)
         event(
             EventType.FLWR_SIMULATION_RUN_ENTER,
@@ -272,9 +277,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             app_dir=str(app_path),
             run=replace(run, federation=NOOP_FEDERATION),
             enable_tf_gpu_growth=enable_tf_gpu_growth,
-            verbose_logging=verbose,
             server_app_context=context,
-            is_app=True,
             exit_event=EventType.FLWR_SIMULATION_RUN_LEAVE,
         )
 

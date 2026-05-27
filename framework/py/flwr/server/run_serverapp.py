@@ -29,30 +29,21 @@ def run(
     grid: Grid,
     context: Context,
     server_app_dir: str,
-    server_app_attr: str | None = None,
-    loaded_server_app: ServerApp | None = None,
+    server_app_attr: str,
 ) -> Context:
     """Run ServerApp with a given Grid."""
-    if not (server_app_attr is None) ^ (loaded_server_app is None):
-        raise ValueError(
-            "Either `server_app_attr` or `loaded_server_app` should be set "
-            "but not both."
-        )
 
     # Load ServerApp if needed
     def _load() -> ServerApp:
-        if server_app_attr:
-            server_app: ServerApp = load_app(
-                server_app_attr, LoadServerAppError, server_app_dir
-            )
+        server_app: ServerApp = load_app(
+            server_app_attr, LoadServerAppError, server_app_dir
+        )
 
-            if not isinstance(server_app, ServerApp):
-                raise LoadServerAppError(
-                    f"Attribute {server_app_attr} is not of type {ServerApp}",
-                ) from None
+        if not isinstance(server_app, ServerApp):
+            raise LoadServerAppError(
+                f"Attribute {server_app_attr} is not of type {ServerApp}",
+            ) from None
 
-        if loaded_server_app:
-            server_app = loaded_server_app
         return server_app
 
     server_app = _load()

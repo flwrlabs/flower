@@ -235,9 +235,6 @@ jobs:
       - name: Run virtual client test
         if: ${{ needs.changes.outputs.framework == 'true' && matrix.directory != 'e2e-bare-auth' }}
         run: python simulation.py
-      - name: Run simulation engine test
-        if: ${{ needs.changes.outputs.framework == 'true' && (matrix.directory == 'e2e-pytorch' || matrix.directory == 'e2e-tensorflow') }}
-        run: python simulation_next.py
       - name: Run driver test
         if: ${{ needs.changes.outputs.framework == 'true' && matrix.directory != 'e2e-bare-auth' }}
         run: ./../test_superlink.sh "${{ matrix.directory }}"
