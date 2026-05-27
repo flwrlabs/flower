@@ -267,8 +267,10 @@ def verify_found_message_replies(
     current = current_time if current_time else now().timestamp()
     for message_res in found_message_res_list:
         message_ins_id = message_res.metadata.reply_to_message_id
+        if message_ins_id in ret_dict:
+            continue
         if update_set:
-            inquired_message_ids.remove(message_ins_id)
+            inquired_message_ids.discard(message_ins_id)
         # Check if the reply Message has expired
         if message_ttl_has_expired(message_res.metadata, current):
             # No need to insert the error Message
