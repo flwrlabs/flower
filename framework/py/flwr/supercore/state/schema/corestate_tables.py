@@ -60,7 +60,7 @@ def create_corestate_metadata() -> MetaData:
     # --------------------------------------------------------------------------
     #  Table: run_series
     # --------------------------------------------------------------------------
-    run_series = Table(
+    Table(
         "run_series",
         metadata,
         Column("series_id", String, primary_key=True, nullable=False),
