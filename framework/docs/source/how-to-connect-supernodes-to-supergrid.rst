@@ -37,16 +37,15 @@ Create a key pair for the first SuperNode:
 .. code-block:: shell
 
     # Create the directory where you'll keep SuperNode keys if it doesn't exist
-    # Note it's up to you to decide where these keys should be stored
-    $ mkdir -p ~/.flwr/supernodes
-    $ ssh-keygen -t ecdsa -b 384 -N "" -f ~/.flwr/supernodes/supernode-1
+    $ mkdir -p ~/supernodes_keys
+    $ ssh-keygen -t ecdsa -b 384 -N "" -f ~/supernodes_keys/supernode-1
 
 This creates two files:
 
-- ``~/.flwr/supernodes/supernode-1``: the private key, used when starting the SuperNode.
+- ``~/supernodes_keys/supernode-1``: the private key, used when starting the SuperNode.
   Never share the private key or upload it anywhere. This key should only be used to
   start the SuperNode.
-- ``~/.flwr/supernodes/supernode-1.pub``: the public key, used when registering the
+- ``~/supernodes_keys/supernode-1.pub``: the public key, used when registering the
   SuperNode in SuperGrid.
 
 Copy the contents of ``supernode-1.pub`` to your clipboard. One way to inspect the
@@ -54,7 +53,7 @@ public key is with the ``cat`` command:
 
 .. code-block:: shell
 
-    $ cat ~/.flwr/supernodes/supernode-1.pub
+    $ cat ~/supernodes_keys/supernode-1.pub
 
     # It should print something like this:
     ecdsa-sha2-nistp384 AAAAE2VjZHNhLXNX/7....rxlJbNiDGwQ4YEVw== <username>@<hostname>
@@ -94,6 +93,16 @@ There are two common ways to run a SuperNode: directly from a Python environment
 with the official SuperNode Docker image. In both cases, use the private key that
 matches the public key you registered in SuperGrid.
 
+.. note::
+
+    A SuperNode must be able to run the ClientApps assigned to it. Make sure the
+    SuperNode environment or Docker image includes the dependencies those ClientApps
+    need, such as PyTorch, TensorFlow, pandas, or other framework-specific packages. You
+    can preinstall them in the Python environment, build a custom Docker image with the
+    required packages, or start the SuperNode with
+    ``--allow-runtime-dependency-installation`` so app dependencies are installed at
+    runtime.
+
 Start from a Python environment
 ===============================
 
@@ -109,7 +118,7 @@ Start the SuperNode:
 
     $ flower-supernode \
         --superlink fleet-supergrid.flower.ai:443 \
-        --auth-supernode-private-key ~/.flwr/supernodes/supernode-1
+        --auth-supernode-private-key ~/supernodes_keys/supernode-1
 
 Keep this process running for as long as you want the SuperNode to remain connected.
 
@@ -132,7 +141,7 @@ key into the container, then pass the key path to ``flower-supernode``:
     $ docker run --rm \
         --user "$(id -u):$(id -g)" \
         -e FLWR_HOME=/tmp/flwr-home \
-        -v "$HOME/.flwr/supernodes:/keys:ro" \
+        -v "$HOME/supernodes_keys:/keys:ro" \
         flwr/supernode:|stable_flwr_version| \
         --superlink fleet-supergrid.flower.ai:443 \
         --auth-supernode-private-key /keys/supernode-1
@@ -147,13 +156,15 @@ key into the container, then pass the key path to ``flower-supernode``:
     * ``-e FLWR_HOME=/tmp/flwr-home``: Set Flower's home directory to a
       container-local writable location. The SuperNode uses this directory to store
       Flower Apps received during runs.
-    * ``-v "$HOME/.flwr/supernodes:/keys:ro"``: Mount the host directory containing the
-      SuperNode private key into the container as read-only. You may need to adjust the path if your key has a different name or is in a different location.
+    * ``-v "$HOME/supernodes_keys:/keys:ro"``: Mount the host directory containing the
+      SuperNode private key into the container as read-only. You may need to adjust
+      the path if your key has a different name or is in a different location.
     * ``flwr/supernode:XYZ``: Use the official SuperNode Docker image.
     * ``--superlink fleet-supergrid.flower.ai:443``: Connect the SuperNode to
       SuperGrid.
-    * ``--auth-supernode-private-key /keys/supernode-1``: Use the mounted private key to
-      authenticate this SuperNode. You may need to adjust the path if your key has a different name or is in a different location.
+    * ``--auth-supernode-private-key /keys/supernode-1``: Use the mounted private key
+      to authenticate this SuperNode. You may need to adjust the path if your key has
+      a different name or is in a different location.
 
 Use this form when you prefer to run SuperNodes from a container image instead of
 installing Flower directly in a Python environment.
