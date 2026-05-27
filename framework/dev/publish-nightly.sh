@@ -35,12 +35,21 @@ cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../
 if [[ $(git log --since="24 hours ago" --pretty=oneline) ]]; then
     sed -i -E "s/^name = \"(.+)\"/name = \"\1-nightly\"/" pyproject.toml
     sed -i -E "s/^version = \"(.+)\"/version = \"\1.dev$(date '+%Y%m%d')\"/" pyproject.toml
+
+    # Build both publishable Python artifacts from the rewritten metadata.
     uv build --clear
+
+    # Store publish options in an array so usernames, passwords, and URLs are
+    # passed to uv as separate arguments even if they contain shell metacharacters.
     publish_args=(--username "${PYPI_REPOSITORY_USERNAME:-__token__}" --password "${PYPI_REPOSITORY_PASSWORD}")
     if [[ -n "${PYPI_REPOSITORY_URL:-}" ]]; then
+        # When a repository URL is configured, publish there instead of using
+        # uv's default PyPI endpoint.
         publish_args=(--publish-url "${PYPI_REPOSITORY_URL}" "${publish_args[@]}")
     fi
-    uv publish "${publish_args[@]}"
+
+    # Publish the artifacts from the explicit build step above.
+    uv publish "${publish_args[@]}" dist/*
 else
     echo "There were no commits in the last 24 hours."
 fi

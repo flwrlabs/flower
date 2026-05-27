@@ -31,7 +31,6 @@ attribute.
 """
 
 
-_current_sys_path: str | None = None  # pylint: disable=invalid-name
 _import_lock = Lock()
 
 
@@ -80,29 +79,31 @@ def validate(
             f"Missing attribute in {module_attribute_str}{OBJECT_REF_HELP_STR}",
         )
 
-    if check_module:
-        if project_dir is None:
-            project_dir = Path.cwd()
-        project_dir = Path(project_dir).absolute()
-        # Set the system path
-        sys.path.insert(0, str(project_dir))
+    if not check_module:
+        return (True, None)
 
-        # Load module
+    if project_dir is None:
+        project_dir = Path.cwd()
+    project_dir = Path(project_dir).absolute()
+
+    # Temporarily include the app directory for module lookup without importing it.
+    sys.path.insert(0, str(project_dir))
+    try:
         module = find_spec(module_str)
-
-        # Unset the system path
+    finally:
         sys.path.remove(str(project_dir))
 
-        # Check if the module and the attribute exist
-        if module and module.origin:
-            if not _find_attribute_in_module(module.origin, attributes_str):
-                return (
-                    False,
-                    f"Unable to find attribute {attributes_str} in module {module_str}"
-                    f"{OBJECT_REF_HELP_STR}",
-                )
-            return (True, None)
-    else:
+    if module and module.origin:
+        # For dotted attributes (e.g. "wrapper.app"), static AST analysis cannot
+        # reliably verify the full chain without importing the module, so only
+        # the first segment is checked against the module's top-level names.
+        root_attribute = attributes_str.split(".")[0]
+        if not _find_attribute_in_module(module.origin, root_attribute):
+            return (
+                False,
+                f"Unable to find attribute {attributes_str} in module {module_str}"
+                f"{OBJECT_REF_HELP_STR}",
+            )
         return (True, None)
 
     return (
@@ -130,8 +131,7 @@ def load_app(  # pylint: disable= too-many-branches
         in an invalid format.
     project_dir : Optional[Union[str, Path]], optional (default=None)
         The directory containing the module. If None, the current working directory
-        is used. The `project_dir` will be inserted into the system path, and the
-        previously inserted `project_dir` will be removed.
+        is used. The `project_dir` will be inserted into the system path.
 
     Returns
     -------
@@ -140,10 +140,7 @@ def load_app(  # pylint: disable= too-many-branches
 
     Note
     ----
-    - This function will unload all modules in the previously provided `project_dir`,
-      if it is invoked again.
-    - This function will modify `sys.path` by inserting the provided `project_dir`
-      and removing the previously inserted `project_dir`.
+    This function will modify `sys.path` by inserting the provided `project_dir`.
     """
     with _import_lock:
         valid, error_msg = validate(module_attribute_str, check_module=False)
@@ -153,19 +150,12 @@ def load_app(  # pylint: disable= too-many-branches
         module_str, _, attributes_str = module_attribute_str.partition(":")
 
         try:
-            # Initialize project path
             if project_dir is None:
                 project_dir = Path.cwd()
             project_dir = Path(project_dir).absolute()
 
-            # Unload modules if the project directory has changed
-            if _current_sys_path and _current_sys_path != str(project_dir):
-                _unload_modules(Path(_current_sys_path))
+            _ensure_sys_path(project_dir)
 
-            # Set the system path
-            _set_sys_path(project_dir)
-
-            # Import the module
             if module_str not in sys.modules:
                 module = importlib.import_module(module_str)
             else:
@@ -190,36 +180,12 @@ def load_app(  # pylint: disable= too-many-branches
         return attribute
 
 
-def _unload_modules(project_dir: Path) -> None:
-    """Unload modules from the project directory."""
-    dir_str = str(project_dir.absolute())
-    for name, m in list(sys.modules.items()):
-        path: str | None = getattr(m, "__file__", None)
-        if path is not None and path.startswith(dir_str):
-            del sys.modules[name]
-
-
-def _set_sys_path(directory: str | Path | None) -> None:
-    """Set the system path."""
-    if directory is None:
-        directory = Path.cwd()
-    else:
-        directory = Path(directory).absolute()
-
-    # If the directory has already been added to `sys.path`, return
+def _ensure_sys_path(directory: str | Path) -> None:
+    """Ensure the directory is available on `sys.path`."""
+    directory = Path(directory).absolute()
     if str(directory) in sys.path:
         return
-
-    # Remove the old path if it exists and is not `""`.
-    global _current_sys_path  # pylint: disable=global-statement
-    if _current_sys_path is not None:
-        sys.path.remove(_current_sys_path)
-
-    # Add the new path to sys.path
     sys.path.insert(0, str(directory))
-
-    # Update the current_sys_path
-    _current_sys_path = str(directory)
 
 
 def _find_attribute_in_module(file_path: str, attribute_name: str) -> bool:
@@ -242,10 +208,15 @@ def _is_module_in_all(attribute_name: str, target: ast.expr, n: ast.Assign) -> b
     if isinstance(target, ast.Name) and target.id == "__all__":
         if isinstance(n.value, ast.List):
             for elt in n.value.elts:
-                if isinstance(elt, ast.Str) and elt.s == attribute_name:
+                if _is_string_constant(elt, attribute_name):
                     return True
         elif isinstance(n.value, ast.Tuple):
             for elt in n.value.elts:
-                if isinstance(elt, ast.Str) and elt.s == attribute_name:
+                if _is_string_constant(elt, attribute_name):
                     return True
     return False
+
+
+def _is_string_constant(node: ast.expr, value: str) -> bool:
+    """Return True if node is a string constant matching value."""
+    return isinstance(node, ast.Constant) and node.value == value

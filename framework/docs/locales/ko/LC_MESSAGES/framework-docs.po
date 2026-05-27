@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-05-22 00:28+0000\n"
-"PO-Revision-Date: 2024-08-23 13:09+0000\n"
+"POT-Creation-Date: 2026-05-24 00:26+0000\n"
+"PO-Revision-Date: 2026-05-23 06:53+0000\n"
 "Last-Translator: Seulki Yun <icstuckyi@gmail.com>\n"
 "Language: ko\n"
 "Language-Team: Korean <https://hosted.weblate.org/projects/flower-"
@@ -849,72 +849,62 @@ msgstr "Poetry 사용하기(권장)"
 #: ../../source/contributor-how-to-install-development-versions.rst:12
 #, fuzzy
 msgid ""
-"Install a ``flwr`` pre-release from PyPI: update the ``flwr`` dependency "
-"in ``pyproject.toml`` and then reinstall with ``uv sync``."
+"Install a ``flwr`` pre-release from PyPI with ``uv add``, which updates "
+"``pyproject.toml`` and syncs the environment:"
 msgstr ""
 "PyPI에서 ``flwr`` 사전 릴리스 설치하기: ``pyproject.toml``에서 ``flwr``의 의존성을 업데이트한 "
 "다음, 재설치하세요(``poetry 설치``이전에 ``poetry.lock`` (``rm poetry.lock``)를 제거하는 것을"
 " 잊지 마세요)."
 
 #: ../../source/contributor-how-to-install-development-versions.rst:15
-#, python-brace-format
-msgid ""
-"``flwr = { version = \"1.0.0a0\", allow-prereleases = true }`` (without "
-"extras)"
-msgstr "``flwr = { version = \"1.0.0a0\", allow-prereleases = true }`` (extras 제외)"
+#, fuzzy
+msgid "``uv add --prerelease=allow \"flwr==1.0.0a0\"`` (without extras)"
+msgstr "``pip install -U --pre flwr`` (extras 제외)"
 
 #: ../../source/contributor-how-to-install-development-versions.rst:16
-#, python-brace-format
-msgid ""
-"``flwr = { version = \"1.0.0a0\", allow-prereleases = true, extras = "
-"[\"simulation\"] }`` (with extras)"
-msgstr ""
-"``flwr = { version = \"1.0.0a0\", allow-prereleases = true, extras = "
-"[\"simulation\"] }`` (extras 포함)"
+#, fuzzy
+msgid "``uv add --prerelease=allow \"flwr[simulation]==1.0.0a0\"`` (with extras)"
+msgstr "``pip install -U --pre 'flwr[simulation]'`` (extras 포함)"
 
-#: ../../source/contributor-how-to-install-development-versions.rst:19
-msgid ""
-"Install ``flwr`` from a local copy of the Flower source code via "
-"``pyproject.toml``:"
+#: ../../source/contributor-how-to-install-development-versions.rst:18
+#, fuzzy
+msgid "Install ``flwr`` from a local copy of the Flower source code:"
 msgstr "``pyproject.toml``을 통해 Flower 소스 코드의 로컬 복사본에서 ``flwr``을 설치하세요:"
 
-#: ../../source/contributor-how-to-install-development-versions.rst:21
-#, python-brace-format
-msgid "``flwr = { path = \"../../\", develop = true }`` (without extras)"
-msgstr "``flwr = { path = \"../../\", develop = true }`` (extras 제외)"
+#: ../../source/contributor-how-to-install-development-versions.rst:20
+#, fuzzy
+msgid "``uv add --editable \"../../\"`` (without extras)"
+msgstr "``pip install -U --pre flwr`` (extras 제외)"
 
-#: ../../source/contributor-how-to-install-development-versions.rst:22
-#, python-brace-format
-msgid ""
-"``flwr = { path = \"../../\", develop = true, extras = [\"simulation\"] "
-"}`` (with extras)"
+#: ../../source/contributor-how-to-install-development-versions.rst:21
+#, fuzzy, python-brace-format
+msgid "``uv add --editable \"../../\" --extra simulation`` (with extras)"
 msgstr ""
 "``flwr = { path = \"../../\", develop = true, extras = [\"simulation\"] "
 "}`` (extras 포함)"
 
-#: ../../source/contributor-how-to-install-development-versions.rst:24
-msgid "Install ``flwr`` from a local wheel file via ``pyproject.toml``:"
+#: ../../source/contributor-how-to-install-development-versions.rst:23
+#, fuzzy
+msgid "Install ``flwr`` from a local wheel file:"
 msgstr "``pyproject.toml``을 통해 로컬 wheel file에서 ``flwr``을 설치하세요:"
 
-#: ../../source/contributor-how-to-install-development-versions.rst:26
-#, python-brace-format
-msgid ""
-"``flwr = { path = \"../../dist/flwr-1.8.0-py3-none-any.whl\" }`` (without"
-" extras)"
+#: ../../source/contributor-how-to-install-development-versions.rst:25
+#, fuzzy, python-brace-format
+msgid "``uv add \"../../dist/flwr-1.8.0-py3-none-any.whl\"`` (without extras)"
 msgstr ""
 "``flwr = { path = \"../../dist/flwr-1.8.0-py3-none-any.whl\" }`` (extras "
 "제외)"
 
-#: ../../source/contributor-how-to-install-development-versions.rst:27
-#, python-brace-format
+#: ../../source/contributor-how-to-install-development-versions.rst:26
+#, fuzzy, python-brace-format
 msgid ""
-"``flwr = { path = \"../../dist/flwr-1.8.0-py3-none-any.whl\", extras = "
-"[\"simulation\"] }`` (with extras)"
+"``uv add \"../../dist/flwr-1.8.0-py3-none-any.whl\" --extra simulation`` "
+"(with extras)"
 msgstr ""
 "``flwr = { path = \"../../dist/flwr-1.8.0-py3-none-any.whl\", extras = "
 "[\"simulation\"] }`` (extras 포함)"
 
-#: ../../source/contributor-how-to-install-development-versions.rst:30
+#: ../../source/contributor-how-to-install-development-versions.rst:28
 #, fuzzy
 msgid ""
 "Please refer to the uv documentation for further details: `Managing "
@@ -924,23 +914,23 @@ msgstr ""
 "자세한 내용은 Poetry 문서를 참고하세요: `Poetry Dependency Specification <https"
 "://python-poetry.org/docs/dependency-specification/>`_"
 
-#: ../../source/contributor-how-to-install-development-versions.rst:34
+#: ../../source/contributor-how-to-install-development-versions.rst:32
 msgid "Using pip (recommended on Colab)"
 msgstr "pip 사용하기(Colab에서 권장)"
 
-#: ../../source/contributor-how-to-install-development-versions.rst:36
+#: ../../source/contributor-how-to-install-development-versions.rst:34
 msgid "Install a ``flwr`` pre-release from PyPI:"
 msgstr "PyPI에서 ``flwr`` 사전 릴리즈를 설치하기:"
 
-#: ../../source/contributor-how-to-install-development-versions.rst:38
+#: ../../source/contributor-how-to-install-development-versions.rst:36
 msgid "``pip install -U --pre flwr`` (without extras)"
 msgstr "``pip install -U --pre flwr`` (extras 제외)"
 
-#: ../../source/contributor-how-to-install-development-versions.rst:39
+#: ../../source/contributor-how-to-install-development-versions.rst:37
 msgid "``pip install -U --pre 'flwr[simulation]'`` (with extras)"
 msgstr "``pip install -U --pre 'flwr[simulation]'`` (extras 포함)"
 
-#: ../../source/contributor-how-to-install-development-versions.rst:41
+#: ../../source/contributor-how-to-install-development-versions.rst:39
 msgid ""
 "Python packages can be installed from git repositories. Use one of the "
 "following commands to install the Flower directly from GitHub."
@@ -948,11 +938,11 @@ msgstr ""
 "Python 패키지는 git 저장소에서 설치할 수 있습니다. 다음 명령어 중 하나를 사용하여 GitHub에서 직접 Flower를 "
 "설치하세요."
 
-#: ../../source/contributor-how-to-install-development-versions.rst:44
+#: ../../source/contributor-how-to-install-development-versions.rst:42
 msgid "Install ``flwr`` from the default GitHub branch (``main``):"
 msgstr "기본 GitHub branch (``main``)에서 ``flwr`` 를 설치하기:"
 
-#: ../../source/contributor-how-to-install-development-versions.rst:46
+#: ../../source/contributor-how-to-install-development-versions.rst:44
 #, fuzzy
 msgid ""
 "``pip install "
@@ -962,7 +952,7 @@ msgstr ""
 "``pip install flwr@git+https://github.com/adap/flower.git@branch-name`` "
 "(extras 제외)"
 
-#: ../../source/contributor-how-to-install-development-versions.rst:48
+#: ../../source/contributor-how-to-install-development-versions.rst:46
 #, fuzzy
 msgid ""
 "``pip install "
@@ -972,11 +962,11 @@ msgstr ""
 "``pip install 'flwr[simulation]@git+https://github.com/adap/flower.git"
 "@branch-name'`` (extras 포함)"
 
-#: ../../source/contributor-how-to-install-development-versions.rst:52
+#: ../../source/contributor-how-to-install-development-versions.rst:50
 msgid "Install ``flwr`` from a specific GitHub branch (``branch-name``):"
 msgstr "특정 GitHub branch (``branch-name``)에서 ``flwr`` 설치하기:"
 
-#: ../../source/contributor-how-to-install-development-versions.rst:54
+#: ../../source/contributor-how-to-install-development-versions.rst:52
 #, fuzzy
 msgid ""
 "``pip install flwr@git+https://github.com/flwrlabs/flower.git@branch-"
@@ -985,7 +975,7 @@ msgstr ""
 "``pip install flwr@git+https://github.com/adap/flower.git@branch-name`` "
 "(extras 제외)"
 
-#: ../../source/contributor-how-to-install-development-versions.rst:57
+#: ../../source/contributor-how-to-install-development-versions.rst:55
 #, fuzzy
 msgid ""
 "``pip install "
@@ -1291,15 +1281,13 @@ msgid "Set up a virtual env"
 msgstr "가상 환경 설정"
 
 #: ../../source/contributor-how-to-set-up-a-virtual-env.rst:5
-#, fuzzy
 msgid ""
 "It is recommended to run your Python setup within a virtual environment. "
-"This guide shows three different examples how to create a virtual "
-"environment with pyenv virtualenv, uv, or Anaconda. You can follow the "
-"instructions or choose your preferred setup."
+"For framework development, uv creates and manages the virtual environment"
+" from the project lockfile. Tools such as pyenv or Anaconda can still "
+"provide the Python interpreter, but they do not need to create a separate"
+" project environment."
 msgstr ""
-"가상 환경 내에서 파이썬 설정을 실행하는 것이 좋습니다. 이 가이드에서는 pyenv virtualenv, poetry 또는 "
-"Anaconda를 사용하여 가상 환경을 만드는 세 가지 예제를 보여줍니다. 안내를 따르거나 원하는 설정을 선택할 수 있습니다."
 
 #: ../../source/contributor-how-to-set-up-a-virtual-env.rst:12
 msgid "Python Version"
@@ -1307,7 +1295,8 @@ msgstr "Python 버전"
 
 #: ../../source/contributor-how-to-set-up-a-virtual-env.rst:14
 #: ../../source/how-to-install-flower.rst:13
-msgid "Flower requires at least `Python 3.10 <https://docs.python.org/3.10/>`_."
+#, fuzzy
+msgid "Flower requires at least `Python 3.11 <https://docs.python.org/3.11/>`_."
 msgstr "Flower는 `Python 3.10 <https://docs.python.org/3.10/>`_이상이 필요하지만."
 
 #: ../../source/contributor-how-to-set-up-a-virtual-env.rst:18
@@ -1322,71 +1311,63 @@ msgstr ""
 " 좋습니다."
 
 #: ../../source/contributor-how-to-set-up-a-virtual-env.rst:24
-msgid "Virtualenv with Pyenv/Virtualenv"
-msgstr "Pyenv/Virtualenv를 사용한 가상 환경"
-
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:26
-#, fuzzy
-msgid ""
-"One of the recommended virtual environment is `pyenv "
-"<https://github.com/pyenv/pyenv>`_/`virtualenv <https://github.com/pyenv"
-"/pyenv-virtualenv>`_. Please see `Flower examples "
-"<https://github.com/flwrlabs/flower/tree/main/examples/>`_ for details."
-msgstr ""
-"권장 가상 환경 중 하나는 `pyenv <https://github.com/pyenv/pyenv>`_/`virtualenv "
-"<https://github.com/pyenv/pyenv-virtualenv>`_입니다. 자세한 내용은 `Flower "
-"examples <https://github.com/adap/flower/tree/main/examples/>`_를 참조하세요."
-
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:31
-msgid ""
-"Once Pyenv is set up, you can use it to install `Python Version 3.10 "
-"<https://docs.python.org/3.10/>`_ or above:"
-msgstr ""
-"Pyenv가 설정되면 이를 사용하여 'Python 버전 3.10 <https://docs.python.org/3.10/>`_ "
-"이상'을 설치할 수 있습니다:"
-
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:38
-msgid "Create the virtualenv with:"
-msgstr "가상 환경을 만듭니다:"
-
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:44
-msgid "Activate the virtualenv by running the following command:"
-msgstr "다음 명령을 실행하여 가상 환경을 활성화합니다:"
-
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:52
 #, fuzzy
 msgid "Virtualenv with uv"
 msgstr "Poetry를 사용한 가상 환경"
 
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:54
-#, fuzzy
-msgid ""
-"The Flower examples use `uv <https://docs.astral.sh/uv/>`_ to manage "
-"dependencies. After installing ``uv`` you can install dependencies with:"
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:26
+msgid "From the repository root, run the bootstrap script:"
 msgstr ""
-"Flower examples은 의존성을 관리하기 위해 `Poetry <https://python-"
-"poetry.org/docs/>`_를 기반으로 합니다. Poetry를 설치한 후 가상 환경을 생성하기만 하면 됩니다:"
 
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:63
-msgid "Virtualenv with Anaconda"
-msgstr "Anaconda를 사용한 가상 환경"
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:32
+msgid ""
+"This creates ``framework/.venv`` with the repository's default Python "
+"version and installs all framework dependencies from "
+"``framework/uv.lock``. To use a specific Python version, pass it as the "
+"first argument:"
+msgstr ""
 
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:65
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:40
+#, fuzzy
+msgid "Activate the created virtual environment with:"
+msgstr "그 후 가상 환경을 활성화합니다:"
+
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:46
+msgid "You can also run uv directly from the ``framework`` directory:"
+msgstr ""
+
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:55
+#, fuzzy
+msgid "Python Versions with Pyenv"
+msgstr "Python 버전"
+
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:57
+msgid ""
+"If you use `pyenv <https://github.com/pyenv/pyenv>`_, install the Python "
+"version you want uv to use:"
+msgstr ""
+
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:64
+msgid "Then pass that version to the bootstrap script:"
+msgstr ""
+
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:72
+#, fuzzy
+msgid "Python Versions with Anaconda"
+msgstr "Python 버전"
+
+#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:74
 #, fuzzy
 msgid ""
-"If you prefer to use Anaconda for your virtual environment then install "
-"and setup the `conda <https://docs.conda.io/projects/conda/en/latest"
-"/user-guide/install/index.html>`_ package. After setting it up you can "
-"create a virtual environment with:"
+"If you prefer conda, create and activate a Python environment, then let "
+"uv create the framework project environment. See the `conda installation "
+"guide <https://docs.conda.io/projects/conda/en/latest/user-"
+"guide/install/index.html>`_ for installation instructions."
 msgstr ""
 "가상 환경에서 Anaconda를 사용하려면 `conda "
 "<https://docs.conda.io/projects/conda/en/latest/user-"
 "guide/install/index.html>`_ 패키지를 설치 및 설정하세요. 설정 후 다음을 사용하여 가상 환경을 만들 수 "
 "있습니다:"
-
-#: ../../source/contributor-how-to-set-up-a-virtual-env.rst:73
-msgid "and activate the virtual environment with:"
-msgstr "그 후 가상 환경을 활성화합니다:"
 
 #: ../../source/contributor-how-to-write-documentation.rst:3
 msgid "Write documentation"
@@ -2284,7 +2265,8 @@ msgid "Prerequisites"
 msgstr "전제 조건"
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:9
-msgid "`Python 3.10 <https://docs.python.org/3.10/>`_ or above"
+#, fuzzy
+msgid "`Python 3.11 <https://docs.python.org/3.11/>`_ or above"
 msgstr "Python 3.10 <https://docs.python.org/3.10/>`_ 이상"
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:10
@@ -2296,11 +2278,7 @@ msgstr "Python 3.10 <https://docs.python.org/3.10/>`_ 이상"
 msgid "(Optional) `pyenv <https://github.com/pyenv/pyenv>`_"
 msgstr "(선택 사항) `pyenv <https://github.com/pyenv/pyenv>`_"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:12
-msgid "(Optional) `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_"
-msgstr "(선택 사항) `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_"
-
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:14
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:13
 #, fuzzy
 msgid ""
 "Flower uses ``pyproject.toml`` to manage dependencies and configure "
@@ -2311,90 +2289,81 @@ msgstr ""
 ":code:`pyproject.toml`을 사용합니다. Poetry는 `PEP 517 "
 "<https://peps.python.org/pep-0517/>`_을 지원하는 빌드 도구입니다."
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:20
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:19
 msgid "Developer Machine Setup"
 msgstr "개발자 머신 설정"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:23
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:22
 #, fuzzy
 msgid "Preliminaries"
 msgstr "사전 준비"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:25
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:24
 msgid "Some system-wide dependencies are needed."
 msgstr "일부 시스템 전체에 대한 의존성이 필요합니다."
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:28
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:27
 msgid "For macOS"
 msgstr "macOS의 경우"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:30
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:29
 msgid ""
 "Install `homebrew <https://brew.sh/>`_. Don't forget the post-"
 "installation actions to add `brew` to your PATH."
 msgstr "`homebrew <https://brew.sh/>`_를 설치합니다. 설치 후 `brew`를 PATH에 추가하는 작업을 잊지 마세요."
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:32
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:31
 #, fuzzy
 msgid ""
 "Install `xz` (to install different Python versions) and `pandoc` to build"
 " the docs:"
 msgstr "xz`(다른 Python 버전을 설치하려면)와 `pandoc`을 설치하여 문서를 빌드합니다::"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:39
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:38
 msgid "For Ubuntu"
 msgstr "Ubuntu의 경우"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:41
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:40
 #, fuzzy
 msgid ""
 "Ensure you system (Ubuntu 22.04+) is up-to-date, and you have all "
 "necessary packages:"
 msgstr "시스템(우분투 22.04 이상)이 최신 상태이고 필요한 패키지가 모두 설치되어 있는지 확인하세요:"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:50
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:49
 msgid "Create Flower Dev Environment"
 msgstr "Flower 개발 환경 만들기"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:52
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:51
 #, fuzzy
 msgid ""
 "Clone the `Flower repository <https://github.com/flwrlabs/flower>`_ from "
 "GitHub:"
 msgstr "1. GitHub: 에서 ``Flower 레포지토리 <https://github.com/adap/flower>`_를 복제합니다::"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:59
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:58
 msgid ""
-"Create and activate a Python virtual environment for development. See "
-"`Set up a virtual env <contributor-how-to-set-up-a-virtual-env.rst>`_ for"
-" detailed instructions."
+"Install uv by following the `uv installation instructions "
+"<https://docs.astral.sh/uv/getting-started/installation/>`_."
 msgstr ""
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:63
-msgid ""
-"One way to do this is by using `pyenv <https://github.com/pyenv/pyenv>`_ "
-"and `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_. You "
-"can also optionally install a specific Python version using pyenv if you "
-"haven't already installed your desired version:"
-msgstr ""
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:60
+#, fuzzy
+msgid "Bootstrap the framework development environment:"
+msgstr "Flower 개발 환경 만들기"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:74
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:66
 msgid ""
-"Install ``uv``, which is used to manage dependencies and development "
-"workflows."
+"The bootstrap script creates ``framework/.venv`` using the Python version"
+" pinned by the repository. Pass a Python version as the first argument to"
+" use a different one:"
 msgstr ""
 
 #: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:75
-msgid ""
-"Navigate to the ``framework`` directory and install the Flower project in"
-" development mode, including all optional dependencies:"
-msgstr ""
-
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:85
 msgid "Convenience Scripts"
 msgstr "편의 스크립트"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:87
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:77
 #, fuzzy
 msgid ""
 "The Flower repository contains a number of convenience scripts to make "
@@ -2405,23 +2374,23 @@ msgstr ""
 "Flower 레포지토리에는 반복적인 개발 작업을 더 쉽고 오류를 줄이기 위한 여러 가지 편의 스크립트가 포함되어 있습니다. 전체 "
 "목록은 :code:`/dev` 하위 디렉터리를 참조하세요. 다음 스크립트는 가장 중요한 스크립트 중 하나입니다:"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:92
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:82
 msgid "Compile ProtoBuf Definitions"
 msgstr "ProtoBuf 정의 컴파일"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:99
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:89
 msgid "Auto-Format Code"
 msgstr "자동 포맷 코드"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:106
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:96
 msgid "Run Linters and Tests"
 msgstr "린터 및 테스트 실행"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:113
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:103
 msgid "Add a pre-commit hook"
 msgstr "사전 커밋 훅 추가"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:115
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:105
 #, fuzzy
 msgid ""
 "Developers may integrate a pre-commit hook into their workflow utilizing "
@@ -2433,45 +2402,45 @@ msgstr ""
 " 워크플로에 통합할 수 있습니다. 사전 커밋 훅은 두 가지 기본 작업을 실행하도록 구성됩니다:``./dev/format.sh`` 및"
 " ``./dev/test.sh`` 스크립트."
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:120
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:110
 msgid "There are multiple ways developers can use this:"
 msgstr "개발자가 이것을 사용할 수 있는 여러가지 방법이 있습니다:"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:122
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:112
 msgid "Install the pre-commit hook to your local git directory by simply running:"
 msgstr "간단하게 실행하여 로컬 git 디렉터리에 사전 커밋 훅을 설치하세요:"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:128
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:118
 msgid ""
 "Each ``git commit`` will trigger the execution of formatting and "
 "linting/test scripts."
 msgstr "각 ``git 커밋``은 포맷 및 린팅/테스트 스크립트의 실행을 트리거합니다."
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:130
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:120
 #, fuzzy
 msgid ""
 "If in a hurry, bypass the hook using ``--no-verify`` with the ``git "
 "commit`` command."
 msgstr "급한 경우 ``git commit`` 명령과 함께 `--no-verify``를 사용하여 훅을 넘기세요:"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:137
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:127
 msgid ""
 "For developers who prefer not to install the hook permanently, it is "
 "possible to execute a one-time check prior to committing changes by using"
 " the following command:"
 msgstr "훅을 영구적으로 설치하지 않으려는 개발자의 경우 다음 명령을 사용하여 변경 사항을 커밋하기 전에 일회성 검사를 실행할 수 있습니다:"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:144
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:134
 msgid ""
 "This executes the formatting and linting checks/tests on all the files "
 "without modifying the default behavior of ``git commit``."
 msgstr "이렇게 하면 ``git commit``의 기본 동작을 수정하지 않고 모든 파일에 대해 포맷 및 린팅 검사/테스트를 실행합니다."
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:148
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:138
 msgid "Run Github Actions (CI) locally"
 msgstr "로컬에서 Github Action(CI) 실행하기"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:150
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:140
 #, fuzzy
 msgid ""
 "Developers could run the full set of Github Actions workflows under their"
@@ -2483,35 +2452,35 @@ msgstr ""
 "Actions 워크플로우 세트를 실행할 수 있습니다. 링크된 레포지토리 아래의 설치 지침을 참조하여 Flower 메인 클론 "
 "레포지토리 폴더 아래에서 다음 명령을 실행하세요::"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:159
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:149
 msgid ""
 "The Flower default workflow would run by setting up the required Docker "
 "machines underneath."
 msgstr "Flower 기본 워크플로우는 아래에 필요한 Docker 머신을 설정하여 실행합니다."
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:164
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:154
 msgid "Build Release"
 msgstr "릴리즈 빌드"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:166
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:156
 #, fuzzy
 msgid ""
 "Flower uses ``uv`` to build releases. The necessary command is wrapped in"
 " a simple script:"
 msgstr "Flower는 Poetry를 사용하여 릴리즈를 빌드합니다. 필요한 명령은 간단한 스크립트로 래핑됩니다::"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:173
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:163
 #, fuzzy
 msgid ""
 "The resulting ``.whl`` and ``.tar.gz`` releases will be stored in the "
 "``./framework/dist`` subdirectory."
 msgstr "결과물인 :code:`.whl` 및 :code:`.tar.gz` 릴리즈는 :code:`/dist` 하위 디렉터리에 저장됩니다."
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:178
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:168
 msgid "Build Documentation"
 msgstr "문서 빌드"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:180
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:170
 #, fuzzy
 msgid ""
 "Flower's documentation uses `Sphinx <https://www.sphinx-doc.org/>`_. To "
@@ -2520,12 +2489,12 @@ msgstr ""
 "Flower의 문서는 `Sphinx <https://www.sphinx-doc.org/>`_를 사용합니다. 아직 문서를 다시 작성할"
 " 수 있는 편리한 스크립트는 없지만 다음과 같이 쉽게 작성할 수 있습니다:"
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:187
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:177
 #, fuzzy
 msgid "This will generate HTML documentation in ``./framework/doc/build/html``."
 msgstr "그러면 ``doc/build/html``에 HTML 문서가 생성됩니다."
 
-#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:189
+#: ../../source/contributor-tutorial-get-started-as-a-contributor.rst:179
 #, fuzzy
 msgid ""
 "Note that, in order to build the documentation locally, `Pandoc "
@@ -14980,8 +14949,8 @@ msgstr "``python -m pip install -U 'flwr[simulation]'``(``start_simulation`` 사
 #: ../../source/how-to-upgrade-to-flower-1.0.rst:34
 #, fuzzy
 msgid ""
-"uv: update the ``flwr`` dependency in ``pyproject.toml`` and then "
-"reinstall with ``uv sync``."
+"uv: update the ``flwr`` dependency in ``pyproject.toml`` and then sync "
+"the environment with ``uv sync``."
 msgstr ""
 "Poetry: ``pyproject.toml``에서 ``flwr`` dependency을 업데이트한 다음 다시 "
 "설치하세요(``poetry 설치``를 실행하기 전에 ``rm poetry.lock``을 통해 ``poetry.lock``을 삭제하는"
@@ -17677,28 +17646,28 @@ msgstr ""
 msgid "Classes"
 msgstr "클래스"
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`Array <flwr.app.Array>`\\ \\(\\)"
 msgstr ":py:obj:`NDArray <flwr.common.NDArray>`\\"
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.common.record.array.Array:1 of
 msgid "Array type."
 msgstr "배열 유형."
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`ArrayRecord <flwr.app.ArrayRecord>`\\ \\(\\)"
 msgstr ":py:obj:`NDArray <flwr.common.NDArray>`\\"
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.common.record.arrayrecord.ArrayRecord:1 of
 #, fuzzy
 msgid "Array record."
 msgstr "매개변수 기록."
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #, fuzzy
 msgid ""
 ":py:obj:`ConfigRecord <flwr.app.ConfigRecord>`\\ \\(\\[config\\_dict\\, "
@@ -17707,57 +17676,57 @@ msgstr ""
 ":py:obj:`ConfigsRecord <flwr.common.ConfigsRecord>`\\ "
 "\\(\\[configs\\_dict\\, keep\\_input\\]\\)"
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.common.record.configrecord.ConfigRecord:1 of
 #, fuzzy
 msgid "Config record."
 msgstr "레코드를 설정합니다."
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #, fuzzy
 msgid ""
 ":py:obj:`Context <flwr.app.Context>`\\ \\(run\\_id\\, node\\_id\\, "
 "node\\_config\\, state\\, ...\\)"
 msgstr ":py:obj:`Context <flwr.common.Context>`\\ \\(state\\)"
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.common.context.Context:1 of
 #, fuzzy
 msgid "Context of your run."
 msgstr "실행 상태."
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`Error <flwr.app.Error>`\\ \\(code\\[\\, reason\\]\\)"
 msgstr ":py:obj:`Error <flwr.common.Error>`\\ \\(code\\[\\, reason\\]\\)"
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1 flwr.app.error.Error:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1 flwr.app.error.Error:1
 #: of
 #, fuzzy
 msgid "The class storing information about an error that occurred."
 msgstr "발생한 오류에 대한 정보를 저장하는 데이터 클래스입니다."
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`Message <flwr.app.Message>`\\ \\(\\)"
 msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.common.message.Message:1 of
 msgid "Represents a message exchanged between ClientApp and ServerApp."
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`MessageType <flwr.app.MessageType>`\\ \\(\\)"
 msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.app.message_type.MessageType:1 of
 msgid "Message type."
 msgstr "메시지 타입."
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #, fuzzy
 msgid ""
 ":py:obj:`Metadata <flwr.app.Metadata>`\\ \\(run\\_id\\, message\\_id\\, "
@@ -17766,13 +17735,13 @@ msgstr ""
 ":py:obj:`Metadata <flwr.common.Metadata>`\\ \\(run\\_id\\, "
 "message\\_id\\, src\\_node\\_id\\, ...\\)"
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.app.metadata.Metadata:1 of
 #, fuzzy
 msgid "The class representing metadata associated with the current message."
 msgstr "현재 메시지와 관련된 메타데이터를 보유한 데이터 클래스입니다."
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #, fuzzy
 msgid ""
 ":py:obj:`MetricRecord <flwr.app.MetricRecord>`\\ \\(\\[metric\\_dict\\, "
@@ -17781,13 +17750,13 @@ msgstr ""
 ":py:obj:`MetricsRecord <flwr.common.MetricsRecord>`\\ "
 "\\(\\[metrics\\_dict\\, keep\\_input\\]\\)"
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.common.record.metricrecord.MetricRecord:1 of
 #, fuzzy
 msgid "Metric record."
 msgstr "메트릭 기록."
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #, fuzzy
 msgid ""
 ":py:obj:`RecordDict <flwr.app.RecordDict>`\\ \\(\\[records\\, "
@@ -17796,22 +17765,11 @@ msgstr ""
 ":py:obj:`RecordSet <flwr.common.RecordSet>`\\ "
 "\\(\\[parameters\\_records\\, ...\\]\\)"
 
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
 #: flwr.common.record.recorddict.RecordDict:1 of
 #, fuzzy
 msgid "RecordDict stores groups of arrays, metrics and configs."
 msgstr "RecordSet은 매개변수, 메트릭 및 설정 그룹을 저장합니다."
-
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
-#, fuzzy
-msgid ":py:obj:`UserConfig <flwr.app.UserConfig>`\\"
-msgstr ":py:obj:`config <flwr.common.FitIns.config>`\\"
-
-#: ../../source/ref-api/flwr.app.rst:32:<autosummary>:1
-msgid ""
-"alias of :py:class:`dict`\\ [:py:class:`str`, :py:class:`bool` | "
-":py:class:`float` | :py:class:`int` | :py:class:`str`]"
-msgstr ""
 
 #: ../../source/ref-api/flwr.app.Array.rst:2
 msgid "Array"
@@ -19667,10 +19625,6 @@ msgstr ""
 
 #: flwr.app.RecordDict.parameters_records:3 of
 msgid "Use ``array_records`` instead."
-msgstr ""
-
-#: ../../source/ref-api/flwr.app.UserConfig.rst:2
-msgid "UserConfig"
 msgstr ""
 
 #: ../../source/ref-api/flwr.clientapp.rst:2
@@ -71899,5 +71853,136 @@ msgstr ""
 #~ "<https://docs.python.org/3/library/pprint.html>`_ and save"
 #~ " the global model NumPy arrays using"
 #~ " ``np.savez()`` as shown above."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``flwr = { version = \"1.0.0a0\", "
+#~ "allow-prereleases = true }`` (without "
+#~ "extras)"
+#~ msgstr ""
+#~ "``flwr = { version = \"1.0.0a0\", "
+#~ "allow-prereleases = true }`` (extras "
+#~ "제외)"
+
+#~ msgid ""
+#~ "``flwr = { version = \"1.0.0a0\", "
+#~ "allow-prereleases = true, extras = "
+#~ "[\"simulation\"] }`` (with extras)"
+#~ msgstr ""
+#~ "``flwr = { version = \"1.0.0a0\", "
+#~ "allow-prereleases = true, extras = "
+#~ "[\"simulation\"] }`` (extras 포함)"
+
+#~ msgid "``flwr = { path = \"../../\", develop = true }`` (without extras)"
+#~ msgstr "``flwr = { path = \"../../\", develop = true }`` (extras 제외)"
+
+#~ msgid ""
+#~ "It is recommended to run your "
+#~ "Python setup within a virtual "
+#~ "environment. This guide shows three "
+#~ "different examples how to create a "
+#~ "virtual environment with pyenv virtualenv, "
+#~ "uv, or Anaconda. You can follow "
+#~ "the instructions or choose your "
+#~ "preferred setup."
+#~ msgstr ""
+#~ "가상 환경 내에서 파이썬 설정을 실행하는 것이 "
+#~ "좋습니다. 이 가이드에서는 pyenv virtualenv, poetry"
+#~ " 또는 Anaconda를 사용하여 가상 환경을 만드는 세"
+#~ " 가지 예제를 보여줍니다. 안내를 따르거나 원하는 설정을"
+#~ " 선택할 수 있습니다."
+
+#~ msgid "Virtualenv with Pyenv/Virtualenv"
+#~ msgstr "Pyenv/Virtualenv를 사용한 가상 환경"
+
+#~ msgid ""
+#~ "One of the recommended virtual "
+#~ "environment is `pyenv "
+#~ "<https://github.com/pyenv/pyenv>`_/`virtualenv "
+#~ "<https://github.com/pyenv/pyenv-virtualenv>`_. Please "
+#~ "see `Flower examples "
+#~ "<https://github.com/flwrlabs/flower/tree/main/examples/>`_ for"
+#~ " details."
+#~ msgstr ""
+#~ "권장 가상 환경 중 하나는 `pyenv "
+#~ "<https://github.com/pyenv/pyenv>`_/`virtualenv "
+#~ "<https://github.com/pyenv/pyenv-virtualenv>`_입니다. 자세한 "
+#~ "내용은 `Flower examples "
+#~ "<https://github.com/adap/flower/tree/main/examples/>`_를 참조하세요."
+
+#~ msgid ""
+#~ "Once Pyenv is set up, you can "
+#~ "use it to install `Python Version "
+#~ "3.10 <https://docs.python.org/3.10/>`_ or above:"
+#~ msgstr ""
+#~ "Pyenv가 설정되면 이를 사용하여 'Python 버전 "
+#~ "3.10 <https://docs.python.org/3.10/>`_ 이상'을 설치할 "
+#~ "수 있습니다:"
+
+#~ msgid "Create the virtualenv with:"
+#~ msgstr "가상 환경을 만듭니다:"
+
+#~ msgid "Activate the virtualenv by running the following command:"
+#~ msgstr "다음 명령을 실행하여 가상 환경을 활성화합니다:"
+
+#~ msgid ""
+#~ "The Flower examples use `uv "
+#~ "<https://docs.astral.sh/uv/>`_ to manage "
+#~ "dependencies. After installing ``uv`` you "
+#~ "can install dependencies with:"
+#~ msgstr ""
+#~ "Flower examples은 의존성을 관리하기 위해 `Poetry"
+#~ " <https://python-poetry.org/docs/>`_를 기반으로 합니다."
+#~ " Poetry를 설치한 후 가상 환경을 생성하기만 하면"
+#~ " 됩니다:"
+
+#~ msgid "Virtualenv with Anaconda"
+#~ msgstr "Anaconda를 사용한 가상 환경"
+
+#~ msgid ""
+#~ "(Optional) `pyenv-virtualenv "
+#~ "<https://github.com/pyenv/pyenv-virtualenv>`_"
+#~ msgstr "(선택 사항) `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_"
+
+#~ msgid ""
+#~ "Create and activate a Python virtual "
+#~ "environment for development. See `Set up"
+#~ " a virtual env <contributor-how-"
+#~ "to-set-up-a-virtual-env.rst>`_ for detailed"
+#~ " instructions."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "One way to do this is by "
+#~ "using `pyenv <https://github.com/pyenv/pyenv>`_ and"
+#~ " `pyenv-virtualenv <https://github.com/pyenv/pyenv-"
+#~ "virtualenv>`_. You can also optionally "
+#~ "install a specific Python version using"
+#~ " pyenv if you haven't already "
+#~ "installed your desired version:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Install ``uv``, which is used to "
+#~ "manage dependencies and development workflows."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Navigate to the ``framework`` directory "
+#~ "and install the Flower project in "
+#~ "development mode, including all optional "
+#~ "dependencies:"
+#~ msgstr ""
+
+#~ msgid ":py:obj:`UserConfig <flwr.app.UserConfig>`\\"
+#~ msgstr ":py:obj:`config <flwr.common.FitIns.config>`\\"
+
+#~ msgid ""
+#~ "alias of :py:class:`dict`\\ [:py:class:`str`, "
+#~ ":py:class:`bool` | :py:class:`float` | "
+#~ ":py:class:`int` | :py:class:`str`]"
+#~ msgstr ""
+
+#~ msgid "UserConfig"
 #~ msgstr ""
 

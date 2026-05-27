@@ -22,7 +22,7 @@ from typing import Any
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.typing import Run
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
-from flwr.supercore.superexec.executor import Executor
+from flwr.supercore.superexec.executor import Executor, LaunchResult
 
 
 class ExecPlugin(ABC):
@@ -79,7 +79,7 @@ class ExecPlugin(ABC):
         """
 
     @abstractmethod
-    def launch_task(self, token: str, task: Task) -> None:
+    def launch_task(self, token: str, task: Task) -> LaunchResult:
         """Launch the process to execute the given task using the given token.
 
         This method starts the TaskExecutor process using the given `token`.
@@ -92,6 +92,11 @@ class ExecPlugin(ABC):
             The token required to run the TaskExecutor process.
         task : Task
             The task to execute.
+
+        Returns
+        -------
+        LaunchResult
+            The immediate launch outcome.
         """
 
     # This method is optional to implement

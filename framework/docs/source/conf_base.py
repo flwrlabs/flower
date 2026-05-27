@@ -27,6 +27,9 @@ from packaging.version import InvalidVersion, Version
 # list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
+# "This file is the shared base conf for all version docs. For any changes that 
+# only apply to a specific version and onwards, please put in the conf.py"
+
 
 # Fixing path issue for autodoc, in case `flwr` project is not installed.
 sys.path.insert(0, os.path.abspath("../../py"))

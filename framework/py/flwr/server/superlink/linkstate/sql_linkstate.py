@@ -86,11 +86,6 @@ PRIMARY_TASK_STATUS_CONDITIONS = {
 class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
     """SQLAlchemy-based LinkState implementation."""
 
-    @property
-    def select_lock_sql(self) -> str:
-        """Return the SQL clause for row-locking, which is overridable by subclasses."""
-        return ""
-
     def __init__(
         self,
         database_path: str,
