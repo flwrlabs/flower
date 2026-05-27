@@ -601,6 +601,8 @@ def context_to_proto(context: Context) -> ProtoContext:
         state=recorddict_to_proto(context.state),
         run_config=user_config_to_proto(context.run_config),
     )
+    if context.series_id is not None:
+        proto.series_id = context.series_id
     return proto
 
 
@@ -612,6 +614,9 @@ def context_from_proto(context_proto: ProtoContext) -> Context:
         node_config=user_config_from_proto(context_proto.node_config),
         state=recorddict_from_proto(context_proto.state),
         run_config=user_config_from_proto(context_proto.run_config),
+        series_id=(
+            context_proto.series_id if context_proto.HasField("series_id") else None
+        ),
     )
     return context
 
@@ -641,6 +646,8 @@ def run_to_proto(run: typing.Run) -> ProtoRun:
     )
     if run.primary_task_id is not None:
         proto.primary_task_id = run.primary_task_id
+    if run.series_id is not None:
+        proto.series_id = run.series_id
     return proto
 
 
@@ -666,6 +673,7 @@ def run_from_proto(run_proto: ProtoRun) -> typing.Run:
         bytes_recv=run_proto.bytes_recv,
         clientapp_runtime=run_proto.clientapp_runtime,
         run_type=run_proto.run_type,
+        series_id=run_proto.series_id if run_proto.HasField("series_id") else None,
     )
     return run
 

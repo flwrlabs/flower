@@ -20,7 +20,9 @@ package flwr.proto;
 import "flwr/proto/fab.proto";
 import "flwr/proto/transport.proto";
 import "flwr/proto/run.proto";
+import "flwr/proto/runseries.proto";
 import "flwr/proto/node.proto";
+import "flwr/proto/message.proto";
 import "flwr/proto/federation.proto";
 import "flwr/proto/federation_config.proto";
 
@@ -36,6 +38,16 @@ service Control {
 
   // flwr ls command
   rpc ListRuns(ListRunsRequest) returns (ListRunsResponse) {}
+
+  // List run series
+  rpc ListRunSeries(ListRunSeriesRequest) returns (ListRunSeriesResponse) {}
+
+  // Get run series
+  rpc GetRunSeries(GetRunSeriesRequest) returns (GetRunSeriesResponse) {}
+
+  // Delete run series
+  rpc DeleteRunSeries(DeleteRunSeriesRequest)
+      returns (DeleteRunSeriesResponse) {}
 
   // Get login details upon request
   rpc GetLoginDetails(GetLoginDetailsRequest)
@@ -122,10 +134,12 @@ message StartRunRequest {
   SimulationConfig override_federation_config = 3;
   string app_spec = 4;
   string federation = 5;
+  optional string series_id = 6;
 }
 message StartRunResponse {
   optional uint64 run_id = 1;
   optional string note = 2;
+  optional string series_id = 3;
 }
 message StreamLogsRequest {
   uint64 run_id = 1;
@@ -143,6 +157,21 @@ message ListRunsResponse {
   map<uint64, Run> run_dict = 1;
   string now = 2;
 }
+
+message ListRunSeriesRequest {
+  optional string after_series_id = 1;
+  optional uint32 limit = 2;
+}
+message ListRunSeriesResponse { repeated RunSeries entries = 1; }
+
+message GetRunSeriesRequest { string series_id = 1; }
+message GetRunSeriesResponse {
+  RunSeries series = 1;
+  Context context = 2;
+}
+
+message DeleteRunSeriesRequest { string series_id = 1; }
+message DeleteRunSeriesResponse { bool success = 1; }
 
 message GetLoginDetailsRequest {}
 message GetLoginDetailsResponse {

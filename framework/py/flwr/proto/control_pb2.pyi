@@ -22,8 +22,10 @@ import collections.abc
 import flwr.proto.fab_pb2
 import flwr.proto.federation_config_pb2
 import flwr.proto.federation_pb2
+import flwr.proto.message_pb2
 import flwr.proto.node_pb2
 import flwr.proto.run_pb2
+import flwr.proto.runseries_pb2
 import flwr.proto.transport_pb2
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
@@ -59,8 +61,10 @@ class StartRunRequest(google.protobuf.message.Message):
     OVERRIDE_FEDERATION_CONFIG_FIELD_NUMBER: builtins.int
     APP_SPEC_FIELD_NUMBER: builtins.int
     FEDERATION_FIELD_NUMBER: builtins.int
+    SERIES_ID_FIELD_NUMBER: builtins.int
     app_spec: builtins.str
     federation: builtins.str
+    series_id: builtins.str
     @property
     def fab(self) -> flwr.proto.fab_pb2.Fab: ...
     @property
@@ -75,9 +79,11 @@ class StartRunRequest(google.protobuf.message.Message):
         override_federation_config: flwr.proto.federation_config_pb2.SimulationConfig | None = ...,
         app_spec: builtins.str = ...,
         federation: builtins.str = ...,
+        series_id: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["fab", b"fab", "override_federation_config", b"override_federation_config"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["app_spec", b"app_spec", "fab", b"fab", "federation", b"federation", "override_config", b"override_config", "override_federation_config", b"override_federation_config"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_series_id", b"_series_id", "fab", b"fab", "override_federation_config", b"override_federation_config", "series_id", b"series_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_series_id", b"_series_id", "app_spec", b"app_spec", "fab", b"fab", "federation", b"federation", "override_config", b"override_config", "override_federation_config", b"override_federation_config", "series_id", b"series_id"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_series_id", b"_series_id"]) -> typing.Literal["series_id"] | None: ...
 
 global___StartRunRequest = StartRunRequest
 
@@ -87,20 +93,25 @@ class StartRunResponse(google.protobuf.message.Message):
 
     RUN_ID_FIELD_NUMBER: builtins.int
     NOTE_FIELD_NUMBER: builtins.int
+    SERIES_ID_FIELD_NUMBER: builtins.int
     run_id: builtins.int
     note: builtins.str
+    series_id: builtins.str
     def __init__(
         self,
         *,
         run_id: builtins.int | None = ...,
         note: builtins.str | None = ...,
+        series_id: builtins.str | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_note", b"_note", "_run_id", b"_run_id", "note", b"note", "run_id", b"run_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_note", b"_note", "_run_id", b"_run_id", "note", b"note", "run_id", b"run_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_note", b"_note", "_run_id", b"_run_id", "_series_id", b"_series_id", "note", b"note", "run_id", b"run_id", "series_id", b"series_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_note", b"_note", "_run_id", b"_run_id", "_series_id", b"_series_id", "note", b"note", "run_id", b"run_id", "series_id", b"series_id"]) -> None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_note", b"_note"]) -> typing.Literal["note"] | None: ...
     @typing.overload
     def WhichOneof(self, oneof_group: typing.Literal["_run_id", b"_run_id"]) -> typing.Literal["run_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_series_id", b"_series_id"]) -> typing.Literal["series_id"] | None: ...
 
 global___StartRunResponse = StartRunResponse
 
@@ -199,6 +210,111 @@ class ListRunsResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["now", b"now", "run_dict", b"run_dict"]) -> None: ...
 
 global___ListRunsResponse = ListRunsResponse
+
+@typing.final
+class ListRunSeriesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    AFTER_SERIES_ID_FIELD_NUMBER: builtins.int
+    LIMIT_FIELD_NUMBER: builtins.int
+    after_series_id: builtins.str
+    limit: builtins.int
+    def __init__(
+        self,
+        *,
+        after_series_id: builtins.str | None = ...,
+        limit: builtins.int | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["_after_series_id", b"_after_series_id", "_limit", b"_limit", "after_series_id", b"after_series_id", "limit", b"limit"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_after_series_id", b"_after_series_id", "_limit", b"_limit", "after_series_id", b"after_series_id", "limit", b"limit"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_after_series_id", b"_after_series_id"]) -> typing.Literal["after_series_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_limit", b"_limit"]) -> typing.Literal["limit"] | None: ...
+
+global___ListRunSeriesRequest = ListRunSeriesRequest
+
+@typing.final
+class ListRunSeriesResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENTRIES_FIELD_NUMBER: builtins.int
+    @property
+    def entries(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.runseries_pb2.RunSeries]: ...
+    def __init__(
+        self,
+        *,
+        entries: collections.abc.Iterable[flwr.proto.runseries_pb2.RunSeries] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["entries", b"entries"]) -> None: ...
+
+global___ListRunSeriesResponse = ListRunSeriesResponse
+
+@typing.final
+class GetRunSeriesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SERIES_ID_FIELD_NUMBER: builtins.int
+    series_id: builtins.str
+    def __init__(
+        self,
+        *,
+        series_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["series_id", b"series_id"]) -> None: ...
+
+global___GetRunSeriesRequest = GetRunSeriesRequest
+
+@typing.final
+class GetRunSeriesResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SERIES_FIELD_NUMBER: builtins.int
+    CONTEXT_FIELD_NUMBER: builtins.int
+    @property
+    def series(self) -> flwr.proto.runseries_pb2.RunSeries: ...
+    @property
+    def context(self) -> flwr.proto.message_pb2.Context: ...
+    def __init__(
+        self,
+        *,
+        series: flwr.proto.runseries_pb2.RunSeries | None = ...,
+        context: flwr.proto.message_pb2.Context | None = ...,
+    ) -> None: ...
+    def HasField(self, field_name: typing.Literal["context", b"context", "series", b"series"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["context", b"context", "series", b"series"]) -> None: ...
+
+global___GetRunSeriesResponse = GetRunSeriesResponse
+
+@typing.final
+class DeleteRunSeriesRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SERIES_ID_FIELD_NUMBER: builtins.int
+    series_id: builtins.str
+    def __init__(
+        self,
+        *,
+        series_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["series_id", b"series_id"]) -> None: ...
+
+global___DeleteRunSeriesRequest = DeleteRunSeriesRequest
+
+@typing.final
+class DeleteRunSeriesResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SUCCESS_FIELD_NUMBER: builtins.int
+    success: builtins.bool
+    def __init__(
+        self,
+        *,
+        success: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["success", b"success"]) -> None: ...
+
+global___DeleteRunSeriesResponse = DeleteRunSeriesResponse
 
 @typing.final
 class GetLoginDetailsRequest(google.protobuf.message.Message):
