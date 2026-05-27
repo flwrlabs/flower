@@ -1,0 +1,13 @@
+context: pytorch-deploy-static
+address: 0.0.0.0
+port: 9200
+tcp: true
+udp: false
+
+topology:
+  mode: static
+  node_name: node_1
+  generate:
+    node_count: 4
+    kind: ring
+    output_path: ./configs/generated_static_topology.yaml
