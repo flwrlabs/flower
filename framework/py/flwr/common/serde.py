@@ -17,7 +17,6 @@
 
 from typing import Any, cast
 
-# pylint: enable=E0611
 from flwr.app.message import (
     Array,
     ArrayRecord,
@@ -53,6 +52,8 @@ from flwr.proto.transport_pb2 import (
     ServerMessage,
     Status,
 )
+
+# pylint: enable=E0611
 
 from . import typing
 from .constant import INT64_MAX_VALUE
