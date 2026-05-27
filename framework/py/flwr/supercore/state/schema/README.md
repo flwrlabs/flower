@@ -12,6 +12,7 @@
 erDiagram
   context {
     BIGINT run_id FK "nullable"
+    VARCHAR series_id "nullable"
     BLOB context "nullable"
   }
 
@@ -104,31 +105,17 @@ erDiagram
     BIGINT primary_task_id
     BIGINT run_id UK "nullable"
     VARCHAR run_type
+    VARCHAR series_id "nullable"
     VARCHAR usage_reported_at
   }
 
-  run_collection {
-    BIGINT id PK
-    VARCHAR collection_id
-    FLOAT created_at
+  run_series {
+    TIMESTAMP created_at
+    VARCHAR description "nullable"
     VARCHAR flwr_aid
     BIGINT last_run_id "nullable"
-    VARCHAR metadata_json
-    VARCHAR title "nullable"
-    FLOAT updated_at
-  }
-
-  run_collection_item {
-    BIGINT id PK
-    VARCHAR collection_id
-    FLOAT created_at
-    VARCHAR flwr_aid
-    BIGINT item_index
-    VARCHAR item_json
-    VARCHAR item_ref "nullable"
-    VARCHAR parent_item_ref "nullable"
-    BIGINT run_id "nullable"
-    BIGINT task_id "nullable"
+    VARCHAR series_id UK
+    TIMESTAMP updated_at
   }
 
   run_objects {
