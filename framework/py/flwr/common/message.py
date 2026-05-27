@@ -20,7 +20,7 @@ from __future__ import annotations
 from logging import WARNING
 from typing import Any, cast, overload
 
-from flwr.app.constants import DEFAULT_TTL as _DEFAULT_TTL
+from flwr.app.constants import DEFAULT_TTL
 from flwr.common.logger import warn_deprecated_feature
 from flwr.proto.message_pb2 import Message as ProtoMessage  # pylint: disable=E0611
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata  # pylint: disable=E0611
@@ -204,7 +204,7 @@ class Message(InflatableObject):
                 reply_to_message_id="",
                 group_id=group_id or "",
                 created_at=now().timestamp(),
-                ttl=ttl or _DEFAULT_TTL,
+                ttl=ttl or DEFAULT_TTL,
                 message_type=message_type,
                 dst_task_id=dst_task_id,
             )
