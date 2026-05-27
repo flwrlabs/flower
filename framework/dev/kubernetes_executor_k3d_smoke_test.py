@@ -1,0 +1,232 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Tests for the optional Kubernetes executor k3d smoke harness."""
+
+from __future__ import annotations
+
+import threading
+from typing import Any
+from unittest.mock import Mock, call
+
+import kubernetes_executor_k3d_smoke as smoke
+import pytest
+
+
+def _list_response(*names: str) -> object:
+    """Return a Kubernetes-list-like object."""
+    return {"items": [{"metadata": {"name": name}} for name in names]}
+
+
+def test_parse_args_uses_environment_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test smoke config defaults can come from environment variables."""
+    monkeypatch.setenv("FLWR_K8S_EXECUTOR_SMOKE_CLUSTER_NAME", "env-cluster")
+    monkeypatch.setenv("FLWR_K8S_EXECUTOR_SMOKE_NAMESPACE", "env-namespace")
+    monkeypatch.setenv("FLWR_K8S_EXECUTOR_SMOKE_IMAGE", "example/image:dev")
+    monkeypatch.setenv("FLWR_K8S_EXECUTOR_SMOKE_IMAGE_PULL_POLICY", "IfNotPresent")
+    monkeypatch.setenv("FLWR_K8S_EXECUTOR_SMOKE_APPIO_API_ADDRESS", "appio:9092")
+    monkeypatch.setenv("FLWR_K8S_EXECUTOR_SMOKE_ACTIVE_POD_BUDGET", "2")
+    monkeypatch.setenv("FLWR_K8S_EXECUTOR_SMOKE_CAPACITY_TIMEOUT", "3.5")
+    monkeypatch.setenv("FLWR_K8S_EXECUTOR_SMOKE_CAPACITY_POLL_INTERVAL", "0.1")
+    monkeypatch.setenv("FLWR_K8S_EXECUTOR_SMOKE_KEEP_RESOURCES", "true")
+    monkeypatch.setenv("FLWR_K8S_EXECUTOR_SMOKE_DELETE_CLUSTER", "yes")
+
+    config = smoke.parse_args([])
+
+    assert config.cluster_name == "env-cluster"
+    assert config.namespace == "env-namespace"
+    assert config.image == "example/image:dev"
+    assert config.image_pull_policy == "IfNotPresent"
+    assert config.appio_api_address == "appio:9092"
+    assert config.active_pod_budget == 2
+    assert config.capacity_timeout == 3.5
+    assert config.capacity_poll_interval == 0.1
+    assert config.keep_resources is True
+    assert config.delete_cluster is True
+
+
+def test_core_v1_api_adapter_forwards_executor_calls() -> None:
+    """Test CoreV1Api calls are adapted to the executor client protocol."""
+    api = Mock()
+    adapter = smoke.CoreV1ApiAdapter(api)
+    secret: dict[str, Any] = {"kind": "Secret"}
+    pod: dict[str, Any] = {"kind": "Pod"}
+
+    adapter.create_namespaced_secret("namespace", secret)
+    adapter.create_namespaced_pod("namespace", pod)
+    adapter.list_namespaced_pod("namespace", "label=value")
+
+    api.create_namespaced_secret.assert_called_once_with(
+        namespace="namespace", body=secret
+    )
+    api.create_namespaced_pod.assert_called_once_with(namespace="namespace", body=pod)
+    api.list_namespaced_pod.assert_called_once_with(
+        namespace="namespace", label_selector="label=value"
+    )
+
+
+def test_build_smoke_executor_scopes_capacity_selector_to_run_label() -> None:
+    """Test executor config includes local-only pool and unique run label."""
+    config = smoke.SmokeConfig(
+        cluster_name="cluster",
+        namespace="namespace",
+        image="image:dev",
+        image_pull_policy="Never",
+        appio_api_address="appio:9092",
+        active_pod_budget=1,
+        capacity_timeout=5.0,
+        capacity_poll_interval=0.1,
+        keep_resources=False,
+        delete_cluster=False,
+    )
+
+    executor_config = smoke.build_executor_config(config, "run-123")
+    selector, _executor = smoke.build_smoke_executor(Mock(), config, "run-123")
+
+    assert "app.kubernetes.io/component=taskexecutor" in selector
+    assert f"{smoke.RUN_LABEL_KEY}=run-123" in selector
+    assert f"flower.ai/resource-pool={smoke.LOCAL_RESOURCE_POOL}" in selector
+    assert executor_config.image_pull_policy == "Never"
+
+
+def test_build_execution_spec_uses_unique_task_ids_and_tokens() -> None:
+    """Test smoke specs remain unique when active Pod budget is overridden."""
+    config = smoke.SmokeConfig(
+        cluster_name="cluster",
+        namespace="namespace",
+        image="image:dev",
+        image_pull_policy="Never",
+        appio_api_address="appio:9092",
+        active_pod_budget=2,
+        capacity_timeout=5.0,
+        capacity_poll_interval=0.1,
+        keep_resources=False,
+        delete_cluster=False,
+    )
+    run_id = "0123456789abcdef0123456789abcdef"
+
+    first = smoke.build_execution_spec(config, run_id, task_offset=0)
+    second = smoke.build_execution_spec(config, run_id, task_offset=1)
+
+    assert first.task_id > 0
+    assert second.task_id == first.task_id + 1
+    assert first.token != second.token
+
+
+def test_validate_smoke_config_rejects_invalid_budget() -> None:
+    """Test harness config rejects a non-positive active Pod budget."""
+    config = smoke.SmokeConfig(
+        cluster_name="cluster",
+        namespace="namespace",
+        image="image:dev",
+        image_pull_policy="Never",
+        appio_api_address="appio:9092",
+        active_pod_budget=0,
+        capacity_timeout=5.0,
+        capacity_poll_interval=0.1,
+        keep_resources=False,
+        delete_cluster=False,
+    )
+
+    with pytest.raises(smoke.SmokeFailure, match="Active Pod budget"):
+        smoke.validate_smoke_config(config)
+
+
+def test_validate_smoke_config_rejects_keep_resources_with_delete_cluster() -> None:
+    """Test mutually exclusive cleanup flags are rejected."""
+    config = smoke.SmokeConfig(
+        cluster_name="cluster",
+        namespace="namespace",
+        image="image:dev",
+        image_pull_policy="Never",
+        appio_api_address="appio:9092",
+        active_pod_budget=1,
+        capacity_timeout=5.0,
+        capacity_poll_interval=0.1,
+        keep_resources=True,
+        delete_cluster=True,
+    )
+
+    with pytest.raises(smoke.SmokeFailure, match="cannot be combined"):
+        smoke.validate_smoke_config(config)
+
+
+def test_cleanup_deletes_only_objects_matching_selector() -> None:
+    """Test cleanup deletes Pods and Secrets returned by labeled list calls."""
+    api = Mock()
+    api.list_namespaced_pod.return_value = _list_response("pod-a", "pod-b")
+    api.list_namespaced_secret.return_value = _list_response("secret-a")
+
+    smoke.cleanup_labeled_objects(api, "namespace", "label=value")
+
+    api.list_namespaced_pod.assert_called_once_with(
+        namespace="namespace", label_selector="label=value"
+    )
+    api.list_namespaced_secret.assert_called_once_with(
+        namespace="namespace", label_selector="label=value"
+    )
+    assert api.delete_namespaced_pod.mock_calls == [
+        call(name="pod-a", namespace="namespace", grace_period_seconds=0),
+        call(name="pod-b", namespace="namespace", grace_period_seconds=0),
+    ]
+    api.delete_namespaced_secret.assert_called_once_with(
+        name="secret-a", namespace="namespace"
+    )
+
+
+def test_cleanup_ignores_objects_already_removed() -> None:
+    """Test cleanup tolerates Kubernetes not-found races."""
+
+    class _NotFound(Exception):
+        status = 404
+
+    api = Mock()
+    api.list_namespaced_pod.return_value = _list_response("pod-a")
+    api.list_namespaced_secret.return_value = _list_response("secret-a")
+    api.delete_namespaced_pod.side_effect = _NotFound()
+    api.delete_namespaced_secret.side_effect = _NotFound()
+
+    smoke.cleanup_labeled_objects(api, "namespace", "label=value")
+
+
+def test_wait_for_capacity_proof_deletes_and_unblocks() -> None:
+    """Test bounded wait proof runs cleanup and observes unblock."""
+    can_finish = threading.Event()
+    cleanup = Mock(side_effect=can_finish.set)
+
+    class _Executor:
+        def wait_for_capacity(self) -> None:
+            can_finish.wait()
+
+    smoke.prove_wait_for_capacity_blocks_and_unblocks(
+        executor=_Executor(), cleanup=cleanup, timeout=1.0, block_check_timeout=0.01
+    )
+
+    cleanup.assert_called_once_with()
+
+
+def test_wait_for_capacity_proof_rejects_immediate_return() -> None:
+    """Test bounded wait proof fails if wait_for_capacity does not block."""
+
+    class _Executor:
+        def wait_for_capacity(self) -> None:
+            return
+
+    with pytest.raises(smoke.SmokeFailure, match="returned before smoke Pod cleanup"):
+        smoke.prove_wait_for_capacity_blocks_and_unblocks(
+            executor=_Executor(),
+            cleanup=Mock(),
+            timeout=1.0,
+            block_check_timeout=0.01,
+        )
