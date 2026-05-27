@@ -11,8 +11,7 @@
 ---
 erDiagram
   context {
-    BIGINT run_id FK "nullable"
-    VARCHAR series_id "nullable"
+    VARCHAR series_id PK,FK
     BLOB context "nullable"
   }
 
@@ -159,7 +158,7 @@ erDiagram
     FLOAT ttl
   }
 
-  run ||--o| context : run_id
+  run_series ||--o| context : series_id
   run ||--o{ logs : run_id
   run ||--o{ message_ins : run_id
   run ||--o{ message_res : run_id
