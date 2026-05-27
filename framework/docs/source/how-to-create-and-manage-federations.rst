@@ -2,9 +2,9 @@
 .. meta::
     :description: Create and manage Flower federations in SuperGrid.
 
-###############################
- Create and Manage Federations
-###############################
+############################################
+ Create and Manage Federations on SuperGrid
+############################################
 
 This guide shows how to create and manage federations in SuperGrid. A federation is a
 workspace for a group of users and the SuperNodes that can take part in Flower runs.

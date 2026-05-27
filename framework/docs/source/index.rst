@@ -81,7 +81,6 @@ Problem-oriented how-to guides show step-by-step how to achieve a specific goal.
     :titlesonly:
     :caption: How-to Guides
 
-    SuperGrid <supergrid>
     Build <build>
     Simulate <simulate>
     Deploy <deploy>

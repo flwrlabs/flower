@@ -131,6 +131,8 @@ key into the container, then pass the key path to ``flower-supernode``:
 
     $ docker run --rm \
         --user "$(id -u):$(id -g)" \
+        -e FLWR_HOME=/flwr-home \
+        -v "$HOME/.flwr:/flwr-home" \
         -v "$HOME/.flwr/supernodes:/keys:ro" \
         flwr/supernode:|stable_flwr_version| \
         --superlink fleet-supergrid.flower.ai:443 \
@@ -141,7 +143,9 @@ key into the container, then pass the key path to ``flower-supernode``:
     Flower Docker images run as a non-root user by default. The ``--user "$(id -u):$(id
     -g)"`` option keeps the container non-root while running it as the host user that
     owns the mounted private key. This lets the SuperNode process read keys created by
-    ``ssh-keygen`` without changing their file permissions.
+    ``ssh-keygen`` without changing their file permissions. Setting ``FLWR_HOME`` to
+    ``/flwr-home`` gives the SuperNode a writable location to store Flower Apps received
+    during runs.
 
 Use this form when you prefer to run SuperNodes from a container image instead of
 installing Flower directly in a Python environment.
