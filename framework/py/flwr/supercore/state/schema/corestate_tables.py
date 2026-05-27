@@ -77,10 +77,10 @@ def create_corestate_metadata() -> MetaData:
     )
 
     # --------------------------------------------------------------------------
-    #  Table: context
+    #  Table: series_context
     # --------------------------------------------------------------------------
     Table(
-        "context",
+        "series_context",
         metadata,
         Column(
             "series_id",

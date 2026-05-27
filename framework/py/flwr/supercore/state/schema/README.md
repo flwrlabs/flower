@@ -11,7 +11,7 @@
 ---
 erDiagram
   context {
-    VARCHAR series_id PK,FK
+    BIGINT run_id FK "nullable"
     BLOB context "nullable"
   }
 
@@ -117,6 +117,11 @@ erDiagram
     TIMESTAMP updated_at
   }
 
+  series_context {
+    VARCHAR series_id PK,FK
+    BLOB context "nullable"
+  }
+
   run_objects {
     VARCHAR object_id PK,FK
     BIGINT run_id PK
@@ -158,7 +163,8 @@ erDiagram
     FLOAT ttl
   }
 
-  run_series ||--o| context : series_id
+  run ||--o| context : run_id
+  run_series ||--o| series_context : series_id
   run ||--o{ logs : run_id
   run ||--o{ message_ins : run_id
   run ||--o{ message_res : run_id

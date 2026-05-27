@@ -101,6 +101,16 @@ def create_linkstate_metadata() -> MetaData:
     )
 
     # --------------------------------------------------------------------------
+    #  Table: context
+    # --------------------------------------------------------------------------
+    Table(
+        "context",
+        metadata,
+        Column("run_id", BigInteger, ForeignKey("run.run_id"), unique=True),
+        Column("context", LargeBinary),
+    )
+
+    # --------------------------------------------------------------------------
     #  Table: message_ins
     # --------------------------------------------------------------------------
     Table(
