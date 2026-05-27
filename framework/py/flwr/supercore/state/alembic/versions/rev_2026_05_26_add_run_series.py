@@ -15,7 +15,7 @@
 """Add run series.
 
 Revision ID: f934b49300f8
-Revises: 26b5d6018750
+Revises: e78facade196
 Create Date: 2026-05-26 16:04:15.523022
 """
 from collections.abc import Sequence
@@ -27,7 +27,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "f934b49300f8"
-down_revision: str | Sequence[str] | None = "26b5d6018750"
+down_revision: str | Sequence[str] | None = "e78facade196"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
