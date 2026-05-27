@@ -129,6 +129,15 @@ erDiagram
     VARCHAR type
   }
 
+  task_event {
+    INTEGER id PK
+    BIGINT task_id FK
+    VARCHAR data
+    VARCHAR event
+    BIGINT run_id
+    TIMESTAMP timestamp
+  }
+
   task_logs {
     BIGINT task_id FK
     VARCHAR log
@@ -155,6 +164,7 @@ erDiagram
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
   objects ||--o| run_objects : object_id
+  task ||--o{ task_event : task_id
   task ||--o{ task_logs : task_id
   task ||--o{ task_message : src_task_id
   task ||--o{ task_message : dst_task_id

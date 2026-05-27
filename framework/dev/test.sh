@@ -17,17 +17,25 @@ echo "- clang-format:  done"
 
 echo "- isort: start"
 if $RUN_FULL_TEST; then
-    python -m isort --check-only --skip py/flwr/proto py/flwr e2e
+    python -m isort \
+        --check-only \
+        --skip py/flwr/proto \
+        --skip-glob "**/.venv/**" \
+        py e2e
 else
-    python -m isort --check-only --skip py/flwr/proto py/flwr
+    python -m isort --check-only --skip py/flwr/proto py
 fi
 echo "- isort: done"
 
 echo "- black: start"
 if $RUN_FULL_TEST; then
-    python -m black --exclude "py\/flwr\/proto" --check py/flwr e2e
+    python -m black \
+        --extend-exclude "py\/flwr\/proto|(^|\/)\.venv\/" \
+        --check py e2e
 else
-    python -m black --exclude "py\/flwr\/proto" --check py/flwr
+    python -m black \
+        --extend-exclude "py\/flwr\/proto" \
+        --check py
 fi
 echo "- black: done"
 
