@@ -57,6 +57,12 @@ screenshot below, a user named ``peter123`` created a federation named
 ``@<username>/<federation-name>``. In the screenshot, the federation's unique name is
 ``@peter123/my-first-federation``.
 
+.. tip::
+
+    This tutorial creates a simulation federation. To create a deployment federation for
+    the Deployment Runtime, manage federation settings, or invite users to collaborate
+    in a federation, see :doc:`how-to-create-and-manage-federations`.
+
 .. image:: ./_static/federation_list.png
     :alt: Federation list showing the newly created federation
     :align: center

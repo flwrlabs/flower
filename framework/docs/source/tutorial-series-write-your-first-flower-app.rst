@@ -274,6 +274,14 @@ Congratulations, you have successfully run your first custom Flower App on Super
 You have also learned about the main components of a Flower App and how they work
 together to enable collaborative AI workloads across a federation of SuperNodes.
 
+.. tip::
+
+    This tutorial runs the app on SuperGrid with simulated SuperNodes. To run Flower
+    Apps on SuperGrid with the Deployment Runtime instead, create a deployment
+    federation in the SuperGrid dashboard and connect real SuperNodes to it. See
+    :doc:`how-to-create-and-manage-federations` and
+    :doc:`how-to-connect-supernodes-to-supergrid`.
+
 In the next tutorial, you will take a look at a more complex Flower App that uses
 PyTorch and real training and evaluation logic. You will also learn how to run a Flower
 App locally on your machine, which is ideal for development and debugging before running
