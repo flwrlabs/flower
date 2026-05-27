@@ -27,7 +27,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     PullPendingTasksRequest,
     PullTaskMessageRequest,
-    PushRunEventsRequest,
     PushTaskMessageRequest,
     SendTaskHeartbeatRequest,
 )
@@ -122,13 +121,6 @@ class TestAppIoServicer(unittest.TestCase):
         # Assert
         self.state.acknowledge_task_heartbeat.assert_called_once_with(123)
         self.assertTrue(response.success)
-
-    def test_push_run_events_is_scaffolded(self) -> None:
-        """PushRunEvents should exist as protocol scaffolding."""
-        with self.assertRaisesRegex(
-            NotImplementedError, "PushRunEvents is not implemented yet."
-        ):
-            self.servicer.PushRunEvents(PushRunEventsRequest(), Mock())
 
     def test_create_task_returns_task_id(self) -> None:
         """CreateTask should create a task for the authenticated run."""
