@@ -20,6 +20,7 @@ from collections.abc import Callable
 from itertools import product
 
 from flwr.app.message_type import MessageType
+from flwr.app.typing import ConfigRecordValues
 from flwr.client.mod import make_ffn
 from flwr.common import ConfigRecord, Context, Message, RecordDict
 from flwr.common.secure_aggregation.secaggplus_constants import (
@@ -28,7 +29,6 @@ from flwr.common.secure_aggregation.secaggplus_constants import (
     Key,
     Stage,
 )
-from flwr.common.typing import ConfigRecordValues
 
 from .secaggplus_mod import SecAggPlusState, check_configs, secaggplus_mod
 

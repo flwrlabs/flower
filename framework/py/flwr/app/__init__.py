@@ -25,21 +25,37 @@ from flwr.common.record import (
     RecordDict,
 )
 
+from .constants import DEFAULT_TTL
 from .error import Error
 from .message_type import MessageType
 from .metadata import Metadata
+from .typing import (
+    ConfigRecordValues,
+    ConfigScalar,
+    ConfigScalarList,
+    MetricRecordValues,
+    MetricScalar,
+    MetricScalarList,
+)
 from .user_config import UserConfig, UserConfigValue
 
 __all__ = [
     "Array",
     "ArrayRecord",
     "ConfigRecord",
+    "ConfigRecordValues",
+    "ConfigScalar",
+    "ConfigScalarList",
     "Context",
+    "DEFAULT_TTL",
     "Error",
     "Message",
     "MessageType",
     "Metadata",
     "MetricRecord",
+    "MetricRecordValues",
+    "MetricScalar",
+    "MetricScalarList",
     "RecordDict",
     "UserConfig",
     "UserConfigValue",
