@@ -38,7 +38,7 @@ def upgrade() -> None:
     op.create_table(
         "task_event",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column("timestamp", sa.Float(), nullable=False),
+        sa.Column("timestamp", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("run_id", sa.BigInteger(), nullable=False),
         sa.Column("task_id", sa.BigInteger(), nullable=False),
         sa.Column("event", sa.String(), nullable=False),

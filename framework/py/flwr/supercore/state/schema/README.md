@@ -135,7 +135,7 @@ erDiagram
     VARCHAR data
     VARCHAR event
     BIGINT run_id
-    FLOAT timestamp
+    TIMESTAMP timestamp
   }
 
   task_logs {

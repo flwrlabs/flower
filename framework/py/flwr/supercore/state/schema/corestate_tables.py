@@ -90,7 +90,7 @@ def create_corestate_metadata() -> MetaData:
         "task_event",
         metadata,
         Column("id", Integer, primary_key=True, autoincrement=True),
-        Column("timestamp", Float, nullable=False),
+        Column("timestamp", TIMESTAMP(timezone=True), nullable=False),
         Column("run_id", BigInteger, nullable=False),
         Column("task_id", BigInteger, ForeignKey("task.task_id"), nullable=False),
         Column("event", String, nullable=False),
