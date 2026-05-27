@@ -130,10 +130,18 @@ containing the private key into the container, then pass the key path to
 .. code-block:: shell
 
     $ docker run --rm \
+        --user "$(id -u):$(id -g)" \
         -v "$HOME/.flwr/supernodes:/keys:ro" \
         flwr/supernode:|stable_flwr_version| \
         --superlink fleet-supergrid.flower.ai:443 \
         --auth-supernode-private-key /keys/supernode-1
+
+.. note::
+
+    Flower Docker images run as a non-root user by default. The ``--user "$(id -u):$(id
+    -g)"`` option keeps the container non-root while running it as the host user that
+    owns the mounted private key. This lets the SuperNode process read keys created by
+    ``ssh-keygen`` without changing their file permissions.
 
 Use this form when you prefer to run SuperNodes from a container image instead of
 installing Flower directly in a Python environment.
