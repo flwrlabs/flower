@@ -26,8 +26,11 @@ from sklearn.preprocessing import StandardScaler
 
 from flwr.common import Context, Message
 from flwr.common.constant import NUM_PARTITIONS_KEY, PARTITION_ID_KEY
+from flwr.common.record.array import Array
 from flwr.common.record.arrayrecord import ArrayRecord
 from flwr.common.record.configrecord import ConfigRecord
+from flwr.common.record.metricrecord import MetricRecord
+from flwr.common.record.recorddict import RecordDict
 from flwr.decentralized.nodeapp import NodeApp
 
 LOGGER = logging.getLogger(__name__)
@@ -136,6 +139,28 @@ app2 = NodeApp(
 )
 
 
+def _arrays_to_record(model: LogisticRegression) -> ArrayRecord:
+    """Serialize fitted LogisticRegression weights into an ArrayRecord."""
+    if not hasattr(model, "coef_"):
+        return ArrayRecord()
+    return ArrayRecord(
+        {
+            "coef": Array.from_numpy_ndarray(model.coef_),
+            "intercept": Array.from_numpy_ndarray(model.intercept_),
+        }
+    )
+
+
+def _load_arrays_into_model(record: ArrayRecord, model: LogisticRegression) -> None:
+    """Load weights from ArrayRecord into a LogisticRegression, if present."""
+    if "coef" not in record or "intercept" not in record:
+        return
+    model.coef_ = record["coef"].numpy()
+    model.intercept_ = record["intercept"].numpy()
+    # Ensure sklearn knows the model is fitted
+    model.classes_ = np.arange(model.coef_.shape[0] + 1) if model.coef_.shape[0] > 1 else np.array([0, 1])
+
+
 def _get_node_id(context: Context) -> str:
     """Get a stable node identifier from Flower Context."""
     node_id = context.node_config.get("node-id")
@@ -162,6 +187,11 @@ def train_app1(
     subject = app1.name
     state = _get_or_init_state(nid)
 
+    # Load peer-averaged weights from incoming message content when present.
+    incoming_arrays = message.content.array_records.get(app1.strategy.arrayrecord_key)
+    if incoming_arrays:
+        _load_arrays_into_model(incoming_arrays, state["model"])
+
     local_epochs: int = int(run_config.get("local-epochs", 3))
     model: LogisticRegression = state["model"]
     # warm_start=True accumulates training; bump max_iter each cycle
@@ -187,7 +217,22 @@ def train_app1(
         train_acc,
         train_loss,
     )
-    return message
+    return Message(
+        content=RecordDict(
+            {
+                app1.strategy.arrayrecord_key: _arrays_to_record(model),
+                "metrics": MetricRecord(
+                    {
+                        "train_acc": train_acc,
+                        "train_loss": train_loss,
+                        "num-examples": len(state["X_train"]),
+                        "cycle": state["cycle"],
+                    }
+                ),
+            }
+        ),
+        reply_to=message,
+    )
 
 
 @app1.evaluate()
@@ -201,6 +246,11 @@ def evaluate_app1(
     subject = app1.name
     state = _get_or_init_state(nid)
     model: LogisticRegression = state["model"]
+
+    # Load peer-averaged weights so evaluation reflects the gossiped model.
+    incoming_arrays = message.content.array_records.get(app1.strategy.arrayrecord_key)
+    if incoming_arrays:
+        _load_arrays_into_model(incoming_arrays, model)
 
     if state["cycle"] == 0:
         LOGGER.info("[NodeApp:%s][evaluate] node=%.12s  model not yet trained", subject, nid)
@@ -219,7 +269,21 @@ def evaluate_app1(
         test_acc,
         test_loss,
     )
-    return message
+    return Message(
+        content=RecordDict(
+            {
+                "metrics": MetricRecord(
+                    {
+                        metric: test_acc,
+                        "eval_loss": test_loss,
+                        "num-examples": len(state["X_test"]),
+                        "cycle": state["cycle"],
+                    }
+                ),
+            }
+        ),
+        reply_to=message,
+    )
 
 
 @app2.train()
