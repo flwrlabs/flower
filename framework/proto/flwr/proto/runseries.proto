@@ -20,7 +20,7 @@ package flwr.proto;
 import "flwr/proto/run.proto";
 
 message RunSeries {
-  string series_id = 1;
+  uint64 series_id = 1;
   string federation = 2;
   optional string description = 3;
   string created_at = 4;
