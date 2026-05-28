@@ -445,6 +445,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 
     def test_push_task_output_stores_simulation_metrics(self) -> None:
         """PushTaskOutput should persist Simulation Runtime usage metrics."""
+        # Prepare
         request = PushTaskOutputRequest(
             sub_status="completed",
             details="",
@@ -453,8 +454,10 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             clientapp_runtime=7.89,
         )
 
+        # Execute
         response, call = self._push_task_output.with_call(request=request)
 
+        # Assert
         assert isinstance(response, PushTaskOutputResponse)
         assert grpc.StatusCode.OK == call.code()
         run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
