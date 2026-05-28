@@ -22,10 +22,11 @@ from contextlib import contextmanager
 from flwr.common import Context
 from flwr.common.logger import warn_deprecated_feature_with_example
 from flwr.server.strategy import Strategy
+from flwr.serverapp.grid import Grid
 
 from .client_manager import ClientManager
 from .compat import start_grid
-from .grid import Driver, Grid
+from .grid import Driver
 from .server import Server
 from .server_config import ServerConfig
 from .typing import ServerAppCallable, ServerFn
