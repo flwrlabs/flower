@@ -51,6 +51,7 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.message_pb2 import Message as ProtoMessage
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
+from flwr.proto.runseries_pb2 import RunSeries
 
 # pylint: enable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
@@ -59,6 +60,7 @@ from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
+from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
 
 
@@ -87,6 +89,74 @@ class StateTest(CoreStateTest):
         """Create a P-384 public key for node creation."""
         _, public_key = generate_key_pairs()
         return public_key_to_bytes(public_key)
+
+    def _add_run_series(
+        self,
+        state: LinkState,
+        *,
+        series_id: int,
+        federation: str,
+        updated_at: str,
+    ) -> None:
+        """Add a RunSeries record directly for CoreState tests."""
+        created_at = "2026-05-28T09:00:00+00:00"
+        if isinstance(state, InMemoryLinkState):
+            with state.lock_run_series_store:
+                state.run_series_store[series_id] = RunSeries(
+                    series_id=series_id,
+                    federation=federation,
+                    description="",
+                    created_at=created_at,
+                    updated_at=updated_at,
+                )
+            return
+
+        if isinstance(state, SqlLinkState):
+            state.query(
+                """
+                INSERT INTO run_series
+                (series_id, federation, description, created_at, updated_at,
+                 last_run_id)
+                VALUES (:series_id, :federation, :description, :created_at,
+                        :updated_at, :last_run_id)
+                """,
+                {
+                    "series_id": uint64_to_int64(series_id),
+                    "federation": federation,
+                    "description": "",
+                    "created_at": created_at,
+                    "updated_at": updated_at,
+                    "last_run_id": None,
+                },
+            )
+            return
+
+        raise TypeError(f"Unexpected state type: {type(state)}")
+
+    def test_get_run_series_updated_before_normalizes_offsets(self) -> None:
+        """Test cursor filtering compares timestamps as UTC instants."""
+        state = self.state_factory()
+        federation = "test-federation"
+        self._add_run_series(
+            state,
+            series_id=1,
+            federation=federation,
+            updated_at="2026-05-28T10:00:00+00:00",
+        )
+        self._add_run_series(
+            state,
+            series_id=2,
+            federation=federation,
+            updated_at="2026-05-28T09:59:59+00:00",
+        )
+
+        run_series = state.get_run_series(
+            federation=federation,
+            updated_before="2026-05-28T12:00:00+02:00",
+            limit=10,
+        )
+
+        self.assertEqual([record.series_id for record in run_series], [2])
 
     def test_store_and_get_fab(self) -> None:
         """Test storing and retrieving a FAB."""

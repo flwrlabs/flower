@@ -19,15 +19,16 @@ import hashlib
 import json
 import secrets
 from collections.abc import Sequence
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any, Literal, cast
 
 from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
 
+from flwr.app import Context, Message
 from flwr.app.message import make_message
 from flwr.app.metadata import Metadata
-from flwr.common import Context, Message, now
+from flwr.common import now
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -44,17 +45,19 @@ from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
 
 # pylint: disable-next=E0611
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
+from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
-from .corestate import CoreState, RunSeries
+from .corestate import CoreState
 from .utils import (
     context_from_bytes,
     context_to_bytes,
     generate_rand_int_from_bytes,
+    timestamp_to_utc,
     timestamp_to_iso,
     validate_task_message,
 )
@@ -142,26 +145,28 @@ class SqlCoreState(CoreState, SqlMixin):
         if limit == 0:
             return []
 
-        conditions = ["federation = :federation"]
-        params: dict[str, Any] = {"federation": federation}
-        if updated_before is not None:
-            conditions.append("updated_at < :updated_before")
-            params["updated_before"] = datetime.fromisoformat(
-                updated_before.replace("Z", "+00:00")
-            )
-
-        query = f"""
+        query = """
             SELECT series_id, federation, description, created_at, updated_at,
                    last_run_id
             FROM run_series
-            WHERE {" AND ".join(conditions)}
-            ORDER BY updated_at DESC, series_id DESC
+            WHERE federation = :federation
         """
-        if limit is not None:
-            query += " LIMIT :limit"
-            params["limit"] = limit
+        rows = self.query(query, {"federation": federation})
 
-        rows = self.query(query, params)
+        cursor = (
+            timestamp_to_utc(updated_before) if updated_before is not None else None
+        )
+        if cursor is not None:
+            rows = [row for row in rows if timestamp_to_utc(row["updated_at"]) < cursor]
+        rows.sort(
+            key=lambda row: (
+                timestamp_to_utc(row["updated_at"]),
+                int64_to_uint64(row["series_id"]),
+            ),
+            reverse=True,
+        )
+        if limit is not None:
+            rows = rows[:limit]
         return [_run_series_from_row(row) for row in rows]
 
     def get_run_series_context(self, series_id: int) -> Context | None:
@@ -752,17 +757,16 @@ def task_from_row(row: dict[str, Any]) -> Task:
 
 def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
     """Convert a database row to a RunSeries object."""
+    run_ids = (
+        [int64_to_uint64(row["last_run_id"])] if row["last_run_id"] is not None else []
+    )
     return RunSeries(
         series_id=int64_to_uint64(row["series_id"]),
         federation=row["federation"],
         description=row["description"] or "",
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
-        last_run_id=(
-            int64_to_uint64(row["last_run_id"])
-            if row["last_run_id"] is not None
-            else None
-        ),
+        run_ids=run_ids,
     )
 
 

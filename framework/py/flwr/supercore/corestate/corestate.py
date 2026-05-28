@@ -17,26 +17,14 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from dataclasses import dataclass
 from typing import Literal
 
-from flwr.common import Context, Message
+from flwr.app import Context, Message
 from flwr.common.typing import Fab
+from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
-
-
-@dataclass(frozen=True)
-class RunSeries:
-    """RunSeries metadata stored in CoreState."""
-
-    series_id: int
-    federation: str
-    description: str
-    created_at: str
-    updated_at: str
-    last_run_id: int | None
 
 
 class CoreState(ABC):

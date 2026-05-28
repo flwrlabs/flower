@@ -25,8 +25,8 @@ from logging import ERROR
 from threading import Lock
 from typing import Literal, cast
 
-from flwr.app.message import Message
-from flwr.common import Context, now
+from flwr.app import Context, Message
+from flwr.common import now
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -37,11 +37,16 @@ from flwr.common.constant import (
 )
 from flwr.common.logger import log
 from flwr.common.typing import Fab
+from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
-from .corestate import CoreState, RunSeries
-from .utils import generate_rand_int_from_bytes, validate_task_message
+from .corestate import CoreState
+from .utils import (
+    generate_rand_int_from_bytes,
+    timestamp_to_utc,
+    validate_task_message,
+)
 
 
 @dataclass
@@ -124,15 +129,21 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         if limit == 0:
             return []
 
+        cursor = (
+            timestamp_to_utc(updated_before) if updated_before is not None else None
+        )
         with self.lock_run_series_store:
             run_series = [
                 record
                 for record in self.run_series_store.values()
                 if record.federation == federation
-                and (updated_before is None or record.updated_at < updated_before)
+                and (cursor is None or timestamp_to_utc(record.updated_at) < cursor)
             ]
             run_series.sort(
-                key=lambda record: (record.updated_at, record.series_id),
+                key=lambda record: (
+                    timestamp_to_utc(record.updated_at),
+                    record.series_id,
+                ),
                 reverse=True,
             )
             if limit is not None:

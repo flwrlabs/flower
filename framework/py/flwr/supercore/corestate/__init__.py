@@ -15,7 +15,9 @@
 """Flower CoreState."""
 
 
-from .corestate import CoreState, RunSeries
+from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+
+from .corestate import CoreState
 
 __all__ = [
     "CoreState",
