@@ -19,11 +19,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from flwr.common import Context
+
 from .exceptions import AgentAppError
 from .session import AgentSession
-from .typing import JSONObject
-
-_AgentAppCallable = Callable[[AgentSession], JSONObject]
+from .typing import AgentAppCallable, JSONObject
 
 
 class AgentApp:
@@ -36,29 +36,45 @@ class AgentApp:
         app = AgentApp()
 
         @app.main()
-        def main(agent: AgentSession) -> JSONObject:
+        def main(agent: AgentSession, context: Context) -> JSONObject:
             return {"output_text": "Hello"}
     """
 
     def __init__(self) -> None:
-        self._main: _AgentAppCallable | None = None
+        self._main: AgentAppCallable | None = None
 
-    def __call__(self, session: AgentSession) -> JSONObject:
-        """Execute the registered main function."""
+    def __call__(self, agent: AgentSession, context: Context) -> JSONObject:
+        """Execute `AgentApp`."""
         if self._main is None:
             raise AgentAppError("AgentApp has no main function.")
-        result = self._main(session)
+        result = self._main(agent, context)
         if not isinstance(result, dict):
             raise AgentAppError("AgentApp main function must return a JSON object.")
         return result
 
-    def main(self) -> Callable[[_AgentAppCallable], _AgentAppCallable]:
-        """Return a decorator that registers the AgentApp main function."""
+    def main(self) -> Callable[[AgentAppCallable], AgentAppCallable]:
+        """Return a decorator that registers the main fn with the agent app.
 
-        def main_decorator(main_fn: _AgentAppCallable) -> _AgentAppCallable:
+        Examples
+        --------
+        ::
+
+            app = AgentApp()
+
+            @app.main()
+            def main(agent: AgentSession, context: Context) -> JSONObject:
+                return {"output_text": "Hello"}
+        """
+
+        def main_decorator(main_fn: AgentAppCallable) -> AgentAppCallable:
+            """Register the main fn with the AgentApp object."""
             if self._main is not None:
                 raise ValueError("AgentApp main function is already registered.")
+
+            # Register provided function with the AgentApp object
             self._main = main_fn
+
+            # Return provided function unmodified
             return main_fn
 
         return main_decorator

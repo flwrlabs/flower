@@ -17,9 +17,17 @@
 
 from __future__ import annotations
 
-from typing import TypeAlias
+from collections.abc import Callable
+from typing import TYPE_CHECKING, TypeAlias
+
+from flwr.common import Context
+
+if TYPE_CHECKING:
+    from .session import AgentSession
+
+AgentAppCallable: TypeAlias = Callable[["AgentSession", Context], "JSONObject"]
 
 JSONObject: TypeAlias = "dict[str, JSONValue]"
 JSONValue: TypeAlias = "None | bool | int | float | str | list[JSONValue] | JSONObject"
 
-__all__ = ["JSONObject", "JSONValue"]
+__all__ = ["AgentAppCallable", "JSONObject", "JSONValue"]

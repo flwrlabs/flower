@@ -50,7 +50,6 @@ class AgentSession:
         *,
         task_id: int,
         run: Run,
-        context: Context,
         agent_ref: str,
         conversation_id: str,
         input_items: list[JSONObject],
@@ -65,7 +64,6 @@ class AgentSession:
             raise ValueError("`input_items` must be a list of JSON objects.")
         self.task_id = task_id
         self.run = run
-        self.context = context
         self.agent_ref = agent_ref
         self.conversation_id = conversation_id
         self.input_items = input_items
@@ -83,7 +81,6 @@ class AgentSession:
         return cls(
             task_id=task_id,
             run=run,
-            context=context,
             agent_ref=start_state.agent_ref,
             conversation_id=start_state.conversation_id,
             input_items=start_state.input_items,

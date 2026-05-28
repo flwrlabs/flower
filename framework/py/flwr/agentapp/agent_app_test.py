@@ -24,6 +24,7 @@ import pytest
 
 import flwr
 from flwr.agentapp import AgentApp, AgentAppError, AgentSession, JSONObject
+from flwr.common import Context, RecordDict
 
 
 def test_agentapp_public_import_path() -> None:
@@ -35,16 +36,17 @@ def test_agentapp_registers_and_calls_main() -> None:
     """Test AgentApp calls the registered main function."""
     app = AgentApp()
     session = Mock(spec=AgentSession)
+    context = _context()
     calls = []
 
     @app.main()
-    def main(session_arg: AgentSession) -> JSONObject:
-        calls.append(session_arg)
+    def main(session_arg: AgentSession, context_arg: Context) -> JSONObject:
+        calls.append((session_arg, context_arg))
         return {"id": "resp-1"}
 
-    result = app(session)
+    result = app(session, context)
 
-    assert calls == [session]
+    assert calls == [(session, context)]
     assert result == {"id": "resp-1"}
 
 
@@ -53,13 +55,13 @@ def test_agentapp_rejects_duplicate_main() -> None:
     app = AgentApp()
 
     @app.main()
-    def main(_: AgentSession) -> JSONObject:
+    def main(_: AgentSession, __: Context) -> JSONObject:
         return {}
 
     with pytest.raises(ValueError, match="already registered"):
 
         @app.main()
-        def duplicate(_: AgentSession) -> JSONObject:
+        def duplicate(_: AgentSession, __: Context) -> JSONObject:
             return {}
 
 
@@ -67,19 +69,32 @@ def test_agentapp_rejects_missing_main() -> None:
     """Test AgentApp requires a main function."""
     app = AgentApp()
     session = Mock(spec=AgentSession)
+    context = _context()
 
     with pytest.raises(AgentAppError, match="no main"):
-        app(session)
+        app(session, context)
 
 
 def test_agentapp_rejects_non_object_main_result() -> None:
     """Test AgentApp requires main to return a JSON object."""
     app = AgentApp()
     session = Mock(spec=AgentSession)
+    context = _context()
 
     @app.main()
-    def main(_: AgentSession) -> Any:
+    def main(_: AgentSession, __: Context) -> Any:
         return None
 
     with pytest.raises(AgentAppError, match="must return a JSON object"):
-        app(session)
+        app(session, context)
+
+
+def _context() -> Context:
+    """Create an empty Context."""
+    return Context(
+        run_id=1,
+        node_id=0,
+        node_config={},
+        state=RecordDict(),
+        run_config={},
+    )

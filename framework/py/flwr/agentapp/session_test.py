@@ -162,13 +162,6 @@ def test_agent_session_rejects_invalid_constructor_arguments(
     values = {
         "task_id": 101,
         "run": Run.create_empty(1),
-        "context": _context(
-            {
-                "agent_ref": "test-agent",
-                "conversation_id": "conv-1",
-                "input_json": "[]",
-            }
-        ),
         "agent_ref": "test-agent",
         "conversation_id": "conv-1",
         "input_items": [],
