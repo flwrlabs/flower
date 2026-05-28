@@ -497,7 +497,7 @@ class NodeApp(App):
                 config=config,
             )
             ctxt = context or self.create_context(
-                run_config=self.train_config,
+                run_config=config,
             )
             return self._call_fn(callback, msg, ctxt)
 
@@ -814,6 +814,7 @@ class NodeApp(App):
                     config=self.train_config,
                     context=ctxt,
                 )
+                self._store_arrays_from_message(msg)
                 self.train_metrics = msg.content.get("metrics", MetricRecord())
                 log(
                     logging.INFO,
@@ -913,6 +914,12 @@ class NodeApp(App):
             return
 
         self.arrays = self._average_array_records(self.arrays, peer_arrays)
+
+    def _store_arrays_from_message(self, message: Message) -> None:
+        """Update local arrays from callback result when arrays are returned."""
+        returned_arrays = message.content.array_records.get(self.strategy.arrayrecord_key)
+        if returned_arrays is not None:
+            self.arrays = returned_arrays
 
     def _handle_pushpull_request(self, request: AggregateRequest) -> None:
         """Handle incoming PUSHPULL request."""

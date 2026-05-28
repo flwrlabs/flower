@@ -19,8 +19,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
+import numpy as np
 import pytest
 
+from flwr.app.message_type import MessageType
+from flwr.common import RecordDict
+from flwr.common.message import Message
+from flwr.common.record.array import Array
+from flwr.common.record.arrayrecord import ArrayRecord
 from flwr.decentralized.nodeapp import (
     NodeApp,
     create_nodeapps_from_pyproject,
@@ -118,6 +124,34 @@ def test_periodic_run_invokes_train_callback_when_registered() -> None:
     app.periodic_run(view=["a", "b"], node_id="node-1")
 
     assert called["value"] is True
+
+
+def test_training_round_persists_callback_returned_arrays() -> None:
+    """Store arrays returned by ClientApp-style train callback for gossip."""
+    app = NodeApp(
+        subject="trainer",
+        run_config={"rounds": 2},
+        initial_arrays=ArrayRecord({"w": Array(np.asarray([0.0], dtype=np.float32))}),
+    )
+
+    @app.train()
+    def train(message: Message, context: object) -> Message:
+        del message, context
+        updated_arrays = ArrayRecord({"w": Array(np.asarray([5.0], dtype=np.float32))})
+        response = app.create_message(
+            message_type=MessageType.TRAIN,
+            config=app.train_config,
+        )
+        response.content = RecordDict(
+            {
+                app.strategy.arrayrecord_key: updated_arrays,
+            }
+        )
+        return response
+
+    app._training_round(1)  # pylint: disable=protected-access
+
+    np.testing.assert_allclose(app.arrays["w"].numpy(), np.asarray([5.0]))
 
 
 def test_load_nodeapp_configs_from_pyproject(tmp_path: Path) -> None:
