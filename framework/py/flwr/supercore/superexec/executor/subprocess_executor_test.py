@@ -141,7 +141,6 @@ def test_launch_renders_serverappio_task_args(
         ]
     )
 
-
 def test_launch_does_not_suppress_output_by_default() -> None:
     """Test subprocess executor leaves output inherited by default."""
     popen_mock = Mock()
