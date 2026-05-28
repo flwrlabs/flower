@@ -64,6 +64,19 @@ def test_invoke_responses_model_rejects_base_endpoint(
         invoke_responses_model({"model": "model", "input": []})
 
 
+def test_invoke_responses_model_uses_configured_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Provider calls should use the configured request timeout."""
+    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
+    monkeypatch.setenv("FLWR_MODEL_API_TIMEOUT", "12.5")
+    post_mock = _patch_post(monkeypatch, _Response(body={"id": "resp_1"}))
+
+    invoke_responses_model({"model": "model", "input": []})
+
+    assert post_mock.call_args.kwargs["timeout"] == 12.5
+
+
 def test_invoke_responses_model_collects_stream_events(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -147,7 +160,10 @@ def test_invoke_responses_model_raises_on_stream_failure_events(
                 b'"error":{"message":"quota exceeded"}}}',
                 b"",
             ],
-            "quota exceeded",
+            (
+                'Model provider request failed: 200 {"type":"response.failed",'
+                '"response":{"id":"resp_1","error":{"message":"quota exceeded"}}}'
+            ),
         ),
         (
             [
@@ -155,11 +171,14 @@ def test_invoke_responses_model_raises_on_stream_failure_events(
                 b'data: {"type":"error","error":{"message":"bad request"}}',
                 b"",
             ],
-            "bad request",
+            (
+                'Model provider request failed: 200 {"type":"error","error":'
+                '{"message":"bad request"}}'
+            ),
         ),
     ]
 
-    for lines, expected_detail in cases:
+    for lines, expected_message in cases:
         _patch_post(
             monkeypatch,
             _Response(headers={"Content-Type": "text/event-stream"}, lines=lines),
@@ -168,6 +187,4 @@ def test_invoke_responses_model_raises_on_stream_failure_events(
         with pytest.raises(RuntimeError) as exc_info:
             invoke_responses_model({"model": "model", "input": [], "stream": True})
 
-        assert str(exc_info.value) == (
-            f"Model provider request failed: 200 {expected_detail}"
-        )
+        assert str(exc_info.value) == expected_message
