@@ -14,8 +14,7 @@
 # ==============================================================================
 """Tests for SuperExec Kubernetes executor."""
 
-
-from typing import Any
+from typing import Any, cast
 from unittest.mock import Mock, call
 
 import pytest
@@ -28,8 +27,8 @@ from .kubernetes_executor import (
     APPIO_TOKEN_FILE_PATH,
     KubernetesExecutor,
     KubernetesExecutorConfig,
-    build_appio_credentials_secret,
-    build_taskexecutor_pod,
+    _build_appio_credentials_secret,
+    _build_taskexecutor_pod,
 )
 from .types import ExecutionSpec, LaunchResultStatus
 
@@ -60,9 +59,16 @@ def _executor_config(**overrides: Any) -> KubernetesExecutorConfig:
     return KubernetesExecutorConfig(**base)
 
 
+def _as_dict(value: object) -> dict[str, Any]:
+    """Return a typed dict for nested JSON assertions."""
+    return cast(dict[str, Any], value)
+
+
 def test_build_appio_credentials_secret_contains_token_and_ca() -> None:
     """Test building the AppIo credential Secret."""
-    secret = build_appio_credentials_secret(_execution_spec(), _executor_config())
+    secret = _as_dict(
+        _build_appio_credentials_secret(_execution_spec(), _executor_config())
+    )
 
     assert secret == {
         "apiVersion": "v1",
@@ -84,7 +90,7 @@ def test_build_appio_credentials_secret_contains_token_and_ca() -> None:
 
 def test_build_taskexecutor_pod_uses_secret_files_for_credentials() -> None:
     """Test Pod construction uses mounted files instead of credential args."""
-    pod = build_taskexecutor_pod(_execution_spec(), _executor_config())
+    pod = _as_dict(_build_taskexecutor_pod(_execution_spec(), _executor_config()))
     container = pod["spec"]["containers"][0]
 
     assert APPIO_CREDENTIALS_MOUNT_PATH == "/run/flwr/appio"
@@ -124,9 +130,11 @@ def test_build_taskexecutor_pod_uses_secret_files_for_credentials() -> None:
 
 def test_build_taskexecutor_pod_supports_clientapp_insecure_args() -> None:
     """Test Pod construction for insecure ClientApp launch args."""
-    pod = build_taskexecutor_pod(
-        _execution_spec(task_type=TaskType.CLIENT_APP, insecure=True),
-        _executor_config(appio_root_certificates=None),
+    pod = _as_dict(
+        _build_taskexecutor_pod(
+            _execution_spec(task_type=TaskType.CLIENT_APP, insecure=True),
+            _executor_config(appio_root_certificates=None),
+        )
     )
 
     assert pod["spec"]["containers"][0]["command"] == ["flwr-clientapp"]
@@ -143,8 +151,8 @@ def test_build_taskexecutor_pod_supports_secure_default_trust_store() -> None:
     """Test secure Pod args can rely on container default trust store."""
     config = _executor_config(appio_root_certificates=None)
 
-    secret = build_appio_credentials_secret(_execution_spec(), config)
-    pod = build_taskexecutor_pod(_execution_spec(), config)
+    secret = _as_dict(_build_appio_credentials_secret(_execution_spec(), config))
+    pod = _as_dict(_build_taskexecutor_pod(_execution_spec(), config))
 
     assert secret["stringData"] == {"token": "task-token"}
     assert pod["spec"]["containers"][0]["args"] == [
@@ -157,9 +165,11 @@ def test_build_taskexecutor_pod_supports_secure_default_trust_store() -> None:
 
 def test_build_taskexecutor_pod_supports_simulation_args() -> None:
     """Test Pod construction for Simulation launch args."""
-    pod = build_taskexecutor_pod(
-        _execution_spec(task_type=TaskType.SIMULATION),
-        _executor_config(),
+    pod = _as_dict(
+        _build_taskexecutor_pod(
+            _execution_spec(task_type=TaskType.SIMULATION),
+            _executor_config(),
+        )
     )
 
     assert pod["spec"]["containers"][0]["command"] == ["flwr-simulation"]
@@ -175,12 +185,14 @@ def test_build_taskexecutor_pod_supports_simulation_args() -> None:
 
 def test_build_taskexecutor_pod_supports_optional_container_config() -> None:
     """Test Pod construction includes optional Kubernetes container config."""
-    pod = build_taskexecutor_pod(
-        _execution_spec(runtime_dependency_install=True),
-        _executor_config(
-            image_pull_policy="IfNotPresent",
-            service_account_name="flower-superexec",
-        ),
+    pod = _as_dict(
+        _build_taskexecutor_pod(
+            _execution_spec(runtime_dependency_install=True),
+            _executor_config(
+                image_pull_policy="IfNotPresent",
+                service_account_name="flower-superexec",
+            ),
+        )
     )
     container = pod["spec"]["containers"][0]
 
@@ -197,8 +209,8 @@ def test_launch_submits_secret_before_pod_and_returns_accepted() -> None:
 
     result = KubernetesExecutor(client=client, config=config).launch(spec)
 
-    secret = build_appio_credentials_secret(spec, config)
-    pod = build_taskexecutor_pod(spec, config)
+    secret = _as_dict(_build_appio_credentials_secret(spec, config))
+    pod = _as_dict(_build_taskexecutor_pod(spec, config))
     assert result.status == LaunchResultStatus.ACCEPTED
     assert client.mock_calls == [
         call.create_namespaced_secret("flower-system", secret),
@@ -235,24 +247,22 @@ def test_launch_returns_failed_if_pod_create_fails() -> None:
     client.create_namespaced_pod.assert_called_once()
 
 
-def test_launch_returns_failed_if_spec_is_invalid() -> None:
-    """Test launch returns failed for local spec validation errors."""
-    client = Mock()
-
-    result = KubernetesExecutor(client=client, config=_executor_config()).launch(
-        _execution_spec(token="")
-    )
-
-    assert result.status == LaunchResultStatus.FAILED
-    assert result.message == "ValueError: Kubernetes executor requires a task token."
-    client.create_namespaced_secret.assert_not_called()
-    client.create_namespaced_pod.assert_not_called()
-
-
-def test_build_rejects_invalid_task_id() -> None:
-    """Test Kubernetes object construction rejects invalid task IDs."""
+def test_execution_spec_rejects_invalid_task_id() -> None:
+    """Test ExecutionSpec rejects invalid task IDs."""
     with pytest.raises(ValueError, match="positive integer task_id"):
-        build_taskexecutor_pod(
-            _execution_spec(task_id=0),
-            _executor_config(),
-        )
+        _execution_spec(task_id=0)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("appio_api_address", "", "AppIo API address"),
+        ("token", "", "task token"),
+    ],
+)
+def test_execution_spec_rejects_empty_required_strings(
+    field: str, value: str, message: str
+) -> None:
+    """Test ExecutionSpec rejects empty string fields required by all executors."""
+    with pytest.raises(ValueError, match=message):
+        _execution_spec(**{field: value})
