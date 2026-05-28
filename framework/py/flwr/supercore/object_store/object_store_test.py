@@ -507,8 +507,7 @@ class SqlFileBasedObjectStoreTest(ObjectStoreTest):
                 with sqlite3.connect(self.temp_file.name) as conn:
                     conn.execute("PRAGMA foreign_keys = ON")
                     conn.execute(
-                        "DELETE FROM objects "
-                        "WHERE object_id = ? AND ref_count = 0",
+                        "DELETE FROM objects WHERE object_id = ? AND ref_count = 0",
                         (object_id,),
                     )
             return original_query(query, data)
