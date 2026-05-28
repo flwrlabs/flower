@@ -15,8 +15,9 @@
 """Flower CoreState."""
 
 
-from .corestate import CoreState
+from .corestate import CoreState, RunSeries
 
 __all__ = [
     "CoreState",
+    "RunSeries",
 ]

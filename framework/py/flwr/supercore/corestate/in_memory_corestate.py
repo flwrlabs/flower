@@ -40,8 +40,8 @@ from flwr.common.typing import Fab
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
-from .corestate import CoreState
-from .utils import clone_context, generate_rand_int_from_bytes, validate_task_message
+from .corestate import CoreState, RunSeries
+from .utils import generate_rand_int_from_bytes, validate_task_message
 
 
 @dataclass
@@ -61,6 +61,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.lock_fab_store = Lock()
         self.nonce_store: dict[tuple[str, str], float] = {}
         self.lock_nonce_store = Lock()
+        self.run_series_store: dict[int, RunSeries] = {}
+        self.lock_run_series_store = Lock()
         self.run_series_context_store: dict[int, Context] = {}
         self.lock_run_series_context_store = Lock()
         self.task_store: dict[int, Task] = {}
@@ -109,20 +111,45 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 verifications=dict(fab.verifications),
             )
 
+    def get_run_series(
+        self,
+        *,
+        federation: str,
+        updated_before: str | None = None,
+        limit: int | None = None,
+    ) -> Sequence[RunSeries]:
+        """Return RunSeries metadata for the specified federation."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if limit == 0:
+            return []
+
+        with self.lock_run_series_store:
+            run_series = [
+                record
+                for record in self.run_series_store.values()
+                if record.federation == federation
+                and (updated_before is None or record.updated_at < updated_before)
+            ]
+            run_series.sort(
+                key=lambda record: (record.updated_at, record.series_id),
+                reverse=True,
+            )
+            if limit is not None:
+                run_series = run_series[:limit]
+            return list(run_series)
+
     def get_run_series_context(self, series_id: int) -> Context | None:
         """Return the shared Context for the specified RunSeries, if present."""
         with self.lock_run_series_context_store:
-            context = self.run_series_context_store.get(series_id)
-            if context is None:
-                return None
-            return clone_context(context)
+            return self.run_series_context_store.get(series_id)
 
     def set_run_series_context(self, series_id: int, context: Context) -> None:
         """Set the shared Context for the specified RunSeries."""
         if series_id == 0:
             raise ValueError("RunSeries ID must be non-zero")
         with self.lock_run_series_context_store:
-            self.run_series_context_store[series_id] = clone_context(context)
+            self.run_series_context_store[series_id] = context
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""

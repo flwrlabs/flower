@@ -17,6 +17,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Literal
 
 from flwr.common import Context, Message
@@ -24,6 +25,18 @@ from flwr.common.typing import Fab
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
+
+
+@dataclass(frozen=True)
+class RunSeries:
+    """RunSeries metadata stored in CoreState."""
+
+    series_id: int
+    federation: str
+    description: str
+    created_at: str
+    updated_at: str
+    last_run_id: int | None
 
 
 class CoreState(ABC):
@@ -41,6 +54,32 @@ class CoreState(ABC):
     @abstractmethod
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return the FAB for the given hash, if present."""
+
+    @abstractmethod
+    def get_run_series(
+        self,
+        *,
+        federation: str,
+        updated_before: str | None = None,
+        limit: int | None = None,
+    ) -> Sequence[RunSeries]:
+        """Return RunSeries metadata for the specified federation.
+
+        Parameters
+        ----------
+        federation : str
+            Federation name used to filter RunSeries.
+        updated_before : str | None
+            If set, return only RunSeries updated before this ISO timestamp.
+        limit : int | None
+            Maximum number of RunSeries records to return. If `None`, no limit is
+            applied.
+
+        Returns
+        -------
+        Sequence[RunSeries]
+            RunSeries records ordered by `updated_at` descending.
+        """
 
     @abstractmethod
     def get_run_series_context(self, series_id: int) -> Context | None:

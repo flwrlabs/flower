@@ -69,11 +69,6 @@ def context_from_bytes(context_bytes: bytes) -> Context:
     return serde.context_from_proto(ProtoContext.FromString(context_bytes))
 
 
-def clone_context(context: Context) -> Context:
-    """Return a serialized copy of a `Context`."""
-    return context_from_bytes(context_to_bytes(context))
-
-
 def validate_task_message(message: Message) -> list[str]:  # pylint: disable=R0912
     """Validate a task Message."""
     validation_errors = []
