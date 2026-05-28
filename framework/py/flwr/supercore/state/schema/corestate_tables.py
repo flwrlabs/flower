@@ -59,6 +59,30 @@ def create_corestate_metadata() -> MetaData:
     )
 
     # --------------------------------------------------------------------------
+    #  Table: run_series
+    # --------------------------------------------------------------------------
+    Table(
+        "run_series",
+        metadata,
+        Column("series_id", BigInteger, primary_key=True, nullable=False),
+        Column("federation", String, nullable=False),
+        Column("description", String, nullable=True),
+        Column("created_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("last_run_id", BigInteger, nullable=True),
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: series_context
+    # --------------------------------------------------------------------------
+    Table(
+        "series_context",
+        metadata,
+        Column("series_id", BigInteger, primary_key=True, nullable=False),
+        Column("context", LargeBinary),
+    )
+
+    # --------------------------------------------------------------------------
     #  Table: task
     # --------------------------------------------------------------------------
     task = Table(

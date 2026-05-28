@@ -104,12 +104,27 @@ erDiagram
     BIGINT primary_task_id
     BIGINT run_id UK "nullable"
     VARCHAR run_type
+    BIGINT series_id "nullable"
     VARCHAR usage_reported_at
   }
 
   run_objects {
     VARCHAR object_id PK,FK
     BIGINT run_id PK
+  }
+
+  run_series {
+    BIGINT series_id PK
+    TIMESTAMP created_at
+    VARCHAR description "nullable"
+    VARCHAR federation
+    BIGINT last_run_id "nullable"
+    TIMESTAMP updated_at
+  }
+
+  series_context {
+    BIGINT series_id PK
+    BLOB context "nullable"
   }
 
   task {
