@@ -15,14 +15,15 @@
 """Flower server."""
 
 
+from flwr.serverapp.grid import Driver as Driver
+from flwr.serverapp.grid import Grid as Grid
+
 from ..compat.server.app import start_server as start_server  # Deprecated
 from . import strategy
 from . import workflow as workflow
 from .client_manager import ClientManager as ClientManager
 from .client_manager import SimpleClientManager as SimpleClientManager
 from .compat import LegacyContext as LegacyContext
-from .grid import Driver as Driver
-from .grid import Grid as Grid
 from .history import History as History
 from .server import Server as Server
 from .server_app import ServerApp as ServerApp
