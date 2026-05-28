@@ -37,7 +37,9 @@ if TYPE_CHECKING:
 def __getattr__(name: str) -> Any:
     """Lazily resolve compatibility exports."""
     if name == "Driver":
-        from flwr.compat.server.grid import Driver  # pylint: disable=import-outside-toplevel
+        from flwr.compat.server.grid import (
+            Driver,  # pylint: disable=import-outside-toplevel
+        )
 
         globals()[name] = Driver
         return Driver
@@ -47,6 +49,7 @@ def __getattr__(name: str) -> Any:
         globals()[name] = ServerApp
         return ServerApp
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "ClientManager",
