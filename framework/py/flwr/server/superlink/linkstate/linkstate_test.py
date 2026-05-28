@@ -51,7 +51,6 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.message_pb2 import Message as ProtoMessage
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
-from flwr.proto.runseries_pb2 import RunSeries
 
 # pylint: enable=E0611
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLinkState
@@ -60,7 +59,6 @@ from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
-from flwr.supercore.utils import uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
 
 

@@ -42,10 +42,7 @@ from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import (
-    generate_rand_int_from_bytes,
-    validate_task_message,
-)
+from .utils import generate_rand_int_from_bytes, validate_task_message
 
 
 @dataclass
