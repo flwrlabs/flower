@@ -388,26 +388,50 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     del self.message_ins_store[message_id]
                     self.acknowledged_message_ins_ids.discard(message_id)
                 # Delete Message replies
-                if message_id in self.message_ins_id_to_message_res_id:
-                    message_res_id = self.message_ins_id_to_message_res_id.pop(
-                        message_id
-                    )
-                    del self.message_res_store[message_res_id]
+                self.message_ins_id_to_message_res_id.pop(message_id, None)
+                for msg_res_id, msg_res in list(self.message_res_store.items()):
+                    if msg_res.metadata.reply_to_message_id == message_id:
+                        self.message_res_store.pop(msg_res_id, None)
 
-    def acknowledge_message(self, message_id: str) -> None:
+    def acknowledge_message(
+        self, message_id: str, run_id: int, reply_to_message_id: str | None = None
+    ) -> bool:
         """Mark a delivered Message as durably received."""
         with self.lock:
             for msg_ins_id, msg_res_id in list(
                 self.message_ins_id_to_message_res_id.items()
             ):
-                if msg_res_id == message_id:
+                msg_res = self.message_res_store.get(msg_res_id)
+                if (
+                    msg_res_id == message_id
+                    and msg_res
+                    and msg_res.metadata.run_id == run_id
+                ):
                     self.message_ins_store.pop(msg_ins_id, None)
                     self.acknowledged_message_ins_ids.discard(msg_ins_id)
                     self.message_ins_id_to_message_res_id.pop(msg_ins_id, None)
-                    self.message_res_store.pop(msg_res_id, None)
-                    return
-            if message_id in self.message_ins_store:
+                    for stored_msg_res_id, stored_msg_res in list(
+                        self.message_res_store.items()
+                    ):
+                        if stored_msg_res.metadata.reply_to_message_id == msg_ins_id:
+                            self.message_res_store.pop(stored_msg_res_id, None)
+                    return True
+            if reply_to_message_id:
+                msg_ins = self.message_ins_store.get(reply_to_message_id)
+                if msg_ins and msg_ins.metadata.run_id == run_id:
+                    self.message_ins_store.pop(reply_to_message_id, None)
+                    self.acknowledged_message_ins_ids.discard(reply_to_message_id)
+                    self.message_ins_id_to_message_res_id.pop(reply_to_message_id, None)
+                    for msg_res_id, msg_res in list(self.message_res_store.items()):
+                        if msg_res.metadata.reply_to_message_id == reply_to_message_id:
+                            self.message_res_store.pop(msg_res_id, None)
+                    return True
+                return False
+            msg_ins = self.message_ins_store.get(message_id)
+            if msg_ins and msg_ins.metadata.run_id == run_id:
                 self.acknowledged_message_ins_ids.add(message_id)
+                return True
+            return False
 
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""

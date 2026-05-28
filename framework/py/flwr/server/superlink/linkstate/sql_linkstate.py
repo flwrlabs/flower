@@ -600,38 +600,94 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             self.query(query_1, params)
             self.query(query_2, params)
 
-    def acknowledge_message(self, message_id: str) -> None:
+    def acknowledge_message(
+        self, message_id: str, run_id: int, reply_to_message_id: str | None = None
+    ) -> bool:
         """Mark a delivered Message as durably received."""
+        sint64_run_id = uint64_to_int64(run_id)
         with self.session():
             rows = self.query(
                 """
                 SELECT reply_to_message_id
                 FROM message_res
-                WHERE message_id = :message_id
+                WHERE message_id = :message_id AND run_id = :run_id
                 """,
-                {"message_id": message_id},
+                {"message_id": message_id, "run_id": sint64_run_id},
             )
             if rows:
                 msg_ins_id = rows[0]["reply_to_message_id"]
                 self.query(
-                    "DELETE FROM message_ins WHERE message_id = :message_id",
-                    {"message_id": msg_ins_id},
+                    """
+                    DELETE FROM message_ins
+                    WHERE message_id = :message_id AND run_id = :run_id
+                    """,
+                    {"message_id": msg_ins_id, "run_id": sint64_run_id},
                 )
                 self.query(
                     "DELETE FROM message_res "
-                    "WHERE reply_to_message_id = :reply_to_message_id",
-                    {"reply_to_message_id": msg_ins_id},
+                    "WHERE reply_to_message_id = :reply_to_message_id "
+                    "AND run_id = :run_id",
+                    {"reply_to_message_id": msg_ins_id, "run_id": sint64_run_id},
                 )
-                return
+                return True
+
+            if reply_to_message_id:
+                rows = self.query(
+                    """
+                    SELECT message_id
+                    FROM message_ins
+                    WHERE message_id = :message_id AND run_id = :run_id
+                    """,
+                    {"message_id": reply_to_message_id, "run_id": sint64_run_id},
+                )
+                if not rows:
+                    return False
+                self.query(
+                    """
+                    DELETE FROM message_ins
+                    WHERE message_id = :message_id AND run_id = :run_id
+                    """,
+                    {"message_id": reply_to_message_id, "run_id": sint64_run_id},
+                )
+                self.query(
+                    "DELETE FROM message_res "
+                    "WHERE reply_to_message_id = :reply_to_message_id "
+                    "AND run_id = :run_id",
+                    {
+                        "reply_to_message_id": reply_to_message_id,
+                        "run_id": sint64_run_id,
+                    },
+                )
+                return True
+
+            rows = self.query(
+                """
+                SELECT message_id
+                FROM message_ins
+                WHERE message_id = :message_id
+                AND run_id = :run_id
+                AND acknowledged_at = ''
+                """,
+                {"message_id": message_id, "run_id": sint64_run_id},
+            )
+            if not rows:
+                return False
 
             self.query(
                 """
                 UPDATE message_ins
                 SET acknowledged_at = :acknowledged_at
-                WHERE message_id = :message_id AND acknowledged_at = ''
+                WHERE message_id = :message_id
+                AND run_id = :run_id
+                AND acknowledged_at = ''
                 """,
-                {"message_id": message_id, "acknowledged_at": now().isoformat()},
+                {
+                    "message_id": message_id,
+                    "run_id": sint64_run_id,
+                    "acknowledged_at": now().isoformat(),
+                },
             )
+            return True
 
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""

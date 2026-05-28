@@ -132,7 +132,9 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
-    def acknowledge_message(self, message_id: str) -> None:
+    def acknowledge_message(
+        self, message_id: str, run_id: int, reply_to_message_id: str | None = None
+    ) -> bool:
         """Mark a delivered Message as durably received."""
 
     @abc.abstractmethod

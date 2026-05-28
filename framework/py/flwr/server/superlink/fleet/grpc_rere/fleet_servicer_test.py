@@ -738,13 +738,14 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         run_id = self._create_dummy_run()
 
         # Prepare: Create a message
-        msg_proto = create_res_message(
+        msg_proto = create_ins_message(
             src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
         )
         message = message_from_proto(msg_proto)
         # pylint: disable-next=E1137
         message.content["test_config"] = ConfigRecord({"a": 123, "b": [4, 5, 6]})
         message.metadata.__dict__["_message_id"] = message.object_id
+        assert self.state.store_message_ins(message)
 
         # Prepare: Store message in ObjectStore
         all_objects = get_all_nested_objects(message)

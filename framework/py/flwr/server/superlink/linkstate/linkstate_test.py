@@ -675,6 +675,39 @@ class StateTest(CoreStateTest):
         assert state.num_message_ins() == 0
         assert state.num_message_res() == 0
 
+    def test_acknowledge_message_removes_duplicate_replies(self) -> None:
+        """Test acknowledgement removes all replies for the instruction."""
+        # Prepare
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg_id = state.store_message_ins(
+            create_ins_message_obj(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=node_id,
+                run_id=run_id,
+            )
+        )
+        assert msg_id
+        msg_ins = state.get_message_ins(node_id=node_id, limit=1)[0]
+
+        msg_res_id = ""
+        for _ in range(2):
+            msg_res = Message(RecordDict(), reply_to=msg_ins)
+            msg_res.metadata.__dict__["_message_id"] = str(uuid4())
+            stored_msg_res_id = state.store_message_res(msg_res)
+            assert stored_msg_res_id
+            msg_res_id = stored_msg_res_id
+        assert state.num_message_ins() == 1
+        assert state.num_message_res() == 2
+
+        # Execute
+        assert state.acknowledge_message(msg_res_id, run_id)
+
+        # Assert
+        assert state.num_message_ins() == 0
+        assert state.num_message_res() == 0
+
     def test_get_message_ids_from_run_id(self) -> None:
         """Test get_message_ids_from_run_id."""
         # Prepare
@@ -2250,7 +2283,7 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         )
         assert len(state.get_message_ins(node_id=node_id, limit=1)) == 1
 
-        state.acknowledge_message(msg_id)
+        state.acknowledge_message(msg_id, run_id)
         state.query(
             """
             UPDATE message_ins
@@ -2296,16 +2329,17 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         )
         assert len(state.get_message_res({msg_id})) == 1
 
-        state.acknowledge_message(res_id)
+        state.acknowledge_message(res_id, run_id)
         assert state.num_message_ins() == 0
         assert state.num_message_res() == 0
 
-    def test_get_message_res_handles_duplicate_replies(self) -> None:
-        """Ensure duplicate replies for one instruction do not crash polling."""
+    def test_acknowledge_message_is_scoped_to_run_id(self) -> None:
+        """Ensure a mismatched run cannot acknowledge delivered Messages."""
         # Prepare
         state = self.state_factory()
         node_id = create_dummy_node(state)
         run_id = create_dummy_run(state)
+        other_run_id = create_dummy_run(state)
         msg_id = state.store_message_ins(
             create_ins_message_obj(
                 src_node_id=SUPERLINK_NODE_ID,
@@ -2316,17 +2350,56 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         assert msg_id
         pulled_ins = state.get_message_ins(node_id=node_id, limit=1)[0]
 
-        for _ in range(2):
-            msg_res = Message(RecordDict(), reply_to=pulled_ins)
-            msg_res.metadata.__dict__["_message_id"] = str(uuid4())
-            assert state.store_message_res(msg_res)
+        msg_res = Message(RecordDict(), reply_to=pulled_ins)
+        msg_res.metadata.__dict__["_message_id"] = str(uuid4())
+        res_id = state.store_message_res(msg_res)
+        assert res_id
+
+        # Execute and assert
+        state.acknowledge_message(res_id, other_run_id)
+        assert state.num_message_ins() == 1
+        assert state.num_message_res() == 1
+
+        state.acknowledge_message(res_id, run_id)
+        assert state.num_message_ins() == 0
+        assert state.num_message_res() == 0
+
+    def test_acknowledge_generated_error_reply_deletes_instruction(self) -> None:
+        """Ensure confirming a generated error reply completes cleanup."""
+        # Prepare
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        assert state.deactivate_node(node_id)
+        msg_id = state.store_message_ins(
+            create_ins_message_obj(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=node_id,
+                run_id=run_id,
+            )
+        )
+        assert msg_id
 
         # Execute
         replies = state.get_message_res({msg_id})
+        assert len(replies) == 1
+        assert replies[0].has_error()
+        other_run_id = create_dummy_run(state)
+        state.acknowledge_message(
+            replies[0].object_id,
+            other_run_id,
+            replies[0].metadata.reply_to_message_id,
+        )
+        assert state.num_message_ins() == 1
+        assert state.num_message_res() == 0
+
+        state.acknowledge_message(
+            replies[0].object_id, run_id, replies[0].metadata.reply_to_message_id
+        )
 
         # Assert
-        assert len(replies) == 1
-        assert replies[0].metadata.reply_to_message_id == msg_id
+        assert state.num_message_ins() == 0
+        assert state.num_message_res() == 0
 
     # pylint: disable-next=too-many-locals
     def test_get_message_ins_distributes_available_work_under_contention(self) -> None:
