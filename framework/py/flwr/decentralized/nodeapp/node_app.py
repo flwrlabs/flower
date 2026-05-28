@@ -42,24 +42,32 @@ from pathlib import Path
 import random
 from typing import Any, Callable, Dict, Optional, Union
 
+from flwr.app.message.array import Array
+from flwr.app.message.arrayrecord import ArrayRecord
+from flwr.app.message.configrecord import ConfigRecord
+from flwr.app.message.context import Context
+from flwr.app.message.message import Message
+from flwr.app.message.metricrecord import MetricRecord
 from flwr.app.user_config import UserConfig
 from flwr.client.mod.utils import make_ffn
 from flwr.common import RecordDict
 from flwr.common.logger import log
 from flwr.common.constant import NUM_PARTITIONS_KEY, PARTITION_ID_KEY
 import numpy as np
-from flwr.common.record.arrayrecord import ArrayRecord
-from flwr.common.record.array import Array
-from flwr.common.record.configrecord import ConfigRecord
-from flwr.common.record.metricrecord import MetricRecord
+
+# from flwr.common.record.arrayrecord import ArrayRecord
+# from flwr.common.record.array import Array
+# from flwr.common.record.configrecord import ConfigRecord
+# from flwr.common.record.metricrecord import MetricRecord
 from flwr.common.typing import NDArrays
 from flwr.serverapp.strategy.fedavg import FedAvg
 from flwr.serverapp.strategy.strategy import Strategy
 
 from flwr.app.message_type import MessageType
 from flwr.client.typing import ClientAppCallable, Mod
-from flwr.common.context import Context
-from flwr.common.message import Message
+
+# from flwr.common.context import Context
+# from flwr.common.message import Message
 from flwr.supercore.inflatable.inflatable_object import InflatableObject
 from flwr.supercore.inflatable.inflatable_utils import inflate_object_from_contents
 
@@ -922,7 +930,9 @@ class NodeApp(App):
 
     def _store_arrays_from_message(self, message: Message) -> None:
         """Update local arrays from callback result when arrays are returned."""
-        returned_arrays = message.content.array_records.get(self.strategy.arrayrecord_key)
+        returned_arrays = message.content.array_records.get(
+            self.strategy.arrayrecord_key
+        )
         if returned_arrays is not None:
             self.arrays = returned_arrays
 

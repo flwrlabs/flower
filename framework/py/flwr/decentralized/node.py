@@ -15,7 +15,6 @@
 """Decentralized node abstraction for app registration and execution."""
 
 from __future__ import annotations
-import logging
 from typing import Optional
 
 from flwr.common.logger import log

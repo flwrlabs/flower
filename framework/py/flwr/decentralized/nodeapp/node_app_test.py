@@ -24,9 +24,9 @@ import pytest
 
 from flwr.app.message_type import MessageType
 from flwr.common import RecordDict
-from flwr.common.message import Message
-from flwr.common.record.array import Array
-from flwr.common.record.arrayrecord import ArrayRecord
+from flwr.app.message.message import Message
+from flwr.app.message.array import Array
+from flwr.app.message.arrayrecord import ArrayRecord
 from flwr.decentralized.nodeapp import (
     NodeApp,
     create_nodeapps_from_pyproject,

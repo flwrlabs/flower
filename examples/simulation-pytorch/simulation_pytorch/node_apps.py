@@ -6,10 +6,10 @@ from typing import Any
 
 from flwr.common import Context, Message
 from flwr.common.constant import NUM_PARTITIONS_KEY, PARTITION_ID_KEY
-from flwr.common.record.arrayrecord import ArrayRecord
-from flwr.common.record.configrecord import ConfigRecord
-from flwr.common.record.metricrecord import MetricRecord
-from flwr.common.record.recorddict import RecordDict
+from flwr.app.message.arrayrecord import ArrayRecord
+from flwr.app.message.configrecord import ConfigRecord
+from flwr.app.message.metricrecord import MetricRecord
+from flwr.app.message.recorddict import RecordDict
 from flwr.decentralized.common.run_config import DLRunConfig
 from flwr.decentralized.nodeapp import NodeApp
 import torch

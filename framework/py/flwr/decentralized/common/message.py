@@ -14,8 +14,8 @@
 # ==============================================================================
 from dataclasses import dataclass
 
-from flwr.common.message import Message
-from flwr.common.record.recorddict import RecordDict
+from flwr.app.message import Message
+from flwr.app.message.recorddict import RecordDict
 
 from .typing import Action
 
