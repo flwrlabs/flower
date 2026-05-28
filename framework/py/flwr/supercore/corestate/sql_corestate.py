@@ -25,6 +25,7 @@ from typing import Any, Literal, cast
 from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
 
+from flwr.app.message import make_message
 from flwr.app.metadata import Metadata
 from flwr.common import Message, now
 from flwr.common.constant import (
@@ -36,7 +37,6 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.message import make_message
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.common.typing import Fab

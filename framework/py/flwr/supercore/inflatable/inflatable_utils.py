@@ -24,16 +24,16 @@ from collections.abc import Callable, Iterable, Iterator
 from queue import Queue
 from typing import TypeVar
 
-from flwr.common.exit import add_exit_handler
-from flwr.common.message import Message
-from flwr.common.record import (
+from flwr.app.message import (
     Array,
     ArrayRecord,
     ConfigRecord,
+    Message,
     MetricRecord,
     RecordDict,
 )
-from flwr.common.record.arraychunk import ArrayChunk
+from flwr.app.message.arraychunk import ArrayChunk
+from flwr.common.exit import add_exit_handler
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 
 from ..constant import (

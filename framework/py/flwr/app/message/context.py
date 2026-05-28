@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 from flwr.app.user_config import UserConfig
 
-from .record import RecordDict
+from .recorddict import RecordDict
 
 
 @dataclass

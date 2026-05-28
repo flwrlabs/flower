@@ -23,6 +23,7 @@ from pathlib import Path
 from time import sleep
 from unittest import TestCase
 
+from flwr.app.message import make_message
 from flwr.client import Client, NumPyClient
 from flwr.clientapp import ClientApp
 from flwr.clientapp.client_app import LoadClientAppError
@@ -39,7 +40,6 @@ from flwr.common import (
     now,
 )
 from flwr.common.constant import Status
-from flwr.common.message import make_message
 from flwr.common.recorddict_compat import getpropertiesins_to_recorddict
 from flwr.common.typing import Run, RunStatus
 from flwr.server.superlink.fleet.vce.vce_api import (
