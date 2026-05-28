@@ -123,12 +123,9 @@ def test_invoke_model_provider_collects_stream_events(
     }
 
 
-def test_invoke_model_provider_raises_on_stream_failure_events(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Provider stream failure events should become structured provider errors."""
-    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
-    cases = [
+@pytest.mark.parametrize(
+    ("lines", "expected_detail", "expected_message"),
+    [
         (
             [
                 b"event: response.failed",
@@ -157,17 +154,24 @@ def test_invoke_model_provider_raises_on_stream_failure_events(
                 '{"message":"bad request"}}'
             ),
         ),
-    ]
+    ],
+)
+def test_invoke_model_provider_raises_on_stream_failure_events(
+    monkeypatch: pytest.MonkeyPatch,
+    lines: list[bytes],
+    expected_detail: JSONObject,
+    expected_message: str,
+) -> None:
+    """Provider stream failure events should become structured provider errors."""
+    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
+    _patch_post(
+        monkeypatch,
+        _Response(headers={"Content-Type": "text/event-stream"}, lines=lines),
+    )
 
-    for lines, expected_detail, expected_message in cases:
-        _patch_post(
-            monkeypatch,
-            _Response(headers={"Content-Type": "text/event-stream"}, lines=lines),
-        )
+    with pytest.raises(ModelProviderError) as exc_info:
+        invoke_model_provider({"model": "model", "input": [], "stream": True})
 
-        with pytest.raises(ModelProviderError) as exc_info:
-            invoke_model_provider({"model": "model", "input": [], "stream": True})
-
-        assert exc_info.value.status_code == 200
-        assert exc_info.value.detail == expected_detail
-        assert str(exc_info.value) == expected_message
+    assert exc_info.value.status_code == 200
+    assert exc_info.value.detail == expected_detail
+    assert str(exc_info.value) == expected_message
