@@ -277,7 +277,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             series_id = runs[0].series_id
 
             # Create an empty context for the Run
-            run_context = Context(
+            context = Context(
                 run_id=run_id,
                 node_id=SUPERLINK_NODE_ID,
                 # Dict is invariant in mypy
@@ -288,7 +288,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             )
 
             # Register the context at the LinkState
-            state.set_serverapp_context(run_id=run_id, context=run_context)
+            state.set_serverapp_context(run_id=run_id, context=context)
 
         except ValueError as e:
             log(ERROR, "Could not start run: %s", str(e))

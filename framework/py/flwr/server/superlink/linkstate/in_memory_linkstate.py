@@ -35,6 +35,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.common.serde import run_status_to_proto
 from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
@@ -595,7 +596,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 return None
             return node_id
 
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
+    # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
     def create_run(
         self,
         fab_id: str | None,
@@ -652,8 +653,11 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             self.run_ids[run_id] = run_record
             with self.lock_run_series_store:
                 run_series = self.run_series_store[resolved_series_id]
-                run_series.last_run_id = run_id
-                run_series.updated_at = now()
+                run_series.run_ids.append(run_id)
+                run_series.last_run_status.CopyFrom(
+                    run_status_to_proto(run_record.run.status)
+                )
+                run_series.updated_at = now().isoformat()
             # Add run_id to the flwr_aid_to_run_ids mapping if flwr_aid is provided
             if flwr_aid:
                 self.flwr_aid_to_run_ids[flwr_aid].add(run_id)

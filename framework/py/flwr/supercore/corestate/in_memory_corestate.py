@@ -38,6 +38,7 @@ from flwr.common.constant import (
 )
 from flwr.common.logger import log
 from flwr.common.typing import Fab
+from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
@@ -51,17 +52,6 @@ class TokenRecord:
 
     token: str
     active_until: datetime
-
-
-@dataclass
-class RunSeriesRecord:
-    """Record containing run series metadata."""
-
-    federation: str
-    description: str | None
-    created_at: datetime
-    updated_at: datetime
-    last_run_id: int | None
 
 
 class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attributes
@@ -83,7 +73,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.lock_task_store = Lock()
         self.task_message_store: dict[str, Message] = {}
         self.lock_task_message_store = Lock()
-        self.run_series_store: dict[int, RunSeriesRecord] = {}
+        self.run_series_store: dict[int, RunSeries] = {}
         self.lock_run_series_store = Lock()
 
     @property
@@ -144,13 +134,13 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                     )
                 return resolved_series_id
 
-            timestamp = now()
-            self.run_series_store[resolved_series_id] = RunSeriesRecord(
+            timestamp = now().isoformat()
+            self.run_series_store[resolved_series_id] = RunSeries(
+                series_id=resolved_series_id,
                 federation=federation,
-                description=None,
+                description="",
                 created_at=timestamp,
                 updated_at=timestamp,
-                last_run_id=None,
             )
             return resolved_series_id
 

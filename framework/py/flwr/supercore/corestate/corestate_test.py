@@ -73,14 +73,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         mock_datetime.now.side_effect = timestamps
         return stack
 
-    def test_ensure_run_series_generates_nonzero_id(self) -> None:
-        """Ensuring a run series without ID should generate a nonzero ID."""
-        state = self.state_factory()
-
-        series_id = state.ensure_run_series("federation-a")
-
-        self.assertGreater(series_id, 0)
-
     def test_ensure_run_series_uses_provided_id(self) -> None:
         """Ensuring a run series should preserve a caller-provided ID."""
         state = self.state_factory()

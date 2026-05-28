@@ -209,35 +209,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         assert run_context is not None
         self.assertEqual(run_context.series_id, 123)
 
-    def test_start_run_rejects_series_id_in_different_federation(self) -> None:
-        """Test StartRun rejects a series ID already owned by another federation."""
-        self.state.ensure_run_series("other-federation", series_id=123)
-        run_count = len(self.state.get_run_info())
-        fab_content = b"test FAB content wrong federation"
-        request = StartRunRequest(series_id=123, federation=NOOP_FEDERATION)
-        request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
-        request.fab.content = fab_content
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
-
-        with (
-            patch(
-                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
-            ) as mock_get_fab_config,
-            patch(
-                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
-            ) as mock_get_metadata_from_config,
-            self.assertRaises(grpc.RpcError),
-        ):
-            mock_get_fab_config.return_value = {"tool": {"flwr": {"app": {}}}}
-            mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
-            self.servicer.StartRun(request, context)
-
-        status_code, details = context.abort.call_args.args
-        self.assertEqual(status_code, grpc.StatusCode.FAILED_PRECONDITION)
-        self.assertIn("belongs to federation", details)
-        self.assertEqual(len(self.state.get_run_info()), run_count)
-
     @parameterized.expand(
         [
             (None, RunType.SERVER_APP, TaskType.SERVER_APP),

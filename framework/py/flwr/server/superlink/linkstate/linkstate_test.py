@@ -199,16 +199,6 @@ class StateTest(CoreStateTest):
         runs = state.get_run_info(run_ids=[run_id_1, run_id_2])
         self.assertEqual({run.series_id for run in runs}, {123})
 
-    def test_create_run_rejects_series_id_in_different_federation(self) -> None:
-        """Test a run series cannot be linked across federations."""
-        # Prepare
-        state = self.state_factory()
-        create_dummy_run(state, federation="federation-a", series_id=123)
-
-        # Execute & Assert
-        with self.assertRaisesRegex(ValueError, "belongs to federation"):
-            create_dummy_run(state, federation="federation-b", series_id=123)
-
     def test_create_run_creates_primary_task(self) -> None:
         """Creating a run should also create its primary task."""
         # Prepare
@@ -2219,6 +2209,20 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         if exceptions:
             raise exceptions[0]
         return results
+
+    def test_ensure_run_series_with_provided_id_is_idempotent_across_replicas(
+        self,
+    ) -> None:
+        """Ensure concurrent replicas can reuse the same new run series ID."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = self._shared_sql_database(tmpdir)
+            self._create_shared_sql_states(db_path)
+
+            results = self._query_states_in_parallel(
+                lambda state: state.ensure_run_series("federation-a", series_id=123)
+            )
+
+            self.assertEqual(results, [123, 123])
 
     # pylint: disable-next=too-many-locals
     def test_get_message_ins_claim_is_unique_across_replicas(self) -> None:

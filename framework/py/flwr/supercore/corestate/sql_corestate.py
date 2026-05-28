@@ -131,6 +131,17 @@ class SqlCoreState(CoreState, SqlMixin):
         if series_id is not None and not 0 < series_id < (1 << 64):
             raise ValueError("Series ID must be a positive uint64")
 
+        insert_query = """
+            INSERT INTO run_series
+            (series_id, federation, description, created_at, updated_at,
+             last_run_id)
+            VALUES
+            (:series_id, :federation, :description, :created_at, :updated_at,
+             :last_run_id)
+            ON CONFLICT(series_id) DO NOTHING
+            RETURNING series_id
+        """
+
         with self.session():
             resolved_series_id = series_id
             if resolved_series_id is None:
@@ -139,45 +150,25 @@ class SqlCoreState(CoreState, SqlMixin):
                         SERIES_ID_NUM_BYTES,
                         exclude={0},
                     )
+                    timestamp = now()
                     rows = self.query(
-                        """
-                        SELECT series_id
-                        FROM run_series
-                        WHERE series_id = :series_id
-                        """,
-                        {"series_id": uint64_to_int64(candidate)},
+                        insert_query,
+                        {
+                            "series_id": uint64_to_int64(candidate),
+                            "federation": federation,
+                            "description": None,
+                            "created_at": timestamp,
+                            "updated_at": timestamp,
+                            "last_run_id": None,
+                        },
                     )
-                    if not rows:
-                        resolved_series_id = candidate
-                        break
-            else:
-                rows = self.query(
-                    """
-                    SELECT series_id, federation
-                    FROM run_series
-                    WHERE series_id = :series_id
-                    """,
-                    {"series_id": uint64_to_int64(resolved_series_id)},
-                )
-                if rows:
-                    existing = rows[0]
-                    if existing["federation"] != federation:
-                        raise ValueError(
-                            f"Run series {resolved_series_id} belongs to federation "
-                            f"{existing['federation']!r}, not {federation!r}"
-                        )
-                    return resolved_series_id
+                    if rows:
+                        return candidate
 
+            assert resolved_series_id is not None
             timestamp = now()
             self.query(
-                """
-                INSERT INTO run_series
-                (series_id, federation, description, created_at, updated_at,
-                 last_run_id)
-                VALUES
-                (:series_id, :federation, :description, :created_at, :updated_at,
-                 :last_run_id)
-                """,
+                insert_query,
                 {
                     "series_id": uint64_to_int64(resolved_series_id),
                     "federation": federation,
@@ -187,6 +178,20 @@ class SqlCoreState(CoreState, SqlMixin):
                     "last_run_id": None,
                 },
             )
+            rows = self.query(
+                """
+                SELECT federation
+                FROM run_series
+                WHERE series_id = :series_id
+                """,
+                {"series_id": uint64_to_int64(resolved_series_id)},
+            )
+            existing = rows[0]
+            if existing["federation"] != federation:
+                raise ValueError(
+                    f"Run series {resolved_series_id} belongs to federation "
+                    f"{existing['federation']!r}, not {federation!r}"
+                )
             return resolved_series_id
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
