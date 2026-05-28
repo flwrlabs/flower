@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-05-27 00:28+0000\n"
+"POT-Creation-Date: 2026-05-28 00:26+0000\n"
 "PO-Revision-Date: 2026-05-23 06:54+0000\n"
 "Last-Translator: Gustavo Bertoli <gubertoli@gmail.com>\n"
 "Language: pt_BR\n"
@@ -2024,13 +2024,13 @@ msgid "Congrats! 🥳 You're now officially a Flower contributor!"
 msgstr ""
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:354
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:374
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:378
 #: ../../source/tutorial-series-customize-the-client-pytorch.rst:345
-#: ../../source/tutorial-series-get-started-with-flower.rst:142
+#: ../../source/tutorial-series-get-started-with-flower.rst:148
 #: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:423
 #: ../../source/tutorial-series-what-is-federated-learning.rst:362
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:605
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:284
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:292
 msgid "Next steps"
 msgstr ""
 
@@ -2673,6 +2673,7 @@ msgstr ""
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst
 #: ../../source/docker/tutorial-quickstart-docker.rst
 #: ../../source/how-to-authenticate-supernodes.rst
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst
 #: ../../source/how-to-enable-tls-connections.rst
 #: ../../source/how-to-run-flower-with-deployment-engine.rst
 msgid "Understand the command"
@@ -2760,7 +2761,7 @@ msgstr ""
 #: ../../source/docker/tutorial-quickstart-docker-compose.rst:250
 #: ../../source/docker/tutorial-quickstart-docker.rst:326
 #: ../../source/how-to-authenticate-accounts.rst:96
-#: ../../source/how-to-authenticate-supernodes.rst:121
+#: ../../source/how-to-authenticate-supernodes.rst:127
 #: ../../source/how-to-enable-tls-connections.rst:220
 #: ../../source/how-to-run-flower-on-azure.rst:230
 #: ../../source/how-to-run-flower-on-gcp.rst:624
@@ -9125,24 +9126,32 @@ msgstr ""
 
 #: ../../source/how-to-authenticate-supernodes.rst:53
 msgid ""
+"This guide covers CLI-managed SuperNode authentication for a self-hosted "
+"SuperLink. To register SuperNodes in the SuperGrid dashboard and add them"
+" to a deployment federation, see :doc:`how-to-connect-supernodes-to-"
+"supergrid`."
+msgstr ""
+
+#: ../../source/how-to-authenticate-supernodes.rst:59
+msgid ""
 "Checkout the `Flower Authentication "
 "<https://github.com/flwrlabs/flower/tree/main/examples/supernode-"
 "authentication>`_ example for a complete self-contained example on how to"
 " setup TLS and node authentication."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:60
+#: ../../source/how-to-authenticate-supernodes.rst:66
 msgid "Generate authentication keys"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:62
+#: ../../source/how-to-authenticate-supernodes.rst:68
 msgid ""
 "To establish an authentication mechanism by which only authorized "
 "SuperNodes can connect to a running SuperLink, a set of key pairs for "
 "both SuperLink and SuperNodes need to be created."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:66
+#: ../../source/how-to-authenticate-supernodes.rst:72
 msgid ""
 "We have prepared a script that can be used to generate such set of keys. "
 "While using these are fine for prototyping, we advice you to follow the "
@@ -9152,7 +9161,7 @@ msgid ""
 " at the top of this guide."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:78
+#: ../../source/how-to-authenticate-supernodes.rst:84
 msgid ""
 "This will generate the keys in a new ``keys/`` directory. By default it "
 "creates a key pair for the SuperLink and one for each SuperNode. Copy "
@@ -9160,11 +9169,11 @@ msgid ""
 " earlier via ``flwr new``)."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:84
+#: ../../source/how-to-authenticate-supernodes.rst:90
 msgid "Enable node authentication in SuperLink"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:86
+#: ../../source/how-to-authenticate-supernodes.rst:92
 msgid ""
 "To launch a SuperLink with SuperNode authentication enabled, you need to "
 "provide three aditional files in addition to the certificates needed for "
@@ -9172,26 +9181,26 @@ msgid ""
 "enabled in the presence of TLS."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:92
+#: ../../source/how-to-authenticate-supernodes.rst:98
 msgid ""
 "To enable TLS also for the AppIo API on SuperLink, please refer to "
 ":ref:`Launching the SuperLink with TLS <launching-the-superlink-with-"
 "tls>`."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:106
+#: ../../source/how-to-authenticate-supernodes.rst:112
 msgid ""
 "``--enable-supernode-auth``: Enables SuperNode authentication therefore "
 "only Supernodes that are first register on the SuperLink will be able to "
 "establish a connection."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:110
+#: ../../source/how-to-authenticate-supernodes.rst:116
 #, fuzzy
 msgid "Register SuperNodes"
 msgstr "Construindo a imagem do servidor"
 
-#: ../../source/how-to-authenticate-supernodes.rst:112
+#: ../../source/how-to-authenticate-supernodes.rst:118
 msgid ""
 "Once your SuperLink is running, the next step is to register the "
 "SuperNodes that will be allowed to connect to it. This process is handled"
@@ -9200,7 +9209,7 @@ msgid ""
 "SuperLink."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:117
+#: ../../source/how-to-authenticate-supernodes.rst:123
 msgid ""
 "First, ensure your Flower configuration file has a SuperLink connection "
 "profile that points to your running SuperLink and that includes a ``root-"
@@ -9208,13 +9217,13 @@ msgid ""
 "the SuperLink. For example:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:129
+#: ../../source/how-to-authenticate-supernodes.rst:135
 msgid ""
 "You can verify that your connection is correctly configured by running a "
 "``flwr ls`` command:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:144
+#: ../../source/how-to-authenticate-supernodes.rst:150
 #: ../../source/how-to-enable-tls-connections.rst:237
 #: ../../source/how-to-run-flower-with-deployment-engine.rst:240
 msgid ""
@@ -9225,79 +9234,79 @@ msgid ""
 "configuration>` guide."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:149
+#: ../../source/how-to-authenticate-supernodes.rst:155
 msgid ""
 "With a correctly configured Flower CLI, let's proceed to register two "
 "SuperNodes:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:156
+#: ../../source/how-to-authenticate-supernodes.rst:162
 msgid "Next, let's register the second SuperNode as well:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:162
+#: ../../source/how-to-authenticate-supernodes.rst:168
 msgid "You can list the registered SuperNodes using the following command:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:169
+#: ../../source/how-to-authenticate-supernodes.rst:175
 msgid ""
 "This will display the IDs of the SuperNodes you just registered as well "
 "as their status. You should see a table similar to the following:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:182
+#: ../../source/how-to-authenticate-supernodes.rst:188
 msgid ""
 "The status of the SuperNodes will change after they connect to the "
 "SuperLink. Let's proceed and laucnh the SuperNodes."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:187
+#: ../../source/how-to-authenticate-supernodes.rst:193
 msgid "Enable node authentication in SuperNode"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:189
+#: ../../source/how-to-authenticate-supernodes.rst:195
 msgid ""
 "Connecting a SuperNode to a SuperLink that has node authentication "
 "enabled requires passing one additional argument (i.e. the private key of"
 " the SuperNode) in addition to the TLS certificate."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:195
+#: ../../source/how-to-authenticate-supernodes.rst:201
 msgid ""
 "To enable TLS also for the AppIo API on SuperNodes, please refer to "
 ":ref:`Launching the SuperNodes with TLS <connecting-the-supernodes-with-"
 "tls>`."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:210
+#: ../../source/how-to-authenticate-supernodes.rst:216
 msgid "``--auth-supernode-private-key``: the private key of this SuperNode."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:212
+#: ../../source/how-to-authenticate-supernodes.rst:218
 msgid ""
 "Follow the same procedure to launch the second SuperNode by passing its "
 "corresponding private key:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:225
+#: ../../source/how-to-authenticate-supernodes.rst:231
 msgid ""
 "After connecting both SuperNodes, you can check the status of the "
 "SuperNodes again. You will notice their status is now ``online``:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:242
+#: ../../source/how-to-authenticate-supernodes.rst:248
 #, fuzzy
 msgid "Unregister SuperNodes"
 msgstr "Construindo a imagem do servidor"
 
-#: ../../source/how-to-authenticate-supernodes.rst:246
+#: ../../source/how-to-authenticate-supernodes.rst:252
 msgid ""
 "This is a destructive operation. Unregistering a SuperNode is permanent "
 "and cannot be undone. If you wish to connect a SuperNode again, a new key"
 " pair is needed."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:249
+#: ../../source/how-to-authenticate-supernodes.rst:255
 msgid ""
 "At anypoint you can unregister a SuperNode from the SuperLink (even if it"
 " has never connected). This will prevent the SuperNode from making future"
@@ -9307,13 +9316,13 @@ msgid ""
 "|flower_cli_supernode_link|_ as follows:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:260
+#: ../../source/how-to-authenticate-supernodes.rst:266
 msgid ""
 "The above command unregisters the first SuperNode. You can verify this by"
 " listing the SuperNodes again:"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:274
+#: ../../source/how-to-authenticate-supernodes.rst:280
 msgid ""
 "If you pass the ``--verbose`` flag to the previous command you'll see "
 "that the status of the unregistered SuperNode has changed to "
@@ -9322,11 +9331,11 @@ msgid ""
 "wish to connect a second SuperNode a new EC key pair is needed.**"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:294
+#: ../../source/how-to-authenticate-supernodes.rst:300
 msgid "Security notice"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:296
+#: ../../source/how-to-authenticate-supernodes.rst:302
 msgid ""
 "The system's security relies on the credentials of the SuperLink and each"
 " SuperNode. Therefore, it is imperative to safeguard and safely store the"
@@ -9337,21 +9346,21 @@ msgid ""
 "methods."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:304
+#: ../../source/how-to-authenticate-supernodes.rst:310
 #: ../../source/how-to-enable-tls-connections.rst:244
 #: ../../source/how-to-use-built-in-mods.rst:175
 #: ../../source/tutorial-series-what-is-federated-learning.rst:291
 msgid "Conclusion"
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:306
+#: ../../source/how-to-authenticate-supernodes.rst:312
 msgid ""
 "You should now have learned how to start a long-running Flower SuperLink "
 "and SuperNode with node authentication enabled. You should also know the "
 "significance of the private key and store it securely to minimize risks."
 msgstr ""
 
-#: ../../source/how-to-authenticate-supernodes.rst:312
+#: ../../source/how-to-authenticate-supernodes.rst:318
 #: ../../source/how-to-enable-tls-connections.rst:254
 msgid ""
 "Refer to the :doc:`docker/index` documentation to learn how to setup a "
@@ -9989,6 +9998,533 @@ msgid ""
 "settings are now **SuperLink connection configuration** and are defined "
 "in the Flower configuration file. Refer to the `Flower Configuration "
 "<ref-flower-configuration.html>`_ for more information."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:-1
+msgid ""
+"Connect SuperNodes to Flower SuperGrid by registering their public keys "
+"and starting them from Python or Docker."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:7
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:90
+#, fuzzy
+msgid "Connect SuperNodes to SuperGrid"
+msgstr "Construindo a imagem do servidor"
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:9
+msgid ""
+"This guide shows how to register a SuperNode in SuperGrid and start the "
+"``flower-supernode`` process so it can connect to SuperGrid. Once "
+"connected, the SuperNode can participate in runs submitted to federations"
+" that include it."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:15
+msgid ""
+"This guide assumes you already have a Flower account on `flower.ai "
+"<https://flower.ai/>`__ and can access SuperGrid. Connecting SuperNodes "
+"may require additional access. Contact hello@flower.ai to request it."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:19
+msgid "You will need:"
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:21
+msgid "Access to SuperGrid at https://flower.ai/supernodes/."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:22
+msgid ""
+"Access to a ``Deployment`` federation. ``Simulation`` federations do not "
+"support adding SuperNodes."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:24
+msgid ""
+"A public/private key pair for each SuperNode you want to connect. This "
+"tutorial shows how to create these with ``ssh-keygen`` in the terminal."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:26
+msgid "A machine where the SuperNode process can keep running."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:30
+#, fuzzy
+msgid "Register SuperNodes with SuperGrid"
+msgstr "Construindo a imagem do servidor"
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:32
+msgid ""
+"Each SuperNode uses its own key pair. The public key is registered with "
+"SuperGrid, and the private key stays on the machine that runs the "
+"SuperNode."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:35
+msgid "Create a key pair for the first SuperNode:"
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:43
+msgid "This creates two files:"
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:45
+msgid ""
+"``~/supernodes_keys/supernode-1``: the private key, used when starting "
+"the SuperNode. Never share the private key or upload it anywhere. This "
+"key should only be used to start the SuperNode."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:48
+msgid ""
+"``~/supernodes_keys/supernode-1.pub``: the public key, used when "
+"registering the SuperNode in SuperGrid."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:51
+msgid ""
+"Copy the contents of ``supernode-1.pub`` to your clipboard. One way to "
+"inspect the public key is with the ``cat`` command:"
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:61
+msgid ""
+"Copy the full key printed in the terminal, including the key type at the "
+"beginning and the optional comment at the end."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:64
+msgid ""
+"Then, go to https://flower.ai/supernodes/ and click ``Register "
+"SuperNode``."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:66
+msgid "SuperNodes page before registering a SuperNode"
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:71
+msgid "In the dialog, paste the public key and click ``Register``."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:73
+msgid "Register SuperNode dialog with a public key"
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:78
+msgid "The SuperNode should then appear in the list of registered SuperNodes."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:80
+msgid "SuperNodes page showing a registered SuperNode"
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:85
+msgid ""
+"To connect more SuperNodes, create and register a separate key pair for "
+"each one. Do not reuse a key pair across multiple SuperNodes."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:92
+msgid ""
+"There are two common ways to run a SuperNode: directly from a Python "
+"environment, or with the official SuperNode Docker image. In both cases, "
+"use the private key that matches the public key you registered in "
+"SuperGrid."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:98
+msgid ""
+"A SuperNode must be able to run the ClientApps assigned to it. Make sure "
+"the SuperNode environment or Docker image includes the dependencies those"
+" ClientApps need, such as PyTorch, TensorFlow, pandas, or other "
+"framework-specific packages. You can preinstall them in the Python "
+"environment, build a custom Docker image with the required packages, or "
+"start the SuperNode with ``--allow-runtime-dependency-installation`` so "
+"app dependencies are installed at runtime."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:107
+msgid "Start from a Python environment"
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:109
+msgid ""
+"Install Flower in a Python environment on the machine that will run the "
+"SuperNode:"
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:115
+#, fuzzy
+msgid "Start the SuperNode:"
+msgstr "``FLWR_VERSION``"
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:123
+msgid ""
+"Keep this process running for as long as you want the SuperNode to remain"
+" connected."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:125
+msgid "Your SuperNode should appear as ``online``:"
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:127
+msgid "SuperNodes page showing an online SuperNode"
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:133
+msgid "Start with Docker"
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:135
+msgid ""
+"You can also run the SuperNode with the official `flwr/supernode Docker "
+"image <https://hub.docker.com/r/flwr/supernode>`__. Mount the directory "
+"containing the private key into the container, then pass the key path to "
+"``flower-supernode``:"
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:152
+msgid "``--rm``: Remove the container after it exits."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:153
+msgid ""
+"``--user \"$(id -u):$(id -g)\"``: Run the container as the host user that"
+" owns the mounted private key. Flower Docker images run as a non-root "
+"user by default; this keeps the container non-root while allowing it to "
+"read keys created by ``ssh-keygen`` without changing their file "
+"permissions."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:157
+msgid ""
+"``-e FLWR_HOME=/tmp/flwr-home``: Set Flower's home directory to a "
+"container-local writable location. The SuperNode uses this directory to "
+"store Flower Apps received during runs."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:160
+msgid ""
+"``-v \"$HOME/supernodes_keys:/keys:ro\"``: Mount the host directory "
+"containing the SuperNode private key into the container as read-only. You"
+" may need to adjust the path if your key has a different name or is in a "
+"different location."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:163
+msgid "``flwr/supernode:XYZ``: Use the official SuperNode Docker image."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:164
+msgid ""
+"``--superlink fleet-supergrid.flower.ai:443``: Connect the SuperNode to "
+"SuperGrid."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:166
+msgid ""
+"``--auth-supernode-private-key /keys/supernode-1``: Use the mounted "
+"private key to authenticate this SuperNode. You may need to adjust the "
+"path if your key has a different name or is in a different location."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:170
+msgid ""
+"Use this form when you prefer to run SuperNodes from a container image "
+"instead of installing Flower directly in a Python environment."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:175
+#, fuzzy
+msgid "Add a SuperNode to a Deployment Federation"
+msgstr "``FLWR_VERSION``"
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:177
+msgid ""
+"After registering a SuperNode in SuperGrid, you can add it to any "
+"deployment federation you are a member of. The SuperNode can then "
+"participate in runs launched in that federation."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:181
+msgid ""
+"Navigate to the federation page in SuperGrid and open the ``SuperNodes`` "
+"tab. If the federation does not have any SuperNodes yet, the list will be"
+" empty. Click ``Add SuperNode``."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:185
+msgid "Deployment federation SuperNodes tab before adding a SuperNode"
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:190
+msgid ""
+"Select the SuperNode you want to add. You can search by SuperNode ID or "
+"owner if the list contains many SuperNodes. Then click ``Add SuperNode``."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:193
+#, fuzzy
+msgid "Add SuperNode to federation dialog"
+msgstr "``FLWR_VERSION``"
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:198
+msgid ""
+"Once added, the SuperNode is listed in the federation's ``SuperNodes`` "
+"tab and can be selected by runs launched in the federation."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:201
+#, fuzzy
+msgid "SuperNode added to federation"
+msgstr "``FLWR_VERSION``"
+
+#: ../../source/how-to-create-and-manage-federations.rst:-1
+#, fuzzy
+msgid "Create and manage Flower federations in SuperGrid."
+msgstr "``FLWR_VERSION``"
+
+#: ../../source/how-to-create-and-manage-federations.rst:7
+#, fuzzy
+msgid "Create and Manage Federations on SuperGrid"
+msgstr "``FLWR_VERSION``"
+
+#: ../../source/how-to-create-and-manage-federations.rst:9
+msgid ""
+"This guide shows how to create and manage federations in SuperGrid. A "
+"federation is a workspace for a group of users and the SuperNodes that "
+"can take part in Flower runs."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:14
+msgid ""
+"This guide assumes you already have a Flower account on `flower.ai "
+"<https://flower.ai/>`__ and can access SuperGrid."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:17
+msgid "SuperGrid supports two federation types:"
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:19
+msgid ""
+"**Simulation federations** run Flower Apps with simulated SuperNodes. Use"
+" this when you want to test or iterate on an app before connecting real "
+"SuperNodes."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:21
+msgid "**Deployment federations** run Flower Apps on connected SuperNodes."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:25
+msgid ""
+"Deployment federations require deployment access. Contact hello@flower.ai"
+" to request it."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:28
+msgid ""
+"All federation members can see runs launched by other members. They can "
+"also launch new runs in the federation."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:33
+#: ../../source/tutorial-series-get-started-with-flower.rst:32
+#, fuzzy
+msgid "Create a Federation"
+msgstr "``FLWR_VERSION``"
+
+#: ../../source/how-to-create-and-manage-federations.rst:35
+msgid ""
+"Open SuperGrid and go to `the Federations page "
+"<https://flower.ai/federations/>`__. Choose whether you want to create a "
+"simulation federation or a deployment federation, then provide the "
+"federation name and the required configuration."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:41
+msgid "There is no limit on the number of federations you can create."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:43
+msgid ""
+"To create a simulation federation, click ``New Federation``, select "
+"``Simulation``, choose a federation name, set the number of simulated "
+"SuperNodes, and click ``Create``. You can change the number of simulated "
+"SuperNodes later if needed. To begin with, start with a small number of "
+"SuperNodes, such as 5 or 10, to keep runs fast."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:48
+msgid ""
+"For a deployment federation, choose ``Deployment`` instead of "
+"``Simulation`` when creating the federation. Choose a meaningful name and"
+" click ``Create``."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:51
+msgid ""
+"In the federations dashboard, you can identify the type of each "
+"federation by the label next to its name. The screenshot below shows two "
+"federations, one for simulation and one for deployment."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:55
+msgid "Federation list showing the newly created federations"
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:60
+msgid ""
+"For deployment federations, you also need to add SuperNodes to the "
+"federation. You can add your own SuperNodes now by following the "
+":doc:`guide on how to connect SuperNodes to SuperGrid <how-to-connect-"
+"supernodes-to-supergrid>`, or you can do it later. SuperGrid federations "
+"become most useful when several members collaborate on runs, each with "
+"their own SuperNodes. The next section shows how to invite other users to"
+" join."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:68
+#, fuzzy
+msgid "Manage a Federation"
+msgstr "``FLWR_VERSION``"
+
+#: ../../source/how-to-create-and-manage-federations.rst:70
+msgid ""
+"After creating a federation, the owner can invite other Flower users to "
+"collaborate. Invited users become federation members after accepting the "
+"invitation. Members can connect their own SuperNodes, inspect runs "
+"launched in the federation, and submit their own runs."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:75
+msgid "Federation ownership controls administrative actions:"
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:77
+msgid "The owner can invite users."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:78
+#, fuzzy
+msgid "The owner can remove users from the federation."
+msgstr "``FLWR_VERSION``"
+
+#: ../../source/how-to-create-and-manage-federations.rst:79
+msgid "The owner can archive the federation when the collaboration is complete."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:80
+#, fuzzy
+msgid "Members can leave the federation themselves."
+msgstr "``FLWR_VERSION``"
+
+#: ../../source/how-to-create-and-manage-federations.rst:83
+msgid "Invite Users"
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:85
+msgid ""
+"Invite users when you want multiple people to collaborate in the same "
+"federation, inspect runs, launch new runs, and contribute their own "
+"SuperNodes. You can invite users to both simulation and deployment "
+"federations, but only deployment federations can have real SuperNodes "
+"connected to them."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:90
+msgid ""
+"Open your federation and navigate to the ``Members`` tab. If this is a "
+"new federation, you will see only your own account listed as the owner."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:93
+#, fuzzy
+msgid "Members tab showing the federation owner"
+msgstr "``FLWR_VERSION``"
+
+#: ../../source/how-to-create-and-manage-federations.rst:98
+msgid ""
+"Click ``Invite User``, enter the username of the Flower account you want "
+"to invite, and click ``Send Invitation``."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:101
+msgid "Invite user dialog in SuperGrid"
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:106
+msgid ""
+"The invitation appears in the member list with status ``Pending`` until "
+"the invited user accepts it. While it is pending, the owner can revoke "
+"the invitation by clicking the delete icon."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:110
+#, fuzzy
+msgid "Pending invitation in the federation members list"
+msgstr "``FLWR_VERSION``"
+
+#: ../../source/how-to-create-and-manage-federations.rst:115
+msgid ""
+"The invited user will see the invitation when they sign in to `flower.ai "
+"<https://flower.ai/>`__ and open their profile page. The invitation shows"
+" the federation name and the username of the user who sent it."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:119
+msgid "Pending federation invitation on the invited user's profile page"
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:124
+msgid ""
+"After accepting the invitation, the user becomes a member of the "
+"federation. From that point on, the user can see the federation in their "
+"dashboard, inspect runs, launch new runs, and, for deployment "
+"federations, connect their own SuperNodes. Members can leave the "
+"federation at any time."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:129
+msgid "Federation members list showing an accepted invitation"
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:135
+#, fuzzy
+msgid "Archive a Federation"
+msgstr "``FLWR_VERSION``"
+
+#: ../../source/how-to-create-and-manage-federations.rst:137
+msgid ""
+"Archive a federation when a project or collaboration has ended. Only the "
+"federation owner can archive it."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:140
+msgid ""
+"To archive a federation, click the archive icon shown in the federations "
+"dashboard. After confirming, the federation is archived and moved to the "
+"archived federations list. The screenshot below shows ``@peter123"
+"/another-federation`` after it has been archived."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:144
+msgid "Archived federation view in SuperGrid"
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:149
+msgid ""
+"Before archiving a federation, make sure the collaboration is complete "
+"and members no longer need to launch workloads in it. Once archived, the "
+"federation is kept as a historical record instead of an active workspace."
+" New runs cannot be launched, and users or SuperNodes can no longer be "
+"added or removed."
 msgstr ""
 
 #: ../../source/how-to-design-stateful-clients.rst:-1
@@ -10771,64 +11307,71 @@ msgid "Learn how to display information about a specific federation."
 msgstr ""
 
 #: ../../source/how-to-manage-flower-federations.rst:37
+msgid ""
+"This guide covers inspecting federations through the Flower CLI when "
+"using a self-hosted SuperLink. To create and manage federations in the "
+"SuperGrid dashboard, see :doc:`how-to-create-and-manage-federations`."
+msgstr ""
+
+#: ../../source/how-to-manage-flower-federations.rst:43
 #, fuzzy
 msgid "List Federations"
 msgstr "``FLWR_VERSION``"
 
-#: ../../source/how-to-manage-flower-federations.rst:39
+#: ../../source/how-to-manage-flower-federations.rst:45
 msgid ""
 "With the |flower_cli_federation_link|_, you can easily inspect the "
 "federations your Flower account is part of:"
 msgstr ""
 
-#: ../../source/how-to-manage-flower-federations.rst:46
+#: ../../source/how-to-manage-flower-federations.rst:52
 msgid ""
 "The above command will display a table with a row for each federation you"
 " are part of. In this case there is only one federation named ``default``"
 " under the account ``none``:"
 msgstr ""
 
-#: ../../source/how-to-manage-flower-federations.rst:60
+#: ../../source/how-to-manage-flower-federations.rst:66
 #, fuzzy
 msgid "Inspect a Federation"
 msgstr "``FLWR_VERSION``"
 
-#: ../../source/how-to-manage-flower-federations.rst:62
+#: ../../source/how-to-manage-flower-federations.rst:68
 msgid ""
 "You can inspect a specific federation by providing the identifier of the "
 "federation to the ``flwr federation list`` command. With this command, "
 "you will be able to see the following information about a federation:"
 msgstr ""
 
-#: ../../source/how-to-manage-flower-federations.rst:66
+#: ../../source/how-to-manage-flower-federations.rst:72
 #, fuzzy
 msgid "The members of the federation."
 msgstr "``FLWR_VERSION``"
 
-#: ../../source/how-to-manage-flower-federations.rst:67
+#: ../../source/how-to-manage-flower-federations.rst:73
 #, fuzzy
 msgid "The SuperNodes registered with the federation and their status."
 msgstr "``FLWR_VERSION``"
 
-#: ../../source/how-to-manage-flower-federations.rst:68
+#: ../../source/how-to-manage-flower-federations.rst:74
 #, fuzzy
 msgid "The runs executed via the federation."
 msgstr "``FLWR_VERSION``"
 
-#: ../../source/how-to-manage-flower-federations.rst:70
+#: ../../source/how-to-manage-flower-federations.rst:76
 msgid ""
 "The ``flwr federation list --federation <federation>`` command requires "
 "the identifier of the federation to inspect as an argument:"
 msgstr ""
 
-#: ../../source/how-to-manage-flower-federations.rst:77
+#: ../../source/how-to-manage-flower-federations.rst:83
 msgid ""
 "Then, assuming that there are two ``SuperNodes`` connected and that three"
 " runs have been submitted through the federation, a representative output"
 " would be similar to:"
 msgstr ""
 
-#: ../../source/how-to-manage-flower-federations.rst:108
+#: ../../source/how-to-manage-flower-federations.rst:114
 msgid ""
 "Note how the ``SuperNodes`` table shows a subset of the information "
 "available via the command ``flwr supernode list`` (Learn more about this "
@@ -17448,8 +17991,8 @@ msgstr ""
 #: flwr.common.record.configrecord.ConfigRecord:9 of
 msgid ""
 "A dictionary that stores basic types (i.e. `str`, `int`, `float`, `bytes`"
-" as defined in `ConfigsScalar`) and lists of such types (see "
-"`ConfigsScalarList`)."
+" as defined in `ConfigScalar`) and lists of such types (see "
+"`ConfigScalarList`)."
 msgstr ""
 
 #: flwr.common.record.configrecord.ConfigRecord:13 of
@@ -17466,9 +18009,9 @@ msgid ""
 "configuration values telling the target node how to perform a certain "
 "action (e.g. train/evaluate a model ). You can use standard Python built-"
 "in types such as :code:`float`, :code:`str` , :code:`bytes`. All types "
-"allowed are defined in :code:`flwr.common.ConfigRecordValues`. While "
-"lists are supported, we encourage you to use a :code:`ArrayRecord` "
-"instead if these are of high dimensionality."
+"allowed are defined in :code:`flwr.app.ConfigRecordValues`. While lists "
+"are supported, we encourage you to use a :code:`ArrayRecord` instead if "
+"these are of high dimensionality."
 msgstr ""
 
 #: flwr.common.record.configrecord.ConfigRecord:29 of
@@ -18098,8 +18641,8 @@ msgstr ""
 msgid ""
 "Since types are enforced, the types of the objects inserted are checked. "
 "For a :code:`MetricRecord`, value types allowed are those in defined in "
-":code:`flwr.common.MetricRecordValues`. Similarly, only :code:`str` keys "
-"are allowed::"
+":code:`flwr.app.MetricRecordValues`. Similarly, only :code:`str` keys are"
+" allowed::"
 msgstr ""
 
 #: flwr.common.record.metricrecord.MetricRecord:50 of
@@ -18870,8 +19413,8 @@ msgid ""
 "Time-to-live for the round trip of this message, i.e., the time from "
 "sending this message to receiving a reply. It specifies in seconds the "
 "duration for which the message and its potential reply are considered "
-"valid. If unset, the default TTL (i.e., ``common.DEFAULT_TTL``) will be "
-"used."
+"valid. If unset, the default TTL (i.e., ``flwr.app.DEFAULT_TTL``) will be"
+" used."
 msgstr ""
 
 #: flwr.server.grid.grid.Grid.create_message:23 of
@@ -35479,25 +36022,26 @@ msgstr ""
 #: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:58
 msgid ""
 "In this tutorial, you'll use Weights & Biases to log strategy metrics. "
-"Add ``wandb`` to the dependency list in ``pyproject.toml``:"
+"From the ``quickstart-pytorch`` directory, add ``wandb`` to the "
+"dependency list in ``pyproject.toml``:"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:65
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:70
 msgid "Then install the updated project dependencies:"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:74
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:78
 msgid ""
 "If this is your first time installing ``wandb``, you might be asked to "
 "create an account and then log in to your system. You can start this "
 "process by typing this in your terminal:"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:84
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:88
 msgid "Customize the ``start`` method of a strategy"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:86
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:90
 msgid ""
 "Flower strategies have a number of methods that can be overridden to "
 "customize their behavior. In the previous strategy tutorial, you learned "
@@ -35512,52 +36056,52 @@ msgid ""
 "three distinct stages:"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:96
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:100
 msgid ""
 "A training stage, where a subset of clients is selected to train the "
 "current global model on their local data."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:98
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:102
 msgid ""
 "An evaluation stage, where a subset of clients is selected to evaluate "
 "the updated global model on their local validation sets."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:100
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:104
 msgid ""
 "An optional stage to evaluate the global model on the server side. Note "
 "that this is what you enabled in the previous tutorial by means of the "
 "``global_evaluate`` callback."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:104
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:108
 msgid ""
 "Let's extend the ``CustomFedAdagrad`` strategy we created earlier and "
 "introduce:"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:106
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:110
 msgid ""
 "``_update_best_acc``: An auxiliary method to save the global model "
 "whenever a new best accuracy is found."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:108
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:112
 msgid ""
 "``set_save_path``: An auxiliary method to set the path where ``wandb`` "
 "logs and model checkpoints will be saved. This method will be called from"
 " the ``server_app.py`` after instantiating the strategy."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:111
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:115
 msgid ""
 "A customized |strategy_start_link|_ method to log metrics to Weights & "
 "Biases (`W&B <https://wandb.ai/site>`__) and save the model checkpoints "
 "to disk."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:299
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:303
 msgid ""
 "With the extended ``CustomFedAdagrad`` strategy defined, we now need to "
 "set the path where the model checkpoints will be saved as well as the "
@@ -35571,14 +36115,14 @@ msgid ""
 "Let's see how this looks in code:"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:336
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:340
 msgid ""
 "Finally, let's run the Flower App locally. This tutorial writes model "
 "checkpoints to your working directory and logs metrics to Weights & "
 "Biases, so a local run makes it easy to inspect the outputs."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:344
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:348
 #: ../../source/tutorial-series-customize-the-client-pytorch.rst:313
 msgid ""
 "Plain ``flwr run . local`` submits the run, prints the run ID, and "
@@ -35586,11 +36130,11 @@ msgid ""
 "the full local workflow."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:347
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:351
 msgid "After starting the run you will notice two things:"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:349
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:353
 msgid ""
 "A new directory will be created in ``outputs/YYYY-MM-DD/HH-MM-SS`` where "
 "``YYYY-MM-DD/HH-MM-SS`` is the current date and time. This directory will"
@@ -35599,13 +36143,13 @@ msgid ""
 "centralized evaluation stage."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:353
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:357
 msgid ""
 "A new run will be created in your `W&B project <https://wandb.ai/home>`_ "
 "where you can visualize the metrics logged during the run."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:356
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:360
 msgid ""
 "Congratulations! You've successfully created a custom Flower strategy by "
 "overriding the |strategy_start_link|_ method. You've also learned how to "
@@ -35613,13 +36157,13 @@ msgid ""
 "disk."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:362
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:366
 #: ../../source/tutorial-series-customize-the-client-pytorch.rst:334
 #: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:409
 msgid "Recap"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:364
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:368
 msgid ""
 "In this tutorial, we've seen how to customize the |strategy_start_link|_ "
 "method of a Flower strategy. This method is the main entry point of any "
@@ -35628,39 +36172,39 @@ msgid ""
 "& Biases and how to save model checkpoints to disk."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:369
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:373
 msgid ""
 "In the next tutorial, you'll communicate additional information between "
 "the ``ClientApp`` and the ``ServerApp`` by serializing it and sending it "
 "in a ``Message``."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:376
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:380
 #: ../../source/tutorial-series-customize-the-client-pytorch.rst:347
-#: ../../source/tutorial-series-get-started-with-flower.rst:144
+#: ../../source/tutorial-series-get-started-with-flower.rst:150
 #: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:425
 #: ../../source/tutorial-series-what-is-federated-learning.rst:364
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:607
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:286
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:294
 msgid ""
 "Before you continue, make sure to join the Flower community on Flower "
 "Discuss (`Join Flower Discuss <https://discuss.flower.ai>`__) and on "
 "Slack (`Join Slack <https://flower.ai/join-slack/>`__)."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:380
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:384
 #: ../../source/tutorial-series-customize-the-client-pytorch.rst:351
-#: ../../source/tutorial-series-get-started-with-flower.rst:148
+#: ../../source/tutorial-series-get-started-with-flower.rst:154
 #: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:429
 #: ../../source/tutorial-series-what-is-federated-learning.rst:368
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:611
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:290
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:298
 msgid ""
 "There's a dedicated ``#questions`` Slack channel if you need help, but "
 "we'd also love to hear who you are in ``#introductions``!"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:383
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:387
 msgid ""
 "The :doc:`Flower Collaborative AI Tutorial - Part 6: Communicate custom "
 "Messages <tutorial-series-customize-the-client-pytorch>` shows how to "
@@ -35949,11 +36493,6 @@ msgid ""
 " already have an account."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:32
-#, fuzzy
-msgid "Create a Federation"
-msgstr "``FLWR_VERSION``"
-
 #: ../../source/tutorial-series-get-started-with-flower.rst:34
 msgid ""
 "On SuperGrid, all collaborative AI workloads happen within a federation "
@@ -35994,21 +36533,29 @@ msgid ""
 "federation``."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:60
+#: ../../source/tutorial-series-get-started-with-flower.rst:62
+msgid ""
+"This tutorial creates a simulation federation. To create a deployment "
+"federation for the Deployment Runtime, manage federation settings, or "
+"invite users to collaborate in a federation, see :doc:`how-to-create-and-"
+"manage-federations`."
+msgstr ""
+
+#: ../../source/tutorial-series-get-started-with-flower.rst:66
 msgid "Federation list showing the newly created federation"
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:65
+#: ../../source/tutorial-series-get-started-with-flower.rst:71
 #, fuzzy
 msgid "You are now the owner of a new federation!"
 msgstr "``FLWR_VERSION``"
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:69
+#: ../../source/tutorial-series-get-started-with-flower.rst:75
 #, fuzzy
 msgid "Run a Flower App"
 msgstr "O nome do repositório da imagem base."
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:71
+#: ../../source/tutorial-series-get-started-with-flower.rst:77
 msgid ""
 "With your federation created, you can now run a Flower App across the "
 "simulated SuperNodes in your federation. First, you need a Flower App. A "
@@ -36019,7 +36566,7 @@ msgid ""
 " collaborative AI workload."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:78
+#: ../../source/tutorial-series-get-started-with-flower.rst:84
 msgid ""
 "`Flower Hub <https://flower.ai/apps/>`__ is a collection of open-source "
 "Flower Apps that you can use and learn from. In this tutorial, you'll use"
@@ -36028,34 +36575,34 @@ msgid ""
 "workload in which the server aggregates NumPy arrays sent by the clients."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:84
+#: ../../source/tutorial-series-get-started-with-flower.rst:90
 #, fuzzy
 msgid "Demo app on Flower Hub"
 msgstr "O nome do repositório da imagem base."
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:89
+#: ../../source/tutorial-series-get-started-with-flower.rst:95
 msgid ""
 "When you click the ``🚀 Run`` button, you'll be asked which federation to "
 "run the app on. Select the federation you just created, then click ``Run "
 "app``."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:92
+#: ../../source/tutorial-series-get-started-with-flower.rst:98
 msgid "Run app dialog in SuperGrid"
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:97
+#: ../../source/tutorial-series-get-started-with-flower.rst:103
 msgid ""
 "Shortly after launching your app, your run will start and you will see "
 "the run details page. This page shows you the progress of your run and "
 "gives you insights into the execution of your app."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:101
+#: ../../source/tutorial-series-get-started-with-flower.rst:107
 msgid "Run details page showing the progress of the app execution"
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:106
+#: ../../source/tutorial-series-get-started-with-flower.rst:112
 msgid ""
 "If you click the ``Logs`` tab, you'll see the logs from the app "
 "execution. This demo app ran for three rounds and sampled all 10 "
@@ -36065,16 +36612,16 @@ msgid ""
 "results from all rounds."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:112
+#: ../../source/tutorial-series-get-started-with-flower.rst:118
 msgid "Logs tab showing logs from the app execution"
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:119
+#: ../../source/tutorial-series-get-started-with-flower.rst:125
 #: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:593
 msgid "Final remarks"
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:121
+#: ../../source/tutorial-series-get-started-with-flower.rst:127
 msgid ""
 "Congratulations, you have successfully run your first Flower App on "
 "SuperGrid! You've taken your first step into the world of collaborative "
@@ -36084,7 +36631,7 @@ msgid ""
 "logs."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:127
+#: ../../source/tutorial-series-get-started-with-flower.rst:133
 msgid ""
 "If you return to the `Federations page "
 "<https://flower.ai/federations/>`__ and click your federation, you'll see"
@@ -36092,18 +36639,18 @@ msgid ""
 "details page you saw right after launching the app."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:131
+#: ../../source/tutorial-series-get-started-with-flower.rst:137
 msgid "Federation details page showing the run that was launched"
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:136
+#: ../../source/tutorial-series-get-started-with-flower.rst:142
 msgid ""
 "In the next tutorial, you'll download an existing Flower App, run it from"
 " your local machine on SuperGrid, make a small customization, and learn "
 "how the main Flower App components fit together."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:151
+#: ../../source/tutorial-series-get-started-with-flower.rst:157
 msgid ""
 "The :doc:`Flower Collaborative AI Tutorial - Part 2: Write your first "
 "Flower App <tutorial-series-write-your-first-flower-app>` will walk you "
@@ -37164,7 +37711,16 @@ msgid ""
 "across a federation of SuperNodes."
 msgstr ""
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:277
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:279
+msgid ""
+"This tutorial runs the app on SuperGrid with simulated SuperNodes. To run"
+" Flower Apps on SuperGrid with the Deployment Runtime instead, create a "
+"deployment federation in the SuperGrid dashboard and connect real "
+"SuperNodes to it. See :doc:`how-to-create-and-manage-federations` and "
+":doc:`how-to-connect-supernodes-to-supergrid`."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:285
 msgid ""
 "In the next tutorial, you will take a look at a more complex Flower App "
 "that uses PyTorch and real training and evaluation logic. You will also "
@@ -37172,7 +37728,7 @@ msgid ""
 " development and debugging before running on SuperGrid."
 msgstr ""
 
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:293
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:301
 msgid ""
 "The :doc:`Flower Collaborative AI Tutorial - Part 3: Write a Flower App "
 "for a PyTorch model <tutorial-series-write-your-first-flower-app-"
@@ -77842,5 +78398,55 @@ msgstr ""
 #~ "pytorch.html>`__ shows how to build a"
 #~ " simple federated learning system with "
 #~ "PyTorch and Flower."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A dictionary that stores basic types "
+#~ "(i.e. `str`, `int`, `float`, `bytes` as"
+#~ " defined in `ConfigsScalar`) and lists "
+#~ "of such types (see `ConfigsScalarList`)."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The usage of a :code:`ConfigRecord` is"
+#~ " envisioned for sending configuration "
+#~ "values telling the target node how "
+#~ "to perform a certain action (e.g. "
+#~ "train/evaluate a model ). You can "
+#~ "use standard Python built-in types "
+#~ "such as :code:`float`, :code:`str` , "
+#~ ":code:`bytes`. All types allowed are "
+#~ "defined in :code:`flwr.common.ConfigRecordValues`. "
+#~ "While lists are supported, we encourage"
+#~ " you to use a :code:`ArrayRecord` "
+#~ "instead if these are of high "
+#~ "dimensionality."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Since types are enforced, the types "
+#~ "of the objects inserted are checked. "
+#~ "For a :code:`MetricRecord`, value types "
+#~ "allowed are those in defined in "
+#~ ":code:`flwr.common.MetricRecordValues`. Similarly, only"
+#~ " :code:`str` keys are allowed::"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Time-to-live for the round trip"
+#~ " of this message, i.e., the time "
+#~ "from sending this message to receiving"
+#~ " a reply. It specifies in seconds "
+#~ "the duration for which the message "
+#~ "and its potential reply are considered"
+#~ " valid. If unset, the default TTL "
+#~ "(i.e., ``common.DEFAULT_TTL``) will be used."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "In this tutorial, you'll use Weights "
+#~ "& Biases to log strategy metrics. "
+#~ "Add ``wandb`` to the dependency list "
+#~ "in ``pyproject.toml``:"
 #~ msgstr ""
 
