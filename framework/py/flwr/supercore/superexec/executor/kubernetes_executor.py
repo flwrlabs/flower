@@ -211,7 +211,9 @@ def _get_appio_root_certificates(
     if config.appio_root_certificates is not None:
         return config.appio_root_certificates
     if spec.root_certificates_path is not None:
-        return Path(spec.root_certificates_path).read_text(encoding="utf-8")
+        return (
+            Path(spec.root_certificates_path).expanduser().read_text(encoding="utf-8")
+        )
     return None
 
 

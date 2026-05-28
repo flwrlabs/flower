@@ -213,6 +213,33 @@ def test_build_taskexecutor_objects_use_execution_spec_root_certificates(
     ]
 
 
+def test_build_taskexecutor_objects_expand_user_root_certificates_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test ExecutionSpec root certificates path supports shell-style home paths."""
+    root_certificates_path = tmp_path / "appio-ca.pem"
+    root_certificates_path.write_text("home-root-ca", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    spec = _execution_spec(root_certificates_path="~/appio-ca.pem")
+    config = _executor_config(appio_root_certificates=None)
+    appio_root_certificates = _appio_root_certificates(spec, config)
+
+    secret = _as_dict(
+        _build_appio_credentials_secret(spec, config, appio_root_certificates)
+    )
+    pod = _as_dict(_build_taskexecutor_pod(spec, config, appio_root_certificates))
+
+    assert secret["stringData"] == {"token": "task-token", "ca.crt": "home-root-ca"}
+    assert pod["spec"]["containers"][0]["args"] == [
+        "--serverappio-api-address",
+        "appio.example.com:9092",
+        "--token-file",
+        APPIO_TOKEN_FILE_PATH,
+        "--root-certificates",
+        APPIO_ROOT_CERTIFICATES_FILE_PATH,
+    ]
+
+
 def test_build_taskexecutor_pod_supports_simulation_args() -> None:
     """Test Pod construction for Simulation launch args."""
     pod = _as_dict(
