@@ -42,7 +42,7 @@ def test_load_nodeapps_from_existing_pyproject_calls_factory(tmp_path: Path) -> 
 
     fake_app = MagicMock(name="app")
     with patch(
-        "flwr.decentralized.superdnode.config.helper." "create_nodeapps_from_pyproject",
+        "flwr.decentralized.superdnode.config.helper." "_create_nodeapps_from_pyproject",
         return_value={"a": fake_app},
     ) as factory:
         out = _load_nodeapps_from_pyproject(cfg)
@@ -74,11 +74,11 @@ def test_run_deploy_registers_loaded_apps_and_runs(tmp_path: Path) -> None:
 
     with (
         patch(
-            "flwr.decentralized.superdnode.cli.flower_super_dnode.get_args_nodes",
+            "flwr.decentralized.superdnode.cli.flower_super_dnode._get_args_nodes",
             return_value=runtime_node,
         ),
         patch(
-            "flwr.decentralized.superdnode.cli.flower_super_dnode.DNode",
+            "flwr.decentralized.superdnode.cli.flower_super_dnode._create_dnode",
             return_value=dnode,
         ),
         patch(
@@ -117,11 +117,11 @@ def test_run_deploy_skips_autoload_when_disabled(tmp_path: Path) -> None:
 
     with (
         patch(
-            "flwr.decentralized.superdnode.cli.flower_super_dnode.get_args_nodes",
+            "flwr.decentralized.superdnode.cli.flower_super_dnode._get_args_nodes",
             return_value=runtime_node,
         ),
         patch(
-            "flwr.decentralized.superdnode.cli.flower_super_dnode.DNode",
+            "flwr.decentralized.superdnode.cli.flower_super_dnode._create_dnode",
             return_value=dnode,
         ),
         patch(
@@ -200,15 +200,15 @@ def test_run_simulation_respects_network_config_mode_override(tmp_path: Path) ->
 
     with (
         patch(
-            "flwr.decentralized.superdnode.cli.flower_super_dnode.build_sim_config",
+            "flwr.decentralized.superdnode.cli.flower_super_dnode._build_sim_config",
             return_value=MagicMock(name="sim_config"),
         ),
         patch(
-            "flwr.decentralized.superdnode.cli.flower_super_dnode.build_sampling_config",
+            "flwr.decentralized.superdnode.cli.flower_super_dnode._build_sampling_config",
             return_value=MagicMock(name="sampling_config"),
         ) as build_sampling,
         patch(
-            "flwr.decentralized.superdnode.cli.flower_super_dnode.run_nodeapp_simulation"
+            "flwr.decentralized.superdnode.cli.flower_super_dnode._run_nodeapp_simulation"
         ),
     ):
         _run_simulation(args)
@@ -216,3 +216,19 @@ def test_run_simulation_respects_network_config_mode_override(tmp_path: Path) ->
     kwargs = build_sampling.call_args.kwargs
     assert kwargs["network_config_mode"] == "csr"
     assert kwargs["attach_sampling_to_csr"] is True
+
+
+def test_run_reports_missing_decentralized_extra() -> None:
+    """Raise a friendly install hint when nodemanager is missing."""
+    with patch(
+        "flwr.decentralized.superdnode.cli.flower_super_dnode._run_simulation",
+        side_effect=ModuleNotFoundError("No module named 'nodemanager'"),
+    ):
+        try:
+            run(["--execution-mode", "simulation"])
+            raised = False
+        except SystemExit as exc:
+            raised = True
+            assert "flwr[decentralized]" in str(exc)
+
+    assert raised

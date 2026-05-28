@@ -19,16 +19,6 @@ import sys
 from typing import Any, Optional, Sequence
 
 from flwr.common.logger import log
-from flwr.decentralized.common.args import (
-    get_args_nodes,
-)
-from flwr.decentralized.node import DNode
-from flwr.decentralized.nodeapp import NodeApp
-from flwr.decentralized.simulation.simulation import (
-    build_sampling_config,
-    build_sim_config,
-    run_nodeapp_simulation,
-)
 from flwr.decentralized.superdnode.config.helper import (
     _apply_simulation_config_overrides,
     _load_nodeapps_from_pyproject,
@@ -37,12 +27,73 @@ from flwr.decentralized.superdnode.config.helper import (
 from flwr.decentralized.superdnode.config.parser import _parse_args_run
 
 
+def _missing_decentralized_dependency(exc: ModuleNotFoundError) -> None:
+    """Raise a friendly error when decentralized extras are missing."""
+    missing_name = exc.name or ""
+    missing_message = str(exc)
+    if (
+        missing_name == "nodemanager"
+        or missing_name.startswith("nodemanager.")
+        or "nodemanager" in missing_message
+    ):
+        raise SystemExit(
+            "Missing optional dependency 'nodemanager' for SuperDNode. "
+            "Install with: pip install \"flwr[decentralized]\""
+        ) from exc
+    raise exc
+
+
+def _get_args_nodes(argv: Sequence[str]) -> Any:
+    """Load and execute decentralized node args parser lazily."""
+    try:
+        from flwr.decentralized.common.args import get_args_nodes
+    except ModuleNotFoundError as exc:
+        _missing_decentralized_dependency(exc)
+    return get_args_nodes(argv)
+
+
+def _create_dnode(**kwargs: Any) -> Any:
+    """Create DNode lazily to avoid eager import of optional dependencies."""
+    try:
+        from flwr.decentralized.node import DNode
+    except ModuleNotFoundError as exc:
+        _missing_decentralized_dependency(exc)
+    return DNode(**kwargs)
+
+
+def _build_sim_config(**kwargs: Any) -> Any:
+    """Build simulation config lazily."""
+    try:
+        from flwr.decentralized.simulation.simulation import build_sim_config
+    except ModuleNotFoundError as exc:
+        _missing_decentralized_dependency(exc)
+    return build_sim_config(**kwargs)
+
+
+def _build_sampling_config(**kwargs: Any) -> Any:
+    """Build sampling config lazily."""
+    try:
+        from flwr.decentralized.simulation.simulation import build_sampling_config
+    except ModuleNotFoundError as exc:
+        _missing_decentralized_dependency(exc)
+    return build_sampling_config(**kwargs)
+
+
+def _run_nodeapp_simulation(**kwargs: Any) -> None:
+    """Run simulation lazily."""
+    try:
+        from flwr.decentralized.simulation.simulation import run_nodeapp_simulation
+    except ModuleNotFoundError as exc:
+        _missing_decentralized_dependency(exc)
+    run_nodeapp_simulation(**kwargs)
+
+
 def _run_deploy(args: argparse.Namespace, argv: Sequence[str]) -> None:
     """Run Super DNode in deployment mode."""
     node_args = _strip_superdnode_only_args(argv)
-    runtime_node = get_args_nodes(node_args)
+    runtime_node = _get_args_nodes(node_args)
 
-    dnode = DNode(**runtime_node.to_dnode_kwargs())
+    dnode = _create_dnode(**runtime_node.to_dnode_kwargs())
     dnode.create_node()
 
     # Parse runtime data_config override from CLI
@@ -63,7 +114,7 @@ def _run_deploy(args: argparse.Namespace, argv: Sequence[str]) -> None:
             )
             raise
 
-    loaded_apps: list[NodeApp] = []
+    loaded_apps: list[Any] = []
     if not args.disable_nodeapps_autoload:
         loaded_apps = _load_nodeapps_from_pyproject(args.nodeapps_pyproject)
         log(
@@ -104,7 +155,7 @@ def _run_deploy(args: argparse.Namespace, argv: Sequence[str]) -> None:
 
 def _run_simulation(args: argparse.Namespace) -> None:
     """Run Super DNode in discrete-event simulation mode."""
-    loaded_apps: list[NodeApp] = []
+    loaded_apps: list[Any] = []
     if not args.disable_nodeapps_autoload:
         loaded_apps = _load_nodeapps_from_pyproject(args.nodeapps_pyproject)
         log(
@@ -119,7 +170,7 @@ def _run_simulation(args: argparse.Namespace) -> None:
     if not loaded_apps:
         log(logging.WARNING, "No NodeApps loaded — simulation will be empty.")
 
-    sim_config = build_sim_config(
+    sim_config = _build_sim_config(
         base_latency_ms=args.base_latency_ms,
         jitter_factor=args.jitter_factor,
         failure_probability=args.failure_probability,
@@ -135,7 +186,7 @@ def _run_simulation(args: argparse.Namespace) -> None:
     network_config_mode = args.network_config_mode or (
         "sampling" if args.enable_sampling else "csr"
     )
-    sampling_config = build_sampling_config(
+    sampling_config = _build_sampling_config(
         network_config_mode=network_config_mode,
         config_file=args.sampling_config_file,
         nb_nodes=args.nb_nodes,
@@ -163,7 +214,7 @@ def _run_simulation(args: argparse.Namespace) -> None:
         attach_sampling_to_csr=(args.enable_sampling and network_config_mode == "csr"),
     )
 
-    run_nodeapp_simulation(
+    _run_nodeapp_simulation(
         nb_nodes=args.nb_nodes,
         apps=loaded_apps,
         config=sim_config,
@@ -182,11 +233,14 @@ def run(argv: Optional[Sequence[str]] = None) -> None:
     raw_argv = list(argv) if argv is not None else sys.argv[1:]
     args = _apply_simulation_config_overrides(parser, args, raw_argv)
 
-    if args.execution_mode == "simulation":
-        _run_simulation(args)
-        return
+    try:
+        if args.execution_mode == "simulation":
+            _run_simulation(args)
+            return
 
-    _run_deploy(args, raw_argv)
+        _run_deploy(args, raw_argv)
+    except ModuleNotFoundError as exc:
+        _missing_decentralized_dependency(exc)
 
 
 def flower_super_dnode() -> None:

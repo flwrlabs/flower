@@ -14,9 +14,17 @@
 # ==============================================================================
 import argparse
 from pathlib import Path
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
-from flwr.decentralized.nodeapp.node_app import NodeApp, create_nodeapps_from_pyproject
+if TYPE_CHECKING:
+    from flwr.decentralized.nodeapp.node_app import NodeApp
+
+
+def _create_nodeapps_from_pyproject(pyproject_path: Path) -> dict[str, "NodeApp"]:
+    """Lazily import and call NodeApp factory from pyproject."""
+    from flwr.decentralized.nodeapp.node_app import create_nodeapps_from_pyproject
+
+    return create_nodeapps_from_pyproject(pyproject_path)
 
 
 def _load_simulation_config_file(path: Path) -> dict[str, Any]:
@@ -296,10 +304,10 @@ def _strip_superdnode_only_args(argv: Sequence[str]) -> list[str]:
     return passthrough
 
 
-def _load_nodeapps_from_pyproject(pyproject_path: Path) -> list[NodeApp]:
+def _load_nodeapps_from_pyproject(pyproject_path: Path) -> list["NodeApp"]:
     """Load NodeApps from pyproject if the file exists, otherwise return empty."""
     if not pyproject_path.exists():
         return []
 
-    apps = create_nodeapps_from_pyproject(pyproject_path)
+    apps = _create_nodeapps_from_pyproject(pyproject_path)
     return list(apps.values())
