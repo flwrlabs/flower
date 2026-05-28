@@ -1,6 +1,6 @@
-:og:description: Run Flower Apps on SuperGrid federations.
+:og:description: Guide for running Flower Apps on Flower SuperGrid Deployment and Simulation federations.
 .. meta::
-    :description: Run Flower Apps on SuperGrid federations.
+    :description: Guide for running Flower Apps on Flower SuperGrid Deployment and Simulation federations.
 
 ##############################
  Run Flower Apps on SuperGrid
@@ -18,7 +18,7 @@ and from a Flower App project on your machine. It uses the `@flwrlabs/quickstart
 workflow applies to other Flower Apps, whether or not they are listed on Flower Hub.
 
 ***************************
- Run directly from the Hub
+ Run Flower Apps from Flower Hub
 ***************************
 
 Running directly from Flower Hub is the quickest way to get started. Open an app page,
@@ -61,7 +61,7 @@ federation.
     :target: ./_static/federation_dashboard_shows_run.png
 
 *******************************
- Run the app from your machine
+ Run Flower apps from your machine
 *******************************
 
 You can also run a Flower App on SuperGrid from your local machine. Use this workflow
