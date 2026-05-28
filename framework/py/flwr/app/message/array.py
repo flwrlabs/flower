@@ -25,6 +25,8 @@ from typing import TYPE_CHECKING, Any, cast, overload
 
 import numpy as np
 
+from flwr.common.constant import FLWR_PRIVATE_MAX_ARRAY_CHUNK_SIZE, SType
+from flwr.common.typing import NDArray
 from flwr.supercore.inflatable.inflatable_object import (
     InflatableObject,
     add_header_to_object_body,
@@ -32,8 +34,6 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_children_ids_from_object_content,
 )
 
-from ..constant import FLWR_PRIVATE_MAX_ARRAY_CHUNK_SIZE, SType
-from ..typing import NDArray
 from .arraychunk import ArrayChunk
 
 if TYPE_CHECKING:

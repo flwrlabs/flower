@@ -21,7 +21,16 @@ from logging import WARNING
 from typing import Any, cast, overload
 
 from flwr.app.constants import DEFAULT_TTL
-from flwr.common.logger import warn_deprecated_feature
+from flwr.app.error import Error
+from flwr.app.metadata import Metadata
+from flwr.common.constant import MESSAGE_TTL_TOLERANCE
+from flwr.common.logger import log, warn_deprecated_feature
+from flwr.common.serde_utils import (
+    error_from_proto,
+    error_to_proto,
+    metadata_from_proto,
+    metadata_to_proto,
+)
 from flwr.proto.message_pb2 import Message as ProtoMessage  # pylint: disable=E0611
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectIDs  # pylint: disable=E0611
@@ -34,17 +43,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_children_ids_from_object_content,
 )
 
-from ..app.error import Error
-from ..app.metadata import Metadata
-from .constant import MESSAGE_TTL_TOLERANCE
-from .logger import log
-from .record import RecordDict
-from .serde_utils import (
-    error_from_proto,
-    error_to_proto,
-    metadata_from_proto,
-    metadata_to_proto,
-)
+from .recorddict import RecordDict
 
 MESSAGE_INIT_ERROR_MESSAGE = (
     "Invalid arguments for Message. Expected one of the documented "
