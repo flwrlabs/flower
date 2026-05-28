@@ -39,8 +39,8 @@ class ModelProviderError(RuntimeError):
     def __init__(
         self,
         *,
-        status_code: int,
         detail: JSONValue,
+        status_code: int | None = None,
         message: str = "Model provider request failed",
     ) -> None:
         """Initialize the provider error."""
@@ -51,7 +51,10 @@ class ModelProviderError(RuntimeError):
             if isinstance(detail, str)
             else json.dumps(detail, separators=(",", ":"))
         )
-        super().__init__(f"{message}: {status_code} {formatted_detail}")
+        if status_code is None:
+            super().__init__(f"{message}: {formatted_detail}")
+        else:
+            super().__init__(f"{message}: {status_code} {formatted_detail}")
 
 
 def invoke_model_provider(
@@ -136,7 +139,7 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
             stream=stream,
         )
     except requests.RequestException as exc:
-        raise RuntimeError(f"Model provider request failed: {exc}") from exc
+        raise ModelProviderError(detail=str(exc)) from exc
 
     if response.status_code >= 400:
         try:
@@ -153,7 +156,10 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
         try:
             payload = response.json()
         except ValueError as exc:
-            raise RuntimeError("Model provider returned invalid JSON.") from exc
+            raise ModelProviderError(
+                detail=response.text or "no response body",
+                message="Model provider returned invalid JSON",
+            ) from exc
         return _ensure_json_object(payload)
 
     # Streaming parsing only works for Server-Sent Event responses.
@@ -174,8 +180,9 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
         try:
             payload = json.loads(data)
         except json.JSONDecodeError as exc:
-            raise RuntimeError(
-                f"Model provider stream returned invalid JSON event: {data}"
+            raise ModelProviderError(
+                detail=data,
+                message="Model provider stream returned invalid JSON event",
             ) from exc
         event = _ensure_json_object(payload)
 
@@ -217,10 +224,9 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
 def _ensure_json_object(payload: object) -> JSONObject:
     if not isinstance(payload, dict):
         detail = cast(JSONValue, payload)
-        if not isinstance(detail, str):
-            detail = json.dumps(detail, separators=(",", ":"))
-        raise RuntimeError(
-            f"Model provider returned a non-object JSON payload: {detail}"
+        raise ModelProviderError(
+            detail=detail,
+            message="Model provider returned a non-object JSON payload",
         )
     return cast(JSONObject, payload)
 
