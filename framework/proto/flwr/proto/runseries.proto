@@ -22,10 +22,9 @@ import "flwr/proto/run.proto";
 message RunSeries {
   uint64 series_id = 1;
   string federation = 2;
-  optional string description = 3;
+  string description = 3;
   string created_at = 4;
   string updated_at = 5;
-  optional uint64 last_run_id = 6;
   RunStatus last_run_status = 7;
   repeated uint64 run_ids = 8;
 }
