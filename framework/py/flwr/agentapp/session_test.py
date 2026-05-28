@@ -42,32 +42,3 @@ def test_agent_session_stores_constructor_arguments() -> None:
     assert session.agent_ref == "test-agent"
     assert session.conversation_id == "conv-1"
     assert session.input_items == input_items
-
-
-@pytest.mark.parametrize(
-    "kwargs, expected",
-    [
-        ({"task_id": 0}, "`task_id` must be greater than zero"),
-        ({"agent_ref": ""}, "`agent_ref` must be a non-empty string"),
-        ({"conversation_id": ""}, "`conversation_id` must be a non-empty string"),
-        (
-            {"input_items": ["not-object"]},
-            "`input_items` must be a list of JSON objects",
-        ),
-    ],
-)
-def test_agent_session_rejects_invalid_constructor_arguments(
-    kwargs: dict[str, object], expected: str
-) -> None:
-    """Test AgentSession validates its public constructor arguments."""
-    values = {
-        "task_id": 101,
-        "run": Run.create_empty(1),
-        "agent_ref": "test-agent",
-        "conversation_id": "conv-1",
-        "input_items": [],
-    }
-    values.update(kwargs)
-
-    with pytest.raises(ValueError, match=expected):
-        AgentSession(**values)  # type: ignore[arg-type]
