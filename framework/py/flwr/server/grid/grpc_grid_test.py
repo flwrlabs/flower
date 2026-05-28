@@ -26,9 +26,9 @@ import grpc
 from parameterized import parameterized
 
 from flwr.app.error import Error
+from flwr.app.message import Message
 from flwr.common import RecordDict
 from flwr.common.constant import SUPERLINK_NODE_ID, ErrorCode
-from flwr.common.message import Message
 from flwr.common.serde import message_to_proto
 from flwr.common.typing import Run
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611

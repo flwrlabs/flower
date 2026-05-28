@@ -53,14 +53,6 @@ Value = (
 )
 
 
-# Value types for common.MetricRecord
-MetricScalar = int | float
-MetricScalarList = list[int] | list[float]
-MetricRecordValues = MetricScalar | MetricScalarList
-# Value types for common.ConfigRecord
-ConfigScalar = MetricScalar | str | bytes | bool
-ConfigScalarList = MetricScalarList | list[str] | list[bytes] | list[bool]
-ConfigRecordValues = ConfigScalar | ConfigScalarList
 Metrics = dict[str, Scalar]
 MetricsAggregationFn = Callable[[list[tuple[int, Metrics]]], Metrics]
 

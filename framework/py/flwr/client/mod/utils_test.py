@@ -18,6 +18,7 @@
 import unittest
 from typing import cast
 
+from flwr.app.message import make_message
 from flwr.client.typing import ClientAppCallable, Mod
 from flwr.common import (
     DEFAULT_TTL,
@@ -29,7 +30,6 @@ from flwr.common import (
     RecordDict,
     now,
 )
-from flwr.common.message import make_message
 
 from .utils import make_ffn
 

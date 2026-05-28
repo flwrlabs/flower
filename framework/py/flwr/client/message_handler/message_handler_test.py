@@ -17,6 +17,7 @@
 
 import uuid
 
+from flwr.app.message import make_message
 from flwr.client import Client
 from flwr.client.typing import ClientFnExt
 from flwr.common import (
@@ -40,7 +41,6 @@ from flwr.common import (
 from flwr.common import recorddict_compat as compat
 from flwr.common import typing
 from flwr.common.constant import MessageTypeLegacy
-from flwr.common.message import make_message
 
 from .message_handler import handle_legacy_message_from_msgtype
 

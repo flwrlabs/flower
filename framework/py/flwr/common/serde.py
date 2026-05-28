@@ -17,6 +17,17 @@
 
 from typing import Any, cast
 
+from flwr.app.message import (
+    Array,
+    ArrayRecord,
+    ConfigRecord,
+    Context,
+    Message,
+    MetricRecord,
+    RecordDict,
+    make_message,
+)
+from flwr.app.typing import ConfigRecordValues, MetricRecordValues
 from flwr.app.user_config import UserConfig, UserConfigValue
 
 # pylint: disable=E0611
@@ -43,17 +54,8 @@ from flwr.proto.transport_pb2 import (
 )
 
 # pylint: enable=E0611
-from . import (
-    Array,
-    ArrayRecord,
-    ConfigRecord,
-    Context,
-    MetricRecord,
-    RecordDict,
-    typing,
-)
+from . import typing
 from .constant import INT64_MAX_VALUE
-from .message import Message, make_message
 from .serde_utils import (
     error_from_proto,
     error_to_proto,
@@ -431,7 +433,7 @@ def metric_record_from_proto(record_proto: ProtoMetricRecord) -> MetricRecord:
     protos = {item.key: item.value for item in record_proto.items}
     return MetricRecord(
         metric_dict=cast(
-            dict[str, typing.MetricRecordValues],
+            dict[str, MetricRecordValues],
             record_value_dict_from_proto(protos),
         ),
         keep_input=False,
@@ -455,7 +457,7 @@ def config_record_from_proto(record_proto: ProtoConfigRecord) -> ConfigRecord:
     protos = {item.key: item.value for item in record_proto.items}
     return ConfigRecord(
         config_dict=cast(
-            dict[str, typing.ConfigRecordValues],
+            dict[str, ConfigRecordValues],
             record_value_dict_from_proto(protos),
         ),
         keep_input=False,
