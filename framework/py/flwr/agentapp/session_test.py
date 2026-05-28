@@ -19,8 +19,9 @@ from __future__ import annotations
 
 import pytest
 
-from flwr.agentapp import AgentSession, JSONObject
+from flwr.agentapp import AgentSession
 from flwr.common.typing import Run
+from flwr.supercore.typing import JSONObject
 
 
 def test_agent_session_stores_constructor_arguments() -> None:

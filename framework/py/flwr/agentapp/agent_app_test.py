@@ -23,8 +23,9 @@ from unittest.mock import Mock
 import pytest
 
 import flwr
-from flwr.agentapp import AgentApp, AgentSession, JSONObject
+from flwr.agentapp import AgentApp, AgentSession
 from flwr.common import Context, RecordDict
+from flwr.supercore.typing import JSONObject
 
 
 def test_agentapp_public_import_path() -> None:

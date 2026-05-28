@@ -18,8 +18,7 @@
 from __future__ import annotations
 
 from flwr.common.typing import Run
-
-from .typing import JSONObject
+from flwr.supercore.typing import JSONObject
 
 
 class AgentSession:
