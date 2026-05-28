@@ -26,7 +26,7 @@ from threading import Lock
 from typing import Literal, cast
 
 from flwr.app.message import Message
-from flwr.common import now
+from flwr.common import Context, now
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -41,7 +41,7 @@ from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import generate_rand_int_from_bytes, validate_task_message
+from .utils import clone_context, generate_rand_int_from_bytes, validate_task_message
 
 
 @dataclass
@@ -61,6 +61,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.lock_fab_store = Lock()
         self.nonce_store: dict[tuple[str, str], float] = {}
         self.lock_nonce_store = Lock()
+        self.run_series_context_store: dict[int, Context] = {}
+        self.lock_run_series_context_store = Lock()
         self.task_store: dict[int, Task] = {}
         # Store task ID to token mapping
         self.task_token_store: dict[int, TokenRecord] = {}
@@ -106,6 +108,21 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 content=fab.content,
                 verifications=dict(fab.verifications),
             )
+
+    def get_run_series_context(self, series_id: int) -> Context | None:
+        """Return the shared Context for the specified RunSeries, if present."""
+        with self.lock_run_series_context_store:
+            context = self.run_series_context_store.get(series_id)
+            if context is None:
+                return None
+            return clone_context(context)
+
+    def set_run_series_context(self, series_id: int, context: Context) -> None:
+        """Set the shared Context for the specified RunSeries."""
+        if series_id == 0:
+            raise ValueError("RunSeries ID must be non-zero")
+        with self.lock_run_series_context_store:
+            self.run_series_context_store[series_id] = clone_context(context)
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""

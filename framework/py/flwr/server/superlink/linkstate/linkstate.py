@@ -17,7 +17,6 @@
 
 import abc
 from collections.abc import Sequence
-from dataclasses import dataclass
 from typing import Literal
 
 from flwr.app.user_config import UserConfig
@@ -27,26 +26,6 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
 from flwr.superlink.federation import FederationManager
-
-
-@dataclass(frozen=True)
-class RunSeriesSummary:
-    """RunSeries metadata without shared context payload."""
-
-    series_id: int
-    federation: str
-    description: str
-    created_at: str
-    updated_at: str
-    last_run_status: RunStatus
-    run_ids: list[int]
-
-
-@dataclass(frozen=True)
-class RunSeries(RunSeriesSummary):
-    """RunSeries metadata and optional shared context."""
-
-    context: Context | None = None
 
 
 class LinkState(CoreState):  # pylint: disable=R0904
@@ -438,48 +417,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         context : Context
             The context to be associated with the specified `run_id`.
         """
-
-    @abc.abstractmethod
-    def ensure_run_series(
-        self,
-        *,
-        series_id: int,
-        federation: str,
-        run_id: int | None = None,
-        description: str | None = None,
-        context: Context | None = None,
-    ) -> bool:
-        """Create or resolve a RunSeries and optionally associate a run.
-
-        Existing series must belong to the same federation. If `run_id` is provided,
-        the run must exist, belong to the same federation, and not already be
-        associated with another series.
-        """
-
-    @abc.abstractmethod
-    def get_run_series_for_run(self, *, run_id: int) -> RunSeries | None:
-        """Return the RunSeries associated with the specified run, if any."""
-
-    @abc.abstractmethod
-    def set_run_series_context_for_run(self, *, run_id: int, context: Context) -> None:
-        """Persist shared RunSeries context for the specified associated run."""
-
-    @abc.abstractmethod
-    def list_run_series(
-        self,
-        *,
-        after_series_id: int | None = None,
-        limit: int | None = None,
-    ) -> Sequence[RunSeriesSummary]:
-        """Return RunSeries summaries ordered by `series_id`."""
-
-    @abc.abstractmethod
-    def get_run_series(self, *, series_id: int) -> RunSeries | None:
-        """Return the RunSeries with shared context, if present."""
-
-    @abc.abstractmethod
-    def delete_run_series(self, *, series_id: int) -> bool:
-        """Delete RunSeries metadata and context without deleting associated runs."""
 
     @abc.abstractmethod
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:

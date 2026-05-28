@@ -27,7 +27,7 @@ from sqlalchemy.exc import IntegrityError
 
 from flwr.app.message import make_message
 from flwr.app.metadata import Metadata
-from flwr.common import Message, now
+from flwr.common import Context, Message, now
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -51,7 +51,13 @@ from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import generate_rand_int_from_bytes, timestamp_to_iso, validate_task_message
+from .utils import (
+    context_from_bytes,
+    context_to_bytes,
+    generate_rand_int_from_bytes,
+    timestamp_to_iso,
+    validate_task_message,
+)
 
 # Define SQL conditions for task statuses to ensure consistency across queries
 STATUS_CONDITIONS = {
@@ -122,6 +128,67 @@ class SqlCoreState(CoreState, SqlMixin):
             content=row["content"],
             verifications=json.loads(row["verifications"]),
         )
+
+    def get_run_series_context(self, series_id: int) -> Context | None:
+        """Return the shared Context for the specified RunSeries, if present."""
+        if series_id == 0:
+            return None
+        rows = self.query(
+            """
+            SELECT context
+            FROM series_context
+            WHERE series_id = :series_id
+            """,
+            {"series_id": uint64_to_int64(series_id)},
+        )
+        if not rows or rows[0]["context"] is None:
+            return None
+        return context_from_bytes(rows[0]["context"])
+
+    def set_run_series_context(self, series_id: int, context: Context) -> None:
+        """Set the shared Context for the specified RunSeries."""
+        if series_id == 0:
+            raise ValueError("RunSeries ID must be non-zero")
+
+        sint_series_id = uint64_to_int64(series_id)
+        context_bytes = context_to_bytes(context)
+        with self.session():
+            if not self.query(
+                """
+                SELECT series_id
+                FROM run_series
+                WHERE series_id = :series_id
+                """,
+                {"series_id": sint_series_id},
+            ):
+                raise ValueError(f"RunSeries {series_id} not found")
+
+            rows = self.query(
+                """
+                SELECT COUNT(*) AS count
+                FROM series_context
+                WHERE series_id = :series_id
+                """,
+                {"series_id": sint_series_id},
+            )
+            if rows[0]["count"] > 0:
+                self.query(
+                    """
+                    UPDATE series_context
+                    SET context = :context
+                    WHERE series_id = :series_id
+                    """,
+                    {"series_id": sint_series_id, "context": context_bytes},
+                )
+                return
+
+            self.query(
+                """
+                INSERT INTO series_context (series_id, context)
+                VALUES (:series_id, :context)
+                """,
+                {"series_id": sint_series_id, "context": context_bytes},
+            )
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""

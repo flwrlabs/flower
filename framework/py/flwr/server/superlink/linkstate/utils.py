@@ -18,16 +18,17 @@
 from typing import Any
 
 from flwr.app.message import make_message
-from flwr.common import Context, Error, Message, Metadata, now, serde
+from flwr.common import Error, Message, Metadata, now
 from flwr.common.constant import HEARTBEAT_PATIENCE, SUPERLINK_NODE_ID, ErrorCode
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
 
 # pylint: disable=E0611
 from flwr.proto.error_pb2 import Error as ProtoError
-from flwr.proto.message_pb2 import Context as ProtoContext
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE, RunType, TaskType
+from flwr.supercore.corestate.utils import context_from_bytes as context_from_bytes
+from flwr.supercore.corestate.utils import context_to_bytes as context_to_bytes
 from flwr.supercore.corestate.utils import (
     generate_rand_int_from_bytes as corestate_generate_rand_int_from_bytes,
 )
@@ -96,36 +97,6 @@ def convert_sint64_values_in_dict_to_uint64(
     for key in keys:
         if key in data_dict:
             data_dict[key] = int64_to_uint64(data_dict[key])
-
-
-def context_to_bytes(context: Context) -> bytes:
-    """Serialize `Context` to bytes."""
-    return serde.context_to_proto(context).SerializeToString()
-
-
-def context_from_bytes(context_bytes: bytes) -> Context:
-    """Deserialize `Context` from bytes."""
-    return serde.context_from_proto(ProtoContext.FromString(context_bytes))
-
-
-def clone_context(context: Context) -> Context:
-    """Return a serialized copy of a `Context`."""
-    return context_from_bytes(context_to_bytes(context))
-
-
-def context_matches_run_series(context: Context, run_id: int, series_id: int) -> bool:
-    """Return True if `context` belongs to the given run and RunSeries."""
-    return context.run_id == run_id and context.series_id in (0, series_id)
-
-
-def materialize_run_series_context(
-    context: Context, *, run_id: int, series_id: int
-) -> Context:
-    """Return a copy of shared RunSeries context for the specified run."""
-    materialized = clone_context(context)
-    materialized.run_id = run_id
-    materialized.series_id = series_id
-    return materialized
 
 
 def create_message_error_unavailable_res_message(

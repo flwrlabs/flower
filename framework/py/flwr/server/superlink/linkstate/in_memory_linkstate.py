@@ -39,11 +39,7 @@ from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
-from flwr.server.superlink.linkstate.linkstate import (
-    LinkState,
-    RunSeries,
-    RunSeriesSummary,
-)
+from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.utils import validate_message
 from flwr.supercore.constant import NodeStatus
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
@@ -52,10 +48,7 @@ from flwr.superlink.federation import FederationManager
 
 from .utils import (
     check_node_availability_for_in_message,
-    clone_context,
-    context_matches_run_series,
     generate_rand_int_from_bytes,
-    materialize_run_series_context,
     primary_task_type_from_run_type,
     verify_found_message_replies,
     verify_message_ids,
@@ -74,19 +67,6 @@ class RunRecord:  # pylint: disable=R0902
     lock: threading.RLock = field(default_factory=threading.RLock)
 
 
-@dataclass
-class RunSeriesRecord:
-    """Stored RunSeries metadata and shared context."""
-
-    series_id: int
-    federation: str
-    description: str
-    created_at: str
-    updated_at: str
-    last_run_id: int | None = None
-    context: Context | None = None
-
-
 class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,R0904
     """In-memory LinkState implementation."""
 
@@ -103,7 +83,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         # Map run_id to RunRecord
         self.run_ids: dict[int, RunRecord] = {}
         self.contexts: dict[int, Context] = {}
-        self.run_series: dict[int, RunSeriesRecord] = {}
         self.message_ins_store: dict[str, Message] = {}
         self.message_res_store: dict[str, Message] = {}
         self.message_ins_id_to_message_res_id: dict[str, str] = {}
@@ -149,56 +128,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
     def _is_finished_run(self, run_id: int) -> bool:
         """Return True if the run has finished."""
         return self._get_run(run_id).status.status == Status.FINISHED
-
-    def _run_series_from_record(
-        self, record: RunSeriesRecord, *, run_id: int | None = None
-    ) -> RunSeries:
-        """Return a RunSeries domain object for the stored record."""
-        run_ids = sorted(
-            stored_run_id
-            for stored_run_id, run_record in self.run_ids.items()
-            if run_record.run.series_id == record.series_id
-        )
-        last_run_status = RunStatus(status="", sub_status="", details="")
-        if record.last_run_id is not None and record.last_run_id in self.run_ids:
-            last_run_status = self._get_run(record.last_run_id).status
-
-        context = None
-        if record.context is not None:
-            if run_id is None:
-                context = clone_context(record.context)
-            else:
-                context = materialize_run_series_context(
-                    record.context,
-                    run_id=run_id,
-                    series_id=record.series_id,
-                )
-
-        return RunSeries(
-            series_id=record.series_id,
-            federation=record.federation,
-            description=record.description,
-            created_at=record.created_at,
-            updated_at=record.updated_at,
-            last_run_status=last_run_status,
-            run_ids=run_ids,
-            context=context,
-        )
-
-    def _run_series_summary_from_record(
-        self, record: RunSeriesRecord
-    ) -> RunSeriesSummary:
-        """Return a RunSeries summary for the stored record."""
-        series = self._run_series_from_record(record)
-        return RunSeriesSummary(
-            series_id=series.series_id,
-            federation=series.federation,
-            description=series.description,
-            created_at=series.created_at,
-            updated_at=series.updated_at,
-            last_run_status=series.last_run_status,
-            run_ids=series.run_ids,
-        )
 
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
@@ -880,149 +809,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             if run_id not in self.run_ids:
                 raise ValueError(f"Run {run_id} not found")
             self.contexts[run_id] = context
-
-    def ensure_run_series(
-        self,
-        *,
-        series_id: int,
-        federation: str,
-        run_id: int | None = None,
-        description: str | None = None,
-        context: Context | None = None,
-    ) -> bool:
-        """Create or resolve a RunSeries and optionally associate a run."""
-        if series_id == 0:
-            return False
-        if context is not None and run_id is None:
-            return False
-
-        with self.lock:
-            run_record = None
-            if run_id is not None:
-                run_record = self.run_ids.get(run_id)
-                if run_record is None:
-                    return False
-                if run_record.run.federation != federation:
-                    return False
-                if run_record.run.series_id not in (0, series_id):
-                    return False
-                if context is not None and not context_matches_run_series(
-                    context, run_id, series_id
-                ):
-                    return False
-
-            current = now().isoformat()
-            record = self.run_series.get(series_id)
-            if record is None:
-                record = RunSeriesRecord(
-                    series_id=series_id,
-                    federation=federation,
-                    description=description or "",
-                    created_at=current,
-                    updated_at=current,
-                )
-                self.run_series[series_id] = record
-            elif record.federation != federation:
-                return False
-            elif description is not None and record.description != description:
-                record.description = description
-                record.updated_at = current
-
-            if run_record is not None:
-                run_record.run.series_id = series_id
-                record.last_run_id = run_id
-                record.updated_at = current
-
-            if context is not None:
-                assert run_id is not None
-                record.context = materialize_run_series_context(
-                    context,
-                    run_id=run_id,
-                    series_id=series_id,
-                )
-                record.updated_at = current
-
-            return True
-
-    def get_run_series_for_run(self, *, run_id: int) -> RunSeries | None:
-        """Return the RunSeries associated with the specified run, if any."""
-        with self.lock_task_store:
-            self._cleanup_expired_task_tokens_locked()
-
-        with self.lock:
-            run_record = self.run_ids.get(run_id)
-            if run_record is None or run_record.run.series_id == 0:
-                return None
-            record = self.run_series.get(run_record.run.series_id)
-            if record is None:
-                return None
-            return self._run_series_from_record(record, run_id=run_id)
-
-    def set_run_series_context_for_run(self, *, run_id: int, context: Context) -> None:
-        """Persist shared RunSeries context for the specified associated run."""
-        with self.lock:
-            run_record = self.run_ids.get(run_id)
-            if run_record is None:
-                raise ValueError(f"Run {run_id} not found")
-            series_id = run_record.run.series_id
-            if series_id == 0 or series_id not in self.run_series:
-                raise ValueError(f"Run {run_id} is not associated with a RunSeries")
-            if not context_matches_run_series(context, run_id, series_id):
-                raise ValueError(f"Context does not belong to run {run_id}")
-
-            record = self.run_series[series_id]
-            record.context = materialize_run_series_context(
-                context,
-                run_id=run_id,
-                series_id=series_id,
-            )
-            record.last_run_id = run_id
-            record.updated_at = now().isoformat()
-
-    def list_run_series(
-        self,
-        *,
-        after_series_id: int | None = None,
-        limit: int | None = None,
-    ) -> Sequence[RunSeriesSummary]:
-        """Return RunSeries summaries ordered by `series_id`."""
-        if limit is not None and limit < 0:
-            raise AssertionError("`limit` must be >= 0")
-        if limit == 0:
-            return []
-
-        with self.lock_task_store:
-            self._cleanup_expired_task_tokens_locked()
-
-        with self.lock:
-            records = [
-                record
-                for series_id, record in self.run_series.items()
-                if after_series_id is None or series_id > after_series_id
-            ]
-            records.sort(key=lambda record: record.series_id)
-            if limit is not None:
-                records = records[:limit]
-            return [self._run_series_summary_from_record(record) for record in records]
-
-    def get_run_series(self, *, series_id: int) -> RunSeries | None:
-        """Return the RunSeries with shared context, if present."""
-        with self.lock_task_store:
-            self._cleanup_expired_task_tokens_locked()
-
-        with self.lock:
-            record = self.run_series.get(series_id)
-            if record is None:
-                return None
-            return self._run_series_from_record(record)
-
-    def delete_run_series(self, *, series_id: int) -> bool:
-        """Delete RunSeries metadata and context without deleting associated runs."""
-        with self.lock:
-            if series_id not in self.run_series:
-                return False
-            del self.run_series[series_id]
-            return True
 
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`."""
