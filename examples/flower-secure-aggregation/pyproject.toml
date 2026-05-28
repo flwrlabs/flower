@@ -37,6 +37,6 @@ batch-size = 32
 num-shares = 3
 reconstruction-threshold = 2
 max-weight = 9000
-timeout = 15.0
+timeout = 120.0
 # Demo flag
 is-demo = true
