@@ -41,7 +41,7 @@ NODEAPPS_PYPROJECT="$EXAMPLE_ROOT/pyproject.toml"
 if [[ -n "${SUPER_DNODE_CMD:-}" ]]; then
   read -r -a SUPER_DNODE_CMD_ARR <<< "${SUPER_DNODE_CMD}"
 elif command -v flower-super-dnode >/dev/null 2>&1; then
-  SUPER_DNODE_CMD_ARR=(flower-super-dnode run)
+  SUPER_DNODE_CMD_ARR=(flower-super-dnode)
 else
   PYTHON_BIN="${PYTHON_BIN:-python3}"
   if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
