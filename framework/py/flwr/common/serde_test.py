@@ -458,7 +458,7 @@ def test_context_serialization_deserialization() -> None:
         node_config=maker.user_config(),
         state=maker.recorddict(1, 1, 1),
         run_config=maker.user_config(),
-        series_id="series-123",
+        series_id=123,
     )
 
     # Execute
@@ -492,7 +492,7 @@ def test_run_serialization_deserialization() -> None:
         bytes_recv=1024,
         clientapp_runtime=3.14,
         run_type=RunType.SIMULATION,
-        series_id="series-123",
+        series_id=123,
     )
 
     # Execute

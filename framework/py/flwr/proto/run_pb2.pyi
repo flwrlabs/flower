@@ -84,7 +84,7 @@ class Run(google.protobuf.message.Message):
     clientapp_runtime: builtins.float
     run_type: builtins.str
     primary_task_id: builtins.int
-    series_id: builtins.str
+    series_id: builtins.int
     @property
     def override_config(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, flwr.proto.transport_pb2.Scalar]: ...
     @property
@@ -109,7 +109,7 @@ class Run(google.protobuf.message.Message):
         clientapp_runtime: builtins.float = ...,
         run_type: builtins.str = ...,
         primary_task_id: builtins.int | None = ...,
-        series_id: builtins.str | None = ...,
+        series_id: builtins.int | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["_primary_task_id", b"_primary_task_id", "_series_id", b"_series_id", "primary_task_id", b"primary_task_id", "series_id", b"series_id", "status", b"status"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing.Literal["_primary_task_id", b"_primary_task_id", "_series_id", b"_series_id", "bytes_recv", b"bytes_recv", "bytes_sent", b"bytes_sent", "clientapp_runtime", b"clientapp_runtime", "fab_hash", b"fab_hash", "fab_id", b"fab_id", "fab_version", b"fab_version", "federation", b"federation", "finished_at", b"finished_at", "flwr_aid", b"flwr_aid", "override_config", b"override_config", "pending_at", b"pending_at", "primary_task_id", b"primary_task_id", "run_id", b"run_id", "run_type", b"run_type", "running_at", b"running_at", "series_id", b"series_id", "starting_at", b"starting_at", "status", b"status"]) -> None: ...

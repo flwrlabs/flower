@@ -64,11 +64,6 @@ class ControlStub(object):
                 request_serializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesRequest.SerializeToString,
                 response_deserializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesResponse.FromString,
                 _registered_method=True)
-        self.DeleteRunSeries = channel.unary_unary(
-                '/flwr.proto.Control/DeleteRunSeries',
-                request_serializer=flwr_dot_proto_dot_control__pb2.DeleteRunSeriesRequest.SerializeToString,
-                response_deserializer=flwr_dot_proto_dot_control__pb2.DeleteRunSeriesResponse.FromString,
-                _registered_method=True)
         self.GetLoginDetails = channel.unary_unary(
                 '/flwr.proto.Control/GetLoginDetails',
                 request_serializer=flwr_dot_proto_dot_control__pb2.GetLoginDetailsRequest.SerializeToString,
@@ -211,13 +206,6 @@ class ControlServicer(object):
 
     def GetRunSeries(self, request, context):
         """Get run series
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def DeleteRunSeries(self, request, context):
-        """Delete run series
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -399,11 +387,6 @@ def add_ControlServicer_to_server(servicer, server):
                     servicer.GetRunSeries,
                     request_deserializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesRequest.FromString,
                     response_serializer=flwr_dot_proto_dot_control__pb2.GetRunSeriesResponse.SerializeToString,
-            ),
-            'DeleteRunSeries': grpc.unary_unary_rpc_method_handler(
-                    servicer.DeleteRunSeries,
-                    request_deserializer=flwr_dot_proto_dot_control__pb2.DeleteRunSeriesRequest.FromString,
-                    response_serializer=flwr_dot_proto_dot_control__pb2.DeleteRunSeriesResponse.SerializeToString,
             ),
             'GetLoginDetails': grpc.unary_unary_rpc_method_handler(
                     servicer.GetLoginDetails,
@@ -668,33 +651,6 @@ class Control(object):
             '/flwr.proto.Control/GetRunSeries',
             flwr_dot_proto_dot_control__pb2.GetRunSeriesRequest.SerializeToString,
             flwr_dot_proto_dot_control__pb2.GetRunSeriesResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def DeleteRunSeries(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/flwr.proto.Control/DeleteRunSeries',
-            flwr_dot_proto_dot_control__pb2.DeleteRunSeriesRequest.SerializeToString,
-            flwr_dot_proto_dot_control__pb2.DeleteRunSeriesResponse.FromString,
             options,
             channel_credentials,
             insecure,

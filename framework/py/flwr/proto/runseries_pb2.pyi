@@ -39,7 +39,7 @@ class RunSeries(google.protobuf.message.Message):
     LAST_RUN_ID_FIELD_NUMBER: builtins.int
     LAST_RUN_STATUS_FIELD_NUMBER: builtins.int
     RUN_IDS_FIELD_NUMBER: builtins.int
-    series_id: builtins.str
+    series_id: builtins.int
     federation: builtins.str
     description: builtins.str
     created_at: builtins.str
@@ -52,7 +52,7 @@ class RunSeries(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        series_id: builtins.str = ...,
+        series_id: builtins.int = ...,
         federation: builtins.str = ...,
         description: builtins.str | None = ...,
         created_at: builtins.str = ...,

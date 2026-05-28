@@ -69,12 +69,6 @@ class ControlStub:
     ]
     """Get run series"""
 
-    DeleteRunSeries: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.control_pb2.DeleteRunSeriesRequest,
-        flwr.proto.control_pb2.DeleteRunSeriesResponse,
-    ]
-    """Delete run series"""
-
     GetLoginDetails: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.GetLoginDetailsRequest,
         flwr.proto.control_pb2.GetLoginDetailsResponse,
@@ -236,12 +230,6 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.GetRunSeriesResponse,
     ]
     """Get run series"""
-
-    DeleteRunSeries: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.control_pb2.DeleteRunSeriesRequest,
-        flwr.proto.control_pb2.DeleteRunSeriesResponse,
-    ]
-    """Delete run series"""
 
     GetLoginDetails: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.GetLoginDetailsRequest,
@@ -416,14 +404,6 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.GetRunSeriesResponse, collections.abc.Awaitable[flwr.proto.control_pb2.GetRunSeriesResponse]]:
         """Get run series"""
-
-    @abc.abstractmethod
-    def DeleteRunSeries(
-        self,
-        request: flwr.proto.control_pb2.DeleteRunSeriesRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.control_pb2.DeleteRunSeriesResponse, collections.abc.Awaitable[flwr.proto.control_pb2.DeleteRunSeriesResponse]]:
-        """Delete run series"""
 
     @abc.abstractmethod
     def GetLoginDetails(
