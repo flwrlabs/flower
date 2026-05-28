@@ -1,6 +1,6 @@
 # Data Config Injection via CLI
 
-**New Feature**: Inject `data_config` (partition-id, num-partitions) at runtime via the `--node-data-config-json` CLI flag to `flower-super-dnode run`.
+**New Feature**: Inject `data_config` (partition-id, num-partitions) at runtime via the `--node-data-config-json` CLI flag to `flower-super-dnode`.
 
 ## Motivation
 
@@ -43,7 +43,7 @@ Now you can:
 
 ```bash
 # Start one node as partition 2 out of 10
-flower-super-dnode run \
+flower-super-dnode \
   --config configs/node_dynamic.yaml \
   --nodeapps-pyproject pyproject.toml \
   --port 9100 \

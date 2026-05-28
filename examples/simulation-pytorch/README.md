@@ -137,12 +137,11 @@ python -m simulation_pytorch.run \
   --sampling-algorithm basalt \
   --sampling-refresh 1
 ```
-```
 
 ## Run (direct CLI)
 
 ```bash
-flower-super-dnode run \
+flower-super-dnode \
   --execution-mode simulation \
   --nodeapps-pyproject pyproject.toml \
   --nb-nodes 4 \

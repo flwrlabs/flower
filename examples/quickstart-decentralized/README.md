@@ -12,7 +12,7 @@ This example shows three ways to launch a Flower decentralized node (`DNode`):
 
 ## NodeApp autoload from `pyproject.toml`
 
-When you start `flower-super-dnode run` in this folder, NodeApps are auto-loaded
+When you start `flower-super-dnode` in this folder, NodeApps are auto-loaded
 from `pyproject.toml` using `[tool.flwr.app.components]`.
 
 This quickstart defines two subjects:
@@ -85,7 +85,7 @@ def evaluate_app2(message: Message, context: Context) -> Message:
 Disable autoload if needed:
 
 ```bash
-flower-super-dnode run --config configs/node_dynamic.yaml --disable-nodeapps-autoload
+flower-super-dnode --config configs/node_dynamic.yaml --disable-nodeapps-autoload
 ```
 
 ---
