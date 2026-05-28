@@ -30,5 +30,5 @@ run-static      = "quickstart_decentralized.run_static:main"
 run-programmatic = "quickstart_decentralized.run_programmatic:main"
 
 [tool.flwr.app.components]
-nodeapp1 = "quickstart_decentralized.node_apps_pytorch:app1"
-nodeapp = "quickstart_decentralized.node_apps:app2"
+nodeapp1 = "quickstart_decentralized.node_apps:app1"
+nodeapp2 = "quickstart_decentralized.node_apps:app2"
