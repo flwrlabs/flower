@@ -22,7 +22,7 @@ import pytest
 
 from flwr.common import Context, RecordDict
 from flwr.server import ServerApp, ServerConfig
-from flwr.server.grid import Grid
+from flwr.serverapp.grid import Grid
 
 
 def test_server_app_custom_mode() -> None:
