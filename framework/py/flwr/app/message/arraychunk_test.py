@@ -17,7 +17,7 @@
 
 import pytest
 
-from .arraychunk import ArrayChunk
+from flwr.app.message.arraychunk import ArrayChunk
 
 
 def test_deflate_inflate() -> None:

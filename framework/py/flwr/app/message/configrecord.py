@@ -17,10 +17,13 @@
 
 from __future__ import annotations
 
-from logging import WARN
 from typing import cast, get_args
 
 from flwr.app.typing import ConfigRecordValues, ConfigScalar
+from flwr.common.serde_utils import (
+    record_value_dict_from_proto,
+    record_value_dict_to_proto,
+)
 
 # pylint: disable=E0611
 from flwr.proto.recorddict_pb2 import ConfigRecord as ProtoConfigRecord
@@ -33,8 +36,6 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_body,
 )
 
-from ..logger import log
-from ..serde_utils import record_value_dict_from_proto, record_value_dict_to_proto
 from .typeddict import TypedDict
 
 
@@ -79,8 +80,8 @@ class ConfigRecord(TypedDict[str, ConfigRecordValues], InflatableObject):
     A :code:`ConfigRecord` is a Python dictionary designed to ensure that
     each key-value pair adheres to specified data types. A :code:`ConfigRecord`
     is one of the types of records that a
-    `flwr.common.RecordDict <flwr.common.RecordDict.html#recorddict>`_ supports and
-    can therefore be used to construct :code:`common.Message` objects.
+    `flwr.app.RecordDict <flwr.app.RecordDict.html#recorddict>`_
+    supports and can therefore be used to construct :code:`app.Message` objects.
 
     Parameters
     ----------
@@ -106,7 +107,7 @@ class ConfigRecord(TypedDict[str, ConfigRecordValues], InflatableObject):
 
     Let's see some examples of how to construct a :code:`ConfigRecord` from scratch::
 
-        from flwr.common import ConfigRecord
+        from flwr.app import ConfigRecord
 
         # A `ConfigRecord` is a specialized Python dictionary
         record = ConfigRecord({"lr": 0.1, "batch-size": 128})
@@ -117,8 +118,9 @@ class ConfigRecord(TypedDict[str, ConfigRecordValues], InflatableObject):
         # And string values (among other types)
         record["path-to-S3"] = "s3://bucket_name/folder1/fileA.json"
 
-    Just like the other types of records in a :code:`flwr.common.RecordDict`, types are
-    enforced. If you need to add a custom data structure or object, we recommend to
+    Just like the other types of records in a :code:`flwr.app.RecordDict`,
+    types are enforced. If you need to add a custom data structure or object, we
+    recommend to
     serialise it into bytes and save it as such (bytes are allowed in a
     :code:`ConfigRecord`)
     """
@@ -223,47 +225,3 @@ class ConfigRecord(TypedDict[str, ConfigRecordValues], InflatableObject):
             ),
             keep_input=False,
         )
-
-
-class ConfigsRecord(ConfigRecord):
-    """Deprecated class ``ConfigsRecord``, use ``ConfigRecord`` instead.
-
-    This class exists solely for backward compatibility with legacy
-    code that previously used ``ConfigsRecord``. It has been renamed
-    to ``ConfigRecord``.
-
-    .. warning::
-        ``ConfigsRecord`` is deprecated and will be removed in a future release.
-        Use ``ConfigRecord`` instead.
-
-    Examples
-    --------
-    Legacy (deprecated) usage::
-
-        from flwr.common import ConfigsRecord
-
-        record = ConfigsRecord()
-
-    Updated usage::
-
-        from flwr.common import ConfigRecord
-
-        record = ConfigRecord()
-    """
-
-    _warning_logged = False
-
-    def __init__(
-        self,
-        config_dict: dict[str, ConfigRecordValues] | None = None,
-        keep_input: bool = True,
-    ):
-        if not ConfigsRecord._warning_logged:
-            ConfigsRecord._warning_logged = True
-            log(
-                WARN,
-                "The `ConfigsRecord` class has been renamed to `ConfigRecord`. "
-                "Support for `ConfigsRecord` will be removed in a future release. "
-                "Please update your code accordingly.",
-            )
-        super().__init__(config_dict, keep_input)
