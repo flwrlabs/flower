@@ -160,6 +160,54 @@ class StateTest(CoreStateTest):
         assert run.federation == "health-federation"
         assert run.override_config["test_key"] == "test_value"
         assert run.flwr_aid == "i1r9f"
+        assert run.series_id > 0
+
+    def test_create_run_uses_provided_series_id(self) -> None:
+        """Test create_run links the run to a provided run series."""
+        # Prepare
+        state = self.state_factory()
+
+        # Execute
+        run_id = create_dummy_run(
+            state,
+            federation="health-federation",
+            series_id=123,
+        )
+
+        # Assert
+        run = state.get_run_info(run_ids=[run_id])[0]
+        self.assertEqual(run.series_id, 123)
+
+    def test_create_run_reuses_series_id_in_same_federation(self) -> None:
+        """Test multiple runs can link to the same federation run series."""
+        # Prepare
+        state = self.state_factory()
+
+        # Execute
+        run_id_1 = create_dummy_run(
+            state,
+            federation="health-federation",
+            series_id=123,
+        )
+        run_id_2 = create_dummy_run(
+            state,
+            federation="health-federation",
+            series_id=123,
+        )
+
+        # Assert
+        runs = state.get_run_info(run_ids=[run_id_1, run_id_2])
+        self.assertEqual({run.series_id for run in runs}, {123})
+
+    def test_create_run_rejects_series_id_in_different_federation(self) -> None:
+        """Test a run series cannot be linked across federations."""
+        # Prepare
+        state = self.state_factory()
+        create_dummy_run(state, federation="federation-a", series_id=123)
+
+        # Execute & Assert
+        with self.assertRaisesRegex(ValueError, "belongs to federation"):
+            create_dummy_run(state, federation="federation-b", series_id=123)
 
     def test_create_run_creates_primary_task(self) -> None:
         """Creating a run should also create its primary task."""
@@ -1931,6 +1979,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     federation_config: SimulationConfig | None = None,
     flwr_aid: str | None = "mock_flwr_aid",
     run_type: str = RunType.SERVER_APP,
+    series_id: int | None = None,
 ) -> int:
     """Create a dummy run."""
     return state.create_run(
@@ -1942,6 +1991,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
         federation_config=federation_config,
         flwr_aid=flwr_aid,
         run_type=run_type,
+        series_id=series_id,
     )
 
 

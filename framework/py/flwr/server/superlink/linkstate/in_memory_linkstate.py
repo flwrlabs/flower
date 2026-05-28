@@ -606,11 +606,13 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         run_type: str,
+        series_id: int | None = None,
     ) -> int:
         """Create a new run."""
         task_type = primary_task_type_from_run_type(run_type)
 
         with self.lock_task_store, self.lock:
+            resolved_series_id = self.ensure_run_series(federation, series_id)
             run_id = generate_rand_int_from_bytes(
                 RUN_ID_NUM_BYTES,
                 exclude=set(self.run_ids),
@@ -643,10 +645,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     bytes_recv=0,
                     clientapp_runtime=0.0,
                     run_type=run_type,
+                    series_id=resolved_series_id,
                 ),
                 federation_config=federation_config,
             )
             self.run_ids[run_id] = run_record
+            with self.lock_run_series_store:
+                run_series = self.run_series_store[resolved_series_id]
+                run_series.last_run_id = run_id
+                run_series.updated_at = now()
             # Add run_id to the flwr_aid_to_run_ids mapping if flwr_aid is provided
             if flwr_aid:
                 self.flwr_aid_to_run_ids[flwr_aid].add(run_id)

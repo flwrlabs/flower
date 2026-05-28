@@ -31,6 +31,7 @@ from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
+    SERIES_ID_NUM_BYTES,
     TASK_ID_NUM_BYTES,
     Status,
     SubStatus,
@@ -52,6 +53,17 @@ class TokenRecord:
     active_until: datetime
 
 
+@dataclass
+class RunSeriesRecord:
+    """Record containing run series metadata."""
+
+    federation: str
+    description: str | None
+    created_at: datetime
+    updated_at: datetime
+    last_run_id: int | None
+
+
 class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attributes
     """In-memory CoreState implementation."""
 
@@ -71,6 +83,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.lock_task_store = Lock()
         self.task_message_store: dict[str, Message] = {}
         self.lock_task_message_store = Lock()
+        self.run_series_store: dict[int, RunSeriesRecord] = {}
+        self.lock_run_series_store = Lock()
 
     @property
     def object_store(self) -> ObjectStore:
@@ -106,6 +120,39 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 content=fab.content,
                 verifications=dict(fab.verifications),
             )
+
+    def ensure_run_series(self, federation: str, series_id: int | None = None) -> int:
+        """Ensure a run series exists and return its ID."""
+        if not federation:
+            raise ValueError("Federation must be set")
+        if series_id is not None and not 0 < series_id < (1 << 64):
+            raise ValueError("Series ID must be a positive uint64")
+
+        with self.lock_run_series_store:
+            resolved_series_id = series_id
+            if resolved_series_id is None:
+                resolved_series_id = generate_rand_int_from_bytes(
+                    SERIES_ID_NUM_BYTES,
+                    exclude=set(self.run_series_store) | {0},
+                )
+            elif resolved_series_id in self.run_series_store:
+                existing = self.run_series_store[resolved_series_id]
+                if existing.federation != federation:
+                    raise ValueError(
+                        f"Run series {resolved_series_id} belongs to federation "
+                        f"{existing.federation!r}, not {federation!r}"
+                    )
+                return resolved_series_id
+
+            timestamp = now()
+            self.run_series_store[resolved_series_id] = RunSeriesRecord(
+                federation=federation,
+                description=None,
+                created_at=timestamp,
+                updated_at=timestamp,
+                last_run_id=None,
+            )
+            return resolved_series_id
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""

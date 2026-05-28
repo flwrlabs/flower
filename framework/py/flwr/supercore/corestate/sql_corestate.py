@@ -32,6 +32,7 @@ from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
+    SERIES_ID_NUM_BYTES,
     SUPERLINK_NODE_ID,
     TASK_ID_NUM_BYTES,
     Status,
@@ -122,6 +123,71 @@ class SqlCoreState(CoreState, SqlMixin):
             content=row["content"],
             verifications=json.loads(row["verifications"]),
         )
+
+    def ensure_run_series(self, federation: str, series_id: int | None = None) -> int:
+        """Ensure a run series exists and return its ID."""
+        if not federation:
+            raise ValueError("Federation must be set")
+        if series_id is not None and not 0 < series_id < (1 << 64):
+            raise ValueError("Series ID must be a positive uint64")
+
+        with self.session():
+            resolved_series_id = series_id
+            if resolved_series_id is None:
+                while True:
+                    candidate = generate_rand_int_from_bytes(
+                        SERIES_ID_NUM_BYTES,
+                        exclude={0},
+                    )
+                    rows = self.query(
+                        """
+                        SELECT series_id
+                        FROM run_series
+                        WHERE series_id = :series_id
+                        """,
+                        {"series_id": uint64_to_int64(candidate)},
+                    )
+                    if not rows:
+                        resolved_series_id = candidate
+                        break
+            else:
+                rows = self.query(
+                    """
+                    SELECT series_id, federation
+                    FROM run_series
+                    WHERE series_id = :series_id
+                    """,
+                    {"series_id": uint64_to_int64(resolved_series_id)},
+                )
+                if rows:
+                    existing = rows[0]
+                    if existing["federation"] != federation:
+                        raise ValueError(
+                            f"Run series {resolved_series_id} belongs to federation "
+                            f"{existing['federation']!r}, not {federation!r}"
+                        )
+                    return resolved_series_id
+
+            timestamp = now()
+            self.query(
+                """
+                INSERT INTO run_series
+                (series_id, federation, description, created_at, updated_at,
+                 last_run_id)
+                VALUES
+                (:series_id, :federation, :description, :created_at, :updated_at,
+                 :last_run_id)
+                """,
+                {
+                    "series_id": uint64_to_int64(resolved_series_id),
+                    "federation": federation,
+                    "description": None,
+                    "created_at": timestamp,
+                    "updated_at": timestamp,
+                    "last_run_id": None,
+                },
+            )
+            return resolved_series_id
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""

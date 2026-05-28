@@ -43,6 +43,31 @@ class CoreState(ABC):
         """Return the FAB for the given hash, if present."""
 
     @abstractmethod
+    def ensure_run_series(self, federation: str, series_id: int | None = None) -> int:
+        """Ensure a run series exists and return its ID.
+
+        Parameters
+        ----------
+        federation : str
+            Federation the run series belongs to.
+        series_id : int | None (default: None)
+            Optional caller-provided series ID. If `None`, a new nonzero series
+            ID is generated and created. If set, the matching series is reused
+            when it already belongs to `federation`, otherwise it is created.
+
+        Returns
+        -------
+        int
+            The ID of the ensured run series.
+
+        Raises
+        ------
+        ValueError
+            If `federation` is empty, `series_id` is not a positive uint64, or
+            an existing series with `series_id` belongs to a different federation.
+        """
+
+    @abstractmethod
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`.
 

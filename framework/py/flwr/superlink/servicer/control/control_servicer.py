@@ -238,6 +238,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     f"FAB ({fab.hash_str}) hash from request doesn't match contents"
                 )
             fab_id, fab_version = get_metadata_from_config(fab_config)
+            request_series_id = (
+                request.series_id if request.HasField("series_id") else None
+            )
 
             run_id = state.create_run(
                 fab_id,
@@ -248,6 +251,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 resolved_federation_config,
                 flwr_aid,
                 run_type,
+                request_series_id,
             )
 
             if run_id == 0:
@@ -264,25 +268,34 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     "tmp_dir": self.artifact_provider.tmp_dir,
                 }
 
+            runs = state.get_run_info(run_ids=[run_id])
+            if not runs:
+                context.abort(
+                    grpc.StatusCode.INTERNAL,
+                    "Failed to retrieve the initialized run.",
+                )
+            series_id = runs[0].series_id
+
             # Create an empty context for the Run
-            context = Context(
+            run_context = Context(
                 run_id=run_id,
                 node_id=SUPERLINK_NODE_ID,
                 # Dict is invariant in mypy
                 node_config=node_config,  # type: ignore[arg-type]
                 state=RecordDict(),
                 run_config={},
+                series_id=series_id,
             )
 
             # Register the context at the LinkState
-            state.set_serverapp_context(run_id=run_id, context=context)
+            state.set_serverapp_context(run_id=run_id, context=run_context)
 
         except ValueError as e:
             log(ERROR, "Could not start run: %s", str(e))
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
 
         log(INFO, "Created %s run %s", run_type, str(run_id))
-        return StartRunResponse(run_id=run_id, note=note)
+        return StartRunResponse(run_id=run_id, note=note, series_id=series_id)
 
     def StreamLogs(  # pylint: disable=C0103
         self, request: StreamLogsRequest, context: grpc.ServicerContext

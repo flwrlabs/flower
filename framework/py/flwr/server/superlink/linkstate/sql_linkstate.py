@@ -917,6 +917,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         run_type: str,
+        series_id: int | None = None,
     ) -> int:
         """Create a new run."""
         task_type = primary_task_type_from_run_type(run_type)
@@ -930,10 +931,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             INSERT INTO run
             (run_id, fab_id, fab_version, fab_hash, override_config, federation,
             primary_task_id, federation_config, run_type, usage_reported_at,
-            flwr_aid, bytes_sent, bytes_recv, clientapp_runtime)
+            series_id, flwr_aid, bytes_sent, bytes_recv, clientapp_runtime)
             VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
             :federation, :primary_task_id, :federation_config, :run_type,
-            :usage_reported_at, :flwr_aid,
+            :usage_reported_at, :series_id, :flwr_aid,
             :bytes_sent, :bytes_recv, :clientapp_runtime)
         """
         task_insert_query = """
@@ -955,6 +956,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             query = "SELECT COUNT(*) as cnt FROM run WHERE run_id = :run_id"
             rows = self.query(query, {"run_id": uint64_to_int64(run_id)})
             if rows[0]["cnt"] == 0:
+                resolved_series_id = self.ensure_run_series(federation, series_id)
                 self.query(
                     run_insert_query,
                     {
@@ -968,6 +970,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         "federation_config": fed_config_json,
                         "run_type": run_type,
                         "usage_reported_at": "",
+                        "series_id": uint64_to_int64(resolved_series_id),
                         "flwr_aid": flwr_aid or "",
                         "bytes_sent": 0,
                         "bytes_recv": 0,
@@ -991,6 +994,18 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         "finished_at": None,
                         "sub_status": "",
                         "details": "",
+                    },
+                )
+                self.query(
+                    """
+                    UPDATE run_series
+                    SET last_run_id = :run_id, updated_at = :updated_at
+                    WHERE series_id = :series_id
+                    """,
+                    {
+                        "run_id": uint64_to_int64(run_id),
+                        "updated_at": pending_at,
+                        "series_id": uint64_to_int64(resolved_series_id),
                     },
                 )
                 return run_id
@@ -1064,7 +1079,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             SELECT
                 r.run_id, r.fab_id, r.fab_version, r.fab_hash, r.override_config,
                 r.federation, r.primary_task_id, r.federation_config, r.run_type,
-                r.flwr_aid, r.bytes_sent, r.bytes_recv, r.clientapp_runtime,
+                r.series_id, r.flwr_aid, r.bytes_sent, r.bytes_recv,
+                r.clientapp_runtime,
                 t.pending_at AS pending_at,
                 t.starting_at AS starting_at,
                 t.running_at AS running_at,
@@ -1361,4 +1377,5 @@ def _run_from_row(row: dict[str, Any]) -> Run:
         bytes_recv=row["bytes_recv"],
         clientapp_runtime=row["clientapp_runtime"],
         run_type=row["run_type"],
+        series_id=int64_to_uint64(row["series_id"]) if row["series_id"] else 0,
     )

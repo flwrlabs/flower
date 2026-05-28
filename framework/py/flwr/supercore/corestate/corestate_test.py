@@ -73,6 +73,60 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         mock_datetime.now.side_effect = timestamps
         return stack
 
+    def test_ensure_run_series_generates_nonzero_id(self) -> None:
+        """Ensuring a run series without ID should generate a nonzero ID."""
+        state = self.state_factory()
+
+        series_id = state.ensure_run_series("federation-a")
+
+        self.assertGreater(series_id, 0)
+
+    def test_ensure_run_series_uses_provided_id(self) -> None:
+        """Ensuring a run series should preserve a caller-provided ID."""
+        state = self.state_factory()
+
+        series_id = state.ensure_run_series("federation-a", series_id=123)
+
+        self.assertEqual(series_id, 123)
+
+    def test_ensure_run_series_rejects_zero_id(self) -> None:
+        """Zero is not a valid run series ID."""
+        state = self.state_factory()
+
+        with self.assertRaisesRegex(ValueError, "positive uint64"):
+            state.ensure_run_series("federation-a", series_id=0)
+
+    def test_ensure_run_series_rejects_negative_id(self) -> None:
+        """Negative values are not valid run series IDs."""
+        state = self.state_factory()
+
+        with self.assertRaisesRegex(ValueError, "positive uint64"):
+            state.ensure_run_series("federation-a", series_id=-1)
+
+    def test_ensure_run_series_rejects_empty_federation(self) -> None:
+        """Run series must belong to a federation."""
+        state = self.state_factory()
+
+        with self.assertRaisesRegex(ValueError, "Federation must be set"):
+            state.ensure_run_series("", series_id=123)
+
+    def test_ensure_run_series_reuses_same_federation_id(self) -> None:
+        """Existing run series IDs can be reused in the same federation."""
+        state = self.state_factory()
+        state.ensure_run_series("federation-a", series_id=123)
+
+        series_id = state.ensure_run_series("federation-a", series_id=123)
+
+        self.assertEqual(series_id, 123)
+
+    def test_ensure_run_series_rejects_different_federation_id(self) -> None:
+        """Existing run series IDs cannot be reused in a different federation."""
+        state = self.state_factory()
+        state.ensure_run_series("federation-a", series_id=123)
+
+        with self.assertRaisesRegex(ValueError, "belongs to federation"):
+            state.ensure_run_series("federation-b", series_id=123)
+
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
         state = self.state_factory()
