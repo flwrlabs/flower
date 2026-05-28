@@ -14,6 +14,7 @@
 # ==============================================================================
 """In-memory LinkState implementation."""
 
+
 import threading
 from collections import defaultdict
 from collections.abc import Sequence
