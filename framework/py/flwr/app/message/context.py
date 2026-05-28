@@ -46,6 +46,8 @@ class Context:
         A config (key/value mapping) held by the entity in a given `run_id` and that
         will stay local. It can be used at any point during the lifecycle of this entity
         (e.g. across multiple rounds)
+    series_id : int (default: 0)
+        The ID that identifies the run series, if this run belongs to one.
     """
 
     run_id: int
@@ -53,6 +55,7 @@ class Context:
     node_config: UserConfig
     state: RecordDict
     run_config: UserConfig
+    series_id: int
 
     def __init__(  # pylint: disable=too-many-arguments, too-many-positional-arguments
         self,
@@ -61,9 +64,11 @@ class Context:
         node_config: UserConfig,
         state: RecordDict,
         run_config: UserConfig,
+        series_id: int = 0,
     ) -> None:
         self.run_id = run_id
         self.node_id = node_id
         self.node_config = node_config
         self.state = state
         self.run_config = run_config
+        self.series_id = series_id
