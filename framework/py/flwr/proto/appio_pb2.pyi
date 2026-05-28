@@ -238,6 +238,34 @@ class PushTaskMessageResponse(google.protobuf.message.Message):
 global___PushTaskMessageResponse = PushTaskMessageResponse
 
 @typing.final
+class PushTaskEventsRequest(google.protobuf.message.Message):
+    """PushTaskEvents messages"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    EVENTS_FIELD_NUMBER: builtins.int
+    @property
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.task_pb2.TaskEvent]: ...
+    def __init__(
+        self,
+        *,
+        events: collections.abc.Iterable[flwr.proto.task_pb2.TaskEvent] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
+
+global___PushTaskEventsRequest = PushTaskEventsRequest
+
+@typing.final
+class PushTaskEventsResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___PushTaskEventsResponse = PushTaskEventsResponse
+
+@typing.final
 class PullTaskMessageRequest(google.protobuf.message.Message):
     """PullTaskMessage messages"""
 
@@ -325,8 +353,14 @@ class PushTaskOutputRequest(google.protobuf.message.Message):
     CONTEXT_FIELD_NUMBER: builtins.int
     SUB_STATUS_FIELD_NUMBER: builtins.int
     DETAILS_FIELD_NUMBER: builtins.int
+    BYTES_SENT_FIELD_NUMBER: builtins.int
+    BYTES_RECV_FIELD_NUMBER: builtins.int
+    CLIENTAPP_RUNTIME_FIELD_NUMBER: builtins.int
     sub_status: builtins.str
     details: builtins.str
+    bytes_sent: builtins.int
+    bytes_recv: builtins.int
+    clientapp_runtime: builtins.float
     @property
     def context(self) -> flwr.proto.message_pb2.Context: ...
     def __init__(
@@ -335,9 +369,12 @@ class PushTaskOutputRequest(google.protobuf.message.Message):
         context: flwr.proto.message_pb2.Context | None = ...,
         sub_status: builtins.str = ...,
         details: builtins.str = ...,
+        bytes_sent: builtins.int = ...,
+        bytes_recv: builtins.int = ...,
+        clientapp_runtime: builtins.float = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["context", b"context"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["context", b"context", "details", b"details", "sub_status", b"sub_status"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["bytes_recv", b"bytes_recv", "bytes_sent", b"bytes_sent", "clientapp_runtime", b"clientapp_runtime", "context", b"context", "details", b"details", "sub_status", b"sub_status"]) -> None: ...
 
 global___PushTaskOutputRequest = PushTaskOutputRequest
 

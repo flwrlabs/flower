@@ -22,13 +22,13 @@ from logging import WARN
 from textwrap import indent
 from typing import TypeVar, cast
 
+from flwr.common.logger import log
 from flwr.supercore.inflatable.inflatable_object import (
     InflatableObject,
     add_header_to_object_body,
     get_object_body,
 )
 
-from ..logger import log
 from .arrayrecord import ArrayRecord
 from .configrecord import ConfigRecord
 from .metricrecord import MetricRecord
@@ -43,8 +43,6 @@ class _WarningTracker:
     def __init__(self) -> None:
         # These variables are used to ensure that the deprecation warnings
         # for the deprecated properties/class are logged only once.
-        self.recordset_init_logged = False
-        self.recorddict_init_logged = False
         self.parameters_records_logged = False
         self.metrics_records_logged = False
         self.configs_records_logged = False
@@ -116,8 +114,8 @@ class RecordDict(TypedDict[str, RecordType], InflatableObject):
     ----------
     records : Optional[dict[str, RecordType]]
         A dictionary mapping string keys to record instances, where each value
-        is either a :class:`ParametersRecord`, :class:`MetricsRecord`,
-        or :class:`ConfigsRecord`.
+        is either a :class:`ArrayRecord`, :class:`MetricRecord`,
+        or :class:`ConfigRecord`.
 
     Examples
     --------
@@ -128,8 +126,8 @@ class RecordDict(TypedDict[str, RecordType], InflatableObject):
 
     Let's see an example::
 
-        from flwr.common import RecordDict
-        from flwr.common import ArrayRecord, ConfigRecord, MetricRecord
+        from flwr.app import RecordDict
+        from flwr.app import ArrayRecord, ConfigRecord, MetricRecord
 
         # Let's begin with an empty record
         my_records = RecordDict()
@@ -145,10 +143,11 @@ class RecordDict(TypedDict[str, RecordType], InflatableObject):
         my_records["my_metrics"] = m_record
 
     Adding an :code:`ArrayRecord` follows the same steps as above but first,
-    the array needs to be serialized and represented as a :code:`flwr.common.Array`.
+    the array needs to be serialized and represented as a
+    :code:`flwr.app.Array`.
     For example::
 
-        from flwr.common import Array
+        from flwr.app import Array
         # Creating an ArrayRecord would look like this
         arr_np = np.random.randn(3, 3)
 
@@ -357,54 +356,4 @@ class RecordDict(TypedDict[str, RecordType], InflatableObject):
         # Instantiate new RecordDict
         return RecordDict(
             {name: children[object_id] for name, object_id in record_refs.items()}  # type: ignore
-        )
-
-
-class RecordSet(RecordDict):
-    """Deprecated class ``RecordSet``, use ``RecordDict`` instead.
-
-    This class exists solely for backward compatibility with legacy
-    code that previously used ``RecordSet``. It has been renamed
-    to ``RecordDict`` and will be removed in a future release.
-
-    .. warning::
-        ``RecordSet`` is deprecated and will be removed in a future release.
-        Use ``RecordDict`` instead.
-
-    Examples
-    --------
-    Legacy (deprecated) usage::
-
-        from flwr.common import RecordSet
-
-        my_content = RecordSet()
-
-    Updated usage::
-
-        from flwr.common import RecordDict
-
-        my_content = RecordDict()
-    """
-
-    def __init__(
-        self,
-        records: dict[str, RecordType] | None = None,
-        *,
-        parameters_records: dict[str, ArrayRecord] | None = None,
-        metrics_records: dict[str, MetricRecord] | None = None,
-        configs_records: dict[str, ConfigRecord] | None = None,
-    ) -> None:
-        if not _warning_tracker.recordset_init_logged:
-            _warning_tracker.recordset_init_logged = True
-            log(
-                WARN,
-                "The `RecordSet` class has been renamed to `RecordDict`. "
-                "Support for `RecordSet` will be removed in a future release. "
-                "Please update your code accordingly.",
-            )
-        super().__init__(
-            records,
-            parameters_records=parameters_records,
-            metrics_records=metrics_records,
-            configs_records=configs_records,
         )

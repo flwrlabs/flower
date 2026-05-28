@@ -21,11 +21,10 @@ import json
 from collections.abc import Sequence
 from typing import cast
 
+from flwr.app.message import ConfigRecord, Message, RecordDict
 from flwr.app.message_type import MessageType
 from flwr.app.metadata import Metadata
 from flwr.common.constant import SUPERLINK_NODE_ID
-from flwr.common.message import Message
-from flwr.common.record import ConfigRecord, RecordDict
 from flwr.supercore.date import now
 from flwr.supercore.typing import JSONObject, JSONValue
 
