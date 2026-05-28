@@ -114,7 +114,7 @@ Next, run the app on SuperGrid to confirm that the new strategy is being used:
 .. code-block:: shell
 
     # Log in if you are not already logged in
-    $ flwr login
+    $ flwr login supergrid
     # Run the app across the federation you created earlier in this tutorial series
     $ flwr run . --federation @<username>/<federation-name>
 

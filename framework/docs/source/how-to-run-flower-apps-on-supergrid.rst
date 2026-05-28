@@ -12,14 +12,15 @@ SuperNodes must also be added to the federation. If you still need to create a
 federation, see :doc:`how-to-create-and-manage-federations`. If you need to register and
 connect SuperNodes first, see :doc:`how-to-connect-supernodes-to-supergrid`.
 
-This guide shows two ways to run a Flower App on SuperGrid: directly from Flower Hub,
-and from a Flower App project on your machine. It uses the `@flwrlabs/quickstart-numpy
-<https://flower.ai/apps/flwrlabs/quickstart-numpy/>`__ app as an example, but the same
-workflow applies to other Flower Apps, whether or not they are listed on Flower Hub.
+This guide shows two ways to run a Flower App on SuperGrid: directly from `Flower Hub
+<https://flower.ai/apps/>`__, and from a Flower App project on your machine. It uses the
+`@flwrlabs/quickstart-numpy <https://flower.ai/apps/flwrlabs/quickstart-numpy/>`__ app
+as an example, but the same workflow applies to other Flower Apps, whether or not they
+are listed on Flower Hub.
 
-***************************
+*********************************
  Run Flower Apps from Flower Hub
-***************************
+*********************************
 
 Running directly from Flower Hub is the quickest way to get started. Open an app page,
 for example `@flwrlabs/quickstart-numpy
@@ -60,9 +61,9 @@ federation.
     :align: center
     :target: ./_static/federation_dashboard_shows_run.png
 
-*******************************
+***********************************
  Run Flower apps from your machine
-*******************************
+***********************************
 
 You can also run a Flower App on SuperGrid from your local machine. Use this workflow
 when you want to inspect or modify an app before submitting it to SuperGrid, or when you
@@ -93,7 +94,7 @@ authenticate with your SuperGrid account. Finally, run the app with ``flwr run``
 .. code-block:: shell
 
     # This opens a browser window where you can log in to SuperGrid.
-    $ flwr login
+    $ flwr login supergrid
 
     $ flwr run . --federation @<username>/<federation-name>
 
@@ -127,3 +128,8 @@ to ``5``:
 
     $ flwr run . --federation @<username>/<federation-name> \
         --run-config "num-server-rounds=5"
+
+.. note::
+
+    For more details on Flower App configuration in ``pyproject.toml``, see
+    :doc:`how-to-configure-pyproject-toml`.

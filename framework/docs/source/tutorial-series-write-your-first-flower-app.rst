@@ -89,7 +89,7 @@ first login to SuperGrid:
 .. code-block:: shell
 
     # This will open a browser window where you can enter your SuperGrid credentials.
-    $ flwr login
+    $ flwr login supergrid
 
 Once you are logged in, run the following command to run the app on SuperGrid and across
 the federation you created in the previous tutorial:
