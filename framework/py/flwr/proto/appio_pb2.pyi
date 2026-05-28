@@ -277,14 +277,9 @@ global___PushTaskEventsRequest = PushTaskEventsRequest
 class PushTaskEventsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    STORED_COUNT_FIELD_NUMBER: builtins.int
-    stored_count: builtins.int
     def __init__(
         self,
-        *,
-        stored_count: builtins.int = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["stored_count", b"stored_count"]) -> None: ...
 
 global___PushTaskEventsResponse = PushTaskEventsResponse
 

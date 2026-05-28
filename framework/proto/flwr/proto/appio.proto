@@ -64,7 +64,7 @@ message TaskEvent {
   string data = 2;
 }
 message PushTaskEventsRequest { repeated TaskEvent events = 1; }
-message PushTaskEventsResponse { uint32 stored_count = 1; }
+message PushTaskEventsResponse {}
 
 // PullTaskMessage messages
 message PullTaskMessageRequest { optional uint64 limit = 1; }
