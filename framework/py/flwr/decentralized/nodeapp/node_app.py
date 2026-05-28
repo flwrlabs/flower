@@ -621,14 +621,6 @@ class NodeApp(App):
             )
             return False
 
-        expected_round = self.current_round if self.current_round > 0 else 1
-        if request.round_number != expected_round:
-            log(
-                logging.INFO,
-                f"[NodeApp:{self.name}] Ignoring out-of-round request from {request.source_node_id}: received={request.round_number}, expected={expected_round}.",
-            )
-            return False
-
         return True
 
     def _is_duplicate_request(self, request: AggregateRequest) -> bool:
