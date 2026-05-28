@@ -16,7 +16,7 @@
 
 .. _clientapp_link: ref-api/flwr.client.ClientApp.html
 
-.. _context_link: ref-api/flwr.common.Context.html
+.. _context_link: ref-api/flwr.app.Context.html
 
 .. _flwr_fed_sim_config_link: ref-api-cli.html#flwr-federation-simulation-config
 
@@ -24,7 +24,7 @@
 
 .. _flwr_run_link: ref-api-cli.html#flwr-run
 
-.. _message_link: ref-api/flwr.common.Message.html
+.. _message_link: ref-api/flwr.app.Message.html
 
 #################
  Run simulations

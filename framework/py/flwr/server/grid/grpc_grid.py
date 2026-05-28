@@ -23,6 +23,7 @@ from typing import cast
 import grpc
 
 from flwr.app.error import Error
+from flwr.app.message import make_message, remove_content_from_message
 from flwr.common import Message, Metadata, RecordDict, now
 from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
@@ -31,7 +32,6 @@ from flwr.common.constant import (
 )
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log, warn_deprecated_feature
-from flwr.common.message import make_message, remove_content_from_message
 from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.common.serde import message_to_proto
 from flwr.common.typing import Run

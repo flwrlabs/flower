@@ -21,11 +21,10 @@ import json
 from collections.abc import Sequence
 from typing import cast
 
+from flwr.app.message import ConfigRecord, Message, RecordDict
 from flwr.app.message_type import MessageType
 from flwr.app.metadata import Metadata
 from flwr.common.constant import SUPERLINK_NODE_ID
-from flwr.common.message import Message
-from flwr.common.record import ConfigRecord, RecordDict
 from flwr.supercore.date import now
 from flwr.supercore.typing import JSONObject, JSONValue
 
@@ -35,7 +34,7 @@ _DEFAULT_TASK_MESSAGE_TTL = 3600.0
 
 
 class ModelRequest(Message):
-    """Task-routed model request in OpenAI Responses create-request shape."""
+    """Task-routed model request in Open Responses create-request shape."""
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
         self,
@@ -106,7 +105,7 @@ class ModelRequest(Message):
 
 
 class ModelResponse(Message):
-    """Task-routed model response in OpenAI Responses object shape."""
+    """Task-routed model response in Open Responses object shape."""
 
     def __init__(
         self,
@@ -132,7 +131,7 @@ class ModelResponse(Message):
 
     @property
     def payload(self) -> JSONObject:
-        """Return this response's OpenAI Responses object payload."""
+        """Return this response's Open Responses object payload."""
         if not self.has_content():
             raise ValueError("Expected a message with content.")
         return _payload_from_content(self.content)
@@ -289,7 +288,7 @@ def _validate_model_request_payload(payload: JSONObject) -> None:
 
 
 def _validate_model_response_payload(payload: JSONObject) -> None:
-    """Validate the minimal OpenAI Responses object shape."""
+    """Validate the minimal Open Responses object shape."""
     if payload.get("object") != "response":
         raise ValueError("ModelResponse payload field 'object' must be 'response'.")
     for field in ("id", "status"):
