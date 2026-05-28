@@ -878,7 +878,7 @@ class NodeApp(App):
             agg_request = self.create_aggregate_request(
                 action=Action.PUSH,
                 source_node_id=self.id,
-                round_number=self.current_round,
+                round_number=self.current_round if self.current_round > 0 else 1,
                 msg=self.create_message(
                     message_type=MessageType.TRAIN,
                     config=self.train_config,
