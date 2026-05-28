@@ -18,6 +18,7 @@ syntax = "proto3";
 package flwr.proto;
 
 import "flwr/proto/fab.proto";
+import "flwr/proto/appio.proto";
 import "flwr/proto/transport.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/node.proto";
@@ -249,8 +250,5 @@ message StreamRunEventsRequest {
   optional uint64 after_id = 2;
 }
 message StreamRunEventsResponse {
-  string event = 1;
-  string data = 2;
-  uint64 id = 3;
-  uint64 task_id = 4;
+  TaskEvent task_event = 1;
 }

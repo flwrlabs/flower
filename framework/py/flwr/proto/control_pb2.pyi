@@ -19,6 +19,7 @@ limitations under the License.
 
 import builtins
 import collections.abc
+import flwr.proto.appio_pb2
 import flwr.proto.fab_pb2
 import flwr.proto.federation_config_pb2
 import flwr.proto.federation_pb2
@@ -818,22 +819,15 @@ global___StreamRunEventsRequest = StreamRunEventsRequest
 class StreamRunEventsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    EVENT_FIELD_NUMBER: builtins.int
-    DATA_FIELD_NUMBER: builtins.int
-    ID_FIELD_NUMBER: builtins.int
-    TASK_ID_FIELD_NUMBER: builtins.int
-    event: builtins.str
-    data: builtins.str
-    id: builtins.int
-    task_id: builtins.int
+    TASK_EVENT_FIELD_NUMBER: builtins.int
+    @property
+    def task_event(self) -> flwr.proto.appio_pb2.TaskEvent: ...
     def __init__(
         self,
         *,
-        event: builtins.str = ...,
-        data: builtins.str = ...,
-        id: builtins.int = ...,
-        task_id: builtins.int = ...,
+        task_event: flwr.proto.appio_pb2.TaskEvent | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["data", b"data", "event", b"event", "id", b"id", "task_id", b"task_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["task_event", b"task_event"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["task_event", b"task_event"]) -> None: ...
 
 global___StreamRunEventsResponse = StreamRunEventsResponse
