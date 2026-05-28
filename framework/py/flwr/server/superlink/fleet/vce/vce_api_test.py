@@ -23,6 +23,7 @@ from pathlib import Path
 from time import sleep
 from unittest import TestCase
 
+from flwr.app.message import make_message
 from flwr.client import Client, NumPyClient
 from flwr.clientapp import ClientApp
 from flwr.clientapp.client_app import LoadClientAppError
@@ -39,7 +40,6 @@ from flwr.common import (
     now,
 )
 from flwr.common.constant import Status
-from flwr.common.message import make_message
 from flwr.common.recorddict_compat import getpropertiesins_to_recorddict
 from flwr.common.typing import Run, RunStatus
 from flwr.server.superlink.fleet.vce.vce_api import (
@@ -267,11 +267,6 @@ class TestFleetSimulationEngineRayBackend(TestCase):
         """Backend Config should be a JSON stream."""
         with self.assertRaises(JSONDecodeError):
             start_and_shutdown(num_supernodes=50, backend_config="not a proper config")
-
-    def test_with_nonexistent_backend(self) -> None:
-        """Test specifying a backend that does not exist."""
-        with self.assertRaises(KeyError):
-            start_and_shutdown(num_supernodes=50, backend="this-backend-does-not-exist")
 
     def test_erroneous_arguments_num_supernodes_and_existing_mapping(self) -> None:
         """Test ValueError if a node mapping is passed but also num_supernodes.

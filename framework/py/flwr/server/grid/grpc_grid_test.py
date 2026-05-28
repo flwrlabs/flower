@@ -26,9 +26,9 @@ import grpc
 from parameterized import parameterized
 
 from flwr.app.error import Error
+from flwr.app.message import Message
 from flwr.common import RecordDict
 from flwr.common.constant import SUPERLINK_NODE_ID, ErrorCode
-from flwr.common.message import Message
 from flwr.common.serde import message_to_proto
 from flwr.common.typing import Run
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
@@ -41,7 +41,10 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
 )
-from flwr.supercore.interceptors import AppIoTokenClientInterceptor
+from flwr.supercore.interceptors import (
+    AppIoTokenClientInterceptor,
+    RuntimeVersionClientInterceptor,
+)
 
 from .grpc_grid import GrpcGrid
 
@@ -89,7 +92,6 @@ class TestGrpcGrid(unittest.TestCase):
         self.assertEqual(len(args), 1)
         self.assertEqual(len(kwargs), 0)
         self.assertIsInstance(args[0], GetNodesRequest)
-        self.assertEqual(args[0].run_id, 61016)
         self.assertEqual(node_ids, [404, 200])
 
     def _prep_message(self, message: Message) -> Message:
@@ -264,13 +266,13 @@ class TestGrpcGrid(unittest.TestCase):
     @patch("flwr.server.grid.grpc_grid.wrap_stub")
     @patch("flwr.server.grid.grpc_grid.ServerAppIoStub")
     @patch("flwr.server.grid.grpc_grid.create_channel")
-    def test_connect_adds_client_interceptor_when_token_is_set(
+    def test_connect_adds_client_interceptors(
         self,
         mock_create_channel: Mock,
         _mock_serverappio_stub: Mock,
         _mock_wrap_stub: Mock,
     ) -> None:
-        """`_connect` should pass the token client interceptor to create_channel."""
+        """`_connect` should pass client interceptors to create_channel."""
         mock_create_channel.return_value = Mock()
         grid = GrpcGrid(token="test-token")
 
@@ -280,8 +282,11 @@ class TestGrpcGrid(unittest.TestCase):
         interceptors = kwargs["interceptors"]
         self.assertIsNotNone(interceptors)
         assert interceptors is not None
-        self.assertEqual(len(interceptors), 1)
-        self.assertIsInstance(interceptors[0], AppIoTokenClientInterceptor)
+        self.assertEqual(len(interceptors), 2)
+        self.assertIsInstance(interceptors[0], RuntimeVersionClientInterceptor)
+        self.assertIsInstance(interceptors[1], AppIoTokenClientInterceptor)
+        # pylint: disable-next=protected-access
+        self.assertEqual(interceptors[0]._metadata.component_name, "flwr-serverapp")
 
     def test_init_rejects_empty_token(
         self,

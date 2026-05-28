@@ -20,7 +20,6 @@ limitations under the License.
 import abc
 import collections.abc
 import flwr.proto.appio_pb2
-import flwr.proto.heartbeat_pb2
 import flwr.proto.log_pb2
 import flwr.proto.message_pb2
 import flwr.proto.run_pb2
@@ -38,28 +37,16 @@ class _ServicerContext(grpc.ServicerContext, grpc.aio.ServicerContext):  # type:
 
 class ServerAppIoStub:
     def __init__(self, channel: typing.Union[grpc.Channel, grpc.aio.Channel]) -> None: ...
-    ListAppsToLaunch: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.ListAppsToLaunchRequest,
-        flwr.proto.appio_pb2.ListAppsToLaunchResponse,
+    PullPendingTasks: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PullPendingTasksRequest,
+        flwr.proto.appio_pb2.PullPendingTasksResponse,
     ]
     """///////////////////////////////////////////////////////////////////////////
     General *AppIo endpoints for SuperExec processes
     ///////////////////////////////////////////////////////////////////////////
 
-    List runs to launch
+    Pull pending tasks
     """
-
-    RequestToken: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.RequestTokenRequest,
-        flwr.proto.appio_pb2.RequestTokenResponse,
-    ]
-    """Request token for a run"""
-
-    PullPendingTasks: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PullPendingTasksRequest,
-        flwr.proto.appio_pb2.PullPendingTasksResponse,
-    ]
-    """Pull pending tasks"""
 
     ClaimTask: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.ClaimTaskRequest,
@@ -78,29 +65,23 @@ class ServerAppIoStub:
     Get run details
     """
 
-    SendAppHeartbeat: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.heartbeat_pb2.SendAppHeartbeatRequest,
-        flwr.proto.heartbeat_pb2.SendAppHeartbeatResponse,
-    ]
-    """App heartbeat"""
-
     SendTaskHeartbeat: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.SendTaskHeartbeatRequest,
         flwr.proto.appio_pb2.SendTaskHeartbeatResponse,
     ]
     """Task heartbeat"""
 
-    PullAppInputs: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PullAppInputsRequest,
-        flwr.proto.appio_pb2.PullAppInputsResponse,
+    PullTaskInput: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PullTaskInputRequest,
+        flwr.proto.appio_pb2.PullTaskInputResponse,
     ]
-    """Pull app inputs"""
+    """Pull task inputs"""
 
-    PushAppOutputs: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PushAppOutputsRequest,
-        flwr.proto.appio_pb2.PushAppOutputsResponse,
+    PushTaskOutput: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushTaskOutputRequest,
+        flwr.proto.appio_pb2.PushTaskOutputResponse,
     ]
-    """Push app outputs"""
+    """Push task outputs"""
 
     PushObject: grpc.UnaryUnaryMultiCallable[
         flwr.proto.message_pb2.PushObjectRequest,
@@ -131,6 +112,24 @@ class ServerAppIoStub:
     ]
     """Create a task"""
 
+    PushTaskMessage: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushTaskMessageRequest,
+        flwr.proto.appio_pb2.PushTaskMessageResponse,
+    ]
+    """Push task message"""
+
+    PullTaskMessage: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PullTaskMessageRequest,
+        flwr.proto.appio_pb2.PullTaskMessageResponse,
+    ]
+    """Pull task messages"""
+
+    PushLogs: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.log_pb2.PushLogsRequest,
+        flwr.proto.log_pb2.PushLogsResponse,
+    ]
+    """Push task logs"""
+
     GetFederationOptions: grpc.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetFederationOptionsRequest,
         flwr.proto.run_pb2.GetFederationOptionsResponse,
@@ -141,18 +140,6 @@ class ServerAppIoStub:
 
     Get Federation Options (only used by flwr-simulation)
     """
-
-    UpdateRunStatus: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.run_pb2.UpdateRunStatusRequest,
-        flwr.proto.run_pb2.UpdateRunStatusResponse,
-    ]
-    """Update the status of a given run"""
-
-    PushLogs: grpc.UnaryUnaryMultiCallable[
-        flwr.proto.log_pb2.PushLogsRequest,
-        flwr.proto.log_pb2.PushLogsResponse,
-    ]
-    """Push ServerApp logs"""
 
     PushMessages: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushAppMessagesRequest,
@@ -173,28 +160,16 @@ class ServerAppIoStub:
     """Return a set of nodes"""
 
 class ServerAppIoAsyncStub:
-    ListAppsToLaunch: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.ListAppsToLaunchRequest,
-        flwr.proto.appio_pb2.ListAppsToLaunchResponse,
+    PullPendingTasks: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PullPendingTasksRequest,
+        flwr.proto.appio_pb2.PullPendingTasksResponse,
     ]
     """///////////////////////////////////////////////////////////////////////////
     General *AppIo endpoints for SuperExec processes
     ///////////////////////////////////////////////////////////////////////////
 
-    List runs to launch
+    Pull pending tasks
     """
-
-    RequestToken: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.RequestTokenRequest,
-        flwr.proto.appio_pb2.RequestTokenResponse,
-    ]
-    """Request token for a run"""
-
-    PullPendingTasks: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PullPendingTasksRequest,
-        flwr.proto.appio_pb2.PullPendingTasksResponse,
-    ]
-    """Pull pending tasks"""
 
     ClaimTask: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.ClaimTaskRequest,
@@ -213,29 +188,23 @@ class ServerAppIoAsyncStub:
     Get run details
     """
 
-    SendAppHeartbeat: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.heartbeat_pb2.SendAppHeartbeatRequest,
-        flwr.proto.heartbeat_pb2.SendAppHeartbeatResponse,
-    ]
-    """App heartbeat"""
-
     SendTaskHeartbeat: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.SendTaskHeartbeatRequest,
         flwr.proto.appio_pb2.SendTaskHeartbeatResponse,
     ]
     """Task heartbeat"""
 
-    PullAppInputs: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PullAppInputsRequest,
-        flwr.proto.appio_pb2.PullAppInputsResponse,
+    PullTaskInput: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PullTaskInputRequest,
+        flwr.proto.appio_pb2.PullTaskInputResponse,
     ]
-    """Pull app inputs"""
+    """Pull task inputs"""
 
-    PushAppOutputs: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.appio_pb2.PushAppOutputsRequest,
-        flwr.proto.appio_pb2.PushAppOutputsResponse,
+    PushTaskOutput: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushTaskOutputRequest,
+        flwr.proto.appio_pb2.PushTaskOutputResponse,
     ]
-    """Push app outputs"""
+    """Push task outputs"""
 
     PushObject: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.message_pb2.PushObjectRequest,
@@ -266,6 +235,24 @@ class ServerAppIoAsyncStub:
     ]
     """Create a task"""
 
+    PushTaskMessage: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushTaskMessageRequest,
+        flwr.proto.appio_pb2.PushTaskMessageResponse,
+    ]
+    """Push task message"""
+
+    PullTaskMessage: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PullTaskMessageRequest,
+        flwr.proto.appio_pb2.PullTaskMessageResponse,
+    ]
+    """Pull task messages"""
+
+    PushLogs: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.log_pb2.PushLogsRequest,
+        flwr.proto.log_pb2.PushLogsResponse,
+    ]
+    """Push task logs"""
+
     GetFederationOptions: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.run_pb2.GetFederationOptionsRequest,
         flwr.proto.run_pb2.GetFederationOptionsResponse,
@@ -276,18 +263,6 @@ class ServerAppIoAsyncStub:
 
     Get Federation Options (only used by flwr-simulation)
     """
-
-    UpdateRunStatus: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.run_pb2.UpdateRunStatusRequest,
-        flwr.proto.run_pb2.UpdateRunStatusResponse,
-    ]
-    """Update the status of a given run"""
-
-    PushLogs: grpc.aio.UnaryUnaryMultiCallable[
-        flwr.proto.log_pb2.PushLogsRequest,
-        flwr.proto.log_pb2.PushLogsResponse,
-    ]
-    """Push ServerApp logs"""
 
     PushMessages: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PushAppMessagesRequest,
@@ -309,33 +284,17 @@ class ServerAppIoAsyncStub:
 
 class ServerAppIoServicer(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def ListAppsToLaunch(
-        self,
-        request: flwr.proto.appio_pb2.ListAppsToLaunchRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.ListAppsToLaunchResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.ListAppsToLaunchResponse]]:
-        """///////////////////////////////////////////////////////////////////////////
-        General *AppIo endpoints for SuperExec processes
-        ///////////////////////////////////////////////////////////////////////////
-
-        List runs to launch
-        """
-
-    @abc.abstractmethod
-    def RequestToken(
-        self,
-        request: flwr.proto.appio_pb2.RequestTokenRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.RequestTokenResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.RequestTokenResponse]]:
-        """Request token for a run"""
-
-    @abc.abstractmethod
     def PullPendingTasks(
         self,
         request: flwr.proto.appio_pb2.PullPendingTasksRequest,
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.appio_pb2.PullPendingTasksResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PullPendingTasksResponse]]:
-        """Pull pending tasks"""
+        """///////////////////////////////////////////////////////////////////////////
+        General *AppIo endpoints for SuperExec processes
+        ///////////////////////////////////////////////////////////////////////////
+
+        Pull pending tasks
+        """
 
     @abc.abstractmethod
     def ClaimTask(
@@ -359,14 +318,6 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def SendAppHeartbeat(
-        self,
-        request: flwr.proto.heartbeat_pb2.SendAppHeartbeatRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.heartbeat_pb2.SendAppHeartbeatResponse, collections.abc.Awaitable[flwr.proto.heartbeat_pb2.SendAppHeartbeatResponse]]:
-        """App heartbeat"""
-
-    @abc.abstractmethod
     def SendTaskHeartbeat(
         self,
         request: flwr.proto.appio_pb2.SendTaskHeartbeatRequest,
@@ -375,20 +326,20 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         """Task heartbeat"""
 
     @abc.abstractmethod
-    def PullAppInputs(
+    def PullTaskInput(
         self,
-        request: flwr.proto.appio_pb2.PullAppInputsRequest,
+        request: flwr.proto.appio_pb2.PullTaskInputRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.PullAppInputsResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PullAppInputsResponse]]:
-        """Pull app inputs"""
+    ) -> typing.Union[flwr.proto.appio_pb2.PullTaskInputResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PullTaskInputResponse]]:
+        """Pull task inputs"""
 
     @abc.abstractmethod
-    def PushAppOutputs(
+    def PushTaskOutput(
         self,
-        request: flwr.proto.appio_pb2.PushAppOutputsRequest,
+        request: flwr.proto.appio_pb2.PushTaskOutputRequest,
         context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.appio_pb2.PushAppOutputsResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushAppOutputsResponse]]:
-        """Push app outputs"""
+    ) -> typing.Union[flwr.proto.appio_pb2.PushTaskOutputResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushTaskOutputResponse]]:
+        """Push task outputs"""
 
     @abc.abstractmethod
     def PushObject(
@@ -428,6 +379,30 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
         """Create a task"""
 
     @abc.abstractmethod
+    def PushTaskMessage(
+        self,
+        request: flwr.proto.appio_pb2.PushTaskMessageRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.PushTaskMessageResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushTaskMessageResponse]]:
+        """Push task message"""
+
+    @abc.abstractmethod
+    def PullTaskMessage(
+        self,
+        request: flwr.proto.appio_pb2.PullTaskMessageRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.PullTaskMessageResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PullTaskMessageResponse]]:
+        """Pull task messages"""
+
+    @abc.abstractmethod
+    def PushLogs(
+        self,
+        request: flwr.proto.log_pb2.PushLogsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.log_pb2.PushLogsResponse, collections.abc.Awaitable[flwr.proto.log_pb2.PushLogsResponse]]:
+        """Push task logs"""
+
+    @abc.abstractmethod
     def GetFederationOptions(
         self,
         request: flwr.proto.run_pb2.GetFederationOptionsRequest,
@@ -439,22 +414,6 @@ class ServerAppIoServicer(metaclass=abc.ABCMeta):
 
         Get Federation Options (only used by flwr-simulation)
         """
-
-    @abc.abstractmethod
-    def UpdateRunStatus(
-        self,
-        request: flwr.proto.run_pb2.UpdateRunStatusRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.run_pb2.UpdateRunStatusResponse, collections.abc.Awaitable[flwr.proto.run_pb2.UpdateRunStatusResponse]]:
-        """Update the status of a given run"""
-
-    @abc.abstractmethod
-    def PushLogs(
-        self,
-        request: flwr.proto.log_pb2.PushLogsRequest,
-        context: _ServicerContext,
-    ) -> typing.Union[flwr.proto.log_pb2.PushLogsResponse, collections.abc.Awaitable[flwr.proto.log_pb2.PushLogsResponse]]:
-        """Push ServerApp logs"""
 
     @abc.abstractmethod
     def PushMessages(

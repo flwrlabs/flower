@@ -18,6 +18,7 @@ syntax = "proto3";
 package flwr.proto;
 
 import "flwr/proto/heartbeat.proto";
+import "flwr/proto/log.proto";
 import "flwr/proto/run.proto";
 import "flwr/proto/message.proto";
 import "flwr/proto/appio.proto";
@@ -27,13 +28,6 @@ service ClientAppIo {
   /////////////////////////////////////////////////////////////////////////////
   // General *AppIo endpoints for SuperExec processes
   /////////////////////////////////////////////////////////////////////////////
-
-  // Get run IDs with pending messages
-  rpc ListAppsToLaunch(ListAppsToLaunchRequest)
-      returns (ListAppsToLaunchResponse) {}
-
-  // Request token
-  rpc RequestToken(RequestTokenRequest) returns (RequestTokenResponse) {}
 
   // Pull pending tasks
   rpc PullPendingTasks(PullPendingTasksRequest)
@@ -49,19 +43,15 @@ service ClientAppIo {
   // Get run details
   rpc GetRun(GetRunRequest) returns (GetRunResponse) {}
 
-  // App heartbeat
-  rpc SendAppHeartbeat(SendAppHeartbeatRequest)
-      returns (SendAppHeartbeatResponse) {}
-
   // Task heartbeat
   rpc SendTaskHeartbeat(SendTaskHeartbeatRequest)
       returns (SendTaskHeartbeatResponse) {}
 
-  // Pull app inputs
-  rpc PullAppInputs(PullAppInputsRequest) returns (PullAppInputsResponse) {}
+  // Pull task inputs
+  rpc PullTaskInput(PullTaskInputRequest) returns (PullTaskInputResponse) {}
 
-  // Push app outputs
-  rpc PushAppOutputs(PushAppOutputsRequest) returns (PushAppOutputsResponse) {}
+  // Push task outputs
+  rpc PushTaskOutput(PushTaskOutputRequest) returns (PushTaskOutputResponse) {}
 
   /////////////////////////////////////////////////////////////////////////////
   // Specific endpoints shared by ServerAppIo and ClientAppIo
@@ -79,6 +69,17 @@ service ClientAppIo {
 
   // Create a task
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {}
+
+  // Push task message
+  rpc PushTaskMessage(PushTaskMessageRequest)
+      returns (PushTaskMessageResponse) {}
+
+  // Pull task messages
+  rpc PullTaskMessage(PullTaskMessageRequest)
+      returns (PullTaskMessageResponse) {}
+
+  // Push task logs
+  rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
 
   /////////////////////////////////////////////////////////////////////////////
   // Specific endpoints for ClientAppIo

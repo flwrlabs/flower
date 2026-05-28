@@ -115,7 +115,6 @@ With default arguments you will see streamed output like this:
     INFO :      Final results:
     INFO :          ServerApp-side Evaluate Metrics:
     INFO :          {}
-    Saving final model to disk...
 
 You can also override the parameters defined in the ``[tool.flwr.app.config]`` section
 in ``pyproject.toml`` like this:
@@ -332,11 +331,12 @@ invoking its |strategy_start_link|_ method. To it we pass:
             num_rounds=num_rounds,
         )
 
-        # Save final model parameters
-        print("\nSaving final model to disk...")
-        ndarrays = result.arrays.to_numpy_ndarrays()
-        set_model_params(model, ndarrays)
-        joblib.dump(model, "logreg_model.pkl")
+        if context.run_config["save-model"]:
+            # Save final model parameters
+            print("\nSaving final model to disk...")
+            ndarrays = result.arrays.to_numpy_ndarrays()
+            set_model_params(model, ndarrays)
+            joblib.dump(model, "logreg_model.pkl")
 
 Congratulations! You've successfully built and run your first federated learning system
 in scikit-learn on the Iris dataset using the new Message API.

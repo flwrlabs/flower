@@ -15,12 +15,7 @@
 """Simple Flower SuperExec plugin for ServerApp."""
 
 
-import subprocess
-from logging import ERROR
-from typing import Any
-
-from flwr.common.logger import log
-from flwr.supercore.constant import RunType
+from flwr.supercore.constant import TaskType
 
 from .base_exec_plugin import BaseExecPlugin
 
@@ -28,29 +23,8 @@ from .base_exec_plugin import BaseExecPlugin
 class ServerAppExecPlugin(BaseExecPlugin):
     """Simple Flower SuperExec plugin for ServerApp.
 
-    The plugin always selects the first candidate run ID.
+    The plugin always selects the first candidate task.
     """
 
-    appio_api_address_arg = "--serverappio-api-address"
-
-    def get_popen_kwargs(self) -> dict[str, Any]:
-        """Isolate ServerApp stdio from the parent SuperLink process streams."""
-        return {
-            "stdout": subprocess.DEVNULL,
-            "stderr": subprocess.DEVNULL,
-        }
-
-    def launch_app(self, token: str, run_id: int) -> None:
-        """Launch the application associated with a given run ID and token."""
-        # Determine the command to launch based on the run type
-        run = self.get_run(run_id)
-        if run.run_type == RunType.SERVER_APP:
-            self.command = "flwr-serverapp"
-        elif run.run_type == RunType.SIMULATION:
-            self.command = "flwr-simulation"
-        else:
-            log(ERROR, "Unknown run type '%s' for run_id %d.", run.run_type, run_id)
-            return
-
-        # Launch the executor process
-        super().launch_app(token, run_id)
+    suppress_output = True
+    supported_task_types = frozenset({TaskType.SERVER_APP, TaskType.SIMULATION})

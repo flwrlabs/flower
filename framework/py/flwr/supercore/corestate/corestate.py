@@ -19,6 +19,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Literal
 
+from flwr.common import Message
 from flwr.common.typing import Fab
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 
@@ -42,6 +43,42 @@ class CoreState(ABC):
         """Return the FAB for the given hash, if present."""
 
     @abstractmethod
+    def add_task_log(self, task_id: int, log_message: str) -> None:
+        """Add a log entry to the task logs for the specified `task_id`.
+
+        Parameters
+        ----------
+        task_id : int
+            The identifier of the task for which to add a log entry.
+        log_message : str
+            The log entry to be added to the task logs.
+        """
+
+    @abstractmethod
+    def get_task_log(
+        self, task_id: int, after_timestamp: float | None
+    ) -> tuple[str, float]:
+        """Get task logs for the specified `task_id`.
+
+        Parameters
+        ----------
+        task_id : int
+            The identifier of the task for which to retrieve logs.
+        after_timestamp : Optional[float]
+            Retrieve logs after this timestamp. If set to `None`, retrieve all logs.
+            The filter is strict: logs at exactly `after_timestamp` are considered
+            already consumed by the caller.
+
+        Returns
+        -------
+        tuple[str, float]
+            A tuple containing:
+            - The concatenated task logs associated with the specified `task_id`.
+            - The timestamp of the latest log entry in the returned logs.
+              Returns `0` if no logs are returned.
+        """
+
+    @abstractmethod
     def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         task_type: str,
@@ -49,6 +86,7 @@ class CoreState(ABC):
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
+        requesting_task_id: int | None = None,
     ) -> int | None:
         """Create a new task.
 
@@ -64,6 +102,9 @@ class CoreState(ABC):
             Model reference associated with the task, if applicable.
         connector_ref : Optional[str] (default: None)
             Connector reference associated with the task, if applicable.
+        requesting_task_id : Optional[int] (default: None)
+            Task requesting creation of the new task. If set, task creation fails
+            when the requesting task does not exist or is already finished.
 
         Returns
         -------
@@ -83,6 +124,7 @@ class CoreState(ABC):
         self,
         *,
         task_ids: Sequence[int] | None = None,
+        run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
@@ -98,6 +140,8 @@ class CoreState(ABC):
         ----------
         task_ids : Optional[Sequence[int]] (default: None)
             Sequence of task IDs to filter by.
+        run_ids : Optional[Sequence[int]] (default: None)
+            Sequence of run IDs to filter by.
         statuses : Optional[Sequence[str]] (default: None)
             Sequence of task status values to filter by.
         order_by : Optional[Literal["pending_at"]] (default: None)
@@ -201,76 +245,50 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def create_token(self, run_id: int) -> str | None:
-        """Create a token for the given run ID.
+    def store_task_message(self, message: Message) -> bool:
+        """Store one task-addressed Message.
+
+        The source and destination task IDs are read from
+        `message.metadata.src_task_id` and `message.metadata.dst_task_id`.
 
         Parameters
         ----------
-        run_id : int
-            The ID of the run for which to create a token.
-
-        Returns
-        -------
-        str | None
-            The newly generated token if one does not already exist
-            for the given run ID, otherwise None.
-        """
-
-    @abstractmethod
-    def verify_token(self, run_id: int, token: str) -> bool:
-        """Verify a token for the given run ID.
-
-        Parameters
-        ----------
-        run_id : int
-            The ID of the run for which to verify the token.
-        token : str
-            The token to verify.
+        message : Message
+            The task-addressed message to store.
 
         Returns
         -------
         bool
-            True if the token is valid for the run ID, False otherwise.
+            True if the message was stored, otherwise False.
         """
 
     @abstractmethod
-    def delete_token(self, run_id: int) -> None:
-        """Delete the token for the given run ID.
+    def get_task_message(
+        self,
+        *,
+        dst_task_ids: Sequence[int] | None = None,
+        limit: int | None = None,
+        order_by: Literal["created_at"] | None = None,
+    ) -> Sequence[Message]:
+        """Retrieve undelivered task-addressed Messages.
+
+        Returned messages are atomically consumed so later calls will not return
+        them again.
 
         Parameters
         ----------
-        run_id : int
-            The ID of the run for which to delete the token.
-        """
-
-    @abstractmethod
-    def get_run_id_by_token(self, token: str) -> int | None:
-        """Get the run ID associated with a given token.
-
-        Parameters
-        ----------
-        token : str
-            The token to look up.
+        dst_task_ids : Optional[Sequence[int]] (default: None)
+            Sequence of destination task IDs to filter by.
+        limit : Optional[int] (default: None)
+            Maximum number of messages to return. If `None`, no limit is applied.
+        order_by : Optional[Literal["created_at"]] (default: None)
+            If set to "created_at", matching messages are returned in ascending
+            creation-time order.
 
         Returns
         -------
-        Optional[int]
-            The run ID if the token is valid, otherwise None.
-        """
-
-    @abstractmethod
-    def acknowledge_app_heartbeat(self, token: str) -> bool:
-        """Acknowledge an app heartbeat with the provided token.
-
-        Parameters
-        ----------
-        token : str
-            The token associated with the app.
-
-        Returns
-        -------
-        bool
-            True if the heartbeat is acknowledged successfully, False otherwise.
+        Sequence[Message]
+            A sequence of matching messages.
         """
 
     @abstractmethod

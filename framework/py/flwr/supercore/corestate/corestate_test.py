@@ -16,7 +16,8 @@
 
 
 import unittest
-from datetime import timedelta
+from contextlib import ExitStack
+from datetime import datetime, timedelta
 from typing import Any, cast
 from unittest.mock import patch
 
@@ -26,6 +27,7 @@ from flwr.common import now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
+    SUPERLINK_NODE_ID,
     Status,
     SubStatus,
 )
@@ -33,6 +35,7 @@ from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 
 from . import CoreState
+from .utils_test import create_task_message
 
 
 class StateTest(unittest.TestCase):  # pylint: disable=R0904
@@ -45,13 +48,39 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Provide state implementation to test."""
         raise NotImplementedError()
 
+    def task_run_id(self, _state: CoreState) -> int:
+        """Return the run ID to use in task-related tests.
+
+        Subclasses can override this hook when task creation requires an existing run
+        record instead of an arbitrary placeholder ID.
+        """
+        return 42
+
+    def other_task_run_id(self, _state: CoreState) -> int:
+        """Return a second run ID for task tests that need multiple runs.
+
+        Subclasses can override this hook when task creation requires existing run
+        records instead of arbitrary placeholder IDs.
+        """
+        return 123
+
+    def _patch_task_log_datetime_now(self, *timestamps: datetime) -> ExitStack:
+        """Patch the shared datetime source used for task-log timestamps."""
+        stack = ExitStack()
+        mock_datetime = stack.enter_context(
+            patch("flwr.supercore.date.datetime.datetime")
+        )
+        mock_datetime.now.side_effect = timestamps
+        return stack
+
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
         state = self.state_factory()
+        run_id = self.task_run_id(state)
 
         task_id = state.create_task(
             task_type=TaskType.MODEL,
-            run_id=42,
+            run_id=run_id,
             fab_hash=None,
             model_ref="model://test",
             connector_ref=None,
@@ -63,7 +92,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         task = tasks[0]
         self.assertEqual(task.task_id, task_id)
         self.assertEqual(task.type, TaskType.MODEL)
-        self.assertEqual(task.run_id, 42)
+        self.assertEqual(task.run_id, run_id)
         self.assertEqual(
             task.status,
             TaskStatus(status=Status.PENDING, sub_status="", details=""),
@@ -76,20 +105,61 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(task.running_at, "")
         self.assertEqual(task.finished_at, "")
 
+    def test_create_task_rejects_finished_requesting_task(self) -> None:
+        """Task creation should fail if the requesting task is already finished."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        requesting_task_id = state.create_task(
+            task_type=TaskType.SERVER_APP,
+            run_id=run_id,
+        )
+        assert requesting_task_id is not None
+        self.assertTrue(state.finish_task(requesting_task_id, SubStatus.STOPPED, ""))
+
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=run_id,
+            model_ref="model://test",
+            requesting_task_id=requesting_task_id,
+        )
+
+        self.assertIsNone(task_id)
+
     def test_get_tasks_missing_returns_empty(self) -> None:
         """Missing tasks should return an empty sequence."""
         state = self.state_factory()
         self.assertEqual(state.get_tasks(task_ids=[123]), [])
 
+    def test_get_tasks_run_id_matches(self) -> None:
+        """Run ID filters should match only tasks from the requested runs."""
+        state = self.state_factory()
+        run_id_1 = self.task_run_id(state)
+        run_id_2 = self.other_task_run_id(state)
+        task_id_1 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_1)
+        task_id_2 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_2)
+        task_id_3 = state.create_task(task_type=TaskType.MODEL, run_id=run_id_1)
+        assert task_id_1 and task_id_2 and task_id_3
+
+        tasks = state.get_tasks(run_ids=[run_id_1])
+        task_ids = {task.task_id for task in tasks}
+
+        self.assertTrue({task_id_1, task_id_3}.issubset(task_ids))
+        self.assertNotIn(task_id_2, task_ids)
+        self.assertTrue(all(task.run_id == run_id_1 for task in tasks))
+
     def test_get_tasks_single_status_matches(self) -> None:
         """A single-item status sequence should match pending tasks."""
         state = self.state_factory()
-        _ = state.create_task(task_type=TaskType.MODEL, run_id=42)
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert task_id
 
         tasks = state.get_tasks(statuses=[Status.PENDING])
+        task_ids = {task.task_id for task in tasks}
 
-        self.assertEqual(len(tasks), 1)
-        self.assertEqual(tasks[0].status.status, Status.PENDING)
+        self.assertIn(task_id, task_ids)
+        for task in tasks:
+            self.assertEqual(task.status.status, Status.PENDING)
 
     def test_get_tasks_negative_limit_raises(self) -> None:
         """Negative limits should be rejected consistently."""
@@ -105,12 +175,20 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         with self.assertRaises(AssertionError):
             _ = state.get_tasks(order_by=cast(Any, "foo"))
 
+    def test_get_task_message_invalid_order_by_raises(self) -> None:
+        """Unsupported task-message order_by values should be rejected."""
+        state = self.state_factory()
+
+        with self.assertRaises(AssertionError):
+            _ = state.get_task_message(order_by=cast(Any, "foo"))
+
     def test_get_task_returns_copy(self) -> None:
         """Retrieved task should be a defensive copy."""
         state = self.state_factory()
+        run_id = self.task_run_id(state)
         task_id = state.create_task(
             task_type=TaskType.SERVER_APP,
-            run_id=42,
+            run_id=run_id,
             fab_hash="fab-hash",
             model_ref=None,
             connector_ref=None,
@@ -127,10 +205,111 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         reloaded = reloaded_tasks[0]
         self.assertEqual(reloaded.fab_hash, "fab-hash")
 
+    def test_add_and_get_task_log(self) -> None:
+        """Adding and retrieving task logs should preserve concatenation order."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        log_entry_1 = "Log entry 1"
+        log_entry_2 = "Log entry 2"
+        fixed_now = now()
+        timestamp = (fixed_now - timedelta(microseconds=1)).timestamp()
+
+        with self._patch_task_log_datetime_now(
+            fixed_now,
+            fixed_now + timedelta(microseconds=1),
+        ):
+            state.add_task_log(task_id, log_entry_1)
+            state.add_task_log(task_id, log_entry_2)
+
+        # Reading from before the first log should return both entries and the
+        # timestamp of the newest returned entry.
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=timestamp)
+
+        assert latest > timestamp
+        assert log_entry_1 + log_entry_2 == retrieved_logs
+
+    def test_get_task_log_after_timestamp(self) -> None:
+        """Retrieving task logs after a specific timestamp should filter old logs."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        log_entry_1 = "Log entry 1"
+        log_entry_2 = "Log entry 2"
+        fixed_now = now()
+        timestamp = (fixed_now + timedelta(microseconds=1)).timestamp()
+
+        with self._patch_task_log_datetime_now(
+            fixed_now,
+            fixed_now + timedelta(microseconds=2),
+        ):
+            state.add_task_log(task_id, log_entry_1)
+            state.add_task_log(task_id, log_entry_2)
+
+        # A timestamp between the two entries should filter out only the older
+        # log and advance the checkpoint to the returned entry.
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=timestamp)
+
+        assert latest > timestamp
+        assert log_entry_1 not in retrieved_logs
+        assert log_entry_2 == retrieved_logs
+
+    def test_get_task_log_after_timestamp_no_logs(self) -> None:
+        """Retrieving task logs after the last entry should return an empty result."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        fixed_now = now()
+        with self._patch_task_log_datetime_now(fixed_now):
+            state.add_task_log(task_id, "Log entry")
+        timestamp = (fixed_now + timedelta(microseconds=1)).timestamp()
+
+        # Polling after the latest known entry should return no logs and no new
+        # checkpoint.
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=timestamp)
+
+        assert latest == 0
+        assert retrieved_logs == ""
+
+    def test_get_task_log_does_not_repeat_logs_at_checkpoint_timestamp(self) -> None:
+        """Polling with the last returned timestamp should not repeat old logs."""
+        state = self.state_factory()
+        task_id = state.create_task(
+            task_type=TaskType.MODEL,
+            run_id=self.task_run_id(state),
+        )
+        assert task_id is not None
+        fixed_now = now()
+
+        with self._patch_task_log_datetime_now(fixed_now):
+            state.add_task_log(task_id, "Log entry 1")
+        retrieved_logs, latest = state.get_task_log(task_id, after_timestamp=None)
+
+        assert retrieved_logs == "Log entry 1"
+        assert latest == fixed_now.timestamp()
+
+        # Reusing the returned timestamp as the next checkpoint must not replay
+        # the log that produced that checkpoint.
+        next_logs, next_latest = state.get_task_log(task_id, after_timestamp=latest)
+
+        assert next_logs == ""
+        assert next_latest == 0
+
     def test_claim_task_transitions_pending_to_starting(self) -> None:
         """Claiming a task should create a token and move it to starting."""
         state = self.state_factory()
-        task_id = state.create_task(task_type="flwr-model", run_id=42)
+        task_id = state.create_task(
+            task_type="flwr-model", run_id=self.task_run_id(state)
+        )
         assert task_id is not None
 
         # Claim should persist token ownership and move the task to STARTING.
@@ -150,12 +329,13 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_claim_task_rejects_missing_claimed_and_non_pending(self) -> None:
         """Only existing pending unclaimed tasks should be claimable."""
         state = self.state_factory()
+        run_id = self.task_run_id(state)
 
         # Missing tasks cannot be claimed.
         self.assertIsNone(state.claim_task(61016))
 
-        claimed_task_id = state.create_task(task_type="flwr-model", run_id=42)
-        finished_task_id = state.create_task(task_type="flwr-model", run_id=42)
+        claimed_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+        finished_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
         assert claimed_task_id is not None and finished_task_id is not None
 
         # Claiming is single-owner and cannot be repeated.
@@ -169,7 +349,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_activate_task_transitions_starting_to_running(self) -> None:
         """Only starting tasks should transition to running."""
         state = self.state_factory()
-        task_id = state.create_task(task_type="flwr-model", run_id=42)
+        task_id = state.create_task(
+            task_type="flwr-model", run_id=self.task_run_id(state)
+        )
         assert task_id is not None
 
         # Task does not exist, so it cannot be activated.
@@ -201,7 +383,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     ) -> None:
         """Finishing a task should store the terminal status details."""
         state = self.state_factory()
-        task_id = state.create_task(task_type="flwr-model", run_id=42)
+        task_id = state.create_task(
+            task_type="flwr-model", run_id=self.task_run_id(state)
+        )
         assert task_id is not None
 
         # Task does not exist.
@@ -237,10 +421,11 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Task heartbeat should keep a claimed task token valid."""
         state = self.state_factory()
         fixed_now = now()
+        run_id = self.task_run_id(state)
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type="flwr-model", run_id=42)
+            task_id = state.create_task(task_type="flwr-model", run_id=run_id)
             assert task_id is not None
             token = state.claim_task(task_id)
             assert token is not None
@@ -268,10 +453,12 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Expired task claims should transition tasks to FINISHED:FAILED."""
         state = self.state_factory()
         fixed_now = now()
+        active_until = fixed_now + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
+        run_id = self.task_run_id(state)
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type="flwr-model", run_id=42)
+            task_id = state.create_task(task_type="flwr-model", run_id=run_id)
             assert task_id is not None
 
             token = state.claim_task(task_id)
@@ -294,6 +481,36 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             ),
         )
         self.assertTrue(tasks[0].finished_at)
+        self.assertEqual(datetime.fromisoformat(tasks[0].finished_at), active_until)
+
+    def test_get_tasks_expires_stale_task_tokens(self) -> None:
+        """Reading tasks should expire stale claimed task tokens first."""
+        state = self.state_factory()
+        fixed_now = now()
+        active_until = fixed_now + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
+        run_id = self.task_run_id(state)
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+            assert task_id is not None
+            assert state.claim_task(task_id) is not None
+
+            mock_dt.now.return_value = fixed_now + timedelta(
+                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
+            )
+            tasks = state.get_tasks(task_ids=[task_id])
+
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(
+            tasks[0].status,
+            TaskStatus(
+                status=Status.FINISHED,
+                sub_status=SubStatus.FAILED,
+                details="No heartbeat received from the task",
+            ),
+        )
+        self.assertEqual(datetime.fromisoformat(tasks[0].finished_at), active_until)
 
     def test_get_task_by_token_returns_none_for_unknown_token(self) -> None:
         """Unknown task tokens should not resolve to a task."""
@@ -301,118 +518,181 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertIsNone(state.get_task_by_token("missing-token"))
 
-    def test_create_verify_and_delete_token(self) -> None:
-        """Test creating, verifying, and deleting tokens."""
-        # Prepare
+    def test_store_and_get_task_message(self) -> None:
+        """Task Messages should round-trip, filter, and be delivered once."""
         state = self.state_factory()
-        run_id = 42
+        run_id = self.task_run_id(state)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        other_dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert (
+            src_task_id is not None
+            and dst_task_id is not None
+            and other_dst_task_id is not None
+        )
 
-        # Execute: create a token
-        token = state.create_token(run_id)
-        assert token is not None
+        message = create_task_message(
+            src_task_id=src_task_id,
+            dst_task_id=dst_task_id,
+            run_id=run_id,
+        )
+        expired = create_task_message(
+            src_task_id,
+            dst_task_id,
+            run_id,
+            created_at=now().timestamp() - 2.0,
+            ttl=1.0,
+        )
+        other_destination = create_task_message(src_task_id, other_dst_task_id, run_id)
 
-        # Assert: token should be valid
-        self.assertTrue(state.verify_token(run_id, token))
+        self.assertTrue(state.store_task_message(message))
+        self.assertFalse(state.store_task_message(expired))
+        self.assertTrue(state.store_task_message(other_destination))
+        pulled = state.get_task_message(dst_task_ids=[dst_task_id])
+        pulled_again = state.get_task_message(dst_task_ids=[dst_task_id])
+        pulled_other = state.get_task_message(dst_task_ids=[other_dst_task_id])
+        pulled_other_again = state.get_task_message(dst_task_ids=[other_dst_task_id])
 
-        # Execute: delete the token
-        state.delete_token(run_id)
+        self.assertEqual(len(pulled), 1)
+        self.assertEqual(pulled_again, [])
+        self.assertEqual(len(pulled_other), 1)
+        self.assertEqual(pulled_other_again, [])
+        pulled_message = pulled[0]
+        pulled_other_message = pulled_other[0]
+        self.assertEqual(
+            pulled_message.metadata.message_id, message.metadata.message_id
+        )
+        self.assertEqual(
+            pulled_other_message.metadata.message_id,
+            other_destination.metadata.message_id,
+        )
+        self.assertEqual(pulled_message.metadata.run_id, run_id)
+        self.assertEqual(pulled_message.metadata.src_node_id, SUPERLINK_NODE_ID)
+        self.assertEqual(pulled_message.metadata.dst_node_id, SUPERLINK_NODE_ID)
+        self.assertEqual(pulled_message.metadata.src_task_id, src_task_id)
+        self.assertEqual(pulled_message.metadata.dst_task_id, dst_task_id)
+        self.assertTrue(pulled_message.has_content())
 
-        # Assert: token should no longer be valid
-        self.assertFalse(state.verify_token(run_id, token))
-
-    def test_create_token_already_exists(self) -> None:
-        """Test creating a token that already exists."""
-        # Prepare
+    def test_store_task_message_validates_task_relationship(self) -> None:
+        """Task Messages should only be stored for valid same-run destinations."""
         state = self.state_factory()
-        run_id = 42
-        state.create_token(run_id)
+        run_id = self.task_run_id(state)
+        other_run_id = self.other_task_run_id(state)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        other_run_task_id = state.create_task(
+            task_type=TaskType.MODEL, run_id=other_run_id
+        )
+        finished_src_task_id = state.create_task(
+            task_type=TaskType.AGENT_APP, run_id=run_id
+        )
+        finished_dst_task_id = state.create_task(
+            task_type=TaskType.MODEL, run_id=run_id
+        )
+        assert (
+            src_task_id is not None
+            and dst_task_id is not None
+            and other_run_task_id is not None
+            and finished_src_task_id is not None
+            and finished_dst_task_id is not None
+        )
+        assert state.finish_task(finished_src_task_id, SubStatus.FAILED, "done")
+        assert state.finish_task(finished_dst_task_id, SubStatus.FAILED, "done")
 
-        # Execute
-        ret = state.create_token(run_id)
+        missing_task_id = (
+            max(
+                src_task_id,
+                dst_task_id,
+                other_run_task_id,
+                finished_src_task_id,
+                finished_dst_task_id,
+            )
+            + 1
+        )
+        while state.get_tasks(task_ids=[missing_task_id]):
+            missing_task_id += 1
+        invalid_messages = [
+            create_task_message(missing_task_id, dst_task_id, run_id),
+            create_task_message(src_task_id, missing_task_id, run_id),
+            create_task_message(src_task_id, other_run_task_id, run_id),
+            create_task_message(src_task_id, finished_dst_task_id, run_id),
+            create_task_message(src_task_id, dst_task_id, 0),
+            create_task_message(src_task_id, dst_task_id, other_run_id),
+        ]
+        finished_source_message = create_task_message(
+            finished_src_task_id, dst_task_id, run_id
+        )
 
-        # Assert: The return is None
-        self.assertIsNone(ret)
+        for message in invalid_messages:
+            self.assertFalse(state.store_task_message(message))
+        self.assertTrue(state.store_task_message(finished_source_message))
 
-    def test_get_run_id_by_token(self) -> None:
-        """Test retrieving run ID by token."""
-        # Prepare
+        pulled = state.get_task_message(dst_task_ids=[dst_task_id])
+
+        self.assertEqual(len(pulled), 1)
+        self.assertEqual(
+            pulled[0].metadata.message_id,
+            finished_source_message.metadata.message_id,
+        )
+        self.assertEqual(state.get_task_message(dst_task_ids=[other_run_task_id]), [])
+        self.assertEqual(
+            state.get_task_message(dst_task_ids=[finished_dst_task_id]), []
+        )
+        self.assertEqual(state.get_task_message(), [])
+
+    def test_get_task_message_does_not_return_expired_messages(self) -> None:
+        """Getting task Messages should not return expired Messages."""
         state = self.state_factory()
-        run_id = 42
-        token = state.create_token(run_id)
-        assert token is not None
+        run_id = self.task_run_id(state)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert src_task_id is not None and dst_task_id is not None
 
-        # Execute: get run ID by token
-        retrieved_run_id1 = state.get_run_id_by_token(token)
-        retrieved_run_id2 = state.get_run_id_by_token("nonexistent_token")
+        msg_ttl = 60.0
+        current = now()
+        expired = create_task_message(
+            src_task_id,
+            dst_task_id,
+            run_id,
+            created_at=current.timestamp(),
+            ttl=msg_ttl,
+        )
+        self.assertTrue(state.store_task_message(expired))
 
-        # Assert: should return the correct run ID
-        self.assertEqual(retrieved_run_id1, run_id)
-        self.assertIsNone(retrieved_run_id2)
-
-    def test_acknowledge_app_heartbeat_success(self) -> None:
-        """Test successfully acknowledging an app heartbeat."""
-        # Prepare
-        state = self.state_factory()
-        run_id = 42
-        token = state.create_token(run_id)
-        assert token is not None
-
-        # Execute: acknowledge heartbeat
-        result = state.acknowledge_app_heartbeat(token)
-
-        # Assert: should return True
-        self.assertTrue(result)
-
-        # Assert: token should still be valid
-        self.assertTrue(state.verify_token(run_id, token))
-
-    def test_acknowledge_app_heartbeat_nonexistent_token(self) -> None:
-        """Test acknowledging heartbeat with nonexistent token."""
-        # Prepare
-        state = self.state_factory()
-
-        # Execute: acknowledge heartbeat with invalid token
-        result = state.acknowledge_app_heartbeat("nonexistent_token")
-
-        # Assert: should return False
-        self.assertFalse(result)
-
-    def test_acknowledge_app_heartbeat_extends_expiration_and_cleanup(self) -> None:
-        """Test that acknowledging app heartbeat extends token expiration and cleanup is
-        performed when expired."""
-        # Prepare
-        state = self.state_factory()
-        created_at = now()
-        run_id1 = 42
-        run_id2 = 123
-        token1 = state.create_token(run_id1)
-        token2 = state.create_token(run_id2)
-        assert token1 is not None and token2 is not None
-
-        # Execute: send heartbeat for token2 to keep it alive
-        state.acknowledge_app_heartbeat(token2)
-
-        # Mock datetime to simulate time passage
-        # token1 should expire in HEARTBEAT_DEFAULT_INTERVAL
-        # token2 should expire in HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+        future = current + timedelta(seconds=msg_ttl + 1)
         with patch("datetime.datetime") as mock_dt:
-            # Advance time just before token1 expiration
-            mock_dt.now.return_value = created_at + timedelta(
-                seconds=HEARTBEAT_DEFAULT_INTERVAL - 1
-            )
+            mock_dt.now.return_value = future
+            self.assertEqual(state.get_task_message(dst_task_ids=[dst_task_id]), [])
 
-            # Verify tokens are valid
-            self.assertTrue(state.verify_token(run_id1, token1))
-            self.assertTrue(state.verify_token(run_id2, token2))
+    def test_get_task_message_limit(self) -> None:
+        """Getting task Messages should respect the provided limit."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        src_task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        dst_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        assert src_task_id is not None and dst_task_id is not None
 
-            # Advance time past token1 expiration
-            mock_dt.now.return_value = created_at + timedelta(
-                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
-            )
+        current = now().timestamp()
+        msg_1 = create_task_message(
+            src_task_id, dst_task_id, run_id, created_at=current - 2.0
+        )
+        msg_2 = create_task_message(
+            src_task_id, dst_task_id, run_id, created_at=current - 1.0
+        )
+        self.assertTrue(state.store_task_message(msg_2))
+        self.assertTrue(state.store_task_message(msg_1))
 
-            # Assert: token1 should be cleaned up, token2 should still be valid
-            self.assertFalse(state.verify_token(run_id1, token1))
-            self.assertTrue(state.verify_token(run_id2, token2))
+        pulled = state.get_task_message(
+            dst_task_ids=[dst_task_id], order_by="created_at", limit=1
+        )
+        pulled_next = state.get_task_message(
+            dst_task_ids=[dst_task_id], order_by="created_at", limit=1
+        )
+
+        self.assertEqual(len(pulled), 1)
+        self.assertEqual(len(pulled_next), 1)
+        self.assertEqual(pulled[0].metadata.message_id, msg_1.metadata.message_id)
+        self.assertEqual(pulled_next[0].metadata.message_id, msg_2.metadata.message_id)
 
     def test_reserve_nonce_first_reservation_succeeds(self) -> None:
         """A new nonce reservation should succeed."""

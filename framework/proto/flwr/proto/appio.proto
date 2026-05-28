@@ -25,16 +25,6 @@ import "flwr/proto/task.proto";
 
 // These messages are used by both ServerAppIo and ClientAppIo services
 
-// ListAppsToLaunch messages
-message ListAppsToLaunchRequest {}
-message ListAppsToLaunchResponse {
-  repeated uint64 run_ids = 1; // List of run IDs of the apps to launch
-}
-
-// RequestToken messages
-message RequestTokenRequest { uint64 run_id = 1; }
-message RequestTokenResponse { string token = 1; }
-
 // PullPendingTasks messages
 message PullPendingTasksRequest {}
 message PullPendingTasksResponse { repeated Task tasks = 1; }
@@ -49,10 +39,8 @@ message SendTaskHeartbeatResponse { bool success = 1; }
 
 // PushAppMessages messages
 message PushAppMessagesRequest {
-  string token = 1 [ deprecated = true ];
   repeated Message messages_list = 2;
-  uint64 run_id = 3;
-  repeated ObjectTree message_object_trees = 4;
+  repeated ObjectTree message_object_trees = 3;
 }
 message PushAppMessagesResponse {
   repeated string message_ids = 1;
@@ -60,18 +48,23 @@ message PushAppMessagesResponse {
 }
 
 // PullAppMessages messages
-message PullAppMessagesRequest {
-  string token = 1 [ deprecated = true ];
-  repeated string message_ids = 2;
-  uint64 run_id = 3;
-}
+message PullAppMessagesRequest { repeated string message_ids = 2; }
 message PullAppMessagesResponse {
   repeated Message messages_list = 1;
   repeated ObjectTree message_object_trees = 2;
 }
-// PullAppInputs messages
-message PullAppInputsRequest { string token = 1 [ deprecated = true ]; }
-message PullAppInputsResponse {
+
+// PushTaskMessage messages
+message PushTaskMessageRequest { Message message = 1; }
+message PushTaskMessageResponse { string message_id = 1; }
+
+// PullTaskMessage messages
+message PullTaskMessageRequest { optional uint64 limit = 1; }
+message PullTaskMessageResponse { repeated Message messages = 1; }
+
+// PullTaskInput messages
+message PullTaskInputRequest {}
+message PullTaskInputResponse {
   Context context = 1;
   Run run = 2;
   Fab fab = 3;
@@ -79,22 +72,19 @@ message PullAppInputsResponse {
   uint64 task_id = 5;
 }
 
-// PushAppInputs messages
-message PushAppOutputsRequest {
-  string token = 1 [ deprecated = true ];
-  uint64 run_id = 2;
-  Context context = 3;
-  string sub_status = 4;
-  string details = 5;
+// PushTaskOutput messages
+message PushTaskOutputRequest {
+  Context context = 1;
+  string sub_status = 2;
+  string details = 3;
 }
-message PushAppOutputsResponse {}
+message PushTaskOutputResponse {}
 
 // CreateTask messages
 message CreateTaskRequest {
   string type = 1;
-  uint64 run_id = 2;
-  optional string fab_hash = 3;
-  optional string model_ref = 4;
-  optional string connector_ref = 5;
+  optional string fab_hash = 2;
+  optional string model_ref = 3;
+  optional string connector_ref = 4;
 }
 message CreateTaskResponse { optional uint64 task_id = 1; }

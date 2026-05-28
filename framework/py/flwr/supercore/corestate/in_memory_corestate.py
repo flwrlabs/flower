@@ -17,26 +17,31 @@
 
 import hashlib
 import secrets
+from bisect import bisect_right
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from logging import ERROR
 from threading import Lock
-from typing import Literal
+from typing import Literal, cast
 
+from flwr.app.message import Message
 from flwr.common import now
 from flwr.common.constant import (
-    FLWR_APP_TOKEN_LENGTH,
+    FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
     TASK_ID_NUM_BYTES,
     Status,
     SubStatus,
 )
+from flwr.common.logger import log
 from flwr.common.typing import Fab
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import generate_rand_int_from_bytes
+from .utils import generate_rand_int_from_bytes, validate_task_message
 
 
 @dataclass
@@ -44,7 +49,7 @@ class TokenRecord:
     """Record containing token and heartbeat information."""
 
     token: str
-    active_until: int
+    active_until: datetime
 
 
 class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attributes
@@ -54,10 +59,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self._object_store = object_store
         self.fab_store: dict[str, Fab] = {}
         self.lock_fab_store = Lock()
-        # Store run ID to token mapping and token to run ID mapping
-        self.token_store: dict[int, TokenRecord] = {}
-        self.token_to_run_id: dict[str, int] = {}
-        self.lock_token_store = Lock()
         self.nonce_store: dict[tuple[str, str], float] = {}
         self.lock_nonce_store = Lock()
         self.task_store: dict[int, Task] = {}
@@ -65,7 +66,11 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.task_token_store: dict[int, TokenRecord] = {}
         # Store token to task ID mapping
         self.task_token_to_task_id: dict[str, int] = {}
+        self.task_logs: dict[int, list[tuple[float, str]]] = {}
+        self.log_lock = Lock()
         self.lock_task_store = Lock()
+        self.task_message_store: dict[str, Message] = {}
+        self.lock_task_message_store = Lock()
 
     @property
     def object_store(self) -> ObjectStore:
@@ -102,6 +107,34 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 verifications=dict(fab.verifications),
             )
 
+    def add_task_log(self, task_id: int, log_message: str) -> None:
+        """Add a log entry to the task logs for the specified `task_id`."""
+        with self.lock_task_store:
+            if task_id not in self.task_store:
+                raise ValueError(f"Task {task_id} not found")
+        with self.log_lock:
+            timestamp = now().timestamp()
+            task_logs = self.task_logs.setdefault(task_id, [])
+            task_logs.append((timestamp, log_message))
+
+    def get_task_log(
+        self, task_id: int, after_timestamp: float | None
+    ) -> tuple[str, float]:
+        """Get task logs for the specified `task_id`."""
+        # We don't check if the task exists before querying logs
+        # because the task_id is validated by the authz layer
+
+        with self.log_lock:
+            task_logs = self.task_logs.get(task_id, [])
+            if after_timestamp is None:
+                after_timestamp = 0.0
+            timestamps = [timestamp for timestamp, _ in task_logs]
+            # Polling is strict-after: entries at the checkpoint timestamp have
+            # already been delivered, so resume after the rightmost equal value.
+            index = bisect_right(timestamps, after_timestamp)
+            latest_timestamp = task_logs[-1][0] if index < len(task_logs) else 0.0
+            return "".join(log for _, log in task_logs[index:]), latest_timestamp
+
     def create_task(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         task_type: str,
@@ -109,9 +142,18 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         fab_hash: str | None = None,
         model_ref: str | None = None,
         connector_ref: str | None = None,
+        requesting_task_id: int | None = None,
     ) -> int | None:
         """Create a task and return its ID."""
         with self.lock_task_store:
+            if requesting_task_id is not None:
+                requesting_task = self.task_store.get(requesting_task_id)
+                if (
+                    requesting_task is None
+                    or requesting_task.status.status == Status.FINISHED
+                ):
+                    return None
+
             task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
 
             task = Task(
@@ -132,6 +174,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self,
         *,
         task_ids: Sequence[int] | None = None,
+        run_ids: Sequence[int] | None = None,
         statuses: Sequence[str] | None = None,
         order_by: Literal["pending_at"] | None = None,
         ascending: bool = True,
@@ -148,12 +191,25 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             raise ValueError("`statuses` must be a sequence of strings")
 
         with self.lock_task_store:
+            # Expire non-responsive tasks before getting tasks
+            self._cleanup_expired_task_tokens_locked()
+
             matched_task_ids = set(self.task_store.keys())
 
             if task_ids is not None:
                 if not task_ids:
                     return []
                 matched_task_ids &= set(task_ids)
+
+            if run_ids is not None:
+                if not run_ids:
+                    return []
+                run_id_set = set(run_ids)
+                matched_task_ids &= {
+                    task_id
+                    for task_id in matched_task_ids
+                    if self.task_store[task_id].run_id in run_id_set
+                }
 
             if statuses is not None:
                 if not statuses:
@@ -186,7 +242,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
 
     def claim_task(self, task_id: int) -> str | None:
         """Atomically claim a pending task."""
-        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)
+        token = secrets.token_hex(FLWR_TASK_TOKEN_LENGTH)
         with self.lock_task_store:
             task = self.task_store.get(task_id)
             if task is None or task_id in self.task_token_store:
@@ -202,7 +258,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             )
             self.task_token_store[task_id] = TokenRecord(
                 token=token,
-                active_until=int(claimed_at.timestamp()) + HEARTBEAT_DEFAULT_INTERVAL,
+                active_until=claimed_at + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL),
             )
             self.task_token_to_task_id[token] = task_id
             return token
@@ -262,10 +318,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             if task is None or record is None or task.status.status == Status.FINISHED:
                 return False
 
-            now_int = int(now().timestamp())
-            record.active_until = (
-                now_int + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-            )
+            ttl = timedelta(seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL)
+            record.active_until = now() + ttl
             return True
 
     def get_task_by_token(self, token: str) -> Task | None:
@@ -280,6 +334,95 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             task.CopyFrom(self.task_store[task_id])
             return task
 
+    def store_task_message(  # pylint: disable=too-many-return-statements
+        self, message: Message
+    ) -> bool:
+        """Store one task-addressed Message."""
+        message_id = message.metadata.message_id
+        if validate_task_message(message):
+            return False
+        src_task_id = cast(int, message.metadata.src_task_id)
+        dst_task_id = cast(int, message.metadata.dst_task_id)
+
+        with self.lock_task_store, self.lock_task_message_store:
+            self._cleanup_expired_task_tokens_locked()
+            self._cleanup_invalid_task_messages_locked(now().timestamp())
+            src_task = self.task_store.get(src_task_id)
+            dst_task = self.task_store.get(dst_task_id)
+            if src_task is None or dst_task is None:
+                return False
+            if src_task.run_id != dst_task.run_id:
+                log(
+                    ERROR,
+                    "Cannot store message: source task %d and destination task %d "
+                    "belong to different runs.",
+                    src_task_id,
+                    dst_task_id,
+                )
+                return False
+            if message.metadata.run_id != src_task.run_id:
+                log(
+                    ERROR,
+                    "Cannot store message for task %s: message run ID %d "
+                    "does not match task run ID %d.",
+                    message_id,
+                    message.metadata.run_id,
+                    src_task.run_id,
+                )
+                return False
+            if dst_task.status.status == Status.FINISHED:
+                return False
+
+            if message_id in self.task_message_store:
+                return False
+            self.task_message_store[message_id] = message
+            return True
+
+    def get_task_message(
+        self,
+        *,
+        dst_task_ids: Sequence[int] | None = None,
+        limit: int | None = None,
+        order_by: Literal["created_at"] | None = None,
+    ) -> Sequence[Message]:
+        """Retrieve undelivered task-addressed Messages."""
+        if order_by not in (None, "created_at"):
+            raise AssertionError("`order_by` must be 'created_at' or None")
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if limit == 0:
+            return []
+        if dst_task_ids is not None and not dst_task_ids:
+            return []
+
+        with self.lock_task_store, self.lock_task_message_store:
+            self._cleanup_expired_task_tokens_locked()
+            current = now().timestamp()
+            self._cleanup_invalid_task_messages_locked(current)
+
+            # Filter by dst_task_id
+            dst_task_id_set = set(dst_task_ids) if dst_task_ids is not None else None
+            selected_messages = [
+                msg
+                for msg in self.task_message_store.values()
+                if dst_task_id_set is None
+                or msg.metadata.dst_task_id in dst_task_id_set
+            ]
+
+            # Apply requested sort order
+            if order_by == "created_at":
+                selected_messages.sort(key=lambda msg: msg.metadata.created_at)
+
+            # Apply limit
+            if limit is not None:
+                selected_messages = selected_messages[:limit]
+
+            # Delete selected messages from storage
+            for msg in selected_messages:
+                del self.task_message_store[msg.metadata.message_id]
+
+        return selected_messages
+
     def _cleanup_expired_task_tokens_locked(self) -> None:
         """Remove expired task tokens.
 
@@ -287,15 +430,15 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         Expired tasks are marked as finished with a failed status, and their
         tokens are removed.
         """
-        expired_at = now()
-        current = int(expired_at.timestamp())
+        current = now()
+        expired_tasks: list[Task] = []
         for task_id, record in list(self.task_token_store.items()):
             if record.active_until < current:
                 # The task is considered expired. Mark it as finished with a failed
                 # status if it's not already finished, and remove the token.
                 task = self.task_store.get(task_id)
                 if task and task.status.status != Status.FINISHED:
-                    task.finished_at = expired_at.isoformat()
+                    task.finished_at = record.active_until.isoformat()
                     task.status.CopyFrom(
                         TaskStatus(
                             status=Status.FINISHED,
@@ -303,92 +446,40 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                             details="No heartbeat received from the task",
                         )
                     )
+                    expired_task = Task()
+                    expired_task.CopyFrom(task)
+                    expired_tasks.append(expired_task)
                 del self.task_token_store[task_id]
                 self.task_token_to_task_id.pop(record.token, None)
 
-    def create_token(self, run_id: int) -> str | None:
-        """Create a token for the given run ID."""
-        token = secrets.token_hex(FLWR_APP_TOKEN_LENGTH)  # Generate a random token
-        with self.lock_token_store:
-            if run_id in self.token_store:
-                return None  # Token already created for this run ID
+        if expired_tasks:
+            self._on_task_tokens_expired(expired_tasks)
 
-            active_until = int(now().timestamp()) + HEARTBEAT_DEFAULT_INTERVAL
-            self.token_store[run_id] = TokenRecord(
-                token=token, active_until=active_until
-            )
-            self.token_to_run_id[token] = run_id
-        return token
+    def _cleanup_invalid_task_messages_locked(self, current: float) -> None:
+        """Remove expired Messages and Messages for invalid destination tasks."""
+        for message_id, message in list(self.task_message_store.items()):
+            dst_task_id = message.metadata.dst_task_id
+            if dst_task_id is None:
+                del self.task_message_store[message_id]
+                continue
 
-    def verify_token(self, run_id: int, token: str) -> bool:
-        """Verify a token for the given run ID."""
-        self._cleanup_expired_tokens()
-        with self.lock_token_store:
-            record = self.token_store.get(run_id)
-            return record is not None and record.token == token
+            dst_task = self.task_store.get(dst_task_id)
+            if (
+                dst_task is None
+                or dst_task.status.status == Status.FINISHED
+                or message.metadata.created_at + message.metadata.ttl <= current
+            ):
+                del self.task_message_store[message_id]
 
-    def delete_token(self, run_id: int) -> None:
-        """Delete the token for the given run ID."""
-        with self.lock_token_store:
-            record = self.token_store.pop(run_id, None)
-            if record is not None:
-                self.token_to_run_id.pop(record.token, None)
-
-    def get_run_id_by_token(self, token: str) -> int | None:
-        """Get the run ID associated with a given token."""
-        self._cleanup_expired_tokens()
-        with self.lock_token_store:
-            return self.token_to_run_id.get(token)
-
-    def acknowledge_app_heartbeat(self, token: str) -> bool:
-        """Acknowledge an app heartbeat with the provided token."""
-        # Clean up expired tokens
-        self._cleanup_expired_tokens()
-
-        with self.lock_token_store:
-            # Return False if token is not found
-            if token not in self.token_to_run_id:
-                return False
-
-            # Get the run_id and update heartbeat info
-            run_id = self.token_to_run_id[token]
-            record = self.token_store[run_id]
-            current = int(now().timestamp())
-            record.active_until = (
-                current + HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
-            )
-            return True
-
-    def _cleanup_expired_tokens(self) -> None:
-        """Remove expired tokens and perform additional cleanup.
-
-        This method is called before token operations to ensure integrity.
-        Subclasses can override `_on_tokens_expired` to add custom cleanup logic.
-        """
-        with self.lock_token_store:
-            current = int(now().timestamp())
-            expired_records: list[tuple[int, int]] = []
-            for run_id, record in list(self.token_store.items()):
-                if record.active_until < current:
-                    expired_records.append((run_id, record.active_until))
-                    # Remove from both stores
-                    del self.token_store[run_id]
-                    self.token_to_run_id.pop(record.token, None)
-
-            # Hook for subclasses
-            if expired_records:
-                self._on_tokens_expired(expired_records)
-
-    def _on_tokens_expired(self, expired_records: list[tuple[int, int]]) -> None:
-        """Handle cleanup of expired tokens.
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+        """Handle cleanup of expired task tokens.
 
         Override in subclasses to add custom cleanup logic.
 
         Parameters
         ----------
-        expired_records : list[tuple[int, int]]
-            List of tuples containing (run_id, active_until timestamp)
-            for expired tokens.
+        tasks : list[Task]
+            Copies of tasks whose claims expired and were marked FINISHED:FAILED.
         """
 
     def reserve_nonce(self, namespace: str, nonce: str, expires_at: float) -> bool:

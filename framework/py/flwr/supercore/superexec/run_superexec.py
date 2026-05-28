@@ -16,36 +16,93 @@
 
 
 import time
+from logging import ERROR, WARNING
 from typing import Any
+
+import grpc
 
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
+from flwr.common.logger import log
 from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.common.serde import run_from_proto
 from flwr.common.telemetry import EventType
 from flwr.common.typing import Run
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    ListAppsToLaunchRequest,
-    RequestTokenRequest,
+    ClaimTaskRequest,
+    PullPendingTasksRequest,
 )
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.run_pb2 import GetRunRequest  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.constant import ExecutorType
 from flwr.supercore.grpc_health import run_health_server_grpc_no_tls
-from flwr.supercore.interceptors import SuperExecAuthClientInterceptor
+from flwr.supercore.interceptors import (
+    RuntimeVersionClientInterceptor,
+    SuperExecAuthClientInterceptor,
+)
 from flwr.supercore.interceptors.superexec_auth_interceptor import (
     CLIENTAPPIO_SUPEREXEC_METHODS,
     SERVERAPPIO_SUPEREXEC_METHODS,
 )
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
+from .executor import LaunchResult, LaunchResultStatus, get_executor
 from .plugin import ExecPlugin
 from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
 
 
-def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
+def _handle_launch_result(result: LaunchResult | None, task: Task) -> None:
+    """Handle the immediate outcome of a TaskExecutor launch attempt."""
+    # Temporary: ephemeral plugins may not return a LaunchResult.
+    # Remove this once ephemeral plugins are removed.
+    if result is None:
+        return
+
+    if result.status == LaunchResultStatus.ACCEPTED:
+        return
+
+    message = result.message or "Not provided by executor."
+    if result.status == LaunchResultStatus.CAPACITY_REJECTED:
+        log(
+            WARNING,
+            "Executor rejected launch for task_id %d due to capacity. Reason: %s "
+            "Existing task expiry handling will apply.",
+            task.task_id,
+            message,
+        )
+        return
+
+    if result.status == LaunchResultStatus.FAILED:
+        log(
+            ERROR,
+            "Executor failed to launch task_id %d. Reason: %s "
+            "Existing task expiry handling will apply.",
+            task.task_id,
+            message,
+        )
+        return
+
+    if result.status == LaunchResultStatus.UNKNOWN:
+        log(
+            WARNING,
+            "Executor launch outcome is unknown for task_id %d. Reason: %s "
+            "Existing task expiry handling will apply.",
+            task.task_id,
+            message,
+        )
+        return
+
+    raise RuntimeError(
+        f"Executor returned unrecognized launch result '{result.status}' "
+        f"for task_id {task.task_id}. Reason: {message}"
+    )
+
+
+def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     plugin_class: type[ExecPlugin],
     stub_class: type[ClientAppIoStub] | type[ServerAppIoStub],
     appio_api_address: str,
@@ -56,6 +113,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
     parent_pid: int | None = None,
     health_server_address: str | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
+    executor_type: ExecutorType = ExecutorType.SUBPROCESS,
 ) -> None:
     """Run Flower SuperExec.
 
@@ -85,19 +143,25 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
         NOT be started.
     runtime_dependency_install : bool (default: False)
         Whether runtime dependency installation is allowed.
+    executor_type : ExecutorType (default: ExecutorType.SUBPROCESS)
+        The executor to use for non-ephemeral app processes.
     """
-    interceptors: list[SuperExecAuthClientInterceptor] | None = None
+    executor = get_executor(executor_type)
+
+    interceptors: list[grpc.UnaryUnaryClientInterceptor] = [
+        RuntimeVersionClientInterceptor(component_name="SuperExec")
+    ]
+    auth_interceptor: SuperExecAuthClientInterceptor | None = None
     if superexec_auth_secret:
         if stub_class is ServerAppIoStub:
             protected_methods = SERVERAPPIO_SUPEREXEC_METHODS
         else:
             protected_methods = CLIENTAPPIO_SUPEREXEC_METHODS
-        interceptors = [
-            SuperExecAuthClientInterceptor(
-                master_secret=superexec_auth_secret,
-                protected_methods=protected_methods,
-            )
-        ]
+        auth_interceptor = SuperExecAuthClientInterceptor(
+            master_secret=superexec_auth_secret,
+            protected_methods=protected_methods,
+        )
+        interceptors.append(auth_interceptor)
 
     # Start monitoring the parent process if a PID is provided
     if parent_pid is not None:
@@ -144,6 +208,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
         root_certificates_path=root_certificates_path,
         get_run=get_run,
         runtime_dependency_install=runtime_dependency_install,
+        executor=executor,
     )
 
     # Load plugin configuration from file if provided
@@ -159,38 +224,40 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0917
     # Start the main loop
     try:
         while True:
-            # Fetch suitable run IDs
-            ls_req = ListAppsToLaunchRequest()
-            ls_res = stub.ListAppsToLaunch(ls_req)
+            # Fetch pending tasks
+            tasks_res = stub.PullPendingTasks(request=PullPendingTasksRequest())
 
-            # Allow the plugin to select a run ID
-            run_id = None
-            if ls_res.run_ids:
-                run_id = plugin.select_run_id(candidate_run_ids=ls_res.run_ids)
+            # Select a task to execute using the plugin's selection logic
+            task = None
+            if tasks_res.tasks:
+                task = plugin.select_task(tasks_res.tasks)
 
-            # Apply for a token if a run ID was selected
-            if run_id is not None:
-                tk_req = RequestTokenRequest(run_id=run_id)
-                tk_res = stub.RequestToken(tk_req)
+            # If a task was selected, claim it
+            if task is not None:
+                executor.wait_for_capacity()
+
+                claim_req = ClaimTaskRequest(task_id=task.task_id)
+                claim_res = stub.ClaimTask(claim_req)
 
                 # Launch the app if a token was granted; do nothing if not
-                if tk_res.token:
+                if claim_res.token:
 
                     # Destroy the auth secret before launching the app
                     # for ephemeral plugins
                     if isinstance(plugin, BaseEphemeralExecPlugin):
 
                         def cleanup_auth_secret() -> None:
-                            nonlocal superexec_auth_secret, interceptors
+                            nonlocal superexec_auth_secret
                             if superexec_auth_secret is not None:
                                 superexec_auth_secret = None
-                            if interceptors:
+                            if auth_interceptor is not None:
                                 # pylint: disable-next=protected-access
-                                interceptors[0]._auth_secret = b"\x00" * 32
+                                auth_interceptor._auth_secret = b"\x00" * 32
 
                         plugin.cleanup_before_launch = cleanup_auth_secret
 
-                    plugin.launch_app(token=tk_res.token, run_id=run_id)
+                    launch_result = plugin.launch_task(token=claim_res.token, task=task)
+                    _handle_launch_result(launch_result, task)
 
             # Sleep for a while before checking again
             time.sleep(1)

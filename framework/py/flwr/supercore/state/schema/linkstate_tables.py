@@ -16,7 +16,6 @@
 
 
 from sqlalchemy import (
-    TIMESTAMP,
     BigInteger,
     Column,
     Float,
@@ -51,7 +50,7 @@ def create_linkstate_metadata() -> MetaData:
         Column("last_activated_at", String, nullable=True),
         Column("last_deactivated_at", String, nullable=True),
         Column("unregistered_at", String, nullable=True),
-        Column("online_until", TIMESTAMP, nullable=True),
+        Column("online_until", Float, nullable=True),
         Column("heartbeat_interval", Float),
         Column("public_key", LargeBinary, unique=True),
         # Indexes
@@ -74,21 +73,17 @@ def create_linkstate_metadata() -> MetaData:
         Column("fab_version", String),
         Column("fab_hash", String),
         Column("override_config", String),
-        Column("pending_at", String),
-        Column("starting_at", String),
-        Column("running_at", String),
-        Column("finished_at", String),
         Column("usage_reported_at", String, nullable=False, server_default=text("''")),
-        Column("sub_status", String),
-        Column("details", String),
         Column("federation", String),
-        Column("primary_task_id", BigInteger, nullable=True),
+        Column("primary_task_id", BigInteger, nullable=False),
         Column("federation_config", String),
         Column("run_type", String, nullable=False, server_default=RunType.SERVER_APP),
+        Column("series_id", BigInteger, nullable=True),
         Column("flwr_aid", String),
         Column("bytes_sent", BigInteger, server_default="0"),
         Column("bytes_recv", BigInteger, server_default="0"),
         Column("clientapp_runtime", Float, server_default="0.0"),
+        Index("idx_run_series_id", "series_id"),
     )
 
     # --------------------------------------------------------------------------

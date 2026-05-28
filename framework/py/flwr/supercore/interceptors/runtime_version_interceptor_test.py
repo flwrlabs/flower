@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for runtime version metadata interceptors."""
 
+import json
 from collections import namedtuple
 from collections.abc import Iterable, Iterator
 from typing import cast
@@ -23,6 +24,7 @@ from unittest.mock import Mock, patch
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
+from flwr.common.exit import ExitCode
 from flwr.proto.serverappio_pb2 import GetNodesRequest  # pylint: disable=E0611
 from flwr.supercore.constant import (
     FLWR_COMPONENT_NAME_METADATA_KEY,
@@ -30,9 +32,13 @@ from flwr.supercore.constant import (
     FLWR_PACKAGE_VERSION_METADATA_KEY,
     VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY,
 )
+from flwr.supercore.error import ApiErrorCode, FlowerError
 from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
     RuntimeVersionServerInterceptor,
+    create_clientappio_runtime_version_server_interceptor,
+    create_control_runtime_version_server_interceptor,
+    create_fleet_runtime_version_server_interceptor,
     create_serverappio_runtime_version_server_interceptor,
 )
 from flwr.supercore.runtime_version_compatibility import RuntimeVersionMetadata
@@ -75,6 +81,17 @@ def _make_runtime_metadata(version: str) -> tuple[tuple[str, str], ...]:
     )
 
 
+def _make_runtime_metadata_with_package(
+    package_name: str,
+    version: str,
+) -> tuple[tuple[str, str], ...]:
+    return (
+        (FLWR_PACKAGE_NAME_METADATA_KEY, package_name),
+        (FLWR_PACKAGE_VERSION_METADATA_KEY, version),
+        (FLWR_COMPONENT_NAME_METADATA_KEY, "simulation"),
+    )
+
+
 def _make_unary_handler() -> grpc.RpcMethodHandler:
     def _handler(_request: GrpcMessage, _context: grpc.ServicerContext) -> str:
         return "ok"
@@ -101,6 +118,20 @@ def _make_stream_call(
     call.trailing_metadata.return_value = trailing_metadata
     call.__iter__ = Mock(return_value=iter(messages))
     return call
+
+
+def _make_runtime_rpc_error() -> grpc.RpcError:
+    rpc_error = grpc.RpcError()
+    rpc_error.trailing_metadata = Mock(return_value=())
+    rpc_error.details = Mock(
+        return_value=FlowerError(
+            ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
+            "internal diagnostic message",
+            public_details="runtime mismatch",
+        ).to_json("Runtime version compatibility check failed.")
+    )
+    rpc_error.add_callback = Mock(return_value=False)
+    return rpc_error
 
 
 class TestRuntimeVersionClientInterceptor(TestCase):
@@ -134,7 +165,7 @@ class TestRuntimeVersionClientInterceptor(TestCase):
         response = self.interceptor.intercept_unary_unary(
             continuation=continuation,
             client_call_details=details,
-            request=GetNodesRequest(run_id=1),
+            request=GetNodesRequest(),
         )
 
         self.assertIs(response, call)
@@ -159,8 +190,30 @@ class TestRuntimeVersionClientInterceptor(TestCase):
             self.interceptor.intercept_unary_unary(
                 continuation=lambda _details, _request: self._make_call(),
                 client_call_details=details,
-                request=GetNodesRequest(run_id=1),
+                request=GetNodesRequest(),
             )
+
+    def test_log_unary_incompatibility_from_returned_rpc_error(self) -> None:
+        """Unary-unary RpcError outcomes should fall back if callbacks are late."""
+        rpc_error = _make_runtime_rpc_error()
+
+        with patch(
+            "flwr.supercore.interceptors.runtime_version_interceptor.flwr_exit"
+        ) as flwr_exit_mock:
+            response = self.interceptor.intercept_unary_unary(
+                continuation=lambda _details, _request: rpc_error,
+                client_call_details=_make_call_details(
+                    "/flwr.proto.ServerAppIo/GetNodes"
+                ),
+                request=GetNodesRequest(),
+            )
+
+        self.assertIs(response, rpc_error)
+        rpc_error.add_callback.assert_called_once()
+        flwr_exit_mock.assert_called_once_with(
+            ExitCode.RUNTIME_VERSION_INCOMPATIBLE,
+            "Runtime version compatibility check failed.\nruntime mismatch",
+        )
 
 
 class TestRuntimeVersionServerInterceptor(TestCase):
@@ -171,7 +224,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         self.interceptor = RuntimeVersionServerInterceptor(
             connection_name="flwr-simulation <-> SuperLink ServerAppIo API",
             local_metadata=RuntimeVersionMetadata.from_local_component(
-                "superlink",
+                "SuperLink",
                 package_name_value="flwr",
                 package_version_value="1.29.0",
             ),
@@ -198,7 +251,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
 
         context = Mock()
-        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        response = intercepted.unary_unary(GetNodesRequest(), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_not_called()
 
@@ -210,7 +263,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
 
         context = Mock()
-        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        response = intercepted.unary_unary(GetNodesRequest(), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_called_once()
 
@@ -222,20 +275,102 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
 
         context = Mock()
-        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        response = intercepted.unary_unary(GetNodesRequest(), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_called_once()
+        metadata = dict(context.set_trailing_metadata.call_args.args[0])
+        self.assertEqual(
+            metadata[VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY],
+            "SuperLink version 1.29.0 detected a runtime version mismatch: "
+            "expected a peer from the same major.minor release, but received "
+            "simulation version 1.30.1.",
+        )
 
-    def test_serverappio_factory_observes_by_default(self) -> None:
-        """ServerAppIo factory should not return warning metadata by default."""
-        self.interceptor = create_serverappio_runtime_version_server_interceptor()
+    def test_package_name_mismatch_preserves_warning_details(self) -> None:
+        """Non-version incompatibilities should preserve diagnostic details."""
+        intercepted = self._intercept(
+            "/flwr.proto.ServerAppIo/GetNodes",
+            _make_runtime_metadata_with_package("custom-flwr", "1.29.0"),
+        )
+
+        context = Mock()
+        response = intercepted.unary_unary(GetNodesRequest(), context)
+        self.assertEqual(response, "ok")
+        context.set_trailing_metadata.assert_called_once()
+        metadata = dict(context.set_trailing_metadata.call_args.args[0])
+        self.assertEqual(
+            metadata[VERSION_INCOMPATIBILITY_MESSAGE_METADATA_KEY],
+            "Peer Flower package name is not recognized: 'custom-flwr'.",
+        )
+
+    def test_incompatible_metadata_is_rejected(self) -> None:
+        """Reject mode should abort with a structured FlowerError."""
+        self.interceptor = RuntimeVersionServerInterceptor(
+            connection_name="flwr-simulation <-> SuperLink ServerAppIo API",
+            local_metadata=RuntimeVersionMetadata.from_local_component(
+                "SuperLink",
+                package_name_value="flwr",
+                package_version_value="1.29.0",
+            ),
+            reject_incompatible=True,
+        )
         intercepted = self._intercept(
             "/flwr.proto.ServerAppIo/GetNodes",
             _make_runtime_metadata("1.30.1"),
         )
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+        context.code.return_value = None
+
+        with self.assertRaises(grpc.RpcError):
+            intercepted.unary_unary(GetNodesRequest(), context)
+
+        status, payload = context.abort.call_args.args
+        self.assertEqual(status, grpc.StatusCode.FAILED_PRECONDITION)
+        error_payload = json.loads(payload)
+        self.assertEqual(
+            error_payload["code"], ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
+        )
+        self.assertEqual(
+            error_payload["public_details"],
+            "SuperLink version 1.29.0 detected a runtime version mismatch: "
+            "expected a peer from the same major.minor release, but received "
+            "simulation version 1.30.1.",
+        )
+
+    def test_serverappio_factory_rejects_incompatible_by_default(self) -> None:
+        """ServerAppIo factory should reject different major.minor by default."""
+        interceptor = create_serverappio_runtime_version_server_interceptor()
+        self.assertTrue(interceptor._reject_incompatible)  # pylint: disable=W0212
+
+    def test_clientappio_factory_rejects_incompatible_by_default(self) -> None:
+        """ClientAppIo factory should reject different major.minor by default."""
+        interceptor = create_clientappio_runtime_version_server_interceptor()
+        self.assertTrue(interceptor._reject_incompatible)  # pylint: disable=W0212
+
+    def test_fleet_factory_observes_by_default(self) -> None:
+        """Fleet factory should not return warning metadata by default."""
+        self.interceptor = create_fleet_runtime_version_server_interceptor()
+        intercepted = self._intercept(
+            "/flwr.proto.Fleet/ActivateNode",
+            _make_runtime_metadata("1.30.1"),
+        )
 
         context = Mock()
-        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        response = intercepted.unary_unary(GetNodesRequest(), context)
+        self.assertEqual(response, "ok")
+        context.set_trailing_metadata.assert_not_called()
+
+    def test_control_factory_observes_by_default(self) -> None:
+        """Control factory should not return warning metadata by default."""
+        self.interceptor = create_control_runtime_version_server_interceptor()
+        intercepted = self._intercept(
+            "/flwr.proto.Control/ListRuns",
+            _make_runtime_metadata("1.30.1"),
+        )
+
+        context = Mock()
+        response = intercepted.unary_unary(GetNodesRequest(), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_not_called()
 
@@ -248,7 +383,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
 
         context = Mock()
-        response = intercepted.unary_unary(GetNodesRequest(run_id=1), context)
+        response = intercepted.unary_unary(GetNodesRequest(), context)
         self.assertEqual(response, "ok")
         context.set_trailing_metadata.assert_not_called()
 
@@ -262,7 +397,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
 
         context = Mock()
-        responses = list(intercepted.unary_stream(GetNodesRequest(run_id=1), context))
+        responses = list(intercepted.unary_stream(GetNodesRequest(), context))
         self.assertEqual(responses, ["a", "b"])
         context.set_trailing_metadata.assert_called_once()
 
@@ -276,7 +411,7 @@ class TestRuntimeVersionServerInterceptor(TestCase):
         )
 
         context = Mock()
-        responses = list(intercepted.unary_stream(GetNodesRequest(run_id=1), context))
+        responses = list(intercepted.unary_stream(GetNodesRequest(), context))
         self.assertEqual(responses, ["a", "b"])
         context.set_trailing_metadata.assert_not_called()
 
@@ -301,7 +436,7 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
                     "/flwr.proto.Fleet/PullTaskIns",
                     metadata,
                 ),
-                request=GetNodesRequest(run_id=1),
+                request=GetNodesRequest(),
             ),
         )
 
@@ -324,7 +459,7 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
             self.interceptor.intercept_unary_stream(
                 continuation=continuation,
                 client_call_details=details,
-                request=GetNodesRequest(run_id=1),
+                request=GetNodesRequest(),
             )
         )
 
@@ -350,7 +485,7 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
             self.interceptor.intercept_unary_stream(
                 continuation=lambda _details, _request: mock_call,
                 client_call_details=_make_call_details("/flwr.proto.Fleet/PullTaskIns"),
-                request=GetNodesRequest(run_id=1),
+                request=GetNodesRequest(),
             )
 
             done_callback = mock_call.add_callback.call_args.args[0]
@@ -374,9 +509,29 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
             response = self.interceptor.intercept_unary_stream(
                 continuation=lambda _details, _request: mock_call,
                 client_call_details=_make_call_details("/flwr.proto.Fleet/PullTaskIns"),
-                request=GetNodesRequest(run_id=1),
+                request=GetNodesRequest(),
             )
 
         self.assertIs(response, mock_call)
         mock_call.add_callback.assert_called_once()
         log_mock.assert_called_once()
+
+    def test_log_stream_incompatibility_from_returned_rpc_error(self) -> None:
+        """Unary-stream RpcError outcomes should fall back if callbacks are late."""
+        rpc_error = _make_runtime_rpc_error()
+
+        with patch(
+            "flwr.supercore.interceptors.runtime_version_interceptor.flwr_exit"
+        ) as flwr_exit_mock:
+            response = self.interceptor.intercept_unary_stream(
+                continuation=lambda _details, _request: rpc_error,
+                client_call_details=_make_call_details("/flwr.proto.Fleet/PullTaskIns"),
+                request=GetNodesRequest(),
+            )
+
+        self.assertIs(response, rpc_error)
+        rpc_error.add_callback.assert_called_once()
+        flwr_exit_mock.assert_called_once_with(
+            ExitCode.RUNTIME_VERSION_INCOMPATIBLE,
+            "Runtime version compatibility check failed.\nruntime mismatch",
+        )

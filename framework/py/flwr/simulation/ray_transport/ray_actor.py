@@ -38,7 +38,7 @@ class VirtualClientEngineActor(ABC):
     def terminate(self) -> None:
         """Manually terminate Actor object."""
         log(WARNING, "Manually terminating %s", self.__class__.__name__)
-        ray.actor.exit_actor()
+        ray.actor.exit_actor()  # type: ignore[no-untyped-call]
 
     def run(
         self,
@@ -97,7 +97,7 @@ def pool_size_from_resources(client_resources: dict[str, int | float]) -> int:
     # if we don't follow a per-node estimation of actors, we'll be creating an actor
     # pool with 2 Actors. This, however, doesn't fit in the cluster since only one of
     # the nodes can fit one Actor.
-    nodes = ray.nodes()
+    nodes = ray.nodes()  # type: ignore[no-untyped-call]
     for node in nodes:
         node_resources = node["Resources"]
 

@@ -30,13 +30,6 @@ service ServerAppIo {
   // General *AppIo endpoints for SuperExec processes
   /////////////////////////////////////////////////////////////////////////////
 
-  // List runs to launch
-  rpc ListAppsToLaunch(ListAppsToLaunchRequest)
-      returns (ListAppsToLaunchResponse) {}
-
-  // Request token for a run
-  rpc RequestToken(RequestTokenRequest) returns (RequestTokenResponse) {}
-
   // Pull pending tasks
   rpc PullPendingTasks(PullPendingTasksRequest)
       returns (PullPendingTasksResponse) {}
@@ -51,19 +44,15 @@ service ServerAppIo {
   // Get run details
   rpc GetRun(GetRunRequest) returns (GetRunResponse) {}
 
-  // App heartbeat
-  rpc SendAppHeartbeat(SendAppHeartbeatRequest)
-      returns (SendAppHeartbeatResponse) {}
-
   // Task heartbeat
   rpc SendTaskHeartbeat(SendTaskHeartbeatRequest)
       returns (SendTaskHeartbeatResponse) {}
 
-  // Pull app inputs
-  rpc PullAppInputs(PullAppInputsRequest) returns (PullAppInputsResponse) {}
+  // Pull task inputs
+  rpc PullTaskInput(PullTaskInputRequest) returns (PullTaskInputResponse) {}
 
-  // Push app outputs
-  rpc PushAppOutputs(PushAppOutputsRequest) returns (PushAppOutputsResponse) {}
+  // Push task outputs
+  rpc PushTaskOutput(PushTaskOutputRequest) returns (PushTaskOutputResponse) {}
 
   /////////////////////////////////////////////////////////////////////////////
   // Specific endpoints shared by ServerAppIo and ClientAppIo
@@ -82,6 +71,17 @@ service ServerAppIo {
   // Create a task
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse) {}
 
+  // Push task message
+  rpc PushTaskMessage(PushTaskMessageRequest)
+      returns (PushTaskMessageResponse) {}
+
+  // Pull task messages
+  rpc PullTaskMessage(PullTaskMessageRequest)
+      returns (PullTaskMessageResponse) {}
+
+  // Push task logs
+  rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
+
   /////////////////////////////////////////////////////////////////////////////
   // Specific endpoints for ServerAppIo
   /////////////////////////////////////////////////////////////////////////////
@@ -89,13 +89,6 @@ service ServerAppIo {
   // Get Federation Options (only used by flwr-simulation)
   rpc GetFederationOptions(GetFederationOptionsRequest)
       returns (GetFederationOptionsResponse) {}
-
-  // Update the status of a given run
-  rpc UpdateRunStatus(UpdateRunStatusRequest)
-      returns (UpdateRunStatusResponse) {}
-
-  // Push ServerApp logs
-  rpc PushLogs(PushLogsRequest) returns (PushLogsResponse) {}
 
   // Create one or more messages
   rpc PushMessages(PushAppMessagesRequest) returns (PushAppMessagesResponse) {}
@@ -108,5 +101,5 @@ service ServerAppIo {
 }
 
 // GetNodes messages
-message GetNodesRequest { uint64 run_id = 1; }
+message GetNodesRequest {}
 message GetNodesResponse { repeated Node nodes = 1; }

@@ -13,12 +13,10 @@ for dir in ../examples/*/; do
 done
 wait
 python -m black -q ../examples
-python -m docformatter -i -r ../examples
 
 # Benchmarks
 python -m isort ../benchmarks
 python -m black -q ../benchmarks
-python -m docformatter -i -r ../benchmarks
 
 # Notebooks
 KEYS="metadata.celltoolbar metadata.language_info metadata.toc metadata.notify_time metadata.varInspector metadata.accelerator metadata.vscode cell.metadata.id cell.metadata.heading_collapsed cell.metadata.hidden cell.metadata.code_folding cell.metadata.tags cell.metadata.init_cell cell.metadata.vscode cell.metadata.pycharm"

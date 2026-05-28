@@ -16,7 +16,6 @@
 
 # pylint: disable=too-many-lines
 
-
 import hashlib
 import json
 import time
@@ -50,11 +49,10 @@ from flwr.common.constant import (
     SUPERLINK_NODE_ID,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     Status,
-    SubStatus,
 )
 from flwr.common.logger import log
 from flwr.common.serde import run_to_proto, user_config_from_proto
-from flwr.common.typing import AccountInfo, Fab, Run, RunStatus
+from flwr.common.typing import AccountInfo, Fab, Run
 from flwr.proto import control_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     AcceptInvitationRequest,
@@ -116,10 +114,9 @@ from flwr.supercore.constant import (
     ActionType,
     RunTime,
     RunType,
-    TaskType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
-from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
+from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
 from flwr.supercore.typing import (
     AcceptInvitationContext,
@@ -249,20 +246,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 run_type,
             )
 
-            # Create primary task
-            if run_type == RunType.SIMULATION:
-                task_type = TaskType.SIMULATION
-            elif run_type == RunType.SERVER_APP:
-                task_type = TaskType.SERVER_APP
-            else:
-                raise ValueError(f"Unsupported run type: {run_type}")
-            task_id = state.create_task(
-                task_type=task_type, run_id=run_id, fab_hash=fab_hash
-            )
-            if task_id is None:
-                log(ERROR, "Failed to create task for run ID %s", run_id)
+            if run_id == 0:
                 context.abort(
-                    grpc.StatusCode.INTERNAL, "Failed to create task for the run."
+                    grpc.StatusCode.INTERNAL,
+                    "Failed to create or initialize the run.",
                 )
 
             # Initialize node config
@@ -310,6 +297,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         if not runs:
             context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
         run = runs[0]
+        task_id = cast(int, run.primary_task_id)
 
         with rpc_error_translator(context, rpc_name):
             flwr_aid = _get_flwr_aid(context)
@@ -319,7 +307,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         after_timestamp = request.after_timestamp + 1e-6
         while context.is_active():
-            log_msg, latest_timestamp = state.get_serverapp_log(run_id, after_timestamp)
+            log_msg, latest_timestamp = state.get_task_log(task_id, after_timestamp)
             if log_msg:
                 yield StreamLogsResponse(
                     log_output=log_msg,
@@ -423,13 +411,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 f"Run ID {run_id} is already finished",
             )
 
-        update_success = _stop_run_in_linkstate(
-            state=state,
-            store=self.objectstore_factory.store(),
-            run_id=run_id,
-        )
-
-        return StopRunResponse(success=update_success)
+        return StopRunResponse(success=state.stop_run(run_id))
 
     def GetLoginDetails(
         self, request: GetLoginDetailsRequest, context: grpc.ServicerContext
@@ -742,14 +724,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 flwr_aid=_get_flwr_aid(context),
                 name=request.federation_name,
             )
-            store = self.objectstore_factory.store()
             for run in state.get_run_info(federations=[request.federation_name]):
                 if run.status.status != Status.FINISHED:
-                    _stop_run_in_linkstate(
-                        state=state,
-                        store=store,
-                        run_id=run.run_id,
-                    )
+                    state.stop_run(run.run_id)
 
         return ArchiveFederationResponse()
 
@@ -810,7 +787,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         log(INFO, rpc_name := self.RemoveAccountFromFederation.__qualname__)
 
         state = self.linkstate_factory.state()
-        store = self.objectstore_factory.store()
 
         target_account = None if not request.account_name else request.account_name
 
@@ -827,7 +803,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 flwr_aids=[removed_flwr_aid],
                 statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
             ):
-                _stop_run_in_linkstate(state=state, store=store, run_id=run.run_id)
+                state.stop_run(run.run_id)
         return RemoveAccountFromFederationResponse()
 
     def CreateInvitation(
@@ -1076,24 +1052,6 @@ def _check_flwr_aid_in_run(
             grpc.StatusCode.PERMISSION_DENIED,
             "⛔️ Run ID does not belong to the account",
         )
-
-
-def _stop_run_in_linkstate(state: LinkState, store: ObjectStore, run_id: int) -> bool:
-    """Stop a run and clean it up using LinkState methods."""
-    update_success = state.update_run_status(
-        run_id=run_id,
-        new_status=RunStatus(Status.FINISHED, SubStatus.STOPPED, ""),
-    )
-
-    # Always invalidate the run token so no further work can be scheduled.
-    state.delete_token(run_id)
-
-    if update_success:
-        message_ids: set[str] = state.get_message_ids_from_run_id(run_id)
-        state.delete_messages(message_ids)
-        store.delete_objects_in_run(run_id)
-
-    return update_success
 
 
 def _format_verification(verifications: list[dict[str, str]]) -> dict[str, str]:

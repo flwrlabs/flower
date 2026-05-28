@@ -21,16 +21,17 @@ import unittest
 import grpc
 
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    ListAppsToLaunchRequest,
-    ListAppsToLaunchResponse,
+    PullPendingTasksRequest,
+    PullPendingTasksResponse,
 )
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PullObjectRequest,
     PullObjectResponse,
 )
+from flwr.supercore.constant import TaskType
 from flwr.supercore.interceptors import (
-    APP_TOKEN_HEADER,
     AUTHENTICATION_FAILED_MESSAGE,
+    TASK_TOKEN_HEADER,
     AppIoTokenClientInterceptor,
     SuperExecAuthClientInterceptor,
 )
@@ -56,7 +57,9 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         state_factory = NodeStateFactory(objectstore_factory=objectstore_factory)
 
         state = state_factory.state()
-        token = state.create_token(99)
+        task_id = state.create_task(task_type=TaskType.CLIENT_APP, run_id=99)
+        assert task_id is not None
+        token = state.claim_task(task_id)
         assert token is not None
         self.valid_token = token
 
@@ -75,9 +78,9 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
             response_deserializer=PullObjectResponse.FromString,
         )
         self._list_apps_to_launch_no_auth = self._base_channel.unary_unary(
-            "/flwr.proto.ClientAppIo/ListAppsToLaunch",
-            request_serializer=ListAppsToLaunchRequest.SerializeToString,
-            response_deserializer=ListAppsToLaunchResponse.FromString,
+            "/flwr.proto.ClientAppIo/PullPendingTasks",
+            request_serializer=PullPendingTasksRequest.SerializeToString,
+            response_deserializer=PullPendingTasksResponse.FromString,
         )
         self._auth_channel = grpc.intercept_channel(
             self._base_channel,
@@ -88,9 +91,9 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
             ),
         )
         self._list_apps_to_launch_with_superexec_auth = self._auth_channel.unary_unary(
-            "/flwr.proto.ClientAppIo/ListAppsToLaunch",
-            request_serializer=ListAppsToLaunchRequest.SerializeToString,
-            response_deserializer=ListAppsToLaunchResponse.FromString,
+            "/flwr.proto.ClientAppIo/PullPendingTasks",
+            request_serializer=PullPendingTasksRequest.SerializeToString,
+            response_deserializer=PullPendingTasksResponse.FromString,
         )
 
     def tearDown(self) -> None:
@@ -109,7 +112,7 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         with self.assertRaises(grpc.RpcError) as err:
             self._pull_object.with_call(
                 request=PullObjectRequest(object_id="obj-2"),
-                metadata=((APP_TOKEN_HEADER, "invalid-token"),),
+                metadata=((TASK_TOKEN_HEADER, "invalid-token"),),
             )
         assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
         assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE
@@ -118,27 +121,27 @@ class TestClientAppIoAuthIntegration(unittest.TestCase):  # pylint: disable=R090
         """Protected RPC should allow requests with valid metadata token."""
         response, call = self._pull_object.with_call(
             request=PullObjectRequest(object_id="obj-3"),
-            metadata=((APP_TOKEN_HEADER, self.valid_token),),
+            metadata=((TASK_TOKEN_HEADER, self.valid_token),),
         )
 
         assert isinstance(response, PullObjectResponse)
         assert call.code() == grpc.StatusCode.OK
 
-    def test_list_apps_to_launch_denied_without_superexec_metadata(self) -> None:
+    def test_pull_pending_tasks_denied_without_superexec_metadata(self) -> None:
         """SuperExec RPC should deny requests missing signed metadata."""
         with self.assertRaises(grpc.RpcError) as err:
             self._list_apps_to_launch_no_auth.with_call(
-                request=ListAppsToLaunchRequest()
+                request=PullPendingTasksRequest()
             )
         assert err.exception.code() == grpc.StatusCode.UNAUTHENTICATED
         assert err.exception.details() == AUTHENTICATION_FAILED_MESSAGE
 
-    def test_list_apps_to_launch_allows_with_superexec_metadata(self) -> None:
+    def test_pull_pending_tasks_allows_with_superexec_metadata(self) -> None:
         """SuperExec RPC should allow requests with valid signed metadata."""
         response, call = self._list_apps_to_launch_with_superexec_auth.with_call(
-            request=ListAppsToLaunchRequest()
+            request=PullPendingTasksRequest()
         )
-        assert isinstance(response, ListAppsToLaunchResponse)
+        assert isinstance(response, PullPendingTasksResponse)
         assert call.code() == grpc.StatusCode.OK
 
 
@@ -163,19 +166,19 @@ class TestClientAppIoAuthIntegrationWithoutSuperExecSecret(unittest.TestCase):
 
         channel = grpc.insecure_channel(self._server.bound_address)
         self._list_apps_to_launch = channel.unary_unary(
-            "/flwr.proto.ClientAppIo/ListAppsToLaunch",
-            request_serializer=ListAppsToLaunchRequest.SerializeToString,
-            response_deserializer=ListAppsToLaunchResponse.FromString,
+            "/flwr.proto.ClientAppIo/PullPendingTasks",
+            request_serializer=PullPendingTasksRequest.SerializeToString,
+            response_deserializer=PullPendingTasksResponse.FromString,
         )
 
     def tearDown(self) -> None:
         """Stop the gRPC API server."""
         self._server.stop(None)
 
-    def test_list_apps_to_launch_allows_without_superexec_metadata(self) -> None:
+    def test_pull_pending_tasks_allows_without_superexec_metadata(self) -> None:
         """No SuperExec signing should be required when auth is disabled."""
         response, call = self._list_apps_to_launch.with_call(
-            request=ListAppsToLaunchRequest()
+            request=PullPendingTasksRequest()
         )
-        assert isinstance(response, ListAppsToLaunchResponse)
+        assert isinstance(response, PullPendingTasksResponse)
         assert call.code() == grpc.StatusCode.OK

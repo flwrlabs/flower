@@ -223,7 +223,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, expected_task_type)
 
-    def test_start_run_aborts_if_create_task_fails(self) -> None:
+    def test_start_run_aborts_if_create_run_fails(self) -> None:
         """Test StartRun aborts with INTERNAL if the initial task cannot be created."""
         fab_content = b"test FAB content task failure"
         request = StartRunRequest()
@@ -240,7 +240,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch(
                 "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
             ) as mock_get_metadata_from_config,
-            patch.object(self.state, "create_task", return_value=None),
+            patch.object(self.state, "create_run", return_value=0),
             self.assertRaises(grpc.RpcError),
         ):
             mock_get_fab_config.return_value = {
@@ -251,7 +251,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         context.abort.assert_called_once_with(
             grpc.StatusCode.INTERNAL,
-            "Failed to create task for the run.",
+            "Failed to create or initialize the run.",
         )
 
     def test_start_run_returns_note_for_remote_app(self) -> None:
@@ -373,7 +373,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 self.state.federation_manager,
                 "can_execute",
                 side_effect=EntitlementError(
-                    details="Start run not permitted.",
+                    "Start run denied for this account.",
+                    public_details="Start run not permitted.",
                     entitlement_code=101,
                 ),
             ),
@@ -544,7 +545,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 self.state.federation_manager,
                 "can_execute",
                 side_effect=EntitlementError(
-                    details="Register node not permitted.",
+                    "Register node denied for this account.",
+                    public_details="Register node not permitted.",
                     entitlement_code=102,
                 ),
             ),
@@ -785,7 +787,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
                 self.state.federation_manager,
                 "can_execute",
                 side_effect=EntitlementError(
-                    details="Create federation not permitted.",
+                    "Create federation denied for this account.",
+                    public_details="Create federation not permitted.",
                     entitlement_code=103,
                 ),
             ),
@@ -866,10 +869,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             self.aid,
             RunType.SERVER_APP,
         )
-        token = self.state.create_token(run_id)
-        assert token is not None
-        _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-        _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
 
         with patch.object(
             self.state.federation_manager,
@@ -881,7 +880,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Archiving should reuse the same stop-run cleanup path as StopRun.
         run = self.state.get_run_info(run_ids=[run_id])[0]
         self.assertEqual(run.status, RunStatus(Status.FINISHED, SubStatus.STOPPED, ""))
-        self.assertFalse(self.state.verify_token(run_id, token))
         self.store.delete_objects_in_run.assert_called_once_with(run_id)
         self.assertIsInstance(response, ArchiveFederationResponse)
 
@@ -924,10 +922,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             target_flwr_aid,
             RunType.SERVER_APP,
         )
-        token = self.state.create_token(run_id)
-        assert token is not None
-        _ = self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-        _ = self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
 
         with patch.object(
             self.state.federation_manager,
@@ -938,7 +932,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         run = self.state.get_run_info(run_ids=[run_id])[0]
         self.assertEqual(run.status, RunStatus(Status.FINISHED, SubStatus.STOPPED, ""))
-        self.assertFalse(self.state.verify_token(run_id, token))
         self.store.delete_objects_in_run.assert_called_once_with(run_id)
         self.assertIsInstance(response, RemoveAccountFromFederationResponse)
 
@@ -1002,7 +995,8 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
         self.state.federation_manager.can_execute.side_effect = EntitlementError(
-            details="Create invitation not permitted.",
+            "Create invitation denied for this account.",
+            public_details="Create invitation not permitted.",
             entitlement_code=104,
         )
 
@@ -1061,7 +1055,8 @@ class TestControlServicerInvitationRPCs(unittest.TestCase):
         context = Mock()
         context.abort.side_effect = grpc.RpcError()
         self.state.federation_manager.can_execute.side_effect = EntitlementError(
-            details="Accept invitation not permitted.",
+            "Accept invitation denied for this account.",
+            public_details="Accept invitation not permitted.",
             entitlement_code=105,
         )
 
@@ -1172,15 +1167,15 @@ class TestControlServicerAuth(unittest.TestCase):
         mock_get_run_info = Mock()
         mock_run = Mock(
             federation=NOOP_FEDERATION,
+            primary_task_id=456,
             status=RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
         )
         mock_get_run_info.return_value = [mock_run]
+        mock_get_task_log = Mock(return_value=("log1", 1.0))
 
         # Execute & Assert
         with (
-            patch.object(
-                self.state, "get_serverapp_log", new=lambda rid, ts: ("log1", 1.0)
-            ),
+            patch.object(self.state, "get_task_log", new=mock_get_task_log),
             patch.object(self.state, "get_run_info", new=mock_get_run_info),
             patch.object(
                 self.state.federation_manager, "has_member", return_value=True
@@ -1190,10 +1185,10 @@ class TestControlServicerAuth(unittest.TestCase):
                 return_value=SimpleNamespace(flwr_aid="user-123"),
             ),
         ):
-            msgs = list(self.servicer.StreamLogs(request, ctx))
             gen = self.servicer.StreamLogs(request, ctx)
             msgs = list(gen)
             mock_get_run_info.assert_called_with(run_ids=[run_id])
+            mock_get_task_log.assert_called_once_with(456, 1e-06)
             self.assertEqual(len(msgs), 1)
             self.assertIsInstance(msgs[0], StreamLogsResponse)
             self.assertEqual(msgs[0].log_output, "log1")

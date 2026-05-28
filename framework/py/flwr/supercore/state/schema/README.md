@@ -63,7 +63,7 @@ erDiagram
     VARCHAR last_activated_at "nullable"
     VARCHAR last_deactivated_at "nullable"
     BIGINT node_id UK "nullable"
-    TIMESTAMP online_until "nullable"
+    FLOAT online_until "nullable"
     VARCHAR owner_aid "nullable"
     VARCHAR owner_name "nullable"
     BLOB public_key UK "nullable"
@@ -94,22 +94,17 @@ erDiagram
     BIGINT bytes_recv "nullable"
     BIGINT bytes_sent "nullable"
     FLOAT clientapp_runtime "nullable"
-    VARCHAR details "nullable"
     VARCHAR fab_hash "nullable"
     VARCHAR fab_id "nullable"
     VARCHAR fab_version "nullable"
     VARCHAR federation "nullable"
     VARCHAR federation_config "nullable"
-    VARCHAR finished_at "nullable"
     VARCHAR flwr_aid "nullable"
     VARCHAR override_config "nullable"
-    VARCHAR pending_at "nullable"
-    BIGINT primary_task_id "nullable"
+    BIGINT primary_task_id
     BIGINT run_id UK "nullable"
     VARCHAR run_type
-    VARCHAR running_at "nullable"
-    VARCHAR starting_at "nullable"
-    VARCHAR sub_status "nullable"
+    BIGINT series_id "nullable"
     VARCHAR usage_reported_at
   }
 
@@ -118,27 +113,63 @@ erDiagram
     BIGINT run_id PK
   }
 
+  run_series {
+    BIGINT series_id PK
+    TIMESTAMP created_at
+    VARCHAR description "nullable"
+    VARCHAR federation
+    BIGINT last_run_id "nullable"
+    TIMESTAMP updated_at
+  }
+
+  series_context {
+    BIGINT series_id PK
+    BLOB context "nullable"
+  }
+
   task {
-    BIGINT active_until "nullable"
+    TIMESTAMP active_until "nullable"
     VARCHAR connector_ref "nullable"
     VARCHAR details
     VARCHAR fab_hash "nullable"
-    VARCHAR finished_at "nullable"
+    TIMESTAMP finished_at "nullable"
     VARCHAR model_ref "nullable"
-    VARCHAR pending_at
+    TIMESTAMP pending_at
     BIGINT run_id
-    VARCHAR running_at "nullable"
-    VARCHAR starting_at "nullable"
+    TIMESTAMP running_at "nullable"
+    TIMESTAMP starting_at "nullable"
     VARCHAR sub_status
     BIGINT task_id UK
     VARCHAR token "nullable"
     VARCHAR type
   }
 
-  token_store {
-    BIGINT run_id PK "nullable"
-    FLOAT active_until "nullable"
-    VARCHAR token UK
+  task_event {
+    INTEGER id PK
+    BIGINT task_id FK
+    VARCHAR data
+    VARCHAR event
+    BIGINT run_id
+    TIMESTAMP timestamp
+  }
+
+  task_logs {
+    BIGINT task_id FK
+    VARCHAR log
+    FLOAT timestamp
+  }
+
+  task_message {
+    VARCHAR message_id PK
+    BIGINT dst_task_id FK
+    BIGINT src_task_id FK
+    BLOB content "nullable"
+    FLOAT created_at
+    BLOB error "nullable"
+    VARCHAR message_type
+    VARCHAR reply_to_message_id "nullable"
+    BIGINT run_id
+    FLOAT ttl
   }
 
   run ||--o| context : run_id
@@ -148,6 +179,10 @@ erDiagram
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
   objects ||--o| run_objects : object_id
+  task ||--o{ task_event : task_id
+  task ||--o{ task_logs : task_id
+  task ||--o{ task_message : src_task_id
+  task ||--o{ task_message : dst_task_id
 
 ```
 <!-- END_SQLALCHEMY_DOCS -->
