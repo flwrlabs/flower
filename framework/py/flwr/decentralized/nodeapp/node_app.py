@@ -708,29 +708,6 @@ class NodeApp(App):
                 return
             return
 
-        event, payload = self._parse_event(message)
-        if event == "evaluate":
-            callback = self._evaluate_fn
-            message_type = MessageType.EVALUATE
-            config = self.eval_config
-        else:
-            callback = self._train_fn
-            message_type = MessageType.TRAIN
-            config = self.train_config
-
-        if callback is None:
-            raise RuntimeError(
-                f"No '{event}' callback is registered on NodeApp '{self.subject}'."
-            )
-
-        self._invoke_callback(
-            callback,
-            message_type=message_type,
-            config=config,
-            payload=payload,
-            node_id=node_id,
-        )
-
     def periodic_run(self, view: list[str], node_id: Optional[str] = None) -> None:
         """Default periodic behavior: call registered `train` callback if present.
 
