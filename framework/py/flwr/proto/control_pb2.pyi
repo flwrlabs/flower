@@ -24,6 +24,7 @@ import flwr.proto.federation_config_pb2
 import flwr.proto.federation_pb2
 import flwr.proto.node_pb2
 import flwr.proto.run_pb2
+import flwr.proto.task_pb2
 import flwr.proto.transport_pb2
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
@@ -796,21 +797,21 @@ global___ConfigureSimulationFederationResponse = ConfigureSimulationFederationRe
 
 @typing.final
 class StreamRunEventsRequest(google.protobuf.message.Message):
-    """##############
-    Unused for now
-    ##############
-    """
-
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RUN_ID_FIELD_NUMBER: builtins.int
+    AFTER_TASK_EVENT_ID_FIELD_NUMBER: builtins.int
     run_id: builtins.int
+    after_task_event_id: builtins.int
     def __init__(
         self,
         *,
         run_id: builtins.int = ...,
+        after_task_event_id: builtins.int | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["run_id", b"run_id"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_after_task_event_id", b"_after_task_event_id", "after_task_event_id", b"after_task_event_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_after_task_event_id", b"_after_task_event_id", "after_task_event_id", b"after_task_event_id", "run_id", b"run_id"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_after_task_event_id", b"_after_task_event_id"]) -> typing.Literal["after_task_event_id"] | None: ...
 
 global___StreamRunEventsRequest = StreamRunEventsRequest
 
@@ -818,16 +819,15 @@ global___StreamRunEventsRequest = StreamRunEventsRequest
 class StreamRunEventsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    EVENT_FIELD_NUMBER: builtins.int
-    DATA_FIELD_NUMBER: builtins.int
-    event: builtins.str
-    data: builtins.str
+    TASK_EVENT_FIELD_NUMBER: builtins.int
+    @property
+    def task_event(self) -> flwr.proto.task_pb2.TaskEvent: ...
     def __init__(
         self,
         *,
-        event: builtins.str = ...,
-        data: builtins.str = ...,
+        task_event: flwr.proto.task_pb2.TaskEvent | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["data", b"data", "event", b"event"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["task_event", b"task_event"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["task_event", b"task_event"]) -> None: ...
 
 global___StreamRunEventsResponse = StreamRunEventsResponse

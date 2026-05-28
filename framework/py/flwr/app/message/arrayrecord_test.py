@@ -28,16 +28,14 @@ import numpy as np
 import pytest
 from parameterized import parameterized
 
+from flwr.app.message import Array, ArrayRecord
 from flwr.common import ndarray_to_bytes
+from flwr.common.constant import SType
+from flwr.common.typing import NDArray
 from flwr.supercore.inflatable.inflatable_object import (
     get_object_body,
     get_object_type_from_object_content,
 )
-
-from ..constant import SType
-from ..typing import NDArray
-from .array import Array
-from .arrayrecord import ArrayRecord
 
 
 def _get_buffer_from_ndarray(array: NDArray) -> bytes:
