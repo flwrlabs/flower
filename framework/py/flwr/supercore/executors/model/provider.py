@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Private Open Responses provider client for Model executors."""
+"""Private Responses-compatible provider client for Model executors."""
 
 from __future__ import annotations
 
@@ -20,18 +20,14 @@ import json
 import os
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
-from typing import TypeAlias, cast
+from typing import cast
 
 import requests
 
-JSONValue: TypeAlias = (
-    None | bool | int | float | str | list["JSONValue"] | dict[str, "JSONValue"]
-)
-JSONObject: TypeAlias = dict[str, JSONValue]
+from flwr.supercore.typing import JSONObject, JSONValue
 
-DEFAULT_MODEL_API_ENDPOINT = "https://api.flower.ai/v1"
-DEFAULT_MODEL_API_TIMEOUT_S = 60.0
-_PROVIDER_NAME = "Open Responses"
+DEFAULT_MODEL_API_ENDPOINT = "https://api.flower.ai/v1/responses"
+DEFAULT_MODEL_API_TIMEOUT_S = 600.0
 _STREAM_CONTENT_TYPE = "text/event-stream"
 _TERMINAL_SUCCESS_EVENTS = frozenset({"response.completed", "response.incomplete"})
 _TERMINAL_FAILURE_EVENTS = frozenset({"error", "response.failed"})
@@ -48,7 +44,7 @@ class ModelProviderFailurePayload:
 
 
 class ModelProviderError(RuntimeError):
-    """Raised when the configured Open Responses provider request fails."""
+    """Raised when the configured model provider request fails."""
 
     def __init__(self, payload: ModelProviderFailurePayload) -> None:
         super().__init__(payload.message)
@@ -57,7 +53,7 @@ class ModelProviderError(RuntimeError):
 
 @dataclass(frozen=True)
 class ModelProviderResult:
-    """Result returned by the Open Responses provider client."""
+    """Result returned by the model provider client."""
 
     response: JSONObject
     events: list[JSONObject]
@@ -75,7 +71,7 @@ def invoke_responses_model(
     *,
     on_stream_event: Callable[[JSONObject], None] | None = None,
 ) -> ModelProviderResult:
-    """Invoke the configured Open Responses-compatible provider."""
+    """Invoke the configured Responses-compatible model provider."""
     config = _resolve_provider_config()
     payload = dict(request)
     if payload.get("stream") is True:
@@ -183,7 +179,7 @@ def _invoke_streaming_response(
             )
 
     raise _provider_error(
-        "Open Responses stream ended without a terminal event.",
+        "Model provider stream ended without a terminal event.",
         status_code=response.status_code,
         detail=last_event,
         event=last_event,
@@ -206,7 +202,7 @@ def _post_responses_request(
         )
     except requests.RequestException as exc:
         raise _provider_error(
-            f"{_PROVIDER_NAME} request failed: {exc}",
+            f"Model provider request failed: {exc}",
             detail=str(exc),
         ) from exc
 
@@ -254,13 +250,13 @@ def _decode_response_json(response: requests.Response) -> JSONObject:
         payload = response.json()
     except ValueError as exc:
         raise _provider_error(
-            f"{_PROVIDER_NAME} returned invalid JSON.",
+            "Model provider returned invalid JSON.",
             status_code=response.status_code,
             detail=_response_text(response),
         ) from exc
     if not isinstance(payload, dict):
         raise _provider_error(
-            f"{_PROVIDER_NAME} returned a non-object JSON payload.",
+            "Model provider returned a non-object JSON payload.",
             status_code=response.status_code,
             detail=cast(JSONValue, payload),
         )
@@ -302,12 +298,12 @@ def _parse_provider_event(*, event_name: str | None, data: str) -> JSONObject | 
         payload = json.loads(data)
     except json.JSONDecodeError as exc:
         raise _provider_error(
-            f"{_PROVIDER_NAME} stream returned invalid JSON event.",
+            "Model provider stream returned invalid JSON event.",
             detail=data,
         ) from exc
     if not isinstance(payload, dict):
         raise _provider_error(
-            f"{_PROVIDER_NAME} stream returned a non-object JSON event.",
+            "Model provider stream returned a non-object JSON event.",
             detail=cast(JSONValue, payload),
         )
 
@@ -365,7 +361,7 @@ def _extract_error_detail(payload: JSONObject) -> JSONValue | None:
 
 
 def _failure_message(*, status_code: int, detail: JSONValue) -> str:
-    return f"{_PROVIDER_NAME} request failed: {status_code} {_format_detail(detail)}"
+    return f"Model provider request failed: {status_code} {_format_detail(detail)}"
 
 
 def _provider_error(

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the private Open Responses model provider client."""
+"""Tests for the private model provider client."""
 
 from __future__ import annotations
 
@@ -56,10 +56,10 @@ def _patch_post(monkeypatch: pytest.MonkeyPatch, response: _Response) -> Mock:
     return post_mock
 
 
-def test_invoke_responses_model_uses_env_config(
+def test_invoke_responses_model_uses_provider_config(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Provider calls should use the configured endpoint, key, and timeout."""
+    """Provider calls should use endpoint, auth, timeout, and defaults."""
     monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
     monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", "https://example.test/v1/responses/")
     monkeypatch.setenv("FLWR_MODEL_API_TIMEOUT_S", "0.1")
@@ -82,24 +82,20 @@ def test_invoke_responses_model_uses_env_config(
     assert post_mock.call_args.kwargs["timeout"] == 1.0
     assert post_mock.call_args.kwargs["stream"] is False
 
-
-def test_invoke_responses_model_uses_default_endpoint(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Missing endpoint should default to the Flower model API."""
-    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
     monkeypatch.delenv("FLWR_MODEL_API_ENDPOINT", raising=False)
+    monkeypatch.delenv("FLWR_MODEL_API_TIMEOUT_S", raising=False)
     post_mock = _patch_post(monkeypatch, _Response(body={}))
 
     invoke_responses_model({"model": "model", "input": []})
 
     assert post_mock.call_args.args[0] == "https://api.flower.ai/v1/responses"
+    assert post_mock.call_args.kwargs["timeout"] == 600.0
 
 
-def test_invoke_responses_model_requires_api_key(
+def test_invoke_responses_model_raises_structured_provider_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Missing API key should raise a structured provider error."""
+    """Provider setup, HTTP, payload, and transport failures should be structured."""
     monkeypatch.delenv("FLWR_MODEL_API_KEY", raising=False)
 
     with pytest.raises(ModelProviderError) as exc_info:
@@ -109,11 +105,6 @@ def test_invoke_responses_model_requires_api_key(
         "Model API key is not set (FLWR_MODEL_API_KEY)."
     )
 
-
-def test_invoke_responses_model_raises_on_http_error(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Provider HTTP errors should become structured provider errors."""
     monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
     _patch_post(
         monkeypatch,
@@ -128,14 +119,8 @@ def test_invoke_responses_model_raises_on_http_error(
 
     assert exc_info.value.payload.status_code == 400
     assert exc_info.value.payload.detail == "model not found"
-    assert str(exc_info.value) == "Open Responses request failed: 400 model not found"
+    assert str(exc_info.value) == "Model provider request failed: 400 model not found"
 
-
-def test_invoke_responses_model_raises_on_error_payload(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """HTTP 200 payloads containing provider errors should fail."""
-    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
     _patch_post(
         monkeypatch,
         _Response(body={"error": {"message": "endpoint paused"}}),
@@ -147,11 +132,23 @@ def test_invoke_responses_model_raises_on_error_payload(
     assert exc_info.value.payload.status_code == 200
     assert exc_info.value.payload.detail == "endpoint paused"
 
+    post_mock = Mock(side_effect=requests.Timeout("timed out"))
+    monkeypatch.setattr(
+        "flwr.supercore.executors.model.provider.requests.post",
+        post_mock,
+    )
+
+    with pytest.raises(ModelProviderError) as exc_info:
+        invoke_responses_model({"model": "model", "input": []})
+
+    assert exc_info.value.payload.status_code is None
+    assert exc_info.value.payload.detail == "timed out"
+
 
 def test_invoke_responses_model_collects_stream_events(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Streaming calls should collect events and call the stream callback."""
+    """Streaming calls should collect events and accept incomplete terminals."""
     monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
     post_mock = _patch_post(
         monkeypatch,
@@ -195,12 +192,6 @@ def test_invoke_responses_model_collects_stream_events(
     }
     assert post_mock.call_args.kwargs["stream"] is True
 
-
-def test_invoke_responses_model_returns_incomplete_stream_response(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Incomplete events should be terminal and [DONE] should be ignored."""
-    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
     _patch_post(
         monkeypatch,
         _Response(
@@ -273,10 +264,10 @@ def test_invoke_responses_model_raises_on_stream_failure_events(
         assert exc_info.value.payload.detail == expected_detail
 
 
-def test_invoke_responses_model_raises_on_invalid_stream_content_type(
+def test_invoke_responses_model_raises_on_malformed_stream_response(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Stream mode should require an explicit SSE content type."""
+    """Stream mode should reject malformed response framing and events."""
     monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
     cases = [
         (
@@ -285,57 +276,27 @@ def test_invoke_responses_model_raises_on_invalid_stream_content_type(
                 body={"detail": "Bad Request: endpoint paused"},
             ),
             "Bad Request: endpoint paused",
+            200,
         ),
-        (_Response(), "Missing Content-Type header for streaming response."),
+        (_Response(), "Missing Content-Type header for streaming response.", 200),
+        (
+            _Response(
+                headers={"Content-Type": "text/event-stream"},
+                lines=[
+                    b"data: {bad-json}",
+                    b"",
+                ],
+            ),
+            "{bad-json}",
+            None,
+        ),
     ]
 
-    for response, expected_detail in cases:
+    for response, expected_detail, expected_status_code in cases:
         _patch_post(monkeypatch, response)
 
         with pytest.raises(ModelProviderError) as exc_info:
             invoke_responses_model({"model": "model", "input": [], "stream": True})
 
-        assert exc_info.value.payload.status_code == 200
+        assert exc_info.value.payload.status_code == expected_status_code
         assert exc_info.value.payload.detail == expected_detail
-
-
-def test_invoke_responses_model_raises_on_invalid_stream_json(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Malformed JSON SSE events should become structured provider errors."""
-    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
-    _patch_post(
-        monkeypatch,
-        _Response(
-            headers={"Content-Type": "text/event-stream"},
-            lines=[
-                b"data: {bad-json}",
-                b"",
-            ],
-        ),
-    )
-
-    with pytest.raises(ModelProviderError) as exc_info:
-        invoke_responses_model({"model": "model", "input": [], "stream": True})
-
-    assert exc_info.value.payload.detail == "{bad-json}"
-    assert str(exc_info.value) == "Open Responses stream returned invalid JSON event."
-
-
-def test_invoke_responses_model_raises_on_request_exception(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Transport exceptions should become structured provider errors."""
-    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
-    post_mock = Mock(side_effect=requests.Timeout("timed out"))
-    monkeypatch.setattr(
-        "flwr.supercore.executors.model.provider.requests.post",
-        post_mock,
-    )
-
-    with pytest.raises(ModelProviderError) as exc_info:
-        invoke_responses_model({"model": "model", "input": []})
-
-    assert exc_info.value.payload.status_code is None
-    assert exc_info.value.payload.detail == "timed out"
-    assert "timed out" in str(exc_info.value)
