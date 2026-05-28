@@ -84,6 +84,7 @@ for ((i=0; i<N; i++)); do
 
   cmd=(
     "${SUPER_DNODE_CMD_ARR[@]}"
+    --execution-mode deploy
     --config "$CONFIG"
     --nodeapps-pyproject "$NODEAPPS_PYPROJECT"
     --timeout "$RUN_TIMEOUT_MS"
