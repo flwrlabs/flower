@@ -168,6 +168,10 @@ def train(message: Message, context: Context) -> Message:
     model: TinyNet = state["model"]
     train_loader: DataLoader = state["train_loader"]
 
+    incoming_arrays = message.content.array_records.get(app.strategy.arrayrecord_key)
+    if incoming_arrays is not None:
+        model.load_state_dict(incoming_arrays.to_torch_state_dict())
+
     local_epochs = int(context.run_config.get("local-epochs", 1))
     learning_rate = float(context.run_config.get("lr", 0.05))
 
@@ -201,6 +205,10 @@ def evaluate(message: Message, context: Context) -> Message:
     state, _ = _get_or_create_state(context)
     model: TinyNet = state["model"]
     test_loader: DataLoader = state["test_loader"]
+
+    incoming_arrays = message.content.array_records.get(app.strategy.arrayrecord_key)
+    if incoming_arrays is not None:
+        model.load_state_dict(incoming_arrays.to_torch_state_dict())
 
     eval_loss, eval_acc = _evaluate(model, test_loader)
 
