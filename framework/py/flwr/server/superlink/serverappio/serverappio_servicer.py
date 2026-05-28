@@ -298,7 +298,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
 
         # Store Simulation Runtime usage metrics before finishing the primary task.
-        # `finish_task` can trigger federation usage reporting.
+        # This ensures that usage is captured even if the task fails to finish properly.
         if request.bytes_sent or request.bytes_recv:
             state.store_traffic(
                 run_id=run_id,
