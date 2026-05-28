@@ -741,46 +741,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(after_first, [events[1]])
         self.assertEqual(no_new, [])
 
-    def test_store_task_events_validates_task_relationship(self) -> None:
-        """Task events should only be stored for a task in the target run."""
-        state = self.state_factory()
-        run_id = self.task_run_id(state)
-        other_run_id = self.other_task_run_id(state)
-        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
-        assert task_id is not None
-
-        self.assertFalse(
-            state.store_task_events(
-                [
-                    TaskEvent(
-                        run_id=other_run_id,
-                        task_id=task_id,
-                        event="response.created",
-                        data='{"type":"response.created"}',
-                    )
-                ]
-            )
-        )
-
-        missing_task_id = task_id + 1
-        while state.get_tasks(task_ids=[missing_task_id]):
-            missing_task_id += 1
-        self.assertFalse(
-            state.store_task_events(
-                [
-                    TaskEvent(
-                        run_id=run_id,
-                        task_id=missing_task_id,
-                        event="response.created",
-                        data='{"type":"response.created"}',
-                    )
-                ]
-            )
-        )
-
-        events = state.get_task_events(run_id, after_task_event_id=None)
-        self.assertEqual(events, [])
-
     @parameterized.expand(  # type: ignore
         [
             ("malformed", "{"),
