@@ -23,7 +23,12 @@ from unittest.mock import Mock
 import pytest
 import requests
 
-from .provider import JSONObject, ModelProviderError, invoke_responses_model
+from .provider import (
+    JSONObject,
+    ModelProviderError,
+    _iter_sse_events,
+    invoke_responses_model,
+)
 
 
 @dataclass
@@ -70,7 +75,10 @@ def test_invoke_responses_model_uses_env_config(
     assert result.response == {"id": "resp_1", "object": "response"}
     assert not result.events
     assert post_mock.call_args.args[0] == "https://example.test/v1/responses"
-    assert post_mock.call_args.kwargs["headers"] == {"Authorization": "Bearer fk_test"}
+    assert post_mock.call_args.kwargs["headers"] == {
+        "Authorization": "Bearer fk_test",
+        "Content-Type": "application/json",
+    }
     assert post_mock.call_args.kwargs["json"] == request
     assert post_mock.call_args.kwargs["timeout"] == 1.0
     assert post_mock.call_args.kwargs["stream"] is False
@@ -87,6 +95,19 @@ def test_invoke_responses_model_uses_default_endpoint(
     invoke_responses_model({"model": "model", "input": []})
 
     assert post_mock.call_args.args[0] == "https://api.flower.ai/v1/responses"
+
+
+def test_invoke_responses_model_accepts_full_responses_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Configured endpoint may be the base URL or the full responses URL."""
+    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
+    monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", "https://example.test/v1/responses/")
+    post_mock = _patch_post(monkeypatch, _Response(body={}))
+
+    invoke_responses_model({"model": "model", "input": []})
+
+    assert post_mock.call_args.args[0] == "https://example.test/v1/responses"
 
 
 def test_invoke_responses_model_requires_api_key(
@@ -189,6 +210,60 @@ def test_invoke_responses_model_collects_stream_events(
     assert post_mock.call_args.kwargs["stream"] is True
 
 
+def test_invoke_responses_model_ignores_done_stream_marker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Streaming calls should ignore the terminal [DONE] marker."""
+    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
+    _patch_post(
+        monkeypatch,
+        _Response(
+            headers={"Content-Type": "text/event-stream"},
+            lines=[
+                b"data: [DONE]",
+                b"",
+                b"event: response.completed",
+                b'data: {"type":"response.completed","response":{"id":"resp_1"}}',
+                b"",
+            ],
+        ),
+    )
+
+    result = invoke_responses_model({"model": "model", "input": [], "stream": True})
+
+    assert result.response == {"id": "resp_1"}
+    assert result.events == [
+        {"type": "response.completed", "response": {"id": "resp_1"}}
+    ]
+
+
+def test_invoke_responses_model_returns_incomplete_stream_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Incomplete response events should be treated as terminal responses."""
+    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
+    _patch_post(
+        monkeypatch,
+        _Response(
+            headers={"Content-Type": "text/event-stream"},
+            lines=[
+                b"event: response.incomplete",
+                b'data: {"type":"response.incomplete","response":{"id":"resp_1",'
+                b'"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"}}}',
+                b"",
+            ],
+        ),
+    )
+
+    result = invoke_responses_model({"model": "model", "input": [], "stream": True})
+
+    assert result.response == {
+        "id": "resp_1",
+        "status": "incomplete",
+        "incomplete_details": {"reason": "max_output_tokens"},
+    }
+
+
 def test_invoke_responses_model_raises_on_stream_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -214,6 +289,30 @@ def test_invoke_responses_model_raises_on_stream_failure(
     assert exc_info.value.payload.detail == "quota exceeded"
 
 
+def test_invoke_responses_model_raises_on_stream_error_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Provider stream error events should become structured provider errors."""
+    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
+    _patch_post(
+        monkeypatch,
+        _Response(
+            headers={"Content-Type": "text/event-stream"},
+            lines=[
+                b"event: error",
+                b'data: {"type":"error","error":{"message":"bad request"}}',
+                b"",
+            ],
+        ),
+    )
+
+    with pytest.raises(ModelProviderError) as exc_info:
+        invoke_responses_model({"model": "model", "input": [], "stream": True})
+
+    assert exc_info.value.payload.status_code == 200
+    assert exc_info.value.payload.detail == "bad request"
+
+
 def test_invoke_responses_model_raises_on_non_sse_stream_response(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -232,6 +331,60 @@ def test_invoke_responses_model_raises_on_non_sse_stream_response(
 
     assert exc_info.value.payload.status_code == 200
     assert exc_info.value.payload.detail == "Bad Request: endpoint paused"
+
+
+def test_invoke_responses_model_raises_on_missing_stream_content_type(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Stream mode should fail when the provider omits the SSE content type."""
+    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
+    _patch_post(monkeypatch, _Response())
+
+    with pytest.raises(ModelProviderError) as exc_info:
+        invoke_responses_model({"model": "model", "input": [], "stream": True})
+
+    assert exc_info.value.payload.status_code == 200
+    assert exc_info.value.payload.detail == (
+        "Missing Content-Type header for streaming response."
+    )
+
+
+def test_invoke_responses_model_raises_on_invalid_stream_json(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Malformed JSON SSE events should become structured provider errors."""
+    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
+    _patch_post(
+        monkeypatch,
+        _Response(
+            headers={"Content-Type": "text/event-stream"},
+            lines=[
+                b"data: {bad-json}",
+                b"",
+            ],
+        ),
+    )
+
+    with pytest.raises(ModelProviderError) as exc_info:
+        invoke_responses_model({"model": "model", "input": [], "stream": True})
+
+    assert exc_info.value.payload.detail == "{bad-json}"
+    assert str(exc_info.value) == "Open Responses stream returned invalid JSON event."
+
+
+def test_iter_sse_events_preserves_data_leading_space() -> None:
+    """SSE data parsing should remove at most one optional leading space."""
+    response = _Response(
+        lines=[
+            b"event: response.output_text.delta",
+            b"data:  leading-space",
+            b"",
+        ],
+    )
+
+    assert list(_iter_sse_events(response)) == [
+        ("response.output_text.delta", " leading-space")
+    ]
 
 
 def test_invoke_responses_model_raises_on_request_exception(

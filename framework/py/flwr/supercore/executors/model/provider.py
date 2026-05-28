@@ -33,8 +33,8 @@ DEFAULT_MODEL_API_ENDPOINT = "https://api.flower.ai/v1"
 DEFAULT_MODEL_API_TIMEOUT_S = 60.0
 _PROVIDER_NAME = "Open Responses"
 _STREAM_CONTENT_TYPE = "text/event-stream"
-_TERMINAL_SUCCESS_EVENT = "response.completed"
-_TERMINAL_FAILURE_EVENTS = frozenset({"response.failed", "response.error"})
+_TERMINAL_SUCCESS_EVENTS = frozenset({"response.completed", "response.incomplete"})
+_TERMINAL_FAILURE_EVENTS = frozenset({"error", "response.failed"})
 
 
 @dataclass(frozen=True)
@@ -65,7 +65,7 @@ class ModelProviderResult:
 
 @dataclass(frozen=True)
 class _ProviderConfig:
-    base_url: str
+    responses_url: str
     headers: dict[str, str]
     timeout_s: float
 
@@ -97,10 +97,20 @@ def _resolve_provider_config() -> _ProviderConfig:
         base_url = DEFAULT_MODEL_API_ENDPOINT
 
     return _ProviderConfig(
-        base_url=base_url.rstrip("/"),
-        headers={"Authorization": f"Bearer {api_key}"},
+        responses_url=_responses_url(base_url),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
         timeout_s=_model_timeout_seconds(),
     )
+
+
+def _responses_url(endpoint: str) -> str:
+    endpoint = endpoint.rstrip("/")
+    if endpoint.endswith("/responses"):
+        return endpoint
+    return f"{endpoint}/responses"
 
 
 def _model_timeout_seconds() -> float:
@@ -150,8 +160,13 @@ def _invoke_streaming_response(
         if on_stream_event is not None:
             on_stream_event(event)
 
+        event_type = event.get("type")
+        is_failure_event = (
+            isinstance(event_type, str) and event_type in _TERMINAL_FAILURE_EVENTS
+        )
+
         detail = _extract_error_detail(event)
-        if detail is not None or event.get("type") in _TERMINAL_FAILURE_EVENTS:
+        if detail is not None or is_failure_event:
             raise _provider_error(
                 _failure_message(
                     status_code=response.status_code, detail=detail or event
@@ -161,7 +176,7 @@ def _invoke_streaming_response(
                 event=event,
             )
 
-        if event.get("type") == _TERMINAL_SUCCESS_EVENT:
+        if isinstance(event_type, str) and event_type in _TERMINAL_SUCCESS_EVENTS:
             return ModelProviderResult(
                 response=_final_response_from_event(event),
                 events=events,
@@ -183,7 +198,7 @@ def _post_responses_request(
 ) -> requests.Response:
     try:
         return requests.post(
-            f"{config.base_url}/responses",
+            config.responses_url,
             headers=config.headers,
             json=request,
             timeout=config.timeout_s,
@@ -221,10 +236,12 @@ def _raise_for_payload_failure(payload: JSONObject, *, status_code: int) -> None
 
 def _raise_for_non_sse_response(response: requests.Response) -> None:
     content_type = _response_content_type(response)
-    if not content_type or _STREAM_CONTENT_TYPE in content_type:
+    if _STREAM_CONTENT_TYPE in content_type:
         return
 
     detail = _response_detail(response)
+    if not content_type and (detail is None or detail == ""):
+        detail = "Missing Content-Type header for streaming response."
     raise _provider_error(
         _failure_message(status_code=response.status_code, detail=detail),
         status_code=response.status_code,
@@ -268,19 +285,31 @@ def _iter_sse_events(response: requests.Response) -> Iterator[tuple[str | None, 
             event_name = line.removeprefix("event:").strip() or None
             continue
         if line.startswith("data:"):
-            data_lines.append(line.removeprefix("data:").lstrip())
+            data = line.removeprefix("data:")
+            if data.startswith(" "):
+                data = data[1:]
+            data_lines.append(data)
 
     if data_lines:
         yield event_name, "\n".join(data_lines)
 
 
 def _parse_provider_event(*, event_name: str | None, data: str) -> JSONObject | None:
+    if data.strip() == "[DONE]":
+        return None
+
     try:
         payload = json.loads(data)
-    except json.JSONDecodeError:
-        return None
+    except json.JSONDecodeError as exc:
+        raise _provider_error(
+            f"{_PROVIDER_NAME} stream returned invalid JSON event.",
+            detail=data,
+        ) from exc
     if not isinstance(payload, dict):
-        return None
+        raise _provider_error(
+            f"{_PROVIDER_NAME} stream returned a non-object JSON event.",
+            detail=cast(JSONValue, payload),
+        )
 
     event = cast(JSONObject, payload)
     if event_name is not None and not isinstance(event.get("type"), str):
