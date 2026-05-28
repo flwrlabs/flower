@@ -108,6 +108,26 @@ def context_from_bytes(context_bytes: bytes) -> Context:
     return serde.context_from_proto(ProtoContext.FromString(context_bytes))
 
 
+def clone_context(context: Context) -> Context:
+    """Return a serialized copy of a `Context`."""
+    return context_from_bytes(context_to_bytes(context))
+
+
+def context_matches_run_series(context: Context, run_id: int, series_id: int) -> bool:
+    """Return True if `context` belongs to the given run and RunSeries."""
+    return context.run_id == run_id and context.series_id in (0, series_id)
+
+
+def materialize_run_series_context(
+    context: Context, *, run_id: int, series_id: int
+) -> Context:
+    """Return a copy of shared RunSeries context for the specified run."""
+    materialized = clone_context(context)
+    materialized.run_id = run_id
+    materialized.series_id = series_id
+    return materialized
+
+
 def create_message_error_unavailable_res_message(
     ins_metadata: Metadata, error_type: str
 ) -> Message:
