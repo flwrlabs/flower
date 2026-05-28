@@ -113,6 +113,40 @@ def test_training_round_persists_callback_returned_arrays() -> None:
     np.testing.assert_allclose(app.arrays["w"].numpy(), np.asarray([5.0]))
 
 
+def test_average_array_records_adopts_peer_when_local_is_empty() -> None:
+    """Adopt peer tensors when local ArrayRecord does not yet contain keys."""
+    local = ArrayRecord({})
+    peer = ArrayRecord({"w": Array(np.asarray([3.0], dtype=np.float32))})
+
+    averaged = NodeApp._average_array_records(local, peer)  # pylint: disable=protected-access
+
+    assert "w" in averaged
+    np.testing.assert_allclose(averaged["w"].numpy(), np.asarray([3.0]))
+
+
+def test_average_array_records_merges_union_of_keys() -> None:
+    """Average shared keys and preserve non-overlapping keys from both sides."""
+    local = ArrayRecord(
+        {
+            "w": Array(np.asarray([2.0], dtype=np.float32)),
+            "local_only": Array(np.asarray([7.0], dtype=np.float32)),
+        }
+    )
+    peer = ArrayRecord(
+        {
+            "w": Array(np.asarray([6.0], dtype=np.float32)),
+            "peer_only": Array(np.asarray([9.0], dtype=np.float32)),
+        }
+    )
+
+    averaged = NodeApp._average_array_records(local, peer)  # pylint: disable=protected-access
+
+    assert set(averaged.keys()) == {"w", "local_only", "peer_only"}
+    np.testing.assert_allclose(averaged["w"].numpy(), np.asarray([4.0]))
+    np.testing.assert_allclose(averaged["local_only"].numpy(), np.asarray([7.0]))
+    np.testing.assert_allclose(averaged["peer_only"].numpy(), np.asarray([9.0]))
+
+
 def test_load_nodeapp_configs_from_pyproject(tmp_path: Path) -> None:
     """Load multiple NodeApp subject configs from pyproject TOML."""
     pyproject = tmp_path / "pyproject.toml"

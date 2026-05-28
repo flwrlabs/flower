@@ -837,12 +837,17 @@ class NodeApp(App):
         that do not apply in a gossip/push-pull setting).
         """
         averaged: dict[str, Array] = {}
-        for key, local_arr in local.items():
-            if key in peer:
-                avg_np = (local_arr.numpy() + peer[key].numpy()) * 0.5
+        for key in set(local.keys()) | set(peer.keys()):
+            local_arr = local.get(key)
+            peer_arr = peer.get(key)
+
+            if local_arr is not None and peer_arr is not None:
+                avg_np = (local_arr.numpy() + peer_arr.numpy()) * 0.5
                 averaged[key] = Array(np.asarray(avg_np))
-            else:
+            elif local_arr is not None:
                 averaged[key] = local_arr
+            elif peer_arr is not None:
+                averaged[key] = peer_arr
         return ArrayRecord(averaged)
 
     def _update_own_parameters(self, request: AggregateRequest) -> None:
