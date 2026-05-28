@@ -209,7 +209,7 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
 
     raise ModelProviderError(
         status_code=response.status_code,
-        detail=last_event,
+        detail=last_event if last_event is not None else "no event was received",
         message="Model provider stream ended before a terminal event",
     )
 
