@@ -51,10 +51,20 @@ def add_args_topology(parser: argparse.ArgumentParser) -> None:
 def validate_topology_args(
     args: argparse.Namespace, parser: argparse.ArgumentParser
 ) -> None:
-    """Validate topology-related command-line arguments."""
-    if args.topology_mode == "static" and args.topology_file is None:
+    """Validate topology-related command-line arguments.
+    
+    When a config file is provided, topology file validation is deferred since
+    topology configuration may be loaded from the config and merged with CLI
+    overrides. Validation only applies when using CLI args exclusively (no config).
+    """
+    if (
+        args.topology_mode == "static"
+        and args.topology_file is None
+        and args.config is None
+    ):
         parser.error(
-            "--topology-file is required when --topology-mode is set to 'static'."
+            "--topology-file is required when --topology-mode is set to 'static' "
+            "(or provide a --config file that defines topology.file or topology.generate)."
         )
 
 

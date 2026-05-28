@@ -178,7 +178,7 @@ class TestValidateTopologyArgs:
     def _ns(self, **kwargs):
         import argparse
 
-        base = {"topology_mode": "dynamic", "topology_file": None}
+        base = {"topology_mode": "dynamic", "topology_file": None, "config": None}
         base.update(kwargs)
         return argparse.Namespace(**base)
 
@@ -192,14 +192,24 @@ class TestValidateTopologyArgs:
 
         validate_topology_args(self._ns(), self._parser())  # no exception
 
-    def test_static_without_file_raises(self):
+    def test_static_without_file_and_config_raises(self):
         from flwr.decentralized.common.args import validate_topology_args
 
         with pytest.raises(SystemExit):
             validate_topology_args(
-                self._ns(topology_mode="static", topology_file=None),
+                self._ns(topology_mode="static", topology_file=None, config=None),
                 self._parser(),
             )
+
+    def test_static_without_file_but_with_config_ok(self, tmp_path):
+        from flwr.decentralized.common.args import validate_topology_args
+
+        config_file = tmp_path / "config.yaml"
+        config_file.touch()
+        validate_topology_args(
+            self._ns(topology_mode="static", topology_file=None, config=config_file),
+            self._parser(),
+        )  # no exception
 
     def test_static_with_file_ok(self, tmp_path):
         from flwr.decentralized.common.args import validate_topology_args
