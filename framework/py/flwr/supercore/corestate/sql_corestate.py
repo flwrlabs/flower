@@ -19,7 +19,7 @@ import hashlib
 import json
 import secrets
 from collections.abc import Sequence
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any, Literal, cast
 
 from sqlalchemy import MetaData
@@ -57,7 +57,6 @@ from .utils import (
     context_from_bytes,
     context_to_bytes,
     generate_rand_int_from_bytes,
-    timestamp_to_utc,
     timestamp_to_iso,
     validate_task_message,
 )
@@ -145,28 +144,26 @@ class SqlCoreState(CoreState, SqlMixin):
         if limit == 0:
             return []
 
-        query = """
+        conditions = ["federation = :federation"]
+        params: dict[str, Any] = {"federation": federation}
+        if updated_before is not None:
+            conditions.append("updated_at < :updated_before")
+            params["updated_before"] = datetime.fromisoformat(
+                updated_before.replace("Z", "+00:00")
+            )
+
+        query = f"""
             SELECT series_id, federation, description, created_at, updated_at,
                    last_run_id
             FROM run_series
-            WHERE federation = :federation
+            WHERE {" AND ".join(conditions)}
+            ORDER BY updated_at DESC, series_id DESC
         """
-        rows = self.query(query, {"federation": federation})
-
-        cursor = (
-            timestamp_to_utc(updated_before) if updated_before is not None else None
-        )
-        if cursor is not None:
-            rows = [row for row in rows if timestamp_to_utc(row["updated_at"]) < cursor]
-        rows.sort(
-            key=lambda row: (
-                timestamp_to_utc(row["updated_at"]),
-                int64_to_uint64(row["series_id"]),
-            ),
-            reverse=True,
-        )
         if limit is not None:
-            rows = rows[:limit]
+            query += " LIMIT :limit"
+            params["limit"] = limit
+
+        rows = self.query(query, params)
         return [_run_series_from_row(row) for row in rows]
 
     def get_run_series_context(self, series_id: int) -> Context | None:

@@ -15,7 +15,7 @@
 """Utility functions for CoreState."""
 
 
-from datetime import UTC, datetime
+from datetime import datetime
 from os import urandom
 
 from flwr.app import Context, Message
@@ -58,18 +58,6 @@ def timestamp_to_iso(value: datetime | str | None) -> str:
         return datetime.fromisoformat(value).isoformat()
     except ValueError:
         return value
-
-
-def timestamp_to_utc(value: datetime | str) -> datetime:
-    """Return a timestamp as a timezone-aware UTC datetime."""
-    if isinstance(value, datetime):
-        timestamp = value
-    else:
-        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
-
-    if timestamp.tzinfo is None or timestamp.utcoffset() is None:
-        return timestamp.replace(tzinfo=UTC)
-    return timestamp.astimezone(UTC)
 
 
 def context_to_bytes(context: Context) -> bytes:

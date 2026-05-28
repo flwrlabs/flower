@@ -44,7 +44,6 @@ from ..object_store import ObjectStore
 from .corestate import CoreState
 from .utils import (
     generate_rand_int_from_bytes,
-    timestamp_to_utc,
     validate_task_message,
 )
 
@@ -129,21 +128,15 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         if limit == 0:
             return []
 
-        cursor = (
-            timestamp_to_utc(updated_before) if updated_before is not None else None
-        )
         with self.lock_run_series_store:
             run_series = [
                 record
                 for record in self.run_series_store.values()
                 if record.federation == federation
-                and (cursor is None or timestamp_to_utc(record.updated_at) < cursor)
+                and (updated_before is None or record.updated_at < updated_before)
             ]
             run_series.sort(
-                key=lambda record: (
-                    timestamp_to_utc(record.updated_at),
-                    record.series_id,
-                ),
+                key=lambda record: (record.updated_at, record.series_id),
                 reverse=True,
             )
             if limit is not None:
