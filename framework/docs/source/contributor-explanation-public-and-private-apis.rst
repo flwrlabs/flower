@@ -115,10 +115,10 @@ docs.
 We also use this to define the public API of private subpackages. Public, in this
 context, means the API that other ``flwr`` subpackages should use. For example,
 ``flwr.server.grid`` is a private subpackage (it's not exported via
-``src/py/flwr/server/__init__.py``'s ``__all__``).
+``src/py/flwr/serverapp/__init__.py``'s ``__all__``).
 
-Still, the private sub-package ``flwr.server.grid`` defines a "public" API using
-``__all__`` in ``src/py/flwr/server/grid/__init__.py``:
+Still, the private sub-package ``flwr.serverapp.grid`` defines a "public" API using
+``__all__`` in ``src/py/flwr/serverapp/grid/__init__.py``:
 
 .. code-block:: python
 
@@ -136,11 +136,11 @@ Still, the private sub-package ``flwr.server.grid`` defines a "public" API using
 The interesting part is that both ``GrpcGrid`` and ``InMemoryGrid`` are never used by
 Flower framework users, only by other parts of the Flower framework codebase. Those
 other parts of the codebase import, for example, ``InMemoryGrid`` using ``from
-flwr.server.driver import InMemoryGrid`` (i.e., the ``InMemoryGrid`` exported via
-``__all__``), not ``from flwr.server.driver.in_memory_driver import InMemoryGrid``
-(``in_memory_driver.py`` is the module containing the actual ``InMemoryGrid`` class
+flwr.serverapp.grid import InMemoryGrid`` (i.e., the ``InMemoryGrid`` exported via
+``__all__``), not ``from flwr.server.grid.in_memory_grid import InMemoryGrid``
+(``in_memory_grid.py`` is the module containing the actual ``InMemoryGrid`` class
 definition).
 
-This is because ``flwr.server.driver`` defines a public interface for other ``flwr``
-subpackages. This allows codeowners of ``flwr.server.driver`` to refactor the package
+This is because ``flwr.serverapp.grid`` defines a public interface for other ``flwr``
+subpackages. This allows codeowners of ``flwr.serverapp.grid`` to refactor the package
 without breaking other ``flwr``-internal users.
