@@ -23,11 +23,10 @@ from typing import Any
 
 import ray
 
+from flwr.app.message import Context, Message
 from flwr.clientapp.client_app import ClientApp
 from flwr.common.constant import PARTITION_ID_KEY
-from flwr.common.context import Context
 from flwr.common.logger import log
-from flwr.common.message import Message
 from flwr.simulation.ray_transport.ray_actor import BasicActorPool, ClientAppActor
 from flwr.simulation.ray_transport.utils import enable_tf_gpu_growth
 

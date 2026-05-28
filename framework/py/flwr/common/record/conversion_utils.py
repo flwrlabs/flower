@@ -15,9 +15,10 @@
 """Conversion utility functions for Records."""
 
 
+from flwr.app.message import Array
+
 from ..logger import warn_deprecated_feature
 from ..typing import NDArray
-from .array import Array
 
 WARN_DEPRECATED_MESSAGE = (
     "`array_from_numpy` is deprecated. Instead, use the `Array(ndarray)` class "

@@ -89,7 +89,7 @@ first login to SuperGrid:
 .. code-block:: shell
 
     # This will open a browser window where you can enter your SuperGrid credentials.
-    $ flwr login
+    $ flwr login supergrid
 
 Once you are logged in, run the following command to run the app on SuperGrid and across
 the federation you created in the previous tutorial:
@@ -99,9 +99,9 @@ the federation you created in the previous tutorial:
     # Navigate to the directory of the app you want to run
     $ cd /path/to/demo
     # Run the app across the federation you created in the previous tutorial
-    $ flwr run . --federation @<username>/<federation-name>
+    $ flwr run . supergrid --federation @<username>/<federation-name>
     # for example
-    # flwr run . --federation @peter123/my-first-federation
+    # flwr run . supergrid --federation @peter123/my-first-federation
 
 Then, if you navigate to the `SuperGrid dashboard <https://flower.ai/federations/>`__,
 you should see a new run in the list of runs of your federation. Click on it to see the
@@ -159,7 +159,7 @@ SuperGrid:
 .. code-block:: shell
 
     # Run your app
-    $ flwr run . --federation @<username>/<federation-name>
+    $ flwr run . supergrid --federation @<username>/<federation-name>
 
 Then, if you navigate to the `SuperGrid dashboard <https://flower.ai/federations/>`__,
 and open the logs of the new run, you should see the new printed messages from the
@@ -273,6 +273,14 @@ configuration values such as learning rate, batch size, and more.
 Congratulations, you have successfully run your first custom Flower App on SuperGrid!
 You have also learned about the main components of a Flower App and how they work
 together to enable collaborative AI workloads across a federation of SuperNodes.
+
+.. tip::
+
+    This tutorial runs the app on SuperGrid with simulated SuperNodes. To run Flower
+    Apps on SuperGrid with the Deployment Runtime instead, create a deployment
+    federation in the SuperGrid dashboard and connect real SuperNodes to it. See
+    :doc:`how-to-create-and-manage-federations` and
+    :doc:`how-to-connect-supernodes-to-supergrid`.
 
 In the next tutorial, you will take a look at a more complex Flower App that uses
 PyTorch and real training and evaluation logic. You will also learn how to run a Flower

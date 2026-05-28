@@ -21,20 +21,18 @@ import gc
 import json
 import sys
 from collections import OrderedDict
-from logging import WARN
 from typing import TYPE_CHECKING, Any, cast, overload
 
 import numpy as np
 
+from flwr.common.constant import GC_THRESHOLD
+from flwr.common.typing import NDArray
 from flwr.supercore.inflatable.inflatable_object import (
     InflatableObject,
     add_header_to_object_body,
     get_object_body,
 )
 
-from ..constant import GC_THRESHOLD
-from ..logger import log
-from ..typing import NDArray
 from .array import Array
 from .typeddict import TypedDict
 
@@ -464,43 +462,3 @@ class ArrayRecord(TypedDict[str, Array], InflatableObject):
         """Delete item and mark the record as dirty."""
         self.is_dirty = True  # Mark as dirty when deleting an item
         super().__delitem__(key)
-
-
-class ParametersRecord(ArrayRecord):
-    """Deprecated class ``ParametersRecord``, use ``ArrayRecord`` instead.
-
-    This class exists solely for backward compatibility with legacy
-    code that previously used ``ParametersRecord``. It has been renamed
-    to ``ArrayRecord``.
-
-    .. warning::
-        ``ParametersRecord`` is deprecated and will be removed in a future release.
-        Use ``ArrayRecord`` instead.
-
-    Examples
-    --------
-    Legacy (deprecated) usage::
-
-        from flwr.common import ParametersRecord
-
-        record = ParametersRecord()
-
-    Updated usage::
-
-        from flwr.common import ArrayRecord
-
-        record = ArrayRecord()
-    """
-
-    _warning_logged = False
-
-    def __init__(self, *args: Any, **kwargs: dict[str, Any]) -> None:
-        if not ParametersRecord._warning_logged:
-            ParametersRecord._warning_logged = True
-            log(
-                WARN,
-                "The `ParametersRecord` class has been renamed to `ArrayRecord`. "
-                "Support for `ParametersRecord` will be removed in a future release. "
-                "Please update your code accordingly.",
-            )
-        super().__init__(*args, **kwargs)

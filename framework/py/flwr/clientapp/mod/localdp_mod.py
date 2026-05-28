@@ -19,15 +19,14 @@ from logging import INFO
 
 import numpy as np
 
+from flwr.app.message import Context, Message
 from flwr.clientapp.typing import ClientAppCallable
 from flwr.common import Array, ArrayRecord
-from flwr.common.context import Context
 from flwr.common.differential_privacy import (
     add_gaussian_noise_inplace,
     compute_clip_model_update,
 )
 from flwr.common.logger import log
-from flwr.common.message import Message
 
 from .centraldp_mods import _handle_array_key_mismatch_err, _handle_multi_record_err
 
