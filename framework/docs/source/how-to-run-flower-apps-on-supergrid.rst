@@ -126,7 +126,7 @@ to ``5``:
 
 .. code-block:: shell
 
-    $ flwr run . --federation @<username>/<federation-name> \
+    $ flwr run . supergrid --federation @<username>/<federation-name> \
         --run-config "num-server-rounds=5"
 
 .. note::

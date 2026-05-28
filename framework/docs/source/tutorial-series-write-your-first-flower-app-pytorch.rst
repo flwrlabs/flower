@@ -154,9 +154,9 @@ the federation you created in the previous tutorial:
     # Navigate to the directory of the app you want to run
     $ cd /path/to/quickstart-pytorch
     # Run the app across the federation you created in the previous tutorial
-    $ flwr run . --federation @<username>/<federation-name>
+    $ flwr run . supergrid --federation @<username>/<federation-name>
     # for example
-    # flwr run . --federation @peter123/my-first-federation
+    # flwr run . supergrid --federation @peter123/my-first-federation
 
 SuperGrid will start a new run for this app. Open the `SuperGrid dashboard
 <https://flower.ai/federations/>`__, select your federation, and click the new run to
