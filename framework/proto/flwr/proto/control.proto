@@ -247,7 +247,7 @@ message ConfigureSimulationFederationResponse {}
 
 message StreamRunEventsRequest {
   uint64 run_id = 1;
-  optional uint64 after_id = 2;
+  optional uint64 after_task_event_id = 2;
 }
 message StreamRunEventsResponse {
   TaskEvent task_event = 1;

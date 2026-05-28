@@ -243,38 +243,29 @@ class TaskEvent(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    EVENT_FIELD_NUMBER: builtins.int
-    DATA_FIELD_NUMBER: builtins.int
     ID_FIELD_NUMBER: builtins.int
     TIMESTAMP_FIELD_NUMBER: builtins.int
     RUN_ID_FIELD_NUMBER: builtins.int
     TASK_ID_FIELD_NUMBER: builtins.int
-    event: builtins.str
-    data: builtins.str
+    EVENT_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
     id: builtins.int
     timestamp: builtins.str
     run_id: builtins.int
     task_id: builtins.int
+    event: builtins.str
+    data: builtins.str
     def __init__(
         self,
         *,
+        id: builtins.int = ...,
+        timestamp: builtins.str = ...,
+        run_id: builtins.int = ...,
+        task_id: builtins.int = ...,
         event: builtins.str = ...,
         data: builtins.str = ...,
-        id: builtins.int | None = ...,
-        timestamp: builtins.str | None = ...,
-        run_id: builtins.int | None = ...,
-        task_id: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_id", b"_id", "_run_id", b"_run_id", "_task_id", b"_task_id", "_timestamp", b"_timestamp", "id", b"id", "run_id", b"run_id", "task_id", b"task_id", "timestamp", b"timestamp"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_id", b"_id", "_run_id", b"_run_id", "_task_id", b"_task_id", "_timestamp", b"_timestamp", "data", b"data", "event", b"event", "id", b"id", "run_id", b"run_id", "task_id", b"task_id", "timestamp", b"timestamp"]) -> None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_id", b"_id"]) -> typing.Literal["id"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_run_id", b"_run_id"]) -> typing.Literal["run_id"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_task_id", b"_task_id"]) -> typing.Literal["task_id"] | None: ...
-    @typing.overload
-    def WhichOneof(self, oneof_group: typing.Literal["_timestamp", b"_timestamp"]) -> typing.Literal["timestamp"] | None: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "event", b"event", "id", b"id", "run_id", b"run_id", "task_id", b"task_id", "timestamp", b"timestamp"]) -> None: ...
 
 global___TaskEvent = TaskEvent
 

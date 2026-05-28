@@ -800,18 +800,18 @@ class StreamRunEventsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RUN_ID_FIELD_NUMBER: builtins.int
-    AFTER_ID_FIELD_NUMBER: builtins.int
+    AFTER_TASK_EVENT_ID_FIELD_NUMBER: builtins.int
     run_id: builtins.int
-    after_id: builtins.int
+    after_task_event_id: builtins.int
     def __init__(
         self,
         *,
         run_id: builtins.int = ...,
-        after_id: builtins.int | None = ...,
+        after_task_event_id: builtins.int | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["_after_id", b"_after_id", "after_id", b"after_id"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["_after_id", b"_after_id", "after_id", b"after_id", "run_id", b"run_id"]) -> None: ...
-    def WhichOneof(self, oneof_group: typing.Literal["_after_id", b"_after_id"]) -> typing.Literal["after_id"] | None: ...
+    def HasField(self, field_name: typing.Literal["_after_task_event_id", b"_after_task_event_id", "after_task_event_id", b"after_task_event_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_after_task_event_id", b"_after_task_event_id", "after_task_event_id", b"after_task_event_id", "run_id", b"run_id"]) -> None: ...
+    def WhichOneof(self, oneof_group: typing.Literal["_after_task_event_id", b"_after_task_event_id"]) -> typing.Literal["after_task_event_id"] | None: ...
 
 global___StreamRunEventsRequest = StreamRunEventsRequest
 
