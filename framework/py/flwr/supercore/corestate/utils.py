@@ -15,6 +15,7 @@
 """Utility functions for CoreState."""
 
 
+import json
 from datetime import datetime
 from os import urandom
 
@@ -24,6 +25,11 @@ from flwr.supercore.date import now
 
 # unix timestamp of 28 February 2025 00h:00m:00s UTC
 _MIN_VALID_MESSAGE_CREATED_AT = 1740700800.0
+
+
+def _reject_non_finite_json_number(value: str) -> None:
+    """Reject JSON constants that are not valid JSON numbers."""
+    raise ValueError(f"Task event data contains non-finite number {value}.")
 
 
 def generate_rand_int_from_bytes(
@@ -56,6 +62,17 @@ def timestamp_to_iso(value: datetime | str | None) -> str:
         return datetime.fromisoformat(value).isoformat()
     except ValueError:
         return value
+
+
+def validate_task_event_data(data: str) -> None:
+    """Validate that task event data is a JSON object string."""
+    try:
+        payload = json.loads(data, parse_constant=_reject_non_finite_json_number)
+    except (TypeError, ValueError) as err:
+        raise ValueError("Task event data must be a JSON object.") from err
+
+    if not isinstance(payload, dict):
+        raise ValueError("Task event data must be a JSON object.")
 
 
 def validate_task_message(message: Message) -> list[str]:  # pylint: disable=R0912

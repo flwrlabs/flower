@@ -694,6 +694,90 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(pulled[0].metadata.message_id, msg_1.metadata.message_id)
         self.assertEqual(pulled_next[0].metadata.message_id, msg_2.metadata.message_id)
 
+    def test_add_and_get_task_events(self) -> None:
+        """Task events should round-trip in assigned ID order."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+        event_1 = ("response.created", '{"type":"response.created"}')
+        event_2 = (
+            "response.output_text.delta",
+            '{"type":"response.output_text.delta","delta":"Hel"}',
+        )
+
+        self.assertEqual(state.add_task_events(run_id, task_id, []), 0)
+        self.assertEqual(state.add_task_events(run_id, task_id, [event_1, event_2]), 2)
+        events, latest_id = state.get_task_events(run_id, after_id=None)
+        after_first, after_first_latest = state.get_task_events(
+            run_id, after_id=events[0][0]
+        )
+        no_new, unchanged_latest = state.get_task_events(run_id, after_id=latest_id)
+
+        self.assertEqual(len(events), 2)
+        self.assertGreater(events[0][0], 0)
+        self.assertGreater(events[1][0], events[0][0])
+        self.assertEqual(events[0][1:], (task_id, *event_1))
+        self.assertEqual(events[1][1:], (task_id, *event_2))
+        self.assertEqual(latest_id, events[1][0])
+        self.assertEqual(after_first, [events[1]])
+        self.assertEqual(after_first_latest, latest_id)
+        self.assertEqual(no_new, [])
+        self.assertEqual(unchanged_latest, latest_id)
+
+    def test_add_task_events_validates_task_relationship(self) -> None:
+        """Task events should only be stored for a task in the target run."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        other_run_id = self.other_task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+        event = ("response.created", '{"type":"response.created"}')
+
+        with self.assertRaises(ValueError):
+            state.add_task_events(other_run_id, task_id, [event])
+
+        missing_task_id = task_id + 1
+        while state.get_tasks(task_ids=[missing_task_id]):
+            missing_task_id += 1
+        with self.assertRaises(ValueError):
+            state.add_task_events(run_id, missing_task_id, [event])
+
+        events, latest_id = state.get_task_events(run_id, after_id=None)
+        self.assertEqual(events, [])
+        self.assertEqual(latest_id, 0)
+
+    @parameterized.expand(  # type: ignore
+        [
+            ("malformed", "{"),
+            ("array", "[]"),
+            ("string", '"value"'),
+            ("non_finite", '{"value": NaN}'),
+        ]
+    )
+    def test_add_task_events_requires_json_object_payload(
+        self, _name: str, data: str
+    ) -> None:
+        """Task event data should be a JSON object string."""
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+
+        with self.assertRaises(ValueError):
+            state.add_task_events(
+                run_id,
+                task_id,
+                [
+                    ("response.created", '{"type":"response.created"}'),
+                    ("response.output_text.delta", data),
+                ],
+            )
+
+        events, latest_id = state.get_task_events(run_id, after_id=None)
+        self.assertEqual(events, [])
+        self.assertEqual(latest_id, 0)
+
     def test_reserve_nonce_first_reservation_succeeds(self) -> None:
         """A new nonce reservation should succeed."""
         state = self.state_factory()

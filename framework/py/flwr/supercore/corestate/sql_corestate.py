@@ -50,8 +50,13 @@ from flwr.supercore.state.schema.corestate_tables import create_corestate_metada
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
-from .corestate import CoreState
-from .utils import generate_rand_int_from_bytes, timestamp_to_iso, validate_task_message
+from .corestate import CoreState, TaskEvent
+from .utils import (
+    generate_rand_int_from_bytes,
+    timestamp_to_iso,
+    validate_task_event_data,
+    validate_task_message,
+)
 
 # Define SQL conditions for task statuses to ensure consistency across queries
 STATUS_CONDITIONS = {
@@ -492,6 +497,84 @@ class SqlCoreState(CoreState, SqlMixin):
             rows = self._claim_task_message_rows(dst_task_ids, order_by, limit)
 
         return [_task_message_from_row(row) for row in rows]
+
+    def add_task_events(
+        self,
+        run_id: int,
+        task_id: int,
+        events: Sequence[tuple[str, str]],
+    ) -> int:
+        """Store task-produced run events."""
+        if not events:
+            return 0
+
+        for _, data in events:
+            validate_task_event_data(data)
+
+        sint64_run_id = uint64_to_int64(run_id)
+        sint64_task_id = uint64_to_int64(task_id)
+        current = now()
+        params = [
+            {
+                "timestamp": current,
+                "run_id": sint64_run_id,
+                "task_id": sint64_task_id,
+                "event": event,
+                "data": data,
+            }
+            for event, data in events
+        ]
+
+        with self.session():
+            task_rows = self.query(
+                """
+                SELECT task_id
+                FROM task
+                WHERE task_id = :task_id AND run_id = :run_id
+                """,
+                {"task_id": sint64_task_id, "run_id": sint64_run_id},
+            )
+            if not task_rows:
+                raise ValueError(f"Task {task_id} not found for run {run_id}")
+
+            self.query(
+                """
+                INSERT INTO task_event (timestamp, run_id, task_id, event, data)
+                VALUES (:timestamp, :run_id, :task_id, :event, :data)
+                """,
+                params,
+            )
+
+        return len(events)
+
+    def get_task_events(
+        self,
+        run_id: int,
+        after_id: int | None,
+    ) -> tuple[list[TaskEvent], int]:
+        """Return task-produced run events after the cursor."""
+        cursor = after_id if after_id is not None else 0
+        rows = self.query(
+            """
+            SELECT id, task_id, event, data
+            FROM task_event
+            WHERE run_id = :run_id AND id > :after_id
+            ORDER BY id ASC
+            """,
+            {"run_id": uint64_to_int64(run_id), "after_id": cursor},
+        )
+
+        events = [
+            (
+                row["id"],
+                int64_to_uint64(row["task_id"]),
+                row["event"],
+                row["data"],
+            )
+            for row in rows
+        ]
+        latest_id = events[-1][0] if events else cursor
+        return events, latest_id
 
     def _claim_task_message_rows(
         self,

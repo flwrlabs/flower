@@ -25,6 +25,8 @@ from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 
+TaskEvent = tuple[int, int, str, str]
+
 
 class CoreState(ABC):
     """Abstract base class for core state."""
@@ -289,6 +291,55 @@ class CoreState(ABC):
         -------
         Sequence[Message]
             A sequence of matching messages.
+        """
+
+    @abstractmethod
+    def add_task_events(
+        self,
+        run_id: int,
+        task_id: int,
+        events: Sequence[tuple[str, str]],
+    ) -> int:
+        """Store task-produced run events.
+
+        Parameters
+        ----------
+        run_id : int
+            The run ID to store events under.
+        task_id : int
+            The task ID producing the events.
+        events : Sequence[tuple[str, str]]
+            Event name and JSON object data pairs.
+
+        Returns
+        -------
+        int
+            Number of stored events.
+        """
+
+    @abstractmethod
+    def get_task_events(
+        self,
+        run_id: int,
+        after_id: int | None,
+    ) -> tuple[list[TaskEvent], int]:
+        """Return task-produced run events after the cursor.
+
+        Parameters
+        ----------
+        run_id : int
+            The run ID to retrieve events for.
+        after_id : Optional[int]
+            Return only events with an ID greater than this cursor. If set to
+            `None`, retrieve all events.
+
+        Returns
+        -------
+        tuple[list[TaskEvent], int]
+            A tuple containing:
+            - Task events as `(id, task_id, event, data)` tuples ordered by ID.
+            - The latest returned event ID, or the unchanged cursor if no events
+              are returned.
         """
 
     @abstractmethod
