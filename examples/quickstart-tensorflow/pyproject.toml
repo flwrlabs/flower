@@ -10,8 +10,7 @@ license = {file = "LICENSE"}
 dependencies = [
     "flwr[simulation]>=1.28.0",
     "flwr-datasets[vision]>=0.6.0",
-    "tensorflow>=2.20.0 ; sys_platform == \"linux\" and (platform_machine == \"x86_64\" or platform_machine == \"aarch64\")",
-    "tensorflow>=2.20.0 ; sys_platform == \"darwin\" and platform_machine == \"arm64\"",
+    "tensorflow==2.20.0",
 ]
 [tool.hatch.build.targets.wheel]
 packages = ["."]
