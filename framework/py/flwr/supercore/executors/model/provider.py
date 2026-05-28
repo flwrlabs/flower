@@ -27,7 +27,7 @@ import requests
 from flwr.supercore.typing import JSONObject, JSONValue
 
 DEFAULT_MODEL_API_ENDPOINT = "https://api.flower.ai/v1/responses"
-DEFAULT_MODEL_API_TIMEOUT_S = 180.0
+DEFAULT_MODEL_API_TIMEOUT = 180.0
 _STREAM_CONTENT_TYPE = "text/event-stream"
 _TERMINAL_SUCCESS_EVENTS = frozenset({"response.completed", "response.incomplete"})
 _TERMINAL_FAILURE_EVENTS = frozenset({"error", "response.failed"})
@@ -55,12 +55,12 @@ def invoke_responses_model(
 
     raw_timeout = os.getenv(
         "FLWR_MODEL_API_TIMEOUT_S",
-        str(DEFAULT_MODEL_API_TIMEOUT_S),
+        str(DEFAULT_MODEL_API_TIMEOUT),
     )
     try:
         timeout_s = float(raw_timeout.strip())
     except ValueError:
-        timeout_s = DEFAULT_MODEL_API_TIMEOUT_S
+        timeout_s = DEFAULT_MODEL_API_TIMEOUT
     timeout_s = max(1.0, timeout_s)
 
     headers = {
