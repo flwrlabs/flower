@@ -31,13 +31,13 @@ from flwr.common.recorddict_compat import (
     arrayrecord_to_parameters,
     parameters_to_arrayrecord,
 )
+from flwr.common.serde import config_record_to_proto, metric_record_to_proto
 from flwr.common.typing import NDArray, NDArrays, Parameters
 from flwr.supercore.inflatable.inflatable_object import (
     get_object_body,
     get_object_type_from_object_content,
 )
 
-from ..serde import config_record_to_proto, metric_record_to_proto
 from . import Array, ArrayRecord, ConfigRecord, MetricRecord, RecordDict
 
 # pylint: disable=E0611
