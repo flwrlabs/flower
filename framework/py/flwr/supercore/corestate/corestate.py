@@ -21,11 +21,9 @@ from typing import Literal
 
 from flwr.common import Message
 from flwr.common.typing import Fab
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
-
-TaskEvent = tuple[int, int, str, str]
 
 
 class CoreState(ABC):
@@ -294,52 +292,44 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def add_task_events(
+    def store_task_events(
         self,
-        run_id: int,
-        task_id: int,
-        events: Sequence[tuple[str, str]],
-    ) -> int:
+        events: Sequence[TaskEvent],
+    ) -> bool:
         """Store task-produced run events.
 
         Parameters
         ----------
-        run_id : int
-            The run ID to store events under.
-        task_id : int
-            The task ID producing the events.
-        events : Sequence[tuple[str, str]]
-            Event name and JSON object data pairs.
+        events : Sequence[TaskEvent]
+            Task events to store. Event IDs and timestamps are assigned by the
+            CoreState implementation.
 
         Returns
         -------
-        int
-            Number of stored events.
+        bool
+            True if the events were stored, otherwise False.
         """
 
     @abstractmethod
     def get_task_events(
         self,
         run_id: int,
-        after_id: int | None,
-    ) -> tuple[list[TaskEvent], int]:
+        after_task_event_id: int | None,
+    ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor.
 
         Parameters
         ----------
         run_id : int
             The run ID to retrieve events for.
-        after_id : Optional[int]
+        after_task_event_id : Optional[int]
             Return only events with an ID greater than this cursor. If set to
             `None`, retrieve all events.
 
         Returns
         -------
-        tuple[list[TaskEvent], int]
-            A tuple containing:
-            - Task events as `(id, task_id, event, data)` tuples ordered by ID.
-            - The latest returned event ID, or the unchanged cursor if no events
-              are returned.
+        Sequence[TaskEvent]
+            Task events ordered by ID.
         """
 
     @abstractmethod

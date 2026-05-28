@@ -44,13 +44,13 @@ from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
 
 # pylint: disable-next=E0611
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
-from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
-from .corestate import CoreState, TaskEvent
+from .corestate import CoreState
 from .utils import (
     generate_rand_int_from_bytes,
     timestamp_to_iso,
@@ -498,44 +498,47 @@ class SqlCoreState(CoreState, SqlMixin):
 
         return [_task_message_from_row(row) for row in rows]
 
-    def add_task_events(
+    def store_task_events(
         self,
-        run_id: int,
-        task_id: int,
-        events: Sequence[tuple[str, str]],
-    ) -> int:
+        events: Sequence[TaskEvent],
+    ) -> bool:
         """Store task-produced run events."""
         if not events:
-            return 0
+            return False
 
-        for _, data in events:
-            validate_task_event_data(data)
+        try:
+            for event in events:
+                validate_task_event_data(event.data)
+        except ValueError:
+            return False
 
-        sint64_run_id = uint64_to_int64(run_id)
-        sint64_task_id = uint64_to_int64(task_id)
         current = now()
         params = [
             {
                 "timestamp": current,
-                "run_id": sint64_run_id,
-                "task_id": sint64_task_id,
-                "event": event,
-                "data": data,
+                "run_id": uint64_to_int64(event.run_id),
+                "task_id": uint64_to_int64(event.task_id),
+                "event": event.event,
+                "data": event.data,
             }
-            for event, data in events
+            for event in events
         ]
 
         with self.session():
-            task_rows = self.query(
-                """
-                SELECT task_id
-                FROM task
-                WHERE task_id = :task_id AND run_id = :run_id
-                """,
-                {"task_id": sint64_task_id, "run_id": sint64_run_id},
-            )
-            if not task_rows:
-                raise ValueError(f"Task {task_id} not found for run {run_id}")
+            for event in events:
+                task_rows = self.query(
+                    """
+                    SELECT task_id
+                    FROM task
+                    WHERE task_id = :task_id AND run_id = :run_id
+                    """,
+                    {
+                        "task_id": uint64_to_int64(event.task_id),
+                        "run_id": uint64_to_int64(event.run_id),
+                    },
+                )
+                if not task_rows:
+                    return False
 
             self.query(
                 """
@@ -545,36 +548,36 @@ class SqlCoreState(CoreState, SqlMixin):
                 params,
             )
 
-        return len(events)
+        return True
 
     def get_task_events(
         self,
         run_id: int,
-        after_id: int | None,
-    ) -> tuple[list[TaskEvent], int]:
+        after_task_event_id: int | None,
+    ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor."""
-        cursor = after_id if after_id is not None else 0
+        cursor = after_task_event_id if after_task_event_id is not None else 0
         rows = self.query(
             """
-            SELECT id, task_id, event, data
+            SELECT id, timestamp, run_id, task_id, event, data
             FROM task_event
-            WHERE run_id = :run_id AND id > :after_id
+            WHERE run_id = :run_id AND id > :after_task_event_id
             ORDER BY id ASC
             """,
-            {"run_id": uint64_to_int64(run_id), "after_id": cursor},
+            {"run_id": uint64_to_int64(run_id), "after_task_event_id": cursor},
         )
 
-        events = [
-            (
-                row["id"],
-                int64_to_uint64(row["task_id"]),
-                row["event"],
-                row["data"],
+        return [
+            TaskEvent(
+                id=row["id"],
+                timestamp=timestamp_to_iso(row["timestamp"]),
+                run_id=int64_to_uint64(row["run_id"]),
+                task_id=int64_to_uint64(row["task_id"]),
+                event=row["event"],
+                data=row["data"],
             )
             for row in rows
         ]
-        latest_id = events[-1][0] if events else cursor
-        return events, latest_id
 
     def _claim_task_message_rows(
         self,
