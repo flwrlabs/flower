@@ -21,7 +21,6 @@ from collections.abc import Callable
 
 from flwr.common import Context
 
-from .exceptions import AgentAppError
 from .session import AgentSession
 from .typing import AgentAppCallable, JSONObject
 
@@ -46,10 +45,10 @@ class AgentApp:
     def __call__(self, agent: AgentSession, context: Context) -> JSONObject:
         """Execute `AgentApp`."""
         if self._main is None:
-            raise AgentAppError("AgentApp has no main function.")
+            raise ValueError("AgentApp has no main function.")
         result = self._main(agent, context)
         if not isinstance(result, dict):
-            raise AgentAppError("AgentApp main function must return a JSON object.")
+            raise ValueError("AgentApp main function must return a JSON object.")
         return result
 
     def main(self) -> Callable[[AgentAppCallable], AgentAppCallable]:
@@ -78,3 +77,7 @@ class AgentApp:
             return main_fn
 
         return main_decorator
+
+
+class LoadAgentAppError(Exception):
+    """Error when trying to load `AgentApp`."""

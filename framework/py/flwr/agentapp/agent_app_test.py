@@ -23,7 +23,7 @@ from unittest.mock import Mock
 import pytest
 
 import flwr
-from flwr.agentapp import AgentApp, AgentAppError, AgentSession, JSONObject
+from flwr.agentapp import AgentApp, AgentSession, JSONObject
 from flwr.common import Context, RecordDict
 
 
@@ -71,7 +71,7 @@ def test_agentapp_rejects_missing_main() -> None:
     session = Mock(spec=AgentSession)
     context = _context()
 
-    with pytest.raises(AgentAppError, match="no main"):
+    with pytest.raises(ValueError, match="no main"):
         app(session, context)
 
 
@@ -85,7 +85,7 @@ def test_agentapp_rejects_non_object_main_result() -> None:
     def main(_: AgentSession, __: Context) -> Any:
         return None
 
-    with pytest.raises(AgentAppError, match="must return a JSON object"):
+    with pytest.raises(ValueError, match="must return a JSON object"):
         app(session, context)
 
 
