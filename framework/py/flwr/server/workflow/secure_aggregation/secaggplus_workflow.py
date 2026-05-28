@@ -647,7 +647,6 @@ class SecAggPlusWorkflow:
         recon_parameters = parameters_mod(masked_vector, state.mod_range)
         q_total_ratio, recon_parameters = factor_extract(recon_parameters)
         inv_dq_total_ratio = state.quantization_range / q_total_ratio
-        # recon_parameters = parameters_divide(recon_parameters, total_weights_factor)
         aggregated_vector = dequantize(
             recon_parameters,
             state.clipping_range,
