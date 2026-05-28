@@ -198,29 +198,12 @@ class SqlCoreState(CoreState, SqlMixin):
             ):
                 raise ValueError(f"RunSeries {series_id} not found")
 
-            rows = self.query(
-                """
-                SELECT COUNT(*) AS count
-                FROM series_context
-                WHERE series_id = :series_id
-                """,
-                {"series_id": sint_series_id},
-            )
-            if rows[0]["count"] > 0:
-                self.query(
-                    """
-                    UPDATE series_context
-                    SET context = :context
-                    WHERE series_id = :series_id
-                    """,
-                    {"series_id": sint_series_id, "context": context_bytes},
-                )
-                return
-
             self.query(
                 """
                 INSERT INTO series_context (series_id, context)
                 VALUES (:series_id, :context)
+                ON CONFLICT(series_id) DO UPDATE SET
+                    context = excluded.context
                 """,
                 {"series_id": sint_series_id, "context": context_bytes},
             )

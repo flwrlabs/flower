@@ -27,8 +27,6 @@ from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.proto.error_pb2 import Error as ProtoError
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE, RunType, TaskType
-from flwr.supercore.corestate.utils import context_from_bytes as context_from_bytes
-from flwr.supercore.corestate.utils import context_to_bytes as context_to_bytes
 from flwr.supercore.corestate.utils import (
     generate_rand_int_from_bytes as corestate_generate_rand_int_from_bytes,
 )
