@@ -20,8 +20,10 @@ from itertools import cycle
 from json import JSONDecodeError
 from math import pi
 from pathlib import Path
+from queue import Queue
 from time import sleep
 from unittest import TestCase
+from unittest.mock import Mock, patch
 
 from flwr.app.message import make_message
 from flwr.client import Client, NumPyClient
@@ -33,19 +35,22 @@ from flwr.common import (
     ConfigRecord,
     Context,
     GetPropertiesIns,
+    Message,
     MessageTypeLegacy,
     Metadata,
     RecordDict,
     Scalar,
     now,
 )
-from flwr.common.constant import Status
+from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.recorddict_compat import getpropertiesins_to_recorddict
 from flwr.common.typing import Run, RunStatus
+from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 from flwr.server.superlink.fleet.vce.vce_api import (
     NodeToPartitionMapping,
     _register_nodes,
     start_vce,
+    worker,
 )
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkStateFactory
 from flwr.server.superlink.linkstate.in_memory_linkstate import RunRecord
@@ -78,6 +83,15 @@ def get_dummy_client(context: Context) -> Client:  # pylint: disable=unused-argu
 dummy_client_app = ClientApp(
     client_fn=get_dummy_client,
 )
+
+
+def _make_vce_test_message(run_id: int = 1234, node_id: int = 1) -> Message:
+    """Create a Message with metadata populated like an InMemoryGrid message."""
+    message = Message(RecordDict(), node_id, "query")
+    message.metadata.__dict__["_run_id"] = run_id
+    message.metadata.__dict__["_src_node_id"] = SUPERLINK_NODE_ID
+    message.metadata.__dict__["_message_id"] = "test-message-id"
+    return message
 
 
 def terminate_simulation(f_stop: threading.Event, sleep_duration: int) -> None:
@@ -238,6 +252,43 @@ def start_and_shutdown(
 
     if duration:
         termination_th.join()
+
+
+def test_worker_records_clientapp_runtime() -> None:
+    """VCE workers should accumulate backend processing time as ClientApp runtime."""
+    metrics = VceMetrics()
+    f_stop = threading.Event()
+    messageins_queue: Queue[Message] = Queue()
+    messageres_queue: Queue[Message] = Queue()
+    message = _make_vce_test_message(node_id=1)
+    messageins_queue.put(message)
+    node_info_store = {1: Mock()}
+    context = Context(1234, 1, {}, RecordDict(), {})
+    node_info_store[1].retrieve_context.return_value = context
+    backend = Mock()
+
+    def _process_message(msg: Message, ctx: Context) -> tuple[Message, Context]:
+        f_stop.set()
+        return Message(RecordDict(), reply_to=msg), ctx
+
+    backend.process_message.side_effect = _process_message
+
+    with patch(
+        "flwr.server.superlink.fleet.vce.vce_api.time.perf_counter",
+        side_effect=[10.0, 12.0],
+    ):
+        worker(
+            messageins_queue=messageins_queue,
+            messageres_queue=messageres_queue,
+            node_info_store=node_info_store,  # type: ignore
+            backend=backend,
+            f_stop=f_stop,
+            metrics=metrics,
+        )
+
+    backend.process_message.assert_called_once_with(message, context)
+    assert not messageres_queue.empty()
+    assert metrics.clientapp_runtime == 2.0
 
 
 class TestFleetSimulationEngineRayBackend(TestCase):
