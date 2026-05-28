@@ -717,9 +717,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertTrue(state.store_task_events([event_1, event_2]))
         events = state.get_task_events(run_id, after_task_event_id=None)
         latest_id = events[-1].id
-        after_first = state.get_task_events(
-            run_id, after_task_event_id=events[0].id
-        )
+        after_first = state.get_task_events(run_id, after_task_event_id=events[0].id)
         no_new = state.get_task_events(run_id, after_task_event_id=latest_id)
 
         self.assertEqual(len(events), 2)

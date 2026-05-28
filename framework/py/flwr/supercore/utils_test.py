@@ -69,9 +69,7 @@ def test_mask_string() -> None:
 
 def test_strict_json_value_loads() -> None:
     """Parse valid JSON values."""
-    assert strict_json_value_loads('{"key":[1,true,null]}') == {
-        "key": [1, True, None]
-    }
+    assert strict_json_value_loads('{"key":[1,true,null]}') == {"key": [1, True, None]}
 
 
 def test_strict_json_value_loads_rejects_non_finite_numbers() -> None:
