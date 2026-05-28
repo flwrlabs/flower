@@ -21,14 +21,10 @@ from dataclasses import dataclass, field
 from unittest.mock import Mock
 
 import pytest
-import requests
 
 from flwr.supercore.typing import JSONObject
 
-from .provider import (
-    ModelProviderError,
-    invoke_responses_model,
-)
+from .provider import invoke_responses_model
 
 
 @dataclass
@@ -55,6 +51,18 @@ def _patch_post(monkeypatch: pytest.MonkeyPatch, response: _Response) -> Mock:
         post_mock,
     )
     return post_mock
+
+
+def test_invoke_responses_model_rejects_base_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Configured provider endpoints must include the responses path."""
+    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
+    monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", "https://example.test/v1")
+
+    with pytest.raises(RuntimeError, match="must include the /responses path"):
+        invoke_responses_model({"model": "model", "input": []})
+
 
 def test_invoke_responses_model_collects_stream_events(
     monkeypatch: pytest.MonkeyPatch,
@@ -157,8 +165,9 @@ def test_invoke_responses_model_raises_on_stream_failure_events(
             _Response(headers={"Content-Type": "text/event-stream"}, lines=lines),
         )
 
-        with pytest.raises(ModelProviderError) as exc_info:
+        with pytest.raises(RuntimeError) as exc_info:
             invoke_responses_model({"model": "model", "input": [], "stream": True})
 
-        assert exc_info.value.status_code == 200
-        assert exc_info.value.detail == expected_detail
+        assert str(exc_info.value) == (
+            f"Model provider request failed: 200 {expected_detail}"
+        )

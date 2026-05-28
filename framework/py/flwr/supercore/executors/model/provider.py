@@ -32,36 +32,40 @@ _TERMINAL_SUCCESS_EVENTS = frozenset({"response.completed", "response.incomplete
 _TERMINAL_FAILURE_EVENTS = frozenset({"error", "response.failed"})
 
 
-class ModelProviderError(RuntimeError):
-    """Raised when the configured model provider request fails."""
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        status_code: int | None = None,
-        detail: JSONValue | None = None,
-        event: JSONObject | None = None,
-    ) -> None:
-        super().__init__(message)
-        self.status_code = status_code
-        self.detail = detail
-        self.event = event
-
-
 def invoke_responses_model(
     request: JSONObject,
     *,
     on_stream_event: Callable[[JSONObject], None] | None = None,
 ) -> JSONObject:
     """Invoke the configured Responses-compatible model provider."""
-    api_key = _model_api_key()
-    responses_url = _model_responses_url()
+    api_key = os.getenv("FLWR_MODEL_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("Model API key is not set (FLWR_MODEL_API_KEY).")
+
+    responses_url = os.getenv("FLWR_MODEL_API_ENDPOINT", "").strip()
+    if not responses_url:
+        responses_url = DEFAULT_MODEL_API_ENDPOINT
+    responses_url = responses_url.rstrip("/")
+    if not responses_url.endswith("/responses"):
+        raise RuntimeError(
+            "Model API endpoint must include the /responses path "
+            "(FLWR_MODEL_API_ENDPOINT)."
+        )
+
+    raw_timeout = os.getenv(
+        "FLWR_MODEL_API_TIMEOUT_S",
+        str(DEFAULT_MODEL_API_TIMEOUT_S),
+    )
+    try:
+        timeout_s = float(raw_timeout.strip())
+    except ValueError:
+        timeout_s = DEFAULT_MODEL_API_TIMEOUT_S
+    timeout_s = max(1.0, timeout_s)
+
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
-    timeout_s = _model_timeout_seconds()
     payload = dict(request)
     if payload.get("stream") is True:
         return _invoke_streaming_response(
@@ -79,39 +83,6 @@ def invoke_responses_model(
     )
 
 
-def _model_api_key() -> str:
-    api_key = os.getenv("FLWR_MODEL_API_KEY", "").strip()
-    if not api_key:
-        raise _provider_error("Model API key is not set (FLWR_MODEL_API_KEY).")
-    return api_key
-
-
-def _model_responses_url() -> str:
-    base_url = os.getenv("FLWR_MODEL_API_ENDPOINT", "").strip()
-    if not base_url:
-        base_url = DEFAULT_MODEL_API_ENDPOINT
-    return _responses_url(base_url)
-
-
-def _responses_url(endpoint: str) -> str:
-    endpoint = endpoint.rstrip("/")
-    if endpoint.endswith("/responses"):
-        return endpoint
-    return f"{endpoint}/responses"
-
-
-def _model_timeout_seconds() -> float:
-    raw_timeout = os.getenv(
-        "FLWR_MODEL_API_TIMEOUT_S",
-        str(DEFAULT_MODEL_API_TIMEOUT_S),
-    )
-    try:
-        timeout_s = float(raw_timeout.strip())
-    except ValueError:
-        timeout_s = DEFAULT_MODEL_API_TIMEOUT_S
-    return max(1.0, timeout_s)
-
-
 def _invoke_response(
     *,
     responses_url: str,
@@ -127,9 +98,13 @@ def _invoke_response(
         stream=False,
     )
     _raise_for_http_failure(response)
-    payload = _decode_response_json(response)
-    _raise_for_payload_failure(payload, status_code=response.status_code)
-    return payload
+    response_payload = _decode_response_json(response)
+    detail = _extract_error_detail(response_payload)
+    if detail is not None:
+        raise RuntimeError(
+            _failure_message(status_code=response.status_code, detail=detail)
+        )
+    return response_payload
 
 
 def _invoke_streaming_response(
@@ -168,23 +143,20 @@ def _invoke_streaming_response(
 
         detail = _extract_error_detail(event)
         if detail is not None or is_failure_event:
-            raise _provider_error(
+            raise RuntimeError(
                 _failure_message(
                     status_code=response.status_code, detail=detail or event
-                ),
-                status_code=response.status_code,
-                detail=detail or event,
-                event=event,
+                )
             )
 
         if isinstance(event_type, str) and event_type in _TERMINAL_SUCCESS_EVENTS:
-            return _final_response_from_event(event)
+            response_payload = event.get("response")
+            if isinstance(response_payload, dict):
+                return cast(JSONObject, response_payload)
+            return event
 
-    raise _provider_error(
-        "Model provider stream ended without a terminal event.",
-        status_code=response.status_code,
-        detail=last_event,
-        event=last_event,
+    raise RuntimeError(
+        _failure_message(status_code=response.status_code, detail=last_event)
     )
 
 
@@ -205,47 +177,33 @@ def _post_responses_request(
             stream=stream,
         )
     except requests.RequestException as exc:
-        raise _provider_error(
-            f"Model provider request failed: {exc}",
-            detail=str(exc),
-        ) from exc
+        raise RuntimeError(f"Model provider request failed: {exc}") from exc
 
 
 def _raise_for_http_failure(response: requests.Response) -> None:
     if response.status_code < 400:
         return
     detail = _response_detail(response)
-    raise _provider_error(
-        _failure_message(status_code=response.status_code, detail=detail),
-        status_code=response.status_code,
-        detail=detail,
-    )
-
-
-def _raise_for_payload_failure(payload: JSONObject, *, status_code: int) -> None:
-    detail = _extract_error_detail(payload)
-    if detail is None:
-        return
-    raise _provider_error(
-        _failure_message(status_code=status_code, detail=detail),
-        status_code=status_code,
-        detail=detail,
-        event=payload,
+    raise RuntimeError(
+        _failure_message(status_code=response.status_code, detail=detail)
     )
 
 
 def _raise_for_non_sse_response(response: requests.Response) -> None:
-    content_type = _response_content_type(response)
+    headers = getattr(response, "headers", {})
+    content_type = (
+        str(headers.get("Content-Type") or "").lower()
+        if isinstance(headers, Mapping)
+        else ""
+    )
     if _STREAM_CONTENT_TYPE in content_type:
         return
 
     detail = _response_detail(response)
     if not content_type and (detail is None or detail == ""):
         detail = "Missing Content-Type header for streaming response."
-    raise _provider_error(
-        _failure_message(status_code=response.status_code, detail=detail),
-        status_code=response.status_code,
-        detail=detail,
+    raise RuntimeError(
+        _failure_message(status_code=response.status_code, detail=detail)
     )
 
 
@@ -253,16 +211,19 @@ def _decode_response_json(response: requests.Response) -> JSONObject:
     try:
         payload = response.json()
     except ValueError as exc:
-        raise _provider_error(
-            "Model provider returned invalid JSON.",
-            status_code=response.status_code,
-            detail=_response_text(response),
+        raise RuntimeError(
+            f"Model provider returned invalid JSON: {_response_text(response)}"
         ) from exc
     if not isinstance(payload, dict):
-        raise _provider_error(
-            "Model provider returned a non-object JSON payload.",
-            status_code=response.status_code,
-            detail=cast(JSONValue, payload),
+        detail = cast(JSONValue, payload)
+        formatted_detail = (
+            detail
+            if isinstance(detail, str)
+            else json.dumps(detail, separators=(",", ":"))
+        )
+        raise RuntimeError(
+            "Model provider returned a non-object JSON payload: "
+            f"{formatted_detail}"
         )
     return cast(JSONObject, payload)
 
@@ -301,14 +262,19 @@ def _parse_provider_event(*, event_name: str | None, data: str) -> JSONObject | 
     try:
         payload = json.loads(data)
     except json.JSONDecodeError as exc:
-        raise _provider_error(
-            "Model provider stream returned invalid JSON event.",
-            detail=data,
+        raise RuntimeError(
+            f"Model provider stream returned invalid JSON event: {data}"
         ) from exc
     if not isinstance(payload, dict):
-        raise _provider_error(
-            "Model provider stream returned a non-object JSON event.",
-            detail=cast(JSONValue, payload),
+        detail = cast(JSONValue, payload)
+        formatted_detail = (
+            detail
+            if isinstance(detail, str)
+            else json.dumps(detail, separators=(",", ":"))
+        )
+        raise RuntimeError(
+            "Model provider stream returned a non-object JSON event: "
+            f"{formatted_detail}"
         )
 
     event = cast(JSONObject, payload)
@@ -316,20 +282,6 @@ def _parse_provider_event(*, event_name: str | None, data: str) -> JSONObject | 
         event = dict(event)
         event["type"] = event_name
     return event
-
-
-def _final_response_from_event(event: JSONObject) -> JSONObject:
-    response = event.get("response")
-    if isinstance(response, dict):
-        return cast(JSONObject, response)
-    return event
-
-
-def _response_content_type(response: requests.Response) -> str:
-    headers = getattr(response, "headers", {})
-    if not isinstance(headers, Mapping):
-        return ""
-    return str(headers.get("Content-Type") or "").lower()
 
 
 def _response_detail(response: requests.Response) -> JSONValue:
@@ -365,22 +317,10 @@ def _extract_error_detail(payload: JSONObject) -> JSONValue | None:
 
 
 def _failure_message(*, status_code: int, detail: JSONValue) -> str:
-    return f"Model provider request failed: {status_code} {_format_detail(detail)}"
-
-
-def _provider_error(
-    message: str,
-    *,
-    status_code: int | None = None,
-    detail: JSONValue | None = None,
-    event: JSONObject | None = None,
-) -> ModelProviderError:
-    return ModelProviderError(
-        message,
-        status_code=status_code,
-        detail=detail,
-        event=event,
+    formatted_detail = (
+        detail if isinstance(detail, str) else json.dumps(detail, separators=(",", ":"))
     )
+    return f"Model provider request failed: {status_code} {formatted_detail}"
 
 
 def _response_text(response: requests.Response, max_chars: int = 400) -> str:
@@ -392,9 +332,3 @@ def _response_text(response: requests.Response, max_chars: int = 400) -> str:
     if len(normalized) <= max_chars:
         return normalized
     return f"{normalized[:max_chars]}..."
-
-
-def _format_detail(detail: JSONValue) -> str:
-    if isinstance(detail, str):
-        return detail
-    return json.dumps(detail, separators=(",", ":"))
