@@ -110,7 +110,7 @@ def test_load_nodeapps_from_pyproject_existing_file_loads_values(
     app_b = SimpleNamespace(name="b")
 
     with patch(
-        "flwr.decentralized.superdnode.config.helper.create_nodeapps_from_pyproject",
+        "flwr.decentralized.superdnode.config.helper._create_nodeapps_from_pyproject",
         return_value={"a": app_a, "b": app_b},
     ):
         loaded = _load_nodeapps_from_pyproject(pyproject)
