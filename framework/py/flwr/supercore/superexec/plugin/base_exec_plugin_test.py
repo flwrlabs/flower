@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for SuperExec base plugin launch behavior."""
 
-
 from typing import cast
 from unittest.mock import Mock, patch
 

@@ -14,7 +14,6 @@
 # ==============================================================================
 """Simple base Flower SuperExec plugin for app processes."""
 
-
 import os
 from collections.abc import Callable, Sequence
 from logging import ERROR
