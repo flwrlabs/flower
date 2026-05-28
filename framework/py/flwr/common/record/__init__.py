@@ -21,9 +21,8 @@ from flwr.compat.common.record import (
     MetricsRecord,
     ParametersRecord,
     RecordSet,
+    array_from_numpy,
 )
-
-from .conversion_utils import array_from_numpy
 
 __all__ = [
     "Array",
