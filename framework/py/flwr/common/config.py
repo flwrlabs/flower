@@ -36,7 +36,7 @@ from flwr.common.typing import Run
 from flwr.supercore.fab_format_version import normalize_and_validate_fab_format
 from flwr.supercore.utils import get_flwr_home
 
-from . import ConfigRecord, object_ref
+from . import object_ref
 
 T_dict = TypeVar("T_dict", bound=dict[str, Any])  # pylint: disable=invalid-name
 
@@ -238,15 +238,6 @@ def get_metadata_from_config(config: dict[str, Any]) -> tuple[str, str]:
         f"{config['tool']['flwr']['app']['publisher']}/{config['project']['name']}",
         config["project"]["version"],
     )
-
-
-def user_config_to_configrecord(config: UserConfig) -> ConfigRecord:
-    """Construct a `ConfigRecord` out of a `UserConfig`."""
-    c_record = ConfigRecord()
-    for k, v in config.items():
-        c_record[k] = v
-
-    return c_record
 
 
 def get_fab_config(fab_file: Path | bytes) -> dict[str, Any]:
