@@ -48,6 +48,7 @@ from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
 
 from .backend import Backend
+from .metrics import VceMetrics
 
 NodeToPartitionMapping = dict[int, int]
 
@@ -101,35 +102,40 @@ def _register_node_info_stores(
     return node_info_store
 
 
-# pylint: disable=too-many-arguments,too-many-locals
+# pylint: disable-next=too-many-arguments,too-many-locals,too-many-positional-arguments
 def worker(
     messageins_queue: Queue[Message],
     messageres_queue: Queue[Message],
     node_info_store: dict[int, DeprecatedRunInfoStore],
     backend: Backend,
     f_stop: threading.Event,
+    metrics: VceMetrics | None = None,
 ) -> None:
     """Process messages from the queue, execute them, update context, and enqueue
     replies."""
     while not f_stop.is_set():
         out_mssg = None
+        message: Message | None = None
+        processing_started_at = None
         try:
             # Fetch from queue with timeout. We use a timeout so
             # the stopping event can be evaluated even when the queue is empty.
-            message: Message = messageins_queue.get(timeout=1.0)
-            node_id = message.metadata.dst_node_id
+            message_in = messageins_queue.get(timeout=1.0)
+            message = message_in
+            node_id = message_in.metadata.dst_node_id
 
             # Retrieve context
             context = node_info_store[node_id].retrieve_context(
-                run_id=message.metadata.run_id
+                run_id=message_in.metadata.run_id
             )
 
             # Let backend process message
-            out_mssg, updated_context = backend.process_message(message, context)
+            processing_started_at = time.perf_counter()
+            out_mssg, updated_context = backend.process_message(message_in, context)
 
             # Update Context
             node_info_store[node_id].update_context(
-                message.metadata.run_id, context=updated_context
+                message_in.metadata.run_id, context=updated_context
             )
         except Empty:
             # An exception raised if queue.get times out
@@ -147,9 +153,14 @@ def worker(
                 e_code = ErrorCode.UNKNOWN
 
             reason = str(type(ex)) + ":<'" + str(ex) + "'>"
-            out_mssg = Message(Error(code=e_code, reason=reason), reply_to=message)
+            if message is not None:
+                out_mssg = Message(Error(code=e_code, reason=reason), reply_to=message)
 
         finally:
+            if metrics is not None and processing_started_at is not None:
+                metrics.add_clientapp_runtime(
+                    time.perf_counter() - processing_started_at
+                )
             if out_mssg:
                 # Assign a message_id
                 out_mssg.metadata.__dict__["_message_id"] = str(uuid4())
@@ -173,7 +184,9 @@ def add_messages_to_queue(
 
 
 def put_message_into_state(
-    state: LinkState, queue: Queue[Message], f_stop: threading.Event
+    state: LinkState,
+    queue: Queue[Message],
+    f_stop: threading.Event,
 ) -> None:
     """Store reply Messages into the LinkState from the queue."""
     while not f_stop.is_set():
@@ -185,7 +198,7 @@ def put_message_into_state(
             pass
 
 
-# pylint: disable=too-many-positional-arguments
+# pylint: disable-next=too-many-positional-arguments,too-many-arguments
 def run_api(
     app_fn: Callable[[], ClientApp],
     backend_fn: Callable[[], Backend],
@@ -193,6 +206,7 @@ def run_api(
     state_factory: LinkStateFactory,
     node_info_stores: dict[int, DeprecatedRunInfoStore],
     f_stop: threading.Event,
+    metrics: VceMetrics | None = None,
 ) -> None:
     """Run the VCE."""
     messageins_queue: Queue[Message] = Queue()
@@ -240,6 +254,7 @@ def run_api(
                     node_info_stores,
                     backend,
                     f_stop,
+                    metrics,
                 )
                 for _ in range(backend.num_workers)
             ]
@@ -279,6 +294,7 @@ def start_vce(
     num_supernodes: int | None = None,
     state_factory: LinkStateFactory | None = None,
     existing_nodes_mapping: NodeToPartitionMapping | None = None,
+    metrics: VceMetrics | None = None,
 ) -> None:
     """Start Fleet API with the Simulation Engine."""
     nodes_mapping = {}
@@ -378,6 +394,7 @@ def start_vce(
             state_factory,
             node_info_stores,
             f_stop,
+            metrics,
         )
     except LoadClientAppError as loadapp_ex:
         f_stop_delay = 10
