@@ -37,10 +37,10 @@ if TYPE_CHECKING:
 def __getattr__(name: str) -> Any:
     """Lazily resolve compatibility exports."""
     if name == "Driver":
-        from flwr.compat.server.grid import (
-            Driver,  # pylint: disable=import-outside-toplevel
-        )
+        # pylint: disable=import-outside-toplevel
+        from flwr.compat.server.grid import Driver
 
+        # pylint: enable=import-outside-toplevel
         globals()[name] = Driver
         return Driver
     if name == "ServerApp":
