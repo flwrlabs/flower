@@ -66,8 +66,8 @@ class DNode(Node):
     Notes
     -----
     In ``topology_mode_dynamic()``, a ``netwk`` configuration object is
-    expected. If configuration creation fails, a warning is logged and node
-    initialization continues with ``config_path=None``.
+    expected. Missing sampling configuration raises ``ValueError`` to avoid
+    starting an invalid dynamic node.
     """
 
     # one too-many attribute; pylint: disable=too-many-instance-attributes
@@ -116,9 +116,8 @@ class DNode(Node):
         Raises
         ------
         ValueError
-            Raised internally when dynamic topology is requested without a
-            network configuration object. The error is logged as a warning and
-            initialization then proceeds.
+            Raised when dynamic topology is requested without a sampling
+            configuration object.
 
         Examples
         --------
@@ -139,25 +138,17 @@ class DNode(Node):
 
         config_path = None
 
-        try:
-            if topology_mode == TopologyMode.dynamic() and sampling_conf is None:
-                raise ValueError(
-                    "A sampling configuration must be provided for dynamic "
-                    "topology mode."
-                )
-            elif sampling_conf is not None:
-                # Attempt to create the sampling configuration file and extract
-                # the path.
-                sampling_conf.create()
-                config_path = sampling_conf.config_file
-            else:
-                config_path = None
-        except Exception as e:
-            log(
-                logging.WARNING,
-                "The sampling configuration could not be created: %s",
-                e,
+        if topology_mode == TopologyMode.dynamic() and sampling_conf is None:
+            raise ValueError(
+                "A sampling configuration must be provided for dynamic "
+                "topology mode."
             )
+
+        if sampling_conf is not None:
+            # Attempt to create the sampling configuration file and extract
+            # the path.
+            sampling_conf.create()
+            config_path = sampling_conf.config_file
 
         # Initialize the parent node with the generated config path when
         # available.

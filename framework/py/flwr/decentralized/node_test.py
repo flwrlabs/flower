@@ -20,8 +20,8 @@ from unittest.mock import MagicMock, patch
 from flwr.decentralized.node import DNode, start_node
 
 
-def test_dnode_dynamic_without_sampling_logs_warning_and_sets_no_config_path() -> None:
-    """Dynamic topology without sampling should continue with `config_path=None`."""
+def test_dnode_dynamic_without_sampling_raises_value_error() -> None:
+    """Dynamic topology without sampling should fail fast."""
     dynamic_mode = object()
 
     with (
@@ -30,21 +30,23 @@ def test_dnode_dynamic_without_sampling_logs_warning_and_sets_no_config_path() -
             "flwr.decentralized.node.Node.__init__",
             return_value=None,
         ) as node_init,
-        patch("flwr.decentralized.node.log") as logger,
     ):
         topology_mode.dynamic.return_value = dynamic_mode
 
-        DNode(
-            context="ctx",
-            address="0.0.0.0",
-            port=1234,
-            topology_mode=dynamic_mode,
-            sampling_conf=None,
-        )
+        try:
+            DNode(
+                context="ctx",
+                address="0.0.0.0",
+                port=1234,
+                topology_mode=dynamic_mode,
+                sampling_conf=None,
+            )
+            raised = False
+        except ValueError:
+            raised = True
 
-    node_init.assert_called_once()
-    assert node_init.call_args.kwargs["config_path"] is None
-    logger.assert_called_once()
+    assert raised
+    node_init.assert_not_called()
 
 
 def test_dnode_uses_sampling_config_file_when_sampling_is_provided() -> None:
