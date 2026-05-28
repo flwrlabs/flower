@@ -56,13 +56,6 @@ class TokenRecord:
     active_until: datetime
 
 
-def _copy_task_event(event: TaskEvent) -> TaskEvent:
-    """Return a mutable protobuf event copy."""
-    copied = TaskEvent()
-    copied.CopyFrom(event)
-    return copied
-
-
 class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attributes
     """In-memory CoreState implementation."""
 
@@ -483,7 +476,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         cursor = after_task_event_id if after_task_event_id is not None else 0
         with self.lock_task_event_store:
             return [
-                _copy_task_event(event)
+                event
                 for event in self.task_event_store.get(run_id, [])
                 if event.id > cursor
             ]
