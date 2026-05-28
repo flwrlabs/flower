@@ -17,8 +17,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from flwr.agentapp import AgentSession
 from flwr.common.typing import Run
 from flwr.supercore.typing import JSONObject

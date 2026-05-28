@@ -21,7 +21,6 @@ from unittest.mock import Mock
 
 from flwr.agentapp import AgentApp, AgentSession
 from flwr.common import Context, RecordDict
-from flwr.supercore.typing import JSONObject
 
 
 def _context() -> Context:
@@ -43,11 +42,9 @@ def test_agentapp_registers_and_calls_main() -> None:
     calls = []
 
     @app.main()
-    def main(session_arg: AgentSession, context_arg: Context) -> JSONObject:
+    def main(session_arg: AgentSession, context_arg: Context) -> None:
         calls.append((session_arg, context_arg))
-        return {"id": "resp-1"}
 
-    result = app(session, context)
+    app(session, context)
 
     assert calls == [(session, context)]
-    assert result == {"id": "resp-1"}

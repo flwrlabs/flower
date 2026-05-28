@@ -18,14 +18,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TypeAlias
 
 from flwr.common import Context
-from flwr.supercore.typing import JSONObject
 
 from .session import AgentSession
-
-AgentAppCallable: TypeAlias = Callable[[AgentSession, Context], JSONObject]
+from .typing import AgentAppCallable
 
 
 class AgentApp:
@@ -38,21 +35,18 @@ class AgentApp:
         app = AgentApp()
 
         @app.main()
-        def main(agent: AgentSession, context: Context) -> JSONObject:
-            return {"output_text": "Hello"}
+        def main(agent: AgentSession, context: Context) -> None:
+            print("AgentApp running")
     """
 
     def __init__(self) -> None:
         self._main: AgentAppCallable | None = None
 
-    def __call__(self, agent: AgentSession, context: Context) -> JSONObject:
+    def __call__(self, agent: AgentSession, context: Context) -> None:
         """Execute `AgentApp`."""
         if self._main is None:
             raise ValueError("AgentApp has no main function.")
-        result = self._main(agent, context)
-        if not isinstance(result, dict):
-            raise ValueError("AgentApp main function must return a JSON object.")
-        return result
+        self._main(agent, context)
 
     def main(self) -> Callable[[AgentAppCallable], AgentAppCallable]:
         """Return a decorator that registers the main fn with the agent app.
@@ -64,8 +58,8 @@ class AgentApp:
             app = AgentApp()
 
             @app.main()
-            def main(agent: AgentSession, context: Context) -> JSONObject:
-                return {"output_text": "Hello"}
+            def main(agent: AgentSession, context: Context) -> None:
+                print("AgentApp running")
         """
 
         def main_decorator(main_fn: AgentAppCallable) -> AgentAppCallable:
