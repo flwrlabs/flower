@@ -38,16 +38,6 @@ def get_parameters_shape(parameters: list[NDArray[Any]]) -> list[tuple[int, ...]
     return [arr.shape for arr in parameters]
 
 
-default_numpy_dtype = np.dtype(np.int64)
-
-
-def get_zero_parameters(
-    dimensions_list: list[tuple[int, ...]], dtype: np.dtype[Any] = default_numpy_dtype
-) -> list[NDArray[Any]]:
-    """Generate zero parameters based on the dimensions list."""
-    return [np.zeros(dimensions, dtype=dtype) for dimensions in dimensions_list]
-
-
 def parameters_addition(
     parameters1: list[NDArray[Any]], parameters2: list[NDArray[Any]]
 ) -> list[NDArray[Any]]:
@@ -75,10 +65,3 @@ def parameters_multiply(
 ) -> list[NDArray[Any]]:
     """Multiply parameters by an integer/float multiplier."""
     return [parameters[idx] * multiplier for idx in range(len(parameters))]
-
-
-def parameters_divide(
-    parameters: list[NDArray[Any]], divisor: int | float
-) -> list[NDArray[Any]]:
-    """Divide weight by an integer/float divisor."""
-    return [parameters[idx] / divisor for idx in range(len(parameters))]

@@ -15,18 +15,17 @@
 """Public Flower App APIs."""
 
 
-from flwr.common.context import Context
-from flwr.common.message import Message
-from flwr.common.record import (
+from .constants import DEFAULT_TTL
+from .error import Error
+from .message import (
     Array,
     ArrayRecord,
     ConfigRecord,
+    Context,
+    Message,
     MetricRecord,
     RecordDict,
 )
-
-from .constants import DEFAULT_TTL
-from .error import Error
 from .message_type import MessageType
 from .metadata import Metadata
 from .typing import (

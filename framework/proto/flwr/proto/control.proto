@@ -20,6 +20,7 @@ package flwr.proto;
 import "flwr/proto/fab.proto";
 import "flwr/proto/transport.proto";
 import "flwr/proto/run.proto";
+import "flwr/proto/task.proto";
 import "flwr/proto/node.proto";
 import "flwr/proto/federation.proto";
 import "flwr/proto/federation_config.proto";
@@ -244,11 +245,8 @@ message ConfigureSimulationFederationRequest {
 }
 message ConfigureSimulationFederationResponse {}
 
-// ##############
-// Unused for now
-// ##############
-message StreamRunEventsRequest { uint64 run_id = 1; }
-message StreamRunEventsResponse {
-  string event = 1;
-  string data = 2;
+message StreamRunEventsRequest {
+  uint64 run_id = 1;
+  optional uint64 after_task_event_id = 2;
 }
+message StreamRunEventsResponse { TaskEvent task_event = 1; }

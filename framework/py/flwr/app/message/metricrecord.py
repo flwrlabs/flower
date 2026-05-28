@@ -17,10 +17,13 @@
 
 from __future__ import annotations
 
-from logging import WARN
 from typing import cast, get_args
 
 from flwr.app.typing import MetricRecordValues, MetricScalar
+from flwr.common.serde_utils import (
+    record_value_dict_from_proto,
+    record_value_dict_to_proto,
+)
 
 # pylint: disable=E0611
 from flwr.proto.recorddict_pb2 import MetricRecord as ProtoMetricRecord
@@ -33,8 +36,6 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_body,
 )
 
-from ..logger import log
-from ..serde_utils import record_value_dict_from_proto, record_value_dict_to_proto
 from .typeddict import TypedDict
 
 
@@ -79,8 +80,8 @@ class MetricRecord(TypedDict[str, MetricRecordValues], InflatableObject):
     A :code:`MetricRecord` is a Python dictionary designed to ensure that
     each key-value pair adheres to specified data types. A :code:`MetricRecord`
     is one of the types of records that a
-    `flwr.common.RecordDict <flwr.common.RecordDict.html#recorddict>`_ supports and
-    can therefore be used to construct :code:`common.Message` objects.
+    `flwr.app.RecordDict <flwr.app.RecordDict.html#recorddict>`_
+    supports and can therefore be used to construct :code:`app.Message` objects.
 
     Parameters
     ----------
@@ -105,7 +106,7 @@ class MetricRecord(TypedDict[str, MetricRecordValues], InflatableObject):
 
     Let's see some examples of how to construct a :code:`MetricRecord` from scratch::
 
-        from flwr.common import MetricRecord
+        from flwr.app import MetricRecord
 
         # A `MetricRecord` is a specialized Python dictionary
         record = MetricRecord({"accuracy": 0.94})
@@ -119,7 +120,7 @@ class MetricRecord(TypedDict[str, MetricRecordValues], InflatableObject):
     :code:`flwr.app.MetricRecordValues`. Similarly, only :code:`str` keys are
     allowed::
 
-        from flwr.common import MetricRecord
+        from flwr.app import MetricRecord
 
         record = MetricRecord() # an empty record
         # Add unsupported value
@@ -198,47 +199,3 @@ class MetricRecord(TypedDict[str, MetricRecordValues], InflatableObject):
             ),
             keep_input=False,
         )
-
-
-class MetricsRecord(MetricRecord):
-    """Deprecated class ``MetricsRecord``, use ``MetricRecord`` instead.
-
-    This class exists solely for backward compatibility with legacy
-    code that previously used ``MetricsRecord``. It has been renamed
-    to ``MetricRecord``.
-
-    .. warning::
-        ``MetricsRecord`` is deprecated and will be removed in a future release.
-        Use ``MetricRecord`` instead.
-
-    Examples
-    --------
-    Legacy (deprecated) usage::
-
-        from flwr.common import MetricsRecord
-
-        record = MetricsRecord()
-
-    Updated usage::
-
-        from flwr.common import MetricRecord
-
-        record = MetricRecord()
-    """
-
-    _warning_logged = False
-
-    def __init__(
-        self,
-        metric_dict: dict[str, MetricRecordValues] | None = None,
-        keep_input: bool = True,
-    ):
-        if not MetricsRecord._warning_logged:
-            MetricsRecord._warning_logged = True
-            log(
-                WARN,
-                "The `MetricsRecord` class has been renamed to `MetricRecord`. "
-                "Support for `MetricsRecord` will be removed in a future release. "
-                "Please update your code accordingly.",
-            )
-        super().__init__(metric_dict, keep_input)
