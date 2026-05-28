@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Private Open Responses-compatible provider client for Model executors."""
+"""Open Responses-compatible provider client for Model executors."""
 
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ _TERMINAL_SUCCESS_EVENTS = frozenset({"response.completed", "response.incomplete
 _TERMINAL_FAILURE_EVENTS = frozenset({"error", "response.failed"})
 
 
-def invoke_responses_model(
+def invoke_model_provider(
     request: JSONObject,
     *,
     on_stream_event: Callable[[JSONObject], None] | None = None,
@@ -43,9 +43,10 @@ def invoke_responses_model(
     Control flow:
     1. Read API key, endpoint, and timeout settings from the environment.
     2. Copy the request payload to avoid mutating the caller's object.
-    3. Route streaming requests to `_invoke_streaming_response`; route all
-       other requests to `_invoke_response`.
+    3. Send the request through one provider path that handles normal and
+       streaming responses.
     """
+    # Resolve provider configuration from environment variables.
     api_key = os.getenv("FLWR_MODEL_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("Model API key is not set (FLWR_MODEL_API_KEY).")
@@ -70,65 +71,22 @@ def invoke_responses_model(
         timeout = DEFAULT_MODEL_API_TIMEOUT
     timeout = max(1.0, timeout)
 
+    # Build request metadata once, then execute the shared provider path.
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
     payload = dict(request)
-    if payload.get("stream") is True:
-        return _invoke_streaming_response(
-            responses_url=responses_url,
-            headers=headers,
-            timeout=timeout,
-            request=payload,
-            on_stream_event=on_stream_event,
-        )
-    return _invoke_response(
+    return _invoke_provider_response(
         responses_url=responses_url,
         headers=headers,
         timeout=timeout,
         request=payload,
+        on_stream_event=on_stream_event,
     )
 
 
-def _invoke_response(
-    *,
-    responses_url: str,
-    headers: dict[str, str],
-    timeout: float,
-    request: JSONObject,
-) -> JSONObject:
-    """Run a non-streaming provider request.
-
-    Control flow:
-    1. POST the request with streaming disabled.
-    2. Fail immediately for HTTP error status codes.
-    3. Parse the response body as a JSON object.
-    4. Return the parsed response object.
-    """
-    response = _post_responses_request(
-        responses_url=responses_url,
-        headers=headers,
-        timeout=timeout,
-        request=request,
-        stream=False,
-    )
-    if response.status_code >= 400:
-        raise RuntimeError(
-            _failure_message(
-                status_code=response.status_code,
-                detail=_response_detail(response),
-            )
-        )
-
-    return _parse_json_object(
-        parse=response.json,
-        invalid_json_message="Model provider returned invalid JSON.",
-        non_object_message="Model provider returned a non-object JSON payload",
-    )
-
-
-def _invoke_streaming_response(
+def _invoke_provider_response(
     *,
     responses_url: str,
     headers: dict[str, str],
@@ -136,31 +94,50 @@ def _invoke_streaming_response(
     request: JSONObject,
     on_stream_event: Callable[[JSONObject], None] | None,
 ) -> JSONObject:
-    """Run a streaming provider request.
+    """Run a normal or streaming provider request.
 
     Control flow:
-    1. Force `stream` to true and POST the request with streaming enabled.
-    2. Fail immediately for HTTP errors or non-SSE response content.
-    3. Parse each SSE data payload as a JSON object and forward it to the
-       optional stream callback.
-    4. Raise on provider failure events; return the terminal success response.
+    1. Detect whether the caller requested streaming.
+    2. POST the request and fail immediately for HTTP error status codes.
+    3. For normal responses, parse and return the response JSON object.
+    4. For streaming responses, validate SSE content and consume events until a
+       terminal success or failure event arrives.
     """
-    request["stream"] = True
-    response = _post_responses_request(
-        responses_url=responses_url,
-        headers=headers,
-        timeout=timeout,
-        request=request,
-        stream=True,
-    )
+    stream = request.get("stream") is True
+
+    # Send one HTTP request and let HTTP status represent transport failure.
+    try:
+        response = requests.post(
+            responses_url,
+            headers=headers,
+            json=request,
+            timeout=timeout,
+            stream=stream,
+        )
+    except requests.RequestException as exc:
+        raise RuntimeError(f"Model provider request failed: {exc}") from exc
+
     if response.status_code >= 400:
+        try:
+            detail = cast(JSONValue, response.json())
+        except ValueError:
+            detail = response.text
         raise RuntimeError(
             _failure_message(
                 status_code=response.status_code,
-                detail=_response_detail(response),
+                detail=detail,
             )
         )
 
+    if not stream:
+        # Successful non-streaming responses must be JSON objects.
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise RuntimeError("Model provider returned invalid JSON.") from exc
+        return _ensure_json_object(payload)
+
+    # Streaming parsing only works for Server-Sent Event responses.
     content_type = response.headers.get("Content-Type", "").lower()
     if _STREAM_CONTENT_TYPE not in content_type:
         raise RuntimeError(
@@ -175,12 +152,17 @@ def _invoke_streaming_response(
     for event_name, data in _iter_sse_events(response):
         if data.strip() == "[DONE]":
             continue
-        event = _parse_json_object(
-            parse=lambda data=data: json.loads(data),
-            invalid_json_message=f"Model provider stream returned invalid JSON event: "
-            f"{data}",
-            non_object_message="Model provider stream returned a non-object JSON event",
-        )
+
+        # Each SSE data payload is an Open Responses stream event object.
+        try:
+            payload = json.loads(data)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                f"Model provider stream returned invalid JSON event: {data}"
+            ) from exc
+        event = _ensure_json_object(payload)
+
+        # Some providers put the event type in the SSE event name instead of JSON.
         if event_name is not None and not isinstance(event.get("type"), str):
             event = dict(event)
             event["type"] = event_name
@@ -189,6 +171,7 @@ def _invoke_streaming_response(
         if on_stream_event is not None:
             on_stream_event(event)
 
+        # Terminal failure events stop the stream and surface the provider event.
         event_type = event.get("type")
         is_failure_event = (
             isinstance(event_type, str) and event_type in _TERMINAL_FAILURE_EVENTS
@@ -202,6 +185,7 @@ def _invoke_streaming_response(
                 )
             )
 
+        # Terminal success events carry the final response object.
         if isinstance(event_type, str) and event_type in _TERMINAL_SUCCESS_EVENTS:
             response_payload = event.get("response")
             if isinstance(response_payload, dict):
@@ -213,39 +197,13 @@ def _invoke_streaming_response(
     )
 
 
-def _post_responses_request(
-    *,
-    responses_url: str,
-    headers: dict[str, str],
-    timeout: float,
-    request: JSONObject,
-    stream: bool,
-) -> requests.Response:
-    try:
-        return requests.post(
-            responses_url,
-            headers=headers,
-            json=request,
-            timeout=timeout,
-            stream=stream,
-        )
-    except requests.RequestException as exc:
-        raise RuntimeError(f"Model provider request failed: {exc}") from exc
-
-
-def _parse_json_object(
-    *,
-    parse: Callable[[], object],
-    invalid_json_message: str,
-    non_object_message: str,
-) -> JSONObject:
-    try:
-        payload = parse()
-    except ValueError as exc:
-        raise RuntimeError(invalid_json_message) from exc
+def _ensure_json_object(payload: object) -> JSONObject:
     if not isinstance(payload, dict):
+        detail = cast(JSONValue, payload)
+        if not isinstance(detail, str):
+            detail = json.dumps(detail, separators=(",", ":"))
         raise RuntimeError(
-            f"{non_object_message}: {_json_detail(cast(JSONValue, payload))}"
+            f"Model provider returned a non-object JSON payload: {detail}"
         )
     return cast(JSONObject, payload)
 
@@ -256,19 +214,27 @@ def _iter_sse_events(response: requests.Response) -> Iterator[tuple[str | None, 
 
     for raw_line in response.iter_lines():
         line = raw_line.decode("utf-8")
+
+        # A blank line terminates one SSE event.
         if not line:
             if data_lines:
                 yield event_name, "\n".join(data_lines)
                 event_name = None
                 data_lines = []
             continue
+
+        # Lines starting with ":" are SSE comments or keepalives.
         if line.startswith(":"):
             continue
+
+        # The event name is optional; data lines carry the event payload.
         if line.startswith("event:"):
             event_name = line.removeprefix("event:").strip() or None
             continue
         if line.startswith("data:"):
             data = line.removeprefix("data:")
+
+            # SSE allows one optional space after the field separator.
             if data.startswith(" "):
                 data = data[1:]
             data_lines.append(data)
@@ -277,19 +243,7 @@ def _iter_sse_events(response: requests.Response) -> Iterator[tuple[str | None, 
         yield event_name, "\n".join(data_lines)
 
 
-def _response_detail(response: requests.Response) -> JSONValue:
-    try:
-        payload = response.json()
-    except ValueError:
-        return response.text
-    return cast(JSONValue, payload)
-
-
 def _failure_message(*, status_code: int, detail: JSONValue) -> str:
-    return f"Model provider request failed: {status_code} {_json_detail(detail)}"
-
-
-def _json_detail(detail: JSONValue) -> str:
-    if isinstance(detail, str):
-        return detail
-    return json.dumps(detail, separators=(",", ":"))
+    if not isinstance(detail, str):
+        detail = json.dumps(detail, separators=(",", ":"))
+    return f"Model provider request failed: {status_code} {detail}"

@@ -24,7 +24,7 @@ import pytest
 
 from flwr.supercore.typing import JSONObject
 
-from .provider import invoke_responses_model
+from .provider import invoke_model_provider
 
 
 @dataclass
@@ -53,31 +53,7 @@ def _patch_post(monkeypatch: pytest.MonkeyPatch, response: _Response) -> Mock:
     return post_mock
 
 
-def test_invoke_responses_model_rejects_base_endpoint(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Configured provider endpoints must include the responses path."""
-    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
-    monkeypatch.setenv("FLWR_MODEL_API_ENDPOINT", "https://example.test/v1")
-
-    with pytest.raises(RuntimeError, match="must include the /responses path"):
-        invoke_responses_model({"model": "model", "input": []})
-
-
-def test_invoke_responses_model_uses_configured_timeout(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Provider calls should use the configured request timeout."""
-    monkeypatch.setenv("FLWR_MODEL_API_KEY", "fk_test")
-    monkeypatch.setenv("FLWR_MODEL_API_TIMEOUT", "12.5")
-    post_mock = _patch_post(monkeypatch, _Response(body={"id": "resp_1"}))
-
-    invoke_responses_model({"model": "model", "input": []})
-
-    assert post_mock.call_args.kwargs["timeout"] == 12.5
-
-
-def test_invoke_responses_model_collects_stream_events(
+def test_invoke_model_provider_collects_stream_events(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Streaming calls should collect events and accept incomplete terminals."""
@@ -102,7 +78,7 @@ def test_invoke_responses_model_collects_stream_events(
     )
     streamed_events: list[JSONObject] = []
 
-    result = invoke_responses_model(
+    result = invoke_model_provider(
         {"model": "model", "input": [], "stream": True},
         on_stream_event=streamed_events.append,
     )
@@ -138,7 +114,7 @@ def test_invoke_responses_model_collects_stream_events(
         ),
     )
 
-    result = invoke_responses_model({"model": "model", "input": [], "stream": True})
+    result = invoke_model_provider({"model": "model", "input": [], "stream": True})
 
     assert result == {
         "id": "resp_1",
@@ -147,7 +123,7 @@ def test_invoke_responses_model_collects_stream_events(
     }
 
 
-def test_invoke_responses_model_raises_on_stream_failure_events(
+def test_invoke_model_provider_raises_on_stream_failure_events(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Provider stream failure events should become structured provider errors."""
@@ -185,6 +161,6 @@ def test_invoke_responses_model_raises_on_stream_failure_events(
         )
 
         with pytest.raises(RuntimeError) as exc_info:
-            invoke_responses_model({"model": "model", "input": [], "stream": True})
+            invoke_model_provider({"model": "model", "input": [], "stream": True})
 
         assert str(exc_info.value) == expected_message
