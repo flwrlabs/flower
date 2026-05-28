@@ -32,22 +32,42 @@ from flwr.common import (
     RecordDict,
     Scalar,
 )
-from flwr.common.constant import NUM_PARTITIONS_KEY, PARTITION_ID_KEY
+from flwr.common.constant import (
+    NODE_ID_NUM_BYTES,
+    NUM_PARTITIONS_KEY,
+    PARTITION_ID_KEY,
+    SUPERLINK_NODE_ID,
+)
 from flwr.common.recorddict_compat import (
     getpropertiesins_to_recorddict,
     recorddict_to_getpropertiesres,
 )
 from flwr.common.recorddict_compat_test import _get_valid_getpropertiesins
-from flwr.simulation.legacy_app import (
-    NodeToPartitionMapping,
-    _create_node_id_to_partition_mapping,
-)
+from flwr.server.superlink.linkstate.utils import generate_rand_int_from_bytes
 from flwr.simulation.ray_transport.ray_actor import (
     ClientAppActor,
     VirtualClientEngineActor,
     VirtualClientEngineActorPool,
 )
 from flwr.simulation.ray_transport.ray_client_proxy import RayActorClientProxy
+
+NodeToPartitionMapping = dict[int, int]
+
+
+def _create_node_id_to_partition_mapping(
+    num_clients: int,
+) -> NodeToPartitionMapping:
+    """Generate a node_id:partition_id mapping."""
+    nodes_mapping: NodeToPartitionMapping = {}
+    for i in range(num_clients):
+        while True:
+            node_id = generate_rand_int_from_bytes(
+                NODE_ID_NUM_BYTES, exclude={SUPERLINK_NODE_ID, 0}
+            )
+            if node_id not in nodes_mapping:
+                break
+        nodes_mapping[node_id] = i
+    return nodes_mapping
 
 
 class DummyClient(NumPyClient):

@@ -232,9 +232,6 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' && matrix.directory != 'e2e-bare-auth' }}
         working-directory: framework/e2e/${{ matrix.directory }}/${{ matrix.e2e }}
         run: ./../../test_legacy.sh "${{ matrix.directory }}"
-      - name: Run virtual client test
-        if: ${{ needs.changes.outputs.framework == 'true' && matrix.directory != 'e2e-bare-auth' }}
-        run: python simulation.py
       - name: Run simulation engine test
         if: ${{ needs.changes.outputs.framework == 'true' && (matrix.directory == 'e2e-pytorch' || matrix.directory == 'e2e-tensorflow') }}
         run: python simulation_next.py
@@ -260,59 +257,6 @@ jobs:
         with:
           path: ${{ env.pythonLocation }}
           key: pythonloc-${{ runner.os }}-${{ matrix.directory }}-${{ env.pythonLocation }}-${{ hashFiles(format('./framework/e2e/{0}/pyproject.toml', matrix.directory)) }}
-
-  strategies:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 10
-    needs: [changes, wheel]
-    strategy:
-      matrix:
-        strat:
-          [
-            "FedMedian",
-            "FedTrimmedAvg",
-            "QFedAvg",
-            "FaultTolerantFedAvg",
-            "FedAvgM",
-            "FedAdam",
-            "FedAdagrad",
-            "FedYogi"
-          ]
-
-    name: Strategy / ${{ matrix.strat }}
-
-    defaults:
-      run:
-        working-directory: framework/e2e/strategies
-
-    steps:
-      - uses: actions/checkout@v5
-      - name: Bootstrap
-        if: ${{ needs.changes.outputs.framework == 'true' }}
-        uses: ./.github/actions/bootstrap
-      - name: Install dependencies
-        if: ${{ needs.changes.outputs.framework == 'true' }}
-        run: |
-          python -m pip install --upgrade .
-      - name: Install Flower wheel from artifact store
-        if: ${{ needs.changes.outputs.framework == 'true' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
-        run: |
-          WHEEL_URL="https://${{ env.ARTIFACT_BUCKET }}/py/${{ needs.wheel.outputs.dir }}/${{ needs.wheel.outputs.short_sha }}/${{ needs.wheel.outputs.whl_path }}"
-          python -m pip install "flwr[simulation] @ ${WHEEL_URL}"
-      - name: Cache Datasets
-        if: ${{ needs.changes.outputs.framework == 'true' }}
-        uses: actions/cache@v4
-        with:
-          path: "~/.keras"
-          key: keras-datasets
-      - name: Download Datasets
-        if: ${{ needs.changes.outputs.framework == 'true' }}
-        run: |
-          python -c "import tensorflow as tf; tf.keras.datasets.mnist.load_data()"
-      - name: Test strategies
-        if: ${{ needs.changes.outputs.framework == 'true' }}
-        run: |
-          python test.py "${{ matrix.strat }}"
 
   apps:
     runs-on: ubuntu-22.04
