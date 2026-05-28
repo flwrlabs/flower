@@ -81,9 +81,8 @@ message PushTaskOutputRequest {
   Context context = 1;
   string sub_status = 2;
   string details = 3;
-  uint64 bytes_sent = 4;
-  uint64 bytes_recv = 5;
-  double clientapp_runtime = 6;
+  // Simulation Runtime usage only.
+  optional double clientapp_runtime = 4;
 }
 message PushTaskOutputResponse {}
 
