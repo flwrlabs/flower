@@ -116,7 +116,7 @@ Next, run the app on SuperGrid to confirm that the new strategy is being used:
     # Log in if you are not already logged in
     $ flwr login supergrid
     # Run the app across the federation you created earlier in this tutorial series
-    $ flwr run . --federation @<username>/<federation-name>
+    $ flwr run . supergrid --federation @<username>/<federation-name>
 
 Open the `SuperGrid dashboard <https://flower.ai/federations/>`__, select your
 federation, and inspect the logs for the new run. You should see that Flower starts the
