@@ -138,6 +138,8 @@ def create_message_error_unavailable_res_message(
         message_type=ins_metadata.message_type,
         created_at=current_time,
         ttl=ttl,
+        src_task_id=ins_metadata.dst_task_id,
+        dst_task_id=ins_metadata.src_task_id,
     )
 
     msg = make_message(
