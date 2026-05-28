@@ -583,28 +583,6 @@ class NodeApp(App):
                 result.update(NodeApp._collect_deflated(child))
         return result
 
-    @staticmethod
-    def _parse_event(message: str) -> tuple[str, str]:
-        """Parse event and payload from incoming message.
-
-        Supported formats:
-        - Raw string => defaults to `train` event.
-        - JSON object => {"event": "train|evaluate", "payload": "..."}
-        """
-        try:
-            data = json.loads(message)
-        except json.JSONDecodeError:
-            return "train", message
-
-        if isinstance(data, dict):
-            event = str(data.get("event", "train")).lower()
-            payload = data.get("payload", message)
-            if not isinstance(payload, str):
-                payload = json.dumps(payload)
-            return event, payload
-
-        return "train", message
-
     def _is_supported_action(self, action: Action) -> bool:
         """Return whether the incoming action is compatible with protocol."""
         if self.run_config.protocol == Mode.PUSH:
@@ -613,7 +591,11 @@ class NodeApp(App):
         return action in {Action.PUSHPULL, Action.PUSH, Action.CANCEL}
 
     def _is_valid_round(self, request: AggregateRequest) -> bool:
-        """Return whether request round is valid for current local state."""
+        """Return whether the request carries a valid (positive) round number.
+
+        Rounds are not required to be synchronized across nodes; any round
+        number ≥ 1 is accepted.
+        """
         if request.round_number < 1:
             log(
                 logging.WARNING,

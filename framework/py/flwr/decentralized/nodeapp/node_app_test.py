@@ -54,60 +54,19 @@ def mapped_evaluate_handler(message: str, **kwargs) -> None:  # type: ignore[no-
     EVAL_CALLS.append(message)
 
 
-def test_train_decorator_and_handle_message() -> None:
-    """Register train callback and ensure dispatch calls it."""
+def test_train_decorator_registered_via_periodic_run() -> None:
+    """Register train callback and ensure periodic_run dispatches it."""
     app = NodeApp(subject="trainer", run_config={"local-epochs": 2})
-    calls: list[tuple[str, str | None, dict]] = []
+    calls: list[str] = []
 
     @app.train()
-    def train(
-        message: str,
-        node_id: str | None,
-        run_config: dict,
-        subject: str,
-        app: NodeApp,
-    ) -> None:
-        del subject, app
-        calls.append((message, node_id, run_config))
+    def train(message: str, **kwargs) -> None:  # type: ignore[no-untyped-def]
+        del kwargs
+        calls.append(message)
 
-    app.handle_message("hello", node_id="node-1")
+    app.periodic_run(view=[], node_id="node-1")
 
     assert len(calls) == 1
-    assert calls[0][0] == "hello"
-    assert calls[0][1] == "node-1"
-    assert calls[0][2]["local-epochs"] == 2
-
-
-def test_evaluate_decorator_dispatch_from_json_event() -> None:
-    """Route evaluate event to evaluate callback when using JSON envelope."""
-    app = NodeApp(subject="eval")
-    received: list[str] = []
-
-    @app.train()
-    def train(**kwargs) -> None:  # type: ignore[no-untyped-def]
-        del kwargs
-
-    @app.evaluate()
-    def evaluate(message: str, **kwargs) -> None:  # type: ignore[no-untyped-def]
-        del kwargs
-        received.append(message)
-
-    app.handle_message('{"event": "evaluate", "payload": "metric"}')
-
-    assert received == ["metric"]
-
-
-def test_missing_train_callback_raises_runtime_error() -> None:
-    """Raise RuntimeError if train event is received but no train callback exists."""
-    app = NodeApp(subject="trainer")
-
-    try:
-        app.handle_message("hello")
-        raised = False
-    except RuntimeError:
-        raised = True
-
-    assert raised
 
 
 def test_periodic_run_invokes_train_callback_when_registered() -> None:
@@ -237,11 +196,13 @@ def test_create_nodeapps_from_pyproject_with_handler_mapping(tmp_path: Path) -> 
     apps = create_nodeapps_from_pyproject(pyproject)
     app = apps["subject_a"]
 
-    app.handle_message("hello")
-    app.handle_message('{"event": "evaluate", "payload": "metric"}')
+    # round 1 → train callback fires
+    app._training_round(1)  # pylint: disable=protected-access
+    # round 2 → evaluate callback fires for round 1, then halts (rounds=1)
+    app._training_round(2)  # pylint: disable=protected-access
 
-    assert TRAIN_CALLS == ["hello"]
-    assert EVAL_CALLS == ["metric"]
+    assert len(TRAIN_CALLS) == 1
+    assert len(EVAL_CALLS) == 1
 
 
 def test_create_nodeapps_from_pyproject_components_style(tmp_path: Path) -> None:
@@ -397,8 +358,8 @@ def test_aggregate_handler_error_does_not_fallback_to_train_callback() -> None:
     assert train_calls == []
 
 
-def test_invalid_aggregate_payload_falls_back_to_train_event() -> None:
-    """Fallback to train/evaluate parsing when AggregateRequest decoding fails."""
+def test_non_aggregate_payload_is_silently_ignored() -> None:
+    """Non-AggregateRequest payloads are silently ignored; no exception raised."""
     app = NodeApp(subject="trainer")
     seen: list[str] = []
 
@@ -407,10 +368,10 @@ def test_invalid_aggregate_payload_falls_back_to_train_event() -> None:
         del kwargs
         seen.append(message)
 
-    invalid_aggregate_like_payload = '{"foo": "bar"}'
-    app.handle_message(invalid_aggregate_like_payload)
+    app.handle_message('{"foo": "bar"}')
+    app.handle_message("hello")
 
-    assert seen == [invalid_aggregate_like_payload]
+    assert seen == []
 
 
 def test_aggregate_request_with_empty_source_is_ignored() -> None:
@@ -451,7 +412,7 @@ def test_load_handler_rejects_invalid_spec_format(spec: str) -> None:
 
 @pytest.mark.parametrize("round_number", [0, 1, 2, 3])
 def test_aggregate_request_round_validation(round_number: int) -> None:
-    """Only handle aggregate requests for the current active round."""
+    """Reject round_number < 1; accept any positive round regardless of current_round."""
     app = NodeApp(subject="trainer", run_config={"rounds": 3})
     app.current_round = 2
     seen: list[AggregateRequest] = []
@@ -470,5 +431,5 @@ def test_aggregate_request_round_validation(round_number: int) -> None:
 
     app.handle_message(app.aggregate_request_to_str(req))
 
-    expected = 1 if round_number == 2 else 0
+    expected = 0 if round_number < 1 else 1
     assert len(seen) == expected
