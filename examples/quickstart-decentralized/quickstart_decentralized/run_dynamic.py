@@ -33,9 +33,11 @@ from __future__ import annotations
 
 import logging
 import sys
+from pathlib import Path
 
 from flwr.decentralized.common.args import get_args_nodes
 from flwr.decentralized.node import DNode, start_node
+from flwr.decentralized.nodeapp import create_nodeapps_from_pyproject
 
 logging.basicConfig(
     level=logging.INFO,
@@ -66,17 +68,22 @@ def main(argv=None) -> None:
     # Build the DNode from the resolved RuntimeNode.
     node = DNode(**runtime_node.to_dnode_kwargs())
 
+    # Load NodeApps declared in quickstart pyproject.toml.
+    pyproject_path = Path(__file__).resolve().parent.parent / "pyproject.toml"
+    nodeapps = create_nodeapps_from_pyproject(pyproject_path)
+    applications = list(nodeapps.values())
+
+    logger.info(
+        "Registering %d NodeApp(s): %s",
+        len(applications),
+        ", ".join(nodeapps.keys()) if nodeapps else "none",
+    )
+
     # Start the node runtime (connects to the network).
     node.create_node()
 
-    # In a real application you would register one or more App instances:
-    #
-    #   from my_app import MyFLApp
-    #   app = MyFLApp(name="fl_app")
-    #   start_node(node, applications=[app], timeout=600)
-    #
-    # Here we just run the bare node loop for demonstration.
-    start_node(node, applications=[], timeout=600)
+    # Start runtime with NodeApps loaded from pyproject.toml.
+    start_node(node, applications=applications, timeout=600)
 
 
 if __name__ == "__main__":

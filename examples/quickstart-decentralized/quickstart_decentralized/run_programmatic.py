@@ -15,6 +15,7 @@ Usage
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from flwr.decentralized.common.node_config import _build_runtime_node
 from flwr.decentralized.common.runtime_node import RuntimeNode
@@ -27,6 +28,7 @@ from flwr.decentralized.common.sampling import (
     SelectionPolicy,
 )
 from flwr.decentralized.node import DNode, start_node
+from flwr.decentralized.nodeapp import create_nodeapps_from_pyproject
 
 logging.basicConfig(
     level=logging.INFO,
@@ -94,8 +96,18 @@ def main() -> None:
     )
 
     node = DNode(**runtime_node.to_dnode_kwargs())
+
+    pyproject_path = Path(__file__).resolve().parent.parent / "pyproject.toml"
+    nodeapps = create_nodeapps_from_pyproject(pyproject_path)
+    applications = list(nodeapps.values())
+    logger.info(
+        "Registering %d NodeApp(s): %s",
+        len(applications),
+        ", ".join(nodeapps.keys()) if nodeapps else "none",
+    )
+
     node.create_node()
-    start_node(node, applications=[], timeout=600)
+    start_node(node, applications=applications, timeout=600)
 
 
 if __name__ == "__main__":
