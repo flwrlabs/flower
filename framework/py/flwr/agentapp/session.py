@@ -24,6 +24,7 @@ from flwr.supercore.typing import JSONObject
 class AgentSession:
     """Runtime session passed to AgentApp main functions."""
 
+    # pylint: disable=too-many-arguments
     def __init__(
         self,
         *,
