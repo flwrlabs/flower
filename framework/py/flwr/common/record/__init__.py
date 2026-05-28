@@ -15,12 +15,15 @@
 """Record APIs."""
 
 
-from .array import Array
-from .arrayrecord import ArrayRecord, ParametersRecord
-from .configrecord import ConfigRecord, ConfigsRecord
+from flwr.app.message import Array, ArrayRecord, ConfigRecord, MetricRecord, RecordDict
+from flwr.compat.common.record import (
+    ConfigsRecord,
+    MetricsRecord,
+    ParametersRecord,
+    RecordSet,
+)
+
 from .conversion_utils import array_from_numpy
-from .metricrecord import MetricRecord, MetricsRecord
-from .recorddict import RecordDict, RecordSet
 
 __all__ = [
     "Array",

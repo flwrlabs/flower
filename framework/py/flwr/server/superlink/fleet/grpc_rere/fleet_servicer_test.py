@@ -22,6 +22,7 @@ from unittest.mock import Mock, patch
 import grpc
 from parameterized import parameterized
 
+from flwr.app.message import get_message_to_descendant_id_mapping
 from flwr.common import ConfigRecord
 from flwr.common.constant import (
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
@@ -30,7 +31,6 @@ from flwr.common.constant import (
     SUPERLINK_NODE_ID,
     SubStatus,
 )
-from flwr.common.message import get_message_to_descendant_id_mapping
 from flwr.common.serde import message_from_proto
 from flwr.common.typing import Fab
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611

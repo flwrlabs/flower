@@ -28,23 +28,23 @@
 
 .. |message_link| replace:: ``Message``
 
-.. _message_link: ref-api/flwr.common.Message.html
+.. _message_link: ref-api/flwr.app.Message.html
 
 .. |arrayrecord_link| replace:: ``ArrayRecord``
 
-.. _arrayrecord_link: ref-api/flwr.common.ArrayRecord.html
+.. _arrayrecord_link: ref-api/flwr.app.ArrayRecord.html
 
 .. |metricrecord_link| replace:: ``MetricRecord``
 
-.. _metricrecord_link: ref-api/flwr.common.MetricRecord.html
+.. _metricrecord_link: ref-api/flwr.app.MetricRecord.html
 
 .. |configrecord_link| replace:: ``ConfigRecord``
 
-.. _configrecord_link: ref-api/flwr.common.ConfigRecord.html
+.. _configrecord_link: ref-api/flwr.app.ConfigRecord.html
 
 .. |recorddict_link| replace:: ``RecordDict``
 
-.. _recorddict_link: ref-api/flwr.common.RecordDict.html
+.. _recorddict_link: ref-api/flwr.app.RecordDict.html
 
 ########################
  Upgrade to Message API

@@ -12,21 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Conversion utility functions for Records."""
+"""Message APIs."""
 
 
-from flwr.app.message import Array
-
-from ..logger import warn_deprecated_feature
-from ..typing import NDArray
-
-WARN_DEPRECATED_MESSAGE = (
-    "`array_from_numpy` is deprecated. Instead, use the `Array(ndarray)` class "
-    "directly or `Array.from_numpy_ndarray(ndarray)`."
+from .array import Array
+from .arrayrecord import ArrayRecord
+from .configrecord import ConfigRecord
+from .context import Context
+from .message import (
+    Message,
+    MessageInitializationError,
+    get_message_to_descendant_id_mapping,
+    make_message,
+    remove_content_from_message,
 )
+from .metricrecord import MetricRecord
+from .recorddict import RecordDict
 
-
-def array_from_numpy(ndarray: NDArray) -> Array:
-    """Create Array from NumPy ndarray."""
-    warn_deprecated_feature(WARN_DEPRECATED_MESSAGE)
-    return Array.from_numpy_ndarray(ndarray)
+__all__ = [
+    "Array",
+    "ArrayRecord",
+    "ConfigRecord",
+    "Context",
+    "Message",
+    "MessageInitializationError",
+    "MetricRecord",
+    "RecordDict",
+    "get_message_to_descendant_id_mapping",
+    "make_message",
+    "remove_content_from_message",
+]

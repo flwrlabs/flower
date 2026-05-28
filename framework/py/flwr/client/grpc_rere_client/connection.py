@@ -23,11 +23,11 @@ from pathlib import Path
 import grpc
 from cryptography.hazmat.primitives.asymmetric import ec
 
+from flwr.app.message import Message, remove_content_from_message
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.constant import HEARTBEAT_CALL_TIMEOUT, HEARTBEAT_DEFAULT_INTERVAL
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
-from flwr.common.message import Message, remove_content_from_message
 from flwr.common.retry_invoker import RetryInvoker, wrap_stub
 from flwr.common.serde import (
     fab_from_proto,
