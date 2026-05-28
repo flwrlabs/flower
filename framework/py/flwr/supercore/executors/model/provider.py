@@ -86,7 +86,7 @@ def invoke_model_provider(
     )
 
 
-def _invoke_provider_response(
+def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branches
     *,
     responses_url: str,
     headers: dict[str, str],
