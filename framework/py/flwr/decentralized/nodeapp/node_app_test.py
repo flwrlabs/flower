@@ -69,6 +69,22 @@ def test_train_decorator_registered_via_periodic_run() -> None:
     assert len(calls) == 1
 
 
+def test_legacy_callback_only_receives_declared_kwargs() -> None:
+    """Legacy callbacks without **kwargs should not receive extra arguments."""
+    app = NodeApp(subject="trainer", run_config={"local-epochs": 2})
+    calls: list[tuple[str, dict]] = []
+
+    @app.train()
+    def train(message: str, run_config: dict) -> None:
+        calls.append((message, run_config))
+
+    app.periodic_run(view=[], node_id="node-1")
+
+    assert len(calls) == 1
+    assert calls[0][0] == ""
+    assert calls[0][1]["local-epochs"] == 2
+
+
 def test_periodic_run_invokes_train_callback_when_registered() -> None:
     """Periodic run should call train callback with periodic marker."""
     app = NodeApp(subject="periodic")

@@ -455,6 +455,51 @@ class NodeApp(App):
         """Call callback using the ClientApp-style signature."""
         return callback(message, context)
 
+    @staticmethod
+    def _legacy_callback_kwargs(
+        callback: NodeFn,
+        *,
+        message: str,
+        node_id: Optional[str],
+        run_config: ConfigRecord,
+        subject: str,
+        app: "NodeApp",
+    ) -> dict[str, Any]:
+        """Return only keyword arguments accepted by a legacy callback."""
+        try:
+            signature = inspect.signature(callback)
+        except (TypeError, ValueError):
+            return {
+                "message": message,
+                "node_id": node_id,
+                "run_config": dict(run_config),
+                "subject": subject,
+                "app": app,
+            }
+
+        accepted_kwargs: dict[str, Any] = {}
+        accepts_var_kwargs = any(
+            param.kind == inspect.Parameter.VAR_KEYWORD
+            for param in signature.parameters.values()
+        )
+        candidate_kwargs = {
+            "message": message,
+            "node_id": node_id,
+            "run_config": dict(run_config),
+            "subject": subject,
+            "app": app,
+        }
+
+        if accepts_var_kwargs:
+            return candidate_kwargs
+
+        for name, value in candidate_kwargs.items():
+            param = signature.parameters.get(name)
+            if param is not None and param.kind != inspect.Parameter.POSITIONAL_ONLY:
+                accepted_kwargs[name] = value
+
+        return accepted_kwargs
+
     def _invoke_callback(
         self,
         callback: NodeFn,
@@ -502,12 +547,16 @@ class NodeApp(App):
             return self._call_fn(callback, msg, ctxt)
 
         legacy_message = payload if payload is not None else ""
-        callback_result = callback(  # type: ignore[misc]
+        callback_kwargs = self._legacy_callback_kwargs(
+            callback,
             message=legacy_message,
             node_id=node_id,
-            run_config=dict(config),
+            run_config=config,
             subject=self.subject,
             app=self,
+        )
+        callback_result = callback(  # type: ignore[misc]
+            **callback_kwargs,
         )
         if isinstance(callback_result, Message):
             return callback_result
