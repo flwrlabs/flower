@@ -409,6 +409,7 @@ def wrap_stub(
     retry_invoker: RetryInvoker,
 ) -> None:
     """Wrap a gRPC stub with a retry invoker."""
+    excluded_methods = {"SendTaskHeartbeat"}
 
     def make_lambda(original_method: Any) -> Any:
         return lambda *args, **kwargs: retry_invoker.invoke(
@@ -416,6 +417,8 @@ def wrap_stub(
         )
 
     for method_name in vars(stub):
+        if method_name in excluded_methods:
+            continue
         method = getattr(stub, method_name)
         if callable(method):
             setattr(stub, method_name, make_lambda(method))

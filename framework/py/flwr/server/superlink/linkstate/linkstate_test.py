@@ -449,7 +449,8 @@ class StateTest(CoreStateTest):
         assert state.claim_task(task_id) is not None
         state.federation_manager.report_run_usage = Mock()  # type: ignore
         # Execute: advance time past token expiry and trigger cleanup
-        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        task_lease = HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+        patched_dt = now() + timedelta(seconds=task_lease + 1)
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = patched_dt
             state.get_run_status({run_id})

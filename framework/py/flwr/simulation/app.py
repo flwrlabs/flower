@@ -277,6 +277,11 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             exit_event=EventType.FLWR_SIMULATION_RUN_LEAVE,
         )
 
+        # Stop heartbeat before finalizing successful task output. Once the
+        # simulation returns, any later heartbeat can only race with completion.
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+
         # Send resulting context
         # Temporarily disable pushing resulting context to SuperLink
         context.state = RecordDict()
@@ -302,6 +307,10 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         if log_uploader:
             flush_logs(log_queue)
 
+        # Stop heartbeat before completing failed task output.
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+
         # Push final status and context (if available)
         out_req = PushTaskOutputRequest(
             context=context_to_proto(context) if context else None,
@@ -316,10 +325,6 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         # Stop log uploader for this run and upload final logs
         if log_uploader:
             stop_log_uploader(log_queue, log_uploader)
-
-        # Stop heartbeat sender
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
 
         cleanup_app_runtime_environment(runtime_env_dir)
 

@@ -139,7 +139,7 @@ def make_task_heartbeat_fn_grpc(
     def fn() -> bool:
         # Call ServerAppIo API
         try:
-            res = stub.SendTaskHeartbeat(req)
+            res = stub.SendTaskHeartbeat(req, timeout=HEARTBEAT_CALL_TIMEOUT)
         except grpc.RpcError as e:
             status_code = e.code()
             if status_code == grpc.StatusCode.UNAVAILABLE:
