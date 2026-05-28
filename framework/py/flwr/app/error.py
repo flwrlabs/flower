@@ -19,7 +19,6 @@ from __future__ import annotations
 
 from typing import cast
 
-DEFAULT_TTL = 43200  # This is 12 hours
 MESSAGE_INIT_ERROR_MESSAGE = (
     "Invalid arguments for Message. Expected one of the documented "
     "signatures: Message(content: RecordDict, dst_node_id: int, message_type: str,"

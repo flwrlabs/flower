@@ -20,6 +20,7 @@ from __future__ import annotations
 from logging import WARNING
 from typing import Any, cast, overload
 
+from flwr.app.constants import DEFAULT_TTL
 from flwr.common.logger import warn_deprecated_feature
 from flwr.proto.message_pb2 import Message as ProtoMessage  # pylint: disable=E0611
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata  # pylint: disable=E0611
@@ -45,7 +46,6 @@ from .serde_utils import (
     metadata_to_proto,
 )
 
-DEFAULT_TTL = 43200  # This is 12 hours
 MESSAGE_INIT_ERROR_MESSAGE = (
     "Invalid arguments for Message. Expected one of the documented "
     "signatures: Message(content: RecordDict, dst_node_id: int, message_type: str,"

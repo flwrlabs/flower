@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-05-24 00:26+0000\n"
+"POT-Creation-Date: 2026-05-27 00:28+0000\n"
 "PO-Revision-Date: 2026-05-23 06:53+0000\n"
 "Last-Translator: Seulki Yun <icstuckyi@gmail.com>\n"
 "Language: ko\n"
@@ -36,7 +36,7 @@ msgid "How-to guides"
 msgstr "사용 방법 가이드"
 
 #: ../../source/build.rst:13 ../../source/contribute.rst:29
-#: ../../source/deploy.rst:13 ../../source/index.rst:76
+#: ../../source/deploy.rst:13 ../../source/index.rst:78
 #: ../../source/simulate.rst:13
 msgid ""
 "Problem-oriented how-to guides show step-by-step how to achieve a "
@@ -62,13 +62,13 @@ msgid ""
 " with Flower."
 msgstr ""
 
-#: ../../source/contribute.rst:7 ../../source/index.rst:113
-#: ../../source/index.rst:118
+#: ../../source/contribute.rst:7 ../../source/index.rst:115
+#: ../../source/index.rst:120
 #, fuzzy
 msgid "Contribute"
 msgstr "속성"
 
-#: ../../source/contribute.rst:9 ../../source/index.rst:115
+#: ../../source/contribute.rst:9 ../../source/index.rst:117
 msgid ""
 "The Flower community welcomes contributions. The following docs are "
 "intended to help along the way."
@@ -83,12 +83,12 @@ msgstr "튜토리얼"
 msgid "A learning-oriented series of tutorials, the best place to start."
 msgstr "학습 중심의 연합 학습 튜토리얼 시리즈로, 시작하기에 가장 좋은 곳입니다."
 
-#: ../../source/contribute.rst:45 ../../source/index.rst:87
-#: ../../source/index.rst:92
+#: ../../source/contribute.rst:45 ../../source/index.rst:89
+#: ../../source/index.rst:94
 msgid "Explanations"
 msgstr "설명"
 
-#: ../../source/contribute.rst:47 ../../source/index.rst:89
+#: ../../source/contribute.rst:47 ../../source/index.rst:91
 msgid ""
 "Understanding-oriented concept guides explain and discuss key topics and "
 "underlying ideas behind Flower and collaborative AI."
@@ -96,7 +96,7 @@ msgstr "이해 중심의 개념 가이드에서는 Flower와 협업 AI의 주요
 
 #: ../../source/contribute.rst:58
 #: ../../source/how-to-run-flower-on-multiple-openshift-clusters.rst:365
-#: ../../source/index.rst:103 ../../source/index.rst:105
+#: ../../source/index.rst:105 ../../source/index.rst:107
 #: ../../source/reference.rst:7
 msgid "References"
 msgstr "참조"
@@ -877,7 +877,7 @@ msgid "``uv add --editable \"../../\"`` (without extras)"
 msgstr "``pip install -U --pre flwr`` (extras 제외)"
 
 #: ../../source/contributor-how-to-install-development-versions.rst:21
-#, fuzzy, python-brace-format
+#, fuzzy
 msgid "``uv add --editable \"../../\" --extra simulation`` (with extras)"
 msgstr ""
 "``flwr = { path = \"../../\", develop = true, extras = [\"simulation\"] "
@@ -889,14 +889,14 @@ msgid "Install ``flwr`` from a local wheel file:"
 msgstr "``pyproject.toml``을 통해 로컬 wheel file에서 ``flwr``을 설치하세요:"
 
 #: ../../source/contributor-how-to-install-development-versions.rst:25
-#, fuzzy, python-brace-format
+#, fuzzy
 msgid "``uv add \"../../dist/flwr-1.8.0-py3-none-any.whl\"`` (without extras)"
 msgstr ""
 "``flwr = { path = \"../../dist/flwr-1.8.0-py3-none-any.whl\" }`` (extras "
 "제외)"
 
 #: ../../source/contributor-how-to-install-development-versions.rst:26
-#, fuzzy, python-brace-format
+#, fuzzy
 msgid ""
 "``uv add \"../../dist/flwr-1.8.0-py3-none-any.whl\" --extra simulation`` "
 "(with extras)"
@@ -2147,11 +2147,13 @@ msgid "Congrats! 🥳 You're now officially a Flower contributor!"
 msgstr "축하합니다! 이제 공식적으로 Flower 기여자가 되셨습니다!"
 
 #: ../../source/contributor-tutorial-contribute-on-github.rst:354
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:402
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:339
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:674
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:436
-#: ../../source/tutorial-series-what-is-federated-learning.rst:367
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:374
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:345
+#: ../../source/tutorial-series-get-started-with-flower.rst:142
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:423
+#: ../../source/tutorial-series-what-is-federated-learning.rst:362
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:605
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:284
 msgid "Next steps"
 msgstr "다음 단계"
 
@@ -4607,7 +4609,7 @@ msgstr ""
 
 #: ../../source/explanation-differential-privacy.rst:7
 #: ../../source/explanation-differential-privacy.rst:20
-#: ../../source/tutorial-series-what-is-federated-learning.rst:325
+#: ../../source/tutorial-series-what-is-federated-learning.rst:319
 msgid "Differential Privacy"
 msgstr "차등 프라이버시"
 
@@ -5011,7 +5013,7 @@ msgstr ""
 "서버 구현에서는 매개변수 집계 후와 연합 평가 전에 :code:`evaluate`를 호출합니다(다음 단락 참조)."
 
 #: ../../source/explanation-federated-evaluation.rst:87
-#: ../../source/tutorial-series-what-is-federated-learning.rst:306
+#: ../../source/tutorial-series-what-is-federated-learning.rst:300
 msgid "Federated Evaluation"
 msgstr "연합 평가"
 
@@ -9873,7 +9875,7 @@ msgstr ""
 #: ../../source/how-to-authenticate-supernodes.rst:304
 #: ../../source/how-to-enable-tls-connections.rst:244
 #: ../../source/how-to-use-built-in-mods.rst:175
-#: ../../source/tutorial-series-what-is-federated-learning.rst:297
+#: ../../source/tutorial-series-what-is-federated-learning.rst:291
 msgid "Conclusion"
 msgstr "결론"
 
@@ -11106,7 +11108,6 @@ msgstr ""
 "변경 하면 됩니다."
 
 #: ../../source/how-to-implement-fedbn.rst:18
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:201
 #, fuzzy
 msgid "Model"
 msgstr "mod"
@@ -11263,7 +11264,6 @@ msgstr ""
 
 #: ../../source/how-to-install-flower.rst:76
 #: ../../source/how-to-run-simulations.rst:53
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:94
 msgid ""
 "If you're on Windows and see unexpected terminal output (e.g.: ``� "
 "□[32m□[1m``), check :ref:`this FAQ entry <faq-windows-unexpected-"
@@ -11469,16 +11469,11 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-migrate-from-openfl.rst:60
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:77
 #, fuzzy
 msgid "Install dependencies"
 msgstr "사전 릴리즈 설치"
 
 #: ../../source/how-to-migrate-from-openfl.rst:62
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:59
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:63
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:79
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:68
 msgid "First, we install the Flower package ``flwr``:"
 msgstr ""
 
@@ -11490,10 +11485,6 @@ msgstr ""
 #: ../../source/tutorial-quickstart-scikitlearn.rst:58
 #: ../../source/tutorial-quickstart-tensorflow.rst:59
 #: ../../source/tutorial-quickstart-xgboost.rst:72
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:66
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:70
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:86
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:75
 msgid "Then, run the command below:"
 msgstr ""
 
@@ -11694,10 +11685,10 @@ msgstr "추가 도움말"
 msgid ""
 "For a complete PyTorch example that goes into depth on various Flower "
 "components, see the `Get started with Flower "
-"<https://flower.ai/docs/framework/tutorial-series-get-started-with-"
-"flower-pytorch.html>`_ tutorial. While we expect this guide will help "
-"most users get migrated quickly to the Flower ecosystem, certain complex "
-"OpenFL workloads may require more clarification or help. If you have "
+"<https://flower.ai/docs/framework/tutorial-series-write-your-first-"
+"flower-app-pytorch.html>`_ tutorial. While we expect this guide will help"
+" most users get migrated quickly to the Flower ecosystem, certain complex"
+" OpenFL workloads may require more clarification or help. If you have "
 "further questions, `join the Flower Slack <https://flower.ai/join-"
 "slack/>`_ (and use the channel ``#questions``) or join our `OpenFL "
 "Continuity Program "
@@ -16868,26 +16859,26 @@ msgstr ""
 msgid "Tutorial"
 msgstr "튜토리얼"
 
-#: ../../source/index.rst:78
+#: ../../source/index.rst:80
 msgid "Build"
 msgstr ""
 
-#: ../../source/index.rst:78
+#: ../../source/index.rst:80
 #, fuzzy
 msgid "Simulate"
 msgstr "시뮬레이션 실행"
 
-#: ../../source/index.rst:78
+#: ../../source/index.rst:80
 #, fuzzy
 msgid "Deploy"
 msgstr "배포"
 
-#: ../../source/index.rst:74 ../../source/index.rst:78
+#: ../../source/index.rst:76 ../../source/index.rst:80
 #, fuzzy
 msgid "How-to Guides"
 msgstr "사용 방법 가이드"
 
-#: ../../source/index.rst:118
+#: ../../source/index.rst:120
 msgid "Contributor docs"
 msgstr "기여자 문서"
 
@@ -16944,7 +16935,7 @@ msgid ""
 "place to start."
 msgstr "학습 중심의 연합 학습 튜토리얼 시리즈로, 시작하기에 가장 좋은 곳입니다."
 
-#: ../../source/index.rst:53
+#: ../../source/index.rst:55
 #, fuzzy
 msgid ""
 "QUICKSTART TUTORIALS: :doc:`PyTorch <tutorial-quickstart-pytorch>` | "
@@ -35623,7 +35614,6 @@ msgstr ""
 #: ../../source/tutorial-quickstart-pytorch.rst:128
 #: ../../source/tutorial-quickstart-scikitlearn.rst:119
 #: ../../source/tutorial-quickstart-tensorflow.rst:120
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:597
 msgid ""
 "You can also override the parameters defined in the "
 "``[tool.flwr.app.config]`` section in ``pyproject.toml`` like this:"
@@ -35930,7 +35920,6 @@ msgstr ""
 #: ../../source/tutorial-quickstart-scikitlearn.rst:289
 #: ../../source/tutorial-quickstart-tensorflow.rst:297
 #: ../../source/tutorial-quickstart-xgboost.rst:367
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:498
 msgid ""
 "a ``Grid`` object that will be used to interface with the nodes running "
 "the ``ClientApp`` to involve them in a round of train/evaluate/query or "
@@ -36463,7 +36452,7 @@ msgstr ""
 
 #: ../../source/tutorial-quickstart-mlx.rst:392
 #: ../../source/tutorial-quickstart-xgboost.rst:364
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:495
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:485
 msgid ""
 "To construct a |serverapp_link|_, we define its ``@app.main()`` method. "
 "This method receives as input arguments:"
@@ -36563,10 +36552,6 @@ msgid ""
 msgstr ""
 
 #: ../../source/tutorial-quickstart-pytorch.rst:73
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:72
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:76
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:97
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:81
 msgid ""
 "After running it you'll notice a new directory named ``quickstart-"
 "pytorch`` has been created. It should have the following structure:"
@@ -37050,189 +37035,158 @@ msgid "Customize a Flower Strategy"
 msgstr "사용자 정의 전략"
 
 #: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:17
-msgid ""
-"Welcome to the third part of the Flower federated learning tutorial. In "
-"previous parts of this tutorial, we introduced federated learning with "
-"PyTorch and the Flower framework (:doc:`part 1 <tutorial-series-get-"
-"started-with-flower-pytorch>`) and we learned how strategies can be used "
-"to customize the execution on both the server and the clients (:doc:`part"
-" 2 <tutorial-series-use-a-federated-learning-strategy-pytorch>`)."
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:21
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:33
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:49
+msgid "Welcome to the next part of the Flower collaborative AI tutorial!"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:23
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:19
 msgid ""
-"In this tutorial, we'll continue to customize the federated learning "
-"system we built previously by creating a much more customized version of "
-"``FedAdagrad``."
+"In the previous tutorials, you created a simulated federation on "
+"SuperGrid, ran and customized Flower Apps, moved from the NumPy demo to "
+"the PyTorch quickstart app, and then customized that PyTorch app by "
+"changing and extending its strategy. In this tutorial, you'll go one step"
+" further and create a more customized version of ``FedAdagrad``."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:28
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:36
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:57
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:27
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:32
+#: ../../source/tutorial-series-get-started-with-flower.rst:16
 #: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:42
 #: ../../source/tutorial-series-what-is-federated-learning.rst:17
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:59
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:22
 msgid ""
 "`Star Flower on GitHub <https://github.com/flwrlabs/flower>`__ ⭐️ and "
-"join the Flower community on Flower Discuss and the Flower Slack to "
-"connect, ask questions, and get help:"
+"join the Flower community on `Flower Discuss "
+"<https://discuss.flower.ai/>`__ or `Flower Slack <https://flower.ai/join-"
+"slack>`__ to introduce yourself, ask questions, and get help."
 msgstr ""
 
 #: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:32
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:40
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:61
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:46
-#: ../../source/tutorial-series-what-is-federated-learning.rst:21
-msgid ""
-"`Join Flower Discuss <https://discuss.flower.ai/>`__ We'd love to hear "
-"from you in the ``Introduction`` topic! If anything is unclear, post in "
-"``Flower Help - Beginners``."
-msgstr ""
-
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:35
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:43
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:64
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:49
-#: ../../source/tutorial-series-what-is-federated-learning.rst:24
-#, fuzzy
-msgid ""
-"`Join Flower Slack <https://flower.ai/join-slack>`__ We'd love to hear "
-"from you in the ``#introductions`` channel! If anything is unclear, head "
-"over to the ``#questions`` channel."
-msgstr ""
-"`Star Flower on GitHub <https://github.com/adap/flower>`__ ⭐️ Slack의 오픈소스"
-" Flower 커뮤니티에 가입하여 소통하고 질문하고 도움을 받을 수 있습니다: `Slack 가입<https://flower.ai"
-"/join-slack>`__ 🌼 ``#introductions``채널에서 당신의 목소리를 듣고 싶습니다! 궁금한 점이 "
-"있으시면``#questions`` 채널로 방문해 주시기 바랍니다."
-
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:39
 msgid ""
 "Let's build a new ``Strategy`` with a customized |strategy_start_link|_ "
 "method that:"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:41
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:34
 msgid "saves a copy of the global model when a new best global accuracy is found;"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:42
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:35
 msgid "logs the metrics generated during the run to Weights & Biases!"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:46
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:52
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:72
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:57
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:39
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:42
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:51
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:31
 msgid "Preparation"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:48
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:54
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:59
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:41
 msgid ""
-"Before we begin with the actual code, let's make sure that we have "
-"everything we need."
+"This tutorial continues from the :doc:`previous tutorial <tutorial-"
+"series-use-a-federated-learning-strategy-pytorch>`. If you completed it, "
+"open the existing ``quickstart-pytorch`` directory and continue from "
+"there."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:51
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:57
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:62
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:46
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:38
 msgid "Installing dependencies"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:55
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:48
 msgid ""
-"If you've completed part 1 and 2 of the tutorial, you can skip this step."
-" But remember to include ``wandb`` as a dependency in your "
-"``pyproject.toml`` file and install it in your environment."
+"If you are starting here directly, first create the app as shown in the "
+"previous tutorial:"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:86
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:58
 msgid ""
-"Next, add the `wandb` dependency to the project by editing the "
-"``pyproject.toml`` file located in the root of the project. Add the "
-"following line to the list of dependencies:"
+"In this tutorial, you'll use Weights & Biases to log strategy metrics. "
+"Add ``wandb`` to the dependency list in ``pyproject.toml``:"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:93
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:90
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:95
-msgid ""
-"Next, we install the project and its dependencies, which are specified in"
-" the ``pyproject.toml`` file:"
-msgstr ""
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:65
+#, fuzzy
+msgid "Then install the updated project dependencies:"
+msgstr "사전 릴리즈 설치"
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:103
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:74
 msgid ""
 "If this is your first time installing ``wandb``, you might be asked to "
 "create an account and then log in to your system. You can start this "
 "process by typing this in your terminal:"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:113
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:84
 msgid "Customize the ``start`` method of a strategy"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:115
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:86
 msgid ""
 "Flower strategies have a number of methods that can be overridden to "
-"customize their behavior. In part 2, you learned how to customize the "
-"``configure_train`` method to perform learning rate decay and communicate"
-" the updated learning rate as part of the |configrecord_link|_ sent to "
-"the clients in the ``Message``. In this tutorial you'll learn how to "
-"customize the |strategy_start_link|_ method. If you inspect the `source "
-"code "
+"customize their behavior. In the previous strategy tutorial, you learned "
+"how to customize the ``configure_train`` method to perform learning rate "
+"decay and communicate the updated learning rate as part of the "
+"|configrecord_link|_ sent to the clients in the ``Message``. In this "
+"tutorial you'll learn how to customize the |strategy_start_link|_ method."
+" If you inspect the `source code "
 "<https://github.com/flwrlabs/flower/blob/main/framework/py/flwr/serverapp/strategy/strategy.py#L135>`_"
 " of this method you'll see that it contains a for loop where each "
 "iteration represents a federated learning round. Each round consists of "
 "three distinct stages:"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:125
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:96
 msgid ""
 "A training stage, where a subset of clients is selected to train the "
 "current global model on their local data."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:127
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:98
 msgid ""
 "An evaluation stage, where a subset of clients is selected to evaluate "
 "the updated global model on their local validation sets."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:129
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:100
 msgid ""
 "An optional stage to evaluate the global model on the server side. Note "
-"that this is what you enabled in part 2 of this tutorial by means of the "
-"``central_evaluate`` callback."
+"that this is what you enabled in the previous tutorial by means of the "
+"``global_evaluate`` callback."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:133
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:104
 msgid ""
 "Let's extend the ``CustomFedAdagrad`` strategy we created earlier and "
 "introduce:"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:135
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:106
 msgid ""
 "``_update_best_acc``: An auxiliary method to save the global model "
 "whenever a new best accuracy is found."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:137
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:108
 msgid ""
 "``set_save_path``: An auxiliary method to set the path where ``wandb`` "
 "logs and model checkpoints will be saved. This method will be called from"
 " the ``server_app.py`` after instantiating the strategy."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:140
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:111
 msgid ""
-"A customized |strategy_start_link|_ method to log metrics to Weight & "
+"A customized |strategy_start_link|_ method to log metrics to Weights & "
 "Biases (`W&B <https://wandb.ai/site>`__) and save the model checkpoints "
 "to disk."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:328
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:299
 msgid ""
 "With the extended ``CustomFedAdagrad`` strategy defined, we now need to "
 "set the path where the model checkpoints will be saved as well as the "
@@ -37246,24 +37200,26 @@ msgid ""
 "Let's see how this looks in code:"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:365
-#, fuzzy
-msgid "Finally, let's run the ``FlowerApp``:"
-msgstr "Flower 시뮬레이션."
-
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:371
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:307
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:336
 msgid ""
-"Plain ``flwr run .`` submits the run, prints the run ID, and returns "
-"without streaming logs. See :doc:`how-to-run-flower-locally` for the full"
-" local workflow."
+"Finally, let's run the Flower App locally. This tutorial writes model "
+"checkpoints to your working directory and logs metrics to Weights & "
+"Biases, so a local run makes it easy to inspect the outputs."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:374
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:344
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:313
+msgid ""
+"Plain ``flwr run . local`` submits the run, prints the run ID, and "
+"returns without streaming logs. See :doc:`how-to-run-flower-locally` for "
+"the full local workflow."
+msgstr ""
+
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:347
 msgid "After starting the run you will notice two things:"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:376
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:349
 msgid ""
 "A new directory will be created in ``outputs/YYYY-MM-DD/HH-MM-SS`` where "
 "``YYYY-MM-DD/HH-MM-SS`` is the current date and time. This directory will"
@@ -37272,60 +37228,72 @@ msgid ""
 "centralized evaluation stage."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:380
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:353
 msgid ""
 "A new run will be created in your `W&B project <https://wandb.ai/home>`_ "
 "where you can visualize the metrics logged during the run."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:383
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:356
 msgid ""
 "Congratulations! You've successfully created a custom Flower strategy by "
 "overriding the |strategy_start_link|_ method. You've also learned how to "
-"log metrics to Weight & Biases and how to save model checkpoints to disk."
+"log metrics to Weights & Biases and how to save model checkpoints to "
+"disk."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:389
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:328
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:422
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:362
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:334
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:409
 msgid "Recap"
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:391
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:364
 msgid ""
 "In this tutorial, we've seen how to customize the |strategy_start_link|_ "
 "method of a Flower strategy. This method is the main entry point of any "
 "strategy and contains the logic to execute the federated learning "
-"process. In this tutorial, you learned how to log the metrics to Weight &"
-" Biases and how to save model checkpoints to disk."
+"process. In this tutorial, you learned how to log the metrics to Weights "
+"& Biases and how to save model checkpoints to disk."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:396
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:369
 msgid ""
-"In the next tutorial, we're going to cover how to communicate arbitrary "
-"Python objects between the ``ClientApp`` and the ``ServerApp`` by "
-"serializing them and send them in a ``Message`` as a ``ConfigRecord``."
+"In the next tutorial, you'll communicate additional information between "
+"the ``ClientApp`` and the ``ServerApp`` by serializing it and sending it "
+"in a ``Message``."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:404
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:341
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:676
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:438
-#: ../../source/tutorial-series-what-is-federated-learning.rst:369
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:376
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:347
+#: ../../source/tutorial-series-get-started-with-flower.rst:144
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:425
+#: ../../source/tutorial-series-what-is-federated-learning.rst:364
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:607
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:286
 msgid ""
 "Before you continue, make sure to join the Flower community on Flower "
 "Discuss (`Join Flower Discuss <https://discuss.flower.ai>`__) and on "
 "Slack (`Join Slack <https://flower.ai/join-slack/>`__)."
 msgstr ""
 
-#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:408
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:345
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:680
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:442
-#: ../../source/tutorial-series-what-is-federated-learning.rst:373
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:380
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:351
+#: ../../source/tutorial-series-get-started-with-flower.rst:148
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:429
+#: ../../source/tutorial-series-what-is-federated-learning.rst:368
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:611
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:290
 msgid ""
 "There's a dedicated ``#questions`` Slack channel if you need help, but "
 "we'd also love to hear who you are in ``#introductions``!"
+msgstr ""
+
+#: ../../source/tutorial-series-build-a-strategy-from-scratch-pytorch.rst:383
+msgid ""
+"The :doc:`Flower Collaborative AI Tutorial - Part 6: Communicate custom "
+"Messages <tutorial-series-customize-the-client-pytorch>` shows how to "
+"customize what the ``ClientApp`` sends back to the ``ServerApp``."
 msgstr ""
 
 #: ../../source/tutorial-series-customize-the-client-pytorch.rst:3
@@ -37333,44 +37301,81 @@ msgstr ""
 msgid "Communicate custom Messages"
 msgstr "해결법"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:21
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:23
 msgid ""
-"Welcome to the fourth part of the Flower federated learning tutorial. In "
-"the previous parts of this tutorial, we introduced federated learning "
-"with PyTorch and Flower (:doc:`part 1 <tutorial-series-get-started-with-"
-"flower-pytorch>`), we learned how strategies can be used to customize the"
-" execution on both the server and the clients (:doc:`part 2 <tutorial-"
-"series-use-a-federated-learning-strategy-pytorch>`) and we built our own "
-"custom strategy from scratch (:doc:`part 3 <tutorial-series-build-a"
-"-strategy-from-scratch-pytorch>`)."
+"In the previous tutorials, you created a simulated federation on "
+"SuperGrid, ran and customized Flower Apps, moved from the NumPy demo to "
+"the PyTorch quickstart app, customized the strategy used by the "
+"``ServerApp``, and then built a more customized strategy. In this "
+"tutorial, you'll turn your attention back to the ``ClientApp`` and learn "
+"how to communicate additional information between ``ClientApp`` and "
+"``ServerApp`` through ``Message`` objects."
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:29
-msgid ""
-"In this final tutorial, we turn our attention again to the ``ClientApp`` "
-"and show how to communicate arbitrary Python objects via a ``Message`` "
-"and how to use it on the ``ServerApp``. This can be useful if you want to"
-" send additional information between ``ClientApp <--> ServerApp`` without"
-" the need for custom protocols."
-msgstr ""
-
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:47
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:37
 msgid ""
 "Let's go deeper and see how to serialize arbitrary Python objects and "
 "communicate them! 🌼"
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:61
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:66
-msgid "If you've completed part 1 of the tutorial, you can skip this step."
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:44
+msgid ""
+"This tutorial continues from the earlier PyTorch tutorials in this "
+"series. If you already have the ``quickstart-pytorch`` app, open that "
+"directory and continue from there."
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:100
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:48
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:58
+msgid "If you are starting here directly, install Flower and fetch the same app:"
+msgstr ""
+
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:62
+msgid "Constructing Messages"
+msgstr ""
+
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:64
+msgid ""
+"In Flower, the server and clients communicate by sending and receiving "
+"|message_link|_ objects. A ``Message`` carries a ``RecordDict`` as its "
+"main payload. The ``RecordDict`` is like a Python dictionary that can "
+"contain multiple records of different types. There are three main types "
+"of records:"
+msgstr ""
+
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:69
+#, fuzzy
+msgid ""
+"|arrayrecord_link|_: Contains model parameters as a dictionary of NumPy "
+"arrays"
+msgstr "**parameters** -- 로컬 모델 파라미터를 NumPy 배열 목록으로 표시합니다."
+
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:70
+msgid ""
+"|metricrecord_link|_: Contains training or evaluation metrics as a "
+"dictionary of integers, floats, lists of integers, or lists of floats."
+msgstr ""
+
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:72
+msgid ""
+"|configrecord_link|_: Contains configuration parameters as a dictionary "
+"of integers, floats, strings, booleans, or bytes. Lists of these types "
+"are also supported."
+msgstr ""
+
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:75
+msgid ""
+"Let's see a few examples of how to work with these types of records and, "
+"ultimately, construct a ``RecordDict`` that can be sent over a "
+"``Message``."
+msgstr ""
+
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:102
 #, fuzzy
 msgid "Revisiting replying from ClientApps"
 msgstr "NumPyClient"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:102
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:104
 msgid ""
 "Let's remind ourselves how the communication between ``ClientApp`` and "
 "``ServerApp`` works. A ``ClientApp`` function wrapped with "
@@ -37379,7 +37384,7 @@ msgid ""
 "such as the training loss and accuracy. In code, this would look like:"
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:125
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:127
 msgid ""
 "Then, on the ``ServerApp``, the Flower strategy will automatically "
 "aggregate the |arrayrecord_link|_ and |metricrecord_link|_ from each "
@@ -37392,7 +37397,7 @@ msgid ""
 "by the strategy. If you do for example:"
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:162
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:164
 msgid ""
 "If you'd like to communicate other types of objects and leave them out of"
 " the aggregation process, you can use a |configrecord_link|_. In addition"
@@ -37401,11 +37406,11 @@ msgid ""
 "arbitrary Python objects by first serializing them to bytes."
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:170
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:172
 msgid "Communicating arbitrary objects"
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:172
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:174
 msgid ""
 "Let's assume the training stage of our ``ClientApp`` produces a dataclass"
 " like the one below and we would like to communicate it to the "
@@ -37413,19 +37418,19 @@ msgid ""
 "``task.py``:"
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:189
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:191
 msgid ""
 "Now, let's see how the ``ClientApp`` can serialize this object, send it "
 "to the ``ServerApp``, make the strategy deserialize it back to the "
 "original object, and use it."
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:193
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:195
 #, fuzzy
 msgid "Sending from ClientApps"
 msgstr "클라이언트앱"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:195
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:197
 msgid ""
 "Let's assume our ``ClientApp`` trains the model locally and generates an "
 "instance of ``TrainProcessMetadata``. In order to send it as part of the "
@@ -37437,26 +37442,32 @@ msgstr ""
 
 #: ../../source/tutorial-series-customize-the-client-pytorch.rst:203
 msgid ""
+"The example below focuses on the additional metadata logic; keep the "
+"model and data setup from your existing ``train`` function unchanged."
+msgstr ""
+
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:208
+msgid ""
 "The following code is for demonstration purposes only. In real-world "
 "applications, since `pickle "
 "<https://docs.python.org/3/library/pickle.html>`_ can execute arbitrary "
-"code during unpickling, you should use a **SAFE** serialization method "
-"than ``pickle``, such as ``json`` or a simple custom solution if the "
-"object is not too complex. ``pickle`` is used here solely for simplicity."
+"code during unpickling, you should use a safer serialization method than "
+"``pickle``, such as ``json`` or a simple custom solution if the object is"
+" not too complex. ``pickle`` is used here solely for simplicity."
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:251
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:257
 msgid ""
 "Let's see next how the strategy on the ``ServerApp`` can deserialize the "
 "object back to its original form and use it."
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:255
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:261
 #, fuzzy
 msgid "Receiving on ServerApps"
 msgstr "Flower 서버앱"
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:257
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:263
 msgid ""
 "As you know, a Flower strategy will automatically aggregate the "
 "``ArrayRecord`` and ``MetricRecord`` from each client. However, it will "
@@ -37465,7 +37476,7 @@ msgid ""
 "deserialization and use of the ``TrainProcessMetadata`` object."
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:264
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:270
 msgid ""
 "We override the ``aggregate_train`` method because we sent the object "
 "from a ``@app.train()`` function. If we had sent it from an "
@@ -37473,21 +37484,21 @@ msgid ""
 "``aggregate_evaluate`` method instead."
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:268
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:274
 msgid ""
-"Let's create a new custom strategy (or reuse the one created in part 2 "
-"and part 3 of this tutorial) in ``server_app.py`` that extends the "
+"Let's create a new custom strategy, or reuse the one created in the "
+"previous strategy tutorials, in ``server_app.py`` that extends the "
 "``FedAdagrad`` strategy and overrides the ``aggregate_train`` method to "
 "deserialize the ``TrainProcessMetadata`` object from each client and "
 "print the training time and convergence status:"
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:301
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:307
 #, fuzzy
 msgid "Finally, we run the Flower App."
 msgstr "Flower 시뮬레이션."
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:310
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:316
 msgid ""
 "You will observe that the training metadata from each client is logged to"
 " the console of the ``ServerApp``. If you finish embedding the creation "
@@ -37495,14 +37506,14 @@ msgid ""
 "see output similar to this:"
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:322
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:328
 msgid ""
 "You can now use this information in your strategy logic as needed. For "
 "example, to implement a custom aggregation method based on convergence "
 "status or to log additional metrics."
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:330
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:336
 msgid ""
 "In this part of the tutorial, we've seen how to communicate arbitrary "
 "Python objects between the ``ClientApp`` and the ``ServerApp`` by "
@@ -37513,7 +37524,7 @@ msgid ""
 "objects in the strategy to send them to the clients."
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:348
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:354
 msgid ""
 "This is the final part of the Flower tutorial (for now!), "
 "congratulations! You're now well equipped to understand the rest of the "
@@ -37521,619 +37532,254 @@ msgid ""
 "recommend the following resources:"
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:352
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:358
 msgid "`Read Flower Docs <https://flower.ai/docs/>`__"
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:353
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:359
 msgid "`Check out Flower Code Examples <https://flower.ai/docs/examples/>`__"
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:354
+#: ../../source/tutorial-series-customize-the-client-pytorch.rst:360
 msgid ""
-"`Use Flower Baselines for your research "
-"<https://flower.ai/docs/baselines/>`__"
+"`Watch Flower AI Summit 2026 videos <https://flower.ai/events/flower-ai-"
+"summit-2026/>`__"
 msgstr ""
 
-#: ../../source/tutorial-series-customize-the-client-pytorch.rst:355
-msgid ""
-"`Watch Flower AI Summit 2025 videos <https://flower.ai/events/flower-ai-"
-"summit-2025/>`__"
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:3
+#: ../../source/tutorial-series-get-started-with-flower.rst:3
 msgid "Get started with Flower"
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:49
-#: ../../source/tutorial-series-what-is-federated-learning.rst:5
-msgid "Welcome to the Flower federated learning tutorial!"
+#: ../../source/tutorial-series-get-started-with-flower.rst:5
+msgid "Welcome to the Flower collaborative AI tutorial!"
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:51
+#: ../../source/tutorial-series-get-started-with-flower.rst:7
 msgid ""
-"In this tutorial, we'll build a federated learning system using the "
-"Flower framework, Flower Datasets and PyTorch. In part 1, we use PyTorch "
-"for model training and data loading. In part 2, we federate this PyTorch "
-"project using Flower."
+"In this tutorial, you'll learn how to run a Flower App directly on "
+"SuperGrid. You'll use an existing app from `Flower Hub "
+"<https://flower.ai/apps/>`__. This means you won't have to write any code"
+" to complete the tutorial, but you'll still get a practical introduction "
+"to the core concepts of collaborative AI with Flower. You'll also get a "
+"look behind the scenes to understand how Flower executes your app and how"
+" the different components interact with each other."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:68
+#: ../../source/tutorial-series-get-started-with-flower.rst:21
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:64
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:27
 #, fuzzy
 msgid "Let's get started! 🌼"
 msgstr "시작하기"
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:74
+#: ../../source/tutorial-series-get-started-with-flower.rst:25
+msgid "Access SuperGrid"
+msgstr ""
+
+#: ../../source/tutorial-series-get-started-with-flower.rst:27
 msgid ""
-"Before we begin with any actual code, let's make sure that we have "
-"everything we need."
+"The only prerequisite for this tutorial is to have an account for "
+"SuperGrid. Sign up on `flower.ai <https://flower.ai/>`__ or log in if you"
+" already have an account."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:111
-msgid ""
-"Next, we install the project and its dependencies, which are specified in"
-" the ``pyproject.toml`` file."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:119
-msgid ""
-"Before we dive into federated learning, we'll take a look at the dataset "
-"that we'll be using for this tutorial, which is the `CIFAR-10 "
-"<https://www.cs.toronto.edu/~kriz/cifar.html>`_ dataset, and run a simple"
-" centralized training pipeline using PyTorch."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:125
-msgid "The ``CIFAR-10`` dataset"
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:127
-msgid ""
-"Federated learning can be applied to many different types of tasks across"
-" different domains. In this tutorial, we introduce federated learning by "
-"training a simple convolutional neural network (CNN) on the popular "
-"CIFAR-10 dataset. CIFAR-10 can be used to train image classifiers that "
-"distinguish between images from ten different classes: 'airplane', "
-"'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', and "
-"'truck'."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:134
-msgid ""
-"We simulate having multiple datasets from multiple organizations (also "
-"called the “cross-silo” setting in federated learning) by splitting the "
-"original CIFAR-10 dataset into multiple partitions. Each partition will "
-"represent the data from a single organization. We're doing this purely "
-"for experimentation purposes. In the real world there's no need for data "
-"splitting because each organization already has their own data (the data "
-"is naturally partitioned)."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:141
-msgid ""
-"Each organization will act as a client in the federated learning system. "
-"Having ten organizations participate in a federation means having ten "
-"clients connected to the federated learning server."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:145
-msgid ""
-"We use the `Flower Datasets <https://flower.ai/docs/datasets/>`_ library "
-"(``flwr-datasets``) to partition CIFAR-10 into ten partitions using "
-"``FederatedDataset``. Using the ``load_data()`` function defined in "
-"``task.py``, we will create a small training and test set for each of the"
-" ten organizations and wrap each of these into a PyTorch ``DataLoader``:"
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:182
-msgid ""
-"We now have a function that can return a training set and validation set "
-"(``trainloader`` and ``valloader``) representing one dataset from one of "
-"ten different organizations. Each ``trainloader``/``valloader`` pair "
-"contains 4000 training examples and 1000 validation examples. There's "
-"also a single ``testloader`` (we did not split the test set). Again, this"
-" is only necessary for building research or educational systems, actual "
-"federated learning systems have their data naturally distributed across "
-"multiple partitions."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:192
+#: ../../source/tutorial-series-get-started-with-flower.rst:32
 #, fuzzy
-msgid "The model, training, and test functions"
-msgstr "클라이언트 앱에 평가함수를 등록하는 데코레이터를 반환합니다."
+msgid "Create a Federation"
+msgstr "새 페이지 만들기"
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:194
+#: ../../source/tutorial-series-get-started-with-flower.rst:34
 msgid ""
-"Next, we're going to use PyTorch to define a simple convolutional neural "
-"network. This introduction assumes basic familiarity with PyTorch, so it "
-"doesn't cover the PyTorch-related aspects in full detail. If you want to "
-"dive deeper into PyTorch, we recommend `this introductory tutorial "
-"<https://pytorch.org/tutorials/beginner/deep_learning_60min_blitz.html>`_."
+"On SuperGrid, all collaborative AI workloads happen within a federation "
+"and are run as Flower Apps. A federation is a collection of users and "
+"their SuperNodes that collaborate towards a common goal. For example, you"
+" can train an AI model across all SuperNodes in the federation, each with"
+" its own data. Only members of a federation can run Flower Apps across "
+"those SuperNodes."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:203
+#: ../../source/tutorial-series-get-started-with-flower.rst:40
 msgid ""
-"We will use the simple CNN described in the aforementioned PyTorch "
-"tutorial (The following code is already defined in ``task.py``):"
+"In this tutorial, you'll create a federation with simulated SuperNodes. "
+"This is ideal because it lets you get started without registering and "
+"connecting real SuperNodes. In a future tutorial, you'll learn how to "
+"connect real SuperNodes to your federation and run apps across them."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:229
+#: ../../source/tutorial-series-get-started-with-flower.rst:45
+msgid ""
+"Go to `the Federations page <https://flower.ai/federations/>`__ and click"
+" ``New Federation``. Select ``Simulation``, give your federation a name, "
+"set it to 10 SuperNodes, and click ``Create``. See the screenshot below "
+"for reference."
+msgstr ""
+
+#: ../../source/tutorial-series-get-started-with-flower.rst:49
+msgid "Create federation dialog in SuperGrid"
+msgstr ""
+
+#: ../../source/tutorial-series-get-started-with-flower.rst:54
+msgid ""
+"After clicking ``Create``, you should see your federation in the "
+"dashboard. In the screenshot below, a user named ``peter123`` created a "
+"federation named ``my-first-federation``. The unique name of a federation"
+" is always of the form ``@<username>/<federation-name>``. In the "
+"screenshot, the federation's unique name is ``@peter123/my-first-"
+"federation``."
+msgstr ""
+
+#: ../../source/tutorial-series-get-started-with-flower.rst:60
+msgid "Federation list showing the newly created federation"
+msgstr ""
+
+#: ../../source/tutorial-series-get-started-with-flower.rst:65
 #, fuzzy
-msgid "Training and test functions"
-msgstr "클라이언트 앱에 평가함수를 등록하는 데코레이터를 반환합니다."
+msgid "You are now the owner of a new federation!"
+msgstr "새 페이지 만들기"
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:231
+#: ../../source/tutorial-series-get-started-with-flower.rst:69
 #, fuzzy
-msgid ""
-"The PyTorch quickstart also provides the usual training and test "
-"functions:"
-msgstr "클라이언트 앱에 평가함수를 등록하는 데코레이터를 반환합니다."
+msgid "Run a Flower App"
+msgstr "Flower 서버."
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:273
+#: ../../source/tutorial-series-get-started-with-flower.rst:71
+msgid ""
+"With your federation created, you can now run a Flower App across the "
+"simulated SuperNodes in your federation. First, you need a Flower App. A "
+"Flower App is a Python project that defines the logic of your "
+"collaborative AI workload. More details will be covered in the next "
+"tutorial, but for now you can think of a Flower App as the code that "
+"defines what happens on the server (SuperGrid) and SuperNodes during your"
+" collaborative AI workload."
+msgstr ""
+
+#: ../../source/tutorial-series-get-started-with-flower.rst:78
+msgid ""
+"`Flower Hub <https://flower.ai/apps/>`__ is a collection of open-source "
+"Flower Apps that you can use and learn from. In this tutorial, you'll use"
+" the `@flwrlabs/demo <https://flower.ai/apps/flwrlabs/demo/>`__ app. It "
+"is maintained by the Flower team and runs a simple collaborative AI "
+"workload in which the server aggregates NumPy arrays sent by the clients."
+msgstr ""
+
+#: ../../source/tutorial-series-get-started-with-flower.rst:84
 #, fuzzy
-msgid "Federated Learning with Flower"
-msgstr "연합 학습"
+msgid "Demo app on Flower Hub"
+msgstr "Flower SuperNode를 실행합니다."
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:275
+#: ../../source/tutorial-series-get-started-with-flower.rst:89
 msgid ""
-"In federated learning, the server sends global model parameters to the "
-"client, and the client updates the local model with parameters received "
-"from the server. It then trains the model on the local data (which "
-"changes the model parameters locally) and sends the updated/changed model"
-" parameters back to the server (or, alternatively, it sends just the "
-"gradients back to the server, not the full model parameters)."
+"When you click the ``🚀 Run`` button, you'll be asked which federation to "
+"run the app on. Select the federation you just created, then click ``Run "
+"app``."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:282
-msgid "Constructing Messages"
+#: ../../source/tutorial-series-get-started-with-flower.rst:92
+msgid "Run app dialog in SuperGrid"
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:284
+#: ../../source/tutorial-series-get-started-with-flower.rst:97
 msgid ""
-"In Flower, the server and clients communicate by sending and receiving "
-"|message_link|_ objects. A ``Message`` carries a ``RecordDict`` as its "
-"main payload. The ``RecordDict`` is like a Python dictionary that can "
-"contain multiple records of different types. There are three main types "
-"of records:"
+"Shortly after launching your app, your run will start and you will see "
+"the run details page. This page shows you the progress of your run and "
+"gives you insights into the execution of your app."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:289
-#, fuzzy
+#: ../../source/tutorial-series-get-started-with-flower.rst:101
+msgid "Run details page showing the progress of the app execution"
+msgstr ""
+
+#: ../../source/tutorial-series-get-started-with-flower.rst:106
 msgid ""
-"|arrayrecord_link|_: Contains model parameters as a dictionary of NumPy "
-"arrays"
-msgstr "**parameters** -- 로컬 모델 파라미터를 NumPy 배열 목록으로 표시합니다."
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:290
-msgid ""
-"|metricrecord_link|_: Contains training or evaluation metrics as a "
-"dictionary of integers, floats, lists of integers, or lists of floats."
+"If you click the ``Logs`` tab, you'll see the logs from the app "
+"execution. This demo app ran for three rounds and sampled all 10 "
+"SuperNodes in each round. In each round, the server aggregated different "
+"metrics received from the clients. You can see these in the logs under "
+"the ``'random_metric'`` key. At the end, the logs show the aggregated "
+"results from all rounds."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:292
-msgid ""
-"|configrecord_link|_: Contains configuration parameters as a dictionary "
-"of integers, floats, strings, booleans, or bytes. Lists of these types "
-"are also supported."
+#: ../../source/tutorial-series-get-started-with-flower.rst:112
+msgid "Logs tab showing logs from the app execution"
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:295
-msgid ""
-"Let's see a few examples of how to work with these types of records and, "
-"ultimately, construct a ``RecordDict`` that can be sent over a "
-"``Message``."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:321
-#, fuzzy
-msgid "Define the Flower ClientApp"
-msgstr "Flower 클라이언트 앱을 실행합니다."
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:323
-msgid ""
-"Federated learning systems consist of a server and multiple nodes or "
-"clients. In Flower, we create a |serverapp_link|_ and a |clientapp_link|_"
-" to run the server-side and client-side code, respectively."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:327
-msgid ""
-"The core functionality of the ``ClientApp`` is to perform some action "
-"with the local data that the node it runs from (e.g. an edge device, a "
-"server in a data center, or a laptop) has access to. In this tutorial "
-"such action is to train and evaluate the small CNN model defined earlier "
-"using the local training and validation data."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:333
-#, fuzzy
-msgid "Training"
-msgstr "중앙 집중식 훈련"
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:335
-msgid ""
-"We can define how the ``ClientApp`` performs training by wrapping a "
-"function with the ``@app.train()`` decorator. In this case we name this "
-"function ``train`` because we'll use it to train the model on the local "
-"data. The function always expects two arguments:"
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:339
-msgid ""
-"A |message_link|_: The message received from the server. It contains the "
-"model parameters and any other configuration information sent by the "
-"server."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:341
-msgid ""
-"A |context_link|_: The context object that contains information about the"
-" node executing the ``ClientApp`` and about the current run."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:344
-msgid ""
-"Through the context you can retrieve the config settings defined in the "
-"``pyproject.toml`` of your app. The context can be used to persist the "
-"state of the client across multiple calls to ``train`` or ``evaluate``. "
-"In Flower, ``ClientApps`` are ephemeral objects that get instantiated for"
-" the execution of one ``Message`` and destroyed when a reply is "
-"communicated back to the server."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:350
-msgid ""
-"Let's see an implementation of ``ClientApp`` that uses the previously "
-"defined PyTorch CNN model, applies the parameters received from the "
-"``ServerApp`` via the message, loads its local data, trains the model "
-"with it (using the ``train_fn`` function), and generates a reply "
-"``Message`` containing the updated model parameters as well as some "
-"metrics of interest."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:399
-msgid ""
-"Note that the ``train_fn`` is simply an alias name pointing to the train "
-"function defined earlier in this tutorial (where we defined the PyTorch "
-"training loop and optimizer). To this function we pass the model we want "
-"to train locally and the data loader, but also the number of local epochs"
-" and the learning rate (``lr``) to use. Note how in this case the "
-"``local-epochs`` setting is read from the run config via the ``Context`` "
-"while the ``lr`` is read from the ``ConfigRecord`` sent by the server via"
-" the ``Message``. This can be used to adjust the learning rate on each "
-"round from the server. When this dynamism isn't needed, reading the "
-"``lr`` from the run config via the ``Context`` is also perfectly valid."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:409
-msgid ""
-"Once training is completed, the ``ClientApp`` constructs a reply "
-"``Message``. This reply typically includes a ``RecordDict`` with two "
-"records:"
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:412
-msgid "An ``ArrayRecord`` containing the updated model parameters"
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:413
-msgid ""
-"A ``MetricRecord`` with relevant metrics (in this case, the training loss"
-" and the number of examples used for training)"
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:418
-msgid ""
-"Returning the number of examples under the ``\"num-examples\"`` key is "
-"**required**, because strategies such as |fedavg_link|_ used by the "
-"``ServerApp`` rely on this key to aggregate both models and metrics by "
-"default, unless you override the ``weighted_by_key`` argument (for "
-"example: ``FedAvg(weighted_by=\"my-different-key\")``)."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:424
-msgid ""
-"After constructing the reply ``Message``, the ``ClientApp`` returns it. "
-"Flower then handles sending the reply back to the server automatically."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:428
-#, fuzzy
-msgid "Evaluation"
-msgstr "평가"
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:430
-msgid ""
-"In a typical federated learning setup, the ``ClientApp`` would also "
-"implement an ``@app.evaluate()`` function to evaluate the model received "
-"from the ``ServerApp`` on local validation data. This is especially "
-"useful to monitor the performance of the global model on each client "
-"during training. The implementation of the ``evaluate`` function is very "
-"similar to the ``train`` function, except that it calls the ``test_fn`` "
-"function defined earlier in this tutorial (which implements the PyTorch "
-"evaluation loop) and it returns a ``Message`` containing only a "
-"``MetricRecord`` with the evaluation metrics (no ``ArrayRecord`` because "
-"the model parameters are not updated during evaluation). Here's how the "
-"``evaluate`` function looks like:"
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:478
-msgid ""
-"As you can see the ``evaluate`` implementation is near identical to the "
-"``train`` implementation, except that it calls the ``test_fn`` function "
-"instead of the ``train_fn`` function and it returns a ``Message`` "
-"containing only a ``MetricRecord`` with metrics relevant to evaluation "
-"(``eval_loss``, ``eval_acc`` -- both scalars). We also need to include "
-"the ``num-examples`` key in the metrics so the server can aggregate the "
-"evaluation metrics correctly."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:486
-#, fuzzy
-msgid "Define the Flower ServerApp"
-msgstr "Flower 서버앱"
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:488
-msgid ""
-"On the server side, we need to configure a strategy which encapsulates "
-"the federated learning approach/algorithm, for example, *Federated "
-"Averaging* (FedAvg). Flower has a number of built-in strategies, but we "
-"can also use our own strategy implementations to customize nearly all "
-"aspects of the federated learning approach. For this tutorial, we use the"
-" built-in ``FedAvg`` implementation and customize it slightly by "
-"specifying the fraction of connected nodes to involve in a round of "
-"training."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:500
-msgid "a |context_link|_ object that provides access to the run configuration."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:502
-msgid ""
-"Before launching the strategy via the |strategy_start_link|_ method, we "
-"want to initialize the global model. This will be the model that gets "
-"sent to the ``ClientApp`` running on the clients in the first round of "
-"federated learning. We can do this by creating an instance of the model "
-"(``Net``), extracting the parameters in its ``state_dict``, and "
-"constructing an ``ArrayRecord`` with them. We can then make it available "
-"to the strategy via the ``initial_arrays`` argument of the ``start()`` "
-"method."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:509
-msgid ""
-"We can also optionally pass to the ``start()`` method a ``ConfigRecord`` "
-"containing settings that we would like to communicate to the clients. "
-"These will be sent as part of the ``Message`` that also carries the model"
-" parameters."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:548
-msgid ""
-"Most of the execution of the ``ServerApp`` happens inside the "
-"``strategy.start()`` method. After the specified number of rounds "
-"(``num_rounds``), the ``start()`` method returns a |result_link|_ object "
-"containing the final model parameters and metrics received from the "
-"clients or generated by the strategy itself. We can then save the final "
-"model to disk for later use."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:555
-msgid "Run the training"
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:557
-msgid ""
-"With all of these components in place, we can now run the federated "
-"learning simulation with Flower! The last step is to run our simulation "
-"in the command line, as follows:"
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:564
-msgid ""
-"This submits the run to the managed local SuperLink for the "
-"``[superlink.local]`` profile (identified in the Flower configuration "
-"with ``address = \":local:\"``), which then executes the federated "
-"learning simulation with 10 clients, or SuperNodes, using the Flower "
-"Simulation Runtime. Plain ``flwr run .`` would submit the run, print the "
-"run ID, and return without streaming logs. For the full local workflow, "
-"see :doc:`how-to-run-flower-locally`. If you run into SQL database errors"
-" during local simulations, see :ref:`FAQ <faq-local-superlink-db-error>`."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:572
-msgid "You should expect streamed output similar to this:"
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:607
-msgid ""
-"Learn more about how to configure the execution of your Flower App by "
-"checking the `pyproject.toml <how-to-configure-pyproject-toml.html>`_ "
-"guide."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:611
-msgid "Behind the scenes"
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:613
-msgid "So how does this work? How does Flower execute this simulation?"
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:615
-msgid ""
-"When we execute ``flwr run`` against the default local connection "
-"configuration (for example, the one with ``address = \":local:\"``), "
-"Flower submits the run to the managed local SuperLink. By default, the "
-"local SuperLink will configure the simulation runtime to use 10 clients. "
-"Each will run an instance of the ``ClientApp`` we defined earlier."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:620
-msgid ""
-"The local SuperLink then starts the ``ServerApp`` and asks it to issue "
-"instructions to those nodes using the ``FedAvg`` strategy. In this "
-"example, ``FedAvg`` is configured with two key parameters:"
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:624
-#, python-format
-msgid "``fraction-train=0.5`` → select 50% of the available clients for training"
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:625
-#, python-format
-msgid ""
-"``fraction-evaluate=1.0`` → select 100% of the available clients for "
-"evaluation"
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:627
-msgid ""
-"This means in our example, 5 out of 10 clients will be selected for "
-"training, and all 10 clients will later participate in evaluation."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:630
-#, fuzzy
-msgid "A typical round looks like this:"
-msgstr "일반적인 mod 함수는 다음과 같은 모습일 수 있습니다:"
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:632
-#, fuzzy
-msgid "**Training**"
-msgstr "설명"
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:634
-#, python-format
-msgid "``FedAvg`` randomly selects 5 clients (50% of 10)."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:635
-msgid "Flower sends a ``TRAIN`` message to each selected ``ClientApp``."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:636
-msgid ""
-"Each ``ClientApp`` calls the function decorated with ``@app.train()``, "
-"then returns a ``Message`` containing an ``ArrayRecord`` (the updated "
-"model parameters) and a ``MetricRecord`` (the training loss and number of"
-" examples)."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:639
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:650
-msgid "The ``ServerApp`` receives all replies."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:640
-msgid ""
-"``FedAvg`` aggregates all ``ArrayRecord`` into a new ``ArrayRecord`` "
-"representing the new global model and combines all ``MetricRecord``."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:643
-#, fuzzy
-msgid "**Evaluation**"
-msgstr "평가"
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:645
-msgid "``FedAvg`` selects all 10 clients (100%)."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:646
-msgid "Flower sends an ``EVALUATE`` message to each ``ClientApp``."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:647
-msgid ""
-"Each ``ClientApp`` calls the function decorated with ``@app.evaluate()`` "
-"and returns a ``Message`` containing a ``MetricRecord`` (the evaluation "
-"loss, accuracy, and number of examples)."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:651
-msgid "``FedAvg`` aggregates all ``MetricRecord``."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:653
-msgid ""
-"Once both training and evaluation are done, the next round begins: "
-"another training step, then another evaluation step, and so on, until the"
-" configured number of rounds is reached."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:659
+#: ../../source/tutorial-series-get-started-with-flower.rst:119
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:593
 msgid "Final remarks"
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:661
+#: ../../source/tutorial-series-get-started-with-flower.rst:121
 msgid ""
-"Congratulations, you just trained a convolutional neural network, "
-"federated over 10 clients! With that, you understand the basics of "
-"federated learning with Flower. The same approach you've seen can be used"
-" with other machine learning frameworks (not just PyTorch) and tasks (not"
-" just CIFAR-10 image classification), for example NLP with Hugging Face "
-"Transformers or speech with SpeechBrain."
+"Congratulations, you have successfully run your first Flower App on "
+"SuperGrid! You've taken your first step into the world of collaborative "
+"AI with Flower. In this tutorial, you created a federation with simulated"
+" SuperNodes and ran an existing Flower App across them. You also explored"
+" the SuperGrid dashboard to monitor your app's progress and view its "
+"logs."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:667
+#: ../../source/tutorial-series-get-started-with-flower.rst:127
 msgid ""
-"In the next tutorial, we're going to cover some more advanced concepts. "
-"Want to customize your strategy? Do learning rate decay at the strategy "
-"and communicate it to the clients ? Or evaluate the aggregated model on "
-"the server side? We'll cover all this and more in the next tutorial."
+"If you return to the `Federations page "
+"<https://flower.ai/federations/>`__ and click your federation, you'll see"
+" the run you launched. You can click that run to open the same run "
+"details page you saw right after launching the app."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower-pytorch.rst:683
+#: ../../source/tutorial-series-get-started-with-flower.rst:131
+msgid "Federation details page showing the run that was launched"
+msgstr ""
+
+#: ../../source/tutorial-series-get-started-with-flower.rst:136
 msgid ""
-"The :doc:`Flower Federated Learning Tutorial - Part 2 <tutorial-series-"
-"use-a-federated-learning-strategy-pytorch>` goes into more depth about "
-"strategies and all the advanced things you can build with them."
+"In the next tutorial, you'll download an existing Flower App, run it from"
+" your local machine on SuperGrid, make a small customization, and learn "
+"how the main Flower App components fit together."
+msgstr ""
+
+#: ../../source/tutorial-series-get-started-with-flower.rst:151
+msgid ""
+"The :doc:`Flower Collaborative AI Tutorial - Part 2: Write your first "
+"Flower App <tutorial-series-write-your-first-flower-app>` will walk you "
+"through the process of customizing your first Flower App and "
+"understanding how components like ``ServerApp`` and ``ClientApp`` "
+"interact with each other."
 msgstr ""
 
 #: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:3
 msgid "Use a federated learning strategy"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:33
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:35
 msgid ""
-"Welcome to the next part of the federated learning tutorial. In previous "
-"parts of this tutorial, we introduced federated learning with PyTorch and"
-" Flower (:doc:`part 1 <tutorial-series-get-started-with-flower-"
-"pytorch>`)."
+"In the previous tutorials, you created a simulated federation on "
+"SuperGrid, ran a Flower App from Flower Hub, customized the NumPy demo "
+"app, and then ran the PyTorch quickstart app on SuperGrid and locally. In"
+" this tutorial, you'll customize that PyTorch app by changing and "
+"extending the federated learning strategy used by the ``ServerApp``."
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:37
-msgid ""
-"In part 2, we'll begin to customize the federated learning system we "
-"built in part 1 using the Flower framework, Flower Datasets, and PyTorch."
-msgstr ""
-
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:53
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:47
 msgid "Let's move beyond FedAvg with Flower strategies! 🌼"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:103
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:53
 msgid ""
-"So far, everything should look familiar if you've worked through the "
-"introductory tutorial. With that, we're ready to introduce a number of "
-"new features."
+"This tutorial continues from the :doc:`previous tutorial <tutorial-"
+"series-write-your-first-flower-app-pytorch>`, where you created and ran "
+"the ``@flwrlabs/quickstart-pytorch`` app. If you completed it, open the "
+"existing ``quickstart-pytorch`` directory and continue from there."
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:108
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:71
+msgid "With that, we're ready to introduce a number of new strategy features."
+msgstr ""
+
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:75
 msgid "Choosing a different strategy"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:110
-msgid ""
-"In part 1, we created a |serverapp_link|_ (in ``server_app.py``). In it, "
-"we defined the strategy, the model to federatedly train, and then we "
-"launched the strategy by calling its ``|strategy_start_link|`` method."
-msgstr ""
-
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:114
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:77
 msgid ""
 "The strategy encapsulates the federated learning approach/algorithm, for "
 "example, |fedavg_link|_. Let's try to use a different strategy this time."
@@ -38141,23 +37787,35 @@ msgid ""
 "``FedAvg`` to |fedadagrad_link|_."
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:154
-#, fuzzy
-msgid "Next, run the training with the following command:"
-msgstr "다음 명령을 실행하여 가상 환경을 활성화합니다:"
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:112
+msgid ""
+"Next, run the app on SuperGrid to confirm that the new strategy is being "
+"used:"
+msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:162
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:121
+msgid ""
+"Open the `SuperGrid dashboard <https://flower.ai/federations/>`__, select"
+" your federation, and inspect the logs for the new run. You should see "
+"that Flower starts the ``FedAdagrad`` strategy instead of ``FedAvg``."
+msgstr ""
+
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:125
+msgid "You can also run the same app locally while developing or debugging:"
+msgstr ""
+
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:133
 msgid "Server-side parameter **evaluation**"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:164
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:135
 msgid ""
 "Flower can evaluate the aggregated model on the server side or on the "
 "client side. Client-side and server-side evaluation are similar in some "
 "ways, but different in others."
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:168
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:139
 msgid ""
 "**Centralized Evaluation** (or *server-side evaluation*) is conceptually "
 "simple: it works the same way that evaluation in centralized machine "
@@ -38168,7 +37826,7 @@ msgid ""
 "evaluation dataset is available at all times."
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:175
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:146
 msgid ""
 "**Federated Evaluation** (or *client-side evaluation*) is more complex, "
 "but also more powerful: it doesn't require a centralized dataset and "
@@ -38184,7 +37842,7 @@ msgid ""
 "our evaluation results fluctuate over consecutive rounds."
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:186
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:157
 msgid ""
 "We've seen how federated evaluation works on the client side (i.e., by "
 "implementing a function wrapped with the ``@app.evaluate`` decorator in "
@@ -38192,73 +37850,75 @@ msgid ""
 "model parameters on the server side."
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:190
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:161
 msgid ""
-"To do so, we need to create a new function in ``task.py`` that we can "
-"name ``global_evaluate``. This function is a callback that will be passed"
-" to the |strategy_start_link|_ method of our strategy. This means that "
-"the strategy will call this function after every round of federated "
-"learning passing two arguments: the current round of federated learning "
-"and the aggregated model parameters."
+"To do so, we use the ``global_evaluate`` function defined in "
+"``server_app.py``. This function is a callback that will be passed to the"
+" |strategy_start_link|_ method of our strategy. This means that the "
+"strategy will call this function after every round of federated learning "
+"passing two arguments: the current round of federated learning and the "
+"aggregated model parameters."
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:196
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:167
 msgid "Our ``global_evaluate`` function performs the following steps:"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:198
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:169
 #, fuzzy
 msgid "Load the aggregated model parameters into a PyTorch model"
 msgstr "4단계: 모델 업데이트를 새 글로벌 모델로 집계"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:199
-msgid "Load the entire CIFAR10 test dataset"
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:170
+msgid "Load the entire CIFAR-10 test dataset"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:200
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:171
 #, fuzzy
 msgid "Evaluate the model on the test dataset"
 msgstr "로컬로 보유한 데이터 세트를 사용하여 제공된 매개변수를 평가합니다."
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:201
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:172
 msgid "Return the evaluation metrics as a |metricrecord_link|_"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:226
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:197
 msgid ""
 "Remember we mentioned this ``global_evaluate`` will be called by the "
 "strategy. To do so we need to pass it to the strategy's ``start`` method "
-"as shown below."
+"as shown below. The quickstart app already does this, so make sure this "
+"part remains in ``server_app.py`` after switching to ``FedAdagrad``."
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:252
-#, fuzzy
-msgid "Finally, we run the simulation."
-msgstr "Flower 시뮬레이션."
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:222
+msgid ""
+"From here on, we'll run locally so you can iterate faster while editing "
+"the app. Run the local simulation with:"
+msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:258
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:229
 msgid ""
 "You'll note that the server logs the metrics returned by the callback "
 "after each round. Also, at the end of the run, note the ``ServerApp-side "
 "Evaluate Metrics`` shown:"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:271
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:242
 #, fuzzy
 msgid "Sending configurations to clients from strategies"
 msgstr "기본 제공 전략을 통한 구성"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:273
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:244
 msgid ""
 "In some situations, we want to configure client-side execution (training,"
 " evaluation) from the server side. One example of this is the server "
-"asking the clients to train for with a different learning rate based on "
-"the current round number. Flower provides a way to send configuration "
-"values from the server to the clients as part of the |message_link|_ that"
-" the ``ClientApp`` receives. Let's see how we can do this."
+"asking the clients to train with a different learning rate based on the "
+"current round number. Flower provides a way to send configuration values "
+"from the server to the clients as part of the |message_link|_ that the "
+"``ClientApp`` receives. Let's see how we can do this."
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:279
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:250
 msgid ""
 "To the |strategy_start_link|_ method of our strategy we are already "
 "passing a |configrecord_link|_ specifying the initial learning rate. This"
@@ -38269,52 +37929,53 @@ msgid ""
 "and embed such logic."
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:286
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:257
 msgid ""
 "To do so, we create a new class inheriting from |fedadagrad_link|_ and "
 "override the ``configure_train`` method. We then use this new strategy in"
-" our ``ServerApp``. Let's see how this looks like in code. Create a new "
-"file called ``custom_strategy.py`` in the ``pytorchexample`` directory "
-"and add the following code:"
+" our ``ServerApp``. Let's see how this looks in code. Create a new file "
+"called ``custom_strategy.py`` in the ``pytorchexample`` directory and add"
+" the following code:"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:312
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:283
 msgid ""
 "Next, we use this new strategy in our ``ServerApp`` by importing it in "
-"your ``server_app.py`` and use it instead of the standard ``FedAdagrad``."
+"your ``server_app.py`` and using it instead of the standard "
+"``FedAdagrad``:"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:315
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:303
 msgid ""
-"Finally, run the training with the following command. Here we increase "
-"the number of rounds to 15 to see the learning rate decay in action."
+"Run locally again, this time increasing the number of rounds to 15 to see"
+" the learning rate decay in action."
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:322
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:310
 msgid ""
 "You'll note that in the ``configure_train`` stage of rounds 5 and 10, the"
 " learning rate is decreased by a factor of 0.5 and the new learning rate "
 "is printed to the terminal."
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:325
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:313
 msgid ""
 "How do we know the ``ClientApp`` is using that new learning rate? Recall "
 "that in ``client_app.py``, we are reading the learning rate from the "
 "``Message`` received by the ``@app.train()`` function:"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:349
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:337
 msgid ""
 "Congratulations! You have created your first custom strategy adding "
 "dynamism to the ``ConfigRecord`` that is sent to clients."
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:354
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:342
 msgid "Scaling federated learning"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:356
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:344
 msgid ""
 "As a last step in this tutorial, let's see how we can use Flower to "
 "experiment with a large number of clients. The most straightforward way "
@@ -38322,13 +37983,13 @@ msgid ""
 "via the ``--federation-config`` flag:"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:365
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:353
 msgid ""
 "For more details on the Simulation Runtime and its configuration, check "
 "out the :doc:`Simulation Runtime documentation <how-to-run-simulations>`."
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:368
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:356
 msgid ""
 "Note that we can reuse the ``ClientApp`` for different ``num-supernodes``"
 " since the ``Context`` carries the ``num-partitions`` key and for "
@@ -38336,34 +37997,32 @@ msgid ""
 "of SuperNodes."
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:372
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:360
 #, python-format
 msgid ""
-"We now have 200 partitions, each holding 45 training and 5 validation "
-"examples. Given that the number of training examples on each client is "
-"quite small, we should probably train the model a bit longer, so we "
-"configure the clients to perform 3 local training epochs. We should also "
-"adjust the fraction of clients selected for training during each round "
-"(we don't want all 200 clients participating in every round), so we add "
-"``fraction-train = 0.025`` and adjust ``fraction-evaluate`` to ``0.05``, "
-"which means that only 2.5% of available clients will be selected for "
-"training each round (so 5 clients) and 5% of them for evaluation (so 10 "
-"clients). We can add and adjust values in the ``pyproject.toml`` for ease"
-" of experimentation:"
+"We now have 50 partitions, each holding 800 training and 200 validation "
+"examples. We configure the clients to perform 3 local training epochs and"
+" adjust the fraction of clients selected for training during each round. "
+"Since we don't want all 50 clients participating in every round, we add "
+"``fraction-train = 0.1`` and adjust ``fraction-evaluate`` to ``0.2``, "
+"which means that 10% of available clients will be selected for training "
+"each round (so 5 clients) and 20% of them for evaluation (so 10 clients)."
+" We can add and adjust values in the ``pyproject.toml`` for ease of "
+"experimentation:"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:392
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:379
 msgid ""
 "Then, we update the initialization of our strategy in ``server_app.py`` "
 "to the following:"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:414
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:401
 #, fuzzy
 msgid "Finally, run the simulation with the following command:"
 msgstr "다음 명령을 실행하여 가상 환경을 활성화합니다:"
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:424
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:411
 msgid ""
 "In this tutorial, we've seen how we can gradually enhance our system by "
 "customizing the strategy, choosing a different strategy, applying "
@@ -38372,22 +38031,21 @@ msgid ""
 "right?"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:429
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:416
 msgid ""
 "In the later sections, we've seen how we can communicate arbitrary values"
 " between server and clients to fully customize client-side execution. "
-"With that capability, we built a large-scale Federated Learning "
-"simulation using the Flower Simulation Runtime and ran an experiment "
-"involving 1000 clients in the same workload — all in the same Flower "
-"project!"
+"With that capability, we built a larger Federated Learning simulation "
+"using the Flower Simulation Runtime and ran an experiment involving 50 "
+"clients in the same workload -- all in the same Flower project!"
 msgstr ""
 
-#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:445
+#: ../../source/tutorial-series-use-a-federated-learning-strategy-pytorch.rst:432
 #, fuzzy
 msgid ""
-"The :doc:`Flower Federated Learning Tutorial - Part 3 <tutorial-series-"
-"build-a-strategy-from-scratch-pytorch>` shows how to build a fully custom"
-" ``Strategy`` from scratch."
+"The :doc:`Flower Collaborative AI Tutorial - Part 5: Build a strategy "
+"from scratch <tutorial-series-build-a-strategy-from-scratch-pytorch>` "
+"shows how to build a fully custom ``Strategy`` from scratch."
 msgstr ""
 "`Flower 연합 학습 튜토리얼- 1부 <https://flower.ai/docs/framework/tutorial-get-"
 "started-with-flower-pytorch.html>`__ PyTorch와 Flower를 사용하여 간단한 연합 학습 시스템을"
@@ -38396,6 +38054,10 @@ msgstr ""
 #: ../../source/tutorial-series-what-is-federated-learning.rst:3
 msgid "What is Federated Learning?"
 msgstr "연합 학습이란 무엇입니까?"
+
+#: ../../source/tutorial-series-what-is-federated-learning.rst:5
+msgid "Welcome to the Flower federated learning tutorial!"
+msgstr ""
 
 #: ../../source/tutorial-series-what-is-federated-learning.rst:7
 msgid ""
@@ -38418,23 +38080,23 @@ msgstr ""
 "🧑‍🏫이 튜토리얼은 사전 지식을 많이 필요로 하지 않으며 연합 학습에 대해 상세히알 필요는 없습니다. 데이터 과학과 파이썬 "
 "프로그래밍에 대한 기본적인 이해만 가정합니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:28
+#: ../../source/tutorial-series-what-is-federated-learning.rst:22
 msgid "Let's get started!"
 msgstr ""
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:32
+#: ../../source/tutorial-series-what-is-federated-learning.rst:26
 #, fuzzy
 msgid "Classical Machine Learning"
 msgstr "전통적인 머신러닝(기계학습)"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:34
+#: ../../source/tutorial-series-what-is-federated-learning.rst:28
 #, fuzzy
 msgid ""
 "Before we begin discussing federated learning, let us quickly recap how "
 "most machine learning works today."
 msgstr "연합 학습에 대해 논의하기 전에 현재 대부분의 머신러닝이 어떻게 작동하는지 간략히 요약하겠습니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:37
+#: ../../source/tutorial-series-what-is-federated-learning.rst:31
 msgid ""
 "In machine learning, we have a model, and we have data. The model could "
 "be a neural network (as depicted here), or something else, like classical"
@@ -38443,7 +38105,7 @@ msgstr ""
 "머신러닝에서 우리는 모델과 데이터를 가지고 있습니다. 모델은 신경망(그림과 같이)일 수도 있고 고전적인 선형 회귀와 같은 다른 것일"
 " 수도 있습니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:46
+#: ../../source/tutorial-series-what-is-federated-learning.rst:40
 msgid ""
 "We train the model using the data to perform a useful task. A task could "
 "be to detect objects in images, transcribe an audio recording, or play a "
@@ -38452,14 +38114,14 @@ msgstr ""
 "우리는 유용한 작업을 수행하기 위해 데이터를 사용하여 모델을 훈련합니다. 작업은 이미지 속 물체를 감지하거나 음성 녹음을 기록하거나"
 " 바둑과 같은 게임을 하는 것일 수 있습니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:55
+#: ../../source/tutorial-series-what-is-federated-learning.rst:49
 #, fuzzy
 msgid ""
 "In practice, the training data we work with doesn't originate on the "
 "machine we train the model on."
 msgstr "실제로 우리가 사용하는 훈련 데이터는 모델을 훈련시키는 기계에서 비롯된 것이 아닙니다. 그 데이터는 다른 곳에서 만들어졌습니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:58
+#: ../../source/tutorial-series-what-is-federated-learning.rst:52
 #, fuzzy
 msgid ""
 "This data gets created “somewhere else”. For instance, the data can "
@@ -38470,7 +38132,7 @@ msgstr ""
 "스마트폰에서 사용자와 앱의 상호 작용, 센서 데이터를 수집하는 자동차, 키보드를 통해 입력을 받는 노트북 또는 누군가 노래를 "
 "부르리는 것을 듣는 스마트 스피커에서 비롯됩니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:69
+#: ../../source/tutorial-series-what-is-federated-learning.rst:63
 #, fuzzy
 msgid ""
 "What's also important to mention, this “somewhere else” is usually not "
@@ -38481,7 +38143,7 @@ msgstr ""
 "또한 중요한 것은 이 \"다른 곳\"이 보통 한 곳만 아니라 여러 곳이라는 것입니다. 같은 앱을 실행하는 여러 기기일 수도 "
 "있습니다. 하지만 여러 조직이 모두 같은 작업을 위해 데이터를 생성하는 것일 수도 있습니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:81
+#: ../../source/tutorial-series-what-is-federated-learning.rst:75
 #, fuzzy
 msgid ""
 "So to use machine learning, or any kind of data analysis, the approach "
@@ -38492,7 +38154,7 @@ msgstr ""
 "따라서 머신러닝이나 어떤 종류의 데이터 분석을 이용하려면 과거에는 중앙 서버에서 모든 데이터를 수집하는 방법이 사용되었습니다. 이 "
 "서버는 데이터 센터 어딘가에 있을 수도 있고 클라우드 어딘가에 있을 수도 있습니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:91
+#: ../../source/tutorial-series-what-is-federated-learning.rst:85
 msgid ""
 "Once all the data is collected in one place, we can finally use machine "
 "learning algorithms to train our model on the data. This is the machine "
@@ -38501,11 +38163,11 @@ msgstr ""
 "모든 데이터가 한 곳에 모이면, 우리는 궁극적으로 머신러닝 알고리즘을 사용하여 데이터에서 모델을 훈련시킬 수 있습니다. 이것이 바로"
 " 우리가 기본적으로 사용해 온 머신러닝 방법입니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:105
+#: ../../source/tutorial-series-what-is-federated-learning.rst:99
 msgid "Challenges of classical machine learning"
 msgstr "클래식 머신러닝의 어려움"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:107
+#: ../../source/tutorial-series-what-is-federated-learning.rst:101
 #, fuzzy
 msgid ""
 "This classical machine learning approach we've just seen can be used in "
@@ -38516,7 +38178,7 @@ msgstr ""
 "우리가 방금 본 전통적 머신러닝의 접근 방식은 경우에 따라 다르게 사용될 수 있습니다. 좋은 예로는 휴일 사진을 분류하거나 웹 "
 "트래픽을 분석하는 것이 있습니다. 이러한 사례에서 모든 데이터는 자연스럽게 중앙 서버에 존재합니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:117
+#: ../../source/tutorial-series-what-is-federated-learning.rst:111
 msgid ""
 "But the approach can not be used in many other cases. Cases, where the "
 "data is not available on a centralized server, or cases where the data "
@@ -38525,7 +38187,7 @@ msgstr ""
 "그러나 이 방법은 다른 많은 경우에 적용되지 않을 수 있습니다. 예를 들어, 중앙 집중식 서버에 데이터가 없거나 서버의 데이터가 "
 "좋은 모델을 훈련하기에 충분하지 않을 수 있습니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:129
+#: ../../source/tutorial-series-what-is-federated-learning.rst:123
 #, fuzzy
 msgid ""
 "There are many reasons why the classical centralized machine learning "
@@ -38535,7 +38197,7 @@ msgstr ""
 "전통적인 중앙 집중식 머신러닝 방법이 현실 세계에서 매우 중요한 수많은 사용 사례를 충족시킬 수 없는 이유가 있습니다. 이유는 "
 "다음과 같은 여러 가지가 있습니다:"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:132
+#: ../../source/tutorial-series-what-is-federated-learning.rst:126
 #, fuzzy
 msgid ""
 "**Regulations**: GDPR (Europe), CCPA (California), PIPEDA (Canada), LGPD "
@@ -38554,7 +38216,7 @@ msgstr ""
 "보호하고 있습니다. 실제로 이러한 규정은 사용자가 세계의 다른 지역에 살고 데이터가 다른 데이터 보호 규정에 의해 통제되기 때문에 "
 "단일 조직이 자체 사용자 데이터를 인공 지능 학습에 사용하는 것을 방지하기도 합니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:139
+#: ../../source/tutorial-series-what-is-federated-learning.rst:133
 msgid ""
 "**User preference**: In addition to regulation, there are use cases where"
 " users just expect that no data leaves their device, ever. If you type "
@@ -38567,7 +38229,7 @@ msgstr ""
 "키보드에 비밀번호와 신용카드 정보를 입력하면 비밀번호가 해당 키보드를 개발한 회사의 서버에 뜨길 원하지는 않겠죠? 사실, 이 사용 "
 "사례가 애당초 연합 학습이 발명된 이유였습니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:144
+#: ../../source/tutorial-series-what-is-federated-learning.rst:138
 msgid ""
 "**Data volume**: Some sensors, like cameras, produce such a high data "
 "volume that it is neither feasible nor economic to collect all the data "
@@ -38583,35 +38245,35 @@ msgstr ""
 "기차역에 수 많은 보안 카메라가 설치되어 있다면, 그들이 생산하는 대량의 미가공 된 온디바이스 데이터는 처리 및 저장을 위해 "
 "엄청나게 강력하고 매우 비싼기반 구조를 필요로 합니다. 그런데 대부분의 데이터는 유용하지도 않습니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:152
+#: ../../source/tutorial-series-what-is-federated-learning.rst:146
 msgid "Examples where centralized machine learning does not work include:"
 msgstr "중앙 집중식 머신러닝이 작동하지 않는 예는 다음과 같습니다:"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:154
+#: ../../source/tutorial-series-what-is-federated-learning.rst:148
 #, fuzzy
 msgid ""
 "Sensitive healthcare records from multiple hospitals to train cancer "
 "detection models."
 msgstr "여러 병원의 민감한 의료기록으로 암 검진 모델 훈련"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:155
+#: ../../source/tutorial-series-what-is-federated-learning.rst:149
 #, fuzzy
 msgid ""
 "Financial information from different organizations to detect financial "
 "fraud."
 msgstr "금융 사기를 탐지하기 위한 다양한 조직의 금융 정보"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:156
+#: ../../source/tutorial-series-what-is-federated-learning.rst:150
 #, fuzzy
 msgid "Location data from your electric car to make better range prediction."
 msgstr "더 나은 범위 예측을 위해 전기 자동차의 위치 데이터"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:157
+#: ../../source/tutorial-series-what-is-federated-learning.rst:151
 #, fuzzy
 msgid "End-to-end encrypted messages to train better auto-complete models."
 msgstr "더 나은 자동 완성 모델을 훈련시키기 위한 엔드 투 엔드 암호화 된 메시지"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:159
+#: ../../source/tutorial-series-what-is-federated-learning.rst:153
 msgid ""
 "The popularity of privacy-enhancing systems like the `Brave "
 "<https://brave.com/>`__ browser or the `Signal <https://signal.org/>`__ "
@@ -38626,12 +38288,12 @@ msgstr ""
 "존재하는 경우 다른 대안보다 개인 정보 보호 강화 버전을 선택합니다. 그런데 이러한 사례에 머신러닝 및 데이터 과학을 적용하여 "
 "프라이버시 데이터를 활용하려면 어떻게 해야 합니까? 이 모든 분야는 최근 AI의 발전으로 상당한 이익을 얻을 수 있는 분야입니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:168
+#: ../../source/tutorial-series-what-is-federated-learning.rst:162
 #, fuzzy
 msgid "Federated Learning"
 msgstr "연합 학습"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:170
+#: ../../source/tutorial-series-what-is-federated-learning.rst:164
 #, fuzzy
 msgid ""
 "Federated Learning simply reverses this approach. It enables machine "
@@ -38641,17 +38303,17 @@ msgstr ""
 "연합 학습은 이 방법을 쉽게 뒤집었습니다. 데이터를 컴퓨팅 센터로 옮기는 대신 컴퓨팅 능력을 데이터가 생성되는 장소로 이동 "
 "시킴으로써 분산된 데이터에서 머신러닝을 실현합니다. 요약하자면:"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:174
+#: ../../source/tutorial-series-what-is-federated-learning.rst:168
 #, fuzzy
 msgid "Centralized machine learning: move the data to the computation"
 msgstr "중앙 집중식 머신러닝: 데이터를 컴퓨팅 센터로 이동"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:175
+#: ../../source/tutorial-series-what-is-federated-learning.rst:169
 #, fuzzy
 msgid "Federated (machine) Learning: move the computation to the data"
 msgstr "연합(기계)학습: 컴퓨팅을 데이터로 옮김"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:177
+#: ../../source/tutorial-series-what-is-federated-learning.rst:171
 #, fuzzy
 msgid ""
 "By doing so, Federated Learning enables us to use machine learning (and "
@@ -38672,22 +38334,22 @@ msgstr ""
 " 보안 메시징)을 구축할 수 있습니다. 그것들은 떠오르는 몇 가지 예에 불과합니다. 연합 학습을 구축함에 따라 이전에 액세스할 수 "
 "없었던 많은 데이터에 액세스할 수 있게 되었기 때문에 갑자기 재생될 수 있는 영역이 점점 더 많아지고 있습니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:187
+#: ../../source/tutorial-series-what-is-federated-learning.rst:181
 #, fuzzy
 msgid ""
 "So how does Federated Learning work, exactly? Let's start with an "
 "intuitive explanation."
 msgstr "그렇다면 연합 학습은 어떻게 작동합니까? 직관적인 설명부터 시작하겠습니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:190
+#: ../../source/tutorial-series-what-is-federated-learning.rst:184
 msgid "Federated learning in five steps"
 msgstr "연합 학습의 5단계"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:193
+#: ../../source/tutorial-series-what-is-federated-learning.rst:187
 msgid "Step 0: Initialize global model"
 msgstr "0단계: 글로벌 모델 초기화"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:195
+#: ../../source/tutorial-series-what-is-federated-learning.rst:189
 msgid ""
 "We start by initializing the model on the server. This is exactly the "
 "same in classic centralized learning: we initialize the model parameters,"
@@ -38696,13 +38358,13 @@ msgstr ""
 "서버에서 모델을 초기화하는 것으로 시작합니다. 이것은 전통적인 중앙 집중식 학습과도 동일합니다: 임의로 또는 이전에 저장된 "
 "체크포인트에서 모델 매개변수를 초기화합니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:208
+#: ../../source/tutorial-series-what-is-federated-learning.rst:202
 msgid ""
 "Step 1: Send model to a number of connected organizations/devices (client"
 " nodes)"
 msgstr "1단계: 연결된 여러 조직/장치(클라이언트 노드)에 모델 전송"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:210
+#: ../../source/tutorial-series-what-is-federated-learning.rst:204
 #, fuzzy
 msgid ""
 "Next, we send the parameters of the global model to the connected client "
@@ -38716,13 +38378,13 @@ msgstr ""
 "이것은 각 참여 노드가 동일한 모델 매개변수를 사용하여 로컬 훈련을 시작하도록 하기 위함입니다. 일반적으로 모든 노드가 아닌 몇 "
 "개의 연결 노드만 사용합니다. 그 이유는 점점 더 많은 클라이언트 노드를 선택하면 학습의 효율성이 감소하기 때문입니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:223
+#: ../../source/tutorial-series-what-is-federated-learning.rst:217
 msgid ""
 "Step 2: Train model locally on the data of each organization/device "
 "(client node)"
 msgstr "2단계: 각 조직/장치(클라이언트 노드)의 데이터에 대해 로컬로 모델 훈련"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:225
+#: ../../source/tutorial-series-what-is-federated-learning.rst:219
 msgid ""
 "Now that all (selected) client nodes have the latest version of the "
 "global model parameters, they start the local training. They use their "
@@ -38735,11 +38397,11 @@ msgstr ""
 "데이터 세트를 사용하여 자신의 로컬 모델을 훈련합니다. 모델이 완전히 수렴할 때까지 훈련하지 않고 잠시만 훈련합니다. 이는 로컬 "
 "데이터에서 한 단계 정도로 짧거나 몇 단계(mini-batches)에 불과할 수 있습니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:238
+#: ../../source/tutorial-series-what-is-federated-learning.rst:232
 msgid "Step 3: Return model updates back to the server"
 msgstr "3단계: 모델 파라미터를 업데이트하여 서버로 되돌리기"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:240
+#: ../../source/tutorial-series-what-is-federated-learning.rst:234
 msgid ""
 "After local training, each client node has a slightly different version "
 "of the model parameters they originally received. The parameters are all "
@@ -38753,11 +38415,11 @@ msgstr ""
 "노드의 로컬 데이터 세트에 다른 데이터가 있기 때문입니다. 그런 다음 클라이언트 노드는 이러한 모델 업데이트를 서버로 다시 "
 "보냅니다. 보내는 모델 업데이트는 전체 모델 파라미터거나 로컬 교육 중에 누적된 그레디언트(gradient)일 수 있습니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:253
+#: ../../source/tutorial-series-what-is-federated-learning.rst:247
 msgid "Step 4: Aggregate model updates into a new global model"
 msgstr "4단계: 모델 업데이트를 새 글로벌 모델로 집계"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:255
+#: ../../source/tutorial-series-what-is-federated-learning.rst:249
 msgid ""
 "The server receives model updates from the selected client nodes. If it "
 "selected 100 client nodes, it now has 100 slightly different versions of "
@@ -38769,7 +38431,7 @@ msgstr ""
 "클라이언트의 로컬 데이터를 기반으로 훈련된 100개의 조금씩 다른 원래 글로벌 모델 버전을 갖게 됩니다. 하지만 우리는 100개의 "
 "모든 클라이언트 노드의 데이터에서 학습한 내용을 포함하는 모델을 하나만 갖고 싶지 않았습니까?"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:260
+#: ../../source/tutorial-series-what-is-federated-learning.rst:254
 #, fuzzy
 msgid ""
 "In order to get one single model, we have to combine all the model "
@@ -38795,11 +38457,11 @@ msgstr ""
 "클라이언트에 100개의 데이터 포인트가 있다면 가중치를 부여하지 않고 10개의 예가 100개의 사례보다 글로벌 모델에 10배 더 "
 "많은 영향을 미칩니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:281
+#: ../../source/tutorial-series-what-is-federated-learning.rst:275
 msgid "Step 5: Repeat steps 1 to 4 until the model converges"
 msgstr "5단계: 모델이 수렴할 때까지 1~4단계를 반복합니다"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:283
+#: ../../source/tutorial-series-what-is-federated-learning.rst:277
 msgid ""
 "Steps 1 to 4 are what we call a single round of federated learning. The "
 "global model parameters get sent to the participating client nodes (step "
@@ -38811,7 +38473,7 @@ msgstr ""
 " 클라이언트 노드는 로컬 데이터에 대한 훈련을 받고(2단계), 업데이트된 모델을 서버에 전송하고(3단계), 서버는 모델 업데이트를 "
 "집계하여 글로벌 모델의 새로운 버전을 얻습니다(4단계)."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:289
+#: ../../source/tutorial-series-what-is-federated-learning.rst:283
 msgid ""
 "During a single round, each client node that participates in that "
 "iteration only trains for a little while. This means that after the "
@@ -38825,7 +38487,7 @@ msgstr ""
 " 관련된 모든 클라이언트 노드의 모든 데이터에 대해 잠시 동안만 훈련되었음을 의미합니다. 그런 다음 모든 클라이언트 노드의 "
 "데이터에서 잘 작동하는 완전히 훈련된 모델에 도달하려면 이 훈련 과정을 계속 반복해야 합니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:299
+#: ../../source/tutorial-series-what-is-federated-learning.rst:293
 msgid ""
 "Congratulations, you now understand the basics of federated learning. "
 "There's a lot more to discuss, of course, but that was federated learning"
@@ -38840,7 +38502,7 @@ msgstr ""
 " 좋은 클라이언트 노드를 어떻게 선택할 수 있을까요? 모델 업데이트를 집계하는 가장 좋은 방법은 무엇일까요? 실패한 클라이언트 "
 "노드(낙오자)를 어떻게 처리할 수 있을까요?"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:308
+#: ../../source/tutorial-series-what-is-federated-learning.rst:302
 msgid ""
 "Just like we can train a model on the decentralized data of different "
 "client nodes, we can also evaluate the model on that data to receive "
@@ -38852,12 +38514,12 @@ msgstr ""
 "메트릭(metrics)을 받을 수도 있습니다. 이를 연합 평가라고 하며 FE라고 약칭하기도 합니다. 사실 연합 평가는 대부분의 연합"
 " 학습 시스템에서 필수적인 부분입니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:314
+#: ../../source/tutorial-series-what-is-federated-learning.rst:308
 #, fuzzy
 msgid "Federated Analytics"
 msgstr "연합 분석"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:316
+#: ../../source/tutorial-series-what-is-federated-learning.rst:310
 msgid ""
 "In many cases, machine learning isn't necessary to derive value from "
 "data. Data analysis can yield valuable insights, but again, there's often"
@@ -38873,7 +38535,7 @@ msgstr ""
 "분석을 사용하면 여러 클라이언트 노드에서 이러한 쿼리(query)를 실행할 수 있습니다. 서버가 단일 클라이언트 노드에서 제출한 "
 "결과를 보지 못하도록 보안을 강화한 집합 방식과 같은 다른 프라이버시 향상 기술과 함께 자주 사용됩니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:327
+#: ../../source/tutorial-series-what-is-federated-learning.rst:321
 #, fuzzy
 msgid ""
 "Differential privacy (DP) is often mentioned in the context of Federated "
@@ -38889,11 +38551,11 @@ msgstr ""
 "잡음(noise)를 추가하여 개별 참가자의 정보를 구별하거나 재식별할 수 없도록 함으로써 이를 달성합니다. 이 기술은 정량적 개인 "
 "정보 보호 조치를 제공하는 최적화라고 볼 수 있습니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:336
+#: ../../source/tutorial-series-what-is-federated-learning.rst:330
 msgid "Flower"
 msgstr "Flower"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:338
+#: ../../source/tutorial-series-what-is-federated-learning.rst:332
 msgid ""
 "Federated learning, federated evaluation, and federated analytics require"
 " infrastructure to move machine learning models back and forth, train and"
@@ -38908,32 +38570,955 @@ msgstr ""
 "목표를 달성합니다. 간단히 말해서, Flower는 연합 학습, 분석 및 평가를 위한 통합 접근 방식을 제공합니다. 이를 통해 "
 "사용자는 모든 워크로드, 머신러닝 프레임워크 및 모든 프로그래밍 언어를 통합할 수 있습니다."
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:357
+#: ../../source/tutorial-series-what-is-federated-learning.rst:351
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:271
 msgid "Final Remarks"
 msgstr ""
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:359
+#: ../../source/tutorial-series-what-is-federated-learning.rst:353
+#, fuzzy
 msgid ""
 "Congratulations, you just learned the basics of federated learning and "
-"how it relates to the classic (centralized) machine learning!"
+"how it relates to classic centralized machine learning."
 msgstr "축하합니다, 지금까지 당신은 연합 학습의 기본 지식과 그것이 어떻게 전통적 (중앙 집중식) 머신러닝과 관련되는지 배웠습니다!"
 
-#: ../../source/tutorial-series-what-is-federated-learning.rst:362
+#: ../../source/tutorial-series-what-is-federated-learning.rst:356
 msgid ""
-"In the next part of this tutorial, we are going to build a first "
-"federated learning system with Flower."
-msgstr "이 튜토리얼의 다음 부분에서는 Flower와 함께 첫 번째 연합 학습 시스템을 구축할 것입니다."
-
-#: ../../source/tutorial-series-what-is-federated-learning.rst:376
-msgid ""
-"The `Flower Federated Learning Tutorial - Part 1 "
-"<https://flower.ai/docs/framework/tutorial-get-started-with-flower-"
-"pytorch.html>`__ shows how to build a simple federated learning system "
-"with PyTorch and Flower."
+"In the next tutorial, you will take the first practical step with Flower:"
+" create a simulated federation on SuperGrid, run an existing Flower App "
+"from Flower Hub, and use the SuperGrid dashboard to follow the run and "
+"inspect its logs."
 msgstr ""
-"`Flower 연합 학습 튜토리얼- 1부 <https://flower.ai/docs/framework/tutorial-get-"
-"started-with-flower-pytorch.html>`__ PyTorch와 Flower를 사용하여 간단한 연합 학습 시스템을"
-" 구축하는 방법을 보여줍니다."
+
+#: ../../source/tutorial-series-what-is-federated-learning.rst:371
+msgid ""
+"The :doc:`Flower Collaborative AI Tutorial - Part 1: Get started with "
+"Flower <tutorial-series-get-started-with-flower>` shows how to create "
+"your first federation on SuperGrid and run a Flower App without writing "
+"code."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:3
+#, fuzzy
+msgid "Write your first Flower App"
+msgstr "Flower 서버."
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:5
+msgid "Welcome to the second part of the Flower collaborative AI tutorial!"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:7
+msgid ""
+"In the previous tutorial, you created your first federation on SuperGrid "
+"using the simulation runtime. This allowed you to experiment with "
+"simulated SuperNodes, run an existing Flower App on SuperGrid, and "
+"explore the dashboard to follow its progress and view its logs."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:12
+msgid ""
+"In this tutorial, you'll pull the `@flwrlabs/demo "
+"<https://flower.ai/apps/flwrlabs/demo/>`__ app from Flower Hub and run it"
+" on SuperGrid from your local machine. You'll then make a small change to"
+" the ``ServerApp``, run the app again, and confirm in the SuperGrid logs "
+"that your custom messages are now part of the app's behavior. In the "
+"second half of the tutorial, you'll step back from the hands-on workflow "
+"to get a high-level introduction to the main components of a Flower App "
+"and see, in concrete terms, how the demo app uses those components "
+"together."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:33
+msgid ""
+"In this tutorial, you'll edit the code of an existing Flower App that "
+"you'll pull from the Flower Hub. In order to do that, you'll need to "
+"install ``flwr``, the Flower Python package. What follows is a brief "
+"guide on how this can be done:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:40
+msgid "First, we install the Flower package ``flwr`` in a new Python environment."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:46
+msgid ""
+"Then, use ``flwr new`` to fetch an existing Flower App from the Flower "
+"Hub. In this case, you'll fetch the `@flwrlabs/demo "
+"<https://flower.ai/apps/flwrlabs/demo/>`__ app."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:53
+msgid ""
+"After running it you'll notice a new directory named ``demo`` has been "
+"created in the directory you executed the above command from. It should "
+"have the following structure:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:67
+msgid ""
+"You did it! You have pulled an existing Flower App from the Flower Hub. "
+"Open the ``demo`` directory in your code editor of choice, then advance "
+"to the next section to learn how to run this app in SuperGrid. Later, "
+"you'll learn about the core components of a Flower App."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:74
+msgid "Run the app on SuperGrid"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:78
+msgid ""
+"If you haven't already, make sure to complete the :doc:`first tutorial in"
+" this series <tutorial-series-get-started-with-flower>` to set up your "
+"SuperGrid account and run a demo app on SuperGrid directly from the "
+"Flower Hub."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:82
+msgid ""
+"In the previous tutorial, you ran the demo app on SuperGrid directly from"
+" Flower Hub. Now that you have the app code on your machine, you can run "
+"it from there instead. This is a crucial step towards customizing the app"
+" and making it your own."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:141
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:86
+msgid ""
+"Open a terminal, activate your Python environment, and run the following "
+"command to first login to SuperGrid:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:149
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:94
+msgid ""
+"Once you are logged in, run the following command to run the app on "
+"SuperGrid and across the federation you created in the previous tutorial:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:106
+msgid ""
+"Then, if you navigate to the `SuperGrid dashboard "
+"<https://flower.ai/federations/>`__, you should see a new run in the list"
+" of runs of your federation. Click on it to see the run details and logs."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:110
+msgid "SuperGrid dashboard showing the newly started run in the federation"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:115
+msgid ""
+"If you inspect the logs, you should see the same output as when you ran "
+"the app directly from the Flower Hub in the previous tutorial. This is "
+"because you are running the exact same app. In the next section, we'll "
+"make a small modification to the app that will reflect in the logs and "
+"make it your own!"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:122
+msgid "Customizing your App"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:124
+msgid ""
+"Now that you have the app running on SuperGrid, you can start customizing"
+" it. In this tutorial you'll make a small customization to the "
+"``ServerApp`` to print a message before the federated learning begins and"
+" just before the app exits. Open the ``demo`` directory in your code "
+"editor of choice and open the ``quickstart_numpy/server_app.py``. Then, "
+"add the following two lines to the ``main()`` function:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:156
+msgid ""
+"If you now run the app again, you should see the new messages in the logs"
+" of your run on SuperGrid:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:164
+msgid ""
+"Then, if you navigate to the `SuperGrid dashboard "
+"<https://flower.ai/federations/>`__, and open the logs of the new run, "
+"you should see the new printed messages from the ``ServerApp`` at the "
+"beginning and end of the logs."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:168
+msgid "SuperGrid run logs showing the custom ServerApp print statements"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:173
+msgid ""
+"You did it! You have successfully customized an existing Flower App and "
+"run it on SuperGrid. So far you have learned about two powerful Flower "
+"commands (``flwr new`` and ``flwr run``) that allow you to pull existing "
+"apps from the Flower Hub and run them on SuperGrid. ``flwr new`` is a "
+"great way to get started with a new app that you can customize for your "
+"needs."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:179
+msgid ""
+"In the next section, you'll learn about the main components of a Flower "
+"App and how they work together, using the demo app as a concrete example."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:184
+#, fuzzy
+msgid "Flower App Components"
+msgstr "공통"
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:186
+msgid ""
+"All Flower Apps follow the same basic structure, which is designed to be "
+"flexible and powerful enough to support a wide variety of collaborative "
+"AI workloads including federated learning, federated analytics, "
+"distributed training, and more. The main components of a Flower App are:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:191
+msgid ""
+"``ServerApp``: the server-side entry point for a run. In a typical "
+"federated learning setup, it defines how the run starts, which initial "
+"model is used, which strategy controls the federated learning process, "
+"and how many rounds to execute. A Flower App can also be built with a "
+"custom strategy or no strategy at all."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:195
+msgid ""
+"``ClientApp``: the code that runs on each client (SuperNode). It defines "
+"what should happen when a SuperNode receives instructions from the server"
+" side, for example \"train this model on your local data\" or \"evaluate "
+"this model on your local data\" or, in general, \"do x with your local "
+"data\"."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:199
+msgid ""
+"``pyproject.toml``: the app configuration file. It declares project "
+"metadata and dependencies, tells Flower where to import the ``ServerApp``"
+" and ``ClientApp`` from, and stores run configuration (e.g. "
+"hyperparameters) that the app can read at runtime."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:203
+msgid ""
+"In summary, you can think of the ``ServerApp`` as the place where the "
+"federated run is launched, the ``Strategy`` as the algorithm that "
+"coordinates each round, and the ``ClientApp`` as the code each "
+"participating SuperNode executes. The ``ServerApp`` and ``ClientApp`` "
+"exchange ``Message`` objects through SuperGrid. Depending on the logic of"
+" the app, these messages can contain instructions or queries, model "
+"parameters, training metrics, or any other information that needs to be "
+"communicated between the server and SuperNodes during the run."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:212
+msgid "How the demo app uses these components"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:214
+msgid ""
+"The ``@flwrlabs/demo`` app is built as a deliberately small NumPy example"
+" so the Flower structure is easy to see."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:217
+msgid ""
+"In ``quickstart_numpy/server_app.py``, the ``ServerApp`` is created and "
+"defines its main entry point with ``@app.main()``. When a run starts, "
+"this function:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:220
+msgid "reads ``num-server-rounds`` from ``context.run_config``;"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:221
+msgid ""
+"creates the initial global model by calling ``get_dummy_model()`` from "
+"``quickstart_numpy/task.py``; For simplicity, the model is just a list of"
+" a single NumPy array, but in a real app it could be a more complex "
+"object such as a PyTorch model."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:225
+msgid ""
+"wraps the model arrays in an ``ArrayRecord`` so Flower can send them to "
+"SuperNodes;"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:226
+#, fuzzy
+msgid "creates a ``FedAvg`` strategy;"
+msgstr "새 페이지 만들기"
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:227
+msgid "launches the strategy by calling ``strategy.start()``."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:229
+msgid ""
+"In ``quickstart_numpy/client_app.py``, a ``ClientApp`` is created and "
+"defines two handlers:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:232
+msgid ""
+"``@app.train()`` receives the current global model array, simulates local"
+" training by adding random noise to it, then replies with the updated "
+"array and a few metrics."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:234
+msgid ""
+"``@app.evaluate()`` receives the current global model array and replies "
+"with evaluation metrics. It does not return an updated array because "
+"evaluation does not change the model."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:238
+msgid ""
+"The strategy connects these two sides. In this demo, ``FedAvg`` sends the"
+" current global array to selected ``ClientApp`` instances for training, "
+"waits for their replies, and aggregates the returned arrays into the next"
+" global model."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:244
+msgid ""
+"In a real app, the ``ClientApp`` would likely have a more complex logic, "
+"for example it could load a model and data, perform actual training and "
+"evaluation, and return updated model parameters and training metrics to "
+"the server. In the next tutorial you'll see a more complex example of a "
+"Flower App that uses PyTorch and real training and evaluation logic."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:250
+msgid ""
+"Finally, ``pyproject.toml`` makes the app components discoverable and "
+"configurable. The ``[tool.flwr.app.components]`` section points Flower to"
+" the objects it should import:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:258
+msgid ""
+"The ``[tool.flwr.app.config]`` section defines values available at "
+"runtime through ``context.run_config``. In this demo, it sets:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:265
+msgid ""
+"That is the value the ``ServerApp`` reads to decide how many federated "
+"learning rounds the ``FedAvg`` strategy should run. In a real app, you "
+"could have many more configuration values such as learning rate, batch "
+"size, and more."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:273
+msgid ""
+"Congratulations, you have successfully run your first custom Flower App "
+"on SuperGrid! You have also learned about the main components of a Flower"
+" App and how they work together to enable collaborative AI workloads "
+"across a federation of SuperNodes."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:277
+msgid ""
+"In the next tutorial, you will take a look at a more complex Flower App "
+"that uses PyTorch and real training and evaluation logic. You will also "
+"learn how to run a Flower App locally on your machine, which is ideal for"
+" development and debugging before running on SuperGrid."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:293
+msgid ""
+"The :doc:`Flower Collaborative AI Tutorial - Part 3: Write a Flower App "
+"for a PyTorch model <tutorial-series-write-your-first-flower-app-"
+"pytorch>` presents a more advanced Flower App that uses PyTorch and real "
+"training and evaluation logic."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:3
+#, fuzzy
+msgid "Write your first Flower App with PyTorch"
+msgstr "gRPC transport layer를 사용하여 Flower 서버를 실행하세요."
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:51
+msgid ""
+"In the previous tutorials, you created a simulated federation on "
+"SuperGrid, ran a Flower App, downloaded the ``@flwrlabs/demo`` app, and "
+"learned how ``ServerApp``, ``ClientApp``, strategies, and "
+"``pyproject.toml`` fit together. In this tutorial, you will use the same "
+"workflow with a more realistic Flower App: a PyTorch app that trains a "
+"small image classifier on CIFAR-10."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:68
+#, fuzzy
+msgid "Create the App"
+msgstr "**PR 만들기**"
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:70
+msgid "Use ``flwr new`` to fetch the PyTorch quickstart app from Flower Hub:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:76
+msgid ""
+"After running the command, a new directory named ``quickstart-pytorch`` "
+"will be created:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:89
+msgid ""
+"This app has the same Flower structure as the NumPy demo from the "
+"previous tutorial, but the workload is now a real PyTorch training task. "
+"The app trains a small convolutional neural network on CIFAR-10, an image"
+" classification dataset with ten classes such as airplane, automobile, "
+"bird, cat, dog, ship, and truck."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:96
+msgid "Quick App Overview"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:100
+msgid ""
+"A more detailed walkthrough of the app is available later in this "
+"tutorial."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:102
+msgid ""
+"Before running the app, it helps to know what each file is responsible "
+"for:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:104
+msgid ""
+"``pytorchexample/task.py`` contains the PyTorch-specific code: the neural"
+" network, CIFAR-10 data loading and partitioning, the local training "
+"loop, the evaluation loop, and server-side evaluation helpers."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:107
+msgid ""
+"``pytorchexample/client_app.py`` defines the ``ClientApp``. Its "
+"``@app.train()`` handler receives the current global model, loads one "
+"CIFAR-10 partition, trains the model locally, and replies with updated "
+"model parameters plus metrics. Its ``@app.evaluate()`` handler evaluates "
+"the received model on local validation data and replies with metrics."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:112
+msgid ""
+"``pytorchexample/server_app.py`` defines the ``ServerApp``. It creates "
+"the initial PyTorch model, wraps the model parameters in an "
+"``ArrayRecord``, creates a ``FedAvg`` strategy, and starts the federated "
+"learning run."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:115
+msgid ""
+"``pyproject.toml`` declares the app metadata and dependencies, points "
+"Flower to the ``ServerApp`` and ``ClientApp`` objects, and defines run "
+"configuration values such as the number of server rounds, batch size, "
+"local epochs, learning rate, and evaluation settings."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:120
+msgid ""
+"The important idea is the same as before: the ``ServerApp`` starts the "
+"run, ``FedAvg`` coordinates each federated learning round, and each "
+"``ClientApp`` trains or evaluates the model using the data available on "
+"its SuperNode."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:124
+msgid ""
+"This app uses `Flower Datasets <https://flower.ai/docs/datasets/>`__ to "
+"download CIFAR-10 and split it into partitions, one for each simulated "
+"client. This is ideal for simulations because it lets you experiment with"
+" federated learning even when you start from a single centralized "
+"dataset. In a typical Flower App that runs outside of simulation, you "
+"usually do not create artificial partitions. Instead, each ``ClientApp`` "
+"loads the data already available on the SuperNode where it runs."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:133
+msgid "Run the App on SuperGrid"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:137
+msgid ""
+"If you have not already done so, complete the :doc:`first tutorial "
+"<tutorial-series-get-started-with-flower>` to create a SuperGrid account "
+"and a simulated federation."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:161
+msgid ""
+"SuperGrid will start a new run for this app. Open the `SuperGrid "
+"dashboard <https://flower.ai/federations/>`__, select your federation, "
+"and click the new run to follow its progress and inspect the logs."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:165
+msgid ""
+"In the logs, you should see Flower start the ``FedAvg`` strategy and run "
+"several rounds of federated learning. Each round includes local training "
+"on selected ``ClientApp`` instances, aggregation in the ``ServerApp``, "
+"and evaluation metrics such as ``eval_loss`` and ``eval_acc``."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:170
+msgid "You can override values from ``pyproject.toml`` at run time. For example:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:185
+#, fuzzy
+msgid "Run the App Locally"
+msgstr "로컬에서 Github Action(CI) 실행하기"
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:187
+msgid ""
+"Running on SuperGrid is the recommended way to run collaborative AI "
+"workflows with Flower. However, it is also useful to run the same app "
+"locally while you are developing or debugging."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:191
+msgid ""
+"From the ``quickstart-pytorch`` directory, install the app and its "
+"dependencies into your Python environment:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:199
+msgid ""
+"Then run the app locally with the command below. Flower will start a "
+"managed local SuperLink -- a distilled version of SuperGrid -- and "
+"execute the app with simulated SuperNodes on your machine. The first run "
+"can take longer because the app needs to download CIFAR-10. With the flag"
+" ``--stream``, you can see the logs from the local run in your terminal."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:209
+msgid "The streamed output should include logs similar to this:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:231
+msgid ""
+"In the above ``flwr run`` command you are not specifying a federation, "
+"this is because for local prototyping there is only one federation "
+"available. Because of this, the ``--federation`` flag is not required."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:237
+msgid ""
+"If you're on Windows and see unexpected terminal output, for example ``� "
+"□[32m□[1m``, check :ref:`this FAQ entry <faq-windows-unexpected-output>`."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:240
+msgid ""
+"For more details on using the Flower CLI against a locally running "
+"SuperLink, including how to list your runs and view their logs, see "
+":doc:`Run Flower Locally with a Managed SuperLink <how-to-run-flower-"
+"locally>`."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:246
+msgid "A Deeper Dive into the App"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:248
+msgid ""
+"The ``@flwrlabs/quickstart-pytorch`` app demonstrates a simple federated "
+"learning workflow. In federated learning, the server sends global model "
+"parameters to the client, and the client updates the local model with "
+"parameters received from the server. It then trains the model on the "
+"local data (which changes the model parameters locally) and sends the "
+"updated/changed model parameters back to the server (or, alternatively, "
+"it sends just the gradients back to the server, not the full model "
+"parameters)."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:256
+#, fuzzy
+msgid "Define the Flower ClientApp"
+msgstr "Flower 클라이언트 앱을 실행합니다."
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:258
+msgid ""
+"Federated learning systems consist of a server and multiple clients "
+"(SuperNodes). In Flower, we create a |serverapp_link|_ and a "
+"|clientapp_link|_ to run the server-side and client-side code, "
+"respectively."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:262
+msgid ""
+"The core functionality of the ``ClientApp`` is to perform some action "
+"with the local data that the SuperNode it runs on (e.g. an edge device, a"
+" server in a data center, or a laptop) has access to. In this tutorial "
+"such action is to train and evaluate the small CNN model defined earlier "
+"using the local training and validation data."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:268
+#, fuzzy
+msgid "Loading the data"
+msgstr "Metadata"
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:270
+msgid ""
+"This app trains a small convolutional neural network on CIFAR-10. Since "
+"the tutorial uses the Simulation Runtime, all data starts from one "
+"centralized dataset and is split into partitions, one for each simulated "
+"SuperNode."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:274
+msgid ""
+"The ``load_data()`` function in ``task.py`` uses `Flower Datasets "
+"<https://flower.ai/docs/datasets/>`_ to load one partition, split it into"
+" training and validation data, apply the PyTorch transforms, and return "
+"two ``DataLoader`` objects:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:309
+msgid ""
+"This partitioning is only needed for simulation. In deployment, each "
+"SuperNode would usually load its own local data directly, for example "
+"from a path provided through ``--node-config``."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:314
+#, fuzzy
+msgid "Training"
+msgstr "중앙 집중식 훈련"
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:316
+msgid ""
+"We can define how the ``ClientApp`` performs training by wrapping a "
+"function with the ``@app.train()`` decorator. In this case we name this "
+"function ``train`` because we'll use it to train the model on the local "
+"data. The function always expects two arguments:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:320
+msgid ""
+"A |message_link|_: The message received from the server. It contains the "
+"model parameters and any other configuration information sent by the "
+"server."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:322
+msgid ""
+"A |context_link|_: The context object that contains information about the"
+" SuperNode executing the ``ClientApp`` and about the current run."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:325
+msgid ""
+"Through the context you can retrieve the config settings defined in the "
+"``pyproject.toml`` of your app. The context can be used to persist the "
+"state of the client across multiple calls to ``train`` or ``evaluate``. "
+"In Flower, ``ClientApps`` are ephemeral objects that get instantiated for"
+" the execution of one ``Message`` and destroyed when a reply is "
+"communicated back to the server."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:331
+msgid ""
+"Let's see an implementation of ``ClientApp`` that uses the previously "
+"defined PyTorch CNN model, applies the parameters received from the "
+"``ServerApp`` via the message, loads its local data, trains the model "
+"with it (using the ``train_fn`` function), and generates a reply "
+"``Message`` containing the updated model parameters as well as some "
+"metrics of interest."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:382
+msgid ""
+"The ``partition-id`` and ``num-partitions`` values shown above are "
+"provided by the :doc:`Simulation Runtime <how-to-run-simulations>`. In a "
+"deployment setting, the ``ClientApp`` would usually load data that "
+"already exists on the SuperNode. For example, you could pass the path to "
+"that data when starting the SuperNode with ``--node-config \"data-"
+"path=/path/to/data\"`` and then call ``load_data`` with "
+"``context.node_config[\"data-path\"]``."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:389
+msgid ""
+"Note that the ``train_fn`` is simply an alias name pointing to the train "
+"function defined earlier in this tutorial (where we defined the PyTorch "
+"training loop and optimizer). To this function we pass the model we want "
+"to train locally and the data loader, but also the number of local epochs"
+" and the learning rate (``lr``) to use. Note how in this case the "
+"``local-epochs`` setting is read from the run config via the ``Context`` "
+"while the ``lr`` is read from the ``ConfigRecord`` sent by the server via"
+" the ``Message``. This can be used to adjust the learning rate on each "
+"round from the server. When this dynamism isn't needed, reading the "
+"``lr`` from the run config via the ``Context`` is also perfectly valid."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:399
+msgid ""
+"Once training is completed, the ``ClientApp`` constructs a reply "
+"``Message``. This reply typically includes a ``RecordDict`` with two "
+"records:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:402
+msgid "An ``ArrayRecord`` containing the updated model parameters"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:403
+msgid ""
+"A ``MetricRecord`` with relevant metrics (in this case, the training loss"
+" and the number of examples used for training)"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:408
+msgid ""
+"Returning the number of examples under the ``\"num-examples\"`` key is "
+"**required**, because strategies such as |fedavg_link|_ used by the "
+"``ServerApp`` rely on this key to aggregate both models and metrics by "
+"default, unless you override the ``weighted_by_key`` argument (for "
+"example: ``FedAvg(weighted_by_key=\"my-different-key\")``)."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:414
+msgid ""
+"After constructing the reply ``Message``, the ``ClientApp`` returns it. "
+"Flower then handles sending the reply back to the server automatically."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:418
+#, fuzzy
+msgid "Evaluation"
+msgstr "평가"
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:420
+msgid ""
+"In a typical federated learning setup, the ``ClientApp`` would also "
+"implement an ``@app.evaluate()`` function to evaluate the model received "
+"from the ``ServerApp`` on local validation data. This is especially "
+"useful to monitor the performance of the global model on each client "
+"during training. The implementation of the ``evaluate`` function is very "
+"similar to the ``train`` function, except that it calls the ``test_fn`` "
+"function defined earlier in this tutorial (which implements the PyTorch "
+"evaluation loop) and it returns a ``Message`` containing only a "
+"``MetricRecord`` with the evaluation metrics (no ``ArrayRecord`` because "
+"the model parameters are not updated during evaluation). Here's how the "
+"``evaluate`` function looks like:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:468
+msgid ""
+"As you can see the ``evaluate`` implementation is near identical to the "
+"``train`` implementation, except that it calls the ``test_fn`` function "
+"instead of the ``train_fn`` function and it returns a ``Message`` "
+"containing only a ``MetricRecord`` with metrics relevant to evaluation "
+"(``eval_loss``, ``eval_acc`` -- both scalars). We also need to include "
+"the ``num-examples`` key in the metrics so the server can aggregate the "
+"evaluation metrics correctly."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:476
+#, fuzzy
+msgid "Define the Flower ServerApp"
+msgstr "Flower 서버앱"
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:478
+msgid ""
+"On the server side, we need to configure a strategy which encapsulates "
+"the federated learning approach/algorithm, for example, *Federated "
+"Averaging* (FedAvg). Flower has a number of built-in strategies, but we "
+"can also use our own strategy implementations to customize nearly all "
+"aspects of the federated learning approach. For this tutorial, we use the"
+" built-in ``FedAvg`` implementation and customize it slightly by "
+"specifying the fraction of connected SuperNodes to involve in a round of "
+"training."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:488
+msgid ""
+"a ``Grid`` object that will be used to interface with the SuperNodes "
+"running the ``ClientApp`` to involve them in a round of "
+"train/evaluate/query or other."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:490
+msgid "a |context_link|_ object that provides access to the run configuration."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:492
+msgid ""
+"Before launching the strategy via the |strategy_start_link|_ method, we "
+"want to initialize the global model. This will be the model that gets "
+"sent to the ``ClientApp`` running on the clients in the first round of "
+"federated learning. We can do this by creating an instance of the model "
+"(``Net``), extracting the parameters in its ``state_dict``, and "
+"constructing an ``ArrayRecord`` with them. We can then make it available "
+"to the strategy via the ``initial_arrays`` argument of the ``start()`` "
+"method."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:499
+msgid ""
+"We can also optionally pass to the ``start()`` method a ``ConfigRecord`` "
+"containing settings that we would like to communicate to the clients. "
+"These will be sent as part of the ``Message`` that also carries the model"
+" parameters."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:538
+msgid ""
+"Most of the execution of the ``ServerApp`` happens inside the "
+"``strategy.start()`` method. After the specified number of rounds "
+"(``num_rounds``), the ``start()`` method returns a |result_link|_ object "
+"containing the final model parameters and metrics received from the "
+"clients or generated by the strategy itself. We can then save the final "
+"model to disk for later use."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:545
+msgid "Behind the scenes"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:547
+msgid "So how does this work? How does Flower execute this simulation?"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:549
+msgid ""
+"When we execute ``flwr run`` against the default local connection "
+"configuration, Flower submits the run to the managed local SuperLink. By "
+"default, the local SuperLink will configure the simulation runtime to use"
+" 10 clients. Each will run an instance of the ``ClientApp`` we defined "
+"earlier."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:554
+msgid ""
+"The local SuperLink then starts the ``ServerApp`` and asks it to issue "
+"instructions to those SuperNodes using the ``FedAvg`` strategy. In this "
+"example, ``FedAvg`` is configured with two key parameters:"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:558
+#, python-format
+msgid "``fraction-train=0.5`` → select 50% of the available clients for training"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:559
+#, python-format
+msgid ""
+"``fraction-evaluate=1.0`` → select 100% of the available clients for "
+"evaluation"
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:561
+msgid ""
+"This means in our example, 5 out of 10 clients will be selected for "
+"training, and all 10 clients will later participate in evaluation."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:564
+#, fuzzy
+msgid "A typical round looks like this:"
+msgstr "일반적인 mod 함수는 다음과 같은 모습일 수 있습니다:"
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:566
+#, fuzzy
+msgid "**Training**"
+msgstr "설명"
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:568
+#, python-format
+msgid "``FedAvg`` randomly selects 5 clients (50% of 10)."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:569
+msgid "Flower sends a ``TRAIN`` message to each selected ``ClientApp``."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:570
+msgid ""
+"Each ``ClientApp`` calls the function decorated with ``@app.train()``, "
+"then returns a ``Message`` containing an ``ArrayRecord`` (the updated "
+"model parameters) and a ``MetricRecord`` (the training loss and number of"
+" examples)."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:573
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:584
+msgid "The ``ServerApp`` receives all replies."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:574
+msgid ""
+"``FedAvg`` aggregates all ``ArrayRecord`` into a new ``ArrayRecord`` "
+"representing the new global model and combines all ``MetricRecord``."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:577
+#, fuzzy
+msgid "**Evaluation**"
+msgstr "평가"
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:579
+msgid "``FedAvg`` selects all 10 clients (100%)."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:580
+msgid "Flower sends an ``EVALUATE`` message to each ``ClientApp``."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:581
+msgid ""
+"Each ``ClientApp`` calls the function decorated with ``@app.evaluate()`` "
+"and returns a ``Message`` containing a ``MetricRecord`` (the evaluation "
+"loss, accuracy, and number of examples)."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:585
+msgid "``FedAvg`` aggregates all ``MetricRecord``."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:587
+msgid ""
+"Once both training and evaluation are done, the next round begins: "
+"another training step, then another evaluation step, and so on, until the"
+" configured number of rounds is reached."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:595
+msgid ""
+"You have now run a PyTorch Flower App on SuperGrid and locally. Compared "
+"with the NumPy demo, this app uses a real model, a real dataset, and real"
+" local training, but the Flower structure is the same: ``ServerApp``, "
+"``ClientApp``, strategy, and ``pyproject.toml``."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:600
+msgid ""
+"In the next tutorial, you will customize the federated learning strategy "
+"to change how the server coordinates training and evaluation."
+msgstr ""
+
+#: ../../source/tutorial-series-write-your-first-flower-app-pytorch.rst:614
+msgid ""
+"The :doc:`Flower Collaborative AI Tutorial - Part 4: Use a federated "
+"learning strategy <tutorial-series-use-a-federated-learning-strategy-"
+"pytorch>` goes into more depth about strategies and the advanced behavior"
+" you can build with them."
+msgstr ""
 
 #~ msgid ""
 #~ "Currently, Flower provides two images, a"
@@ -71985,4 +72570,729 @@ msgstr ""
 
 #~ msgid "UserConfig"
 #~ msgstr ""
+
+#~ msgid ""
+#~ "For a complete PyTorch example that "
+#~ "goes into depth on various Flower "
+#~ "components, see the `Get started with"
+#~ " Flower <https://flower.ai/docs/framework/tutorial-"
+#~ "series-get-started-with-flower-"
+#~ "pytorch.html>`_ tutorial. While we expect "
+#~ "this guide will help most users "
+#~ "get migrated quickly to the Flower "
+#~ "ecosystem, certain complex OpenFL workloads"
+#~ " may require more clarification or "
+#~ "help. If you have further questions, "
+#~ "`join the Flower Slack <https://flower.ai"
+#~ "/join-slack/>`_ (and use the channel "
+#~ "``#questions``) or join our `OpenFL "
+#~ "Continuity Program "
+#~ "<https://docs.google.com/forms/d/e/1FAIpQLScprGGX_jFRoEUv4HbJkkhkg6O7e5eCiq7uP95_0xK5Qnt1gA/viewform>`_"
+#~ " to get in touch with our team!"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Welcome to the third part of the"
+#~ " Flower federated learning tutorial. In "
+#~ "previous parts of this tutorial, we "
+#~ "introduced federated learning with PyTorch "
+#~ "and the Flower framework (:doc:`part 1"
+#~ " <tutorial-series-get-started-with-"
+#~ "flower-pytorch>`) and we learned how "
+#~ "strategies can be used to customize "
+#~ "the execution on both the server "
+#~ "and the clients (:doc:`part 2 "
+#~ "<tutorial-series-use-a-federated-learning-"
+#~ "strategy-pytorch>`)."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "In this tutorial, we'll continue to "
+#~ "customize the federated learning system "
+#~ "we built previously by creating a "
+#~ "much more customized version of "
+#~ "``FedAdagrad``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "`Star Flower on GitHub "
+#~ "<https://github.com/flwrlabs/flower>`__ ⭐️ and join"
+#~ " the Flower community on Flower "
+#~ "Discuss and the Flower Slack to "
+#~ "connect, ask questions, and get help:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "`Join Flower Discuss <https://discuss.flower.ai/>`__"
+#~ " We'd love to hear from you in"
+#~ " the ``Introduction`` topic! If anything"
+#~ " is unclear, post in ``Flower Help"
+#~ " - Beginners``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "`Join Flower Slack <https://flower.ai/join-"
+#~ "slack>`__ We'd love to hear from "
+#~ "you in the ``#introductions`` channel! "
+#~ "If anything is unclear, head over "
+#~ "to the ``#questions`` channel."
+#~ msgstr ""
+#~ "`Star Flower on GitHub "
+#~ "<https://github.com/adap/flower>`__ ⭐️ Slack의 오픈소스"
+#~ " Flower 커뮤니티에 가입하여 소통하고 질문하고 도움을 "
+#~ "받을 수 있습니다: `Slack 가입<https://flower.ai"
+#~ "/join-slack>`__ 🌼 ``#introductions``채널에서 당신의 "
+#~ "목소리를 듣고 싶습니다! 궁금한 점이 있으시면``#questions``"
+#~ " 채널로 방문해 주시기 바랍니다."
+
+#~ msgid ""
+#~ "Before we begin with the actual "
+#~ "code, let's make sure that we have"
+#~ " everything we need."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "If you've completed part 1 and 2"
+#~ " of the tutorial, you can skip "
+#~ "this step. But remember to include "
+#~ "``wandb`` as a dependency in your "
+#~ "``pyproject.toml`` file and install it "
+#~ "in your environment."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Next, add the `wandb` dependency to "
+#~ "the project by editing the "
+#~ "``pyproject.toml`` file located in the "
+#~ "root of the project. Add the "
+#~ "following line to the list of "
+#~ "dependencies:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Next, we install the project and "
+#~ "its dependencies, which are specified in"
+#~ " the ``pyproject.toml`` file:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Flower strategies have a number of "
+#~ "methods that can be overridden to "
+#~ "customize their behavior. In part 2, "
+#~ "you learned how to customize the "
+#~ "``configure_train`` method to perform learning"
+#~ " rate decay and communicate the "
+#~ "updated learning rate as part of "
+#~ "the |configrecord_link|_ sent to the "
+#~ "clients in the ``Message``. In this "
+#~ "tutorial you'll learn how to customize"
+#~ " the |strategy_start_link|_ method. If you"
+#~ " inspect the `source code "
+#~ "<https://github.com/flwrlabs/flower/blob/main/framework/py/flwr/serverapp/strategy/strategy.py#L135>`_"
+#~ " of this method you'll see that "
+#~ "it contains a for loop where each"
+#~ " iteration represents a federated learning"
+#~ " round. Each round consists of three"
+#~ " distinct stages:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "An optional stage to evaluate the "
+#~ "global model on the server side. "
+#~ "Note that this is what you enabled"
+#~ " in part 2 of this tutorial by"
+#~ " means of the ``central_evaluate`` "
+#~ "callback."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A customized |strategy_start_link|_ method to"
+#~ " log metrics to Weight & Biases "
+#~ "(`W&B <https://wandb.ai/site>`__) and save the"
+#~ " model checkpoints to disk."
+#~ msgstr ""
+
+#~ msgid "Finally, let's run the ``FlowerApp``:"
+#~ msgstr "Flower 시뮬레이션."
+
+#~ msgid ""
+#~ "Plain ``flwr run .`` submits the "
+#~ "run, prints the run ID, and "
+#~ "returns without streaming logs. See :doc"
+#~ ":`how-to-run-flower-locally` for the"
+#~ " full local workflow."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Congratulations! You've successfully created a"
+#~ " custom Flower strategy by overriding "
+#~ "the |strategy_start_link|_ method. You've also"
+#~ " learned how to log metrics to "
+#~ "Weight & Biases and how to save"
+#~ " model checkpoints to disk."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "In this tutorial, we've seen how "
+#~ "to customize the |strategy_start_link|_ method"
+#~ " of a Flower strategy. This method"
+#~ " is the main entry point of any"
+#~ " strategy and contains the logic to"
+#~ " execute the federated learning process."
+#~ " In this tutorial, you learned how"
+#~ " to log the metrics to Weight &"
+#~ " Biases and how to save model "
+#~ "checkpoints to disk."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "In the next tutorial, we're going "
+#~ "to cover how to communicate arbitrary"
+#~ " Python objects between the ``ClientApp``"
+#~ " and the ``ServerApp`` by serializing "
+#~ "them and send them in a "
+#~ "``Message`` as a ``ConfigRecord``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Welcome to the fourth part of the"
+#~ " Flower federated learning tutorial. In "
+#~ "the previous parts of this tutorial, "
+#~ "we introduced federated learning with "
+#~ "PyTorch and Flower (:doc:`part 1 "
+#~ "<tutorial-series-get-started-with-"
+#~ "flower-pytorch>`), we learned how "
+#~ "strategies can be used to customize "
+#~ "the execution on both the server "
+#~ "and the clients (:doc:`part 2 "
+#~ "<tutorial-series-use-a-federated-learning-"
+#~ "strategy-pytorch>`) and we built our "
+#~ "own custom strategy from scratch "
+#~ "(:doc:`part 3 <tutorial-series-build-a"
+#~ "-strategy-from-scratch-pytorch>`)."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "In this final tutorial, we turn "
+#~ "our attention again to the ``ClientApp``"
+#~ " and show how to communicate "
+#~ "arbitrary Python objects via a "
+#~ "``Message`` and how to use it on"
+#~ " the ``ServerApp``. This can be "
+#~ "useful if you want to send "
+#~ "additional information between ``ClientApp "
+#~ "<--> ServerApp`` without the need for"
+#~ " custom protocols."
+#~ msgstr ""
+
+#~ msgid "If you've completed part 1 of the tutorial, you can skip this step."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The following code is for demonstration"
+#~ " purposes only. In real-world "
+#~ "applications, since `pickle "
+#~ "<https://docs.python.org/3/library/pickle.html>`_ can "
+#~ "execute arbitrary code during unpickling, "
+#~ "you should use a **SAFE** serialization"
+#~ " method than ``pickle``, such as "
+#~ "``json`` or a simple custom solution "
+#~ "if the object is not too complex."
+#~ " ``pickle`` is used here solely for"
+#~ " simplicity."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Let's create a new custom strategy "
+#~ "(or reuse the one created in part"
+#~ " 2 and part 3 of this tutorial)"
+#~ " in ``server_app.py`` that extends the "
+#~ "``FedAdagrad`` strategy and overrides the "
+#~ "``aggregate_train`` method to deserialize the"
+#~ " ``TrainProcessMetadata`` object from each "
+#~ "client and print the training time "
+#~ "and convergence status:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "`Use Flower Baselines for your research"
+#~ " <https://flower.ai/docs/baselines/>`__"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "`Watch Flower AI Summit 2025 videos "
+#~ "<https://flower.ai/events/flower-ai-summit-2025/>`__"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "In this tutorial, we'll build a "
+#~ "federated learning system using the "
+#~ "Flower framework, Flower Datasets and "
+#~ "PyTorch. In part 1, we use PyTorch"
+#~ " for model training and data loading."
+#~ " In part 2, we federate this "
+#~ "PyTorch project using Flower."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Before we begin with any actual "
+#~ "code, let's make sure that we have"
+#~ " everything we need."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Next, we install the project and "
+#~ "its dependencies, which are specified in"
+#~ " the ``pyproject.toml`` file."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Before we dive into federated learning,"
+#~ " we'll take a look at the "
+#~ "dataset that we'll be using for "
+#~ "this tutorial, which is the `CIFAR-10"
+#~ " <https://www.cs.toronto.edu/~kriz/cifar.html>`_ dataset, "
+#~ "and run a simple centralized training"
+#~ " pipeline using PyTorch."
+#~ msgstr ""
+
+#~ msgid "The ``CIFAR-10`` dataset"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Federated learning can be applied to "
+#~ "many different types of tasks across "
+#~ "different domains. In this tutorial, we"
+#~ " introduce federated learning by training"
+#~ " a simple convolutional neural network "
+#~ "(CNN) on the popular CIFAR-10 dataset."
+#~ " CIFAR-10 can be used to train "
+#~ "image classifiers that distinguish between "
+#~ "images from ten different classes: "
+#~ "'airplane', 'automobile', 'bird', 'cat', "
+#~ "'deer', 'dog', 'frog', 'horse', 'ship', "
+#~ "and 'truck'."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "We simulate having multiple datasets "
+#~ "from multiple organizations (also called "
+#~ "the “cross-silo” setting in federated"
+#~ " learning) by splitting the original "
+#~ "CIFAR-10 dataset into multiple partitions. "
+#~ "Each partition will represent the data"
+#~ " from a single organization. We're "
+#~ "doing this purely for experimentation "
+#~ "purposes. In the real world there's "
+#~ "no need for data splitting because "
+#~ "each organization already has their own"
+#~ " data (the data is naturally "
+#~ "partitioned)."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Each organization will act as a "
+#~ "client in the federated learning system."
+#~ " Having ten organizations participate in"
+#~ " a federation means having ten "
+#~ "clients connected to the federated "
+#~ "learning server."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "We use the `Flower Datasets "
+#~ "<https://flower.ai/docs/datasets/>`_ library (``flwr-"
+#~ "datasets``) to partition CIFAR-10 into "
+#~ "ten partitions using ``FederatedDataset``. "
+#~ "Using the ``load_data()`` function defined "
+#~ "in ``task.py``, we will create a "
+#~ "small training and test set for "
+#~ "each of the ten organizations and "
+#~ "wrap each of these into a PyTorch"
+#~ " ``DataLoader``:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "We now have a function that can"
+#~ " return a training set and validation"
+#~ " set (``trainloader`` and ``valloader``) "
+#~ "representing one dataset from one of "
+#~ "ten different organizations. Each "
+#~ "``trainloader``/``valloader`` pair contains 4000 "
+#~ "training examples and 1000 validation "
+#~ "examples. There's also a single "
+#~ "``testloader`` (we did not split the "
+#~ "test set). Again, this is only "
+#~ "necessary for building research or "
+#~ "educational systems, actual federated learning"
+#~ " systems have their data naturally "
+#~ "distributed across multiple partitions."
+#~ msgstr ""
+
+#~ msgid "The model, training, and test functions"
+#~ msgstr "클라이언트 앱에 평가함수를 등록하는 데코레이터를 반환합니다."
+
+#~ msgid ""
+#~ "Next, we're going to use PyTorch "
+#~ "to define a simple convolutional neural"
+#~ " network. This introduction assumes basic"
+#~ " familiarity with PyTorch, so it "
+#~ "doesn't cover the PyTorch-related "
+#~ "aspects in full detail. If you "
+#~ "want to dive deeper into PyTorch, "
+#~ "we recommend `this introductory tutorial "
+#~ "<https://pytorch.org/tutorials/beginner/deep_learning_60min_blitz.html>`_."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "We will use the simple CNN "
+#~ "described in the aforementioned PyTorch "
+#~ "tutorial (The following code is already"
+#~ " defined in ``task.py``):"
+#~ msgstr ""
+
+#~ msgid "Training and test functions"
+#~ msgstr "클라이언트 앱에 평가함수를 등록하는 데코레이터를 반환합니다."
+
+#~ msgid ""
+#~ "The PyTorch quickstart also provides the"
+#~ " usual training and test functions:"
+#~ msgstr "클라이언트 앱에 평가함수를 등록하는 데코레이터를 반환합니다."
+
+#~ msgid "Federated Learning with Flower"
+#~ msgstr "연합 학습"
+
+#~ msgid ""
+#~ "In federated learning, the server sends"
+#~ " global model parameters to the "
+#~ "client, and the client updates the "
+#~ "local model with parameters received "
+#~ "from the server. It then trains "
+#~ "the model on the local data (which"
+#~ " changes the model parameters locally) "
+#~ "and sends the updated/changed model "
+#~ "parameters back to the server (or, "
+#~ "alternatively, it sends just the "
+#~ "gradients back to the server, not "
+#~ "the full model parameters)."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Federated learning systems consist of a"
+#~ " server and multiple nodes or "
+#~ "clients. In Flower, we create a "
+#~ "|serverapp_link|_ and a |clientapp_link|_ to"
+#~ " run the server-side and client-"
+#~ "side code, respectively."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The core functionality of the "
+#~ "``ClientApp`` is to perform some action"
+#~ " with the local data that the "
+#~ "node it runs from (e.g. an edge"
+#~ " device, a server in a data "
+#~ "center, or a laptop) has access "
+#~ "to. In this tutorial such action "
+#~ "is to train and evaluate the small"
+#~ " CNN model defined earlier using the"
+#~ " local training and validation data."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A |context_link|_: The context object "
+#~ "that contains information about the node"
+#~ " executing the ``ClientApp`` and about "
+#~ "the current run."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Returning the number of examples under"
+#~ " the ``\"num-examples\"`` key is "
+#~ "**required**, because strategies such as "
+#~ "|fedavg_link|_ used by the ``ServerApp`` "
+#~ "rely on this key to aggregate both"
+#~ " models and metrics by default, "
+#~ "unless you override the ``weighted_by_key``"
+#~ " argument (for example: ``FedAvg(weighted_by"
+#~ "=\"my-different-key\")``)."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "On the server side, we need to "
+#~ "configure a strategy which encapsulates "
+#~ "the federated learning approach/algorithm, for"
+#~ " example, *Federated Averaging* (FedAvg). "
+#~ "Flower has a number of built-in"
+#~ " strategies, but we can also use "
+#~ "our own strategy implementations to "
+#~ "customize nearly all aspects of the "
+#~ "federated learning approach. For this "
+#~ "tutorial, we use the built-in "
+#~ "``FedAvg`` implementation and customize it "
+#~ "slightly by specifying the fraction of"
+#~ " connected nodes to involve in a "
+#~ "round of training."
+#~ msgstr ""
+
+#~ msgid "Run the training"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "With all of these components in "
+#~ "place, we can now run the "
+#~ "federated learning simulation with Flower! "
+#~ "The last step is to run our "
+#~ "simulation in the command line, as "
+#~ "follows:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "This submits the run to the "
+#~ "managed local SuperLink for the "
+#~ "``[superlink.local]`` profile (identified in "
+#~ "the Flower configuration with ``address "
+#~ "= \":local:\"``), which then executes "
+#~ "the federated learning simulation with "
+#~ "10 clients, or SuperNodes, using the "
+#~ "Flower Simulation Runtime. Plain ``flwr "
+#~ "run .`` would submit the run, "
+#~ "print the run ID, and return "
+#~ "without streaming logs. For the full "
+#~ "local workflow, see :doc:`how-to-run-"
+#~ "flower-locally`. If you run into "
+#~ "SQL database errors during local "
+#~ "simulations, see :ref:`FAQ <faq-local-"
+#~ "superlink-db-error>`."
+#~ msgstr ""
+
+#~ msgid "You should expect streamed output similar to this:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Learn more about how to configure "
+#~ "the execution of your Flower App "
+#~ "by checking the `pyproject.toml <how-"
+#~ "to-configure-pyproject-toml.html>`_ guide."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "When we execute ``flwr run`` against "
+#~ "the default local connection configuration "
+#~ "(for example, the one with ``address "
+#~ "= \":local:\"``), Flower submits the run"
+#~ " to the managed local SuperLink. By"
+#~ " default, the local SuperLink will "
+#~ "configure the simulation runtime to use"
+#~ " 10 clients. Each will run an "
+#~ "instance of the ``ClientApp`` we defined"
+#~ " earlier."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The local SuperLink then starts the "
+#~ "``ServerApp`` and asks it to issue "
+#~ "instructions to those nodes using the"
+#~ " ``FedAvg`` strategy. In this example, "
+#~ "``FedAvg`` is configured with two key"
+#~ " parameters:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Congratulations, you just trained a "
+#~ "convolutional neural network, federated over"
+#~ " 10 clients! With that, you "
+#~ "understand the basics of federated "
+#~ "learning with Flower. The same approach"
+#~ " you've seen can be used with "
+#~ "other machine learning frameworks (not "
+#~ "just PyTorch) and tasks (not just "
+#~ "CIFAR-10 image classification), for example"
+#~ " NLP with Hugging Face Transformers "
+#~ "or speech with SpeechBrain."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "In the next tutorial, we're going "
+#~ "to cover some more advanced concepts."
+#~ " Want to customize your strategy? Do"
+#~ " learning rate decay at the strategy"
+#~ " and communicate it to the clients"
+#~ " ? Or evaluate the aggregated model"
+#~ " on the server side? We'll cover "
+#~ "all this and more in the next "
+#~ "tutorial."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The :doc:`Flower Federated Learning Tutorial"
+#~ " - Part 2 <tutorial-series-use-a"
+#~ "-federated-learning-strategy-pytorch>` goes "
+#~ "into more depth about strategies and "
+#~ "all the advanced things you can "
+#~ "build with them."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Welcome to the next part of the"
+#~ " federated learning tutorial. In previous"
+#~ " parts of this tutorial, we "
+#~ "introduced federated learning with PyTorch "
+#~ "and Flower (:doc:`part 1 <tutorial-"
+#~ "series-get-started-with-flower-pytorch>`)."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "In part 2, we'll begin to "
+#~ "customize the federated learning system "
+#~ "we built in part 1 using the "
+#~ "Flower framework, Flower Datasets, and "
+#~ "PyTorch."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "So far, everything should look familiar"
+#~ " if you've worked through the "
+#~ "introductory tutorial. With that, we're "
+#~ "ready to introduce a number of new"
+#~ " features."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "In part 1, we created a "
+#~ "|serverapp_link|_ (in ``server_app.py``). In "
+#~ "it, we defined the strategy, the "
+#~ "model to federatedly train, and then "
+#~ "we launched the strategy by calling "
+#~ "its ``|strategy_start_link|`` method."
+#~ msgstr ""
+
+#~ msgid "Next, run the training with the following command:"
+#~ msgstr "다음 명령을 실행하여 가상 환경을 활성화합니다:"
+
+#~ msgid ""
+#~ "To do so, we need to create "
+#~ "a new function in ``task.py`` that "
+#~ "we can name ``global_evaluate``. This "
+#~ "function is a callback that will "
+#~ "be passed to the |strategy_start_link|_ "
+#~ "method of our strategy. This means "
+#~ "that the strategy will call this "
+#~ "function after every round of federated"
+#~ " learning passing two arguments: the "
+#~ "current round of federated learning and"
+#~ " the aggregated model parameters."
+#~ msgstr ""
+
+#~ msgid "Load the entire CIFAR10 test dataset"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Remember we mentioned this ``global_evaluate``"
+#~ " will be called by the strategy. "
+#~ "To do so we need to pass it"
+#~ " to the strategy's ``start`` method "
+#~ "as shown below."
+#~ msgstr ""
+
+#~ msgid "Finally, we run the simulation."
+#~ msgstr "Flower 시뮬레이션."
+
+#~ msgid ""
+#~ "In some situations, we want to "
+#~ "configure client-side execution (training, "
+#~ "evaluation) from the server side. One"
+#~ " example of this is the server "
+#~ "asking the clients to train for "
+#~ "with a different learning rate based "
+#~ "on the current round number. Flower "
+#~ "provides a way to send configuration "
+#~ "values from the server to the "
+#~ "clients as part of the |message_link|_"
+#~ " that the ``ClientApp`` receives. Let's "
+#~ "see how we can do this."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "To do so, we create a new "
+#~ "class inheriting from |fedadagrad_link|_ and"
+#~ " override the ``configure_train`` method. "
+#~ "We then use this new strategy in"
+#~ " our ``ServerApp``. Let's see how "
+#~ "this looks like in code. Create a"
+#~ " new file called ``custom_strategy.py`` in"
+#~ " the ``pytorchexample`` directory and add"
+#~ " the following code:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Next, we use this new strategy in"
+#~ " our ``ServerApp`` by importing it in"
+#~ " your ``server_app.py`` and use it "
+#~ "instead of the standard ``FedAdagrad``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Finally, run the training with the "
+#~ "following command. Here we increase the"
+#~ " number of rounds to 15 to see"
+#~ " the learning rate decay in action."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "We now have 200 partitions, each "
+#~ "holding 45 training and 5 validation "
+#~ "examples. Given that the number of "
+#~ "training examples on each client is "
+#~ "quite small, we should probably train"
+#~ " the model a bit longer, so we"
+#~ " configure the clients to perform 3"
+#~ " local training epochs. We should "
+#~ "also adjust the fraction of clients "
+#~ "selected for training during each round"
+#~ " (we don't want all 200 clients "
+#~ "participating in every round), so we "
+#~ "add ``fraction-train = 0.025`` and "
+#~ "adjust ``fraction-evaluate`` to ``0.05``, "
+#~ "which means that only 2.5% of "
+#~ "available clients will be selected for"
+#~ " training each round (so 5 clients)"
+#~ " and 5% of them for evaluation "
+#~ "(so 10 clients). We can add and"
+#~ " adjust values in the ``pyproject.toml``"
+#~ " for ease of experimentation:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "In the later sections, we've seen "
+#~ "how we can communicate arbitrary values"
+#~ " between server and clients to fully"
+#~ " customize client-side execution. With "
+#~ "that capability, we built a large-"
+#~ "scale Federated Learning simulation using "
+#~ "the Flower Simulation Runtime and ran"
+#~ " an experiment involving 1000 clients "
+#~ "in the same workload — all in "
+#~ "the same Flower project!"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "In the next part of this tutorial,"
+#~ " we are going to build a first"
+#~ " federated learning system with Flower."
+#~ msgstr "이 튜토리얼의 다음 부분에서는 Flower와 함께 첫 번째 연합 학습 시스템을 구축할 것입니다."
+
+#~ msgid ""
+#~ "The `Flower Federated Learning Tutorial "
+#~ "- Part 1 <https://flower.ai/docs/framework"
+#~ "/tutorial-get-started-with-flower-"
+#~ "pytorch.html>`__ shows how to build a"
+#~ " simple federated learning system with "
+#~ "PyTorch and Flower."
+#~ msgstr ""
+#~ "`Flower 연합 학습 튜토리얼- 1부 "
+#~ "<https://flower.ai/docs/framework/tutorial-get-started-"
+#~ "with-flower-pytorch.html>`__ PyTorch와 Flower를"
+#~ " 사용하여 간단한 연합 학습 시스템을 구축하는 방법을"
+#~ " 보여줍니다."
 
