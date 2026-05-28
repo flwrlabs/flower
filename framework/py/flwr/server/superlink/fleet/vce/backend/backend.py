@@ -18,10 +18,10 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
+from flwr.app.typing import ConfigRecordValues
 from flwr.clientapp.client_app import ClientApp
 from flwr.common.context import Context
 from flwr.common.message import Message
-from flwr.common.typing import ConfigRecordValues
 
 BackendConfig = dict[str, dict[str, ConfigRecordValues]]
 
