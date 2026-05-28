@@ -97,8 +97,27 @@ def _invoke_response(
         request=request,
         stream=False,
     )
-    _raise_for_http_failure(response)
-    response_payload = _decode_response_json(response)
+    if response.status_code >= 400:
+        raise RuntimeError(
+            _failure_message(
+                status_code=response.status_code,
+                detail=_response_detail(response),
+            )
+        )
+
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise RuntimeError(
+            f"Model provider returned invalid JSON: {_response_text(response)}"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError(
+            "Model provider returned a non-object JSON payload: "
+            f"{_json_detail(cast(JSONValue, payload))}"
+        )
+
+    response_payload = cast(JSONObject, payload)
     detail = _extract_error_detail(response_payload)
     if detail is not None:
         raise RuntimeError(
@@ -123,14 +142,48 @@ def _invoke_streaming_response(
         request=request,
         stream=True,
     )
-    _raise_for_http_failure(response)
-    _raise_for_non_sse_response(response)
+    if response.status_code >= 400:
+        raise RuntimeError(
+            _failure_message(
+                status_code=response.status_code,
+                detail=_response_detail(response),
+            )
+        )
+
+    headers = getattr(response, "headers", {})
+    content_type = (
+        str(headers.get("Content-Type") or "").lower()
+        if isinstance(headers, Mapping)
+        else ""
+    )
+    if _STREAM_CONTENT_TYPE not in content_type:
+        detail = _response_detail(response)
+        if not content_type and (detail is None or detail == ""):
+            detail = "Missing Content-Type header for streaming response."
+        raise RuntimeError(
+            _failure_message(status_code=response.status_code, detail=detail)
+        )
 
     last_event: JSONObject | None = None
     for event_name, data in _iter_sse_events(response):
-        event = _parse_provider_event(event_name=event_name, data=data)
-        if event is None:
+        if data.strip() == "[DONE]":
             continue
+        try:
+            payload = json.loads(data)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                f"Model provider stream returned invalid JSON event: {data}"
+            ) from exc
+        if not isinstance(payload, dict):
+            raise RuntimeError(
+                "Model provider stream returned a non-object JSON event: "
+                f"{_json_detail(cast(JSONValue, payload))}"
+            )
+
+        event = cast(JSONObject, payload)
+        if event_name is not None and not isinstance(event.get("type"), str):
+            event = dict(event)
+            event["type"] = event_name
 
         last_event = event
         if on_stream_event is not None:
@@ -180,54 +233,6 @@ def _post_responses_request(
         raise RuntimeError(f"Model provider request failed: {exc}") from exc
 
 
-def _raise_for_http_failure(response: requests.Response) -> None:
-    if response.status_code < 400:
-        return
-    detail = _response_detail(response)
-    raise RuntimeError(
-        _failure_message(status_code=response.status_code, detail=detail)
-    )
-
-
-def _raise_for_non_sse_response(response: requests.Response) -> None:
-    headers = getattr(response, "headers", {})
-    content_type = (
-        str(headers.get("Content-Type") or "").lower()
-        if isinstance(headers, Mapping)
-        else ""
-    )
-    if _STREAM_CONTENT_TYPE in content_type:
-        return
-
-    detail = _response_detail(response)
-    if not content_type and (detail is None or detail == ""):
-        detail = "Missing Content-Type header for streaming response."
-    raise RuntimeError(
-        _failure_message(status_code=response.status_code, detail=detail)
-    )
-
-
-def _decode_response_json(response: requests.Response) -> JSONObject:
-    try:
-        payload = response.json()
-    except ValueError as exc:
-        raise RuntimeError(
-            f"Model provider returned invalid JSON: {_response_text(response)}"
-        ) from exc
-    if not isinstance(payload, dict):
-        detail = cast(JSONValue, payload)
-        formatted_detail = (
-            detail
-            if isinstance(detail, str)
-            else json.dumps(detail, separators=(",", ":"))
-        )
-        raise RuntimeError(
-            "Model provider returned a non-object JSON payload: "
-            f"{formatted_detail}"
-        )
-    return cast(JSONObject, payload)
-
-
 def _iter_sse_events(response: requests.Response) -> Iterator[tuple[str | None, str]]:
     event_name: str | None = None
     data_lines: list[str] = []
@@ -253,35 +258,6 @@ def _iter_sse_events(response: requests.Response) -> Iterator[tuple[str | None, 
 
     if data_lines:
         yield event_name, "\n".join(data_lines)
-
-
-def _parse_provider_event(*, event_name: str | None, data: str) -> JSONObject | None:
-    if data.strip() == "[DONE]":
-        return None
-
-    try:
-        payload = json.loads(data)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(
-            f"Model provider stream returned invalid JSON event: {data}"
-        ) from exc
-    if not isinstance(payload, dict):
-        detail = cast(JSONValue, payload)
-        formatted_detail = (
-            detail
-            if isinstance(detail, str)
-            else json.dumps(detail, separators=(",", ":"))
-        )
-        raise RuntimeError(
-            "Model provider stream returned a non-object JSON event: "
-            f"{formatted_detail}"
-        )
-
-    event = cast(JSONObject, payload)
-    if event_name is not None and not isinstance(event.get("type"), str):
-        event = dict(event)
-        event["type"] = event_name
-    return event
 
 
 def _response_detail(response: requests.Response) -> JSONValue:
@@ -317,10 +293,13 @@ def _extract_error_detail(payload: JSONObject) -> JSONValue | None:
 
 
 def _failure_message(*, status_code: int, detail: JSONValue) -> str:
-    formatted_detail = (
-        detail if isinstance(detail, str) else json.dumps(detail, separators=(",", ":"))
-    )
-    return f"Model provider request failed: {status_code} {formatted_detail}"
+    return f"Model provider request failed: {status_code} {_json_detail(detail)}"
+
+
+def _json_detail(detail: JSONValue) -> str:
+    if isinstance(detail, str):
+        return detail
+    return json.dumps(detail, separators=(",", ":"))
 
 
 def _response_text(response: requests.Response, max_chars: int = 400) -> str:
