@@ -112,7 +112,7 @@ class RecordDict(TypedDict[str, RecordType], InflatableObject):
 
     Parameters
     ----------
-        records : Optional[dict[str, RecordType]]
+    records : Optional[dict[str, RecordType]]
         A dictionary mapping string keys to record instances, where each value
         is either a :class:`ArrayRecord`, :class:`MetricRecord`,
         or :class:`ConfigRecord`.
