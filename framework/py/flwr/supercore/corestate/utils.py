@@ -61,11 +61,7 @@ def timestamp_to_iso(value: datetime | str | None) -> str:
 
 def validate_task_event_data(data: str) -> None:
     """Validate that task event data is a JSON object string."""
-    try:
-        payload = strict_json_value_loads(data)
-    except (TypeError, ValueError) as err:
-        raise ValueError("Task event data must be a JSON object.") from err
-
+    payload = strict_json_value_loads(data)
     if not isinstance(payload, dict):
         raise ValueError("Task event data must be a JSON object.")
 
