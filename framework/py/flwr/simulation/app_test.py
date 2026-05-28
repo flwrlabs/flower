@@ -20,15 +20,26 @@ import unittest
 from pathlib import Path
 from queue import Queue
 from types import SimpleNamespace
+from typing import cast
 from unittest.mock import Mock, patch
 
 import pytest
 
-from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
+from flwr.common import Context, RecordDict
+from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS, SubStatus
+from flwr.common.serde import context_to_proto, fab_to_proto, run_to_proto
+from flwr.common.typing import Fab, Run
+from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
+    PullTaskInputResponse,
+    PushTaskOutputRequest,
+)
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 
 from .app import _parse_args_run_flwr_simulation, run_simulation_process
 
 simulation_app_module = importlib.import_module("flwr.simulation.app")
+_TEST_CLIENTAPP_RUNTIME = 7.89
 
 
 class TestRunSimulationProcess(unittest.TestCase):
@@ -64,6 +75,120 @@ class TestRunSimulationProcess(unittest.TestCase):
             token="test-token",
         )
         mock_flwr_exit.assert_called_once()
+
+
+def _test_context() -> Context:
+    """Return a minimal Simulation Runtime context."""
+    return Context(
+        run_id=1234,
+        node_id=0,
+        node_config={},
+        state=RecordDict(),
+        run_config={},
+    )
+
+
+def _add_test_metrics(metrics: VceMetrics) -> None:
+    """Add deterministic metrics to a VCE metrics accumulator."""
+    metrics.add_clientapp_runtime(_TEST_CLIENTAPP_RUNTIME)
+
+
+def _patch_run_simulation_process_dependencies(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, context: Context
+) -> list[PushTaskOutputRequest]:
+    """Patch external process dependencies and capture pushed task output."""
+    run = Run.create_empty(run_id=1234)
+    run.fab_hash = "fab-hash"
+    fab = Fab(hash_str="fab-hash", content=b"fab-content", verifications={})
+    pull_response = PullTaskInputResponse(
+        context=context_to_proto(context),
+        run=run_to_proto(run),
+        fab=fab_to_proto(fab),
+        federation_config=SimulationConfig(num_supernodes=1),
+    )
+    pushed_requests: list[PushTaskOutputRequest] = []
+    mock_conn = Mock()
+    # pylint: disable=protected-access,unnecessary-lambda
+    mock_conn._stub.PullTaskInput.return_value = pull_response
+    mock_conn._stub.PushTaskOutput.side_effect = lambda req: pushed_requests.append(req)
+    mock_conn._retry_invoker = SimpleNamespace(max_tries=3)
+    # pylint: enable=protected-access,unnecessary-lambda
+    heartbeat_sender = Mock()
+    heartbeat_sender.is_running = True
+
+    project_config = {
+        "tool": {
+            "flwr": {
+                "app": {
+                    "components": {
+                        "clientapp": "client:app",
+                        "serverapp": "server:app",
+                    }
+                }
+            }
+        }
+    }
+    patches = {
+        "SimulationIoConnection": Mock(return_value=mock_conn),
+        "register_signal_handlers": Mock(),
+        "HeartbeatSender": Mock(return_value=heartbeat_sender),
+        "make_task_heartbeat_fn_grpc": lambda _stub: lambda: None,
+        "start_log_uploader": lambda **_kwargs: None,
+        "install_from_fab": lambda *_args, **_kwargs: None,
+        "get_fab_metadata": lambda _content: ("app", "1.0.0"),
+        "get_project_dir": lambda *_args: tmp_path,
+        "get_project_config": lambda _path: project_config,
+        "get_fused_config_from_dir": lambda *_args: {},
+        "cleanup_app_runtime_environment": lambda _path: None,
+        "event": lambda *_args, **_kwargs: None,
+        "flwr_exit": Mock(),
+    }
+    for name, value in patches.items():
+        monkeypatch.setattr(simulation_app_module, name, value)
+
+    return pushed_requests
+
+
+@pytest.mark.parametrize("raise_after_metrics", [False, True])
+def test_run_simulation_process_pushes_simulation_metrics(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, raise_after_metrics: bool
+) -> None:
+    """Simulation process should report collected run metrics to SuperLink."""
+    context = _test_context()
+    pushed_requests = _patch_run_simulation_process_dependencies(
+        monkeypatch, tmp_path, context
+    )
+
+    def _run_simulation(**kwargs: object) -> SimpleNamespace:
+        metrics = cast(VceMetrics, kwargs["metrics"])
+        _add_test_metrics(metrics)
+        if raise_after_metrics:
+            raise RuntimeError("simulation failed after processing messages")
+        return SimpleNamespace(context=context, metrics=metrics)
+
+    monkeypatch.setattr(
+        simulation_app_module,
+        "_run_simulation",
+        _run_simulation,
+    )
+
+    run_simulation_process(
+        serverappio_api_address="127.0.0.1:9091",
+        log_queue=Queue(),
+        insecure=True,
+        token="test-token",
+        runtime_dependency_install=False,
+    )
+
+    assert len(pushed_requests) == 1
+    out_req = pushed_requests[0]
+    expected_sub_status = (
+        SubStatus.FAILED if raise_after_metrics else SubStatus.COMPLETED
+    )
+    assert out_req.sub_status == expected_sub_status
+    if raise_after_metrics:
+        assert "simulation failed after processing messages" in out_req.details
+    assert out_req.clientapp_runtime == _TEST_CLIENTAPP_RUNTIME
 
 
 def test_parse_flwr_simulation_requires_token() -> None:
