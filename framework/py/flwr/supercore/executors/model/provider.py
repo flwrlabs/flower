@@ -19,7 +19,6 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Callable, Iterator, Mapping
-from dataclasses import dataclass
 from typing import cast
 
 import requests
@@ -27,79 +26,71 @@ import requests
 from flwr.supercore.typing import JSONObject, JSONValue
 
 DEFAULT_MODEL_API_ENDPOINT = "https://api.flower.ai/v1/responses"
-DEFAULT_MODEL_API_TIMEOUT_S = 600.0
+DEFAULT_MODEL_API_TIMEOUT_S = 180.0
 _STREAM_CONTENT_TYPE = "text/event-stream"
 _TERMINAL_SUCCESS_EVENTS = frozenset({"response.completed", "response.incomplete"})
 _TERMINAL_FAILURE_EVENTS = frozenset({"error", "response.failed"})
 
 
-@dataclass(frozen=True)
-class ModelProviderFailurePayload:
-    """Structured private payload for model provider failures."""
-
-    message: str
-    status_code: int | None = None
-    detail: JSONValue | None = None
-    event: JSONObject | None = None
-
-
 class ModelProviderError(RuntimeError):
     """Raised when the configured model provider request fails."""
 
-    def __init__(self, payload: ModelProviderFailurePayload) -> None:
-        super().__init__(payload.message)
-        self.payload = payload
-
-
-@dataclass(frozen=True)
-class ModelProviderResult:
-    """Result returned by the model provider client."""
-
-    response: JSONObject
-    events: list[JSONObject]
-
-
-@dataclass(frozen=True)
-class _ProviderConfig:
-    responses_url: str
-    headers: dict[str, str]
-    timeout_s: float
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        detail: JSONValue | None = None,
+        event: JSONObject | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.detail = detail
+        self.event = event
 
 
 def invoke_responses_model(
     request: JSONObject,
     *,
     on_stream_event: Callable[[JSONObject], None] | None = None,
-) -> ModelProviderResult:
+) -> JSONObject:
     """Invoke the configured Responses-compatible model provider."""
-    config = _resolve_provider_config()
+    api_key = _model_api_key()
+    responses_url = _model_responses_url()
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    timeout_s = _model_timeout_seconds()
     payload = dict(request)
     if payload.get("stream") is True:
         return _invoke_streaming_response(
-            config=config,
+            responses_url=responses_url,
+            headers=headers,
+            timeout_s=timeout_s,
             request=payload,
             on_stream_event=on_stream_event,
         )
-    return _invoke_response(config=config, request=payload)
+    return _invoke_response(
+        responses_url=responses_url,
+        headers=headers,
+        timeout_s=timeout_s,
+        request=payload,
+    )
 
 
-def _resolve_provider_config() -> _ProviderConfig:
+def _model_api_key() -> str:
     api_key = os.getenv("FLWR_MODEL_API_KEY", "").strip()
     if not api_key:
         raise _provider_error("Model API key is not set (FLWR_MODEL_API_KEY).")
+    return api_key
 
+
+def _model_responses_url() -> str:
     base_url = os.getenv("FLWR_MODEL_API_ENDPOINT", "").strip()
     if not base_url:
         base_url = DEFAULT_MODEL_API_ENDPOINT
-
-    return _ProviderConfig(
-        responses_url=_responses_url(base_url),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        timeout_s=_model_timeout_seconds(),
-    )
+    return _responses_url(base_url)
 
 
 def _responses_url(endpoint: str) -> str:
@@ -123,28 +114,43 @@ def _model_timeout_seconds() -> float:
 
 def _invoke_response(
     *,
-    config: _ProviderConfig,
+    responses_url: str,
+    headers: dict[str, str],
+    timeout_s: float,
     request: JSONObject,
-) -> ModelProviderResult:
-    response = _post_responses_request(config=config, request=request, stream=False)
+) -> JSONObject:
+    response = _post_responses_request(
+        responses_url=responses_url,
+        headers=headers,
+        timeout_s=timeout_s,
+        request=request,
+        stream=False,
+    )
     _raise_for_http_failure(response)
     payload = _decode_response_json(response)
     _raise_for_payload_failure(payload, status_code=response.status_code)
-    return ModelProviderResult(response=payload, events=[])
+    return payload
 
 
 def _invoke_streaming_response(
     *,
-    config: _ProviderConfig,
+    responses_url: str,
+    headers: dict[str, str],
+    timeout_s: float,
     request: JSONObject,
     on_stream_event: Callable[[JSONObject], None] | None,
-) -> ModelProviderResult:
+) -> JSONObject:
     request["stream"] = True
-    response = _post_responses_request(config=config, request=request, stream=True)
+    response = _post_responses_request(
+        responses_url=responses_url,
+        headers=headers,
+        timeout_s=timeout_s,
+        request=request,
+        stream=True,
+    )
     _raise_for_http_failure(response)
     _raise_for_non_sse_response(response)
 
-    events: list[JSONObject] = []
     last_event: JSONObject | None = None
     for event_name, data in _iter_sse_events(response):
         event = _parse_provider_event(event_name=event_name, data=data)
@@ -152,7 +158,6 @@ def _invoke_streaming_response(
             continue
 
         last_event = event
-        events.append(event)
         if on_stream_event is not None:
             on_stream_event(event)
 
@@ -173,10 +178,7 @@ def _invoke_streaming_response(
             )
 
         if isinstance(event_type, str) and event_type in _TERMINAL_SUCCESS_EVENTS:
-            return ModelProviderResult(
-                response=_final_response_from_event(event),
-                events=events,
-            )
+            return _final_response_from_event(event)
 
     raise _provider_error(
         "Model provider stream ended without a terminal event.",
@@ -188,16 +190,18 @@ def _invoke_streaming_response(
 
 def _post_responses_request(
     *,
-    config: _ProviderConfig,
+    responses_url: str,
+    headers: dict[str, str],
+    timeout_s: float,
     request: JSONObject,
     stream: bool,
 ) -> requests.Response:
     try:
         return requests.post(
-            config.responses_url,
-            headers=config.headers,
+            responses_url,
+            headers=headers,
             json=request,
-            timeout=config.timeout_s,
+            timeout=timeout_s,
             stream=stream,
         )
     except requests.RequestException as exc:
@@ -372,12 +376,10 @@ def _provider_error(
     event: JSONObject | None = None,
 ) -> ModelProviderError:
     return ModelProviderError(
-        ModelProviderFailurePayload(
-            message=message,
-            status_code=status_code,
-            detail=detail,
-            event=event,
-        )
+        message,
+        status_code=status_code,
+        detail=detail,
+        event=event,
     )
 
 
