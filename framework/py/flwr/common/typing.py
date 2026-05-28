@@ -226,7 +226,7 @@ class Run:  # pylint: disable=too-many-instance-attributes
     bytes_recv: int
     clientapp_runtime: float
     run_type: str = ""
-    series_id: int = 0
+    series_id: int | None = None
 
     @classmethod
     def create_empty(cls, run_id: int) -> "Run":
@@ -249,7 +249,7 @@ class Run:  # pylint: disable=too-many-instance-attributes
             bytes_recv=0,
             clientapp_runtime=0.0,
             run_type=RunType.SERVER_APP,
-            series_id=0,
+            series_id=None,
         )
 
 
