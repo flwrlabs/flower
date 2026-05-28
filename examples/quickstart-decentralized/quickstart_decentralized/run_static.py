@@ -42,7 +42,7 @@ def main(argv=None) -> None:
     """Entry point — parse CLI args and start a DNode with static topology."""
     default_argv = [
         "--config", "configs/node_static.yaml",
-        "--node-name", "node_0",
+        "--node-name", "node_1",
     ]
     argv = argv if argv is not None else (sys.argv[1:] or default_argv)
 
