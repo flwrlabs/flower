@@ -619,6 +619,74 @@ class TestLoadNodeConfigYaml:
         assert node.topology_mode is _STATIC_MODE
         _mock_gen.assert_called_once()
 
+        @_PATCH_STATIC
+        @_PATCH_GENERATE
+        def test_static_topology_auto_generate_random_exact(
+                self, _mock_gen, _mock_static, tmp_path
+        ):
+                from flwr.decentralized.common.graph import RandomExact
+                from flwr.decentralized.common.node_config import load_node_config_yaml
+
+                out = tmp_path / "gen_topo_exact.yaml"
+                p = self._write(
+                        tmp_path,
+                        textwrap.dedent(f"""\
+                        context: cls
+                        topology:
+                            mode: static
+                            node_name: node_0
+                            generate:
+                                node_count: 5
+                                kind: random
+                                output_path: {out}
+                                random:
+                                    mode: exact
+                                    send_to: 3
+                                    receive_from: 2
+                """),
+                )
+
+                node = load_node_config_yaml(p)
+                assert node.topology_mode is _STATIC_MODE
+                _mock_gen.assert_called_once()
+                random_input = _mock_gen.call_args.kwargs["random"]
+                assert isinstance(random_input, RandomExact)
+
+        @_PATCH_STATIC
+        @_PATCH_GENERATE
+        def test_static_topology_auto_generate_random_range(
+                self, _mock_gen, _mock_static, tmp_path
+        ):
+                from flwr.decentralized.common.graph import RandomRange
+                from flwr.decentralized.common.node_config import load_node_config_yaml
+
+                out = tmp_path / "gen_topo_range.yaml"
+                p = self._write(
+                        tmp_path,
+                        textwrap.dedent(f"""\
+                        context: cls
+                        topology:
+                            mode: static
+                            node_name: node_0
+                            generate:
+                                node_count: 6
+                                kind: random
+                                output_path: {out}
+                                random:
+                                    mode: range
+                                    min_send_to: 1
+                                    max_send_to: 3
+                                    min_receive_from: 1
+                                    max_receive_from: 4
+                """),
+                )
+
+                node = load_node_config_yaml(p)
+                assert node.topology_mode is _STATIC_MODE
+                _mock_gen.assert_called_once()
+                random_input = _mock_gen.call_args.kwargs["random"]
+                assert isinstance(random_input, RandomRange)
+
     def test_file_not_found_raises(self):
         from flwr.decentralized.common.node_config import load_node_config_yaml
 

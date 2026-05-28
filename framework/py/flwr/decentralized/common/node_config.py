@@ -97,6 +97,9 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 from flwr.decentralized.common.graph import (
+    RandomExact,
+    RandomInput,
+    RandomRange,
     generate_deploy_topology_yaml,
     topology_mode_dynamic,
     topology_mode_static,
@@ -270,6 +273,32 @@ def _resolve_topology(
     mode = topology_cfg.get("mode", "dynamic")
     resolved_node_name: Optional[str] = node_name or topology_cfg.get("node_name")
 
+    def _build_random_topology_input(
+        random_cfg: Optional[Dict[str, Any]],
+    ) -> Optional[RandomInput]:
+        if random_cfg is None:
+            return None
+
+        random_mode = str(random_cfg.get("mode", "exact")).lower()
+        if random_mode == "range":
+            return RandomRange(
+                min_send_to=random_cfg["min_send_to"],
+                max_send_to=random_cfg["max_send_to"],
+                min_receive_from=random_cfg["min_receive_from"],
+                max_receive_from=random_cfg["max_receive_from"],
+            )
+
+        if random_mode == "exact":
+            return RandomExact(
+                send_to=random_cfg["send_to"],
+                receive_from=random_cfg["receive_from"],
+            )
+
+        raise ValueError(
+            "Unknown topology.generate.random.mode "
+            f"'{random_mode}'. Expected 'exact' or 'range'."
+        )
+
     if mode == "dynamic":
         return topology_mode_dynamic()
 
@@ -289,11 +318,12 @@ def _resolve_topology(
                 "topology.mode is 'static'."
             )
         output_path = generate_cfg["output_path"]
+        random_input = _build_random_topology_input(generate_cfg.get("random"))
         generate_deploy_topology_yaml(
             node_count=generate_cfg["node_count"],
             kind=generate_cfg["kind"],
             output_path=output_path,
-            random=generate_cfg.get("random"),
+            random=random_input,
         )
         topology_file = output_path
 
