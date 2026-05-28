@@ -75,6 +75,9 @@ service ServerAppIo {
   rpc PushTaskMessage(PushTaskMessageRequest)
       returns (PushTaskMessageResponse) {}
 
+  // Push task events
+  rpc PushTaskEvents(PushTaskEventsRequest) returns (PushTaskEventsResponse) {}
+
   // Pull task messages
   rpc PullTaskMessage(PullTaskMessageRequest)
       returns (PullTaskMessageResponse) {}
