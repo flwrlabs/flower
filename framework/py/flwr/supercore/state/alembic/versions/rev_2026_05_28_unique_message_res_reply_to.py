@@ -15,7 +15,7 @@
 """Ensure each instruction has at most one reply.
 
 Revision ID: b2f7c9e5a4d1
-Revises: c8f4f6e2c1ad
+Revises: f934b49300f8
 Create Date: 2026-05-28 00:00:00.000000
 """
 
@@ -28,7 +28,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "b2f7c9e5a4d1"
-down_revision: str | Sequence[str] | None = "c8f4f6e2c1ad"
+down_revision: str | Sequence[str] | None = "f934b49300f8"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
