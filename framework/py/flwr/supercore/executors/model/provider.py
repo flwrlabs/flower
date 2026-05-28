@@ -46,11 +46,10 @@ class ModelProviderError(RuntimeError):
         """Initialize the provider error."""
         self.status_code = status_code
         self.detail = detail
-        formatted_detail = (
-            detail
-            if isinstance(detail, str)
-            else json.dumps(detail, separators=(",", ":"))
-        )
+        if isinstance(detail, str):
+            formatted_detail = detail
+        else:
+            formatted_detail = json.dumps(detail, separators=(",", ":"))
         if status_code is None:
             super().__init__(f"{message}: {formatted_detail}")
         else:
