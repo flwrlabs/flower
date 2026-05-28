@@ -88,8 +88,6 @@ With default arguments you will see streamed output like this:
     INFO :      Final results:
     INFO :          ServerApp-side Evaluate Metrics:
     INFO :          {}
-    Saving final model to disk...
-
 You can also run the project with GPU as follows:
 
 .. code-block:: shell
@@ -353,17 +351,18 @@ invoking its |strategy_start_link|_ method. To it we pass:
             num_rounds=num_rounds,
         )
 
-        # Save final model to disk
-        print("\nSaving final model to disk...")
-        state_dict = result.arrays.to_torch_state_dict()
-        torch.save(state_dict, "final_model.pt")
+        if context.run_config["save-model"]:
+            # Save final model to disk
+            print("\nSaving final model to disk...")
+            state_dict = result.arrays.to_torch_state_dict()
+            torch.save(state_dict, "final_model.pt")
 
 Note the ``start`` method of the strategy returns a result object. This object contains
 all the relevant information about the FL process, including the final model weights as
 an ``ArrayRecord``, and federated training and evaluation metrics as ``MetricRecords``.
 You can easily log the metrics using Python's `pprint
-<https://docs.python.org/3/library/pprint.html>`_ and save the global model `state_dict`
-using ``torch.save``.
+<https://docs.python.org/3/library/pprint.html>`_ and, if ``save-model`` is set to
+``true``, save the global model `state_dict` using ``torch.save``.
 
 Congratulations! You've successfully built and run your first federated learning system
 for an LLM.

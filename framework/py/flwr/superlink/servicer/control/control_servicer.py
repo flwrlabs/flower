@@ -16,7 +16,6 @@
 
 # pylint: disable=too-many-lines
 
-
 import hashlib
 import json
 import time
@@ -50,7 +49,6 @@ from flwr.common.constant import (
     SUPERLINK_NODE_ID,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     Status,
-    SubStatus,
 )
 from flwr.common.logger import log
 from flwr.common.serde import run_to_proto, user_config_from_proto
@@ -73,12 +71,16 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetAuthTokensResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
+    GetRunSeriesRequest,
+    GetRunSeriesResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
     ListInvitationsResponse,
     ListNodesRequest,
     ListNodesResponse,
+    ListRunSeriesRequest,
+    ListRunSeriesResponse,
     ListRunsRequest,
     ListRunsResponse,
     PullArtifactsRequest,
@@ -118,7 +120,7 @@ from flwr.supercore.constant import (
     RunType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
-from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
+from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
 from flwr.supercore.typing import (
     AcceptInvitationContext,
@@ -382,6 +384,22 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             now=now().isoformat(),
         )
 
+    def ListRunSeries(
+        self, request: ListRunSeriesRequest, context: grpc.ServicerContext
+    ) -> ListRunSeriesResponse:
+        """List run series."""
+        log(INFO, "ControlServicer.ListRunSeries")
+        context.abort(grpc.StatusCode.UNIMPLEMENTED, "Method not implemented!")
+        raise grpc.RpcError()  # This line is unreachable
+
+    def GetRunSeries(
+        self, request: GetRunSeriesRequest, context: grpc.ServicerContext
+    ) -> GetRunSeriesResponse:
+        """Get run series."""
+        log(INFO, "ControlServicer.GetRunSeries")
+        context.abort(grpc.StatusCode.UNIMPLEMENTED, "Method not implemented!")
+        raise grpc.RpcError()  # This line is unreachable
+
     def StopRun(
         self, request: StopRunRequest, context: grpc.ServicerContext
     ) -> StopRunResponse:
@@ -413,13 +431,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 f"Run ID {run_id} is already finished",
             )
 
-        update_success = _stop_run_in_linkstate(
-            state=state,
-            store=self.objectstore_factory.store(),
-            run_id=run_id,
-        )
-
-        return StopRunResponse(success=update_success)
+        return StopRunResponse(success=state.stop_run(run_id))
 
     def GetLoginDetails(
         self, request: GetLoginDetailsRequest, context: grpc.ServicerContext
@@ -732,14 +744,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 flwr_aid=_get_flwr_aid(context),
                 name=request.federation_name,
             )
-            store = self.objectstore_factory.store()
             for run in state.get_run_info(federations=[request.federation_name]):
                 if run.status.status != Status.FINISHED:
-                    _stop_run_in_linkstate(
-                        state=state,
-                        store=store,
-                        run_id=run.run_id,
-                    )
+                    state.stop_run(run.run_id)
 
         return ArchiveFederationResponse()
 
@@ -800,7 +807,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         log(INFO, rpc_name := self.RemoveAccountFromFederation.__qualname__)
 
         state = self.linkstate_factory.state()
-        store = self.objectstore_factory.store()
 
         target_account = None if not request.account_name else request.account_name
 
@@ -817,7 +823,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 flwr_aids=[removed_flwr_aid],
                 statuses=[Status.PENDING, Status.STARTING, Status.RUNNING],
             ):
-                _stop_run_in_linkstate(state=state, store=store, run_id=run.run_id)
+                state.stop_run(run.run_id)
         return RemoveAccountFromFederationResponse()
 
     def CreateInvitation(
@@ -1066,22 +1072,6 @@ def _check_flwr_aid_in_run(
             grpc.StatusCode.PERMISSION_DENIED,
             "⛔️ Run ID does not belong to the account",
         )
-
-
-def _stop_run_in_linkstate(state: LinkState, store: ObjectStore, run_id: int) -> bool:
-    """Stop a run and clean it up using LinkState methods."""
-    # Stop all non-finished tasks of the run
-    update_success = False
-    for task in state.get_tasks(run_ids=[run_id]):
-        update_success |= state.finish_task(task.task_id, SubStatus.STOPPED, "")
-
-    # Clean up the run if any task was successfully updated to STOPPED
-    if update_success:
-        message_ids: set[str] = state.get_message_ids_from_run_id(run_id)
-        state.delete_messages(message_ids)
-        store.delete_objects_in_run(run_id)
-
-    return update_success
 
 
 def _format_verification(verifications: list[dict[str, str]]) -> dict[str, str]:

@@ -100,3 +100,33 @@ class TaskStatus(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["details", b"details", "status", b"status", "sub_status", b"sub_status"]) -> None: ...
 
 global___TaskStatus = TaskStatus
+
+@typing.final
+class TaskEvent(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    TIMESTAMP_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    TASK_ID_FIELD_NUMBER: builtins.int
+    EVENT_FIELD_NUMBER: builtins.int
+    DATA_FIELD_NUMBER: builtins.int
+    id: builtins.int
+    timestamp: builtins.str
+    run_id: builtins.int
+    task_id: builtins.int
+    event: builtins.str
+    data: builtins.str
+    def __init__(
+        self,
+        *,
+        id: builtins.int = ...,
+        timestamp: builtins.str = ...,
+        run_id: builtins.int = ...,
+        task_id: builtins.int = ...,
+        event: builtins.str = ...,
+        data: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["data", b"data", "event", b"event", "id", b"id", "run_id", b"run_id", "task_id", b"task_id", "timestamp", b"timestamp"]) -> None: ...
+
+global___TaskEvent = TaskEvent

@@ -22,9 +22,9 @@ from typing import Any, TypeVar, cast
 
 import pytest
 
+from flwr.app.message import make_message
 from flwr.app.user_config import UserConfig
 from flwr.common.constant import SUPERLINK_NODE_ID
-from flwr.common.message import make_message
 
 # pylint: disable=E0611
 from flwr.proto import transport_pb2 as pb2
@@ -458,6 +458,7 @@ def test_context_serialization_deserialization() -> None:
         node_config=maker.user_config(),
         state=maker.recorddict(1, 1, 1),
         run_config=maker.user_config(),
+        series_id=123,
     )
 
     # Execute
@@ -491,6 +492,7 @@ def test_run_serialization_deserialization() -> None:
         bytes_recv=1024,
         clientapp_runtime=3.14,
         run_type=RunType.SIMULATION,
+        series_id=123,
     )
 
     # Execute

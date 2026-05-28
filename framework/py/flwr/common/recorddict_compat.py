@@ -18,10 +18,11 @@
 from collections.abc import Mapping
 from typing import cast, get_args
 
+from flwr.app.typing import ConfigRecordValues, MetricRecordValues
+
 from . import Array, ArrayRecord, ConfigRecord, MetricRecord, RecordDict
 from .typing import (
     Code,
-    ConfigRecordValues,
     EvaluateIns,
     EvaluateRes,
     FitIns,
@@ -30,7 +31,6 @@ from .typing import (
     GetParametersRes,
     GetPropertiesIns,
     GetPropertiesRes,
-    MetricRecordValues,
     Parameters,
     Scalar,
     Status,
@@ -126,8 +126,8 @@ def _check_mapping_from_recordscalartype_to_scalar(
         if not isinstance(value, get_args(Scalar)):
             raise TypeError(
                 "There is not a 1:1 mapping between `common.Scalar` types and those "
-                "supported in `common.ConfigRecordValues` or "
-                "`common.ConfigRecordValues`. Consider casting your values to a type "
+                "supported in `flwr.app.ConfigRecordValues` or "
+                "`flwr.app.MetricRecordValues`. Consider casting your values to a type "
                 "supported by the `common.RecordDict` infrastructure. "
                 f"You used type: {type(value)}"
             )

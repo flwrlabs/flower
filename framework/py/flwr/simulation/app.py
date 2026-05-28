@@ -22,12 +22,12 @@ from queue import Queue
 
 import grpc
 
-from flwr.app import RecordDict
+from flwr.app.message import Context, RecordDict
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
 from flwr.common import EventType, event
-from flwr.common.args import add_args_flwr_app_common
+from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.config import (
     get_fused_config_from_dir,
     get_project_config,
@@ -38,7 +38,6 @@ from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
     SubStatus,
 )
-from flwr.common.context import Context
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import (
     flush_logs,
@@ -109,6 +108,7 @@ def _run_simulation_settings(
 def flwr_simulation() -> None:
     """Run process-isolated Flower Simulation."""
     args = _parse_args_run_flwr_simulation().parse_args()
+    token = try_obtain_flwr_app_token(args)
 
     # Capture stdout/stderr
     log_queue: Queue[str | None] = Queue()
@@ -127,7 +127,7 @@ def flwr_simulation() -> None:
     run_simulation_process(
         serverappio_api_address=args.serverappio_api_address,
         log_queue=log_queue,
-        token=args.token,
+        token=token,
         insecure=args.insecure,
         certificates=certificates,
         parent_pid=args.parent_pid,
