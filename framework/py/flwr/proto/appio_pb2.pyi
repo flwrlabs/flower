@@ -238,48 +238,18 @@ class PushTaskMessageResponse(google.protobuf.message.Message):
 global___PushTaskMessageResponse = PushTaskMessageResponse
 
 @typing.final
-class TaskEvent(google.protobuf.message.Message):
+class PushTaskEventsRequest(google.protobuf.message.Message):
     """PushTaskEvents messages"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    ID_FIELD_NUMBER: builtins.int
-    TIMESTAMP_FIELD_NUMBER: builtins.int
-    RUN_ID_FIELD_NUMBER: builtins.int
-    TASK_ID_FIELD_NUMBER: builtins.int
-    EVENT_FIELD_NUMBER: builtins.int
-    DATA_FIELD_NUMBER: builtins.int
-    id: builtins.int
-    timestamp: builtins.str
-    run_id: builtins.int
-    task_id: builtins.int
-    event: builtins.str
-    data: builtins.str
-    def __init__(
-        self,
-        *,
-        id: builtins.int = ...,
-        timestamp: builtins.str = ...,
-        run_id: builtins.int = ...,
-        task_id: builtins.int = ...,
-        event: builtins.str = ...,
-        data: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["data", b"data", "event", b"event", "id", b"id", "run_id", b"run_id", "task_id", b"task_id", "timestamp", b"timestamp"]) -> None: ...
-
-global___TaskEvent = TaskEvent
-
-@typing.final
-class PushTaskEventsRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
     EVENTS_FIELD_NUMBER: builtins.int
     @property
-    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[global___TaskEvent]: ...
+    def events(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.task_pb2.TaskEvent]: ...
     def __init__(
         self,
         *,
-        events: collections.abc.Iterable[global___TaskEvent] | None = ...,
+        events: collections.abc.Iterable[flwr.proto.task_pb2.TaskEvent] | None = ...,
     ) -> None: ...
     def ClearField(self, field_name: typing.Literal["events", b"events"]) -> None: ...
 

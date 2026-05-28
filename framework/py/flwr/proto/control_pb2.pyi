@@ -19,12 +19,12 @@ limitations under the License.
 
 import builtins
 import collections.abc
-import flwr.proto.appio_pb2
 import flwr.proto.fab_pb2
 import flwr.proto.federation_config_pb2
 import flwr.proto.federation_pb2
 import flwr.proto.node_pb2
 import flwr.proto.run_pb2
+import flwr.proto.task_pb2
 import flwr.proto.transport_pb2
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
@@ -821,11 +821,11 @@ class StreamRunEventsResponse(google.protobuf.message.Message):
 
     TASK_EVENT_FIELD_NUMBER: builtins.int
     @property
-    def task_event(self) -> flwr.proto.appio_pb2.TaskEvent: ...
+    def task_event(self) -> flwr.proto.task_pb2.TaskEvent: ...
     def __init__(
         self,
         *,
-        task_event: flwr.proto.appio_pb2.TaskEvent | None = ...,
+        task_event: flwr.proto.task_pb2.TaskEvent | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["task_event", b"task_event"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing.Literal["task_event", b"task_event"]) -> None: ...

@@ -59,14 +59,6 @@ message PushTaskMessageRequest { Message message = 1; }
 message PushTaskMessageResponse { string message_id = 1; }
 
 // PushTaskEvents messages
-message TaskEvent {
-  uint64 id = 1;
-  string timestamp = 2;
-  uint64 run_id = 3;
-  uint64 task_id = 4;
-  string event = 5;
-  string data = 6;
-}
 message PushTaskEventsRequest { repeated TaskEvent events = 1; }
 message PushTaskEventsResponse {}
 

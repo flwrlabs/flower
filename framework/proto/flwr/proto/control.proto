@@ -18,9 +18,9 @@ syntax = "proto3";
 package flwr.proto;
 
 import "flwr/proto/fab.proto";
-import "flwr/proto/appio.proto";
 import "flwr/proto/transport.proto";
 import "flwr/proto/run.proto";
+import "flwr/proto/task.proto";
 import "flwr/proto/node.proto";
 import "flwr/proto/federation.proto";
 import "flwr/proto/federation_config.proto";
