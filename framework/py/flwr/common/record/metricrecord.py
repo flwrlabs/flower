@@ -20,7 +20,7 @@ from __future__ import annotations
 from logging import WARN
 from typing import cast, get_args
 
-from flwr.common.typing import MetricRecordValues, MetricScalar
+from flwr.app.typing import MetricRecordValues, MetricScalar
 
 # pylint: disable=E0611
 from flwr.proto.recorddict_pb2 import MetricRecord as ProtoMetricRecord
@@ -116,7 +116,7 @@ class MetricRecord(TypedDict[str, MetricRecordValues], InflatableObject):
 
     Since types are enforced, the types of the objects inserted are checked. For a
     :code:`MetricRecord`, value types allowed are those in defined in
-    :code:`flwr.common.MetricRecordValues`. Similarly, only :code:`str` keys are
+    :code:`flwr.app.MetricRecordValues`. Similarly, only :code:`str` keys are
     allowed::
 
         from flwr.common import MetricRecord
