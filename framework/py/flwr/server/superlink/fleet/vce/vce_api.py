@@ -115,27 +115,25 @@ def worker(
     replies."""
     while not f_stop.is_set():
         out_mssg = None
-        message: Message | None = None
         processing_started_at = None
         try:
             # Fetch from queue with timeout. We use a timeout so
             # the stopping event can be evaluated even when the queue is empty.
-            message_in = messageins_queue.get(timeout=1.0)
-            message = message_in
-            node_id = message_in.metadata.dst_node_id
+            message: Message = messageins_queue.get(timeout=1.0)
+            node_id = message.metadata.dst_node_id
 
             # Retrieve context
             context = node_info_store[node_id].retrieve_context(
-                run_id=message_in.metadata.run_id
+                run_id=message.metadata.run_id
             )
 
             # Let backend process message
             processing_started_at = time.perf_counter()
-            out_mssg, updated_context = backend.process_message(message_in, context)
+            out_mssg, updated_context = backend.process_message(message, context)
 
             # Update Context
             node_info_store[node_id].update_context(
-                message_in.metadata.run_id, context=updated_context
+                message.metadata.run_id, context=updated_context
             )
         except Empty:
             # An exception raised if queue.get times out
@@ -153,8 +151,7 @@ def worker(
                 e_code = ErrorCode.UNKNOWN
 
             reason = str(type(ex)) + ":<'" + str(ex) + "'>"
-            if message is not None:
-                out_mssg = Message(Error(code=e_code, reason=reason), reply_to=message)
+            out_mssg = Message(Error(code=e_code, reason=reason), reply_to=message)
 
         finally:
             if metrics is not None and processing_started_at is not None:
@@ -184,9 +181,7 @@ def add_messages_to_queue(
 
 
 def put_message_into_state(
-    state: LinkState,
-    queue: Queue[Message],
-    f_stop: threading.Event,
+    state: LinkState, queue: Queue[Message], f_stop: threading.Event
 ) -> None:
     """Store reply Messages into the LinkState from the queue."""
     while not f_stop.is_set():
