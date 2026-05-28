@@ -24,7 +24,7 @@ import pytest
 
 from flwr.supercore.typing import JSONObject
 
-from .provider import invoke_model_provider
+from .provider import ModelProviderError, invoke_model_provider
 
 
 @dataclass
@@ -136,6 +136,10 @@ def test_invoke_model_provider_raises_on_stream_failure_events(
                 b'"error":{"message":"quota exceeded"}}}',
                 b"",
             ],
+            {
+                "type": "response.failed",
+                "response": {"id": "resp_1", "error": {"message": "quota exceeded"}},
+            },
             (
                 'Model provider request failed: 200 {"type":"response.failed",'
                 '"response":{"id":"resp_1","error":{"message":"quota exceeded"}}}'
@@ -147,6 +151,7 @@ def test_invoke_model_provider_raises_on_stream_failure_events(
                 b'data: {"type":"error","error":{"message":"bad request"}}',
                 b"",
             ],
+            {"type": "error", "error": {"message": "bad request"}},
             (
                 'Model provider request failed: 200 {"type":"error","error":'
                 '{"message":"bad request"}}'
@@ -154,13 +159,15 @@ def test_invoke_model_provider_raises_on_stream_failure_events(
         ),
     ]
 
-    for lines, expected_message in cases:
+    for lines, expected_detail, expected_message in cases:
         _patch_post(
             monkeypatch,
             _Response(headers={"Content-Type": "text/event-stream"}, lines=lines),
         )
 
-        with pytest.raises(RuntimeError) as exc_info:
+        with pytest.raises(ModelProviderError) as exc_info:
             invoke_model_provider({"model": "model", "input": [], "stream": True})
 
+        assert exc_info.value.status_code == 200
+        assert exc_info.value.detail == expected_detail
         assert str(exc_info.value) == expected_message

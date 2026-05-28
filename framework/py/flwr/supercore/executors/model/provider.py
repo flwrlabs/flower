@@ -33,6 +33,27 @@ _TERMINAL_SUCCESS_EVENTS = frozenset({"response.completed", "response.incomplete
 _TERMINAL_FAILURE_EVENTS = frozenset({"error", "response.failed"})
 
 
+class ModelProviderError(RuntimeError):
+    """Error returned by the configured model provider."""
+
+    def __init__(
+        self,
+        *,
+        status_code: int,
+        detail: JSONValue,
+        message: str = "Model provider request failed",
+    ) -> None:
+        """Initialize the provider error."""
+        self.status_code = status_code
+        self.detail = detail
+        formatted_detail = (
+            detail
+            if isinstance(detail, str)
+            else json.dumps(detail, separators=(",", ":"))
+        )
+        super().__init__(f"{message}: {status_code} {formatted_detail}")
+
+
 def invoke_model_provider(
     request: JSONObject,
     *,
@@ -122,11 +143,9 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
             detail = cast(JSONValue, response.json())
         except ValueError:
             detail = response.text
-        raise RuntimeError(
-            _failure_message(
-                status_code=response.status_code,
-                detail=detail,
-            )
+        raise ModelProviderError(
+            status_code=response.status_code,
+            detail=detail,
         )
 
     if not stream:
@@ -140,12 +159,10 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
     # Streaming parsing only works for Server-Sent Event responses.
     content_type = response.headers.get("Content-Type", "").lower()
     if _STREAM_CONTENT_TYPE not in content_type:
-        raise RuntimeError(
-            _failure_message(
-                status_code=response.status_code,
-                detail=f"Expected streaming response Content-Type "
-                f"{_STREAM_CONTENT_TYPE}, got {content_type or '<missing>'}.",
-            )
+        raise ModelProviderError(
+            status_code=response.status_code,
+            detail=f"Expected streaming response Content-Type "
+            f"{_STREAM_CONTENT_TYPE}, got {content_type or '<missing>'}.",
         )
 
     last_event: JSONObject | None = None
@@ -178,11 +195,9 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
         )
 
         if is_failure_event:
-            raise RuntimeError(
-                _failure_message(
-                    status_code=response.status_code,
-                    detail=event,
-                )
+            raise ModelProviderError(
+                status_code=response.status_code,
+                detail=event,
             )
 
         # Terminal success events carry the final response object.
@@ -192,8 +207,10 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
                 return cast(JSONObject, response_payload)
             return event
 
-    raise RuntimeError(
-        _failure_message(status_code=response.status_code, detail=last_event)
+    raise ModelProviderError(
+        status_code=response.status_code,
+        detail=last_event,
+        message="Model provider stream ended before a terminal event",
     )
 
 
@@ -241,9 +258,3 @@ def _iter_sse_events(response: requests.Response) -> Iterator[tuple[str | None, 
 
     if data_lines:
         yield event_name, "\n".join(data_lines)
-
-
-def _failure_message(*, status_code: int, detail: JSONValue) -> str:
-    if not isinstance(detail, str):
-        detail = json.dumps(detail, separators=(",", ":"))
-    return f"Model provider request failed: {status_code} {detail}"
