@@ -17,31 +17,31 @@ echo "- clang-format:  done"
 
 echo "- isort: start"
 if $RUN_FULL_TEST; then
-    python -m isort --check-only --skip py/flwr/proto py/flwr e2e
+    python -m isort \
+        --check-only \
+        --skip py/flwr/proto \
+        --skip-glob "**/.venv/**" \
+        py e2e
 else
-    python -m isort --check-only --skip py/flwr/proto py/flwr
+    python -m isort --check-only --skip py/flwr/proto py
 fi
 echo "- isort: done"
 
 echo "- black: start"
 if $RUN_FULL_TEST; then
-    python -m black --exclude "py\/flwr\/proto" --check py/flwr e2e
+    python -m black \
+        --extend-exclude "py\/flwr\/proto|(^|\/)\.venv\/" \
+        --check py e2e
 else
-    python -m black --exclude "py\/flwr\/proto" --check py/flwr
+    python -m black \
+        --extend-exclude "py\/flwr\/proto" \
+        --check py
 fi
 echo "- black: done"
 
 echo "- init_py_check: start"
 python -m devtool.init_py_check py/flwr
 echo "- init_py_check: done"
-
-echo "- docformatter: start"
-if $RUN_FULL_TEST; then
-    python -m docformatter -c -r py/flwr e2e -e py/flwr/proto
-else
-    python -m docformatter -c -r py/flwr -e py/flwr/proto
-fi
-echo "- docformatter:  done"
 
 echo "- docsig: start"
 docsig py/flwr

@@ -4,11 +4,11 @@
 
 .. |message_link| replace:: ``Message``
 
-.. _message_link: ref-api/flwr.common.Message.html
+.. _message_link: ref-api/flwr.app.Message.html
 
 .. |metricrecord_link| replace:: ``MetricRecord``
 
-.. _metricrecord_link: ref-api/flwr.common.MetricRecord.html
+.. _metricrecord_link: ref-api/flwr.app.MetricRecord.html
 
 .. |configrecord_link| replace:: ``ConfigRecord``
 
@@ -18,31 +18,21 @@
 
 .. _arrayrecord_link: ref-api/flwr.app.ArrayRecord.html
 
-Welcome to the fourth part of the Flower federated learning tutorial. In the previous
-parts of this tutorial, we introduced federated learning with PyTorch and Flower
-(:doc:`part 1 <tutorial-series-get-started-with-flower-pytorch>`), we learned how
-strategies can be used to customize the execution on both the server and the clients
-(:doc:`part 2 <tutorial-series-use-a-federated-learning-strategy-pytorch>`) and we built
-our own custom strategy from scratch (:doc:`part 3
-<tutorial-series-build-a-strategy-from-scratch-pytorch>`).
+Welcome to the next part of the Flower collaborative AI tutorial!
 
-In this final tutorial, we turn our attention again to the ``ClientApp`` and show how to
-communicate arbitrary Python objects via a ``Message`` and how to use it on the
-``ServerApp``. This can be useful if you want to send additional information between
-``ClientApp <--> ServerApp`` without the need for custom protocols.
+In the previous tutorials, you created a simulated federation on SuperGrid, ran and
+customized Flower Apps, moved from the NumPy demo to the PyTorch quickstart app,
+customized the strategy used by the ``ServerApp``, and then built a more customized
+strategy. In this tutorial, you'll turn your attention back to the ``ClientApp`` and
+learn how to communicate additional information between ``ClientApp`` and ``ServerApp``
+through ``Message`` objects.
 
 .. tip::
 
     `Star Flower on GitHub <https://github.com/flwrlabs/flower>`__ ⭐️ and join the
-    Flower community on Flower Discuss and the Flower Slack to connect, ask questions,
-    and get help:
-
-    - `Join Flower Discuss <https://discuss.flower.ai/>`__ We'd love to hear from you in
-      the ``Introduction`` topic! If anything is unclear, post in ``Flower Help -
-      Beginners``.
-    - `Join Flower Slack <https://flower.ai/join-slack>`__ We'd love to hear from you in
-      the ``#introductions`` channel! If anything is unclear, head over to the
-      ``#questions`` channel.
+    Flower community on `Flower Discuss <https://discuss.flower.ai/>`__ or `Flower Slack
+    <https://flower.ai/join-slack>`__ to introduce yourself, ask questions, and get
+    help.
 
 Let's go deeper and see how to serialize arbitrary Python objects and communicate them!
 🌼
@@ -51,49 +41,61 @@ Let's go deeper and see how to serialize arbitrary Python objects and communicat
  Preparation
 *************
 
-Before we begin with the actual code, let's make sure that we have everything we need.
+This tutorial continues from the earlier PyTorch tutorials in this series. If you
+already have the ``quickstart-pytorch`` app, open that directory and continue from
+there.
 
-Installing dependencies
-=======================
-
-.. note::
-
-    If you've completed part 1 of the tutorial, you can skip this step.
-
-First, we install the Flower package ``flwr``:
+If you are starting here directly, install Flower and fetch the same app:
 
 .. code-block:: shell
 
-    # In a new Python environment
+    # Install Flower with the simulation extra
     $ pip install -U "flwr[simulation]"
-
-Then, run the command below:
-
-.. code-block:: shell
-
+    # Fetch the app from Flower Hub
     $ flwr new @flwrlabs/quickstart-pytorch
-
-After running it you'll notice a new directory named ``quickstart-pytorch`` has been
-created. It should have the following structure:
-
-.. code-block:: shell
-
-    quickstart-pytorch
-    ├── pytorchexample
-    │   ├── __init__.py
-    │   ├── client_app.py   # Defines your ClientApp
-    │   ├── server_app.py   # Defines your ServerApp
-    │   └── task.py         # Defines your model, training and data loading
-    ├── pyproject.toml      # Project metadata like dependencies and configs
-    └── README.md
-
-Next, we install the project and its dependencies, which are specified in the
-``pyproject.toml`` file:
-
-.. code-block:: shell
-
+    # Navigate to the app directory
     $ cd quickstart-pytorch
+    # Install the app dependencies
     $ pip install -e .
+
+Constructing Messages
+=====================
+
+In Flower, the server and clients communicate by sending and receiving |message_link|_
+objects. A ``Message`` carries a ``RecordDict`` as its main payload. The ``RecordDict``
+is like a Python dictionary that can contain multiple records of different types. There
+are three main types of records:
+
+- |arrayrecord_link|_: Contains model parameters as a dictionary of NumPy arrays
+- |metricrecord_link|_: Contains training or evaluation metrics as a dictionary of
+  integers, floats, lists of integers, or lists of floats.
+- |configrecord_link|_: Contains configuration parameters as a dictionary of integers,
+  floats, strings, booleans, or bytes. Lists of these types are also supported.
+
+Let's see a few examples of how to work with these types of records and, ultimately,
+construct a ``RecordDict`` that can be sent over a ``Message``.
+
+.. code-block:: python
+
+    from flwr.app import ArrayRecord, MetricRecord, ConfigRecord, RecordDict
+
+    # ConfigRecord can be used to communicate configs between ServerApp and ClientApp
+    # They can hold scalars, but also strings and booleans
+    config = ConfigRecord(
+        {"batch_size": 32, "use_augmentation": True, "data-path": "/my/dataset"}
+    )
+
+    # MetricRecords expect scalar-based metrics (i.e. int/float/list[int]/list[float])
+    # By limiting the types Flower can aggregate MetricRecords automatically
+    metrics = MetricRecord({"accuracy": 0.9, "losses": [0.1, 0.001], "perplexity": 2.31})
+
+    # ArrayRecord objects are designed to communicate arrays/tensors/weights from ML models
+    array_record = ArrayRecord(my_model.state_dict())  # for a PyTorch model
+    array_record_other = ArrayRecord(my_model.to_numpy_ndarrays())  # for other ML models
+
+    # A RecordDict is like a dictionary that holds named records.
+    # This is the main payload of a Message
+    rd = RecordDict({"my-config": config, "metrics": metrics, "my-model": array_record})
 
 *************************************
  Revisiting replying from ClientApps
@@ -198,18 +200,22 @@ serialize it to bytes. In this case, we can use the ``pickle`` module from the P
 standard library. We can then send the serialized object in a ``ConfigRecord`` in the
 ``Message`` reply. Let's see how this would look like in code:
 
+The example below focuses on the additional metadata logic; keep the model and data
+setup from your existing ``train`` function unchanged.
+
 .. warning::
 
     The following code is for demonstration purposes only. In real-world applications,
     since `pickle <https://docs.python.org/3/library/pickle.html>`_ can execute
-    arbitrary code during unpickling, you should use a **SAFE** serialization method
-    than ``pickle``, such as ``json`` or a simple custom solution if the object is not
-    too complex. ``pickle`` is used here solely for simplicity.
+    arbitrary code during unpickling, you should use a safer serialization method than
+    ``pickle``, such as ``json`` or a simple custom solution if the object is not too
+    complex. ``pickle`` is used here solely for simplicity.
 
 .. code-block:: python
-    :emphasize-lines: 1,10,20,22,35
+    :emphasize-lines: 1-2,11,21,23,36
 
     import pickle
+    import time
 
 
     @app.train()
@@ -217,15 +223,15 @@ standard library. We can then send the serialized object in a ``ConfigRecord`` i
         """Train the model on local data."""
 
         # ... prepare model, load data, train locally
-        # The train function returns a TrainProcessMetadata object
-        train_metadata = train_fn(...)
-        # For example:
-
-        # TrainProcessMetadata(
-        #     training_time=123.45,
-        #     converged=True,
-        #     training_losses={"epoch1": 0.56, "epoch2": 0.34}
-        # )
+        # The train function returns the training loss
+        start_time = time.time()
+        train_loss = train_fn(...)
+        # Construct a TrainProcessMetadata object
+        train_metadata = TrainProcessMetadata(
+            training_time=time.time() - start_time,
+            converged=True,
+            training_losses={"final": train_loss},
+        )
 
         # Serialize the TrainProcessMetadata object to bytes
         train_meta_bytes = pickle.dumps(train_metadata)
@@ -265,10 +271,10 @@ strategy to handle the deserialization and use of the ``TrainProcessMetadata`` o
     ``@app.train()`` function. If we had sent it from an ``@app.evaluate()`` function,
     we would override the ``aggregate_evaluate`` method instead.
 
-Let's create a new custom strategy (or reuse the one created in part 2 and part 3 of
-this tutorial) in ``server_app.py`` that extends the ``FedAdagrad`` strategy and
-overrides the ``aggregate_train`` method to deserialize the ``TrainProcessMetadata``
-object from each client and print the training time and convergence status:
+Let's create a new custom strategy, or reuse the one created in the previous strategy
+tutorials, in ``server_app.py`` that extends the ``FedAdagrad`` strategy and overrides
+the ``aggregate_train`` method to deserialize the ``TrainProcessMetadata`` object from
+each client and print the training time and convergence status:
 
 .. code-block:: python
     :emphasize-lines: 1,8,18,19,21
@@ -302,10 +308,10 @@ Finally, we run the Flower App.
 
 .. code-block:: shell
 
-    $ flwr run . --stream
+    $ flwr run . local --stream
 
-Plain ``flwr run .`` submits the run, prints the run ID, and returns without streaming
-logs. See :doc:`how-to-run-flower-locally` for the full local workflow.
+Plain ``flwr run . local`` submits the run, prints the run ID, and returns without
+streaming logs. See :doc:`how-to-run-flower-locally` for the full local workflow.
 
 You will observe that the training metadata from each client is logged to the console of
 the ``ServerApp``. If you finish embedding the creation of the ``TrainProcessMetadata``
@@ -314,7 +320,7 @@ object in the ``ClientApp``, you should see output similar to this:
 .. code-block:: console
 
     INFO :      [ROUND 1/3]
-    INFO :      configure_train: Sampled 25 nodes (out of 1000)
+    INFO :      configure_train: Sampled 5 SuperNodes (out of 50)
     {'training_time': 123.45, 'converged': True, 'training_losses': {'epoch1': 0.56, 'epoch2': 0.34}}
     {'training_time': 130.67, 'converged': False, 'training_losses': {'epoch1': 0.60, 'epoch2': 0.40}}
     ...
@@ -351,6 +357,5 @@ didn't cover in the tutorial, we recommend the following resources:
 
 - `Read Flower Docs <https://flower.ai/docs/>`__
 - `Check out Flower Code Examples <https://flower.ai/docs/examples/>`__
-- `Use Flower Baselines for your research <https://flower.ai/docs/baselines/>`__
-- `Watch Flower AI Summit 2025 videos
-  <https://flower.ai/events/flower-ai-summit-2025/>`__
+- `Watch Flower AI Summit 2026 videos
+  <https://flower.ai/events/flower-ai-summit-2026/>`__

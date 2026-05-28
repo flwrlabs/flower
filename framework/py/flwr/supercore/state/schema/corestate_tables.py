@@ -16,11 +16,13 @@
 
 
 from sqlalchemy import (
+    TIMESTAMP,
     BigInteger,
     Column,
     Float,
     ForeignKey,
     Index,
+    Integer,
     LargeBinary,
     MetaData,
     String,
@@ -57,9 +59,33 @@ def create_corestate_metadata() -> MetaData:
     )
 
     # --------------------------------------------------------------------------
-    #  Table: task
+    #  Table: run_series
     # --------------------------------------------------------------------------
     Table(
+        "run_series",
+        metadata,
+        Column("series_id", BigInteger, primary_key=True, nullable=False),
+        Column("federation", String, nullable=False),
+        Column("description", String, nullable=True),
+        Column("created_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("last_run_id", BigInteger, nullable=True),
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: series_context
+    # --------------------------------------------------------------------------
+    Table(
+        "series_context",
+        metadata,
+        Column("series_id", BigInteger, primary_key=True, nullable=False),
+        Column("context", LargeBinary),
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: task
+    # --------------------------------------------------------------------------
+    task = Table(
         "task",
         metadata,
         Column("task_id", BigInteger, nullable=False, unique=True),
@@ -69,14 +95,57 @@ def create_corestate_metadata() -> MetaData:
         Column("model_ref", String, nullable=True),
         Column("connector_ref", String, nullable=True),
         Column("token", String, nullable=True),
-        Column("active_until", BigInteger, nullable=True),
-        Column("pending_at", String, nullable=False),
-        Column("starting_at", String, nullable=True),
-        Column("running_at", String, nullable=True),
-        Column("finished_at", String, nullable=True),
+        Column("active_until", TIMESTAMP(timezone=True), nullable=True),
+        Column("pending_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("starting_at", TIMESTAMP(timezone=True), nullable=True),
+        Column("running_at", TIMESTAMP(timezone=True), nullable=True),
+        Column("finished_at", TIMESTAMP(timezone=True), nullable=True),
         Column("sub_status", String, nullable=False, server_default=text("''")),
         Column("details", String, nullable=False, server_default=text("''")),
     )
+    Index("idx_task_run_id", task.c.run_id)
+    Index("idx_task_token", task.c.token)
+    Index("idx_task_active_until", task.c.active_until)
+
+    # --------------------------------------------------------------------------
+    #  Table: task_event
+    # --------------------------------------------------------------------------
+    task_event = Table(
+        "task_event",
+        metadata,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("timestamp", TIMESTAMP(timezone=True), nullable=False),
+        Column("run_id", BigInteger, nullable=False),
+        Column("task_id", BigInteger, ForeignKey("task.task_id"), nullable=False),
+        Column("event", String, nullable=False),
+        Column("data", String, nullable=False),
+    )
+    Index("idx_task_event_run_id_id", task_event.c.run_id, task_event.c.id)
+    Index("idx_task_event_task_id", task_event.c.task_id)
+
+    # --------------------------------------------------------------------------
+    #  Table: task_message
+    # --------------------------------------------------------------------------
+    task_message = Table(
+        "task_message",
+        metadata,
+        Column("message_id", String, primary_key=True, nullable=False),
+        Column("run_id", BigInteger, nullable=False),
+        Column("src_task_id", BigInteger, ForeignKey("task.task_id"), nullable=False),
+        Column("dst_task_id", BigInteger, ForeignKey("task.task_id"), nullable=False),
+        Column("reply_to_message_id", String, nullable=True),
+        Column("created_at", Float, nullable=False),
+        Column("ttl", Float, nullable=False),
+        Column("message_type", String, nullable=False),
+        Column("content", LargeBinary, nullable=True),
+        Column("error", LargeBinary, nullable=True),
+    )
+    Index(
+        "idx_task_message_dst_task_id_created_at",
+        task_message.c.dst_task_id,
+        task_message.c.created_at,
+    )
+    Index("idx_task_message_run_id", task_message.c.run_id)
 
     # --------------------------------------------------------------------------
     #  Table: task_logs

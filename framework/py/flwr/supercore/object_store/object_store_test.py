@@ -16,8 +16,10 @@
 
 
 import tempfile
+import threading
 import unittest
 from abc import abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 from typing import cast
 
 from parameterized import parameterized
@@ -397,6 +399,23 @@ class SqlInMemoryObjectStoreTest(ObjectStoreTest):
         ).get_table_names()
         self.assertNotIn("alembic_version", table_names)
 
+    def test_preregister_rejects_new_children_for_existing_object_id(self) -> None:
+        """Ensure existing SQL objects cannot get new children."""
+        store = self.object_store_factory()
+        parent_id = get_object_id(b"parent")
+        child_id = get_object_id(b"child")
+
+        store.preregister(run_id=1, object_tree=ObjectTree(object_id=parent_id))
+
+        with self.assertRaisesRegex(ValueError, "different children"):
+            store.preregister(
+                run_id=2,
+                object_tree=ObjectTree(
+                    object_id=parent_id,
+                    children=[ObjectTree(object_id=child_id)],
+                ),
+            )
+
 
 class SqlFileBasedObjectStoreTest(ObjectStoreTest):
     """Test SqlObjectStore implementation with file-based database."""
@@ -426,3 +445,37 @@ class SqlFileBasedObjectStoreTest(ObjectStoreTest):
             cast(Engine, store._engine)  # pylint: disable=W0212
         ).get_table_names()
         self.assertIn("alembic_version", table_names)
+
+    def test_concurrent_preregister_and_run_cleanup(self) -> None:
+        """Concurrent run cleanup preserves objects registered by another run."""
+        store = self.object_store_factory()
+        second_store = SqlObjectStore(self.temp_file.name)
+        second_store.initialize()
+        child = CustomDataClass(b"shared")
+        old_parent = CustomDataClass(b"old", children=[child])
+        new_parent = CustomDataClass(b"new", children=[child])
+        content_by_id = {obj.object_id: obj.deflate() for obj in [child, new_parent]}
+
+        store.preregister(run_id=1, object_tree=get_object_tree(old_parent))
+        store.put(child.object_id, child.deflate())
+        store.put(old_parent.object_id, old_parent.deflate())
+        barrier = threading.Barrier(2)
+
+        def cleanup() -> None:
+            barrier.wait()
+            store.delete_objects_in_run(run_id=1)
+
+        def preregister() -> None:
+            barrier.wait()
+            missing = second_store.preregister(
+                run_id=2, object_tree=get_object_tree(new_parent)
+            )
+            for object_id in missing:
+                second_store.put(object_id, content_by_id[object_id])
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            for future in [executor.submit(cleanup), executor.submit(preregister)]:
+                future.result()
+
+        self.assertEqual(store.get(child.object_id), child.deflate())
+        self.assertEqual(store.get(new_parent.object_id), new_parent.deflate())

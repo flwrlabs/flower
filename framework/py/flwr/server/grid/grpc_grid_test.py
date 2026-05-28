@@ -26,9 +26,9 @@ import grpc
 from parameterized import parameterized
 
 from flwr.app.error import Error
+from flwr.app.message import Message
 from flwr.common import RecordDict
 from flwr.common.constant import SUPERLINK_NODE_ID, ErrorCode
-from flwr.common.message import Message
 from flwr.common.serde import message_to_proto
 from flwr.common.typing import Run
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
@@ -92,7 +92,6 @@ class TestGrpcGrid(unittest.TestCase):
         self.assertEqual(len(args), 1)
         self.assertEqual(len(kwargs), 0)
         self.assertIsInstance(args[0], GetNodesRequest)
-        self.assertEqual(args[0].run_id, 61016)
         self.assertEqual(node_ids, [404, 200])
 
     def _prep_message(self, message: Message) -> Message:

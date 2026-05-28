@@ -21,8 +21,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from flwr.common.context import Context
-from flwr.common.message import Message
+from flwr.app.message import Context, Message
 
 from .client_app import ClientApp
 from .typing import ClientAppCallable

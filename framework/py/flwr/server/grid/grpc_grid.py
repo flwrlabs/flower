@@ -23,6 +23,7 @@ from typing import cast
 import grpc
 
 from flwr.app.error import Error
+from flwr.app.message import make_message, remove_content_from_message
 from flwr.common import Message, Metadata, RecordDict, now
 from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
@@ -31,7 +32,6 @@ from flwr.common.constant import (
 )
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log, warn_deprecated_feature
-from flwr.common.message import make_message, remove_content_from_message
 from flwr.common.retry_invoker import make_simple_grpc_retry_invoker, wrap_stub
 from flwr.common.serde import message_to_proto
 from flwr.common.typing import Run
@@ -235,9 +235,7 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
     def get_node_ids(self) -> Iterable[int]:
         """Get node IDs."""
         # Call GrpcServerAppIoStub method
-        res: GetNodesResponse = self._stub.GetNodes(
-            GetNodesRequest(run_id=cast(Run, self._run).run_id)
-        )
+        res: GetNodesResponse = self._stub.GetNodes(GetNodesRequest())
         return [node.node_id for node in res.nodes]
 
     def _try_push_messages(self, run_id: int, messages: Iterable[Message]) -> list[str]:
@@ -256,7 +254,6 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
         res: PushAppMessagesResponse = self._stub.PushMessages(
             PushAppMessagesRequest(
                 messages_list=proto_messages,
-                run_id=run_id,
                 message_object_trees=object_trees,
             )
         )
@@ -325,7 +322,6 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
             res: PullAppMessagesResponse = self._stub.PullMessages(
                 PullAppMessagesRequest(
                     message_ids=message_ids,
-                    run_id=run_id,
                 )
             )
             # Pull Messages from store

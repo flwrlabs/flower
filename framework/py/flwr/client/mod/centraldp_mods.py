@@ -17,18 +17,17 @@
 
 from logging import INFO
 
+from flwr.app.message import Context, Message
 from flwr.app.message_type import MessageType
 from flwr.client.typing import ClientAppCallable
 from flwr.common import ndarrays_to_parameters, parameters_to_ndarrays
 from flwr.common import recorddict_compat as compat
-from flwr.common.context import Context
 from flwr.common.differential_privacy import (
     compute_adaptive_clip_model_update,
     compute_clip_model_update,
 )
 from flwr.common.differential_privacy_constants import KEY_CLIPPING_NORM, KEY_NORM_BIT
 from flwr.common.logger import log
-from flwr.common.message import Message
 
 
 def fixedclipping_mod(

@@ -2,6 +2,10 @@
 set -e
 cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/../
 
+# Default value (true)
+RUN_FULL_FORMAT=${1:-true}
+echo "RUN_FULL_FORMAT: $RUN_FULL_FORMAT"
+
 taplo fmt
 
 # Python
@@ -9,20 +13,18 @@ python -m devtool.check_copyright py/flwr
 python -m devtool.init_py_fix py/flwr
 python -m isort --skip py/flwr/proto py
 python -m black -q --exclude py/flwr/proto py
-python -m docformatter -i -r py/flwr -e py/flwr/proto
 python -m ruff check --fix py/flwr
 
 # Protos
 find proto/flwr/proto -name *.proto | grep "\.proto" | xargs clang-format -i
 
-if [ -d e2e ]; then
+if $RUN_FULL_FORMAT; then
   # E2E
   python -m isort e2e
   python -m black -q e2e
-  python -m docformatter -i -r e2e
 fi
 
-if [ -d docs/source ]; then
+if $RUN_FULL_FORMAT; then
   # Markdown
   python -m mdformat --number docs/source
 
