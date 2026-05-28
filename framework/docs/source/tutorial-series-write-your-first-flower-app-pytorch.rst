@@ -1,6 +1,6 @@
-#########################
- Get started with Flower
-#########################
+##########################################
+ Write your first Flower App with PyTorch
+##########################################
 
 .. |Grid_link| replace:: ``Grid``
 
@@ -46,56 +46,34 @@
 
 .. _result_link: ref-api/flwr.serverapp.strategy.Result.html
 
-Welcome to the Flower federated learning tutorial!
+Welcome to the next part of the Flower collaborative AI tutorial!
 
-In this tutorial, we'll build a federated learning system using the Flower framework,
-Flower Datasets and PyTorch. In part 1, we use PyTorch for model training and data
-loading. In part 2, we federate this PyTorch project using Flower.
+In the previous tutorials, you created a simulated federation on SuperGrid, ran a Flower
+App, downloaded the ``@flwrlabs/demo`` app, and learned how ``ServerApp``,
+``ClientApp``, strategies, and ``pyproject.toml`` fit together. In this tutorial, you
+will use the same workflow with a more realistic Flower App: a PyTorch app that trains a
+small image classifier on CIFAR-10.
 
 .. tip::
 
     `Star Flower on GitHub <https://github.com/flwrlabs/flower>`__ ⭐️ and join the
-    Flower community on Flower Discuss and the Flower Slack to connect, ask questions,
-    and get help:
-
-    - `Join Flower Discuss <https://discuss.flower.ai/>`__ We'd love to hear from you in
-      the ``Introduction`` topic! If anything is unclear, post in ``Flower Help -
-      Beginners``.
-    - `Join Flower Slack <https://flower.ai/join-slack>`__ We'd love to hear from you in
-      the ``#introductions`` channel! If anything is unclear, head over to the
-      ``#questions`` channel.
+    Flower community on `Flower Discuss <https://discuss.flower.ai/>`__ or `Flower Slack
+    <https://flower.ai/join-slack>`__ to introduce yourself, ask questions, and get
+    help.
 
 Let's get started! 🌼
 
-*************
- Preparation
-*************
+****************
+ Create the App
+****************
 
-Before we begin with any actual code, let's make sure that we have everything we need.
-
-Install dependencies
-====================
-
-First, we install the Flower package ``flwr``:
-
-.. code-block:: shell
-
-    # In a new Python environment
-    $ pip install -U "flwr[simulation]"
-
-Then, run the command below:
+Use ``flwr new`` to fetch the PyTorch quickstart app from Flower Hub:
 
 .. code-block:: shell
 
     $ flwr new @flwrlabs/quickstart-pytorch
 
-.. note::
-
-    If you're on Windows and see unexpected terminal output (e.g.: ``� □[32m□[1m``),
-    check :ref:`this FAQ entry <faq-windows-unexpected-output>`.
-
-After running it you'll notice a new directory named ``quickstart-pytorch`` has been
-created. It should have the following structure:
+After running the command, a new directory named ``quickstart-pytorch`` will be created:
 
 .. code-block:: shell
 
@@ -108,45 +86,194 @@ created. It should have the following structure:
     ├── pyproject.toml      # Project metadata like dependencies and configs
     └── README.md
 
-Next, we install the project and its dependencies, which are specified in the
-``pyproject.toml`` file.
+This app has the same Flower structure as the NumPy demo from the previous tutorial, but
+the workload is now a real PyTorch training task. The app trains a small convolutional
+neural network on CIFAR-10, an image classification dataset with ten classes such as
+airplane, automobile, bird, cat, dog, ship, and truck.
+
+********************
+ Quick App Overview
+********************
+
+.. note::
+
+    A more detailed walkthrough of the app is available later in this tutorial.
+
+Before running the app, it helps to know what each file is responsible for:
+
+- ``pytorchexample/task.py`` contains the PyTorch-specific code: the neural network,
+  CIFAR-10 data loading and partitioning, the local training loop, the evaluation loop,
+  and server-side evaluation helpers.
+- ``pytorchexample/client_app.py`` defines the ``ClientApp``. Its ``@app.train()``
+  handler receives the current global model, loads one CIFAR-10 partition, trains the
+  model locally, and replies with updated model parameters plus metrics. Its
+  ``@app.evaluate()`` handler evaluates the received model on local validation data and
+  replies with metrics.
+- ``pytorchexample/server_app.py`` defines the ``ServerApp``. It creates the initial
+  PyTorch model, wraps the model parameters in an ``ArrayRecord``, creates a ``FedAvg``
+  strategy, and starts the federated learning run.
+- ``pyproject.toml`` declares the app metadata and dependencies, points Flower to the
+  ``ServerApp`` and ``ClientApp`` objects, and defines run configuration values such as
+  the number of server rounds, batch size, local epochs, learning rate, and evaluation
+  settings.
+
+The important idea is the same as before: the ``ServerApp`` starts the run, ``FedAvg``
+coordinates each federated learning round, and each ``ClientApp`` trains or evaluates
+the model using the data available on its SuperNode.
+
+This app uses `Flower Datasets <https://flower.ai/docs/datasets/>`__ to download
+CIFAR-10 and split it into partitions, one for each simulated client. This is ideal for
+simulations because it lets you experiment with federated learning even when you start
+from a single centralized dataset. In a typical Flower App that runs outside of
+simulation, you usually do not create artificial partitions. Instead, each ``ClientApp``
+loads the data already available on the SuperNode where it runs.
+
+**************************
+ Run the App on SuperGrid
+**************************
+
+.. note::
+
+    If you have not already done so, complete the :doc:`first tutorial
+    <tutorial-series-get-started-with-flower>` to create a SuperGrid account and a
+    simulated federation.
+
+Open a terminal, activate your Python environment, and run the following command to
+first login to SuperGrid:
 
 .. code-block:: shell
 
-    $ cd quickstart-pytorch
+    # This will open a browser window where you can enter your SuperGrid credentials.
+    $ flwr login
+
+Once you are logged in, run the following command to run the app on SuperGrid and across
+the federation you created in the previous tutorial:
+
+.. code-block:: shell
+
+    # Navigate to the directory of the app you want to run
+    $ cd /path/to/quickstart-pytorch
+    # Run the app across the federation you created in the previous tutorial
+    $ flwr run . --federation @<username>/<federation-name>
+    # for example
+    # flwr run . --federation @peter123/my-first-federation
+
+SuperGrid will start a new run for this app. Open the `SuperGrid dashboard
+<https://flower.ai/federations/>`__, select your federation, and click the new run to
+follow its progress and inspect the logs.
+
+In the logs, you should see Flower start the ``FedAvg`` strategy and run several rounds
+of federated learning. Each round includes local training on selected ``ClientApp``
+instances, aggregation in the ``ServerApp``, and evaluation metrics such as
+``eval_loss`` and ``eval_acc``.
+
+You can override values from ``pyproject.toml`` at run time. For example:
+
+.. code-block:: shell
+
+    # Run the app for five rounds instead of the default three rounds
+    $ flwr run . --federation @<username>/<federation-name> \
+        --run-config "num-server-rounds=5"
+
+    # Run the app for five rounds and a smaller batch size
+    $ flwr run . --federation @<username>/<federation-name> \
+        --run-config "num-server-rounds=5" \
+        --run-config "batch-size=16"
+
+*********************
+ Run the App Locally
+*********************
+
+Running on SuperGrid is the recommended way to run collaborative AI workflows with
+Flower. However, it is also useful to run the same app locally while you are developing
+or debugging.
+
+From the ``quickstart-pytorch`` directory, install the app and its dependencies into
+your Python environment:
+
+.. code-block:: shell
+
+    $ cd /path/to/quickstart-pytorch
     $ pip install -e .
 
-Before we dive into federated learning, we'll take a look at the dataset that we'll be
-using for this tutorial, which is the `CIFAR-10
-<https://www.cs.toronto.edu/~kriz/cifar.html>`_ dataset, and run a simple centralized
-training pipeline using PyTorch.
+Then run the app locally with the command below. Flower will start a managed local
+SuperLink -- a distilled version of SuperGrid -- and execute the app with simulated
+SuperNodes on your machine. The first run can take longer because the app needs to
+download CIFAR-10. With the flag ``--stream``, you can see the logs from the local run
+in your terminal.
 
-The ``CIFAR-10`` dataset
-========================
+.. code-block:: shell
 
-Federated learning can be applied to many different types of tasks across different
-domains. In this tutorial, we introduce federated learning by training a simple
-convolutional neural network (CNN) on the popular CIFAR-10 dataset. CIFAR-10 can be used
-to train image classifiers that distinguish between images from ten different classes:
-'airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', and
-'truck'.
+    $ flwr run . local --stream
 
-We simulate having multiple datasets from multiple organizations (also called the
-“cross-silo” setting in federated learning) by splitting the original CIFAR-10 dataset
-into multiple partitions. Each partition will represent the data from a single
-organization. We're doing this purely for experimentation purposes. In the real world
-there's no need for data splitting because each organization already has their own data
-(the data is naturally partitioned).
+The streamed output should include logs similar to this:
 
-Each organization will act as a client in the federated learning system. Having ten
-organizations participate in a federation means having ten clients connected to the
-federated learning server.
+.. code-block:: shell
 
-We use the `Flower Datasets <https://flower.ai/docs/datasets/>`_ library
-(``flwr-datasets``) to partition CIFAR-10 into ten partitions using
-``FederatedDataset``. Using the ``load_data()`` function defined in ``task.py``, we will
-create a small training and test set for each of the ten organizations and wrap each of
-these into a PyTorch ``DataLoader``:
+    INFO :      Starting FedAvg strategy:
+    INFO :          ├── Number of rounds: 3
+    INFO :      ...
+    INFO :      [ROUND 1/3]
+    INFO :      configure_train: Sampled 5 SuperNodes (out of 10)
+    INFO :      aggregate_train: Received 5 results and 0 failures
+    INFO :          └──> Aggregated MetricRecord: {'train_loss': 2.149280}
+    INFO :      configure_evaluate: Sampled 10 SuperNodes (out of 10)
+    INFO :      aggregate_evaluate: Received 10 results and 0 failures
+    INFO :          └──> Aggregated MetricRecord: {'eval_loss': 2.31319, 'eval_acc': 0.13004}
+    INFO :      [ROUND 2/3]
+    INFO :      ...
+    INFO :      [ROUND 3/3]
+    INFO :      ...
+    INFO :      Strategy execution finished
+
+.. note::
+
+    In the above ``flwr run`` command you are not specifying a federation, this is
+    because for local prototyping there is only one federation available. Because of
+    this, the ``--federation`` flag is not required.
+
+.. note::
+
+    If you're on Windows and see unexpected terminal output, for example ``�
+    □[32m□[1m``, check :ref:`this FAQ entry <faq-windows-unexpected-output>`.
+
+For more details on using the Flower CLI against a locally running SuperLink, including
+how to list your runs and view their logs, see :doc:`Run Flower Locally with a Managed
+SuperLink <how-to-run-flower-locally>`.
+
+****************************
+ A Deeper Dive into the App
+****************************
+
+The ``@flwrlabs/quickstart-pytorch`` app demonstrates a simple federated learning
+workflow. In federated learning, the server sends global model parameters to the client,
+and the client updates the local model with parameters received from the server. It then
+trains the model on the local data (which changes the model parameters locally) and
+sends the updated/changed model parameters back to the server (or, alternatively, it
+sends just the gradients back to the server, not the full model parameters).
+
+Define the Flower ClientApp
+===========================
+
+Federated learning systems consist of a server and multiple clients (SuperNodes). In
+Flower, we create a |serverapp_link|_ and a |clientapp_link|_ to run the server-side and
+client-side code, respectively.
+
+The core functionality of the ``ClientApp`` is to perform some action with the local
+data that the SuperNode it runs on (e.g. an edge device, a server in a data center, or a
+laptop) has access to. In this tutorial such action is to train and evaluate the small
+CNN model defined earlier using the local training and validation data.
+
+Loading the data
+----------------
+
+This app trains a small convolutional neural network on CIFAR-10. Since the tutorial
+uses the Simulation Runtime, all data starts from one centralized dataset and is split
+into partitions, one for each simulated SuperNode.
+
+The ``load_data()`` function in ``task.py`` uses `Flower Datasets
+<https://flower.ai/docs/datasets/>`_ to load one partition, split it into training and
+validation data, apply the PyTorch transforms, and return two ``DataLoader`` objects:
 
 .. code-block:: python
 
@@ -161,7 +288,7 @@ these into a PyTorch ``DataLoader``:
                 partitioners={"train": partitioner},
             )
         partition = fds.load_partition(partition_id)
-        # Divide data on each node: 80% train, 20% test
+        # Divide data on each SuperNode: 80% train, 20% test
         partition_train_test = partition.train_test_split(test_size=0.2, seed=42)
         pytorch_transforms = Compose(
             [ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
@@ -179,155 +306,9 @@ these into a PyTorch ``DataLoader``:
         testloader = DataLoader(partition_train_test["test"], batch_size=batch_size)
         return trainloader, testloader
 
-We now have a function that can return a training set and validation set
-(``trainloader`` and ``valloader``) representing one dataset from one of ten different
-organizations. Each ``trainloader``/``valloader`` pair contains 4000 training examples
-and 1000 validation examples. There's also a single ``testloader`` (we did not split the
-test set). Again, this is only necessary for building research or educational systems,
-actual federated learning systems have their data naturally distributed across multiple
-partitions.
-
-*****************************************
- The model, training, and test functions
-*****************************************
-
-Next, we're going to use PyTorch to define a simple convolutional neural network. This
-introduction assumes basic familiarity with PyTorch, so it doesn't cover the
-PyTorch-related aspects in full detail. If you want to dive deeper into PyTorch, we
-recommend `this introductory tutorial
-<https://pytorch.org/tutorials/beginner/deep_learning_60min_blitz.html>`_.
-
-Model
-=====
-
-We will use the simple CNN described in the aforementioned PyTorch tutorial (The
-following code is already defined in ``task.py``):
-
-.. code-block:: python
-
-    class Net(nn.Module):
-        """Model (simple CNN adapted from 'PyTorch: A 60 Minute Blitz')"""
-
-        def __init__(self):
-            super(Net, self).__init__()
-            self.conv1 = nn.Conv2d(3, 6, 5)
-            self.pool = nn.MaxPool2d(2, 2)
-            self.conv2 = nn.Conv2d(6, 16, 5)
-            self.fc1 = nn.Linear(16 * 5 * 5, 120)
-            self.fc2 = nn.Linear(120, 84)
-            self.fc3 = nn.Linear(84, 10)
-
-        def forward(self, x):
-            x = self.pool(F.relu(self.conv1(x)))
-            x = self.pool(F.relu(self.conv2(x)))
-            x = x.view(-1, 16 * 5 * 5)
-            x = F.relu(self.fc1(x))
-            x = F.relu(self.fc2(x))
-            return self.fc3(x)
-
-Training and test functions
-===========================
-
-The PyTorch quickstart also provides the usual training and test functions:
-
-.. code-block:: python
-
-    def train(net, trainloader, epochs, lr, device):
-        """Train the model on the training set."""
-        net.to(device)  # move model to GPU if available
-        criterion = torch.nn.CrossEntropyLoss().to(device)
-        optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9)
-        net.train()
-        running_loss = 0.0
-        for _ in range(epochs):
-            for batch in trainloader:
-                images = batch["img"].to(device)
-                labels = batch["label"].to(device)
-                optimizer.zero_grad()
-                loss = criterion(net(images), labels)
-                loss.backward()
-                optimizer.step()
-                running_loss += loss.item()
-        avg_trainloss = running_loss / (epochs * len(trainloader))
-        return avg_trainloss
-
-
-    def test(net, testloader, device):
-        """Validate the model on the test set."""
-        net.to(device)
-        criterion = torch.nn.CrossEntropyLoss()
-        correct, loss = 0, 0.0
-        with torch.no_grad():
-            for batch in testloader:
-                images = batch["img"].to(device)
-                labels = batch["label"].to(device)
-                outputs = net(images)
-                loss += criterion(outputs, labels).item()
-                correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
-        accuracy = correct / len(testloader.dataset)
-        loss = loss / len(testloader)
-        return loss, accuracy
-
-********************************
- Federated Learning with Flower
-********************************
-
-In federated learning, the server sends global model parameters to the client, and the
-client updates the local model with parameters received from the server. It then trains
-the model on the local data (which changes the model parameters locally) and sends the
-updated/changed model parameters back to the server (or, alternatively, it sends just
-the gradients back to the server, not the full model parameters).
-
-Constructing Messages
-=====================
-
-In Flower, the server and clients communicate by sending and receiving |message_link|_
-objects. A ``Message`` carries a ``RecordDict`` as its main payload. The ``RecordDict``
-is like a Python dictionary that can contain multiple records of different types. There
-are three main types of records:
-
-- |arrayrecord_link|_: Contains model parameters as a dictionary of NumPy arrays
-- |metricrecord_link|_: Contains training or evaluation metrics as a dictionary of
-  integers, floats, lists of integers, or lists of floats.
-- |configrecord_link|_: Contains configuration parameters as a dictionary of integers,
-  floats, strings, booleans, or bytes. Lists of these types are also supported.
-
-Let's see a few examples of how to work with these types of records and, ultimately,
-construct a ``RecordDict`` that can be sent over a ``Message``.
-
-.. code-block:: python
-
-    from flwr.app import ArrayRecord, MetricRecord, ConfigRecord, RecordDict
-
-    # ConfigRecord can be used to communicate configs between ServerApp and ClientApp
-    # They can hold scalars, but also strings and booleans
-    config = ConfigRecord(
-        {"batch_size": 32, "use_augmentation": True, "data-path": "/my/dataset"}
-    )
-
-    # MetricRecords expect scalar-based metrics (i.e. int/float/list[int]/list[float])
-    # By limiting the types Flower can aggregate MetricRecords automatically
-    metrics = MetricRecord({"accuracy": 0.9, "losses": [0.1, 0.001], "perplexity": 2.31})
-
-    # ArrayRecord objects are designed to communicate arrays/tensors/weights from ML models
-    array_record = ArrayRecord(my_model.state_dict())  # for a PyTorch model
-    array_record_other = ArrayRecord(my_model.to_numpy_ndarrays())  # for other ML models
-
-    # A RecordDict is like a dictionary that holds named records.
-    # This is the main payload of a Message
-    rd = RecordDict({"my-config": config, "metrics": metrics, "my-model": array_record})
-
-Define the Flower ClientApp
-===========================
-
-Federated learning systems consist of a server and multiple nodes or clients. In Flower,
-we create a |serverapp_link|_ and a |clientapp_link|_ to run the server-side and
-client-side code, respectively.
-
-The core functionality of the ``ClientApp`` is to perform some action with the local
-data that the node it runs from (e.g. an edge device, a server in a data center, or a
-laptop) has access to. In this tutorial such action is to train and evaluate the small
-CNN model defined earlier using the local training and validation data.
+This partitioning is only needed for simulation. In deployment, each SuperNode would
+usually load its own local data directly, for example from a path provided through
+``--node-config``.
 
 Training
 --------
@@ -338,7 +319,7 @@ use it to train the model on the local data. The function always expects two arg
 
 - A |message_link|_: The message received from the server. It contains the model
   parameters and any other configuration information sent by the server.
-- A |context_link|_: The context object that contains information about the node
+- A |context_link|_: The context object that contains information about the SuperNode
   executing the ``ClientApp`` and about the current run.
 
 Through the context you can retrieve the config settings defined in the
@@ -355,7 +336,7 @@ metrics of interest.
 
 .. code-block:: python
 
-    from flower_tutorial.task import train as train_fn
+    from pytorchexample.task import train as train_fn
 
     # Flower ClientApp
     app = ClientApp()
@@ -396,6 +377,15 @@ metrics of interest.
         content = RecordDict({"arrays": model_record, "metrics": metric_record})
         return Message(content=content, reply_to=msg)
 
+.. note::
+
+    The ``partition-id`` and ``num-partitions`` values shown above are provided by the
+    :doc:`Simulation Runtime <how-to-run-simulations>`. In a deployment setting, the
+    ``ClientApp`` would usually load data that already exists on the SuperNode. For
+    example, you could pass the path to that data when starting the SuperNode with
+    ``--node-config "data-path=/path/to/data"`` and then call ``load_data`` with
+    ``context.node_config["data-path"]``.
+
 Note that the ``train_fn`` is simply an alias name pointing to the train function
 defined earlier in this tutorial (where we defined the PyTorch training loop and
 optimizer). To this function we pass the model we want to train locally and the data
@@ -419,7 +409,7 @@ typically includes a ``RecordDict`` with two records:
     because strategies such as |fedavg_link|_ used by the ``ServerApp`` rely on this key
     to aggregate both models and metrics by default, unless you override the
     ``weighted_by_key`` argument (for example:
-    ``FedAvg(weighted_by="my-different-key")``).
+    ``FedAvg(weighted_by_key="my-different-key")``).
 
 After constructing the reply ``Message``, the ``ClientApp`` returns it. Flower then
 handles sending the reply back to the server automatically.
@@ -439,7 +429,7 @@ evaluation). Here's how the ``evaluate`` function looks like:
 
 .. code-block:: python
 
-    from flower_tutorial.task import test as test_fn
+    from pytorchexample.task import test as test_fn
 
 
     @app.evaluate()
@@ -490,12 +480,12 @@ learning approach/algorithm, for example, *Federated Averaging* (FedAvg). Flower
 number of built-in strategies, but we can also use our own strategy implementations to
 customize nearly all aspects of the federated learning approach. For this tutorial, we
 use the built-in ``FedAvg`` implementation and customize it slightly by specifying the
-fraction of connected nodes to involve in a round of training.
+fraction of connected SuperNodes to involve in a round of training.
 
 To construct a |serverapp_link|_, we define its ``@app.main()`` method. This method
 receives as input arguments:
 
-- a ``Grid`` object that will be used to interface with the nodes running the
+- a ``Grid`` object that will be used to interface with the SuperNodes running the
   ``ClientApp`` to involve them in a round of train/evaluate/query or other.
 - a |context_link|_ object that provides access to the run configuration.
 
@@ -551,75 +541,19 @@ returns a |result_link|_ object containing the final model parameters and metric
 received from the clients or generated by the strategy itself. We can then save the
 final model to disk for later use.
 
-Run the training
-================
-
-With all of these components in place, we can now run the federated learning simulation
-with Flower! The last step is to run our simulation in the command line, as follows:
-
-.. code-block:: shell
-
-    $ flwr run . --stream
-
-This submits the run to the managed local SuperLink for the ``[superlink.local]``
-profile (identified in the Flower configuration with ``address = ":local:"``), which
-then executes the federated learning simulation with 10 clients, or SuperNodes, using
-the Flower Simulation Runtime. Plain ``flwr run .`` would submit the run, print the run
-ID, and return without streaming logs. For the full local workflow, see
-:doc:`how-to-run-flower-locally`. If you run into SQL database errors during local
-simulations, see :ref:`FAQ <faq-local-superlink-db-error>`.
-
-You should expect streamed output similar to this:
-
-.. code-block:: shell
-
-    Starting local SuperLink on 127.0.0.1:39093...
-    Successfully started run 1859953118041441032
-    INFO :      Starting FedAvg strategy:
-    INFO :          ├── Number of rounds: 3
-    INFO :      [ROUND 1/3]
-    INFO :      configure_train: Sampled 5 nodes (out of 10)
-    INFO :      aggregate_train: Received 5 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'train_loss': 2.25811}
-    INFO :      configure_evaluate: Sampled 10 nodes (out of 10)
-    INFO :      aggregate_evaluate: Received 10 results and 0 failures
-    INFO :          └──> Aggregated MetricRecord: {'eval_loss': 2.304821, 'eval_acc': 0.0965}
-    INFO :      [ROUND 2/3]
-    INFO :      ...
-    INFO :      [ROUND 3/3]
-    INFO :      ...
-    INFO :      Strategy execution finished in 17.18s
-    INFO :      Final results:
-    INFO :          ServerApp-side Evaluate Metrics:
-    INFO :          {}
-    Saving final model to disk...
-
-You can also override the parameters defined in the ``[tool.flwr.app.config]`` section
-in ``pyproject.toml`` like this:
-
-.. code-block:: shell
-
-    # Run the simulation with 5 server rounds and 3 local epochs
-    $ flwr run . --stream --run-config "num-server-rounds=5 local-epochs=3"
-
-.. tip::
-
-    Learn more about how to configure the execution of your Flower App by checking the
-    `pyproject.toml <how-to-configure-pyproject-toml.html>`_ guide.
-
 Behind the scenes
 =================
 
 So how does this work? How does Flower execute this simulation?
 
-When we execute ``flwr run`` against the default local connection configuration (for
-example, the one with ``address = ":local:"``), Flower submits the run to the managed
-local SuperLink. By default, the local SuperLink will configure the simulation runtime
-to use 10 clients. Each will run an instance of the ``ClientApp`` we defined earlier.
+When we execute ``flwr run`` against the default local connection configuration, Flower
+submits the run to the managed local SuperLink. By default, the local SuperLink will
+configure the simulation runtime to use 10 clients. Each will run an instance of the
+``ClientApp`` we defined earlier.
 
 The local SuperLink then starts the ``ServerApp`` and asks it to issue instructions to
-those nodes using the ``FedAvg`` strategy. In this example, ``FedAvg`` is configured
-with two key parameters:
+those SuperNodes using the ``FedAvg`` strategy. In this example, ``FedAvg`` is
+configured with two key parameters:
 
 - ``fraction-train=0.5`` → select 50% of the available clients for training
 - ``fraction-evaluate=1.0`` → select 100% of the available clients for evaluation
@@ -658,16 +592,13 @@ reached.
  Final remarks
 ***************
 
-Congratulations, you just trained a convolutional neural network, federated over 10
-clients! With that, you understand the basics of federated learning with Flower. The
-same approach you've seen can be used with other machine learning frameworks (not just
-PyTorch) and tasks (not just CIFAR-10 image classification), for example NLP with
-Hugging Face Transformers or speech with SpeechBrain.
+You have now run a PyTorch Flower App on SuperGrid and locally. Compared with the NumPy
+demo, this app uses a real model, a real dataset, and real local training, but the
+Flower structure is the same: ``ServerApp``, ``ClientApp``, strategy, and
+``pyproject.toml``.
 
-In the next tutorial, we're going to cover some more advanced concepts. Want to
-customize your strategy? Do learning rate decay at the strategy and communicate it to
-the clients ? Or evaluate the aggregated model on the server side? We'll cover all this
-and more in the next tutorial.
+In the next tutorial, you will customize the federated learning strategy to change how
+the server coordinates training and evaluation.
 
 ************
  Next steps
@@ -680,6 +611,6 @@ Flower Discuss <https://discuss.flower.ai>`__) and on Slack (`Join Slack
 There's a dedicated ``#questions`` Slack channel if you need help, but we'd also love to
 hear who you are in ``#introductions``!
 
-The :doc:`Flower Federated Learning Tutorial - Part 2
+The :doc:`Flower Collaborative AI Tutorial - Part 4: Use a federated learning strategy
 <tutorial-series-use-a-federated-learning-strategy-pytorch>` goes into more depth about
-strategies and all the advanced things you can build with them.
+strategies and the advanced behavior you can build with them.

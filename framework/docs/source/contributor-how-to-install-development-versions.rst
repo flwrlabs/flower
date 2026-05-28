@@ -6,30 +6,27 @@
  Install development versions of Flower
 ****************************************
 
-Using Poetry (recommended)
-==========================
+Using uv (recommended)
+======================
 
-Install a ``flwr`` pre-release from PyPI: update the ``flwr`` dependency in
-``pyproject.toml`` and then reinstall (ensure to delete ``poetry.lock`` via ``rm
-poetry.lock`` before running ``python -m poetry install``).
+Install a ``flwr`` pre-release from PyPI with ``uv add``, which updates
+``pyproject.toml`` and syncs the environment:
 
-- ``flwr = { version = "1.0.0a0", allow-prereleases = true }`` (without extras)
-- ``flwr = { version = "1.0.0a0", allow-prereleases = true, extras = ["simulation"] }``
-  (with extras)
+- ``uv add --prerelease=allow "flwr==1.0.0a0"`` (without extras)
+- ``uv add --prerelease=allow "flwr[simulation]==1.0.0a0"`` (with extras)
 
-Install ``flwr`` from a local copy of the Flower source code via ``pyproject.toml``:
+Install ``flwr`` from a local copy of the Flower source code:
 
-- ``flwr = { path = "../../", develop = true }`` (without extras)
-- ``flwr = { path = "../../", develop = true, extras = ["simulation"] }`` (with extras)
+- ``uv add --editable "../../"`` (without extras)
+- ``uv add --editable "../../" --extra simulation`` (with extras)
 
-Install ``flwr`` from a local wheel file via ``pyproject.toml``:
+Install ``flwr`` from a local wheel file:
 
-- ``flwr = { path = "../../dist/flwr-1.8.0-py3-none-any.whl" }`` (without extras)
-- ``flwr = { path = "../../dist/flwr-1.8.0-py3-none-any.whl", extras = ["simulation"]
-  }`` (with extras)
+- ``uv add "../../dist/flwr-1.8.0-py3-none-any.whl"`` (without extras)
+- ``uv add "../../dist/flwr-1.8.0-py3-none-any.whl" --extra simulation`` (with extras)
 
-Please refer to the Poetry documentation for further details: `Poetry Dependency
-Specification <https://python-poetry.org/docs/dependency-specification/>`_
+Please refer to the uv documentation for further details: `Managing dependencies with uv
+<https://docs.astral.sh/uv/concepts/projects/dependencies/>`_
 
 Using pip (recommended on Colab)
 ================================

@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,8 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+"""Executor abstractions and implementations for SuperExec."""
 
-set -e
-cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/../
+from .factory import get_executor
+from .subprocess_executor import SubprocessExecutor
+from .types import ExecutionSpec, Executor, LaunchResult, LaunchResultStatus
 
-uv build --clear
+__all__ = [
+    "ExecutionSpec",
+    "Executor",
+    "LaunchResult",
+    "LaunchResultStatus",
+    "SubprocessExecutor",
+    "get_executor",
+]

@@ -119,7 +119,7 @@ def run_simulation(
         for values parsed to initialisation of backend, `client_resources`
         to define the resources for clients, and `actor` to define the actor
         parameters. Values supported in <value> are those included by
-        `flwr.common.typing.ConfigRecordValues`.
+        `flwr.app.ConfigRecordValues`.
 
     enable_tf_gpu_growth : bool (default: False)
         A boolean to indicate whether to enable GPU growth on the main thread. This is
