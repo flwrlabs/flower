@@ -148,6 +148,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         """Set the shared Context for the specified RunSeries."""
         if series_id == 0:
             raise ValueError("RunSeries ID must be non-zero")
+        with self.lock_run_series_store:
+            if series_id not in self.run_series_store:
+                raise ValueError(f"RunSeries {series_id} not found")
         with self.lock_run_series_context_store:
             self.run_series_context_store[series_id] = context
 

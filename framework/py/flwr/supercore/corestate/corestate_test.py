@@ -23,7 +23,7 @@ from unittest.mock import patch
 
 from parameterized import parameterized
 
-from flwr.common import now
+from flwr.common import Context, RecordDict, now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
@@ -88,6 +88,20 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         with self.assertRaises(AssertionError):
             state.get_run_series(federation="test-federation", limit=-1)
+
+    def test_set_run_series_context_rejects_missing_series(self) -> None:
+        """Test setting context for a nonexistent RunSeries."""
+        state = self.state_factory()
+        context = Context(
+            run_id=0,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={},
+            state=RecordDict(),
+            run_config={},
+        )
+
+        with self.assertRaises(ValueError):
+            state.set_run_series_context(123, context)
 
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
