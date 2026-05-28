@@ -32,7 +32,7 @@ def deploy_static() -> None:
             "--nodeapps-pyproject",
             "pyproject.toml",
             "--node-name",
-            "node_0",
+            "node_1",
             "--node-data-config-json",
             '{"partition-id": 0, "num-partitions": 4}',
         ]
