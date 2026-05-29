@@ -137,7 +137,7 @@ The interesting part is that both ``GrpcGrid`` and ``InMemoryGrid`` are never us
 Flower framework users, only by other parts of the Flower framework codebase. Those
 other parts of the codebase import, for example, ``InMemoryGrid`` using ``from
 flwr.serverapp.grid import InMemoryGrid`` (i.e., the ``InMemoryGrid`` exported via
-``__all__``), not ``from flwr.server.grid.in_memory_grid import InMemoryGrid``
+``__all__``), not ``from flwr.serverapp.grid.in_memory_grid import InMemoryGrid``
 (``in_memory_grid.py`` is the module containing the actual ``InMemoryGrid`` class
 definition).
 
