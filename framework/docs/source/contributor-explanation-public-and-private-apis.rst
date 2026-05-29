@@ -114,8 +114,8 @@ docs.
 
 We also use this to define the public API of private subpackages. Public, in this
 context, means the API that other ``flwr`` subpackages should use. For example,
-``flwr.superlink.grid`` is a private subpackage (it's not exported via
-``src/py/flwr/superlink/__init__.py``'s ``__all__``).
+``flwr.superlink.grid`` is a private subpackage (it's not re-exported via
+``src/py/flwr/superlink/__init__.py``).
 
 Still, the private sub-package ``flwr.superlink.grid`` defines a "public" API using
 ``__all__`` in ``src/py/flwr/superlink/grid/__init__.py``:
