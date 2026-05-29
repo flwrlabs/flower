@@ -59,7 +59,12 @@ def upgrade() -> None:
 
     op.create_table(
         "series_runs",
-        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column(
+            "id",
+            sa.BigInteger(),
+            autoincrement=True,
+            nullable=False,
+        ),
         sa.Column("series_id", sa.BigInteger(), nullable=False),
         sa.Column("run_id", sa.BigInteger(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
