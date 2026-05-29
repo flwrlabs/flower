@@ -247,6 +247,7 @@ def start_and_shutdown(
         is_app=False,
         f_stop=f_stop,
         run=run,
+        metrics=VceMetrics(),
         existing_nodes_mapping=nodes_mapping,
     )
 

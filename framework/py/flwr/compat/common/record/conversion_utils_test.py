@@ -20,7 +20,10 @@ from io import BytesIO
 
 import numpy as np
 
-from ..constant import SType
+from flwr.common import array_from_numpy as common_array_from_numpy
+from flwr.common.constant import SType
+from flwr.compat.common.record import array_from_numpy as compat_record_array_from_numpy
+
 from .conversion_utils import array_from_numpy
 
 
@@ -42,3 +45,8 @@ class TestArrayFromNumpy(unittest.TestCase):
         self.assertEqual(array_instance.shape, tuple(original_array.shape))
         self.assertEqual(array_instance.stype, SType.NUMPY)
         np.testing.assert_array_equal(deserialized_array, original_array)
+
+    def test_reexports(self) -> None:
+        """Test compatibility re-exports."""
+        self.assertIs(common_array_from_numpy, array_from_numpy)
+        self.assertIs(compat_record_array_from_numpy, array_from_numpy)
