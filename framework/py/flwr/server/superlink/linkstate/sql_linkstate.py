@@ -956,7 +956,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             rows = self.query(query, {"run_id": uint64_to_int64(run_id)})
             if rows[0]["cnt"] == 0:
                 resolved_series_id = self.ensure_run_series(
-                    federation, series_id, run_id=run_id
+                    federation=federation, series_id=series_id
                 )
                 if resolved_series_id is None:
                     log(ERROR, "Unexpected run series creation failure.")
@@ -1000,6 +1000,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         "sub_status": "",
                         "details": "",
                     },
+                )
+                self.store_run_to_series(
+                    series_id=resolved_series_id,
+                    run_id=run_id,
                 )
                 return run_id
 

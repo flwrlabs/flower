@@ -612,7 +612,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         task_type = primary_task_type_from_run_type(run_type)
 
         with self.lock_task_store, self.lock:
-            resolved_series_id = self.ensure_run_series(federation, series_id)
+            resolved_series_id = self.ensure_run_series(
+                federation=federation,
+                series_id=series_id,
+            )
             if resolved_series_id is None:
                 log(ERROR, "Unexpected run series creation failure.")
                 return 0
@@ -653,10 +656,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 federation_config=federation_config,
             )
             self.run_ids[run_id] = run_record
-            with self.lock_run_series_store:
-                run_series = self.run_series_store[resolved_series_id]
-                run_series.run_ids.append(run_id)
-                run_series.updated_at = current
+            self.store_run_to_series(series_id=resolved_series_id, run_id=run_id)
             # Add run_id to the flwr_aid_to_run_ids mapping if flwr_aid is provided
             if flwr_aid:
                 self.flwr_aid_to_run_ids[flwr_aid].add(run_id)

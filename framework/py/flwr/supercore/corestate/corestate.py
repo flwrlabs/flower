@@ -45,29 +45,38 @@ class CoreState(ABC):
     @abstractmethod
     def ensure_run_series(
         self,
+        *,
         federation: str,
         series_id: int | None = None,
-        *,
-        run_id: int | None = None,
     ) -> int | None:
         """Ensure a run series exists and return its ID.
 
         Parameters
         ----------
         federation : str
-            Federation the run series belongs to.
+            Keyword-only federation the run series belongs to.
         series_id : int | None (default: None)
-            Optional caller-provided series ID. If `None`, a new series
-            ID is generated and creation is attempted. If set, the matching
-            series must already exist and belong to `federation`.
-        run_id : int | None (default: None)
-            Optional run ID to associate with the ensured run series.
+            Optional keyword-only caller-provided series ID. If `None`, a
+            new series ID is generated and creation is attempted. If set,
+            the matching series must already exist and belong to `federation`.
 
         Returns
         -------
         int | None
             The ID of the ensured run series, or `None` if a new run series
             could not be created or the caller-provided run series is invalid.
+        """
+
+    @abstractmethod
+    def store_run_to_series(self, *, series_id: int, run_id: int) -> None:
+        """Associate a run with a run series.
+
+        Parameters
+        ----------
+        series_id : int
+            Keyword-only run series ID.
+        run_id : int
+            Keyword-only run ID to associate with the run series.
         """
 
     @abstractmethod

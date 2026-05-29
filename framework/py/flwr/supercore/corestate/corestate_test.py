@@ -77,7 +77,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Ensuring a run series should create a nonzero ID."""
         state = self.state_factory()
 
-        series_id = state.ensure_run_series("federation-a")
+        series_id = state.ensure_run_series(federation="federation-a")
 
         self.assertIsNotNone(series_id)
         assert series_id is not None
@@ -88,7 +88,10 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         state = self.state_factory()
 
         with self.assertLogs("flwr", level="ERROR") as logs:
-            series_id = state.ensure_run_series("federation-a", series_id=123)
+            series_id = state.ensure_run_series(
+                federation="federation-a",
+                series_id=123,
+            )
 
         self.assertIsNone(series_id)
         self.assertIn("Run series 123 not found", logs.output[0])
