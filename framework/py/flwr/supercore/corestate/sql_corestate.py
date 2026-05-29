@@ -71,6 +71,7 @@ STATUS_CONDITIONS = {
 }
 
 
+# pylint: disable-next=too-many-public-methods
 class SqlCoreState(CoreState, SqlMixin):
     """SQLAlchemy-based CoreState implementation."""
 
