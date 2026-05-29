@@ -176,6 +176,31 @@ class StateTest(CoreStateTest):
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
 
+    def test_create_agent_run_creates_agentapp_primary_task(self) -> None:
+        """Creating an AgentApp run should create an AgentApp primary task."""
+        # Prepare
+        state = self.state_factory()
+
+        # Execute
+        run_id = state.create_run(
+            "flwr/gpt-chat",
+            "v0.0.1",
+            "hash123",
+            {},
+            NOOP_FEDERATION,
+            None,
+            None,
+            RunType.AGENT_APP,
+        )
+
+        # Assert
+        tasks = state.get_tasks(run_ids=[run_id])
+        run = state.get_run_info(run_ids=[run_id])[0]
+        self.assertEqual(run.run_type, RunType.AGENT_APP)
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
+        self.assertEqual(run.primary_task_id, tasks[0].task_id)
+
     def test_store_messages_rejects_stopped_run(self) -> None:
         """Messages cannot be stored after a run is stopped."""
         state = self.state_factory()

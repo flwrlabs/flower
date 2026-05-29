@@ -20,12 +20,14 @@ import hashlib
 import json
 import time
 from collections.abc import Generator, Sequence
+from dataclasses import dataclass
 from logging import ERROR, INFO
 from typing import Any, cast
 
 import grpc
 import requests
 
+from flwr.app.user_config import UserConfig
 from flwr.cli.utils import validate_federation_name
 from flwr.common import Context, RecordDict, now
 from flwr.common.config import (
@@ -134,6 +136,61 @@ from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
 from .control_account_auth_interceptor import get_current_account_info
+
+
+_AGENT_REF_CONFIG_KEY = "agent_ref"
+_AGENT_INPUT_JSON_CONFIG_KEY = "input_json"
+_AGENT_MODEL_CONFIG_KEY = "model"
+_BUILTIN_GPT_CHAT_AGENT_REF = "gpt-chat"
+
+
+@dataclass(frozen=True)
+class _AgentStartConfig:
+    """Parsed AgentApp start fields from Control override config."""
+
+    agent_ref: str
+    input_json: str
+    model: str | None
+
+
+def _parse_agent_start_config(override_config: UserConfig) -> _AgentStartConfig | None:
+    """Parse reserved AgentApp start keys from Control override config."""
+    if _AGENT_REF_CONFIG_KEY not in override_config:
+        return None
+
+    agent_ref = override_config[_AGENT_REF_CONFIG_KEY]
+    if not isinstance(agent_ref, str) or not agent_ref:
+        raise ValueError("Agent run requires a non-empty string 'agent_ref'.")
+    if agent_ref != _BUILTIN_GPT_CHAT_AGENT_REF:
+        raise ValueError(f"Unsupported agent_ref: {agent_ref}.")
+
+    input_json = override_config.get(_AGENT_INPUT_JSON_CONFIG_KEY)
+    if not isinstance(input_json, str):
+        raise ValueError("Agent run requires string 'input_json'.")
+    _validate_agent_input_json(input_json)
+
+    model = override_config.get(_AGENT_MODEL_CONFIG_KEY)
+    if model is not None and not isinstance(model, str):
+        raise ValueError("Agent run optional 'model' must be a string.")
+
+    return _AgentStartConfig(agent_ref=agent_ref, input_json=input_json, model=model)
+
+
+def _validate_agent_input_json(input_json: str) -> None:
+    """Validate AgentApp input JSON shape."""
+    try:
+        decoded = json.loads(input_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError("Agent input_json must be valid JSON.") from exc
+
+    if isinstance(decoded, dict):
+        return
+    if isinstance(decoded, list) and all(isinstance(item, dict) for item in decoded):
+        return
+
+    raise ValueError(
+        "Agent input_json must be a JSON object or an array of JSON objects."
+    )
 
 
 # pylint: disable=too-many-public-methods

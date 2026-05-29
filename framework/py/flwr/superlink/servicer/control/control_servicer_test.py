@@ -104,6 +104,7 @@ from flwr.superlink.servicer.control.control_account_auth_interceptor import (
 from .control_servicer import (
     ControlServicer,
     _format_verification,
+    _parse_agent_start_config,
     _validate_federation_and_node_in_request,
     _validate_federation_membership_in_request,
 )
@@ -129,6 +130,63 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.aid: str = account_info.flwr_aid
         shared_account_info.set(account_info)
         self.state = self.servicer.linkstate_factory.state()
+
+    def test_parse_agent_start_config_returns_none_without_agent_ref(self) -> None:
+        """Agent start config parser should ignore non-agent runs."""
+        config = _parse_agent_start_config({"train.lr": 0.1})
+
+        self.assertIsNone(config)
+
+    def test_parse_agent_start_config_accepts_gpt_chat_object_input(self) -> None:
+        """Agent start config parser should accept GPT Chat object input."""
+        input_json = json.dumps({"role": "user", "content": "hello"})
+
+        config = _parse_agent_start_config(
+            {
+                "agent_ref": "gpt-chat",
+                "input_json": input_json,
+                "model": "openai/gpt-5.5",
+            }
+        )
+
+        assert config is not None
+        self.assertEqual(config.agent_ref, "gpt-chat")
+        self.assertEqual(config.input_json, input_json)
+        self.assertEqual(config.model, "openai/gpt-5.5")
+
+    def test_parse_agent_start_config_accepts_gpt_chat_list_input(self) -> None:
+        """Agent start config parser should accept a list of input objects."""
+        input_json = json.dumps([{"role": "user", "content": "hello"}])
+
+        config = _parse_agent_start_config(
+            {"agent_ref": "gpt-chat", "input_json": input_json}
+        )
+
+        assert config is not None
+        self.assertEqual(config.model, None)
+
+    @parameterized.expand(
+        [
+            ("unsupported", {"agent_ref": "other-agent", "input_json": "{}"}),
+            ("missing_input", {"agent_ref": "gpt-chat"}),
+            ("malformed_input", {"agent_ref": "gpt-chat", "input_json": "{"}),
+            ("scalar_input", {"agent_ref": "gpt-chat", "input_json": '"hello"'}),
+            (
+                "mixed_list_input",
+                {"agent_ref": "gpt-chat", "input_json": '[{"role": "user"}, 1]'},
+            ),
+            (
+                "non_string_model",
+                {"agent_ref": "gpt-chat", "input_json": "{}", "model": 3},
+            ),
+        ]
+    )  # type: ignore
+    def test_parse_agent_start_config_rejects_invalid_values(
+        self, _name: str, override_config: dict[str, bool | float | int | str]
+    ) -> None:
+        """Agent start config parser should reject invalid agent config."""
+        with self.assertRaises(ValueError):
+            _parse_agent_start_config(override_config)
 
     def _create_dummy_run(self, flwr_aid: str | None) -> int:
         return self.state.create_run(

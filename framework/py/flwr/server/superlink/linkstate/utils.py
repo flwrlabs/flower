@@ -54,6 +54,8 @@ def primary_task_type_from_run_type(run_type: str) -> TaskType:
         return TaskType.SIMULATION
     if run_type == RunType.SERVER_APP:
         return TaskType.SERVER_APP
+    if run_type == RunType.AGENT_APP:
+        return TaskType.AGENT_APP
     raise ValueError(f"Unsupported run type: {run_type}")
 
 
