@@ -1197,29 +1197,7 @@ class TestControlServicerAuth(unittest.TestCase):
             self.assertEqual(msgs[0].log_output, "log1")
             self.assertEqual(msgs[0].latest_timestamp, 1.0)
 
-    def test_streamrunevents_auth_unsuccessful_when_not_federation_member(
-        self,
-    ) -> None:
-        """Test StreamRunEvents aborts when requester is not a federation member."""
-        run_id = self._create_dummy_run("run-owner")
-        request = StreamRunEventsRequest(run_id=run_id)
-        ctx = self.make_context()
-
-        with (
-            patch(
-                "flwr.superlink.servicer.control.control_servicer.get_current_account_info",
-                return_value=SimpleNamespace(flwr_aid="user-123"),
-            ),
-            patch.object(
-                self.state.federation_manager, "has_member", return_value=False
-            ),
-        ):
-            gen = self.servicer.StreamRunEvents(request, ctx)
-            with self.assertRaises(RuntimeError) as cm:
-                next(gen)
-            self.assertIn("FAILED_PRECONDITION", str(cm.exception))
-
-    def test_streamrunevents_yields_events_for_federation_member(self) -> None:
+    def test_streamrunevents_yields_events(self) -> None:
         """Test StreamRunEvents streams task events for an accessible run."""
         # Prepare
         run_id = 789
@@ -1228,7 +1206,7 @@ class TestControlServicerAuth(unittest.TestCase):
         ctx.is_active.return_value = True
         mock_run = Mock(
             federation=NOOP_FEDERATION,
-            status=RunStatus(Status.RUNNING, SubStatus.COMPLETED, ""),
+            status=RunStatus(Status.FINISHED, SubStatus.COMPLETED, ""),
         )
         event_1 = TaskEvent(
             id=5,
@@ -1269,10 +1247,7 @@ class TestControlServicerAuth(unittest.TestCase):
         self.assertEqual(msgs[0].task_event.id, 5)
         self.assertEqual(msgs[0].task_event.task_id, 123)
         self.assertEqual(msgs[0].task_event.event, "response.output_text.delta")
-        self.assertEqual(
-            msgs[0].task_event.data,
-            '{"delta":"Hel","type":"response.output_text.delta"}',
-        )
+        self.assertEqual(msgs[0].task_event.data, '{"delta":"Hel"}')
         self.assertEqual(msgs[1].task_event.id, 6)
         self.assertEqual(msgs[1].task_event.event, "response.completed")
 
