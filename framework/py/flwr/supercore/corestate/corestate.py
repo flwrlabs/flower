@@ -57,9 +57,9 @@ class CoreState(ABC):
         ----------
         federation : str
             Federation name used to filter RunSeries.
-        updated_before : str | None
+        updated_before : str | None (default: None)
             If set, return only RunSeries updated before this ISO timestamp.
-        limit : int | None
+        limit : int | None (default: None)
             Maximum number of RunSeries records to return. If `None`, no limit is
             applied.
 
