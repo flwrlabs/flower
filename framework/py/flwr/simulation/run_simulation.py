@@ -27,10 +27,11 @@ from logging import DEBUG, ERROR, INFO, WARNING
 from queue import Empty, Queue
 from typing import Any, cast
 
+from flwr.app import Context, RecordDict
 from flwr.app.user_config import UserConfig
 from flwr.cli.utils import get_sha256_hash
 from flwr.clientapp import ClientApp
-from flwr.common import Context, EventType, RecordDict, event, log
+from flwr.common import EventType, event, log
 from flwr.common.constant import RUN_ID_NUM_BYTES, TASK_ID_NUM_BYTES
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import (

@@ -21,18 +21,9 @@ from logging import DEBUG, ERROR, INFO, WARN
 from typing import cast
 
 import flwr.common.recorddict_compat as compat
+from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.app.message_type import MessageType
-from flwr.common import (
-    ConfigRecord,
-    Context,
-    FitRes,
-    Message,
-    NDArrays,
-    RecordDict,
-    bytes_to_ndarray,
-    log,
-    ndarrays_to_parameters,
-)
+from flwr.common import FitRes, NDArrays, bytes_to_ndarray, log, ndarrays_to_parameters
 from flwr.common.secure_aggregation.crypto.shamir import combine_shares
 from flwr.common.secure_aggregation.crypto.symmetric_encryption import (
     generate_shared_key,

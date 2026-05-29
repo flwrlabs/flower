@@ -19,7 +19,7 @@ from logging import DEBUG, ERROR, INFO
 
 import grpc
 
-from flwr.common import Message
+from flwr.app import Message
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.logger import log
 from flwr.common.serde import (

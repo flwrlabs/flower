@@ -25,9 +25,10 @@ from typing import Any, Literal, cast
 from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
 
+from flwr.app import Message
 from flwr.app.message import make_message
 from flwr.app.metadata import Metadata
-from flwr.common import Message, now
+from flwr.common import now
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,

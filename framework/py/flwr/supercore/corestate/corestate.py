@@ -19,7 +19,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Literal
 
-from flwr.common import Message
+from flwr.app import Message
 from flwr.common.typing import Fab
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 
