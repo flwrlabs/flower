@@ -360,12 +360,29 @@ def confirm_message_received(
     if abort_msg:
         raise InvalidRunStatusException(abort_msg)
 
-    state.acknowledge_message(request.message_object_id)
+    reply_to_message_id = _try_get_reply_to_message_id(
+        store.get(request.message_object_id)
+    )
+    acknowledged = state.acknowledge_message(
+        request.message_object_id, request.run_id, reply_to_message_id
+    )
 
     # Delete the message object
-    store.delete(request.message_object_id)
+    if acknowledged:
+        store.delete(request.message_object_id)
 
     return ConfirmMessageReceivedResponse()
+
+
+def _try_get_reply_to_message_id(object_content: bytes | None) -> str | None:
+    """Return reply_to_message_id for stored Message objects without children."""
+    if object_content is None:
+        return None
+    try:
+        message = Message.inflate(object_content)
+    except (ValueError, UnexpectedObjectContentError):
+        return None
+    return message.metadata.reply_to_message_id or None
 
 
 def _validate_heartbeat_interval(interval: float) -> None:

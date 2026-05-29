@@ -26,10 +26,13 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     PullMessagesRequest,
     PushMessagesRequest,
 )
-from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
+from flwr.proto.message_pb2 import (  # pylint: disable=E0611
+    ConfirmMessageReceivedRequest,
+    ObjectTree,
+)
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 
-from .message_handler import pull_messages, push_messages
+from .message_handler import confirm_message_received, pull_messages, push_messages
 
 
 def test_pull_messages() -> None:
@@ -159,3 +162,19 @@ def test_push_messages_cleans_up_failed_message_objects() -> None:
     store.delete.assert_called_once_with("object-id")
     store.delete_objects_in_run.assert_not_called()
     assert not response.objects_to_push
+
+
+def test_confirm_message_received_keeps_object_when_not_acknowledged() -> None:
+    """Test confirm_message_received keeps object after rejected acknowledgement."""
+    request = ConfirmMessageReceivedRequest(run_id=123, message_object_id="msg-id")
+    state = MagicMock()
+    state.get_run_status.return_value = {
+        123: RunStatus(status=Status.RUNNING, sub_status="", details="")
+    }
+    state.acknowledge_message.return_value = False
+    store = MagicMock()
+
+    confirm_message_received(request=request, state=state, store=store)
+
+    state.acknowledge_message.assert_called_once_with("msg-id", 123, None)
+    store.delete.assert_not_called()

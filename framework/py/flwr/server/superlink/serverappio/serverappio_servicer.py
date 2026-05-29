@@ -377,12 +377,29 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
-        _ = _get_authenticated_serverapp_run_id(context)
+        run_id = _get_authenticated_serverapp_run_id(context)
 
-        state.acknowledge_message(request.message_object_id)
-        store.delete(request.message_object_id)
+        reply_to_message_id = _try_get_reply_to_message_id(
+            store.get(request.message_object_id)
+        )
+        acknowledged = state.acknowledge_message(
+            request.message_object_id, run_id, reply_to_message_id
+        )
+        if acknowledged:
+            store.delete(request.message_object_id)
 
         return ConfirmMessageReceivedResponse()
+
+
+def _try_get_reply_to_message_id(object_content: bytes | None) -> str | None:
+    """Return reply_to_message_id for stored Message objects without children."""
+    if object_content is None:
+        return None
+    try:
+        message = Message.inflate(object_content)
+    except (ValueError, UnexpectedObjectContentError):
+        return None
+    return message.metadata.reply_to_message_id or None
 
 
 def _get_authenticated_serverapp_run_id(context: grpc.ServicerContext) -> int:

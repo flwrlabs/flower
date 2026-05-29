@@ -27,7 +27,7 @@ from unittest.mock import Mock, patch
 import grpc
 from parameterized import parameterized
 
-from flwr.common import ConfigRecord, Context, Error, Message, RecordDict
+from flwr.common import ConfigRecord, Context, Message, RecordDict
 from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
     SUPERLINK_NODE_ID,
@@ -534,70 +534,6 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             # Ins message was deleted
             assert self.state.num_message_ins() == 0
 
-    @parameterized.expand(
-        [
-            # Reply with Message
-            (RecordDict(), None),
-            # Reply with Error
-            (None, Error(code=0)),
-        ]
-    )  # type: ignore
-    def test_confirm_message_received_deletes_messages_in_linkstate(
-        self, content: RecordDict | None, error: Error | None
-    ) -> None:
-        """Test `ConfirmMessageReceived` deletes messages from LinkState."""
-        # Prepare
-        run_id = self._auth_run_id
-
-        # Push Messages and reply
-        message_ins = message_from_proto(
-            create_ins_message(
-                src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
-            )
-        )
-        # pylint: disable-next=W0212
-        message_ins.metadata._message_id = message_ins.object_id  # type: ignore
-
-        msg_id = self.state.store_message_ins(message=message_ins)
-        msg_ = self.state.get_message_ins(node_id=self.node_id, limit=1)[0]
-
-        if content is not None:
-            reply_msg = Message(content, reply_to=msg_)
-        else:
-            assert error is not None
-            reply_msg = Message(error, reply_to=msg_)
-
-        # pylint: disable-next=W0212
-        reply_msg.metadata._message_id = reply_msg.object_id  # type: ignore
-
-        self.state.store_message_res(message=reply_msg)
-        # Register response in ObjectStore (so pulling message request can be completed)
-        self.store.preregister(run_id, get_object_tree(reply_msg))
-        request = PullAppMessagesRequest(message_ids=[str(msg_id)])
-
-        # Execute
-        response, call = self._pull_messages.with_call(request=request)
-
-        # Assert
-        assert isinstance(response, PullAppMessagesResponse)
-        assert grpc.StatusCode.OK == call.code()
-        assert self.state.num_message_ins() == 1
-        assert self.state.num_message_res() == 1
-
-        confirm_request = ConfirmMessageReceivedRequest(
-            node=Node(node_id=self.node_id),
-            run_id=run_id,
-            message_object_id=reply_msg.object_id,
-        )
-        response, call = self._confirm_message_received.with_call(
-            request=confirm_request
-        )
-
-        assert isinstance(response, ConfirmMessageReceivedResponse)
-        assert grpc.StatusCode.OK == call.code()
-        assert self.state.num_message_ins() == 0
-        assert self.state.num_message_res() == 0
-
     def test_pull_message_from_expired_message_error(self) -> None:
         """Test that the servicer correctly handles the registration in the ObjectStore
         of an Error message created by the LinkState due to an expired TTL."""
@@ -636,6 +572,42 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             ]
             # expected a single object id (that of the error message)
             assert list(object_ids_in_response) == [msg_res.object_id]
+
+    def test_confirm_generated_error_reply_deletes_message_in_linkstate(self) -> None:
+        """Test `ConfirmMessageReceived` cleans up generated error replies."""
+        # Prepare
+        run_id = self._auth_run_id
+        assert self.state.deactivate_node(self.node_id)
+        message_ins = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
+            )
+        )
+        msg_id = self.state.store_message_ins(message=message_ins)
+
+        request = PullAppMessagesRequest(message_ids=[str(msg_id)])
+        response, call = self._pull_messages.with_call(request=request)
+        assert isinstance(response, PullAppMessagesResponse)
+        assert grpc.StatusCode.OK == call.code()
+        msg_res = message_from_proto(response.messages_list[0])
+        assert msg_res.has_error()
+        assert self.state.num_message_ins() == 1
+
+        # Execute
+        confirm_request = ConfirmMessageReceivedRequest(
+            node=Node(node_id=self.node_id),
+            run_id=run_id,
+            message_object_id=msg_res.object_id,
+        )
+        response, call = self._confirm_message_received.with_call(
+            request=confirm_request
+        )
+
+        # Assert
+        assert isinstance(response, ConfirmMessageReceivedResponse)
+        assert grpc.StatusCode.OK == call.code()
+        assert self.state.num_message_ins() == 0
+        assert self.state.num_message_res() == 0
 
     def test_push_object_succesful(self) -> None:
         """Test `PushObject`."""
@@ -758,14 +730,19 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
     def test_confirm_message_received_successful(self) -> None:
         """Test `ConfirmMessageReceived` success."""
         # Prepare
-        run_id = self._create_dummy_run()
+        run_id = self._auth_run_id
         proto = create_ins_message(
             src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
         )
         message_ins = message_from_proto(proto)
+        assert self.state.store_message_ins(message_ins)
+        message_ins = self.state.get_message_ins(node_id=self.node_id, limit=1)[0]
         message_res = Message(
             RecordDict({"cfg": ConfigRecord({"key": "value"})}), reply_to=message_ins
         )
+        # pylint: disable-next=W0212
+        message_res.metadata._message_id = message_res.object_id  # type: ignore
+        assert self.state.store_message_res(message_res)
 
         # Prepare: Save reply message in ObjectStore
         all_objects = get_all_nested_objects(message_res)
@@ -775,6 +752,8 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 
         # Assert: All objects are stored in the ObjectStore
         assert len(self.store) == len(all_objects)
+        assert self.state.num_message_ins() == 1
+        assert self.state.num_message_res() == 1
 
         # Execute: Confirm message received
         request = ConfirmMessageReceivedRequest(
@@ -790,6 +769,8 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 
         # Assert: Message is removed from LinkState
         assert len(self.store) == 0
+        assert self.state.num_message_ins() == 0
+        assert self.state.num_message_res() == 0
 
     def test_run_status_transitions(self) -> None:
         """Test `PullTaskInput` activates a claimed task and marks the run running."""
