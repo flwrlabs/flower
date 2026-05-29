@@ -323,10 +323,10 @@ class CoreState(ABC):
 
         Parameters
         ----------
-        run_id : Optional[int]
+        run_id : Optional[int] (default: None)
             If set, return only events for this run. If set to `None`, return
             events for all runs.
-        after_task_event_id : Optional[int]
+        after_task_event_id : Optional[int] (default: None)
             Return only events with an ID greater than this cursor. If set to
             `None`, retrieve all events.
 
