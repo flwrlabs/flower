@@ -47,16 +47,17 @@ class CoreState(ABC):
     def get_run_series(
         self,
         *,
-        federation: str,
+        federation: str | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
-        """Return RunSeries metadata for the specified federation.
+        """Return RunSeries metadata, optionally filtered by federation.
 
         Parameters
         ----------
-        federation : str
-            Federation name used to filter RunSeries.
+        federation : str | None (default: None)
+            Federation name used to filter RunSeries. If `None`, RunSeries from all
+            federations are returned.
         updated_before : str | None (default: None)
             If set, return only RunSeries updated before this ISO timestamp.
         limit : int | None (default: None)

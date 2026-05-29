@@ -23,7 +23,7 @@ from unittest.mock import patch
 
 from parameterized import parameterized
 
-from flwr.common import Context, RecordDict, now
+from flwr.common import now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,

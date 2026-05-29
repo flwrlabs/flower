@@ -134,28 +134,32 @@ class SqlCoreState(CoreState, SqlMixin):
     def get_run_series(
         self,
         *,
-        federation: str,
+        federation: str | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
-        """Return RunSeries metadata for the specified federation."""
+        """Return RunSeries metadata, optionally filtered by federation."""
         if limit is not None and limit < 0:
             raise AssertionError("`limit` must be >= 0")
         if limit == 0:
             return []
 
-        conditions = ["federation = :federation"]
-        params: dict[str, Any] = {"federation": federation}
+        conditions: list[str] = []
+        params: dict[str, Any] = {}
+        if federation is not None:
+            conditions.append("federation = :federation")
+            params["federation"] = federation
         if updated_before is not None:
             conditions.append("updated_at < :updated_before")
             params["updated_before"] = datetime.fromisoformat(
                 updated_before.replace("Z", "+00:00")
             )
 
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         query = f"""
             SELECT series_id, federation, description, created_at, updated_at
             FROM run_series
-            WHERE {" AND ".join(conditions)}
+            {where_clause}
             ORDER BY updated_at DESC
         """
         if limit is not None:

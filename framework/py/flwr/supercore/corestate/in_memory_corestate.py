@@ -115,11 +115,11 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
     def get_run_series(
         self,
         *,
-        federation: str,
+        federation: str | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
-        """Return RunSeries metadata for the specified federation."""
+        """Return RunSeries metadata, optionally filtered by federation."""
         if limit is not None and limit < 0:
             raise AssertionError("`limit` must be >= 0")
         if limit == 0:
@@ -128,7 +128,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         with self.lock_run_series_store:
             run_series = []
             for record in self.run_series_store.values():
-                if record.federation != federation:
+                if federation is not None and record.federation != federation:
                     continue
                 if updated_before is not None and record.updated_at >= updated_before:
                     continue
