@@ -624,7 +624,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 TASK_ID_NUM_BYTES,
                 exclude=set(self.task_store),
             )
-            pending_at = now().isoformat()
+            current = now().isoformat()
             run_record = RunRecord(
                 run=Run(
                     run_id=run_id,
@@ -656,7 +656,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             with self.lock_run_series_store:
                 run_series = self.run_series_store[resolved_series_id]
                 run_series.run_ids.append(run_id)
-                run_series.updated_at = now().isoformat()
+                run_series.updated_at = current
             # Add run_id to the flwr_aid_to_run_ids mapping if flwr_aid is provided
             if flwr_aid:
                 self.flwr_aid_to_run_ids[flwr_aid].add(run_id)
@@ -670,7 +670,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     sub_status="",
                     details="",
                 ),
-                pending_at=pending_at,
+                pending_at=current,
                 fab_hash=fab_hash,
                 model_ref=None,
                 connector_ref=None,

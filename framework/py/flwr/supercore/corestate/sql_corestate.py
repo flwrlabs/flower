@@ -128,9 +128,6 @@ class SqlCoreState(CoreState, SqlMixin):
         self, federation: str, series_id: int | None = None
     ) -> int | None:
         """Ensure a run series exists and return its ID."""
-        if not federation:
-            raise ValueError("Federation must be set")
-
         insert_query = """
             INSERT INTO run_series
             (series_id, federation, description, created_at, updated_at,

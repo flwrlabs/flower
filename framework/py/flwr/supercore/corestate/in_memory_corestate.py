@@ -115,9 +115,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self, federation: str, series_id: int | None = None
     ) -> int | None:
         """Ensure a run series exists and return its ID."""
-        if not federation:
-            raise ValueError("Federation must be set")
-
         with self.lock_run_series_store:
             if series_id is not None:
                 existing = self.run_series_store.get(series_id)

@@ -950,7 +950,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         override_config_json = json.dumps(override_config)
         run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
-        pending_at = now()
 
         with self.session():
             query = "SELECT COUNT(*) as cnt FROM run WHERE run_id = :run_id"
@@ -960,6 +959,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 if resolved_series_id is None:
                     log(ERROR, "Unexpected run series creation failure.")
                     return 0
+                current = now()
                 self.query(
                     run_insert_query,
                     {
@@ -991,7 +991,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         "connector_ref": None,
                         "token": None,
                         "active_until": None,
-                        "pending_at": pending_at,
+                        "pending_at": current,
                         "starting_at": None,
                         "running_at": None,
                         "finished_at": None,
@@ -1007,7 +1007,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     """,
                     {
                         "run_id": uint64_to_int64(run_id),
-                        "updated_at": pending_at,
+                        "updated_at": current,
                         "series_id": uint64_to_int64(resolved_series_id),
                     },
                 )
