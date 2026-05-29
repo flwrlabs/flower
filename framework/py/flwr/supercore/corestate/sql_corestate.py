@@ -188,10 +188,9 @@ class SqlCoreState(CoreState, SqlMixin):
                 return None
             return series_id
 
-    def store_run_to_series(self, *, series_id: int, run_id: int) -> None:
+    def store_run_to_series(self, *, series_id: int, run_id: int) -> bool:
         """Associate a run with a run series."""
-        timestamp = now()
-        with self.session():
+        try:
             self.query(
                 """
                 INSERT INTO series_runs (id, series_id, run_id)
@@ -203,17 +202,9 @@ class SqlCoreState(CoreState, SqlMixin):
                     "run_id": uint64_to_int64(run_id),
                 },
             )
-            self.query(
-                """
-                UPDATE run_series
-                SET updated_at = :updated_at
-                WHERE series_id = :series_id
-                """,
-                {
-                    "updated_at": timestamp,
-                    "series_id": uint64_to_int64(series_id),
-                },
-            )
+            return True
+        except IntegrityError:
+            return False
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""

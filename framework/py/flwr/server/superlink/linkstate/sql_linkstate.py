@@ -962,6 +962,12 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                     log(ERROR, "Unexpected run series creation failure.")
                     return 0
                 current = now()
+                if not self.store_run_to_series(
+                    series_id=resolved_series_id,
+                    run_id=run_id,
+                ):
+                    log(ERROR, "Unexpected run series membership failure.")
+                    return 0
                 self.query(
                     run_insert_query,
                     {
@@ -1000,10 +1006,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         "sub_status": "",
                         "details": "",
                     },
-                )
-                self.store_run_to_series(
-                    series_id=resolved_series_id,
-                    run_id=run_id,
                 )
                 return run_id
 

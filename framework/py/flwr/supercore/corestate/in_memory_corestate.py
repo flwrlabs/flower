@@ -157,12 +157,14 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             self.run_series_store[new_series_id] = run_series
             return new_series_id
 
-    def store_run_to_series(self, *, series_id: int, run_id: int) -> None:
+    def store_run_to_series(self, *, series_id: int, run_id: int) -> bool:
         """Associate a run with a run series."""
         with self.lock_run_series_store:
-            run_series = self.run_series_store[series_id]
+            run_series = self.run_series_store.get(series_id)
+            if run_series is None or run_id in run_series.run_ids:
+                return False
             run_series.run_ids.append(run_id)
-            run_series.updated_at = now().isoformat()
+            return True
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""

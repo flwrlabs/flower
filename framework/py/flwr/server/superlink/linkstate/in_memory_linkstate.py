@@ -628,6 +628,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 exclude=set(self.task_store),
             )
             current = now().isoformat()
+            if not self.store_run_to_series(
+                series_id=resolved_series_id,
+                run_id=run_id,
+            ):
+                log(ERROR, "Unexpected run series membership failure.")
+                return 0
             run_record = RunRecord(
                 run=Run(
                     run_id=run_id,
@@ -656,7 +662,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 federation_config=federation_config,
             )
             self.run_ids[run_id] = run_record
-            self.store_run_to_series(series_id=resolved_series_id, run_id=run_id)
             # Add run_id to the flwr_aid_to_run_ids mapping if flwr_aid is provided
             if flwr_aid:
                 self.flwr_aid_to_run_ids[flwr_aid].add(run_id)

@@ -68,7 +68,7 @@ class CoreState(ABC):
         """
 
     @abstractmethod
-    def store_run_to_series(self, *, series_id: int, run_id: int) -> None:
+    def store_run_to_series(self, *, series_id: int, run_id: int) -> bool:
         """Associate a run with a run series.
 
         Parameters
@@ -77,6 +77,11 @@ class CoreState(ABC):
             Keyword-only run series ID.
         run_id : int
             Keyword-only run ID to associate with the run series.
+
+        Returns
+        -------
+        bool
+            `True` if the association was stored, otherwise `False`.
         """
 
     @abstractmethod

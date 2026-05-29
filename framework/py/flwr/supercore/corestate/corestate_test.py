@@ -96,6 +96,17 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertIsNone(series_id)
         self.assertIn("Run series 123 not found", logs.output[0])
 
+    def test_store_run_to_series_returns_false_for_duplicate_run_id(self) -> None:
+        """Storing the same run ID twice should return False."""
+        state = self.state_factory()
+        series_id = state.ensure_run_series(federation="federation-a")
+        assert series_id is not None
+
+        self.assertTrue(state.store_run_to_series(series_id=series_id, run_id=123))
+        stored = state.store_run_to_series(series_id=series_id, run_id=123)
+
+        self.assertFalse(stored)
+
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
         state = self.state_factory()
