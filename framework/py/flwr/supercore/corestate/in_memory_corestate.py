@@ -79,6 +79,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.lock_task_message_store = Lock()
         self.run_series_store: dict[int, RunSeries] = {}
         self.task_event_store: dict[int, list[TaskEvent]] = {}
+        self.lock_task_event_store = Lock()
         self.lock_run_series_store = Lock()
         self._next_task_event_id = 1
 
