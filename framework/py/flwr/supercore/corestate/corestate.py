@@ -315,8 +315,9 @@ class CoreState(ABC):
     @abstractmethod
     def get_task_events(
         self,
-        run_id: int,
-        after_task_event_id: int | None,
+        *,
+        run_id: int | None = None,
+        after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor.
 
