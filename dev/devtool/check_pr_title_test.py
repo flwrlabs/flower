@@ -18,9 +18,7 @@ def test_main_accepts_valid_title(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_main_accepts_model_project(monkeypatch: pytest.MonkeyPatch) -> None:
     """The model project should be accepted."""
-    monkeypatch.setattr(
-        sys, "argv", ["python", "docs(model): Add Lizzy model docs"]
-    )
+    monkeypatch.setattr(sys, "argv", ["python", "docs(model): Add Lizzy model docs"])
 
     check_pr_title.main()
 
