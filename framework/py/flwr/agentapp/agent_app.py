@@ -21,8 +21,7 @@ from collections.abc import Callable
 
 from flwr.common import Context
 
-from .session import AgentSession
-from .typing import AgentAppCallable
+from .base import AgentAppCallable, AgentSession
 
 
 class AgentApp:

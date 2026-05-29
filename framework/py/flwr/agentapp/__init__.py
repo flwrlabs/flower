@@ -16,8 +16,8 @@
 
 
 from .agent_app import AgentApp as AgentApp
-from .responses import AgentResponses as AgentResponses
-from .session import AgentSession as AgentSession
+from .base import AgentResponses as AgentResponses
+from .base import AgentSession as AgentSession
 
 __all__ = [
     "AgentApp",

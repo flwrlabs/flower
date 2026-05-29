@@ -12,14 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""AgentSession (abstract base class)."""
+"""AgentApp abstract base classes and callable type alias."""
 
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 
-from .responses import AgentResponses
+from flwr.common import Context
+from flwr.supercore.typing import JSONObject
+
+
+class AgentResponses(ABC):
+    """Abstract base class for AgentApp model response creation."""
+
+    @abstractmethod
+    def create(self, request: JSONObject) -> JSONObject:
+        """Create a model response.
+
+        Parameters
+        ----------
+        request : JSONObject
+            Open Responses-compatible create request.
+
+        Returns
+        -------
+        response : JSONObject
+            Open Responses-compatible response.
+        """
 
 
 class AgentSession(ABC):
@@ -29,3 +50,6 @@ class AgentSession(ABC):
     @abstractmethod
     def responses(self) -> AgentResponses:
         """Model response creation API."""
+
+
+AgentAppCallable = Callable[[AgentSession, Context], None]
