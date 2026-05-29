@@ -143,8 +143,7 @@ class SqlCoreState(CoreState, SqlMixin):
         """
 
         with self.session():
-            resolved_series_id = series_id
-            if resolved_series_id is None:
+            if series_id is None:
                 while True:
                     candidate = generate_rand_int_from_bytes(
                         SERIES_ID_NUM_BYTES,
@@ -165,34 +164,24 @@ class SqlCoreState(CoreState, SqlMixin):
                     if rows:
                         return candidate
 
-            assert resolved_series_id is not None
-            timestamp = now()
-            self.query(
-                insert_query,
-                {
-                    "series_id": uint64_to_int64(resolved_series_id),
-                    "federation": federation,
-                    "description": None,
-                    "created_at": timestamp,
-                    "updated_at": timestamp,
-                    "last_run_id": None,
-                },
-            )
+            assert series_id is not None
             rows = self.query(
                 """
                 SELECT federation
                 FROM run_series
                 WHERE series_id = :series_id
                 """,
-                {"series_id": uint64_to_int64(resolved_series_id)},
+                {"series_id": uint64_to_int64(series_id)},
             )
+            if not rows:
+                raise ValueError(f"Run series {series_id} not found")
             existing = rows[0]
             if existing["federation"] != federation:
                 raise ValueError(
-                    f"Run series {resolved_series_id} belongs to federation "
+                    f"Run series {series_id} belongs to federation "
                     f"{existing['federation']!r}, not {federation!r}"
                 )
-            return resolved_series_id
+            return series_id
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""

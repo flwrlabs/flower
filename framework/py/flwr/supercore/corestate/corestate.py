@@ -52,8 +52,8 @@ class CoreState(ABC):
             Federation the run series belongs to.
         series_id : int | None (default: None)
             Optional caller-provided series ID. If `None`, a new nonzero series
-            ID is generated and created. If set, the matching series is reused
-            when it already belongs to `federation`, otherwise it is created.
+            ID is generated and created. If set, the matching series must
+            already exist and belong to `federation`.
 
         Returns
         -------
@@ -64,7 +64,7 @@ class CoreState(ABC):
         ------
         ValueError
             If `federation` is empty, `series_id` is not a positive uint64, or
-            an existing series with `series_id` belongs to a different federation.
+            `series_id` does not identify an existing run series for `federation`.
         """
 
     @abstractmethod

@@ -290,8 +290,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             The type of run being created.
         series_id : int | None (default: None)
             Optional run series ID. If `None`, a new run series is created for
-            the federation. If set, the series is resolved or created for the
-            federation.
+            the federation. If set, the series must already exist and belong to
+            the federation.
 
         Returns
         -------

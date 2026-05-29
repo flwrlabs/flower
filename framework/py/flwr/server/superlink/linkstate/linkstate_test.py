@@ -162,21 +162,35 @@ class StateTest(CoreStateTest):
         assert run.flwr_aid == "i1r9f"
         assert run.series_id > 0
 
-    def test_create_run_uses_provided_series_id(self) -> None:
-        """Test create_run links the run to a provided run series."""
+    def test_create_run_uses_existing_series_id(self) -> None:
+        """Test create_run links the run to an existing run series."""
         # Prepare
         state = self.state_factory()
+        series_id = state.ensure_run_series("health-federation")
 
         # Execute
         run_id = create_dummy_run(
             state,
             federation="health-federation",
-            series_id=123,
+            series_id=series_id,
         )
 
         # Assert
         run = state.get_run_info(run_ids=[run_id])[0]
-        self.assertEqual(run.series_id, 123)
+        self.assertEqual(run.series_id, series_id)
+
+    def test_create_run_rejects_unknown_series_id(self) -> None:
+        """Test create_run rejects an unknown run series ID."""
+        # Prepare
+        state = self.state_factory()
+
+        # Execute & assert
+        with self.assertRaisesRegex(ValueError, "not found"):
+            create_dummy_run(
+                state,
+                federation="health-federation",
+                series_id=123,
+            )
 
     def test_create_run_reuses_series_id_in_same_federation(self) -> None:
         """Test multiple runs can link to the same federation run series."""
@@ -187,17 +201,17 @@ class StateTest(CoreStateTest):
         run_id_1 = create_dummy_run(
             state,
             federation="health-federation",
-            series_id=123,
         )
+        first_run = state.get_run_info(run_ids=[run_id_1])[0]
         run_id_2 = create_dummy_run(
             state,
             federation="health-federation",
-            series_id=123,
+            series_id=first_run.series_id,
         )
 
         # Assert
         runs = state.get_run_info(run_ids=[run_id_1, run_id_2])
-        self.assertEqual({run.series_id for run in runs}, {123})
+        self.assertEqual({run.series_id for run in runs}, {first_run.series_id})
 
     def test_create_run_creates_primary_task(self) -> None:
         """Creating a run should also create its primary task."""
@@ -2210,19 +2224,22 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             raise exceptions[0]
         return results
 
-    def test_ensure_run_series_with_provided_id_is_idempotent_across_replicas(
+    def test_ensure_run_series_with_existing_id_is_idempotent_across_replicas(
         self,
     ) -> None:
-        """Ensure concurrent replicas can reuse the same new run series ID."""
+        """Ensure concurrent replicas can reuse the same existing run series ID."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = self._shared_sql_database(tmpdir)
-            self._create_shared_sql_states(db_path)
+            state = self._create_shared_sql_states(db_path)[0]
+            series_id = state.ensure_run_series("federation-a")
 
             results = self._query_states_in_parallel(
-                lambda state: state.ensure_run_series("federation-a", series_id=123)
+                lambda state: state.ensure_run_series(
+                    "federation-a", series_id=series_id
+                )
             )
 
-            self.assertEqual(results, [123, 123])
+            self.assertEqual(results, [series_id, series_id])
 
     # pylint: disable-next=too-many-locals
     def test_get_message_ins_claim_is_unique_across_replicas(self) -> None:

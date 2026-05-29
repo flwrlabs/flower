@@ -73,13 +73,20 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         mock_datetime.now.side_effect = timestamps
         return stack
 
-    def test_ensure_run_series_uses_provided_id(self) -> None:
-        """Ensuring a run series should preserve a caller-provided ID."""
+    def test_ensure_run_series_creates_id(self) -> None:
+        """Ensuring a run series should create a nonzero ID."""
         state = self.state_factory()
 
-        series_id = state.ensure_run_series("federation-a", series_id=123)
+        series_id = state.ensure_run_series("federation-a")
 
-        self.assertEqual(series_id, 123)
+        self.assertGreater(series_id, 0)
+
+    def test_ensure_run_series_rejects_unknown_id(self) -> None:
+        """Unknown caller-provided run series IDs are invalid."""
+        state = self.state_factory()
+
+        with self.assertRaisesRegex(ValueError, "not found"):
+            state.ensure_run_series("federation-a", series_id=123)
 
     def test_ensure_run_series_rejects_zero_id(self) -> None:
         """Zero is not a valid run series ID."""
@@ -105,19 +112,21 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_ensure_run_series_reuses_same_federation_id(self) -> None:
         """Existing run series IDs can be reused in the same federation."""
         state = self.state_factory()
-        state.ensure_run_series("federation-a", series_id=123)
+        created_series_id = state.ensure_run_series("federation-a")
 
-        series_id = state.ensure_run_series("federation-a", series_id=123)
+        series_id = state.ensure_run_series(
+            "federation-a", series_id=created_series_id
+        )
 
-        self.assertEqual(series_id, 123)
+        self.assertEqual(series_id, created_series_id)
 
     def test_ensure_run_series_rejects_different_federation_id(self) -> None:
         """Existing run series IDs cannot be reused in a different federation."""
         state = self.state_factory()
-        state.ensure_run_series("federation-a", series_id=123)
+        series_id = state.ensure_run_series("federation-a")
 
         with self.assertRaisesRegex(ValueError, "belongs to federation"):
-            state.ensure_run_series("federation-b", series_id=123)
+            state.ensure_run_series("federation-b", series_id=series_id)
 
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""

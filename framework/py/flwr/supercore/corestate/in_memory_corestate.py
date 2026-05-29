@@ -119,20 +119,21 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             raise ValueError("Series ID must be a positive uint64")
 
         with self.lock_run_series_store:
-            resolved_series_id = series_id
-            if resolved_series_id is None:
-                resolved_series_id = generate_rand_int_from_bytes(
-                    SERIES_ID_NUM_BYTES,
-                    exclude=set(self.run_series_store) | {0},
-                )
-            elif resolved_series_id in self.run_series_store:
-                existing = self.run_series_store[resolved_series_id]
+            if series_id is not None:
+                existing = self.run_series_store.get(series_id)
+                if existing is None:
+                    raise ValueError(f"Run series {series_id} not found")
                 if existing.federation != federation:
                     raise ValueError(
-                        f"Run series {resolved_series_id} belongs to federation "
+                        f"Run series {series_id} belongs to federation "
                         f"{existing.federation!r}, not {federation!r}"
                     )
-                return resolved_series_id
+                return series_id
+
+            resolved_series_id = generate_rand_int_from_bytes(
+                SERIES_ID_NUM_BYTES,
+                exclude=set(self.run_series_store) | {0},
+            )
 
             timestamp = now().isoformat()
             self.run_series_store[resolved_series_id] = RunSeries(

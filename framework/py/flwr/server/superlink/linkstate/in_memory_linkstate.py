@@ -654,9 +654,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             with self.lock_run_series_store:
                 run_series = self.run_series_store[resolved_series_id]
                 run_series.run_ids.append(run_id)
-                run_series.last_run_status.CopyFrom(
-                    run_status_to_proto(run_record.run.status)
-                )
                 run_series.updated_at = now().isoformat()
             # Add run_id to the flwr_aid_to_run_ids mapping if flwr_aid is provided
             if flwr_aid:

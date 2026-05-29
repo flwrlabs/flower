@@ -182,10 +182,11 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         assert run_context is not None
         self.assertEqual(run_context.series_id, response.series_id)
 
-    def test_start_run_uses_provided_series_id(self) -> None:
-        """Test StartRun links the run to the provided run series."""
+    def test_start_run_uses_existing_series_id(self) -> None:
+        """Test StartRun links the run to an existing run series."""
         fab_content = b"test FAB content with series ID"
-        request = StartRunRequest(series_id=123, federation=NOOP_FEDERATION)
+        series_id = self.state.ensure_run_series(NOOP_FEDERATION)
+        request = StartRunRequest(series_id=series_id, federation=NOOP_FEDERATION)
         request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
         request.fab.content = fab_content
 
@@ -204,10 +205,37 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         run = self.state.get_run_info(run_ids=[response.run_id])[0]
         run_context = self.state.get_serverapp_context(response.run_id)
 
-        self.assertEqual(response.series_id, 123)
-        self.assertEqual(run.series_id, 123)
+        self.assertEqual(response.series_id, series_id)
+        self.assertEqual(run.series_id, series_id)
         assert run_context is not None
-        self.assertEqual(run_context.series_id, 123)
+        self.assertEqual(run_context.series_id, series_id)
+
+    def test_start_run_aborts_for_unknown_series_id(self) -> None:
+        """Test StartRun aborts when the provided run series does not exist."""
+        fab_content = b"test FAB content with unknown series ID"
+        request = StartRunRequest(series_id=123, federation=NOOP_FEDERATION)
+        request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
+        request.fab.content = fab_content
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+            ) as mock_get_fab_config,
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+            ) as mock_get_metadata_from_config,
+            self.assertRaises(grpc.RpcError),
+        ):
+            mock_get_fab_config.return_value = {"tool": {"flwr": {"app": {}}}}
+            mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
+            self.servicer.StartRun(request, context)
+
+        context.abort.assert_called_once()
+        status_code, details = context.abort.call_args.args
+        self.assertEqual(status_code, grpc.StatusCode.FAILED_PRECONDITION)
+        self.assertIn("Run series 123 not found", details)
 
     @parameterized.expand(
         [
