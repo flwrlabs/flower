@@ -133,3 +133,13 @@ class TestMakeTaskHeartbeatFnGrpc(unittest.TestCase):
 
         # Execute & assert
         self.assertFalse(heartbeat_fn())
+
+    def test_send_task_heartbeat_failed_ack_returns_false(self) -> None:
+        """Test that failed heartbeat acknowledgements are retried."""
+        # Prepare
+        stub = Mock()
+        stub.SendTaskHeartbeat.return_value = SendTaskHeartbeatResponse(success=False)
+        heartbeat_fn = make_task_heartbeat_fn_grpc(stub)
+
+        # Execute & assert
+        self.assertFalse(heartbeat_fn())

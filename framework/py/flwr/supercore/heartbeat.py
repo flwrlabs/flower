@@ -16,7 +16,6 @@
 
 
 import random
-import signal
 import threading
 from collections.abc import Callable
 
@@ -148,10 +147,11 @@ def make_task_heartbeat_fn_grpc(
                 return False
             raise
 
-        # Raise SIGINT to trigger graceful shutdown if heartbeat failed
+        # Retry failed heartbeat acknowledgements instead of interrupting the app
+        # immediately. The state backend remains authoritative and will mark tasks
+        # failed once their heartbeat lease expires.
         if not res.success:
-            # Never reach here due to token authentication unless race conditions occur
-            signal.raise_signal(signal.SIGINT)
+            return False
         return True
 
     return fn
