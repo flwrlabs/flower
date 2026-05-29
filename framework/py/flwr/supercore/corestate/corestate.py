@@ -319,12 +319,13 @@ class CoreState(ABC):
         run_id: int | None = None,
         after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
-        """Return task-produced run events after the cursor.
+        """Return task-produced run events matching the filters.
 
         Parameters
         ----------
-        run_id : int
-            The run ID to retrieve events for.
+        run_id : Optional[int]
+            If set, return only events for this run. If set to `None`, return
+            events for all runs.
         after_task_event_id : Optional[int]
             Return only events with an ID greater than this cursor. If set to
             `None`, retrieve all events.

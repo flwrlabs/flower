@@ -457,15 +457,24 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
 
     def get_task_events(
         self,
-        run_id: int,
-        after_task_event_id: int | None,
+        *,
+        run_id: int | None = None,
+        after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor."""
         cursor = after_task_event_id if after_task_event_id is not None else 0
         with self.lock_task_event_store:
+            if run_id is None:
+                events = [
+                    event
+                    for task_events in self.task_event_store.values()
+                    for event in task_events
+                ]
+            else:
+                events = list(self.task_event_store.get(run_id, []))
             return [
                 event
-                for event in self.task_event_store.get(run_id, [])
+                for event in sorted(events, key=lambda event: event.id)
                 if event.id > cursor
             ]
 

@@ -537,19 +537,26 @@ class SqlCoreState(CoreState, SqlMixin):
 
     def get_task_events(
         self,
-        run_id: int,
-        after_task_event_id: int | None,
+        *,
+        run_id: int | None = None,
+        after_task_event_id: int | None = None,
     ) -> Sequence[TaskEvent]:
         """Return task-produced run events after the cursor."""
         cursor = after_task_event_id if after_task_event_id is not None else 0
+        conditions = ["id > :after_task_event_id"]
+        params = {"after_task_event_id": cursor}
+        if run_id is not None:
+            conditions.append("run_id = :run_id")
+            params["run_id"] = uint64_to_int64(run_id)
+
         rows = self.query(
-            """
+            f"""
             SELECT id, timestamp, run_id, task_id, event, data
             FROM task_event
-            WHERE run_id = :run_id AND id > :after_task_event_id
+            WHERE {" AND ".join(conditions)}
             ORDER BY id ASC
             """,
-            {"run_id": uint64_to_int64(run_id), "after_task_event_id": cursor},
+            params,
         )
 
         return [
