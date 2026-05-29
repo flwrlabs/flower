@@ -53,14 +53,6 @@ Value = (
 )
 
 
-# Value types for common.MetricRecord
-MetricScalar = int | float
-MetricScalarList = list[int] | list[float]
-MetricRecordValues = MetricScalar | MetricScalarList
-# Value types for common.ConfigRecord
-ConfigScalar = MetricScalar | str | bytes | bool
-ConfigScalarList = MetricScalarList | list[str] | list[bytes] | list[bool]
-ConfigRecordValues = ConfigScalar | ConfigScalarList
 Metrics = dict[str, Scalar]
 MetricsAggregationFn = Callable[[list[tuple[int, Metrics]]], Metrics]
 
@@ -226,6 +218,7 @@ class Run:  # pylint: disable=too-many-instance-attributes
     bytes_recv: int
     clientapp_runtime: float
     run_type: str = ""
+    series_id: int = 0
 
     @classmethod
     def create_empty(cls, run_id: int) -> "Run":
@@ -248,6 +241,7 @@ class Run:  # pylint: disable=too-many-instance-attributes
             bytes_recv=0,
             clientapp_runtime=0.0,
             run_type=RunType.SERVER_APP,
+            series_id=0,
         )
 
 

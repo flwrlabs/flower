@@ -26,11 +26,10 @@ import grpc
 from google.protobuf.message import Message as GrpcMessage
 from parameterized import parameterized
 
+from flwr.app.message import Message, RecordDict
 from flwr.client.grpc_rere_client.connection import grpc_request_response
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.constant import PUBLIC_KEY_HEADER, SIGNATURE_HEADER, TIMESTAMP_HEADER
-from flwr.common.message import Message
-from flwr.common.record import RecordDict
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
     ActivateNodeResponse,
