@@ -277,6 +277,9 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             exit_event=EventType.FLWR_SIMULATION_RUN_LEAVE,
         )
 
+        sub_status = SubStatus.COMPLETED
+        details = ""
+
         # Stop heartbeat before finalizing successful task output. Once the
         # simulation returns, any later heartbeat can only race with completion.
         if heartbeat_sender and heartbeat_sender.is_running:
@@ -285,9 +288,6 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         # Send resulting context
         # Temporarily disable pushing resulting context to SuperLink
         context.state = RecordDict()
-
-        sub_status = SubStatus.COMPLETED
-        details = ""
 
     except Exception as ex:  # pylint: disable=broad-exception-caught
         exc_entity = "Simulation"

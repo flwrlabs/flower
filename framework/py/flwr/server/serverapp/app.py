@@ -227,14 +227,15 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             context=context,
         )
 
+        # Update sub_status and details for successful completion as soon as
+        # the ServerApp returns. Cleanup below can block or be interrupted.
+        sub_status = SubStatus.COMPLETED
+        details = ""
+
         # Stop heartbeat before finalizing successful task output. Once the
         # ServerApp returns, any later heartbeat can only race with completion.
         if heartbeat_sender and heartbeat_sender.is_running:
             heartbeat_sender.stop()
-
-        # Update sub_status and details for successful completion
-        sub_status = SubStatus.COMPLETED
-        details = ""
 
         # Send resulting context
         # Temporarily disable pushing resulting context to servicer
