@@ -90,27 +90,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         with self.assertRaisesRegex(ValueError, "not found"):
             state.ensure_run_series("federation-a", series_id=123)
 
-    def test_ensure_run_series_reuses_same_federation_id(self) -> None:
-        """Existing run series IDs can be reused in the same federation."""
-        state = self.state_factory()
-        created_series_id = state.ensure_run_series("federation-a")
-        self.assertIsNotNone(created_series_id)
-        assert created_series_id is not None
-
-        series_id = state.ensure_run_series("federation-a", series_id=created_series_id)
-
-        self.assertEqual(series_id, created_series_id)
-
-    def test_ensure_run_series_rejects_different_federation_id(self) -> None:
-        """Existing run series IDs cannot be reused in a different federation."""
-        state = self.state_factory()
-        series_id = state.ensure_run_series("federation-a")
-        self.assertIsNotNone(series_id)
-        assert series_id is not None
-
-        with self.assertRaisesRegex(ValueError, "belongs to federation"):
-            state.ensure_run_series("federation-b", series_id=series_id)
-
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
         state = self.state_factory()

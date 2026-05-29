@@ -119,12 +119,17 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             if series_id is not None:
                 existing = self.run_series_store.get(series_id)
                 if existing is None:
-                    raise ValueError(f"Run series {series_id} not found")
+                    log(ERROR, "Run series %d not found", series_id)
+                    return None
                 if existing.federation != federation:
-                    raise ValueError(
-                        f"Run series {series_id} belongs to federation "
-                        f"{existing.federation!r}, not {federation!r}"
+                    log(
+                        ERROR,
+                        "Run series %d belongs to federation %r, not %r",
+                        series_id,
+                        existing.federation,
+                        federation,
                     )
+                    return None
                 return series_id
 
             new_series_id = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
