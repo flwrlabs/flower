@@ -35,7 +35,6 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.serde import run_status_to_proto
 from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
@@ -614,6 +613,9 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
         with self.lock_task_store, self.lock:
             resolved_series_id = self.ensure_run_series(federation, series_id)
+            if resolved_series_id is None:
+                log(ERROR, "Unexpected run series creation failure.")
+                return 0
             run_id = generate_rand_int_from_bytes(
                 RUN_ID_NUM_BYTES,
                 exclude=set(self.run_ids),

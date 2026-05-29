@@ -124,12 +124,12 @@ class SqlCoreState(CoreState, SqlMixin):
             verifications=json.loads(row["verifications"]),
         )
 
-    def ensure_run_series(self, federation: str, series_id: int | None = None) -> int:
+    def ensure_run_series(
+        self, federation: str, series_id: int | None = None
+    ) -> int | None:
         """Ensure a run series exists and return its ID."""
         if not federation:
             raise ValueError("Federation must be set")
-        if series_id is not None and not 0 < series_id < (1 << 64):
-            raise ValueError("Series ID must be a positive uint64")
 
         insert_query = """
             INSERT INTO run_series
@@ -144,27 +144,23 @@ class SqlCoreState(CoreState, SqlMixin):
 
         with self.session():
             if series_id is None:
-                while True:
-                    candidate = generate_rand_int_from_bytes(
-                        SERIES_ID_NUM_BYTES,
-                        exclude={0},
-                    )
-                    timestamp = now()
-                    rows = self.query(
-                        insert_query,
-                        {
-                            "series_id": uint64_to_int64(candidate),
-                            "federation": federation,
-                            "description": None,
-                            "created_at": timestamp,
-                            "updated_at": timestamp,
-                            "last_run_id": None,
-                        },
-                    )
-                    if rows:
-                        return candidate
+                candidate = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
+                timestamp = now()
+                rows = self.query(
+                    insert_query,
+                    {
+                        "series_id": uint64_to_int64(candidate),
+                        "federation": federation,
+                        "description": None,
+                        "created_at": timestamp,
+                        "updated_at": timestamp,
+                        "last_run_id": None,
+                    },
+                )
+                if rows:
+                    return candidate
+                return None
 
-            assert series_id is not None
             rows = self.query(
                 """
                 SELECT federation

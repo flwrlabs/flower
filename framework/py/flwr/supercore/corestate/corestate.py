@@ -43,7 +43,9 @@ class CoreState(ABC):
         """Return the FAB for the given hash, if present."""
 
     @abstractmethod
-    def ensure_run_series(self, federation: str, series_id: int | None = None) -> int:
+    def ensure_run_series(
+        self, federation: str, series_id: int | None = None
+    ) -> int | None:
         """Ensure a run series exists and return its ID.
 
         Parameters
@@ -51,20 +53,21 @@ class CoreState(ABC):
         federation : str
             Federation the run series belongs to.
         series_id : int | None (default: None)
-            Optional caller-provided series ID. If `None`, a new nonzero series
-            ID is generated and created. If set, the matching series must
-            already exist and belong to `federation`.
+            Optional caller-provided series ID. If `None`, a new series
+            ID is generated and creation is attempted. If set, the matching
+            series must already exist and belong to `federation`.
 
         Returns
         -------
-        int
-            The ID of the ensured run series.
+        int | None
+            The ID of the ensured run series, or `None` if a new run series
+            could not be created.
 
         Raises
         ------
         ValueError
-            If `federation` is empty, `series_id` is not a positive uint64, or
-            `series_id` does not identify an existing run series for `federation`.
+            If `federation` is empty, or `series_id` does not identify an
+            existing run series for `federation`.
         """
 
     @abstractmethod

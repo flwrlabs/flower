@@ -111,7 +111,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 verifications=dict(fab.verifications),
             )
 
-    def ensure_run_series(self, federation: str, series_id: int | None = None) -> int:
+    def ensure_run_series(
+        self, federation: str, series_id: int | None = None
+    ) -> int | None:
         """Ensure a run series exists and return its ID."""
         if not federation:
             raise ValueError("Federation must be set")
@@ -129,6 +131,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 return series_id
 
             new_series_id = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
+            if new_series_id in self.run_series_store:
+                return None
 
             timestamp = now().isoformat()
             self.run_series_store[new_series_id] = RunSeries(

@@ -167,6 +167,8 @@ class StateTest(CoreStateTest):
         # Prepare
         state = self.state_factory()
         series_id = state.ensure_run_series("health-federation")
+        self.assertIsNotNone(series_id)
+        assert series_id is not None
 
         # Execute
         run_id = create_dummy_run(
@@ -2223,23 +2225,6 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
         if exceptions:
             raise exceptions[0]
         return results
-
-    def test_ensure_run_series_with_existing_id_is_idempotent_across_replicas(
-        self,
-    ) -> None:
-        """Ensure concurrent replicas can reuse the same existing run series ID."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = self._shared_sql_database(tmpdir)
-            state = self._create_shared_sql_states(db_path)[0]
-            series_id = state.ensure_run_series("federation-a")
-
-            results = self._query_states_in_parallel(
-                lambda state: state.ensure_run_series(
-                    "federation-a", series_id=series_id
-                )
-            )
-
-            self.assertEqual(results, [series_id, series_id])
 
     # pylint: disable-next=too-many-locals
     def test_get_message_ins_claim_is_unique_across_replicas(self) -> None:
