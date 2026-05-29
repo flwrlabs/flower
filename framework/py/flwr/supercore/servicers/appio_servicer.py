@@ -16,7 +16,7 @@
 
 
 from abc import ABC, abstractmethod
-from logging import DEBUG
+from logging import DEBUG, ERROR
 
 import grpc
 
@@ -154,7 +154,24 @@ class AppIoServicer(ABC):
     ) -> PushTaskEventsResponse:
         """Push task events."""
         log(DEBUG, "AppIoServicer.PushTaskEvents")
-        raise NotImplementedError("PushTaskEvents is not implemented yet.")
+
+        task = get_authenticated_task()
+        if not request.events:
+            return PushTaskEventsResponse()
+
+        for event in request.events:
+            event.run_id = task.run_id
+            event.task_id = task.task_id
+
+        if not self.state().store_task_events(request.events):
+            log(
+                ERROR,
+                "Task events could not be stored for task %d of run %d.",
+                task.task_id,
+                task.run_id,
+            )
+
+        return PushTaskEventsResponse()
 
     def PullTaskMessage(
         self, request: PullTaskMessageRequest, context: grpc.ServicerContext
