@@ -302,7 +302,9 @@ class CoreState(ABC):
         ----------
         events : Sequence[TaskEvent]
             Task events to store. Event IDs and timestamps are assigned by the
-            CoreState implementation.
+            CoreState implementation. Event payloads are validated before any
+            events are stored, so one invalid event payload rejects the whole
+            batch.
 
         Returns
         -------

@@ -525,21 +525,6 @@ class SqlCoreState(CoreState, SqlMixin):
         ]
 
         with self.session():
-            for event in events:
-                task_rows = self.query(
-                    """
-                    SELECT task_id
-                    FROM task
-                    WHERE task_id = :task_id AND run_id = :run_id
-                    """,
-                    {
-                        "task_id": uint64_to_int64(event.task_id),
-                        "run_id": uint64_to_int64(event.run_id),
-                    },
-                )
-                if not task_rows:
-                    return False
-
             self.query(
                 """
                 INSERT INTO task_event (timestamp, run_id, task_id, event, data)

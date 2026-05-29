@@ -26,7 +26,7 @@ from flwr.app.metadata import Metadata
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.supercore.date import now
 from flwr.supercore.typing import JSONObject, JSONValue
-from flwr.supercore.utils import strict_json_value_dumps, strict_json_value_loads
+from flwr.supercore.utils import strict_json_loads, strict_json_value_dumps
 
 _PAYLOAD_RECORD_KEY = "payload"
 _PAYLOAD_JSON_KEY = "json"
@@ -204,7 +204,7 @@ def _payload_from_content(content: RecordDict) -> JSONObject:
         raise ValueError("Expected payload JSON to be a string.")
 
     try:
-        payload = strict_json_value_loads(raw)
+        payload = strict_json_loads(raw)
     except ValueError as err:
         raise ValueError("Payload JSON is malformed.") from err
 

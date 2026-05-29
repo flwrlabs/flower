@@ -66,7 +66,7 @@ def _reject_non_finite_strict_json_value(value: str) -> None:
     raise ValueError(f"Strict JSON value contains non-finite number {value}.")
 
 
-def strict_json_value_loads(raw: str | bytes | bytearray) -> JSONValue:
+def strict_json_loads(raw: str | bytes | bytearray) -> JSONValue:
     """Parse a strict JSON value.
 
     Strict JSON values reject Python's non-standard ``NaN`` and ``Infinity``

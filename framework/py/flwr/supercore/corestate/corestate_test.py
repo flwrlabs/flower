@@ -696,6 +696,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
     def test_store_and_get_task_events(self) -> None:
         """Task events should round-trip in assigned ID order."""
+        # Prepare: Create one run with a task and two valid task events.
         state = self.state_factory()
         run_id = self.task_run_id(state)
         task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
@@ -713,6 +714,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             data='{"type":"response.output_text.delta","delta":"Hel"}',
         )
 
+        # Execute: Store the events and read them through full and cursored fetches.
         self.assertFalse(state.store_task_events([]))
         self.assertTrue(state.store_task_events([event_1, event_2]))
         events = state.get_task_events(run_id, after_task_event_id=None)
@@ -720,6 +722,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         after_first = state.get_task_events(run_id, after_task_event_id=events[0].id)
         no_new = state.get_task_events(run_id, after_task_event_id=latest_id)
 
+        # Assert: Events keep assigned ID order and cursor filtering works.
         self.assertEqual(len(events), 2)
         self.assertIsInstance(events[0], TaskEvent)
         self.assertGreater(events[0].id, 0)
@@ -751,11 +754,13 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self, _name: str, data: str
     ) -> None:
         """Task event data should be a JSON object string."""
+        # Prepare: Create one valid event followed by an invalid payload variant.
         state = self.state_factory()
         run_id = self.task_run_id(state)
         task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
         assert task_id is not None
 
+        # Execute: Attempt to store the mixed event batch.
         self.assertFalse(
             state.store_task_events(
                 [
@@ -775,6 +780,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             )
         )
 
+        # Assert: The invalid payload rejects the whole batch.
         events = state.get_task_events(run_id, after_task_event_id=None)
         self.assertEqual(events, [])
 

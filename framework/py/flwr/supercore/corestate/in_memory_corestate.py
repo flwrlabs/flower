@@ -444,25 +444,13 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         except ValueError:
             return False
 
-        with self.lock_task_store, self.lock_task_event_store:
-            for event in events:
-                task = self.task_store.get(event.task_id)
-                if task is None or task.run_id != event.run_id:
-                    return False
-
+        with self.lock_task_event_store:
             current = now().isoformat()
             for event in events:
                 task_events = self.task_event_store.setdefault(event.run_id, [])
-                task_events.append(
-                    TaskEvent(
-                        id=self._next_task_event_id,
-                        timestamp=current,
-                        run_id=event.run_id,
-                        task_id=event.task_id,
-                        event=event.event,
-                        data=event.data,
-                    )
-                )
+                event.id = self._next_task_event_id
+                event.timestamp = current
+                task_events.append(event)
                 self._next_task_event_id += 1
 
         return True

@@ -38,8 +38,8 @@ from .utils import (
     request_download_link,
     simulation_config_from_json,
     simulation_config_to_json,
+    strict_json_loads,
     strict_json_value_dumps,
-    strict_json_value_loads,
     uint64_to_int64,
 )
 
@@ -67,15 +67,15 @@ def test_mask_string() -> None:
     assert mask_string("1234567890", head=5, tail=4) == "12345...7890"
 
 
-def test_strict_json_value_loads() -> None:
+def test_strict_json_loads() -> None:
     """Parse valid JSON values."""
-    assert strict_json_value_loads('{"key":[1,true,null]}') == {"key": [1, True, None]}
+    assert strict_json_loads('{"key":[1,true,null]}') == {"key": [1, True, None]}
 
 
-def test_strict_json_value_loads_rejects_non_finite_numbers() -> None:
+def test_strict_json_loads_rejects_non_finite_numbers() -> None:
     """Reject Python's non-standard JSON number constants."""
     with pytest.raises(ValueError, match="non-finite number NaN"):
-        strict_json_value_loads('{"key":NaN}')
+        strict_json_loads('{"key":NaN}')
 
 
 def test_strict_json_value_dumps() -> None:
