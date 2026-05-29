@@ -83,6 +83,17 @@ def create_corestate_metadata() -> MetaData:
     )
 
     # --------------------------------------------------------------------------
+    #  Table: series_run
+    # --------------------------------------------------------------------------
+    series_run = Table(
+        "series_run",
+        metadata,
+        Column("series_id", BigInteger, nullable=False),
+        Column("run_id", BigInteger, primary_key=True, nullable=False),
+    )
+    Index("idx_series_run_series_id", series_run.c.series_id)
+
+    # --------------------------------------------------------------------------
     #  Table: task
     # --------------------------------------------------------------------------
     task = Table(
