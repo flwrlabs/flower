@@ -60,6 +60,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
+from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
 from flwr.supercore.app_utils import start_parent_process_monitor
@@ -166,6 +167,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     sub_status = SubStatus.FAILED
     details = "Task failed with unknown error."
     context: Context | None = None
+    metrics = VceMetrics()
     runtime_env_dir = None
     exit_code = ExitCode.SUCCESS
 
@@ -262,7 +264,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         )
 
         # Launch the simulation
-        context = _run_simulation(
+        simulation_result = _run_simulation(
             server_app_attr=server_app_attr,
             client_app_attr=client_app_attr,
             num_supernodes=num_supernodes,
@@ -275,7 +277,9 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             server_app_context=context,
             is_app=True,
             exit_event=EventType.FLWR_SIMULATION_RUN_LEAVE,
+            metrics=metrics,
         )
+        context = simulation_result.context
 
         # Send resulting context
         # Temporarily disable pushing resulting context to SuperLink
@@ -307,6 +311,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             context=context_to_proto(context) if context else None,
             sub_status=sub_status,
             details=details,
+            clientapp_runtime=metrics.clientapp_runtime,
         )
         try:
             conn._stub.PushTaskOutput(out_req)

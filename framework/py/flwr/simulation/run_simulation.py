@@ -22,6 +22,7 @@ import logging
 import platform
 import threading
 import traceback
+from dataclasses import dataclass
 from logging import DEBUG, ERROR, INFO, WARNING
 from queue import Empty, Queue
 from typing import Any, cast
@@ -45,6 +46,7 @@ from flwr.server.run_serverapp import run as _run
 from flwr.server.server_app import ServerApp
 from flwr.server.superlink.fleet import vce
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
+from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkStateFactory
 from flwr.server.superlink.linkstate.in_memory_linkstate import RunRecord
 from flwr.server.superlink.linkstate.utils import generate_rand_int_from_bytes
@@ -58,6 +60,14 @@ from flwr.supercore.constant import (
 )
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.superlink.federation import NoOpFederationManager
+
+
+@dataclass(frozen=True)
+class SimulationRunResult:
+    """Result returned after a Simulation Runtime run."""
+
+    context: Context
+    metrics: VceMetrics
 
 
 def _replace_keys(d: Any, match: str, target: str) -> Any:
@@ -253,7 +263,8 @@ def _main_loop(
     server_app: ServerApp | None = None,
     server_app_attr: str | None = None,
     server_app_context: Context | None = None,
-) -> Context:
+    metrics: VceMetrics | None = None,
+) -> SimulationRunResult:
     """Start ServerApp on a separate thread, then launch Simulation Engine."""
     # Initialize StateFactory
     state_factory = LinkStateFactory(
@@ -265,6 +276,8 @@ def _main_loop(
     server_app_thread_has_exception = threading.Event()
     serverapp_th = None
     success = True
+    if metrics is None:
+        metrics = VceMetrics()
     if server_app_context is None:
         server_app_context = Context(
             run_id=run.run_id,
@@ -314,6 +327,7 @@ def _main_loop(
             state_factory=state_factory,
             f_stop=f_stop,
             run=run,
+            metrics=metrics,
         )
 
         updated_context = output_context_queue.get(timeout=3)
@@ -342,7 +356,7 @@ def _main_loop(
                 raise RuntimeError("Exception in ServerApp thread")
 
     log(DEBUG, "Stopping Simulation Engine now.")
-    return updated_context
+    return SimulationRunResult(context=updated_context, metrics=metrics)
 
 
 # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
@@ -361,7 +375,8 @@ def _run_simulation(
     enable_tf_gpu_growth: bool = False,
     verbose_logging: bool = False,
     is_app: bool = False,
-) -> Context:
+    metrics: VceMetrics | None = None,
+) -> SimulationRunResult:
     """Launch the Simulation Engine."""
     if backend_config is None:
         backend_config = {}
@@ -443,6 +458,7 @@ def _run_simulation(
         server_app,
         server_app_attr,
         server_app_context,
+        metrics,
     )
     # Detect if there is an Asyncio event loop already running.
     # If yes, disable logger propagation. In environmnets
@@ -464,5 +480,5 @@ def _run_simulation(
             # Set logger propagation to False to prevent duplicated log output in Colab.
             logger = set_logger_propagation(logger, False)
 
-        updated_context = _main_loop(*args)
-    return updated_context
+        simulation_result = _main_loop(*args)
+    return simulation_result
