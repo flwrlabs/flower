@@ -127,7 +127,7 @@ erDiagram
     BLOB context "nullable"
   }
 
-  series_run {
+  series_runs {
     BIGINT run_id PK
     BIGINT series_id
   }
