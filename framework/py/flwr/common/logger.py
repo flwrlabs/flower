@@ -221,12 +221,12 @@ def configure_superlink_log_file(
     for handler in FLOWER_LOGGER.handlers:
         if not isinstance(handler, TimedRotatingFileHandler):
             continue
-        if Path(handler.baseFilename).resolve() != path:  # pylint: disable=no-member
+        if Path(handler.baseFilename).resolve() != path:
             continue
         matching_handlers.append(handler)
-        if handler.interval != interval_hours * 60 * 60:  # pylint: disable=no-member
+        if handler.interval != interval_hours * 60 * 60:
             continue
-        if handler.backupCount != backup_count:  # pylint: disable=no-member
+        if handler.backupCount != backup_count:
             continue
         return
 
