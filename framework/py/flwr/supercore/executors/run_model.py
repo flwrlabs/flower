@@ -165,14 +165,7 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
         # Set exit code
         exit_code = ExitCode.SERVERAPP_EXCEPTION
 
-        # Push a model error response when request routing metadata is available.
-        if (
-            task_id is not None
-            and run_id is not None
-            and request_message is not None
-            and request_message.metadata.src_task_id is not None
-            and bool(request_message.metadata.message_id)
-        ):
+        if task_id is not None and run_id is not None and request_message is not None:
             try:
                 _push_model_response(
                     stub,

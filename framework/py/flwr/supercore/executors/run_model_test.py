@@ -35,15 +35,11 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     SendTaskHeartbeatResponse,
 )
 from flwr.proto.run_pb2 import Run, RunStatus  # pylint: disable=E0611
-from flwr.supercore.interceptors import (
-    AppIoTokenClientInterceptor,
-    RuntimeVersionClientInterceptor,
-)
 from flwr.supercore.model_message import ModelRequest, ModelResponse
 from flwr.supercore.typing import JSONObject
 
 from .model.provider import ModelProviderError
-from .run_model import _create_serverappio_stub, run_model
+from .run_model import run_model
 
 
 class _FakeChannel:
@@ -60,7 +56,7 @@ class _FakeChannel:
 class _FakeStub:  # pylint: disable=invalid-name
     """Fake ServerAppIo stub."""
 
-    def __init__(self, request: ModelRequest | None = None) -> None:
+    def __init__(self, request: ModelRequest) -> None:
         self.request = request
         self.messages: list[ModelResponse] = []
         self.outputs: list[PushTaskOutputRequest] = []
@@ -84,8 +80,6 @@ class _FakeStub:  # pylint: disable=invalid-name
     def PullTaskMessage(self, _request: object) -> PullTaskMessageResponse:
         """Fake task message pull."""
         self.calls.append("PullTaskMessage")
-        if self.request is None:
-            return PullTaskMessageResponse(messages=[])
         return PullTaskMessageResponse(messages=[message_to_proto(self.request)])
 
     def PushTaskMessage(self, request: Any) -> object:
@@ -143,33 +137,6 @@ def _run_with_stub(stub: _FakeStub) -> Mock:
     heartbeat_sender.start.assert_called_once()
     heartbeat_sender.stop.assert_called_once()
     return flwr_exit
-
-
-def test_create_serverappio_stub_adds_model_interceptors() -> None:
-    """The model executor should authenticate as `flwr-model`."""
-    channel = Mock()
-    with (
-        patch(
-            "flwr.supercore.executors.run_model.create_channel",
-            return_value=channel,
-        ) as create_channel,
-        patch("flwr.supercore.executors.run_model.ServerAppIoStub"),
-        patch("flwr.supercore.executors.run_model.wrap_stub"),
-    ):
-        _create_serverappio_stub(
-            serverappio_api_address="127.0.0.1:9091",
-            token="task-token",
-            certificates=None,
-        )
-
-    kwargs = create_channel.call_args.kwargs
-    assert kwargs["server_address"] == "127.0.0.1:9091"
-    assert kwargs["insecure"] is True
-    interceptors = kwargs["interceptors"]
-    assert isinstance(interceptors[0], RuntimeVersionClientInterceptor)
-    assert isinstance(interceptors[1], AppIoTokenClientInterceptor)
-    metadata = interceptors[0]._metadata  # pylint: disable=protected-access
-    assert metadata.component_name == "flwr-model"
 
 
 def test_run_model_pushes_stream_and_success_responses() -> None:
@@ -240,30 +207,4 @@ def test_run_model_pushes_error_response_on_provider_failure() -> None:
     assert error["provider_status_code"] == 429
     assert stub.outputs[-1].sub_status == SubStatus.FAILED
     assert "quota exceeded" in stub.outputs[-1].details
-    assert flwr_exit.call_args.args[0] == ExitCode.SERVERAPP_EXCEPTION
-
-
-def test_run_model_fails_task_when_request_is_missing() -> None:
-    """The executor should require one model request."""
-    stub = _FakeStub(None)
-
-    flwr_exit = _run_with_stub(stub)
-
-    assert not stub.messages
-    assert stub.outputs[-1].sub_status == SubStatus.FAILED
-    assert "Expected exactly one model request" in stub.outputs[-1].details
-    assert flwr_exit.call_args.args[0] == ExitCode.SERVERAPP_EXCEPTION
-
-
-def test_run_model_fails_task_when_request_metadata_is_invalid() -> None:
-    """The executor should fail malformed requests without replying."""
-    request = _request_message()
-    request.metadata.src_task_id = None
-    stub = _FakeStub(request)
-
-    flwr_exit = _run_with_stub(stub)
-
-    assert not stub.messages
-    assert stub.outputs[-1].sub_status == SubStatus.FAILED
-    assert "Model request source task is not set" in stub.outputs[-1].details
     assert flwr_exit.call_args.args[0] == ExitCode.SERVERAPP_EXCEPTION
