@@ -71,12 +71,16 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetAuthTokensResponse,
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
+    GetRunSeriesRequest,
+    GetRunSeriesResponse,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
     ListInvitationsResponse,
     ListNodesRequest,
     ListNodesResponse,
+    ListRunSeriesRequest,
+    ListRunSeriesResponse,
     ListRunsRequest,
     ListRunsResponse,
     PullArtifactsRequest,
@@ -379,6 +383,22 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             run_dict={run.run_id: run_to_proto(run) for run in runs},
             now=now().isoformat(),
         )
+
+    def ListRunSeries(
+        self, request: ListRunSeriesRequest, context: grpc.ServicerContext
+    ) -> ListRunSeriesResponse:
+        """List run series."""
+        log(INFO, "ControlServicer.ListRunSeries")
+        context.abort(grpc.StatusCode.UNIMPLEMENTED, "Method not implemented!")
+        raise grpc.RpcError()  # This line is unreachable
+
+    def GetRunSeries(
+        self, request: GetRunSeriesRequest, context: grpc.ServicerContext
+    ) -> GetRunSeriesResponse:
+        """Get run series."""
+        log(INFO, "ControlServicer.GetRunSeries")
+        context.abort(grpc.StatusCode.UNIMPLEMENTED, "Method not implemented!")
+        raise grpc.RpcError()  # This line is unreachable
 
     def StopRun(
         self, request: StopRunRequest, context: grpc.ServicerContext

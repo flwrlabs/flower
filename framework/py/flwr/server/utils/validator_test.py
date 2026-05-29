@@ -20,9 +20,9 @@ from uuid import uuid4
 
 from parameterized import parameterized
 
+from flwr.app.message import make_message
 from flwr.common import DEFAULT_TTL, Error, Message, Metadata, RecordDict, now
 from flwr.common.constant import SUPERLINK_NODE_ID
-from flwr.common.message import make_message
 
 from .validator import validate_message
 

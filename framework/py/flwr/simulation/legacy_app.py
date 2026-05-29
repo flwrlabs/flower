@@ -50,33 +50,6 @@ from flwr.simulation.ray_transport.ray_actor import (
 )
 from flwr.simulation.ray_transport.ray_client_proxy import RayActorClientProxy
 
-INVALID_ARGUMENTS_START_SIMULATION = """
-INVALID ARGUMENTS ERROR
-
-Invalid Arguments in method:
-
-`start_simulation(
-    *,
-    client_fn: ClientFn,
-    num_clients: int,
-    clients_ids: Optional[List[str]] = None,
-    client_resources: Optional[Dict[str, float]] = None,
-    server: Optional[Server] = None,
-    config: ServerConfig = None,
-    strategy: Optional[Strategy] = None,
-    client_manager: Optional[ClientManager] = None,
-    ray_init_args: Optional[Dict[str, Any]] = None,
-) -> None:`
-
-REASON:
-    Method requires:
-        - Either `num_clients`[int] or `clients_ids`[List[str]]
-        to be set exclusively.
-        OR
-        - `len(clients_ids)` == `num_clients`
-
-"""
-
 NodeToPartitionMapping = dict[int, int]
 
 
