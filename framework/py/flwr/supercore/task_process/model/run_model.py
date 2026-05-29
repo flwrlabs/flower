@@ -18,7 +18,6 @@
 from __future__ import annotations
 
 from logging import DEBUG, ERROR
-from pathlib import Path
 from queue import Queue
 from typing import cast
 
@@ -55,9 +54,6 @@ from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
 )
 from flwr.supercore.model_message import ModelRequest, ModelResponse
-from flwr.supercore.superexec.dependency_installer import (
-    cleanup_app_runtime_environment,
-)
 from flwr.supercore.typing import JSONObject, JSONValue
 
 from .model.provider import ModelProviderError, invoke_model_provider
@@ -91,7 +87,6 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
     # Initialize variables for exit handler
     log_uploader = None
     heartbeat_sender = None
-    runtime_env_dir: Path | None = None
     task_id: int | None = None
     run_id: int | None = None
     request_message: ModelRequest | None = None
@@ -100,15 +95,9 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
     details = _UNKNOWN_ERROR_DETAILS
     exit_code = ExitCode.SUCCESS
 
-    def on_exit() -> None:
-        if log_uploader:
-            stop_log_uploader(log_queue, log_uploader)
-        cleanup_app_runtime_environment(runtime_env_dir)
-
     register_signal_handlers(
         event_type=EventType.FLWR_MODEL_RUN_LEAVE,
         exit_message="Run stopped by user.",
-        exit_handlers=[on_exit],
     )
 
     try:
@@ -152,8 +141,15 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
             model_request.payload,
             on_stream_event=on_stream_event,
         )
-        response = _normalize_response(provider_response)
-        _push_model_response(stub, request_message, task_id, run_id, response)
+        response = dict(provider_response)
+        response.setdefault("object", "response")
+        _push_model_response(
+            stub,
+            request_message,
+            task_id,
+            run_id,
+            cast(JSONObject, response),
+        )
 
         # Update sub_status and details for successful completion
         sub_status = SubStatus.COMPLETED
@@ -219,9 +215,6 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
         # Close the Grpc connection
         channel.close()
 
-        # Clean up run-scoped runtime environment, if any.
-        cleanup_app_runtime_environment(runtime_env_dir)
-
     flwr_exit(
         exit_code,
         event_type=EventType.FLWR_MODEL_RUN_LEAVE,
@@ -276,13 +269,6 @@ def _parse_model_request(message: ModelRequest, task_id: int) -> ModelRequest:
     return ModelRequest.from_message(message)
 
 
-def _get_reply_task_id(request_message: ModelRequest) -> int:
-    """Return the task ID that should receive the model response."""
-    if request_message.metadata.src_task_id is None:
-        raise RuntimeError("Model request source task is not set.")
-    return request_message.metadata.src_task_id
-
-
 def _push_model_response(
     stub: ServerAppIoStub,
     request_message: ModelRequest,
@@ -291,8 +277,10 @@ def _push_model_response(
     response: JSONObject,
 ) -> None:
     """Push a ModelResponse back to the requesting task."""
+    if request_message.metadata.src_task_id is None:
+        raise RuntimeError("Model request source task is not set.")
     message = ModelResponse(
-        dst_task_id=_get_reply_task_id(request_message),
+        dst_task_id=request_message.metadata.src_task_id,
         response=response,
         reply_to_message_id=request_message.metadata.message_id,
     )
@@ -300,13 +288,6 @@ def _push_model_response(
     message.metadata.src_task_id = src_task_id
     message.metadata.__dict__["_message_id"] = message.object_id
     stub.PushTaskMessage(PushTaskMessageRequest(message=message_to_proto(message)))
-
-
-def _normalize_response(response: JSONObject) -> JSONObject:
-    """Ensure provider output can be sent as a ModelResponse payload."""
-    normalized = dict(response)
-    normalized.setdefault("object", "response")
-    return cast(JSONObject, normalized)
 
 
 def _stream_event_response(event: JSONObject, model: str) -> JSONObject:
