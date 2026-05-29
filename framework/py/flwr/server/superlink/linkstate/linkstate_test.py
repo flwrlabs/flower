@@ -59,7 +59,6 @@ from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
-from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
 
 
