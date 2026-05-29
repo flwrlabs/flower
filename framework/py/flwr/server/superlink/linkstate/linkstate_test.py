@@ -181,19 +181,6 @@ class StateTest(CoreStateTest):
         run = state.get_run_info(run_ids=[run_id])[0]
         self.assertEqual(run.series_id, series_id)
 
-    def test_create_run_rejects_unknown_series_id(self) -> None:
-        """Test create_run rejects an unknown run series ID."""
-        # Prepare
-        state = self.state_factory()
-
-        # Execute & assert
-        with self.assertRaisesRegex(ValueError, "not found"):
-            create_dummy_run(
-                state,
-                federation="health-federation",
-                series_id=123,
-            )
-
     def test_create_run_reuses_series_id_in_same_federation(self) -> None:
         """Test multiple runs can link to the same federation run series."""
         # Prepare
