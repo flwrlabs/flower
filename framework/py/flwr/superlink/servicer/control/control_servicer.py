@@ -1002,6 +1002,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         if request.HasField("after_task_event_id"):
             after_task_event_id = request.after_task_event_id
         while context.is_active():
+            should_break = run.status.status == Status.FINISHED
+
             # Retrieve and yield all task events generated after the latest
             # streamed task event
             events = state.get_task_events(
@@ -1012,13 +1014,17 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 after_task_event_id = event.id
                 yield StreamRunEventsResponse(task_event=event)
 
-            # Wait for and continue to yield more event responses only if the
-            # run isn't completed yet. If the run is finished, all events are
-            # returned at this point and the server ends the stream.
-            run = state.get_run_info(run_ids=[run_id])[0]
-            if run.status.status == Status.FINISHED:
+            # If the run was already finished before fetching this batch, all
+            # events are returned at this point and the server ends the stream.
+            if should_break:
                 log(INFO, "All events for run ID `%s` returned", run_id)
                 break
+
+            # Refresh status after yielding. If streaming this batch raced with
+            # run completion, continue immediately and fetch one final batch.
+            run = state.get_run_info(run_ids=[run_id])[0]
+            if run.status.status == Status.FINISHED:
+                continue
 
             # Sleep briefly to avoid busy waiting
             time.sleep(RUN_EVENTS_STREAM_INTERVAL)
