@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower ModelApp process."""
+"""Flower model task process."""
 
 
 from __future__ import annotations
 
 from logging import DEBUG, ERROR
 from queue import Queue
-from typing import cast
 
 import grpc
 
@@ -38,12 +37,10 @@ from flwr.common.retry_invoker import (
     make_simple_grpc_retry_invoker,
     wrap_stub,
 )
-from flwr.common.serde import message_from_proto, message_to_proto, run_from_proto
+from flwr.common.serde import run_from_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
     PullTaskInputResponse,
-    PullTaskMessageRequest,
-    PushTaskMessageRequest,
     PushTaskOutputRequest,
 )
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
@@ -53,10 +50,8 @@ from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
-from flwr.supercore.model_message import ModelRequest, ModelResponse
-from flwr.supercore.typing import JSONObject, JSONValue
 
-from .model.provider import ModelProviderError, invoke_model_provider
+from .process import execute_model_task
 
 _UNKNOWN_ERROR_DETAILS = "Model task failed with unknown error."
 
@@ -69,11 +64,7 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
     parent_pid: int | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
-    """Run Flower ModelApp process.
-
-    The model executor processes one task-routed model request, replies to the
-    requesting task, and then finishes.
-    """
+    """Run Flower model task process."""
     # Monitor the main process in case of SIGKILL
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
@@ -87,10 +78,6 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
     # Initialize variables for exit handler
     log_uploader = None
     heartbeat_sender = None
-    task_id: int | None = None
-    run_id: int | None = None
-    request_message: ModelRequest | None = None
-    model: str | None = None
     sub_status = SubStatus.FAILED
     details = _UNKNOWN_ERROR_DETAILS
     exit_code = ExitCode.SUCCESS
@@ -110,46 +97,17 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
         # Pull task input from SuperLink
         log(DEBUG, "[flwr-model] Pull task input")
         task_input: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
-        task_id = task_input.task_id
-        run_id = run_from_proto(task_input.run).run_id
+        run = run_from_proto(task_input.run)
 
         # Start log uploader for this run
         log_uploader = start_log_uploader(
             log_queue=log_queue,
             node_id=0,
-            run_id=run_id,
+            run_id=run.run_id,
             stub=stub,
         )
 
-        # Pull and parse exactly one model request.
-        request_message = _pull_single_model_request(stub)
-        model_request = _parse_model_request(request_message, task_id)
-        model = cast(str, model_request.payload["model"])
-
-        def on_stream_event(event_data: JSONObject) -> None:
-            stream_response = _stream_event_response(event_data, model)
-            _push_model_response(
-                stub,
-                request_message,
-                task_id,
-                run_id,
-                stream_response,
-            )
-
-        # Invoke the provider and forward stream events to the requesting task.
-        provider_response = invoke_model_provider(
-            model_request.payload,
-            on_stream_event=on_stream_event,
-        )
-        response = dict(provider_response)
-        response.setdefault("object", "response")
-        _push_model_response(
-            stub,
-            request_message,
-            task_id,
-            run_id,
-            cast(JSONObject, response),
-        )
+        execute_model_task(stub, task_input.task_id, run.run_id)
 
         # Update sub_status and details for successful completion
         sub_status = SubStatus.COMPLETED
@@ -164,18 +122,6 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
 
         # Set exit code
         exit_code = ExitCode.SERVERAPP_EXCEPTION
-
-        if task_id is not None and run_id is not None and request_message is not None:
-            try:
-                _push_model_response(
-                    stub,
-                    request_message,
-                    task_id,
-                    run_id,
-                    _error_response(model, ex),
-                )
-            except Exception as reply_error:  # pylint: disable=broad-exception-caught
-                log(ERROR, "Failed to push model error response: %s", str(reply_error))
 
     finally:
         log(DEBUG, "[flwr-model] Will push Model task output")
@@ -238,85 +184,3 @@ def _create_serverappio_stub(
     retry_invoker = make_simple_grpc_retry_invoker()
     wrap_stub(stub, retry_invoker)
     return channel, stub, retry_invoker
-
-
-def _pull_single_model_request(stub: ServerAppIoStub) -> ModelRequest:
-    """Pull and parse exactly one model request message."""
-    response = stub.PullTaskMessage(PullTaskMessageRequest(limit=1))
-    messages = [message_from_proto(message) for message in response.messages]
-    if len(messages) != 1:
-        raise RuntimeError(f"Expected exactly one model request, got {len(messages)}.")
-    return cast(ModelRequest, messages[0])
-
-
-def _parse_model_request(message: ModelRequest, task_id: int) -> ModelRequest:
-    """Parse a task message as a model request for this task."""
-    if message.metadata.dst_task_id != task_id:
-        raise RuntimeError(
-            "Model request destination does not match the authenticated task."
-        )
-    if message.metadata.src_task_id is None:
-        raise RuntimeError("Model request source task is not set.")
-    if not message.metadata.message_id:
-        raise RuntimeError("Model request message ID is not set.")
-    return ModelRequest.from_message(message)
-
-
-def _push_model_response(
-    stub: ServerAppIoStub,
-    request_message: ModelRequest,
-    src_task_id: int,
-    run_id: int,
-    response: JSONObject,
-) -> None:
-    """Push a ModelResponse back to the requesting task."""
-    if request_message.metadata.src_task_id is None:
-        raise RuntimeError("Model request source task is not set.")
-    message = ModelResponse(
-        dst_task_id=request_message.metadata.src_task_id,
-        response=response,
-        reply_to_message_id=request_message.metadata.message_id,
-    )
-    message.metadata.__dict__["_run_id"] = run_id
-    message.metadata.src_task_id = src_task_id
-    message.metadata.__dict__["_message_id"] = message.object_id
-    stub.PushTaskMessage(PushTaskMessageRequest(message=message_to_proto(message)))
-
-
-def _stream_event_response(event: JSONObject, model: str) -> JSONObject:
-    """Wrap one provider stream event in a task-routed model response."""
-    data = dict(event)
-    event_type = data.get("type")
-    if not isinstance(event_type, str) or not event_type:
-        data["type"] = "response.event"
-    data.setdefault("model", model)
-    return {
-        "object": "response",
-        "status": "in_progress",
-        "model": model,
-        "events": [cast(JSONObject, data)],
-    }
-
-
-def _error_response(model: str | None, error: Exception) -> JSONObject:
-    """Build a Responses-compatible failed response."""
-    response: JSONObject = {
-        "object": "response",
-        "status": "failed",
-        "error": _error_payload(error),
-    }
-    if model is not None:
-        response["model"] = model
-    return response
-
-
-def _error_payload(error: Exception) -> JSONObject:
-    """Build a structured error payload."""
-    payload: JSONObject = {
-        "type": error.__class__.__name__,
-        "message": str(error),
-    }
-    if isinstance(error, ModelProviderError):
-        payload["provider_status_code"] = error.status_code
-        payload["provider_detail"] = cast(JSONValue, error.detail)
-    return payload

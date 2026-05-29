@@ -12,45 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Tests for the `flwr-model` executor."""
+"""Tests for model task processing."""
 
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from queue import Queue
-from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
-from flwr.common.constant import Status, SubStatus
-from flwr.common.exit import ExitCode
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    PullTaskInputResponse,
     PullTaskMessageResponse,
-    PushTaskOutputRequest,
-    SendTaskHeartbeatResponse,
 )
-from flwr.proto.run_pb2 import Run, RunStatus  # pylint: disable=E0611
+from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.supercore.model_message import ModelRequest, ModelResponse
 from flwr.supercore.typing import JSONObject
 
-from .model.provider import ModelProviderError
-from .run_model import run_model
-
-
-class _FakeChannel:
-    """Fake gRPC channel."""
-
-    def __init__(self) -> None:
-        self.closed = False
-
-    def close(self) -> None:
-        """Record channel close."""
-        self.closed = True
+from .process import execute_model_task
+from .provider import ModelProviderError
 
 
 class _FakeStub:  # pylint: disable=invalid-name
@@ -59,41 +41,16 @@ class _FakeStub:  # pylint: disable=invalid-name
     def __init__(self, request: ModelRequest) -> None:
         self.request = request
         self.messages: list[ModelResponse] = []
-        self.outputs: list[PushTaskOutputRequest] = []
-        self.calls: list[str] = []
-
-    def SendTaskHeartbeat(self, _request: object) -> SendTaskHeartbeatResponse:
-        """Fake heartbeat."""
-        return SendTaskHeartbeatResponse(success=True)
-
-    def PullTaskInput(self, _request: object) -> PullTaskInputResponse:
-        """Fake task input."""
-        self.calls.append("PullTaskInput")
-        return PullTaskInputResponse(
-            run=Run(
-                run_id=42,
-                status=RunStatus(status=Status.RUNNING, sub_status="", details=""),
-            ),
-            task_id=321,
-        )
 
     def PullTaskMessage(self, _request: object) -> PullTaskMessageResponse:
         """Fake task message pull."""
-        self.calls.append("PullTaskMessage")
         return PullTaskMessageResponse(messages=[message_to_proto(self.request)])
 
     def PushTaskMessage(self, request: Any) -> object:
         """Record task messages."""
-        self.calls.append("PushTaskMessage")
         self.messages.append(
             ModelResponse.from_message(message_from_proto(request.message))
         )
-        return object()
-
-    def PushTaskOutput(self, request: Any) -> object:
-        """Record task output."""
-        self.calls.append("PushTaskOutput")
-        self.outputs.append(request)
         return object()
 
 
@@ -110,36 +67,7 @@ def _request_message() -> ModelRequest:
     return request
 
 
-def _run_with_stub(stub: _FakeStub) -> Mock:
-    heartbeat_sender = Mock()
-    heartbeat_sender.is_running = True
-    flwr_exit = Mock(side_effect=RuntimeError("exit"))
-    with (
-        patch(
-            "flwr.supercore.executors.run_model._create_serverappio_stub",
-            return_value=(_FakeChannel(), stub, SimpleNamespace(max_tries=None)),
-        ),
-        patch(
-            "flwr.supercore.executors.run_model.HeartbeatSender",
-            return_value=heartbeat_sender,
-        ),
-        patch("flwr.supercore.executors.run_model.start_log_uploader"),
-        patch("flwr.supercore.executors.run_model.flush_logs"),
-        patch("flwr.supercore.executors.run_model.stop_log_uploader"),
-        patch("flwr.supercore.executors.run_model.flwr_exit", flwr_exit),
-        pytest.raises(RuntimeError, match="exit"),
-    ):
-        run_model(
-            serverappio_api_address="127.0.0.1:9091",
-            log_queue=Queue(),
-            token="task-token",
-        )
-    heartbeat_sender.start.assert_called_once()
-    heartbeat_sender.stop.assert_called_once()
-    return flwr_exit
-
-
-def test_run_model_pushes_stream_and_success_responses() -> None:
+def test_execute_model_task_pushes_stream_and_success_responses() -> None:
     """A provider success should stream and reply to the source task."""
     stub = _FakeStub(_request_message())
 
@@ -159,10 +87,9 @@ def test_run_model_pushes_stream_and_success_responses() -> None:
             "output": [{"type": "message", "role": "assistant", "content": []}],
         }
 
-    with patch("flwr.supercore.executors.run_model.invoke_model_provider", invoke):
-        flwr_exit = _run_with_stub(stub)
+    with patch("flwr.supercore.executors.model.process.invoke_model_provider", invoke):
+        execute_model_task(cast(ServerAppIoStub, stub), task_id=321, run_id=42)
 
-    assert stub.calls.index("PullTaskInput") < stub.calls.index("PullTaskMessage")
     assert len(stub.messages) == 2
     stream_message = stub.messages[0]
     assert stream_message.metadata.src_task_id == 321
@@ -178,24 +105,24 @@ def test_run_model_pushes_stream_and_success_responses() -> None:
     assert final_message.metadata.reply_to_message_id == "request-message-id"
     assert final_message.payload["id"] == "resp_1"
     assert "events" not in final_message.payload
-    assert stub.outputs[-1].sub_status == SubStatus.COMPLETED
-    assert flwr_exit.call_args.args[0] == ExitCode.SUCCESS
 
 
-def test_run_model_pushes_error_response_on_provider_failure() -> None:
-    """A provider failure should reply with a failed response and fail the task."""
+def test_execute_model_task_pushes_error_response_on_provider_failure() -> None:
+    """A provider failure should reply with a failed response."""
     stub = _FakeStub(_request_message())
-
     provider_error = ModelProviderError(
         status_code=429,
         detail={"error": {"message": "quota exceeded"}},
     )
 
-    with patch(
-        "flwr.supercore.executors.run_model.invoke_model_provider",
-        side_effect=provider_error,
+    with (
+        patch(
+            "flwr.supercore.executors.model.process.invoke_model_provider",
+            side_effect=provider_error,
+        ),
+        pytest.raises(ModelProviderError),
     ):
-        flwr_exit = _run_with_stub(stub)
+        execute_model_task(cast(ServerAppIoStub, stub), task_id=321, run_id=42)
 
     assert len(stub.messages) == 1
     message = stub.messages[0]
@@ -205,6 +132,3 @@ def test_run_model_pushes_error_response_on_provider_failure() -> None:
     assert message.payload["status"] == "failed"
     error = cast(JSONObject, message.payload["error"])
     assert error["provider_status_code"] == 429
-    assert stub.outputs[-1].sub_status == SubStatus.FAILED
-    assert "quota exceeded" in stub.outputs[-1].details
-    assert flwr_exit.call_args.args[0] == ExitCode.SERVERAPP_EXCEPTION
