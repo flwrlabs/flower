@@ -152,9 +152,7 @@ class SqlCoreState(CoreState, SqlMixin):
             params["federation"] = federation
         if updated_before is not None:
             conditions.append("updated_at < :updated_before")
-            params["updated_before"] = datetime.fromisoformat(
-                updated_before.replace("Z", "+00:00")
-            )
+            params["updated_before"] = datetime.fromisoformat(updated_before)
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         query = f"""
