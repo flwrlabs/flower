@@ -14,14 +14,14 @@
 # ==============================================================================
 """Helpers for running and validating Alembic migrations."""
 
-
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from logging import INFO
 from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import MetaData, create_engine, inspect, pool
+from sqlalchemy import MetaData, create_engine, inspect, pool, text
 from sqlalchemy.engine import Engine
 
 from flwr.common.exit import ExitCode, flwr_exit
@@ -43,6 +43,8 @@ ALEMBIC_DIR = Path(__file__).resolve().parent
 ALEMBIC_VERSION_TABLE = "alembic_version"
 FLWR_STATE_BASELINE_REVISION = "8e65d8ae60b0"  # Never change this
 FLWR_STATE_LATEST_REVISIONS = "heads"
+_POSTGRESQL_MIGRATION_LOCK_NAMESPACE = 0x466C5752  # "FlWR"
+_POSTGRESQL_MIGRATION_LOCK_ID = 0x4D494752  # "MIGR"
 
 
 def register_metadata_provider(provider: MetadataProvider) -> None:
@@ -120,6 +122,12 @@ def get_combined_metadata() -> MetaData:
 
 
 def run_migrations(engine: Engine) -> None:
+    """Run pending Alembic migrations under the configured database guard."""
+    with _migration_guard(engine):
+        _run_migrations(engine)
+
+
+def _run_migrations(engine: Engine) -> None:
     """Run pending Alembic migrations, handling pre-Alembic legacy databases.
 
     Expected scenarios:
@@ -168,6 +176,35 @@ def run_migrations(engine: Engine) -> None:
     stamp_existing_database(engine, FLWR_STATE_BASELINE_REVISION)
     command.upgrade(config, FLWR_STATE_LATEST_REVISIONS)
     log(INFO, "Flower state database stamped and upgraded successfully!")
+
+
+@contextmanager
+def _migration_guard(engine: Engine) -> Iterator[None]:
+    """Guard schema migrations for backends that need cross-process serialization."""
+    if engine.dialect.name != "postgresql":
+        yield
+        return
+
+    lock_params = {
+        "namespace": _POSTGRESQL_MIGRATION_LOCK_NAMESPACE,
+        "lock_id": _POSTGRESQL_MIGRATION_LOCK_ID,
+    }
+
+    with engine.connect() as connection:
+        lock_connection = connection.execution_options(isolation_level="AUTOCOMMIT")
+        log(INFO, "Acquiring PostgreSQL advisory lock for Flower state migrations.")
+        lock_connection.execute(
+            text("SELECT pg_advisory_lock(:namespace, :lock_id)"),
+            lock_params,
+        )
+        try:
+            yield
+        finally:
+            lock_connection.execute(
+                text("SELECT pg_advisory_unlock(:namespace, :lock_id)"),
+                lock_params,
+            )
+            log(INFO, "Released PostgreSQL advisory lock for Flower state migrations.")
 
 
 def build_alembic_config(engine: Engine) -> Config:
