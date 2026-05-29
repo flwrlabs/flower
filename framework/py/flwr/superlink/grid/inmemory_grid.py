@@ -26,7 +26,6 @@ from flwr.common.logger import warn_deprecated_feature
 from flwr.common.typing import Run
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
-
 from flwr.serverapp.grid import Grid
 
 

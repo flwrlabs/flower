@@ -58,8 +58,8 @@ from flwr.supercore.constant import (
     NOOP_FEDERATION,
 )
 from flwr.supercore.object_store import ObjectStoreFactory
-from flwr.superlink.grid import InMemoryGrid
 from flwr.superlink.federation import NoOpFederationManager
+from flwr.superlink.grid import InMemoryGrid
 
 
 @dataclass(frozen=True)

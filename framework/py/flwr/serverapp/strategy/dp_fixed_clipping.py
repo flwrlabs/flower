@@ -36,7 +36,6 @@ from flwr.common.differential_privacy_constants import (
 )
 
 from ..grid import Grid
-
 from .strategy import Strategy
 
 

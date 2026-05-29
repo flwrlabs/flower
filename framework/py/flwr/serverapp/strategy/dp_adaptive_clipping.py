@@ -35,7 +35,6 @@ from flwr.common.differential_privacy_constants import KEY_CLIPPING_NORM, KEY_NO
 
 from ..exception import AggregationError
 from ..grid import Grid
-
 from .dp_fixed_clipping import validate_replies
 from .strategy import Strategy
 

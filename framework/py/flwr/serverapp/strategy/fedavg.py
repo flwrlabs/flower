@@ -29,7 +29,6 @@ from flwr.common import (
 )
 
 from ..grid import Grid
-
 from .strategy import Strategy
 from .strategy_utils import (
     aggregate_arrayrecords,

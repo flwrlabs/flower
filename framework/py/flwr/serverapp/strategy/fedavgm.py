@@ -34,9 +34,8 @@ from flwr.common import (
     log,
 )
 
-from ..grid import Grid
-
 from ..exception import AggregationError
+from ..grid import Grid
 from .fedavg import FedAvg
 
 

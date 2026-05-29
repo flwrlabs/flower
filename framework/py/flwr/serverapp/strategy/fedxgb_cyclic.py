@@ -30,7 +30,6 @@ from flwr.common import (
 )
 
 from ..grid import Grid
-
 from .fedavg import FedAvg
 from .strategy_utils import sample_nodes
 

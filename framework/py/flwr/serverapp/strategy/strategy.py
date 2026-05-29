@@ -24,7 +24,6 @@ from logging import INFO
 from flwr.common import ArrayRecord, ConfigRecord, Message, MetricRecord, log
 
 from ..grid import Grid
-
 from .result import Result
 from .strategy_utils import log_strategy_start_info
 

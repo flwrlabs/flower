@@ -33,9 +33,8 @@ from flwr.common import (
     log,
 )
 
-from ..grid import Grid
-
 from ..exception import InconsistentMessageReplies
+from ..grid import Grid
 
 
 def config_to_str(config: ConfigRecord) -> str:
