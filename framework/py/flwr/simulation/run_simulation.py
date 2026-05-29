@@ -327,7 +327,7 @@ def _main_loop(
             state_factory=state_factory,
             f_stop=f_stop,
             run=run,
-            metrics=metrics if is_app else None,
+            metrics=metrics,
         )
 
         updated_context = output_context_queue.get(timeout=3)
