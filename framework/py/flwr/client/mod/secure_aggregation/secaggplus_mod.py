@@ -21,6 +21,7 @@ from logging import DEBUG, WARNING
 from typing import Any, cast
 
 from flwr.app.message_type import MessageType
+from flwr.app.typing import ConfigRecordValues
 from flwr.client.typing import ClientAppCallable
 from flwr.common import (
     ConfigRecord,
@@ -58,7 +59,6 @@ from flwr.common.secure_aggregation.secaggplus_utils import (
     share_keys_plaintext_concat,
     share_keys_plaintext_separate,
 )
-from flwr.common.typing import ConfigRecordValues
 from flwr.supercore.primitives.asymmetric import (
     bytes_to_private_key,
     bytes_to_public_key,

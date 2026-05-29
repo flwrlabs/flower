@@ -19,10 +19,9 @@ from logging import INFO
 
 import numpy as np
 
+from flwr.app.message import Context, Message
 from flwr.client.typing import ClientAppCallable
-from flwr.common.context import Context
 from flwr.common.logger import log
-from flwr.common.message import Message
 
 
 def message_size_mod(

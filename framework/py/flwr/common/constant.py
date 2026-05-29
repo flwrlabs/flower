@@ -62,7 +62,6 @@ HEARTBEAT_MIN_INTERVAL = 10
 HEARTBEAT_MAX_INTERVAL = 1800  # 30 minutes
 HEARTBEAT_INTERVAL_INF = 1e300  # Large value, disabling heartbeats
 HEARTBEAT_PATIENCE = 2
-RUN_FAILURE_DETAILS_NO_HEARTBEAT = "No heartbeat received from the run."
 
 # IDs
 RUN_ID_NUM_BYTES = 8
@@ -150,7 +149,6 @@ LOG_UPLOAD_INTERVAL = 0.2  # Minimum interval between two log uploads
 MAX_RETRY_DELAY = 20  # Maximum delay duration between two consecutive retries.
 
 # Constants for account authentication
-CREDENTIALS_DIR = ".credentials"
 AUTHN_TYPE_JSON_KEY = "authn-type"  # For key name in JSON file
 AUTHN_TYPE_YAML_KEY = "authn_type"  # For key name in YAML file
 ACCESS_TOKEN_KEY = "flwr-oidc-access-token"
@@ -165,9 +163,6 @@ SIGNATURE_HEADER = "flwr-signature-bin"  # Must end with "-bin" for binary data
 TIMESTAMP_HEADER = "flwr-timestamp"
 TIMESTAMP_TOLERANCE = 300  # General tolerance for timestamp verification
 SYSTEM_TIME_TOLERANCE = 5  # Allowance for system time drift
-
-# Constants for grpc retry
-GRPC_RETRY_MAX_DELAY = 20  # Maximum delay duration between two consecutive retries.
 
 # Constants for ArrayRecord
 GC_THRESHOLD = 200_000_000  # 200 MB
@@ -188,7 +183,6 @@ RUN_ID_NOT_FOUND_MESSAGE = "Run ID not found"
 NO_ACCOUNT_AUTH_MESSAGE = "ControlServicer initialized without account authentication"
 NO_ARTIFACT_PROVIDER_MESSAGE = "ControlServicer initialized without artifact provider"
 PULL_UNFINISHED_RUN_MESSAGE = "Cannot pull artifacts for an unfinished run"
-SUPERNODE_NOT_CREATED_FROM_CLI_MESSAGE = "Invalid SuperNode credentials"
 PUBLIC_KEY_ALREADY_IN_USE_MESSAGE = "Public key already in use"
 PUBLIC_KEY_NOT_VALID = "The provided public key is not valid"
 NODE_NOT_FOUND_MESSAGE = "Node ID not found for account"

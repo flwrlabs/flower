@@ -71,7 +71,7 @@ class Grid(ABC):
             Time-to-live for the round trip of this message, i.e., the time from sending
             this message to receiving a reply. It specifies in seconds the duration for
             which the message and its potential reply are considered valid. If unset,
-            the default TTL (i.e., ``common.DEFAULT_TTL``) will be used.
+            the default TTL (i.e., ``flwr.app.DEFAULT_TTL``) will be used.
 
         Returns
         -------
@@ -154,32 +154,3 @@ class Grid(ABC):
         replies for all sent messages. A message remains valid until its TTL,
         which is not affected by ``timeout``.
         """
-
-
-class Driver(Grid):
-    """Deprecated abstract base class ``Driver``, use ``Grid`` instead.
-
-    This class is provided solely for backward compatibility with legacy
-    code that previously relied on the ``Driver`` class. It has been deprecated
-    in favor of the updated abstract base class ``Grid``, which now encompasses
-    all communication-related functionality and improvements between the
-    ServerApp and the SuperLink.
-
-    .. warning::
-        ``Driver`` is deprecated and will be removed in a future release.
-        Use ``Grid`` in the signature of your ServerApp.
-
-    Examples
-    --------
-    Legacy (deprecated) usage::
-
-        @app.main()
-        def main(driver: Driver, context: Context) -> None:
-            ...
-
-    Updated usage::
-
-        @app.main()
-        def main(grid: Grid, context: Context) -> None:
-            ...
-    """
