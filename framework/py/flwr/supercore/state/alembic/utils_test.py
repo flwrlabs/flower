@@ -175,7 +175,7 @@ class TestAlembicRun(unittest.TestCase):
         finally:
             engine.dispose()
 
-    @patch("flwr.supercore.state.alembic.utils._run_migrations")
+    @patch("flwr.supercore.state.alembic.utils._run_migration_workflow")
     def test_run_migrations_uses_postgresql_advisory_lock(
         self, mock_run_migrations: MagicMock
     ) -> None:
@@ -206,7 +206,7 @@ class TestAlembicRun(unittest.TestCase):
         self.assertEqual(connection.commit.call_count, 2)
         mock_run_migrations.assert_called_once_with(engine, connection)
 
-    @patch("flwr.supercore.state.alembic.utils._run_migrations")
+    @patch("flwr.supercore.state.alembic.utils._run_migration_workflow")
     def test_run_migrations_releases_postgresql_advisory_lock_on_error(
         self, mock_run_migrations: MagicMock
     ) -> None:
@@ -235,7 +235,7 @@ class TestAlembicRun(unittest.TestCase):
         connection.rollback.assert_called_once_with()
         mock_run_migrations.assert_called_once_with(engine, connection)
 
-    @patch("flwr.supercore.state.alembic.utils._run_migrations")
+    @patch("flwr.supercore.state.alembic.utils._run_migration_workflow")
     def test_run_migrations_does_not_lock_non_postgresql_backends(
         self, mock_run_migrations: MagicMock
     ) -> None:

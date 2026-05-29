@@ -125,10 +125,10 @@ def get_combined_metadata() -> MetaData:
 def run_migrations(engine: Engine) -> None:
     """Run pending Alembic migrations under the configured database guard."""
     with _migration_bind(engine) as bind:
-        _run_migrations(engine, bind)
+        _run_migration_workflow(engine, bind)
 
 
-def _run_migrations(engine: Engine, bind: MigrationBind) -> None:
+def _run_migration_workflow(engine: Engine, bind: MigrationBind) -> None:
     """Run pending Alembic migrations, handling pre-Alembic legacy databases.
 
     Expected scenarios:
