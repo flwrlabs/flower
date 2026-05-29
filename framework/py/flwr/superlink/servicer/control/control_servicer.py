@@ -238,9 +238,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     f"FAB ({fab.hash_str}) hash from request doesn't match contents"
                 )
             fab_id, fab_version = get_metadata_from_config(fab_config)
-            request_series_id = (
-                request.series_id if request.HasField("series_id") else None
-            )
 
             run_id = state.create_run(
                 fab_id,
@@ -251,7 +248,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 resolved_federation_config,
                 flwr_aid,
                 run_type,
-                request_series_id,
+                request.series_id if request.HasField("series_id") else None,
             )
 
             if run_id == 0:
@@ -269,11 +266,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 }
 
             runs = state.get_run_info(run_ids=[run_id])
-            if not runs:
-                context.abort(
-                    grpc.StatusCode.INTERNAL,
-                    "Failed to retrieve the initialized run.",
-                )
             series_id = runs[0].series_id
 
             # Create an empty context for the Run
