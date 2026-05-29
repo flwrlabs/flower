@@ -71,7 +71,7 @@ STATUS_CONDITIONS = {
 }
 
 
-class SqlCoreState(CoreState, SqlMixin):
+class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     """SQLAlchemy-based CoreState implementation."""
 
     def __init__(self, database_path: str, object_store: ObjectStore) -> None:
