@@ -70,7 +70,7 @@ if TYPE_CHECKING:
     from ..compat.common.record import MetricsRecord as MetricsRecord
     from ..compat.common.record import ParametersRecord as ParametersRecord
     from ..compat.common.record import RecordSet as RecordSet
-    from .record import array_from_numpy as array_from_numpy
+    from ..compat.common.record import array_from_numpy as array_from_numpy
 
 _LAZY_EXPORTS = {
     "Array": ("flwr.app.message", "Array"),
@@ -84,7 +84,7 @@ _LAZY_EXPORTS = {
     "ParametersRecord": ("flwr.compat.common.record", "ParametersRecord"),
     "RecordDict": ("flwr.app.message", "RecordDict"),
     "RecordSet": ("flwr.compat.common.record", "RecordSet"),
-    "array_from_numpy": ("flwr.common.record.conversion_utils", "array_from_numpy"),
+    "array_from_numpy": ("flwr.compat.common.record", "array_from_numpy"),
 }
 
 
