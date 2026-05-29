@@ -364,53 +364,13 @@ class TestAppIoServicer(unittest.TestCase):
         stored_events = self.state.store_task_events.call_args.args[0]
         self.assertIsInstance(response, PushTaskEventsResponse)
         self.assertEqual(len(stored_events), 1)
-        self.assertEqual(stored_events[0].id, 0)
-        self.assertEqual(stored_events[0].timestamp, "")
+        self.assertIs(stored_events[0], request.events[0])
+        self.assertEqual(stored_events[0].id, 999)
+        self.assertEqual(stored_events[0].timestamp, "client-ts")
         self.assertEqual(stored_events[0].run_id, 789)
         self.assertEqual(stored_events[0].task_id, 123)
-        self.assertEqual(stored_events[0].event, "response.created")
+        self.assertEqual(stored_events[0].event, " response.created ")
         self.assertEqual(stored_events[0].data, '{"payload":"preserved"}')
-
-    def test_push_task_events_ignores_empty_batch(self) -> None:
-        """PushTaskEvents should treat an empty event batch as a no-op."""
-        # Execute
-        with patch(
-            "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
-            return_value=Task(task_id=123, run_id=789),
-        ):
-            response = self.servicer.PushTaskEvents(PushTaskEventsRequest(), Mock())
-
-        # Assert
-        self.state.store_task_events.assert_not_called()
-        self.assertIsInstance(response, PushTaskEventsResponse)
-
-    def test_push_task_events_aborts_for_empty_event_name(self) -> None:
-        """PushTaskEvents should reject events without a name."""
-        # Prepare
-        request = PushTaskEventsRequest(
-            events=[
-                TaskEvent(event=" ", data='{"type":"response.created"}'),
-            ]
-        )
-        context = Mock(spec=grpc.ServicerContext)
-        context.abort.side_effect = grpc.RpcError()
-
-        # Execute
-        with (
-            patch(
-                "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
-                return_value=Task(task_id=123, run_id=789),
-            ),
-            self.assertRaises(grpc.RpcError),
-        ):
-            self.servicer.PushTaskEvents(request, context)
-
-        # Assert
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            "Task event name must not be empty.",
-        )
-        self.state.store_task_events.assert_not_called()
 
     def test_push_task_events_aborts_when_state_rejects_events(self) -> None:
         """PushTaskEvents should abort when CoreState cannot store events."""

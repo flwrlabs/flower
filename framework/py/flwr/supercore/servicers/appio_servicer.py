@@ -161,20 +161,9 @@ class AppIoServicer(ABC):
 
         task_events: list[TaskEvent] = []
         for event in request.events:
-            event_name = event.event.strip()
-            if not event_name:
-                context.abort(
-                    grpc.StatusCode.FAILED_PRECONDITION,
-                    "Task event name must not be empty.",
-                )
-            task_events.append(
-                TaskEvent(
-                    run_id=task.run_id,
-                    task_id=task.task_id,
-                    event=event_name,
-                    data=event.data,
-                )
-            )
+            event.run_id = task.run_id
+            event.task_id = task.task_id
+            task_events.append(event)
 
         if not self.state().store_task_events(task_events):
             context.abort(
