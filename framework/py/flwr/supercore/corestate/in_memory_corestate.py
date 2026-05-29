@@ -119,10 +119,15 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             )
 
     def ensure_run_series(
-        self, federation: str, series_id: int | None = None
+        self,
+        federation: str,
+        series_id: int | None = None,
+        *,
+        run_id: int | None = None,
     ) -> int | None:
         """Ensure a run series exists and return its ID."""
         with self.lock_run_series_store:
+            timestamp = now().isoformat()
             if series_id is not None:
                 existing = self.run_series_store.get(series_id)
                 if existing is None:
@@ -137,20 +142,25 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                         federation,
                     )
                     return None
+                if run_id is not None:
+                    existing.run_ids.append(run_id)
+                    existing.updated_at = timestamp
                 return series_id
 
             new_series_id = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
             if new_series_id in self.run_series_store:
                 return None
 
-            timestamp = now().isoformat()
-            self.run_series_store[new_series_id] = RunSeries(
+            run_series = RunSeries(
                 series_id=new_series_id,
                 federation=federation,
                 description="",
                 created_at=timestamp,
                 updated_at=timestamp,
             )
+            if run_id is not None:
+                run_series.run_ids.append(run_id)
+            self.run_series_store[new_series_id] = run_series
             return new_series_id
 
     def add_task_log(self, task_id: int, log_message: str) -> None:

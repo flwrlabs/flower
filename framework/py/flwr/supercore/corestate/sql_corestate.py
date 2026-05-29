@@ -19,7 +19,7 @@ import hashlib
 import json
 import secrets
 from collections.abc import Sequence
-from datetime import timedelta
+from datetime import datetime, timedelta
 from logging import ERROR
 from typing import Any, Literal, cast
 
@@ -132,19 +132,47 @@ class SqlCoreState(CoreState, SqlMixin):
         )
 
     def ensure_run_series(
-        self, federation: str, series_id: int | None = None
+        self,
+        federation: str,
+        series_id: int | None = None,
+        *,
+        run_id: int | None = None,
     ) -> int | None:
         """Ensure a run series exists and return its ID."""
         insert_query = """
             INSERT INTO run_series
-            (series_id, federation, description, created_at, updated_at,
-             last_run_id)
+            (series_id, federation, description, created_at, updated_at)
             VALUES
-            (:series_id, :federation, :description, :created_at, :updated_at,
-             :last_run_id)
+            (:series_id, :federation, :description, :created_at, :updated_at)
             ON CONFLICT(series_id) DO NOTHING
             RETURNING series_id
         """
+
+        def link_run(resolved_series_id: int, timestamp: datetime) -> None:
+            if run_id is None:
+                return
+            self.query(
+                """
+                INSERT INTO series_runs (id, series_id, run_id)
+                VALUES (:id, :series_id, :run_id)
+                """,
+                {
+                    "id": uint64_to_int64(run_id),
+                    "series_id": uint64_to_int64(resolved_series_id),
+                    "run_id": uint64_to_int64(run_id),
+                },
+            )
+            self.query(
+                """
+                UPDATE run_series
+                SET updated_at = :updated_at
+                WHERE series_id = :series_id
+                """,
+                {
+                    "updated_at": timestamp,
+                    "series_id": uint64_to_int64(resolved_series_id),
+                },
+            )
 
         with self.session():
             if series_id is None:
@@ -158,13 +186,14 @@ class SqlCoreState(CoreState, SqlMixin):
                         "description": None,
                         "created_at": timestamp,
                         "updated_at": timestamp,
-                        "last_run_id": None,
                     },
                 )
                 if rows:
+                    link_run(candidate, timestamp)
                     return candidate
                 return None
 
+            timestamp = now()
             rows = self.query(
                 """
                 SELECT federation
@@ -186,6 +215,7 @@ class SqlCoreState(CoreState, SqlMixin):
                     federation,
                 )
                 return None
+            link_run(series_id, timestamp)
             return series_id
 
     def add_task_log(self, task_id: int, log_message: str) -> None:

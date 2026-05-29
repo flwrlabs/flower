@@ -59,6 +59,7 @@ from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
+from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 from flwr.superlink.federation import NoOpFederationManager
 
 
@@ -2126,6 +2127,39 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         assert status.status == Status.FINISHED
         assert status.sub_status == SubStatus.COMPLETED
         assert status.details == "done"
+
+    def test_create_run_records_series_run_membership(self) -> None:
+        """Creating runs should add memberships to series_runs."""
+        # Prepare
+        state = self.state_factory()
+        run_id_1 = create_dummy_run(state, federation="health-federation")
+        run_1 = state.get_run_info(run_ids=[run_id_1])[0]
+
+        # Execute
+        run_id_2 = create_dummy_run(
+            state,
+            federation="health-federation",
+            series_id=run_1.series_id,
+        )
+
+        # Assert
+        rows = state.query(
+            """
+            SELECT series_id, run_id
+            FROM series_runs
+            WHERE series_id = :series_id
+            """,
+            {"series_id": uint64_to_int64(run_1.series_id)},
+        )
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(
+            {int64_to_uint64(row["series_id"]) for row in rows},
+            {run_1.series_id},
+        )
+        self.assertEqual(
+            {int64_to_uint64(row["run_id"]) for row in rows},
+            {run_id_1, run_id_2},
+        )
 
 
 class SqlFileBasedTest(SqlInMemoryStateTest):

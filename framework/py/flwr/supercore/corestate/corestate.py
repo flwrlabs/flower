@@ -44,7 +44,11 @@ class CoreState(ABC):
 
     @abstractmethod
     def ensure_run_series(
-        self, federation: str, series_id: int | None = None
+        self,
+        federation: str,
+        series_id: int | None = None,
+        *,
+        run_id: int | None = None,
     ) -> int | None:
         """Ensure a run series exists and return its ID.
 
@@ -56,6 +60,8 @@ class CoreState(ABC):
             Optional caller-provided series ID. If `None`, a new series
             ID is generated and creation is attempted. If set, the matching
             series must already exist and belong to `federation`.
+        run_id : int | None (default: None)
+            Optional run ID to associate with the ensured run series.
 
         Returns
         -------

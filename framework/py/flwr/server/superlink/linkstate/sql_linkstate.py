@@ -955,7 +955,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             query = "SELECT COUNT(*) as cnt FROM run WHERE run_id = :run_id"
             rows = self.query(query, {"run_id": uint64_to_int64(run_id)})
             if rows[0]["cnt"] == 0:
-                resolved_series_id = self.ensure_run_series(federation, series_id)
+                resolved_series_id = self.ensure_run_series(
+                    federation, series_id, run_id=run_id
+                )
                 if resolved_series_id is None:
                     log(ERROR, "Unexpected run series creation failure.")
                     return 0
@@ -997,18 +999,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         "finished_at": None,
                         "sub_status": "",
                         "details": "",
-                    },
-                )
-                self.query(
-                    """
-                    UPDATE run_series
-                    SET last_run_id = :run_id, updated_at = :updated_at
-                    WHERE series_id = :series_id
-                    """,
-                    {
-                        "run_id": uint64_to_int64(run_id),
-                        "updated_at": current,
-                        "series_id": uint64_to_int64(resolved_series_id),
                     },
                 )
                 return run_id
