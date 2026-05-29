@@ -115,8 +115,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         """Ensure a run series exists and return its ID."""
         if not federation:
             raise ValueError("Federation must be set")
-        if series_id is not None and not 0 < series_id < (1 << 64):
-            raise ValueError("Series ID must be a positive uint64")
 
         with self.lock_run_series_store:
             if series_id is not None:
@@ -130,20 +128,20 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                     )
                 return series_id
 
-            resolved_series_id = generate_rand_int_from_bytes(
+            new_series_id = generate_rand_int_from_bytes(
                 SERIES_ID_NUM_BYTES,
                 exclude=set(self.run_series_store) | {0},
             )
 
             timestamp = now().isoformat()
-            self.run_series_store[resolved_series_id] = RunSeries(
-                series_id=resolved_series_id,
+            self.run_series_store[new_series_id] = RunSeries(
+                series_id=new_series_id,
                 federation=federation,
                 description="",
                 created_at=timestamp,
                 updated_at=timestamp,
             )
-            return resolved_series_id
+            return new_series_id
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""
