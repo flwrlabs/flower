@@ -32,7 +32,8 @@ from flwr.common import (
     RecordDict,
     log,
 )
-from flwr.server import Grid
+
+from ..grid import Grid
 
 from ..exception import InconsistentMessageReplies
 

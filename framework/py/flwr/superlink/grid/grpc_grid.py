@@ -73,7 +73,7 @@ from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
 )
 
-from .grid import Grid
+from flwr.serverapp.grid import Grid
 
 ERROR_MESSAGE_PUSH_MESSAGES_RESOURCE_EXHAUSTED = """
 

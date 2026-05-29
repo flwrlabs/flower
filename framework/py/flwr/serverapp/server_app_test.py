@@ -22,7 +22,7 @@ import pytest
 
 from flwr.common import Context, RecordDict
 from flwr.server import ServerConfig
-from flwr.server.grid import Grid
+from flwr.serverapp import Grid
 
 from .server_app import ServerApp
 

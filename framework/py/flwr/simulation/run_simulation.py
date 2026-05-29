@@ -41,7 +41,6 @@ from flwr.common.logger import (
 )
 from flwr.common.typing import Run
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
-from flwr.server.grid import Grid, InMemoryGrid
 from flwr.server.run_serverapp import run as _run
 from flwr.server.superlink.fleet import vce
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
@@ -49,7 +48,7 @@ from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 from flwr.server.superlink.linkstate import InMemoryLinkState, LinkStateFactory
 from flwr.server.superlink.linkstate.in_memory_linkstate import RunRecord
 from flwr.server.superlink.linkstate.utils import generate_rand_int_from_bytes
-from flwr.serverapp import ServerApp
+from flwr.serverapp import Grid, ServerApp
 from flwr.simulation.ray_transport.utils import (
     enable_tf_gpu_growth as enable_gpu_growth,
 )
@@ -59,6 +58,7 @@ from flwr.supercore.constant import (
     NOOP_FEDERATION,
 )
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.superlink.grid import InMemoryGrid
 from flwr.superlink.federation import NoOpFederationManager
 
 

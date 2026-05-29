@@ -19,7 +19,8 @@ from typing import cast
 import numpy as np
 
 from flwr.common import ArrayRecord, ConfigRecord, Message, MetricRecord
-from flwr.server import Grid
+
+from ..grid import Grid
 
 from ..exception import InconsistentMessageReplies
 from .fedavg import FedAvg
