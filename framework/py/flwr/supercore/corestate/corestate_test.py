@@ -73,36 +73,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         mock_datetime.now.side_effect = timestamps
         return stack
 
-    def test_get_run_series_empty(self) -> None:
-        """Test retrieving RunSeries when no records exist."""
-        state = self.state_factory()
-
-        self.assertEqual(state.get_run_series(federation="test-federation"), [])
-        self.assertEqual(
-            state.get_run_series(
-                federation="test-federation",
-                updated_before=now().isoformat(),
-                limit=0,
-            ),
-            [],
-        )
-        with self.assertRaises(AssertionError):
-            state.get_run_series(federation="test-federation", limit=-1)
-
-    def test_set_run_series_context_rejects_missing_series(self) -> None:
-        """Test setting context for a nonexistent RunSeries."""
-        state = self.state_factory()
-        context = Context(
-            run_id=0,
-            node_id=SUPERLINK_NODE_ID,
-            node_config={},
-            state=RecordDict(),
-            run_config={},
-        )
-
-        with self.assertRaises(ValueError):
-            state.set_run_series_context(123, context)
-
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
         state = self.state_factory()

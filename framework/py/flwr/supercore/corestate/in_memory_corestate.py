@@ -126,16 +126,14 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             return []
 
         with self.lock_run_series_store:
-            run_series = [
-                record
-                for record in self.run_series_store.values()
-                if record.federation == federation
-                and (updated_before is None or record.updated_at < updated_before)
-            ]
-            run_series.sort(
-                key=lambda record: (record.updated_at, record.series_id),
-                reverse=True,
-            )
+            run_series = []
+            for record in self.run_series_store.values():
+                if record.federation != federation:
+                    continue
+                if updated_before is not None and record.updated_at >= updated_before:
+                    continue
+                run_series.append(record)
+            run_series.sort(key=lambda record: record.updated_at, reverse=True)
             if limit is not None:
                 run_series = run_series[:limit]
             return list(run_series)
@@ -147,11 +145,6 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
 
     def set_run_series_context(self, series_id: int, context: Context) -> None:
         """Set the shared Context for the specified RunSeries."""
-        if series_id == 0:
-            raise ValueError("RunSeries ID must be non-zero")
-        with self.lock_run_series_store:
-            if series_id not in self.run_series_store:
-                raise ValueError(f"RunSeries {series_id} not found")
         with self.lock_run_series_context_store:
             self.run_series_context_store[series_id] = context
 

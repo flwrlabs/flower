@@ -153,11 +153,10 @@ class SqlCoreState(CoreState, SqlMixin):
             )
 
         query = f"""
-            SELECT series_id, federation, description, created_at, updated_at,
-                   last_run_id
+            SELECT series_id, federation, description, created_at, updated_at
             FROM run_series
             WHERE {" AND ".join(conditions)}
-            ORDER BY updated_at DESC, series_id DESC
+            ORDER BY updated_at DESC
         """
         if limit is not None:
             query += " LIMIT :limit"
@@ -168,8 +167,6 @@ class SqlCoreState(CoreState, SqlMixin):
 
     def get_run_series_context(self, series_id: int) -> Context | None:
         """Return the shared Context for the specified RunSeries, if present."""
-        if series_id == 0:
-            return None
         rows = self.query(
             """
             SELECT context
@@ -184,22 +181,9 @@ class SqlCoreState(CoreState, SqlMixin):
 
     def set_run_series_context(self, series_id: int, context: Context) -> None:
         """Set the shared Context for the specified RunSeries."""
-        if series_id == 0:
-            raise ValueError("RunSeries ID must be non-zero")
-
         sint_series_id = uint64_to_int64(series_id)
         context_bytes = context_to_bytes(context)
         with self.session():
-            if not self.query(
-                """
-                SELECT series_id
-                FROM run_series
-                WHERE series_id = :series_id
-                """,
-                {"series_id": sint_series_id},
-            ):
-                raise ValueError(f"RunSeries {series_id} not found")
-
             self.query(
                 """
                 INSERT INTO series_context (series_id, context)
@@ -754,16 +738,12 @@ def task_from_row(row: dict[str, Any]) -> Task:
 
 def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
     """Convert a database row to a RunSeries object."""
-    run_ids = (
-        [int64_to_uint64(row["last_run_id"])] if row["last_run_id"] is not None else []
-    )
     return RunSeries(
         series_id=int64_to_uint64(row["series_id"]),
         federation=row["federation"],
         description=row["description"] or "",
         created_at=timestamp_to_iso(row["created_at"]),
         updated_at=timestamp_to_iso(row["updated_at"]),
-        run_ids=run_ids,
     )
 
 

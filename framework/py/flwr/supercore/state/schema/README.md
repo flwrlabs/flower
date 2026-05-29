@@ -118,7 +118,6 @@ erDiagram
     TIMESTAMP created_at
     VARCHAR description "nullable"
     VARCHAR federation
-    BIGINT last_run_id "nullable"
     TIMESTAMP updated_at
   }
 

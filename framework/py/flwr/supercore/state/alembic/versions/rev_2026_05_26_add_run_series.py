@@ -46,7 +46,6 @@ def upgrade() -> None:
         sa.Column("description", sa.String(), nullable=True),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("updated_at", sa.TIMESTAMP(timezone=True), nullable=False),
-        sa.Column("last_run_id", sa.BigInteger(), nullable=True),
         sa.PrimaryKeyConstraint("series_id"),
     )
 
