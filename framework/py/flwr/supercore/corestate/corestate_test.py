@@ -722,9 +722,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         after_first = state.get_task_events(
             run_id=run_id, after_task_event_id=events[0].id
         )
-        no_new = state.get_task_events(
-            run_id=run_id, after_task_event_id=latest_id
-        )
+        no_new = state.get_task_events(run_id=run_id, after_task_event_id=latest_id)
 
         # Assert: Events keep assigned ID order and cursor filtering works.
         self.assertEqual(len(events), 2)
