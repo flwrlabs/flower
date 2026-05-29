@@ -184,7 +184,7 @@ class TestAlembicRun(unittest.TestCase):
         engine = MagicMock()
         engine.dialect.name = "postgresql"
         connection = MagicMock()
-        connection.in_transaction.return_value = False
+        connection.in_transaction.return_value = True
         engine.connect.return_value.__enter__.return_value = connection
 
         def execute(statement: object, _params: object) -> None:
@@ -194,16 +194,22 @@ class TestAlembicRun(unittest.TestCase):
             if "pg_advisory_unlock" in sql:
                 events.append("unlock")
 
+        def commit() -> None:
+            events.append("commit")
+
         def run(_engine: Engine, _bind: Connection) -> None:
             events.append("migrate")
 
         connection.execute.side_effect = execute
+        connection.commit.side_effect = commit
         mock_run_migrations.side_effect = run
 
         run_migrations(engine)
 
-        self.assertEqual(events, ["lock", "migrate", "unlock"])
-        self.assertEqual(connection.commit.call_count, 2)
+        self.assertEqual(
+            events, ["lock", "commit", "migrate", "commit", "unlock", "commit"]
+        )
+        self.assertEqual(connection.commit.call_count, 3)
         mock_run_migrations.assert_called_once_with(engine, connection)
 
     @patch("flwr.supercore.state.alembic.utils._run_migration_workflow")

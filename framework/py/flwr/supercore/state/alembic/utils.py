@@ -201,13 +201,17 @@ def _migration_bind(engine: Engine) -> Iterator[MigrationBind]:
             lock_params,
         )
         connection.commit()
+        migration_failed = False
         try:
             yield connection
         except BaseException:
+            migration_failed = True
             if connection.in_transaction():
                 connection.rollback()
             raise
         finally:
+            if not migration_failed and connection.in_transaction():
+                connection.commit()
             connection.execute(
                 text("SELECT pg_advisory_unlock(:namespace, :lock_id)"),
                 lock_params,
