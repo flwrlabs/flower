@@ -17,11 +17,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
-from threading import Thread
 from typing import cast
 
 import grpc
@@ -67,50 +65,7 @@ from .model.provider import ModelProviderError, invoke_model_provider
 _UNKNOWN_ERROR_DETAILS = "Model task failed with unknown error."
 
 
-@dataclass
-# pylint: disable-next=too-many-instance-attributes
-class _ModelTaskContext:
-    """State carried across the model executor task lifecycle."""
-
-    channel: grpc.Channel
-    stub: ServerAppIoStub
-    retry_invoker: RetryInvoker
-    log_queue: Queue[str | None]
-    log_uploader: Thread | None = None
-    heartbeat_sender: HeartbeatSender | None = None
-    runtime_env_dir: Path | None = None
-    task_id: int | None = None
-    run_id: int | None = None
-    request_message: ModelRequest | None = None
-    model: str | None = None
-    sub_status: str = SubStatus.FAILED
-    details: str = _UNKNOWN_ERROR_DETAILS
-    exit_code: int = ExitCode.SUCCESS
-
-    def stop_log_uploader(self) -> None:
-        """Stop the log uploader if it is running."""
-        if self.log_uploader is not None:
-            stop_log_uploader(self.log_queue, self.log_uploader)
-            self.log_uploader = None
-
-    def cleanup_runtime_environment(self) -> None:
-        """Clean up the task runtime environment."""
-        cleanup_app_runtime_environment(self.runtime_env_dir)
-        self.runtime_env_dir = None
-
-
-@dataclass(frozen=True)
-class _ModelReplyContext:
-    """Metadata needed to reply to the requesting task."""
-
-    stub: ServerAppIoStub
-    dst_task_id: int
-    src_task_id: int
-    run_id: int
-    reply_to_message_id: str
-
-
-def run_model(  # pylint: disable=R0913, R0917
+def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
     serverappio_api_address: str,
     log_queue: Queue[str | None],
     token: str,
@@ -132,16 +87,23 @@ def run_model(  # pylint: disable=R0913, R0917
         token=token,
         certificates=certificates,
     )
-    context = _ModelTaskContext(
-        channel=channel,
-        stub=stub,
-        retry_invoker=retry_invoker,
-        log_queue=log_queue,
-    )
+
+    # Initialize variables for exit handler
+    log_uploader = None
+    heartbeat_sender = None
+    runtime_env_dir: Path | None = None
+    task_id: int | None = None
+    run_id: int | None = None
+    request_message: ModelRequest | None = None
+    model: str | None = None
+    sub_status = SubStatus.FAILED
+    details = _UNKNOWN_ERROR_DETAILS
+    exit_code = ExitCode.SUCCESS
 
     def on_exit() -> None:
-        context.stop_log_uploader()
-        context.cleanup_runtime_environment()
+        if log_uploader:
+            stop_log_uploader(log_queue, log_uploader)
+        cleanup_app_runtime_environment(runtime_env_dir)
 
     register_signal_handlers(
         event_type=EventType.FLWR_MODEL_RUN_LEAVE,
@@ -150,121 +112,123 @@ def run_model(  # pylint: disable=R0913, R0917
     )
 
     try:
-        _run_model_task(context, runtime_dependency_install)
+        _ = runtime_dependency_install
+
+        # Set up heartbeat sender
+        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
+        heartbeat_sender.start()
+
+        # Pull task input from SuperLink
+        log(DEBUG, "[flwr-model] Pull task input")
+        task_input: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
+        task_id = task_input.task_id
+        run_id = run_from_proto(task_input.run).run_id
+
+        # Start log uploader for this run
+        log_uploader = start_log_uploader(
+            log_queue=log_queue,
+            node_id=0,
+            run_id=run_id,
+            stub=stub,
+        )
+
+        # Pull and parse exactly one model request.
+        request_message = _pull_single_model_request(stub)
+        model_request = _parse_model_request(request_message, task_id)
+        model = cast(str, model_request.payload["model"])
+
+        def on_stream_event(event_data: JSONObject) -> None:
+            stream_response = _stream_event_response(event_data, model)
+            _push_model_response(
+                stub,
+                request_message,
+                task_id,
+                run_id,
+                stream_response,
+            )
+
+        # Invoke the provider and forward stream events to the requesting task.
+        provider_response = invoke_model_provider(
+            model_request.payload,
+            on_stream_event=on_stream_event,
+        )
+        response = _normalize_response(provider_response)
+        _push_model_response(stub, request_message, task_id, run_id, response)
+
+        # Update sub_status and details for successful completion
+        sub_status = SubStatus.COMPLETED
+        details = ""
 
     except Exception as ex:  # pylint: disable=broad-exception-caught
-        _handle_model_task_error(context, ex)
+        log(ERROR, "`flwr-model` failed", exc_info=ex)
+
+        # Update sub_status and details based on the exception
+        sub_status = SubStatus.FAILED
+        details = f"Model task failed with exception: {str(ex)}"
+
+        # Set exit code
+        exit_code = ExitCode.SERVERAPP_EXCEPTION
+
+        # Push a model error response when request routing metadata is available.
+        if (
+            task_id is not None
+            and run_id is not None
+            and request_message is not None
+            and request_message.metadata.src_task_id is not None
+            and bool(request_message.metadata.message_id)
+        ):
+            try:
+                _push_model_response(
+                    stub,
+                    request_message,
+                    task_id,
+                    run_id,
+                    _error_response(model, ex),
+                )
+            except Exception as reply_error:  # pylint: disable=broad-exception-caught
+                log(ERROR, "Failed to push model error response: %s", str(reply_error))
 
     finally:
-        _finish_model_task(context)
+        log(DEBUG, "[flwr-model] Will push Model task output")
+
+        # Set Grpc max retries to 1 to avoid blocking on exit
+        retry_invoker.max_tries = 1
+
+        # Upload any remaining logs before pushing final output
+        if log_uploader:
+            flush_logs(log_queue)
+
+        # Push final status
+        pushoutput_req = PushTaskOutputRequest(
+            sub_status=sub_status,
+            details=details,
+        )
+        try:
+            stub.PushTaskOutput(pushoutput_req)
+        except grpc.RpcError as err:
+            log(ERROR, "Failed to push task output: %s", str(err))
+
+        # Stop log uploader for this run and upload final logs
+        if log_uploader:
+            stop_log_uploader(log_queue, log_uploader)
+
+        # Stop heartbeat sender
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+
+        # Close the Grpc connection
+        channel.close()
+
+        # Clean up run-scoped runtime environment, if any.
+        cleanup_app_runtime_environment(runtime_env_dir)
 
     flwr_exit(
-        context.exit_code,
+        exit_code,
         event_type=EventType.FLWR_MODEL_RUN_LEAVE,
-        event_details={"success": context.exit_code == ExitCode.SUCCESS},
+        event_details={
+            "success": exit_code == ExitCode.SUCCESS,
+        },
     )
-
-
-def _run_model_task(
-    context: _ModelTaskContext,
-    runtime_dependency_install: bool,
-) -> None:
-    """Run the successful model task path."""
-    _ = runtime_dependency_install
-    context.heartbeat_sender = HeartbeatSender(
-        make_task_heartbeat_fn_grpc(context.stub)
-    )
-    context.heartbeat_sender.start()
-
-    log(DEBUG, "[flwr-model] Pull task input")
-    task_input: PullTaskInputResponse = context.stub.PullTaskInput(
-        PullTaskInputRequest()
-    )
-    task_id = task_input.task_id
-    run_id = run_from_proto(task_input.run).run_id
-    context.task_id = task_id
-    context.run_id = run_id
-
-    context.log_uploader = start_log_uploader(
-        log_queue=context.log_queue,
-        node_id=0,
-        run_id=run_id,
-        stub=context.stub,
-    )
-
-    request_message = _pull_single_model_request(context.stub)
-    context.request_message = request_message
-    model_request = _parse_model_request(request_message, task_id)
-    model = cast(str, model_request.payload["model"])
-    context.model = model
-
-    provider_response = _invoke_provider_with_events(
-        context,
-        model_request,
-    )
-    response = _normalize_response(provider_response)
-    _push_model_response(_reply_context(context), response)
-    context.sub_status = SubStatus.COMPLETED
-    context.details = ""
-
-
-def _invoke_provider_with_events(
-    context: _ModelTaskContext,
-    model_request: ModelRequest,
-) -> JSONObject:
-    """Invoke the provider and forward stream events to the requesting task."""
-
-    def on_stream_event(event: JSONObject) -> None:
-        _push_model_stream_event(
-            _reply_context(context),
-            event,
-            model=_require_model(context),
-        )
-
-    return invoke_model_provider(
-        model_request.payload,
-        on_stream_event=on_stream_event,
-    )
-
-
-def _handle_model_task_error(context: _ModelTaskContext, error: Exception) -> None:
-    """Handle task errors and push best-effort failure data."""
-    log(ERROR, "`flwr-model` failed", exc_info=error)
-    context.exit_code = ExitCode.SERVERAPP_EXCEPTION
-    context.sub_status = SubStatus.FAILED
-    context.details = f"Model task failed with exception: {str(error)}"
-
-    if _can_reply_to_request(context):
-        _try_push_model_error_response(
-            _reply_context(context),
-            model=context.model,
-            error=error,
-        )
-
-
-def _finish_model_task(context: _ModelTaskContext) -> None:
-    """Push task output and release local resources."""
-    context.retry_invoker.max_tries = 1
-
-    if context.log_uploader is not None:
-        flush_logs(context.log_queue)
-
-    try:
-        context.stub.PushTaskOutput(
-            PushTaskOutputRequest(
-                sub_status=context.sub_status,
-                details=context.details,
-            )
-        )
-    except grpc.RpcError as err:
-        log(ERROR, "Failed to push task output: %s", str(err))
-
-    context.stop_log_uploader()
-
-    if context.heartbeat_sender is not None and context.heartbeat_sender.is_running:
-        context.heartbeat_sender.stop()
-    context.channel.close()
-    context.cleanup_runtime_environment()
 
 
 def _create_serverappio_stub(
@@ -319,98 +283,23 @@ def _get_reply_task_id(request_message: ModelRequest) -> int:
     return request_message.metadata.src_task_id
 
 
-def _require_task_id(context: _ModelTaskContext) -> int:
-    """Return the task ID if the task input has been pulled."""
-    if context.task_id is None:
-        raise RuntimeError("Model task ID is not set.")
-    return context.task_id
-
-
-def _require_run_id(context: _ModelTaskContext) -> int:
-    """Return the run ID if the task input has been pulled."""
-    if context.run_id is None:
-        raise RuntimeError("Model run ID is not set.")
-    return context.run_id
-
-
-def _require_request_message(context: _ModelTaskContext) -> ModelRequest:
-    """Return the request message if it has been pulled."""
-    if context.request_message is None:
-        raise RuntimeError("Model request message is not set.")
-    return context.request_message
-
-
-def _require_model(context: _ModelTaskContext) -> str:
-    """Return the model name if the model request has been parsed."""
-    if context.model is None:
-        raise RuntimeError("Model name is not set.")
-    return context.model
-
-
-def _can_reply_to_request(context: _ModelTaskContext) -> bool:
-    """Return true if enough request metadata is available for a response."""
-    if (
-        context.task_id is None
-        or context.run_id is None
-        or context.request_message is None
-    ):
-        return False
-    return context.request_message.metadata.src_task_id is not None and bool(
-        context.request_message.metadata.message_id
-    )
-
-
-def _reply_context(context: _ModelTaskContext) -> _ModelReplyContext:
-    """Build response routing metadata from the task context."""
-    request_message = _require_request_message(context)
-    return _ModelReplyContext(
-        stub=context.stub,
-        dst_task_id=_get_reply_task_id(request_message),
-        src_task_id=_require_task_id(context),
-        run_id=_require_run_id(context),
-        reply_to_message_id=request_message.metadata.message_id,
-    )
-
-
 def _push_model_response(
-    reply: _ModelReplyContext,
+    stub: ServerAppIoStub,
+    request_message: ModelRequest,
+    src_task_id: int,
+    run_id: int,
     response: JSONObject,
 ) -> None:
     """Push a ModelResponse back to the requesting task."""
     message = ModelResponse(
-        dst_task_id=reply.dst_task_id,
+        dst_task_id=_get_reply_task_id(request_message),
         response=response,
-        reply_to_message_id=reply.reply_to_message_id,
+        reply_to_message_id=request_message.metadata.message_id,
     )
-    message.metadata.__dict__["_run_id"] = reply.run_id
-    message.metadata.src_task_id = reply.src_task_id
+    message.metadata.__dict__["_run_id"] = run_id
+    message.metadata.src_task_id = src_task_id
     message.metadata.__dict__["_message_id"] = message.object_id
-    reply.stub.PushTaskMessage(
-        PushTaskMessageRequest(message=message_to_proto(message))
-    )
-
-
-def _try_push_model_error_response(
-    reply: _ModelReplyContext,
-    *,
-    model: str | None,
-    error: Exception,
-) -> None:
-    """Best-effort model error response push."""
-    try:
-        _push_model_response(reply, _error_response(model, error))
-    except Exception as reply_error:  # pylint: disable=broad-exception-caught
-        log(ERROR, "Failed to push model error response: %s", str(reply_error))
-
-
-def _push_model_stream_event(
-    reply: _ModelReplyContext,
-    event: JSONObject,
-    *,
-    model: str,
-) -> None:
-    """Push one provider stream event back to the requesting task."""
-    _push_model_response(reply, _stream_event_response(event, model))
+    stub.PushTaskMessage(PushTaskMessageRequest(message=message_to_proto(message)))
 
 
 def _normalize_response(response: JSONObject) -> JSONObject:
