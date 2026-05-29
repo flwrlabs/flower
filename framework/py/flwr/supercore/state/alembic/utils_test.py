@@ -184,7 +184,7 @@ class TestAlembicRun(unittest.TestCase):
         engine = MagicMock()
         engine.dialect.name = "postgresql"
         connection = MagicMock()
-        connection.execution_options.return_value = connection
+        connection.in_transaction.return_value = False
         engine.connect.return_value.__enter__.return_value = connection
 
         def execute(statement: object, _params: object) -> None:
@@ -194,7 +194,7 @@ class TestAlembicRun(unittest.TestCase):
             if "pg_advisory_unlock" in sql:
                 events.append("unlock")
 
-        def run(_engine: Engine) -> None:
+        def run(_engine: Engine, _bind: Connection) -> None:
             events.append("migrate")
 
         connection.execute.side_effect = execute
@@ -203,10 +203,8 @@ class TestAlembicRun(unittest.TestCase):
         run_migrations(engine)
 
         self.assertEqual(events, ["lock", "migrate", "unlock"])
-        connection.execution_options.assert_called_once_with(
-            isolation_level="AUTOCOMMIT"
-        )
-        mock_run_migrations.assert_called_once_with(engine)
+        self.assertEqual(connection.commit.call_count, 2)
+        mock_run_migrations.assert_called_once_with(engine, connection)
 
     @patch("flwr.supercore.state.alembic.utils._run_migrations")
     def test_run_migrations_releases_postgresql_advisory_lock_on_error(
@@ -217,7 +215,7 @@ class TestAlembicRun(unittest.TestCase):
         engine = MagicMock()
         engine.dialect.name = "postgresql"
         connection = MagicMock()
-        connection.execution_options.return_value = connection
+        connection.in_transaction.return_value = True
         engine.connect.return_value.__enter__.return_value = connection
 
         def execute(statement: object, _params: object) -> None:
@@ -234,7 +232,8 @@ class TestAlembicRun(unittest.TestCase):
             run_migrations(engine)
 
         self.assertEqual(events, ["lock", "unlock"])
-        mock_run_migrations.assert_called_once_with(engine)
+        connection.rollback.assert_called_once_with()
+        mock_run_migrations.assert_called_once_with(engine, connection)
 
     @patch("flwr.supercore.state.alembic.utils._run_migrations")
     def test_run_migrations_does_not_lock_non_postgresql_backends(
@@ -247,7 +246,7 @@ class TestAlembicRun(unittest.TestCase):
         run_migrations(engine)
 
         engine.connect.assert_not_called()
-        mock_run_migrations.assert_called_once_with(engine)
+        mock_run_migrations.assert_called_once_with(engine, engine)
 
     def test_migrated_schema_matches_metadata(self) -> None:
         """Verify that migrations match current SQLAlchemy metadata."""
