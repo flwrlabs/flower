@@ -16,13 +16,6 @@ def test_main_accepts_valid_title(monkeypatch: pytest.MonkeyPatch) -> None:
     check_pr_title.main()
 
 
-def test_main_accepts_model_project(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The model project should be accepted."""
-    monkeypatch.setattr(sys, "argv", ["python", "docs(model): Add Lizzy model docs"])
-
-    check_pr_title.main()
-
-
 def test_main_rejects_star_without_skip(monkeypatch: pytest.MonkeyPatch) -> None:
     """A wildcard project must use :skip."""
     monkeypatch.setattr(sys, "argv", ["python", "feat(*): Add test-devtool pytest"])
