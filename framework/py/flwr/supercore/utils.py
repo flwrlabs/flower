@@ -78,7 +78,7 @@ def strict_json_loads(raw: str | bytes | bytearray) -> JSONValue:
     )
 
 
-def strict_json_value_dumps(value: JSONValue, *, compact: bool = False) -> str:
+def strict_json_dumps(value: JSONValue, *, compact: bool = False) -> str:
     """Serialize a strict JSON value.
 
     Strict JSON values reject non-finite floating-point values.

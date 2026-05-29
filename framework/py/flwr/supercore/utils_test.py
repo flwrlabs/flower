@@ -38,8 +38,8 @@ from .utils import (
     request_download_link,
     simulation_config_from_json,
     simulation_config_to_json,
+    strict_json_dumps,
     strict_json_loads,
-    strict_json_value_dumps,
     uint64_to_int64,
 )
 
@@ -78,17 +78,17 @@ def test_strict_json_loads_rejects_non_finite_numbers() -> None:
         strict_json_loads('{"key":NaN}')
 
 
-def test_strict_json_value_dumps() -> None:
+def test_strict_json_dumps() -> None:
     """Serialize valid JSON values."""
-    assert strict_json_value_dumps({"key": [1, True, None]}, compact=True) == (
+    assert strict_json_dumps({"key": [1, True, None]}, compact=True) == (
         '{"key":[1,true,null]}'
     )
 
 
-def test_strict_json_value_dumps_rejects_non_finite_numbers() -> None:
+def test_strict_json_dumps_rejects_non_finite_numbers() -> None:
     """Reject non-finite floating-point values."""
     with pytest.raises(ValueError, match="Out of range float values"):
-        strict_json_value_dumps({"key": float("nan")})
+        strict_json_dumps({"key": float("nan")})
 
 
 @pytest.mark.parametrize(
