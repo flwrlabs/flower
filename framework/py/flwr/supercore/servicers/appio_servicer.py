@@ -16,7 +16,7 @@
 
 
 from abc import ABC, abstractmethod
-from logging import DEBUG
+from logging import DEBUG, ERROR
 
 import grpc
 
@@ -43,7 +43,7 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
     PushLogsResponse,
 )
-from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import (
     TASK_TYPES_ALLOWED_TO_CREATE_TASKS,
     TASK_TYPES_REQUIRING_CONNECTOR_REF,
@@ -164,9 +164,11 @@ class AppIoServicer(ABC):
             event.task_id = task.task_id
 
         if not self.state().store_task_events(request.events):
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION,
-                "Task events could not be stored.",
+            log(
+                ERROR,
+                "Task events could not be stored for task %d of run %d.",
+                task.task_id,
+                task.run_id,
             )
 
         return PushTaskEventsResponse()

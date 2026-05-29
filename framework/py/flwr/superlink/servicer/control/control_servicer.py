@@ -979,9 +979,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         """Start run event stream."""
         log(INFO, rpc_name := self.StreamRunEvents.__qualname__)
 
+        # Init link state
         state = self.linkstate_factory.state()
+
+        # Retrieve run ID and run
         run_id = request.run_id
         runs = state.get_run_info(run_ids=[run_id])
+
+        # Exit if `run_id` not found
         if not runs:
             context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
             raise grpc.RpcError()  # This line is unreachable
@@ -997,6 +1002,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         if request.HasField("after_task_event_id"):
             after_task_event_id = request.after_task_event_id
         while context.is_active():
+            # Retrieve and yield all task events generated after the latest
+            # streamed task event
             events = state.get_task_events(
                 run_id=run_id,
                 after_task_event_id=after_task_event_id,
@@ -1005,11 +1012,15 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 after_task_event_id = event.id
                 yield StreamRunEventsResponse(task_event=event)
 
+            # Wait for and continue to yield more event responses only if the
+            # run isn't completed yet. If the run is finished, all events are
+            # returned at this point and the server ends the stream.
             run = state.get_run_info(run_ids=[run_id])[0]
             if run.status.status == Status.FINISHED:
                 log(INFO, "All events for run ID `%s` returned", run_id)
                 break
 
+            # Sleep briefly to avoid busy waiting
             time.sleep(RUN_EVENTS_STREAM_INTERVAL)
 
 

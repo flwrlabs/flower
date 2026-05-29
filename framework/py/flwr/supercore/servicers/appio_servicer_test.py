@@ -16,6 +16,7 @@
 
 
 import unittest
+from logging import ERROR
 from unittest.mock import Mock, patch
 
 import grpc
@@ -372,8 +373,8 @@ class TestAppIoServicer(unittest.TestCase):
         self.assertEqual(stored_events[0].event, " response.created ")
         self.assertEqual(stored_events[0].data, '{"payload":"preserved"}')
 
-    def test_push_task_events_aborts_when_state_rejects_events(self) -> None:
-        """PushTaskEvents should abort when CoreState cannot store events."""
+    def test_push_task_events_logs_when_state_rejects_events(self) -> None:
+        """PushTaskEvents should log when CoreState cannot store events."""
         # Prepare
         self.state.store_task_events.return_value = False
         request = PushTaskEventsRequest(
@@ -382,7 +383,6 @@ class TestAppIoServicer(unittest.TestCase):
             ]
         )
         context = Mock(spec=grpc.ServicerContext)
-        context.abort.side_effect = grpc.RpcError()
 
         # Execute
         with (
@@ -390,14 +390,18 @@ class TestAppIoServicer(unittest.TestCase):
                 "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
                 return_value=Task(task_id=123, run_id=789),
             ),
-            self.assertRaises(grpc.RpcError),
+            patch("flwr.supercore.servicers.appio_servicer.log") as log_mock,
         ):
-            self.servicer.PushTaskEvents(request, context)
+            response = self.servicer.PushTaskEvents(request, context)
 
         # Assert
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.FAILED_PRECONDITION,
-            "Task events could not be stored.",
+        self.assertIsInstance(response, PushTaskEventsResponse)
+        context.abort.assert_not_called()
+        log_mock.assert_any_call(
+            ERROR,
+            "Task events could not be stored for task %d of run %d.",
+            123,
+            789,
         )
 
     def test_pull_task_message_uses_authenticated_task_destination(self) -> None:
