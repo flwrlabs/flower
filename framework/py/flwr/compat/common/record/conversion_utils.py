@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Conversion utility functions for Records."""
+"""Deprecated conversion utility functions for Records."""
 
 
 from flwr.app.message import Array
-
-from ..logger import warn_deprecated_feature
-from ..typing import NDArray
+from flwr.common.logger import warn_deprecated_feature
+from flwr.common.typing import NDArray
 
 WARN_DEPRECATED_MESSAGE = (
     "`array_from_numpy` is deprecated. Instead, use the `Array(ndarray)` class "
