@@ -61,7 +61,7 @@ class MetadataLookupError(Exception):
         super().__init__(message)
 
 
-def _reject_non_finite_strict_json_value(value: str) -> None:
+def _reject_non_finite_strict_json(value: str) -> None:
     """Reject JSON constants that are not valid JSON values."""
     raise ValueError(f"Strict JSON value contains non-finite number {value}.")
 
@@ -74,7 +74,7 @@ def strict_json_loads(raw: str | bytes | bytearray) -> JSONValue:
     """
     return cast(
         JSONValue,
-        json.loads(raw, parse_constant=_reject_non_finite_strict_json_value),
+        json.loads(raw, parse_constant=_reject_non_finite_strict_json),
     )
 
 
