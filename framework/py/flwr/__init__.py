@@ -19,9 +19,10 @@ import importlib
 
 from flwr.supercore.version import package_version as _package_version
 
-from . import app, clientapp, serverapp
+from . import agentapp, app, clientapp, serverapp
 
 __all__ = [
+    "agentapp",
     "app",
     "clientapp",
     "serverapp",
