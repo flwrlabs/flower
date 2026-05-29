@@ -159,13 +159,11 @@ class AppIoServicer(ABC):
         if not request.events:
             return PushTaskEventsResponse()
 
-        task_events: list[TaskEvent] = []
         for event in request.events:
             event.run_id = task.run_id
             event.task_id = task.task_id
-            task_events.append(event)
 
-        if not self.state().store_task_events(task_events):
+        if not self.state().store_task_events(request.events):
             context.abort(
                 grpc.StatusCode.FAILED_PRECONDITION,
                 "Task events could not be stored.",
