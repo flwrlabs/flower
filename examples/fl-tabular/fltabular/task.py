@@ -28,7 +28,9 @@ def load_data(partition_id: int, num_partitions: int):
 
     dataset.dropna(inplace=True)
 
-    categorical_cols = dataset.select_dtypes(include=["object"]).columns
+    categorical_cols = dataset.select_dtypes(
+        include=["object", "string"]
+    ).columns.to_list()
     ordinal_encoder = OrdinalEncoder()
     dataset[categorical_cols] = ordinal_encoder.fit_transform(dataset[categorical_cols])
 
@@ -39,7 +41,7 @@ def load_data(partition_id: int, num_partitions: int):
         X, y, test_size=0.2, random_state=42
     )
 
-    numeric_features = X.select_dtypes(include=["float64", "int64"]).columns
+    numeric_features = X.select_dtypes(include=["number"]).columns.to_list()
     numeric_transformer = Pipeline(steps=[("scaler", StandardScaler())])
 
     preprocessor = ColumnTransformer(
