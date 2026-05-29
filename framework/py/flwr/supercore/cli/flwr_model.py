@@ -27,7 +27,7 @@ from flwr.supercore.task_process import run_model
 
 
 def flwr_model() -> None:
-    """Run process-isolated Flower ModelApp."""
+    """Run process-isolated Flower model task."""
     args = _parse_args_run_flwr_model().parse_args()
 
     if not args.insecure:
@@ -64,7 +64,7 @@ def flwr_model() -> None:
 def _parse_args_run_flwr_model() -> argparse.ArgumentParser:
     """Parse `flwr-model` command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Run a Flower ModelApp",
+        description="Run a Flower model task",
     )
     parser.add_argument(
         "--serverappio-api-address",
