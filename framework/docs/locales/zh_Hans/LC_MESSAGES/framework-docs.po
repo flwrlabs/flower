@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-05-28 00:26+0000\n"
+"POT-Creation-Date: 2026-05-29 00:30+0000\n"
 "PO-Revision-Date: 2026-05-23 06:56+0000\n"
 "Last-Translator: reducedradius <feixiang512@outlook.com>\n"
 "Language: zh_Hans\n"
@@ -12267,6 +12267,174 @@ msgstr "随着 Flower Next 的不断快速改进，我们将定期更新本指�
 msgid "Happy migrating! 🚀"
 msgstr "移民愉快！🚀"
 
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:-1
+msgid ""
+"Guide for running Flower Apps on Flower SuperGrid Deployment and "
+"Simulation federations."
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:7
+#, fuzzy
+msgid "Run Flower Apps on SuperGrid"
+msgstr "使用模拟引擎运行花朵应用程序。"
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:9
+msgid ""
+"To run a Flower App on SuperGrid, you need a federation. The federation "
+"can be a Simulation federation or a Deployment federation. For Deployment"
+" federations, connected SuperNodes must also be added to the federation. "
+"If you still need to create a federation, see :doc:`how-to-create-and-"
+"manage-federations`. If you need to register and connect SuperNodes "
+"first, see :doc:`how-to-connect-supernodes-to-supergrid`."
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:15
+msgid ""
+"This guide shows two ways to run a Flower App on SuperGrid: directly from"
+" `Flower Hub <https://flower.ai/apps/>`__, and from a Flower App project "
+"on your machine. It uses the `@flwrlabs/quickstart-numpy "
+"<https://flower.ai/apps/flwrlabs/quickstart-numpy/>`__ app as an example,"
+" but the same workflow applies to other Flower Apps, whether or not they "
+"are listed on Flower Hub."
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:23
+#, fuzzy
+msgid "Run Flower Apps from Flower Hub"
+msgstr "使用模拟引擎运行花朵应用程序。"
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:25
+msgid ""
+"Running directly from Flower Hub is the quickest way to get started. Open"
+" an app page, for example `@flwrlabs/quickstart-numpy "
+"<https://flower.ai/apps/flwrlabs/quickstart-numpy/>`__, and click "
+"``Run``."
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:29
+#, fuzzy
+msgid "Flower App page on Flower Hub"
+msgstr "使用模拟引擎运行花朵应用程序。"
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:34
+msgid "Select the federation to run the app on, then click ``Run app``."
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:36
+#: ../../source/tutorial-series-get-started-with-flower.rst:98
+msgid "Run app dialog in SuperGrid"
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:41
+msgid ""
+"After the run starts, open the federation in the `SuperGrid dashboard "
+"<https://flower.ai/federations/>`__ to inspect the run status."
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:44
+#: ../../source/tutorial-series-get-started-with-flower.rst:107
+msgid "Run details page showing the progress of the app execution"
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:49
+msgid "Open the ``Logs`` tab to inspect the app logs."
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:51
+#: ../../source/tutorial-series-get-started-with-flower.rst:118
+msgid "Logs tab showing logs from the app execution"
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:56
+msgid ""
+"If you return to the federation page, the run appears in the list of runs"
+" for that federation."
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:59
+#: ../../source/tutorial-series-get-started-with-flower.rst:137
+msgid "Federation details page showing the run that was launched"
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:66
+#, fuzzy
+msgid "Run Flower apps from your machine"
+msgstr "Flower 服务器。"
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:68
+msgid ""
+"You can also run a Flower App on SuperGrid from your local machine. Use "
+"this workflow when you want to inspect or modify an app before submitting"
+" it to SuperGrid, or when you are developing a Flower App locally and do "
+"not want to list it on Flower Hub."
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:72
+msgid ""
+"This section assumes you have a Python environment set up. Install Flower"
+" with ``pip``:"
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:78
+msgid "Pull the app locally with ``flwr new``:"
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:85
+msgid ""
+"Then, log in to SuperGrid with ``flwr login``. This opens a browser "
+"window where you can authenticate with your SuperGrid account. Finally, "
+"run the app with ``flwr run`` and use ``--federation`` to choose the "
+"federation:"
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:91
+msgid ""
+"Replace ``@<username>/<federation-name>`` with the unique name of your "
+"federation, for example ``@peter123/my-federation``."
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:101
+msgid "The run appears in the same SuperGrid federation dashboard."
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:103
+#: ../../source/tutorial-series-write-your-first-flower-app.rst:110
+msgid "SuperGrid dashboard showing the newly started run in the federation"
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:109
+#, fuzzy
+msgid "Customize the run configuration"
+msgstr "配置值"
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:111
+msgid ""
+"Flower Apps can define default runtime settings in the "
+"``[tool.flwr.app.config]`` section of their ``pyproject.toml``. The "
+"``quickstart-numpy`` app used in this guide defines ``num-server-rounds``"
+" to control how many rounds its ``ServerApp`` runs:"
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:120
+msgid ""
+"Apps can define additional settings in this section and read them from "
+"the app code, for example learning rates, model sizes, batch sizes, or "
+"dataset-specific options."
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:123
+msgid ""
+"You can override app-defined values for a single run with the ``--run-"
+"config`` flag. The following command runs ``quickstart-numpy`` on "
+"SuperGrid with ``num-server-rounds`` set to ``5``:"
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:134
+msgid ""
+"For more details on Flower App configuration in ``pyproject.toml``, see "
+":doc:`how-to-configure-pyproject-toml`."
+msgstr ""
+
 #: ../../source/how-to-run-flower-locally.rst:-1
 msgid ""
 "Learn how local `flwr run` uses a managed local SuperLink, how to inspect"
@@ -18187,7 +18355,7 @@ msgid ":py:obj:`Array <flwr.app.Array>`\\ \\(\\)"
 msgstr ":py:obj:`NDArray <flwr.common.NDArray>`\\"
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
-#: flwr.common.record.array.Array:1 of
+#: flwr.app.message.array.Array:1 of
 #, fuzzy
 msgid "Array type."
 msgstr "返回类型"
@@ -18198,7 +18366,7 @@ msgid ":py:obj:`ArrayRecord <flwr.app.ArrayRecord>`\\ \\(\\)"
 msgstr ":py:obj:`NDArray <flwr.common.NDArray>`\\"
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
-#: flwr.common.record.arrayrecord.ArrayRecord:1 of
+#: flwr.app.message.arrayrecord.ArrayRecord:1 of
 #, fuzzy
 msgid "Array record."
 msgstr "参数"
@@ -18214,7 +18382,7 @@ msgstr ""
 "...)``"
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
-#: flwr.common.record.configrecord.ConfigRecord:1 of
+#: flwr.app.message.configrecord.ConfigRecord:1 of
 #, fuzzy
 msgid "Config record."
 msgstr "配置日志记录"
@@ -18227,7 +18395,7 @@ msgid ""
 msgstr ":py:obj:`Context <flwr.common.Context>`\\ \\(state\\)"
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
-#: flwr.common.context.Context:1 of
+#: flwr.app.message.context.Context:1 of
 #, fuzzy
 msgid "Context of your run."
 msgstr "您的运行状态。"
@@ -18249,7 +18417,7 @@ msgid ":py:obj:`Message <flwr.app.Message>`\\ \\(\\)"
 msgstr ":py:obj:`MessageType <flwr.common.MessageType>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
-#: flwr.common.message.Message:1 of
+#: flwr.app.message.message.Message:1 of
 msgid "Represents a message exchanged between ClientApp and ServerApp."
 msgstr ""
 
@@ -18289,7 +18457,7 @@ msgstr ""
 "\\(\\[metrics\\_dict\\, keep\\_input\\]\\)"
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
-#: flwr.common.record.metricrecord.MetricRecord:1 of
+#: flwr.app.message.metricrecord.MetricRecord:1 of
 #, fuzzy
 msgid "Metric record."
 msgstr "指标记录。"
@@ -18304,7 +18472,7 @@ msgstr ""
 "\\(\\[parameters\\_records\\, ...\\]\\)"
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
-#: flwr.common.record.recorddict.RecordDict:1 of
+#: flwr.app.message.recorddict.RecordDict:1 of
 #, fuzzy
 msgid "RecordDict stores groups of arrays, metrics and configs."
 msgstr "RecordSet 可存储参数、指标和配置组。"
@@ -18314,14 +18482,14 @@ msgstr "RecordSet 可存储参数、指标和配置组。"
 msgid "Array"
 msgstr "数组"
 
-#: flwr.common.message.Message:1 flwr.common.record.array.Array:1 of
+#: flwr.app.message.array.Array:1 flwr.app.message.message.Message:1 of
 #, fuzzy
 msgid ""
 "Bases: "
 ":py:class:`~flwr.supercore.inflatable.inflatable_object.InflatableObject`"
 msgstr "Bases: :py:class:`~flwr.common.context.Context`"
 
-#: flwr.common.record.array.Array:3 of
+#: flwr.app.message.array.Array:3 of
 #, fuzzy
 msgid ""
 "A dataclass containing serialized data from an array-like or tensor-like "
@@ -18329,26 +18497,26 @@ msgid ""
 "of three ways:"
 msgstr "数据类，包含数组类或张量类对象的序列化数据以及相关元数据。"
 
-#: flwr.common.record.array.Array:6 of
+#: flwr.app.message.array.Array:6 of
 msgid "By specifying explicit values for `dtype`, `shape`, `stype`, and `data`."
 msgstr ""
 
-#: flwr.common.record.array.Array:7 of
+#: flwr.app.message.array.Array:7 of
 msgid "By providing a NumPy ndarray (via the `ndarray` argument)."
 msgstr ""
 
-#: flwr.common.record.array.Array:8 of
+#: flwr.app.message.array.Array:8 of
 msgid "By providing a PyTorch tensor (via the `torch_tensor` argument)."
 msgstr ""
 
-#: flwr.common.record.array.Array:10 of
+#: flwr.app.message.array.Array:10 of
 msgid ""
 "In scenarios (2)-(3), the `dtype`, `shape`, `stype`, and `data` are "
 "automatically derived from the input. In scenario (1), these fields must "
 "be specified manually."
 msgstr ""
 
-#: flwr.common.record.array.Array:13 of
+#: flwr.app.message.array.Array:13 of
 #, fuzzy
 msgid ""
 "A string representing the data type of the serialized object (e.g. "
@@ -18356,14 +18524,14 @@ msgid ""
 "tensor."
 msgstr "表示序列化对象数据类型的字符串（例如 `np.float32`)"
 
-#: flwr.common.record.array.Array:16 of
+#: flwr.app.message.array.Array:16 of
 #, fuzzy
 msgid ""
 "A tuple representing the shape of the unserialized array-like object. "
 "Only required if you are not passing in a ndarray or a tensor."
 msgstr "代表未序列化数组对象形状的列表。它可用于反序列化数据（取决于序列化方法），或仅作为元数据字段使用。"
 
-#: flwr.common.record.array.Array:19 of
+#: flwr.app.message.array.Array:19 of
 #, fuzzy
 msgid ""
 "A string indicating the serialization mechanism used to generate the "
@@ -18371,37 +18539,36 @@ msgid ""
 "if you are not passing in a ndarray or a tensor."
 msgstr "表示序列化机制类型的字符串，用于从类似数组或类似张量的对象中生成 `data` 中的字节。"
 
-#: flwr.common.record.array.Array:23 of
+#: flwr.app.message.array.Array:23 of
 #, fuzzy
 msgid ""
 "A buffer of bytes containing the data. Only required if you are not "
 "passing in a ndarray or a tensor."
 msgstr "代表未序列化数组对象形状的列表。它可用于反序列化数据（取决于序列化方法），或仅作为元数据字段使用。"
 
-#: flwr.common.record.array.Array:26 of
+#: flwr.app.message.array.Array:26 of
 msgid ""
 "A NumPy ndarray. If provided, the `dtype`, `shape`, `stype`, and `data` "
 "fields are derived automatically from it."
 msgstr ""
 
-#: flwr.common.record.array.Array:29 of
+#: flwr.app.message.array.Array:29 of
 msgid ""
 "A PyTorch tensor. If provided, it will be **detached and moved to CPU** "
 "before conversion, and the `dtype`, `shape`, `stype`, and `data` fields "
 "will be derived automatically from it."
 msgstr ""
 
+#: flwr.app.message.array.Array:35 flwr.app.message.arrayrecord.ArrayRecord:36
+#: flwr.app.message.configrecord.ConfigRecord:20
+#: flwr.app.message.metricrecord.MetricRecord:19
+#: flwr.app.message.recorddict.RecordDict:14
 #: flwr.clientapp.client_app.ClientApp:4
 #: flwr.clientapp.client_app.ClientApp.evaluate:12
 #: flwr.clientapp.client_app.ClientApp.lifespan:7
 #: flwr.clientapp.client_app.ClientApp.query:12
 #: flwr.clientapp.client_app.ClientApp.train:12
 #: flwr.clientapp.mod.localdp_mod.LocalDpMod:22
-#: flwr.common.record.array.Array:35
-#: flwr.common.record.arrayrecord.ArrayRecord:36
-#: flwr.common.record.configrecord.ConfigRecord:20
-#: flwr.common.record.metricrecord.MetricRecord:19
-#: flwr.common.record.recorddict.RecordDict:14
 #: flwr.server.server_app.ServerApp:4
 #: flwr.server.server_app.ServerApp.lifespan:7
 #: flwr.server.server_app.ServerApp.main:4
@@ -18412,16 +18579,16 @@ msgstr ""
 msgid "Examples"
 msgstr "实例"
 
-#: flwr.common.record.array.Array:36 of
+#: flwr.app.message.array.Array:36 of
 msgid "Initializing by specifying all fields directly::"
 msgstr ""
 
-#: flwr.common.record.array.Array:45 of
+#: flwr.app.message.array.Array:45 of
 #, fuzzy
 msgid "Initializing with a NumPy ndarray::"
 msgstr "存放 ParametersRecord 实例的字典。"
 
-#: flwr.common.record.array.Array:50 of
+#: flwr.app.message.array.Array:50 of
 msgid "Initializing with a PyTorch tensor::"
 msgstr ""
 
@@ -18469,7 +18636,7 @@ msgid ":py:obj:`deflate <flwr.app.Array.deflate>`\\ \\(\\)"
 msgstr ":py:obj:`data <flwr.common.Array.data>`\\"
 
 #: ../../source/ref-api/flwr.app.Array.rst:41:<autosummary>:1
-#: flwr.common.record.array.Array.deflate:1 of
+#: flwr.app.message.array.Array.deflate:1 of
 msgid "Deflate the Array."
 msgstr ""
 
@@ -18481,7 +18648,7 @@ msgid ""
 msgstr ":py:obj:`array_from_numpy <flwr.common.array_from_numpy>`\\ \\(ndarray\\)"
 
 #: ../../source/ref-api/flwr.app.Array.rst:41:<autosummary>:1
-#: flwr.common.record.array.Array.from_numpy_ndarray:1 of
+#: flwr.app.message.array.Array.from_numpy_ndarray:1 of
 #, fuzzy
 msgid "Create Array from NumPy ndarray."
 msgstr "将参数对象转换为 NumPy ndarrays。"
@@ -18494,7 +18661,7 @@ msgid ""
 msgstr ":py:obj:`ndarray_to_bytes <flwr.common.ndarray_to_bytes>`\\ \\(ndarray\\)"
 
 #: ../../source/ref-api/flwr.app.Array.rst:41:<autosummary>:1
-#: flwr.common.record.array.Array.from_torch_tensor:1 of
+#: flwr.app.message.array.Array.from_torch_tensor:1 of
 #, fuzzy
 msgid "Create Array from PyTorch tensor."
 msgstr "将参数对象转换为 NumPy ndarrays。"
@@ -18507,7 +18674,7 @@ msgid ""
 msgstr ":py:obj:`items <flwr.common.MetricsRecord.items>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.app.Array.rst:41:<autosummary>:1
-#: flwr.common.record.array.Array.inflate:1 of
+#: flwr.app.message.array.Array.inflate:1 of
 #, fuzzy
 msgid "Inflate an Array from bytes."
 msgstr "从字节反序列化 NumPy ndarray。"
@@ -18518,7 +18685,7 @@ msgid ":py:obj:`numpy <flwr.app.Array.numpy>`\\ \\(\\)"
 msgstr "server.strategy.Strategy"
 
 #: ../../source/ref-api/flwr.app.Array.rst:41:<autosummary>:1
-#: flwr.common.record.array.Array.numpy:1 of
+#: flwr.app.message.array.Array.numpy:1 of
 #, fuzzy
 msgid "Return the array as a NumPy array."
 msgstr "以 NumPy ndarrays 列表形式返回模型参数"
@@ -18529,7 +18696,7 @@ msgid ":py:obj:`slice_array <flwr.app.Array.slice_array>`\\ \\(\\)"
 msgstr ":py:obj:`NDArray <flwr.common.NDArray>`\\"
 
 #: ../../source/ref-api/flwr.app.Array.rst:41:<autosummary>:1
-#: flwr.common.record.array.Array.slice_array:1 of
+#: flwr.app.message.array.Array.slice_array:1 of
 msgid "Slice Array data and construct a list of ArrayChunks."
 msgstr ""
 
@@ -18608,11 +18775,11 @@ msgstr "server.strategy.Strategy"
 msgid ":py:obj:`data <flwr.app.Array.data>`\\"
 msgstr ":py:obj:`data <flwr.common.Array.data>`\\"
 
-#: flwr.common.record.array.Array.inflate:3 of
+#: flwr.app.message.array.Array.inflate:3 of
 msgid "The deflated object content of the Array."
 msgstr ""
 
-#: flwr.common.record.array.Array.inflate:5 of
+#: flwr.app.message.array.Array.inflate:5 of
 msgid ""
 "Must be ``None``. ``Array`` must have child objects. Providing no "
 "children will raise a ``ValueError``."
@@ -18651,7 +18818,7 @@ msgstr ""
 msgid "Returns"
 msgstr "返回"
 
-#: flwr.common.record.array.Array.inflate:9 of
+#: flwr.app.message.array.Array.inflate:9 of
 msgid "The inflated Array."
 msgstr ""
 
@@ -18694,17 +18861,17 @@ msgstr "返回类型"
 msgid "ArrayRecord"
 msgstr "参数"
 
-#: flwr.common.record.arrayrecord.ArrayRecord:1 of
+#: flwr.app.message.arrayrecord.ArrayRecord:1 of
 #, fuzzy
 msgid ""
-"Bases: :py:class:`~flwr.common.record.typeddict.TypedDict`\\ "
-"[:py:class:`str`, :py:class:`~flwr.common.record.array.Array`], "
+"Bases: :py:class:`~flwr.app.message.typeddict.TypedDict`\\ "
+"[:py:class:`str`, :py:class:`~flwr.app.message.array.Array`], "
 ":py:class:`~flwr.supercore.inflatable.inflatable_object.InflatableObject`"
 msgstr ""
 "Bases: :py:class:`~flwr.common.record.typeddict.TypedDict`\\ "
 "[:py:class:`str`, :py:class:`~flwr.common.record.parametersrecord.Array`]"
 
-#: flwr.common.record.arrayrecord.ArrayRecord:3 of
+#: flwr.app.message.arrayrecord.ArrayRecord:3 of
 msgid ""
 "A typed dictionary (``str`` to :class:`Array`) that can store named "
 "arrays, including model parameters, gradients, embeddings or non-"
@@ -18713,59 +18880,59 @@ msgid ""
 "``state_dict``, but it holds arrays in a serialized form."
 msgstr ""
 
-#: flwr.common.record.arrayrecord.ArrayRecord:9 of
+#: flwr.app.message.arrayrecord.ArrayRecord:9 of
 msgid ""
 "This object is one of the record types supported by :class:`RecordDict` "
 "and can therefore be stored in the ``content`` of a :class:`Message` or "
 "the ``state`` of a :class:`Context`."
 msgstr ""
 
-#: flwr.common.record.arrayrecord.ArrayRecord:13 of
+#: flwr.app.message.arrayrecord.ArrayRecord:13 of
 msgid "This class can be instantiated in multiple ways:"
 msgstr ""
 
-#: flwr.common.record.arrayrecord.ArrayRecord:15 of
+#: flwr.app.message.arrayrecord.ArrayRecord:15 of
 msgid "By providing nothing (empty container)."
 msgstr ""
 
-#: flwr.common.record.arrayrecord.ArrayRecord:16 of
+#: flwr.app.message.arrayrecord.ArrayRecord:16 of
 msgid ""
 "By providing a dictionary of :class:`Array` (via the ``array_dict`` "
 "argument)."
 msgstr ""
 
-#: flwr.common.record.arrayrecord.ArrayRecord:17 of
+#: flwr.app.message.arrayrecord.ArrayRecord:17 of
 msgid ""
 "By providing a list of NumPy ``ndarray`` (via the ``numpy_ndarrays`` "
 "argument)."
 msgstr ""
 
-#: flwr.common.record.arrayrecord.ArrayRecord:18 of
+#: flwr.app.message.arrayrecord.ArrayRecord:18 of
 msgid ""
 "By providing a PyTorch ``state_dict`` (via the ``torch_state_dict`` "
 "argument)."
 msgstr ""
 
-#: flwr.common.record.arrayrecord.ArrayRecord:20 of
+#: flwr.app.message.arrayrecord.ArrayRecord:20 of
 msgid ""
 "An existing dictionary containing named :class:`Array` instances. If "
 "provided, these entries will be used directly to populate the record."
 msgstr ""
 
-#: flwr.common.record.arrayrecord.ArrayRecord:23 of
+#: flwr.app.message.arrayrecord.ArrayRecord:23 of
 msgid ""
 "A list of NumPy arrays. Each array will be automatically converted into "
 "an :class:`Array` and stored in this record with generated keys."
 msgstr ""
 
-#: flwr.common.record.arrayrecord.ArrayRecord:26 of
+#: flwr.app.message.arrayrecord.ArrayRecord:26 of
 msgid ""
 "A PyTorch ``state_dict`` (``str`` keys to ``torch.Tensor`` values). Each "
 "tensor will be converted into an :class:`Array` and stored in this "
 "record."
 msgstr ""
 
-#: flwr.common.record.arrayrecord.ArrayRecord:29 of
+#: flwr.app.message.arrayrecord.ArrayRecord:29 of
 msgid ""
 "If ``False``, entries from the input are removed after being added to "
 "this record to free up memory. If ``True``, the input remains unchanged. "
@@ -18773,26 +18940,26 @@ msgid ""
 "dictionary of :class:`Array`, i.e., ``array_dict``."
 msgstr ""
 
-#: flwr.common.record.arrayrecord.ArrayRecord:37 of
+#: flwr.app.message.arrayrecord.ArrayRecord:37 of
 #, fuzzy
 msgid "Initializing an empty ArrayRecord::"
 msgstr "存放 ParametersRecord 实例的字典。"
 
-#: flwr.common.record.arrayrecord.ArrayRecord:41 of
+#: flwr.app.message.arrayrecord.ArrayRecord:41 of
 #, fuzzy
 msgid "Initializing with a dictionary of :class:`Array`::"
 msgstr "将参数对象转换为 NumPy ndarrays。"
 
-#: flwr.common.record.arrayrecord.ArrayRecord:46 of
+#: flwr.app.message.arrayrecord.ArrayRecord:46 of
 #, fuzzy
 msgid "Initializing with a list of NumPy arrays::"
 msgstr "存放 ParametersRecord 实例的字典。"
 
-#: flwr.common.record.arrayrecord.ArrayRecord:53 of
+#: flwr.app.message.arrayrecord.ArrayRecord:53 of
 msgid "Initializing with a PyTorch model state_dict::"
 msgstr ""
 
-#: flwr.common.record.arrayrecord.ArrayRecord:59 of
+#: flwr.app.message.arrayrecord.ArrayRecord:59 of
 msgid "Initializing with a TensorFlow model weights (a list of NumPy arrays)::"
 msgstr ""
 
@@ -18810,7 +18977,7 @@ msgstr ":py:obj:`keys <flwr.common.MetricsRecord.keys>`\\ \\(\\)"
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
 #: ../../source/ref-api/flwr.app.RecordDict.rst:59:<autosummary>:1
-#: flwr.common.record.typeddict.TypedDict.copy:1 of
+#: flwr.app.message.typeddict.TypedDict.copy:1 of
 msgid "Return a shallow copy of the dictionary."
 msgstr ""
 
@@ -18822,9 +18989,9 @@ msgstr ":py:obj:`count_bytes <flwr.common.ParametersRecord.count_bytes>`\\ \\(\\
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
-#: flwr.common.record.arrayrecord.ArrayRecord.count_bytes:1
-#: flwr.common.record.configrecord.ConfigRecord.count_bytes:1
-#: flwr.common.record.metricrecord.MetricRecord.count_bytes:1 of
+#: flwr.app.message.arrayrecord.ArrayRecord.count_bytes:1
+#: flwr.app.message.configrecord.ConfigRecord.count_bytes:1
+#: flwr.app.message.metricrecord.MetricRecord.count_bytes:1 of
 #, fuzzy
 msgid "Return number of Bytes stored in this object."
 msgstr "返回存储在此对象中的字节数。"
@@ -18835,7 +19002,7 @@ msgid ":py:obj:`deflate <flwr.app.ArrayRecord.deflate>`\\ \\(\\)"
 msgstr ":py:obj:`data <flwr.common.Array.data>`\\"
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
-#: flwr.common.record.arrayrecord.ArrayRecord.deflate:1 of
+#: flwr.app.message.arrayrecord.ArrayRecord.deflate:1 of
 #, fuzzy
 msgid "Deflate the ArrayRecord."
 msgstr "参数"
@@ -18850,7 +19017,7 @@ msgstr ""
 "\\(\\[array\\_dict\\, keep\\_input\\]\\)"
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
-#: flwr.common.record.arrayrecord.ArrayRecord.from_array_dict:1 of
+#: flwr.app.message.arrayrecord.ArrayRecord.from_array_dict:1 of
 #, fuzzy
 msgid "Create ArrayRecord from a dictionary of :class:`Array`."
 msgstr "将参数对象转换为 NumPy ndarrays。"
@@ -18864,7 +19031,7 @@ msgid ""
 msgstr ":py:obj:`array_from_numpy <flwr.common.array_from_numpy>`\\ \\(ndarray\\)"
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
-#: flwr.common.record.arrayrecord.ArrayRecord.from_numpy_ndarrays:1 of
+#: flwr.app.message.arrayrecord.ArrayRecord.from_numpy_ndarrays:1 of
 #, fuzzy
 msgid "Create ArrayRecord from a list of NumPy ``ndarray``."
 msgstr "将参数对象转换为 NumPy ndarrays。"
@@ -18878,7 +19045,7 @@ msgid ""
 msgstr ":py:obj:`get <flwr.common.ParametersRecord.get>`\\ \\(k\\[\\,d\\]\\)"
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
-#: flwr.common.record.arrayrecord.ArrayRecord.from_torch_state_dict:1 of
+#: flwr.app.message.arrayrecord.ArrayRecord.from_torch_state_dict:1 of
 #, fuzzy
 msgid "Create ArrayRecord from PyTorch ``state_dict``."
 msgstr "将参数对象转换为 NumPy ndarrays。"
@@ -18896,7 +19063,7 @@ msgid ""
 msgstr ":py:obj:`items <flwr.common.MetricsRecord.items>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
-#: flwr.common.record.arrayrecord.ArrayRecord.inflate:1 of
+#: flwr.app.message.arrayrecord.ArrayRecord.inflate:1 of
 #, fuzzy
 msgid "Inflate an ArrayRecord from bytes."
 msgstr "从字节反序列化 NumPy ndarray。"
@@ -18951,7 +19118,7 @@ msgid ""
 msgstr ":py:obj:`array_from_numpy <flwr.common.array_from_numpy>`\\ \\(ndarray\\)"
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
-#: flwr.common.record.arrayrecord.ArrayRecord.to_numpy_ndarrays:1 of
+#: flwr.app.message.arrayrecord.ArrayRecord.to_numpy_ndarrays:1 of
 #, fuzzy
 msgid "Return the ArrayRecord as a list of NumPy ``ndarray``."
 msgstr "**parameters** -- NumPy ndarrays 的本地模型参数列表。"
@@ -18967,7 +19134,7 @@ msgstr ""
 "\\(\\[array\\_dict\\, keep\\_input\\]\\)"
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:77:<autosummary>:1
-#: flwr.common.record.arrayrecord.ArrayRecord.to_torch_state_dict:1 of
+#: flwr.app.message.arrayrecord.ArrayRecord.to_torch_state_dict:1 of
 #, fuzzy
 msgid "Return the ArrayRecord as a PyTorch ``state_dict``."
 msgstr "**parameters** -- NumPy ndarrays 的本地模型参数列表。"
@@ -19015,7 +19182,7 @@ msgstr ":py:obj:`clear <flwr.common.MetricsRecord.clear>`\\ \\(\\)"
 msgid ":py:obj:`object_id <flwr.app.ArrayRecord.object_id>`\\"
 msgstr ":py:obj:`data <flwr.common.Array.data>`\\"
 
-#: flwr.common.record.arrayrecord.ArrayRecord.count_bytes:3 of
+#: flwr.app.message.arrayrecord.ArrayRecord.count_bytes:3 of
 #, fuzzy
 msgid ""
 "Note that a small amount of Bytes might also be included in this counting"
@@ -19023,18 +19190,18 @@ msgid ""
 "array) needed for deseralization."
 msgstr "请注意，该计数中还可能包含少量字节，这些字节与序列化对象（如 NumPy 数组）的元数据相对应，需要进行去eralization。"
 
-#: flwr.common.record.arrayrecord.ArrayRecord.inflate:3 of
+#: flwr.app.message.arrayrecord.ArrayRecord.inflate:3 of
 #, fuzzy
 msgid "The deflated object content of the ArrayRecord."
 msgstr "配置日志记录"
 
-#: flwr.common.record.arrayrecord.ArrayRecord.inflate:5 of
+#: flwr.app.message.arrayrecord.ArrayRecord.inflate:5 of
 msgid ""
 "Dictionary of children InflatableObjects mapped to their Object IDs. "
 "These children enable the full inflation of the ArrayRecord."
 msgstr ""
 
-#: flwr.common.record.arrayrecord.ArrayRecord.inflate:9 of
+#: flwr.app.message.arrayrecord.ArrayRecord.inflate:9 of
 #, fuzzy
 msgid "The inflated ArrayRecord."
 msgstr "指标记录。"
@@ -19044,10 +19211,10 @@ msgstr "指标记录。"
 msgid "ConfigRecord"
 msgstr "配置日志记录"
 
-#: flwr.common.record.configrecord.ConfigRecord:1 of
+#: flwr.app.message.configrecord.ConfigRecord:1 of
 #, fuzzy
 msgid ""
-"Bases: :py:class:`~flwr.common.record.typeddict.TypedDict`\\ "
+"Bases: :py:class:`~flwr.app.message.typeddict.TypedDict`\\ "
 "[:py:class:`str`, :py:class:`int` | :py:class:`float` | :py:class:`str` |"
 " :py:class:`bytes` | :py:class:`bool` | :py:class:`list`\\ "
 "[:py:class:`int`] | :py:class:`list`\\ [:py:class:`float`] | "
@@ -19063,24 +19230,23 @@ msgstr ""
 ":py:class:`~typing.List`\\ [:py:class:`bytes`], "
 ":py:class:`~typing.List`\\ [:py:class:`bool`]]]"
 
-#: flwr.common.record.configrecord.ConfigRecord:3 of
+#: flwr.app.message.configrecord.ConfigRecord:3 of
 msgid ""
 "A :code:`ConfigRecord` is a Python dictionary designed to ensure that "
 "each key-value pair adheres to specified data types. A "
 ":code:`ConfigRecord` is one of the types of records that a "
-"`flwr.common.RecordDict <flwr.common.RecordDict.html#recorddict>`_ "
-"supports and can therefore be used to construct :code:`common.Message` "
-"objects."
+"`flwr.app.RecordDict <flwr.app.RecordDict.html#recorddict>`_ supports and"
+" can therefore be used to construct :code:`app.Message` objects."
 msgstr ""
 
-#: flwr.common.record.configrecord.ConfigRecord:9 of
+#: flwr.app.message.configrecord.ConfigRecord:9 of
 msgid ""
 "A dictionary that stores basic types (i.e. `str`, `int`, `float`, `bytes`"
 " as defined in `ConfigScalar`) and lists of such types (see "
 "`ConfigScalarList`)."
 msgstr ""
 
-#: flwr.common.record.configrecord.ConfigRecord:13 of
+#: flwr.app.message.configrecord.ConfigRecord:13 of
 msgid ""
 "A boolean indicating whether config passed should be deleted from the "
 "input dictionary immediately after adding them to the record. When set to"
@@ -19088,7 +19254,7 @@ msgid ""
 "to False."
 msgstr ""
 
-#: flwr.common.record.configrecord.ConfigRecord:21 of
+#: flwr.app.message.configrecord.ConfigRecord:21 of
 msgid ""
 "The usage of a :code:`ConfigRecord` is envisioned for sending "
 "configuration values telling the target node how to perform a certain "
@@ -19099,18 +19265,18 @@ msgid ""
 "these are of high dimensionality."
 msgstr ""
 
-#: flwr.common.record.configrecord.ConfigRecord:29 of
+#: flwr.app.message.configrecord.ConfigRecord:29 of
 msgid ""
 "Let's see some examples of how to construct a :code:`ConfigRecord` from "
 "scratch::"
 msgstr ""
 
-#: flwr.common.record.configrecord.ConfigRecord:42 of
+#: flwr.app.message.configrecord.ConfigRecord:42 of
 msgid ""
-"Just like the other types of records in a :code:`flwr.common.RecordDict`,"
-" types are enforced. If you need to add a custom data structure or "
-"object, we recommend to serialise it into bytes and save it as such "
-"(bytes are allowed in a :code:`ConfigRecord`)"
+"Just like the other types of records in a :code:`flwr.app.RecordDict`, "
+"types are enforced. If you need to add a custom data structure or object,"
+" we recommend to serialise it into bytes and save it as such (bytes are "
+"allowed in a :code:`ConfigRecord`)"
 msgstr ""
 
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
@@ -19135,8 +19301,8 @@ msgstr ":py:obj:`items <flwr.common.ConfigsRecord.items>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
-#: flwr.common.record.configrecord.ConfigRecord.deflate:1
-#: flwr.common.record.metricrecord.MetricRecord.deflate:1 of
+#: flwr.app.message.configrecord.ConfigRecord.deflate:1
+#: flwr.app.message.metricrecord.MetricRecord.deflate:1 of
 msgid "Deflate object."
 msgstr ""
 
@@ -19153,7 +19319,7 @@ msgid ""
 msgstr ":py:obj:`items <flwr.common.ConfigsRecord.items>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst:62:<autosummary>:1
-#: flwr.common.record.configrecord.ConfigRecord.inflate:1 of
+#: flwr.app.message.configrecord.ConfigRecord.inflate:1 of
 msgid "Inflate a ConfigRecord from bytes."
 msgstr ""
 
@@ -19229,22 +19395,22 @@ msgstr ":py:obj:`keys <flwr.common.ConfigsRecord.keys>`\\ \\(\\)"
 msgid "Get object_id."
 msgstr "获取节点 ID。"
 
-#: flwr.common.record.configrecord.ConfigRecord.count_bytes:3 of
+#: flwr.app.message.configrecord.ConfigRecord.count_bytes:3 of
 #, fuzzy
 msgid "This function counts booleans as occupying 1 Byte."
 msgstr "该函数将布尔值计算为占用 1 个字节。"
 
-#: flwr.common.record.configrecord.ConfigRecord.inflate:3 of
+#: flwr.app.message.configrecord.ConfigRecord.inflate:3 of
 msgid "The deflated object content of the ConfigRecord."
 msgstr ""
 
-#: flwr.common.record.configrecord.ConfigRecord.inflate:5 of
+#: flwr.app.message.configrecord.ConfigRecord.inflate:5 of
 msgid ""
 "Must be ``None``. ``ConfigRecord`` does not support child objects. "
 "Providing any children will raise a ``ValueError``."
 msgstr ""
 
-#: flwr.common.record.configrecord.ConfigRecord.inflate:9 of
+#: flwr.app.message.configrecord.ConfigRecord.inflate:9 of
 #, fuzzy
 msgid "The inflated ConfigRecord."
 msgstr "配置日志记录"
@@ -19261,33 +19427,34 @@ msgstr ""
 msgid "Context"
 msgstr "背景"
 
-#: flwr.app.error.Error:1 flwr.app.message_type.MessageType:1
-#: flwr.app.metadata.Metadata:1 flwr.clientapp.client_app.ClientApp:1
-#: flwr.clientapp.mod.localdp_mod.LocalDpMod:1 flwr.common.context.Context:1
+#: flwr.app.error.Error:1 flwr.app.message.context.Context:1
+#: flwr.app.message_type.MessageType:1 flwr.app.metadata.Metadata:1
+#: flwr.clientapp.client_app.ClientApp:1
+#: flwr.clientapp.mod.localdp_mod.LocalDpMod:1
 #: flwr.server.server_app.ServerApp:1 flwr.serverapp.strategy.result.Result:1
 #: of
 #, fuzzy
 msgid "Bases: :py:class:`object`"
 msgstr "Bases: :py:class:`object`"
 
-#: flwr.common.context.Context:3 of
+#: flwr.app.message.context.Context:3 of
 #, fuzzy
 msgid "The ID that identifies the run."
 msgstr "错误的标识符。"
 
-#: flwr.common.context.Context:5 of
+#: flwr.app.message.context.Context:5 of
 #, fuzzy
 msgid "The ID that identifies the node."
 msgstr "错误的标识符。"
 
-#: flwr.common.context.Context:7 of
+#: flwr.app.message.context.Context:7 of
 msgid ""
 "A config (key/value mapping) unique to the node and independent of the "
 "`run_config`. This config persists across all runs this node participates"
 " in."
 msgstr ""
 
-#: flwr.common.context.Context:10 of
+#: flwr.app.message.context.Context:10 of
 #, fuzzy
 msgid ""
 "Holds records added by the entity in a given `run_id` and that will stay "
@@ -19298,37 +19465,47 @@ msgid ""
 "multiple rounds)"
 msgstr "保存实体在给定运行中添加的记录，这些记录将保留在本地。这意味着它保存的数据永远不会离开运行的系统。在执行模式时，它可用作中间存储或抓取板。它还可以作为存储器，在实体生命周期的不同阶段（如多轮）进行访问。"
 
-#: flwr.common.context.Context:17 of
+#: flwr.app.message.context.Context:17 of
 msgid ""
 "A config (key/value mapping) held by the entity in a given `run_id` and "
 "that will stay local. It can be used at any point during the lifecycle of"
 " this entity (e.g. across multiple rounds)"
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.Context.rst:32:<autosummary>:1
+#: flwr.app.message.context.Context:21 of
+#, fuzzy
+msgid "The ID that identifies the run series, if this run belongs to one."
+msgstr "错误的标识符。"
+
+#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`run_id <flwr.app.Context.run_id>`\\"
 msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
 
-#: ../../source/ref-api/flwr.app.Context.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`node_id <flwr.app.Context.node_id>`\\"
 msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
 
-#: ../../source/ref-api/flwr.app.Context.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`node_config <flwr.app.Context.node_config>`\\"
 msgstr ":py:obj:`config <flwr.common.FitIns.config>`\\"
 
-#: ../../source/ref-api/flwr.app.Context.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`state <flwr.app.Context.state>`\\"
 msgstr "server.strategy.Strategy"
 
-#: ../../source/ref-api/flwr.app.Context.rst:32:<autosummary>:1
+#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
 #, fuzzy
 msgid ":py:obj:`run_config <flwr.app.Context.run_config>`\\"
 msgstr ":py:obj:`config <flwr.common.FitIns.config>`\\"
+
+#: ../../source/ref-api/flwr.app.Context.rst:33:<autosummary>:1
+#, fuzzy
+msgid ":py:obj:`series_id <flwr.app.Context.series_id>`\\"
+msgstr ":py:obj:`src_node_id <flwr.common.Metadata.src_node_id>`\\"
 
 #: ../../source/ref-api/flwr.app.Error.rst:2
 #, fuzzy
@@ -19370,20 +19547,20 @@ msgstr "报告的错误原因。"
 msgid "Message"
 msgstr "服务器端"
 
-#: flwr.common.message.Message:3 of
+#: flwr.app.message.message.Message:3 of
 msgid ""
 "This class encapsulates the payload and metadata necessary for "
 "communication between a ClientApp and a ServerApp."
 msgstr ""
 
-#: flwr.common.message.Message:6 of
+#: flwr.app.message.message.Message:6 of
 #, fuzzy
 msgid ""
 "Holds records either sent by another entity (e.g. sent by the server-side"
 " logic to a client, or vice-versa) or that will be sent to it."
 msgstr "保存由其他实体发送的记录（如由服务器端逻辑发送到客户端，反之亦然）或将发送到该实体的记录。"
 
-#: flwr.common.message.Message:9 of
+#: flwr.app.message.message.Message:9 of
 #, fuzzy
 msgid ""
 "A dataclass that captures information about an error that took place when"
@@ -19391,40 +19568,40 @@ msgid ""
 msgstr "数据类，用于捕捉处理其他报文时发生的错误信息。"
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1
-#: flwr.app.Metadata.dst_node_id:1 flwr.app.metadata.Metadata:9
-#: flwr.common.message.Message:12 of
+#: flwr.app.Metadata.dst_node_id:1 flwr.app.message.message.Message:12
+#: flwr.app.metadata.Metadata:9 of
 #, fuzzy
 msgid "An identifier for the node receiving this message."
 msgstr "接收此信息的节点的标识符。"
 
 #: flwr.app.Metadata.created_at:1:<autosummary>:1
-#: flwr.app.Metadata.message_type:1 flwr.app.metadata.Metadata:20
-#: flwr.common.message.Message:14 of
+#: flwr.app.Metadata.message_type:1 flwr.app.message.message.Message:14
+#: flwr.app.metadata.Metadata:20 of
 #, fuzzy
 msgid "A string that encodes the action to be executed on the receiving end."
 msgstr "编码接收端要执行的操作的字符串。"
 
-#: flwr.common.message.Message:17 of
+#: flwr.app.message.message.Message:17 of
 msgid ""
 "Time-to-live (TTL) for this message in seconds. If `None` (default), the "
 "TTL is set to 43,200 seconds (12 hours)."
 msgstr ""
 
-#: flwr.app.metadata.Metadata:13 flwr.common.message.Message:20 of
+#: flwr.app.message.message.Message:20 flwr.app.metadata.Metadata:13 of
 #, fuzzy
 msgid ""
 "An identifier for grouping messages. In some settings, this is used as "
 "the FL round."
 msgstr "用于分组报文的标识符。在某些设置中，它被用作 FL 轮。"
 
-#: flwr.common.message.Message:23 of
+#: flwr.app.message.message.Message:23 of
 #, fuzzy
 msgid ""
 "Experimental. An identifier for the destination task receiving this "
 "message."
 msgstr "接收此信息的节点的标识符。"
 
-#: flwr.common.message.Message:25 of
+#: flwr.app.message.message.Message:25 of
 msgid ""
 "The instruction message to which this message is a reply. This message "
 "does not retain the original message's content but derives its metadata "
@@ -19441,7 +19618,7 @@ msgstr ""
 "\\(error\\, ttl\\)"
 
 #: ../../source/ref-api/flwr.app.Message.rst:41:<autosummary>:1
-#: flwr.common.message.Message.create_error_reply:1 of
+#: flwr.app.message.message.Message.create_error_reply:1 of
 #, fuzzy
 msgid "Construct a reply message indicating an error happened."
 msgstr "构建一条回复信息，说明发生了错误。"
@@ -19456,7 +19633,7 @@ msgstr ""
 " ttl\\)"
 
 #: ../../source/ref-api/flwr.app.Message.rst:41:<autosummary>:1
-#: flwr.common.message.Message.create_reply:1 of
+#: flwr.app.message.message.Message.create_reply:1 of
 #, fuzzy
 msgid "Create a reply to this message with specified content and TTL."
 msgstr "以指定的内容和 TTL 创建对该信息的回复。"
@@ -19467,7 +19644,7 @@ msgid ":py:obj:`deflate <flwr.app.Message.deflate>`\\ \\(\\)"
 msgstr ":py:obj:`items <flwr.common.MetricsRecord.items>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.app.Message.rst:41:<autosummary>:1
-#: flwr.common.message.Message.deflate:1 of
+#: flwr.app.message.message.Message.deflate:1 of
 #, fuzzy
 msgid "Deflate message."
 msgstr "服务器端"
@@ -19478,7 +19655,7 @@ msgid ":py:obj:`has_content <flwr.app.Message.has_content>`\\ \\(\\)"
 msgstr ":py:obj:`has_content <flwr.common.Message.has_content>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.app.Message.rst:41:<autosummary>:1
-#: flwr.common.message.Message.has_content:1 of
+#: flwr.app.message.message.Message.has_content:1 of
 #, fuzzy
 msgid "Return True if message has content, else False."
 msgstr "如果信息有内容，则返回 True，否则返回 False。"
@@ -19489,7 +19666,7 @@ msgid ":py:obj:`has_error <flwr.app.Message.has_error>`\\ \\(\\)"
 msgstr ":py:obj:`has_error <flwr.common.Message.has_error>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.app.Message.rst:41:<autosummary>:1
-#: flwr.common.message.Message.has_error:1 of
+#: flwr.app.message.message.Message.has_error:1 of
 #, fuzzy
 msgid "Return True if message has an error, else False."
 msgstr "如果信息有错误，则返回 True，否则返回 False。"
@@ -19502,7 +19679,7 @@ msgid ""
 msgstr ":py:obj:`items <flwr.common.MetricsRecord.items>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.app.Message.rst:41:<autosummary>:1
-#: flwr.common.message.Message.inflate:1 of
+#: flwr.app.message.message.Message.inflate:1 of
 #, fuzzy
 msgid "Inflate an Message from bytes."
 msgstr "从字节反序列化 NumPy ndarray。"
@@ -19556,13 +19733,13 @@ msgstr "数据类型，包括要执行的信息的相关信息。"
 msgid ":py:obj:`object_id <flwr.app.Message.object_id>`\\"
 msgstr ":py:obj:`keys <flwr.common.MetricsRecord.keys>`\\ \\(\\)"
 
-#: flwr.common.message.Message.create_error_reply:3 of
+#: flwr.app.message.message.Message.create_error_reply:3 of
 #, fuzzy
 msgid "The error that was encountered."
 msgstr "遇到的错误。"
 
-#: flwr.common.message.Message.create_error_reply:5
-#: flwr.common.message.Message.create_reply:9 of
+#: flwr.app.message.message.Message.create_error_reply:5
+#: flwr.app.message.message.Message.create_reply:9 of
 #, fuzzy
 msgid ""
 "Time-to-live for this message in seconds. If unset, it will be set based "
@@ -19573,8 +19750,8 @@ msgstr ""
 "该信息的有效时间（秒）。如果未设置，则将根据收到的信息过期前的剩余时间来设置。其计算公式为：ttl = msg.meta.ttl - "
 "(reply.meta.created_at - msg.meta.created_at)"
 
-#: flwr.common.message.Message.create_error_reply:5
-#: flwr.common.message.Message.create_reply:9 of
+#: flwr.app.message.message.Message.create_error_reply:5
+#: flwr.app.message.message.Message.create_reply:9 of
 #, fuzzy
 msgid ""
 "Time-to-live for this message in seconds. If unset, it will be set based "
@@ -19582,18 +19759,18 @@ msgid ""
 "follows the equation:"
 msgstr "该信息的有效时间（秒）。如果未设置，则将根据接收到的信息过期前的剩余时间来设置。其计算公式如下"
 
-#: flwr.common.message.Message.create_error_reply:9
-#: flwr.common.message.Message.create_reply:13 of
+#: flwr.app.message.message.Message.create_error_reply:9
+#: flwr.app.message.message.Message.create_reply:13 of
 #, fuzzy
 msgid "ttl = msg.meta.ttl - (reply.meta.created_at - msg.meta.created_at)"
 msgstr "ttl = msg.meta.ttl - (reply.meta.created_at - msg.meta.created_at)"
 
-#: flwr.common.message.Message.create_error_reply:12 of
+#: flwr.app.message.message.Message.create_error_reply:12 of
 #, fuzzy
 msgid "**message** -- A Message containing only the relevant error and metadata."
 msgstr "**message** -- 具有指定内容和元数据的新 \"信息 \"实例。"
 
-#: flwr.common.message.Message.create_reply:3 of
+#: flwr.app.message.message.Message.create_reply:3 of
 #, fuzzy
 msgid ""
 "The method generates a new `Message` as a reply to this message. It "
@@ -19604,28 +19781,28 @@ msgstr ""
 "\"run_id\"、\"src_node_id\"、\"dst_node_id \"和 \"message_type\"，并将 "
 "\"reply_to_message \"设置为该消息的 ID。"
 
-#: flwr.common.message.Message.create_reply:7 of
+#: flwr.app.message.message.Message.create_reply:7 of
 #, fuzzy
 msgid "The content for the reply message."
 msgstr "回复信息的内容。"
 
-#: flwr.common.message.Message.create_reply:16 of
+#: flwr.app.message.message.Message.create_reply:16 of
 #, fuzzy
 msgid "A new `Message` instance representing the reply."
 msgstr "代表回复的新的 `Message` 实例。"
 
-#: flwr.common.message.Message.inflate:3 of
+#: flwr.app.message.message.Message.inflate:3 of
 #, fuzzy
 msgid "The deflated object content of the Message."
 msgstr "配置日志记录"
 
-#: flwr.common.message.Message.inflate:5 of
+#: flwr.app.message.message.Message.inflate:5 of
 msgid ""
 "Dictionary of children InflatableObjects mapped to their Object IDs. "
 "These children enable the full inflation of the Message."
 msgstr ""
 
-#: flwr.common.message.Message.inflate:9 of
+#: flwr.app.message.message.Message.inflate:9 of
 #, fuzzy
 msgid "The inflated Message."
 msgstr "指标记录。"
@@ -19784,10 +19961,10 @@ msgstr "该信息的有效时间。"
 msgid "MetricRecord"
 msgstr "MetricsRecord"
 
-#: flwr.common.record.metricrecord.MetricRecord:1 of
+#: flwr.app.message.metricrecord.MetricRecord:1 of
 #, fuzzy
 msgid ""
-"Bases: :py:class:`~flwr.common.record.typeddict.TypedDict`\\ "
+"Bases: :py:class:`~flwr.app.message.typeddict.TypedDict`\\ "
 "[:py:class:`str`, :py:class:`int` | :py:class:`float` | "
 ":py:class:`list`\\ [:py:class:`int`] | :py:class:`list`\\ "
 "[:py:class:`float`]], "
@@ -19798,23 +19975,22 @@ msgstr ""
 ":py:class:`float`, :py:class:`~typing.List`\\ [:py:class:`int`], "
 ":py:class:`~typing.List`\\ [:py:class:`float`]]]"
 
-#: flwr.common.record.metricrecord.MetricRecord:3 of
+#: flwr.app.message.metricrecord.MetricRecord:3 of
 msgid ""
 "A :code:`MetricRecord` is a Python dictionary designed to ensure that "
 "each key-value pair adheres to specified data types. A "
 ":code:`MetricRecord` is one of the types of records that a "
-"`flwr.common.RecordDict <flwr.common.RecordDict.html#recorddict>`_ "
-"supports and can therefore be used to construct :code:`common.Message` "
-"objects."
+"`flwr.app.RecordDict <flwr.app.RecordDict.html#recorddict>`_ supports and"
+" can therefore be used to construct :code:`app.Message` objects."
 msgstr ""
 
-#: flwr.common.record.metricrecord.MetricRecord:9 of
+#: flwr.app.message.metricrecord.MetricRecord:9 of
 msgid ""
 "A dictionary that stores basic types (i.e. `int`, `float` as defined in "
 "`MetricScalar`) and list of such types (see `MetricScalarList`)."
 msgstr ""
 
-#: flwr.common.record.metricrecord.MetricRecord:12 of
+#: flwr.app.message.metricrecord.MetricRecord:12 of
 msgid ""
 "A boolean indicating whether metrics should be deleted from the input "
 "dictionary immediately after adding them to the record. When set to True,"
@@ -19822,7 +19998,7 @@ msgid ""
 "False."
 msgstr ""
 
-#: flwr.common.record.metricrecord.MetricRecord:20 of
+#: flwr.app.message.metricrecord.MetricRecord:20 of
 msgid ""
 "The usage of a :code:`MetricRecord` is envisioned for communicating "
 "results obtained when a node performs an action. A few typical examples "
@@ -19834,13 +20010,13 @@ msgid ""
 ":code:`float`) or list of scalars."
 msgstr ""
 
-#: flwr.common.record.metricrecord.MetricRecord:28 of
+#: flwr.app.message.metricrecord.MetricRecord:28 of
 msgid ""
 "Let's see some examples of how to construct a :code:`MetricRecord` from "
 "scratch::"
 msgstr ""
 
-#: flwr.common.record.metricrecord.MetricRecord:39 of
+#: flwr.app.message.metricrecord.MetricRecord:39 of
 msgid ""
 "Since types are enforced, the types of the objects inserted are checked. "
 "For a :code:`MetricRecord`, value types allowed are those in defined in "
@@ -19848,7 +20024,7 @@ msgid ""
 " allowed::"
 msgstr ""
 
-#: flwr.common.record.metricrecord.MetricRecord:50 of
+#: flwr.app.message.metricrecord.MetricRecord:50 of
 msgid ""
 "If you need a more versatily type of record try :code:`ConfigRecord` or "
 ":code:`ArrayRecord`."
@@ -19887,7 +20063,7 @@ msgid ""
 msgstr ":py:obj:`items <flwr.common.MetricsRecord.items>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.app.MetricRecord.rst:62:<autosummary>:1
-#: flwr.common.record.metricrecord.MetricRecord.inflate:1 of
+#: flwr.app.message.metricrecord.MetricRecord.inflate:1 of
 msgid "Inflate a MetricRecord from bytes."
 msgstr ""
 
@@ -19945,17 +20121,17 @@ msgstr ":py:obj:`clear <flwr.common.MetricsRecord.clear>`\\ \\(\\)"
 msgid ":py:obj:`object_id <flwr.app.MetricRecord.object_id>`\\"
 msgstr ":py:obj:`keys <flwr.common.MetricsRecord.keys>`\\ \\(\\)"
 
-#: flwr.common.record.metricrecord.MetricRecord.inflate:3 of
+#: flwr.app.message.metricrecord.MetricRecord.inflate:3 of
 msgid "The deflated object content of the MetricRecord."
 msgstr ""
 
-#: flwr.common.record.metricrecord.MetricRecord.inflate:5 of
+#: flwr.app.message.metricrecord.MetricRecord.inflate:5 of
 msgid ""
 "Must be ``None``. ``MetricRecord`` does not support child objects. "
 "Providing any children will raise a ``ValueError``."
 msgstr ""
 
-#: flwr.common.record.metricrecord.MetricRecord.inflate:9 of
+#: flwr.app.message.metricrecord.MetricRecord.inflate:9 of
 #, fuzzy
 msgid "The inflated MetricRecord."
 msgstr "指标记录。"
@@ -19965,33 +20141,33 @@ msgstr "指标记录。"
 msgid "RecordDict"
 msgstr "RecordSet"
 
-#: flwr.common.record.recorddict.RecordDict:1 of
+#: flwr.app.message.recorddict.RecordDict:1 of
 #, fuzzy
 msgid ""
-"Bases: :py:class:`~flwr.common.record.typeddict.TypedDict`\\ "
-"[:py:class:`str`, :py:class:`~flwr.common.record.arrayrecord.ArrayRecord`"
-" | :py:class:`~flwr.common.record.metricrecord.MetricRecord` | "
-":py:class:`~flwr.common.record.configrecord.ConfigRecord`], "
+"Bases: :py:class:`~flwr.app.message.typeddict.TypedDict`\\ "
+"[:py:class:`str`, :py:class:`~flwr.app.message.arrayrecord.ArrayRecord` |"
+" :py:class:`~flwr.app.message.metricrecord.MetricRecord` | "
+":py:class:`~flwr.app.message.configrecord.ConfigRecord`], "
 ":py:class:`~flwr.supercore.inflatable.inflatable_object.InflatableObject`"
 msgstr ""
 "Bases: :py:class:`~flwr.common.record.typeddict.TypedDict`\\ "
 "[:py:class:`str`, :py:class:`~flwr.common.record.parametersrecord.Array`]"
 
-#: flwr.common.record.recorddict.RecordDict:3 of
+#: flwr.app.message.recorddict.RecordDict:3 of
 msgid ""
 "A :class:`RecordDict` is the unified mechanism by which arrays, metrics "
 "and configs can be either stored as part of a :class:`Context` in your "
 "apps or communicated as part of a :class:`Message` between your apps."
 msgstr ""
 
-#: flwr.common.record.recorddict.RecordDict:8 of
+#: flwr.app.message.recorddict.RecordDict:8 of
 msgid ""
 "A dictionary mapping string keys to record instances, where each value is"
-" either a :class:`ParametersRecord`, :class:`MetricsRecord`, or "
-":class:`ConfigsRecord`."
+" either a :class:`ArrayRecord`, :class:`MetricRecord`, or "
+":class:`ConfigRecord`."
 msgstr ""
 
-#: flwr.common.record.recorddict.RecordDict:15 of
+#: flwr.app.message.recorddict.RecordDict:15 of
 msgid ""
 "A :class:`RecordDict` can hold three types of records, each designed with"
 " an specific purpose. What is common to all of them is that they are "
@@ -19999,19 +20175,19 @@ msgid ""
 "to specified data types."
 msgstr ""
 
-#: flwr.common.record.recorddict.RecordDict:20 of
+#: flwr.app.message.recorddict.RecordDict:20 of
 #, fuzzy
 msgid "Let's see an example::"
 msgstr "让我们来看几个例子："
 
-#: flwr.common.record.recorddict.RecordDict:38 of
+#: flwr.app.message.recorddict.RecordDict:38 of
 msgid ""
 "Adding an :code:`ArrayRecord` follows the same steps as above but first, "
 "the array needs to be serialized and represented as a "
-":code:`flwr.common.Array`. For example::"
+":code:`flwr.app.Array`. For example::"
 msgstr ""
 
-#: flwr.common.record.recorddict.RecordDict:55 of
+#: flwr.app.message.recorddict.RecordDict:56 of
 msgid ""
 "For additional examples on how to construct each of the records types "
 "shown above, please refer to the documentation for :code:`ConfigRecord`, "
@@ -20034,7 +20210,7 @@ msgid ":py:obj:`deflate <flwr.app.RecordDict.deflate>`\\ \\(\\)"
 msgstr ":py:obj:`items <flwr.common.MetricsRecord.items>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.app.RecordDict.rst:59:<autosummary>:1
-#: flwr.common.record.recorddict.RecordDict.deflate:1 of
+#: flwr.app.message.recorddict.RecordDict.deflate:1 of
 #, fuzzy
 msgid "Deflate the RecordDict."
 msgstr "指标记录。"
@@ -20052,7 +20228,7 @@ msgid ""
 msgstr ":py:obj:`items <flwr.common.MetricsRecord.items>`\\ \\(\\)"
 
 #: ../../source/ref-api/flwr.app.RecordDict.rst:59:<autosummary>:1
-#: flwr.common.record.recorddict.RecordDict.inflate:1 of
+#: flwr.app.message.recorddict.RecordDict.inflate:1 of
 #, fuzzy
 msgid "Inflate an RecordDict from bytes."
 msgstr "从字节反序列化 NumPy ndarray。"
@@ -20172,19 +20348,19 @@ msgstr ":py:obj:`parameters_records <flwr.common.RecordSet.parameters_records>`\
 msgid "Use ``config_records`` instead."
 msgstr ""
 
-#: flwr.common.record.recorddict.RecordDict.inflate:3 of
+#: flwr.app.message.recorddict.RecordDict.inflate:3 of
 #, fuzzy
 msgid "The deflated object content of the RecordDict."
 msgstr "配置日志记录"
 
-#: flwr.common.record.recorddict.RecordDict.inflate:5 of
+#: flwr.app.message.recorddict.RecordDict.inflate:5 of
 msgid ""
 "Dictionary of children InflatableObjects mapped to their Object IDs. "
 "These children enable the full inflation of the RecordDict. Default is "
 "None."
 msgstr ""
 
-#: flwr.common.record.recorddict.RecordDict.inflate:9 of
+#: flwr.app.message.recorddict.RecordDict.inflate:9 of
 #, fuzzy
 msgid "The inflated RecordDict."
 msgstr "指标记录。"
@@ -42036,19 +42212,11 @@ msgid ""
 "app``."
 msgstr ""
 
-#: ../../source/tutorial-series-get-started-with-flower.rst:98
-msgid "Run app dialog in SuperGrid"
-msgstr ""
-
 #: ../../source/tutorial-series-get-started-with-flower.rst:103
 msgid ""
 "Shortly after launching your app, your run will start and you will see "
 "the run details page. This page shows you the progress of your run and "
 "gives you insights into the execution of your app."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower.rst:107
-msgid "Run details page showing the progress of the app execution"
 msgstr ""
 
 #: ../../source/tutorial-series-get-started-with-flower.rst:112
@@ -42059,10 +42227,6 @@ msgid ""
 "metrics received from the clients. You can see these in the logs under "
 "the ``'random_metric'`` key. At the end, the logs show the aggregated "
 "results from all rounds."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower.rst:118
-msgid "Logs tab showing logs from the app execution"
 msgstr ""
 
 #: ../../source/tutorial-series-get-started-with-flower.rst:125
@@ -42086,10 +42250,6 @@ msgid ""
 "<https://flower.ai/federations/>`__ and click your federation, you'll see"
 " the run you launched. You can click that run to open the same run "
 "details page you saw right after launching the app."
-msgstr ""
-
-#: ../../source/tutorial-series-get-started-with-flower.rst:137
-msgid "Federation details page showing the run that was launched"
 msgstr ""
 
 #: ../../source/tutorial-series-get-started-with-flower.rst:142
@@ -43024,10 +43184,6 @@ msgid ""
 "Then, if you navigate to the `SuperGrid dashboard "
 "<https://flower.ai/federations/>`__, you should see a new run in the list"
 " of runs of your federation. Click on it to see the run details and logs."
-msgstr ""
-
-#: ../../source/tutorial-series-write-your-first-flower-app.rst:110
-msgid "SuperGrid dashboard showing the newly started run in the federation"
 msgstr ""
 
 #: ../../source/tutorial-series-write-your-first-flower-app.rst:115
@@ -73511,5 +73667,55 @@ msgstr ""
 #~ "& Biases to log strategy metrics. "
 #~ "Add ``wandb`` to the dependency list "
 #~ "in ``pyproject.toml``:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A :code:`ConfigRecord` is a Python "
+#~ "dictionary designed to ensure that each"
+#~ " key-value pair adheres to specified"
+#~ " data types. A :code:`ConfigRecord` is "
+#~ "one of the types of records that"
+#~ " a `flwr.common.RecordDict "
+#~ "<flwr.common.RecordDict.html#recorddict>`_ supports and"
+#~ " can therefore be used to construct"
+#~ " :code:`common.Message` objects."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Just like the other types of "
+#~ "records in a :code:`flwr.common.RecordDict`, "
+#~ "types are enforced. If you need to"
+#~ " add a custom data structure or "
+#~ "object, we recommend to serialise it "
+#~ "into bytes and save it as such "
+#~ "(bytes are allowed in a "
+#~ ":code:`ConfigRecord`)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A :code:`MetricRecord` is a Python "
+#~ "dictionary designed to ensure that each"
+#~ " key-value pair adheres to specified"
+#~ " data types. A :code:`MetricRecord` is "
+#~ "one of the types of records that"
+#~ " a `flwr.common.RecordDict "
+#~ "<flwr.common.RecordDict.html#recorddict>`_ supports and"
+#~ " can therefore be used to construct"
+#~ " :code:`common.Message` objects."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A dictionary mapping string keys to "
+#~ "record instances, where each value is"
+#~ " either a :class:`ParametersRecord`, "
+#~ ":class:`MetricsRecord`, or :class:`ConfigsRecord`."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Adding an :code:`ArrayRecord` follows the "
+#~ "same steps as above but first, the"
+#~ " array needs to be serialized and "
+#~ "represented as a :code:`flwr.common.Array`. "
+#~ "For example::"
 #~ msgstr ""
 

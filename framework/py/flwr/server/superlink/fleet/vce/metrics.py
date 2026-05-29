@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,21 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Conversion utility functions for Records."""
+"""Metrics collected by the Virtual Client Engine."""
 
 
-from flwr.app.message import Array
-
-from ..logger import warn_deprecated_feature
-from ..typing import NDArray
-
-WARN_DEPRECATED_MESSAGE = (
-    "`array_from_numpy` is deprecated. Instead, use the `Array(ndarray)` class "
-    "directly or `Array.from_numpy_ndarray(ndarray)`."
-)
+import threading
+from dataclasses import dataclass, field
 
 
-def array_from_numpy(ndarray: NDArray) -> Array:
-    """Create Array from NumPy ndarray."""
-    warn_deprecated_feature(WARN_DEPRECATED_MESSAGE)
-    return Array.from_numpy_ndarray(ndarray)
+@dataclass
+class VceMetrics:
+    """Thread-safe runtime accumulator for Simulation Runtime runs."""
+
+    clientapp_runtime: float = 0.0
+    _lock: threading.Lock = field(
+        default_factory=threading.Lock, init=False, repr=False, compare=False
+    )
+
+    def add_clientapp_runtime(self, runtime: float) -> None:
+        """Add ClientApp execution runtime in seconds."""
+        with self._lock:
+            self.clientapp_runtime += runtime

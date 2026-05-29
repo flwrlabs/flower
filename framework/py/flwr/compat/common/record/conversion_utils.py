@@ -1,4 +1,4 @@
-# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Deprecated record compatibility APIs."""
+"""Deprecated conversion utility functions for Records."""
 
-from .arrayrecord import ParametersRecord
-from .configrecord import ConfigsRecord
-from .conversion_utils import array_from_numpy
-from .metricrecord import MetricsRecord
-from .recorddict import RecordSet
 
-__all__ = [
-    "ConfigsRecord",
-    "MetricsRecord",
-    "ParametersRecord",
-    "RecordSet",
-    "array_from_numpy",
-]
+from flwr.app.message import Array
+from flwr.common.logger import warn_deprecated_feature
+from flwr.common.typing import NDArray
+
+WARN_DEPRECATED_MESSAGE = (
+    "`array_from_numpy` is deprecated. Instead, use the `Array(ndarray)` class "
+    "directly or `Array.from_numpy_ndarray(ndarray)`."
+)
+
+
+def array_from_numpy(ndarray: NDArray) -> Array:
+    """Create Array from NumPy ndarray."""
+    warn_deprecated_feature(WARN_DEPRECATED_MESSAGE)
+    return Array.from_numpy_ndarray(ndarray)
