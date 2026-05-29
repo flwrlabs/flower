@@ -21,14 +21,14 @@ from contextlib import contextmanager
 
 from flwr.common import Context
 from flwr.common.logger import warn_deprecated_feature_with_example
+from flwr.compat.server.grid import Driver
+from flwr.server.client_manager import ClientManager
+from flwr.server.compat import start_grid
+from flwr.server.grid import Grid
+from flwr.server.server import Server
+from flwr.server.server_config import ServerConfig
 from flwr.server.strategy import Strategy
-
-from .client_manager import ClientManager
-from .compat import start_grid
-from .grid import Driver, Grid
-from .server import Server
-from .server_config import ServerConfig
-from .typing import ServerAppCallable, ServerFn
+from flwr.server.typing import ServerAppCallable, ServerFn
 
 SERVER_FN_USAGE_EXAMPLE = """
 
