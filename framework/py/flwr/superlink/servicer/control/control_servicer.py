@@ -993,11 +993,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 state, flwr_aid, run.federation, context
             )
 
-        after_task_event_id = (
-            request.after_task_event_id
-            if request.HasField("after_task_event_id")
-            else None
-        )
+        after_task_event_id = None
+        if request.HasField("after_task_event_id"):
+            after_task_event_id = request.after_task_event_id
         while context.is_active():
             events = state.get_task_events(
                 run_id=run_id,
