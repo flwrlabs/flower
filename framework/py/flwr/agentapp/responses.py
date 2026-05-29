@@ -12,15 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Public Flower AgentApp APIs."""
+"""AgentResponses (abstract base class)."""
 
 
-from .agent_app import AgentApp as AgentApp
-from .responses import AgentResponses as AgentResponses
-from .session import AgentSession as AgentSession
+from __future__ import annotations
 
-__all__ = [
-    "AgentApp",
-    "AgentResponses",
-    "AgentSession",
-]
+from abc import ABC, abstractmethod
+
+from flwr.supercore.typing import JSONObject
+
+
+class AgentResponses(ABC):
+    """Abstract base class for AgentApp model response creation."""
+
+    @abstractmethod
+    def create(self, request: JSONObject) -> JSONObject:
+        """Create a model response.
+
+        Parameters
+        ----------
+        request : JSONObject
+            Open Responses-compatible create request.
+
+        Returns
+        -------
+        response : JSONObject
+            Open Responses-compatible response.
+        """

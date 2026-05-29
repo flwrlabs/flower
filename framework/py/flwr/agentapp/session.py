@@ -12,38 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""AgentApp session."""
+"""AgentSession (abstract base class)."""
 
 
 from __future__ import annotations
 
-from flwr.common.typing import Run
-from flwr.supercore.typing import JSONObject
+from abc import ABC, abstractmethod
+
+from .responses import AgentResponses
 
 
-class AgentSession:
-    """Runtime session passed to AgentApp main functions."""
+class AgentSession(ABC):
+    """Abstract base class for AgentApp runtime capabilities."""
 
-    # pylint: disable=too-many-arguments
-    def __init__(
-        self,
-        *,
-        task_id: int,
-        run: Run,
-        agent_ref: str,
-        conversation_id: str,
-        input_items: list[JSONObject],
-    ) -> None:
-        if task_id <= 0:
-            raise ValueError("`task_id` must be greater than zero.")
-        if not agent_ref:
-            raise ValueError("`agent_ref` must be a non-empty string.")
-        if not conversation_id:
-            raise ValueError("`conversation_id` must be a non-empty string.")
-        if not all(isinstance(item, dict) for item in input_items):
-            raise ValueError("`input_items` must be a list of JSON objects.")
-        self.task_id = task_id
-        self.run = run
-        self.agent_ref = agent_ref
-        self.conversation_id = conversation_id
-        self.input_items = input_items
+    @property
+    @abstractmethod
+    def responses(self) -> AgentResponses:
+        """Model response creation API."""
