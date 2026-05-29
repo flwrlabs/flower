@@ -297,15 +297,9 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         # Init state and store
         state = self.state_factory.state()
 
-        # Store Simulation Runtime usage metrics before finishing the primary task.
-        # This ensures that usage is captured even if the task fails to finish properly.
-        if request.bytes_sent or request.bytes_recv:
-            state.store_traffic(
-                run_id=run_id,
-                bytes_sent=request.bytes_sent,
-                bytes_recv=request.bytes_recv,
-            )
-        if request.clientapp_runtime:
+        # Store Simulation Runtime usage before finishing the primary task.
+        # This ensures usage is captured even if the task fails to finish properly.
+        if request.HasField("clientapp_runtime"):
             state.add_clientapp_runtime(run_id, request.clientapp_runtime)
 
         # Finish the task

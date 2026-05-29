@@ -15,14 +15,8 @@
 """Deprecated ``flwr.server.grid.grid`` compatibility APIs."""
 
 
-from flwr.serverapp.grid.grid import Driver as Driver
-from flwr.serverapp.grid.grid import Grid as Grid
+from flwr.serverapp.grid.grid import Grid as Grid  # pylint: disable=unused-import
 
 from . import _warn_deprecated_import
 
 _warn_deprecated_import()
-
-__all__ = [
-    "Driver",
-    "Grid",
-]

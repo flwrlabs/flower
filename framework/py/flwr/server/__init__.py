@@ -15,7 +15,8 @@
 """Flower server."""
 
 
-from flwr.serverapp.grid import Driver as Driver
+from typing import TYPE_CHECKING, Any
+
 from flwr.serverapp.grid import Grid as Grid
 
 from ..compat.server.app import start_server as start_server  # Deprecated
@@ -26,9 +27,30 @@ from .client_manager import SimpleClientManager as SimpleClientManager
 from .compat import LegacyContext as LegacyContext
 from .history import History as History
 from .server import Server as Server
-from .server_app import ServerApp as ServerApp
 from .server_config import ServerConfig as ServerConfig
 from .serverapp_components import ServerAppComponents as ServerAppComponents
+
+if TYPE_CHECKING:
+    from flwr.compat.server.grid import Driver as Driver
+    from flwr.serverapp import ServerApp as ServerApp
+
+
+def __getattr__(name: str) -> Any:
+    """Lazily resolve compatibility exports."""
+    if name == "Driver":
+        # pylint: disable=import-outside-toplevel
+        from flwr.compat.server.grid import Driver
+
+        # pylint: enable=import-outside-toplevel
+        globals()[name] = Driver
+        return Driver
+    if name == "ServerApp":
+        from flwr.serverapp import ServerApp  # pylint: disable=import-outside-toplevel
+
+        globals()[name] = ServerApp
+        return ServerApp
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "ClientManager",

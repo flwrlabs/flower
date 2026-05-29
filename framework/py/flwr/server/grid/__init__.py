@@ -16,7 +16,6 @@
 
 
 from flwr.common.logger import warn_deprecated_feature
-from flwr.serverapp.grid import Driver as Driver
 from flwr.serverapp.grid import Grid as Grid
 from flwr.serverapp.grid import GrpcGrid as GrpcGrid
 from flwr.serverapp.grid import InMemoryGrid as InMemoryGrid
@@ -39,7 +38,6 @@ def _warn_deprecated_import() -> None:
 _warn_deprecated_import()
 
 __all__ = [
-    "Driver",
     "Grid",
     "GrpcGrid",
     "InMemoryGrid",

@@ -15,10 +15,9 @@
 """Public Flower ServerApp APIs."""
 
 
-from flwr.server.server_app import ServerApp
-from flwr.serverapp.grid import Grid
-
 from . import strategy
+from .grid import Grid
+from .server_app import ServerApp as ServerApp
 
 __all__ = [
     "Grid",

@@ -12,18 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Deprecated record compatibility APIs."""
+"""Public Flower AgentApp APIs."""
 
-from .arrayrecord import ParametersRecord
-from .configrecord import ConfigsRecord
-from .conversion_utils import array_from_numpy
-from .metricrecord import MetricsRecord
-from .recorddict import RecordSet
+
+from .agent_app import AgentApp as AgentApp
+from .base import AgentResponses as AgentResponses
+from .base import AgentSession as AgentSession
 
 __all__ = [
-    "ConfigsRecord",
-    "MetricsRecord",
-    "ParametersRecord",
-    "RecordSet",
-    "array_from_numpy",
+    "AgentApp",
+    "AgentResponses",
+    "AgentSession",
 ]
