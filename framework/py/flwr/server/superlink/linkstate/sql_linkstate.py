@@ -58,6 +58,7 @@ from flwr.superlink.federation import FederationManager
 
 from .linkstate import LinkState
 from .utils import (
+    MESSAGE_DELIVERY_LEASE_SECONDS,
     check_node_availability_for_in_message,
     context_from_bytes,
     context_to_bytes,
@@ -193,8 +194,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 return None
 
             # Insert message
+            data[0]["lease_expires_at"] = 0.0
+            data[0]["acknowledged_at"] = ""
+            column_names = ", ".join(data[0])
             columns = ", ".join([f":{key}" for key in data[0]])
-            query = f"INSERT INTO message_ins VALUES({columns})"
+            query = f"INSERT INTO message_ins ({column_names}) VALUES({columns})"
 
             # Only invalid run_id can trigger IntegrityError.
             # This may need to be changed in the future version
@@ -320,7 +324,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         }
         common_condition = """
             dst_node_id = :node_id
-            AND delivered_at = ''
+            AND acknowledged_at = ''
+            AND (delivered_at = '' OR lease_expires_at <= :current)
             AND (created_at + ttl) > :current
         """
         candidate_cte = ""
@@ -345,17 +350,22 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 message_id IN (
                     SELECT message_id FROM candidate_message_ins
                 )
-                AND delivered_at = ''
+                AND acknowledged_at = ''
+                AND (delivered_at = '' OR lease_expires_at <= :current)
             """
             params["limit"] = limit
 
         query = f"""
             {candidate_cte}
             UPDATE message_ins
-            SET delivered_at = :delivered_at
+            SET delivered_at = :delivered_at,
+                lease_expires_at = :lease_expires_at
             WHERE {condition}
             RETURNING *
         """
+        params["lease_expires_at"] = (
+            current_time.timestamp() + MESSAGE_DELIVERY_LEASE_SECONDS
+        )
         return self.query(query, params)
 
     def _load_message_ins_rows(self, message_ids: set[str]) -> list[dict[str, Any]]:
@@ -429,8 +439,12 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 msg_dict, ["run_id", "src_node_id", "dst_node_id"]
             )
 
+            # Reply acknowledgement is terminal, so replies are deleted instead
+            # of marked acknowledged.
+            msg_dict["lease_expires_at"] = 0.0
+            column_names = ", ".join(msg_dict)
             columns = ", ".join([f":{key}" for key in msg_dict])
-            query = f"INSERT INTO message_res VALUES({columns})"
+            query = f"INSERT INTO message_res ({column_names}) VALUES({columns})"
 
             try:
                 self.query(query, msg_dict)
@@ -512,17 +526,26 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
             # Atomically claim all eligible reply Messages
             placeholders = ",".join([f":mid_{i}" for i in range(len(message_ids))])
-            delivered_at = now().isoformat()
+            claimed_until = now()
+            delivered_at = claimed_until.isoformat()
             query = f"""
                 UPDATE message_res
-                SET delivered_at = :delivered_at
+                SET delivered_at = :delivered_at,
+                    lease_expires_at = :lease_expires_at
                 WHERE reply_to_message_id IN ({placeholders})
-                AND delivered_at = ''
+                AND (delivered_at = '' OR lease_expires_at <= :current)
                 RETURNING *
             """
-            params = {"delivered_at": delivered_at}
-            params.update({f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)})
-            rows = self.query(query, params)
+            reply_params: dict[str, str | float] = {
+                "current": current,
+                "delivered_at": delivered_at,
+                "lease_expires_at": claimed_until.timestamp()
+                + MESSAGE_DELIVERY_LEASE_SECONDS,
+            }
+            reply_params.update(
+                {f"mid_{i}": str(mid) for i, mid in enumerate(message_ids)}
+            )
+            rows = self.query(query, reply_params)
             for row in rows:
                 convert_sint64_values_in_dict_to_uint64(
                     row, ["run_id", "src_node_id", "dst_node_id"]
@@ -578,6 +601,39 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         with self.session():
             self.query(query_1, params)
             self.query(query_2, params)
+
+    def acknowledge_message(self, message_id: str) -> None:
+        """Mark a delivered Message as durably received."""
+        with self.session():
+            rows = self.query(
+                """
+                SELECT reply_to_message_id
+                FROM message_res
+                WHERE message_id = :message_id
+                """,
+                {"message_id": message_id},
+            )
+            if rows:
+                msg_ins_id = rows[0]["reply_to_message_id"]
+                self.query(
+                    "DELETE FROM message_ins WHERE message_id = :message_id",
+                    {"message_id": msg_ins_id},
+                )
+                self.query(
+                    "DELETE FROM message_res "
+                    "WHERE reply_to_message_id = :reply_to_message_id",
+                    {"reply_to_message_id": msg_ins_id},
+                )
+                return
+
+            self.query(
+                """
+                UPDATE message_ins
+                SET acknowledged_at = :acknowledged_at
+                WHERE message_id = :message_id AND acknowledged_at = ''
+                """,
+                {"message_id": message_id, "acknowledged_at": now().isoformat()},
+            )
 
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""

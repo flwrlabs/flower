@@ -14,7 +14,6 @@
 # ==============================================================================
 """Abstract base class LinkState."""
 
-
 import abc
 from collections.abc import Sequence
 from typing import Literal
@@ -131,6 +130,10 @@ class LinkState(CoreState):  # pylint: disable=R0904
             A set of Message IDs. For each ID in the set, the corresponding
             Message and its associated reply Message will be deleted.
         """
+
+    @abc.abstractmethod
+    def acknowledge_message(self, message_id: str) -> None:
+        """Mark a delivered Message as durably received."""
 
     @abc.abstractmethod
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:

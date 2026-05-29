@@ -14,7 +14,6 @@
 # ==============================================================================
 """In-memory LinkState implementation."""
 
-
 import threading
 from collections import defaultdict
 from collections.abc import Sequence
@@ -47,6 +46,7 @@ from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.superlink.federation import FederationManager
 
 from .utils import (
+    MESSAGE_DELIVERY_LEASE_SECONDS,
     check_node_availability_for_in_message,
     generate_rand_int_from_bytes,
     primary_task_type_from_run_type,
@@ -86,6 +86,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         self.message_ins_store: dict[str, Message] = {}
         self.message_res_store: dict[str, Message] = {}
         self.message_ins_id_to_message_res_id: dict[str, str] = {}
+        self.acknowledged_message_ins_ids: set[str] = set()
 
         # Map flwr_aid to run_ids for O(1) reverse index lookup
         self.flwr_aid_to_run_ids: dict[str, set[int]] = defaultdict(set)
@@ -128,6 +129,17 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
     def _is_finished_run(self, run_id: int) -> bool:
         """Return True if the run has finished."""
         return self._get_run(run_id).status.status == Status.FINISHED
+
+    def _has_active_delivery_lease(self, message: Message) -> bool:
+        """Return True if the Message delivery lease is still active."""
+        delivered_at = message.metadata.delivered_at
+        if delivered_at == "":
+            return False
+        return (
+            datetime.fromisoformat(delivered_at).timestamp()
+            + MESSAGE_DELIVERY_LEASE_SECONDS
+            > now().timestamp()
+        )
 
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
@@ -221,7 +233,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 if (
                     (msg_ins := self.message_ins_store.get(msg_id))
                     and msg_ins.metadata.dst_node_id == node_id
-                    and msg_ins.metadata.delivered_at == ""
+                    and msg_id not in self.acknowledged_message_ins_ids
+                    and not self._has_active_delivery_lease(msg_ins)
                 ):
                     message_ins_list.append(msg_ins)
                 if limit and len(message_ins_list) == limit:
@@ -346,7 +359,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     message_id
                 ):
                     message_res = self.message_res_store[message_res_id]
-                    if message_res.metadata.delivered_at == "":
+                    if not self._has_active_delivery_lease(message_res):
                         message_res_found.append(message_res)
             tmp_ret_dict = verify_found_message_replies(
                 inquired_message_ids=message_ids,
@@ -373,12 +386,28 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 # Delete Messages
                 if message_id in self.message_ins_store:
                     del self.message_ins_store[message_id]
+                    self.acknowledged_message_ins_ids.discard(message_id)
                 # Delete Message replies
                 if message_id in self.message_ins_id_to_message_res_id:
                     message_res_id = self.message_ins_id_to_message_res_id.pop(
                         message_id
                     )
                     del self.message_res_store[message_res_id]
+
+    def acknowledge_message(self, message_id: str) -> None:
+        """Mark a delivered Message as durably received."""
+        with self.lock:
+            for msg_ins_id, msg_res_id in list(
+                self.message_ins_id_to_message_res_id.items()
+            ):
+                if msg_res_id == message_id:
+                    self.message_ins_store.pop(msg_ins_id, None)
+                    self.acknowledged_message_ins_ids.discard(msg_ins_id)
+                    self.message_ins_id_to_message_res_id.pop(msg_ins_id, None)
+                    self.message_res_store.pop(msg_res_id, None)
+                    return
+            if message_id in self.message_ins_store:
+                self.acknowledged_message_ins_ids.add(message_id)
 
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""
@@ -407,6 +436,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             }
             for message_id in message_ids:
                 self.message_ins_store.pop(message_id, None)
+                self.acknowledged_message_ins_ids.discard(message_id)
                 if message_id in self.message_ins_id_to_message_res_id:
                     message_res_id = self.message_ins_id_to_message_res_id.pop(
                         message_id

@@ -14,7 +14,6 @@
 # ==============================================================================
 """Utility functions for State."""
 
-
 from typing import Any
 
 from flwr.app.message import make_message
@@ -46,6 +45,7 @@ NODE_UNAVAILABLE_ERROR_REASON = (
     "Error: Node Unavailable — The destination node failed to report a heartbeat "
     f"within {HEARTBEAT_PATIENCE} × its expected interval."
 )
+MESSAGE_DELIVERY_LEASE_SECONDS = 60.0
 
 
 def primary_task_type_from_run_type(run_type: str) -> TaskType:
@@ -254,8 +254,10 @@ def verify_found_message_replies(
     current = current_time if current_time else now().timestamp()
     for message_res in found_message_res_list:
         message_ins_id = message_res.metadata.reply_to_message_id
+        if message_ins_id in ret_dict:
+            continue
         if update_set:
-            inquired_message_ids.remove(message_ins_id)
+            inquired_message_ids.discard(message_ins_id)
         # Check if the reply Message has expired
         if message_ttl_has_expired(message_res.metadata, current):
             # No need to insert the error Message
@@ -350,7 +352,11 @@ def dict_to_message(message_dict: dict[str, Any]) -> Message:
 
     # Metadata constructor doesn't allow passing created_at. We set it later
     metadata = Metadata(
-        **{k: v for k, v in message_dict.items() if k not in ["delivered_at"]}
+        **{
+            k: v
+            for k, v in message_dict.items()
+            if k not in ["delivered_at", "lease_expires_at", "acknowledged_at"]
+        }
     )
     msg = make_message(metadata=metadata, content=content, error=error)
     msg.metadata.delivered_at = message_dict.get("delivered_at", "")

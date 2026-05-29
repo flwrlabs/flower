@@ -16,7 +16,6 @@
 
 # pylint: disable=too-many-lines
 
-
 import hashlib
 import os
 import tempfile
@@ -543,10 +542,10 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             (None, Error(code=0)),
         ]
     )  # type: ignore
-    def test_successful_pull_messages_deletes_messages_in_linkstate(
+    def test_confirm_message_received_deletes_messages_in_linkstate(
         self, content: RecordDict | None, error: Error | None
     ) -> None:
-        """Test `PullMessages` deletes messages from LinkState."""
+        """Test `ConfirmMessageReceived` deletes messages from LinkState."""
         # Prepare
         run_id = self._auth_run_id
 
@@ -581,6 +580,20 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 
         # Assert
         assert isinstance(response, PullAppMessagesResponse)
+        assert grpc.StatusCode.OK == call.code()
+        assert self.state.num_message_ins() == 1
+        assert self.state.num_message_res() == 1
+
+        confirm_request = ConfirmMessageReceivedRequest(
+            node=Node(node_id=self.node_id),
+            run_id=run_id,
+            message_object_id=reply_msg.object_id,
+        )
+        response, call = self._confirm_message_received.with_call(
+            request=confirm_request
+        )
+
+        assert isinstance(response, ConfirmMessageReceivedResponse)
         assert grpc.StatusCode.OK == call.code()
         assert self.state.num_message_ins() == 0
         assert self.state.num_message_res() == 0

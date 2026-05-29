@@ -30,12 +30,14 @@ erDiagram
 
   message_ins {
     BIGINT run_id FK "nullable"
+    VARCHAR acknowledged_at
     BLOB content "nullable"
     FLOAT created_at "nullable"
     VARCHAR delivered_at "nullable"
     BIGINT dst_node_id "nullable"
     BLOB error "nullable"
     VARCHAR group_id "nullable"
+    FLOAT lease_expires_at
     VARCHAR message_id UK "nullable"
     VARCHAR message_type "nullable"
     VARCHAR reply_to_message_id "nullable"
@@ -51,6 +53,7 @@ erDiagram
     BIGINT dst_node_id "nullable"
     BLOB error "nullable"
     VARCHAR group_id "nullable"
+    FLOAT lease_expires_at
     VARCHAR message_id UK "nullable"
     VARCHAR message_type "nullable"
     VARCHAR reply_to_message_id "nullable"

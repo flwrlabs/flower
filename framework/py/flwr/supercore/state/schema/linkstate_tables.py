@@ -14,7 +14,6 @@
 # ==============================================================================
 """SQLAlchemy Core Table definitions for LinkState."""
 
-
 from sqlalchemy import (
     BigInteger,
     Column,
@@ -124,6 +123,8 @@ def create_linkstate_metadata() -> MetaData:
         Column("reply_to_message_id", String),
         Column("created_at", Float),
         Column("delivered_at", String),
+        Column("lease_expires_at", Float, nullable=False, server_default="0"),
+        Column("acknowledged_at", String, nullable=False, server_default=text("''")),
         Column("ttl", Float),
         Column("message_type", String),
         Column("content", LargeBinary, nullable=True),
@@ -144,6 +145,7 @@ def create_linkstate_metadata() -> MetaData:
         Column("reply_to_message_id", String),
         Column("created_at", Float),
         Column("delivered_at", String),
+        Column("lease_expires_at", Float, nullable=False, server_default="0"),
         Column("ttl", Float),
         Column("message_type", String),
         Column("content", LargeBinary, nullable=True),

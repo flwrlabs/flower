@@ -14,7 +14,6 @@
 # ==============================================================================
 """ServerAppIo API servicer."""
 
-
 from logging import DEBUG, ERROR, INFO
 
 import grpc
@@ -195,13 +194,6 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                     for obj_id, obj in all_objects.items():
                         store.put(obj_id, obj.deflate())
 
-        # Delete the instruction Messages and their replies if found
-        message_ins_ids_to_delete = {
-            msg_res.metadata.reply_to_message_id for msg_res in messages_res
-        }
-
-        state.delete_messages(message_ins_ids=message_ins_ids_to_delete)
-
         # Convert Messages to proto
         messages_list = []
         trees = []
@@ -224,8 +216,11 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 trees.append(obj_tree)
             except NoObjectInStoreError as e:
                 log(ERROR, e.message)
-                # Delete message ins from state
-                state.delete_messages(message_ins_ids={msg_object_id})
+                # Message cleanup deletes instruction/reply pairs, so use the
+                # instruction Message ID.
+                state.delete_messages(
+                    message_ins_ids={msg.metadata.reply_to_message_id}
+                )
 
         return PullAppMessagesResponse(
             messages_list=messages_list, message_object_trees=trees
@@ -380,12 +375,13 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         """Confirm message received."""
         log(DEBUG, "ServerAppIoServicer.ConfirmMessageReceived")
 
-        # Init store
+        # Init state and store
+        state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
         _ = _get_authenticated_serverapp_run_id(context)
 
-        # Delete the message object
+        state.acknowledge_message(request.message_object_id)
         store.delete(request.message_object_id)
 
         return ConfirmMessageReceivedResponse()
