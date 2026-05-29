@@ -61,13 +61,7 @@ class CoreState(ABC):
         -------
         int | None
             The ID of the ensured run series, or `None` if a new run series
-            could not be created.
-
-        Raises
-        ------
-        ValueError
-            If `federation` is empty, or `series_id` does not identify an
-            existing run series for `federation`.
+            could not be created or the caller-provided run series is invalid.
         """
 
     @abstractmethod

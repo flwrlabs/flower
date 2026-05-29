@@ -20,6 +20,7 @@ import json
 import secrets
 from collections.abc import Sequence
 from datetime import timedelta
+from logging import ERROR
 from typing import Any, Literal, cast
 
 from sqlalchemy import MetaData
@@ -38,6 +39,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
+from flwr.common.logger import log
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.common.typing import Fab
@@ -167,13 +169,18 @@ class SqlCoreState(CoreState, SqlMixin):
                 {"series_id": uint64_to_int64(series_id)},
             )
             if not rows:
-                raise ValueError(f"Run series {series_id} not found")
+                log(ERROR, "Run series %d not found", series_id)
+                return None
             existing = rows[0]
             if existing["federation"] != federation:
-                raise ValueError(
-                    f"Run series {series_id} belongs to federation "
-                    f"{existing['federation']!r}, not {federation!r}"
+                log(
+                    ERROR,
+                    "Run series %d belongs to federation %r, not %r",
+                    series_id,
+                    existing["federation"],
+                    federation,
                 )
+                return None
             return series_id
 
     def add_task_log(self, task_id: int, log_message: str) -> None:

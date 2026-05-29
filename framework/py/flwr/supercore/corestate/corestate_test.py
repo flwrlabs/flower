@@ -83,12 +83,15 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         assert series_id is not None
         self.assertGreater(series_id, 0)
 
-    def test_ensure_run_series_rejects_unknown_id(self) -> None:
-        """Unknown caller-provided run series IDs are invalid."""
+    def test_ensure_run_series_returns_none_for_unknown_id(self) -> None:
+        """Unknown caller-provided run series IDs return None."""
         state = self.state_factory()
 
-        with self.assertRaisesRegex(ValueError, "not found"):
-            state.ensure_run_series("federation-a", series_id=123)
+        with self.assertLogs("flwr", level="ERROR") as logs:
+            series_id = state.ensure_run_series("federation-a", series_id=123)
+
+        self.assertIsNone(series_id)
+        self.assertIn("Run series 123 not found", logs.output[0])
 
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
