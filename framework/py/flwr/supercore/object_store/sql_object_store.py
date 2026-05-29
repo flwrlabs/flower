@@ -184,12 +184,8 @@ class SqlObjectStore(ObjectStore, SqlMixin):
                 raise NoObjectInStoreError(
                     f"Object with ID '{object_id}' was not pre-registered."
                 )
-            if rows[0]["is_available"]:
-                return
 
-            raise NoObjectInStoreError(
-                f"Object with ID '{object_id}' was not pre-registered."
-            )
+            return
 
     def get(self, object_id: str) -> bytes | None:
         """Get an object from the store."""
