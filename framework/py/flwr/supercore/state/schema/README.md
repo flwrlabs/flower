@@ -128,7 +128,8 @@ erDiagram
   }
 
   series_runs {
-    BIGINT run_id PK
+    INTEGER id PK
+    BIGINT run_id UK
     BIGINT series_id
   }
 
