@@ -114,7 +114,7 @@ docs.
 
 We also use this to define the public API of private subpackages. Public, in this
 context, means the API that other ``flwr`` subpackages should use. For example,
-``flwr.server.grid`` is a private subpackage (it's not exported via
+``flwr.serverapp.grid`` is a private subpackage (it's not exported via
 ``src/py/flwr/serverapp/__init__.py``'s ``__all__``).
 
 Still, the private sub-package ``flwr.serverapp.grid`` defines a "public" API using
