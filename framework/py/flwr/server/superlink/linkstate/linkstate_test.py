@@ -2224,8 +2224,8 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             # Assert
             assert sum(len(res) for res in results if res is not None) == 1
 
-    def test_get_message_ins_redelivers_after_lease_expires(self) -> None:
-        """Ensure an unacknowledged instruction can be redelivered."""
+    def test_get_message_ins_redelivers_until_acknowledged(self) -> None:
+        """Ensure only unacknowledged instructions can be redelivered."""
         # Prepare
         state = self.state_factory()
         node_id = create_dummy_node(state)

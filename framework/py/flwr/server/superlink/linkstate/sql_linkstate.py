@@ -439,6 +439,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 msg_dict, ["run_id", "src_node_id", "dst_node_id"]
             )
 
+            # Reply acknowledgement is terminal, so replies are deleted instead
+            # of marked acknowledged.
             msg_dict["lease_expires_at"] = 0.0
             column_names = ", ".join(msg_dict)
             columns = ", ".join([f":{key}" for key in msg_dict])

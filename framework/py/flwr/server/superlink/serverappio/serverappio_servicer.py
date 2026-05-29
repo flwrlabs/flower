@@ -216,6 +216,8 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 trees.append(obj_tree)
             except NoObjectInStoreError as e:
                 log(ERROR, e.message)
+                # Message cleanup deletes instruction/reply pairs, so use the
+                # instruction Message ID.
                 state.delete_messages(
                     message_ins_ids={msg.metadata.reply_to_message_id}
                 )
