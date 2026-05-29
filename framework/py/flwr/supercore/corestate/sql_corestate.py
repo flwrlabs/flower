@@ -156,18 +156,36 @@ class SqlCoreState(CoreState, SqlMixin):
             params["updated_before"] = datetime.fromisoformat(updated_before)
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-        query = f"""
+        selected_run_series_query = f"""
             SELECT series_id, federation, description, created_at, updated_at
             FROM run_series
             {where_clause}
             ORDER BY updated_at DESC
         """
         if limit is not None:
-            query += " LIMIT :limit"
+            selected_run_series_query += " LIMIT :limit"
             params["limit"] = limit
 
+        query = f"""
+            WITH selected_run_series AS (
+                {selected_run_series_query}
+            )
+            SELECT
+                selected_run_series.*,
+                series_runs.run_id
+            FROM selected_run_series
+            LEFT JOIN series_runs
+                ON series_runs.series_id = selected_run_series.series_id
+        """
         rows = self.query(query, params)
-        return [_run_series_from_row(row) for row in rows]
+        series_by_id: dict[int, RunSeries] = {}
+        for row in rows:
+            series_id = row["series_id"]
+            if series_id not in series_by_id:
+                series_by_id[series_id] = _run_series_from_row(row)
+            if row["run_id"] is not None:
+                series_by_id[series_id].run_ids.append(int64_to_uint64(row["run_id"]))
+        return list(series_by_id.values())
 
     def get_run_series_context(self, series_id: int) -> Context | None:
         """Return the shared Context for the specified RunSeries, if present."""
