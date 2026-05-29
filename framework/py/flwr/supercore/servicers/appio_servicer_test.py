@@ -27,6 +27,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     PullPendingTasksRequest,
     PullTaskMessageRequest,
+    PushTaskEventsRequest,
+    PushTaskEventsResponse,
     PushTaskMessageRequest,
     SendTaskHeartbeatRequest,
 )
@@ -34,7 +36,7 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
     PushLogsResponse,
 )
-from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
 from flwr.supercore.corestate.utils_test import create_task_message
 
@@ -331,6 +333,111 @@ class TestAppIoServicer(unittest.TestCase):
         context.abort.assert_called_once_with(
             grpc.StatusCode.FAILED_PRECONDITION,
             "Task message could not be stored.",
+        )
+
+    def test_push_task_events_derives_authenticated_task_identity(self) -> None:
+        """PushTaskEvents should derive run and task IDs from task auth."""
+        # Prepare
+        self.state.store_task_events.return_value = True
+        request = PushTaskEventsRequest(
+            events=[
+                TaskEvent(
+                    id=999,
+                    timestamp="client-ts",
+                    run_id=111,
+                    task_id=222,
+                    event=" response.created ",
+                    data='{"payload":"preserved"}',
+                )
+            ]
+        )
+
+        # Execute
+        with patch(
+            "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+            return_value=Task(task_id=123, run_id=789),
+        ):
+            response = self.servicer.PushTaskEvents(request, Mock())
+
+        # Assert
+        self.state.store_task_events.assert_called_once()
+        stored_events = self.state.store_task_events.call_args.args[0]
+        self.assertIsInstance(response, PushTaskEventsResponse)
+        self.assertEqual(len(stored_events), 1)
+        self.assertEqual(stored_events[0].id, 0)
+        self.assertEqual(stored_events[0].timestamp, "")
+        self.assertEqual(stored_events[0].run_id, 789)
+        self.assertEqual(stored_events[0].task_id, 123)
+        self.assertEqual(stored_events[0].event, "response.created")
+        self.assertEqual(stored_events[0].data, '{"payload":"preserved"}')
+
+    def test_push_task_events_ignores_empty_batch(self) -> None:
+        """PushTaskEvents should treat an empty event batch as a no-op."""
+        # Execute
+        with patch(
+            "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+            return_value=Task(task_id=123, run_id=789),
+        ):
+            response = self.servicer.PushTaskEvents(PushTaskEventsRequest(), Mock())
+
+        # Assert
+        self.state.store_task_events.assert_not_called()
+        self.assertIsInstance(response, PushTaskEventsResponse)
+
+    def test_push_task_events_aborts_for_empty_event_name(self) -> None:
+        """PushTaskEvents should reject events without a name."""
+        # Prepare
+        request = PushTaskEventsRequest(
+            events=[
+                TaskEvent(event=" ", data='{"type":"response.created"}'),
+            ]
+        )
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+
+        # Execute
+        with (
+            patch(
+                "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+                return_value=Task(task_id=123, run_id=789),
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.PushTaskEvents(request, context)
+
+        # Assert
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            "Task event name must not be empty.",
+        )
+        self.state.store_task_events.assert_not_called()
+
+    def test_push_task_events_aborts_when_state_rejects_events(self) -> None:
+        """PushTaskEvents should abort when CoreState cannot store events."""
+        # Prepare
+        self.state.store_task_events.return_value = False
+        request = PushTaskEventsRequest(
+            events=[
+                TaskEvent(event="response.created", data="{"),
+            ]
+        )
+        context = Mock(spec=grpc.ServicerContext)
+        context.abort.side_effect = grpc.RpcError()
+
+        # Execute
+        with (
+            patch(
+                "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+                return_value=Task(task_id=123, run_id=789),
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.PushTaskEvents(request, context)
+
+        # Assert
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            "Task events could not be stored.",
         )
 
     def test_pull_task_message_uses_authenticated_task_destination(self) -> None:

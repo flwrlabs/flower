@@ -43,7 +43,7 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
     PushLogsResponse,
 )
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from flwr.supercore.constant import (
     TASK_TYPES_ALLOWED_TO_CREATE_TASKS,
     TASK_TYPES_REQUIRING_CONNECTOR_REF,
@@ -154,7 +154,35 @@ class AppIoServicer(ABC):
     ) -> PushTaskEventsResponse:
         """Push task events."""
         log(DEBUG, "AppIoServicer.PushTaskEvents")
-        raise NotImplementedError("PushTaskEvents is not implemented yet.")
+
+        task = get_authenticated_task()
+        if not request.events:
+            return PushTaskEventsResponse()
+
+        task_events: list[TaskEvent] = []
+        for event in request.events:
+            event_name = event.event.strip()
+            if not event_name:
+                context.abort(
+                    grpc.StatusCode.FAILED_PRECONDITION,
+                    "Task event name must not be empty.",
+                )
+            task_events.append(
+                TaskEvent(
+                    run_id=task.run_id,
+                    task_id=task.task_id,
+                    event=event_name,
+                    data=event.data,
+                )
+            )
+
+        if not self.state().store_task_events(task_events):
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "Task events could not be stored.",
+            )
+
+        return PushTaskEventsResponse()
 
     def PullTaskMessage(
         self, request: PullTaskMessageRequest, context: grpc.ServicerContext

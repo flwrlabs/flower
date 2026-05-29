@@ -111,6 +111,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.constant import (
     NOOP_FEDERATION,
@@ -129,7 +130,12 @@ from flwr.supercore.typing import (
     RegisterSupernodeContext,
     StartRunContext,
 )
-from flwr.supercore.utils import parse_app_spec, request_download_link
+from flwr.supercore.utils import (
+    parse_app_spec,
+    request_download_link,
+    strict_json_dumps,
+    strict_json_loads,
+)
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
@@ -972,15 +978,50 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         return ConfigureSimulationFederationResponse()
 
-    # ***************
-    # Unused for now
-    # ***************
     def StreamRunEvents(
         self, request: StreamRunEventsRequest, context: grpc.ServicerContext
     ) -> Generator[StreamRunEventsResponse, Any, None]:
         """Start run event stream."""
-        _ = request, context
-        raise NotImplementedError("StreamRunEvents is not implemented yet.")
+        log(INFO, rpc_name := self.StreamRunEvents.__qualname__)
+
+        state = self.linkstate_factory.state()
+        run_id = request.run_id
+        runs = state.get_run_info(run_ids=[run_id])
+        if not runs:
+            context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
+            raise grpc.RpcError()  # This line is unreachable
+        run = runs[0]
+
+        with rpc_error_translator(context, rpc_name):
+            flwr_aid = _get_flwr_aid(context)
+            _validate_federation_membership_in_request(
+                state, flwr_aid, run.federation, context
+            )
+
+        after_task_event_id = (
+            request.after_task_event_id
+            if request.HasField("after_task_event_id")
+            else 0
+        )
+        while context.is_active():
+            events = state.get_task_events(
+                run_id=run_id,
+                after_task_event_id=after_task_event_id,
+            )
+            for event in events:
+                after_task_event_id = event.id
+                task_event = _task_event_for_stream(event)
+                yield StreamRunEventsResponse(task_event=task_event)
+                if _is_terminal_task_event(task_event):
+                    log(INFO, "Terminal event for run ID `%s` returned", run_id)
+                    return
+
+            run = state.get_run_info(run_ids=[run_id])[0]
+            if run.status.status == Status.FINISHED:
+                log(INFO, "All events for run ID `%s` returned", run_id)
+                break
+
+            time.sleep(LOG_STREAM_INTERVAL)
 
 
 class FederationNotSpecified(FlowerError):
@@ -991,6 +1032,31 @@ class FederationNotSpecified(FlowerError):
         super().__init__(
             ApiErrorCode.FEDERATION_NOT_SPECIFIED, "No federation specified in request."
         )
+
+
+_TERMINAL_TASK_EVENTS = frozenset(
+    {
+        "response.completed",
+        "response.failed",
+        "response.error",
+    }
+)
+
+
+def _task_event_for_stream(event: TaskEvent) -> TaskEvent:
+    """Return a stream-safe copy of a task event."""
+    task_event = TaskEvent()
+    task_event.CopyFrom(event)
+    payload = strict_json_loads(task_event.data)
+    if isinstance(payload, dict) and "type" not in payload:
+        payload["type"] = task_event.event
+        task_event.data = strict_json_dumps(payload, compact=True)
+    return task_event
+
+
+def _is_terminal_task_event(event: TaskEvent) -> bool:
+    """Return whether the task event should close the stream."""
+    return event.event in _TERMINAL_TASK_EVENTS
 
 
 def _validate_federation_and_node_in_request(
