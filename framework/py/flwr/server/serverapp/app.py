@@ -227,15 +227,9 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             context=context,
         )
 
-        # Update sub_status and details for successful completion as soon as
-        # the ServerApp returns. Cleanup below can block or be interrupted.
+        # Update sub_status and details for successful completion
         sub_status = SubStatus.COMPLETED
         details = ""
-
-        # Stop heartbeat before finalizing successful task output. Once the
-        # ServerApp returns, any later heartbeat can only race with completion.
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
 
         # Send resulting context
         # Temporarily disable pushing resulting context to servicer
@@ -264,10 +258,6 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         if log_uploader:
             flush_logs(log_queue)
 
-        # Stop heartbeat before completing failed task output.
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
-
         # Push final status and context (if available)
         pushoutput_req = PushTaskOutputRequest(
             context=context_to_proto(context) if context else None,
@@ -282,6 +272,10 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         # Stop log uploader for this run and upload final logs
         if log_uploader:
             stop_log_uploader(log_queue, log_uploader)
+
+        # Stop heartbeat sender
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
 
         # Close the Grpc connection
         grid.close()
