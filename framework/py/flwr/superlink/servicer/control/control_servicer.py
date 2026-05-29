@@ -1013,8 +1013,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 yield StreamRunEventsResponse(task_event=event)
 
             # Wait for and continue to yield more event responses only if the
-            # run isn't completed yet. If the run is finished, all events are
-            # returned at this point and the server ends the stream.
+            # run isn't completed yet.
             run = state.get_run_info(run_ids=[run_id])[0]
             if run.status.status == Status.FINISHED:
                 log(INFO, "All events for run ID `%s` returned", run_id)
