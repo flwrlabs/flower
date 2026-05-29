@@ -21,8 +21,10 @@ from unittest.mock import MagicMock, Mock
 import pytest
 
 from flwr.common import Context, RecordDict
-from flwr.server import ServerApp, ServerConfig
+from flwr.server import ServerConfig
 from flwr.server.grid import Grid
+
+from .server_app import ServerApp
 
 
 def test_server_app_custom_mode() -> None:
