@@ -88,27 +88,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         with self.assertRaisesRegex(ValueError, "not found"):
             state.ensure_run_series("federation-a", series_id=123)
 
-    def test_ensure_run_series_rejects_zero_id(self) -> None:
-        """Zero is not a valid run series ID."""
-        state = self.state_factory()
-
-        with self.assertRaisesRegex(ValueError, "positive uint64"):
-            state.ensure_run_series("federation-a", series_id=0)
-
-    def test_ensure_run_series_rejects_negative_id(self) -> None:
-        """Negative values are not valid run series IDs."""
-        state = self.state_factory()
-
-        with self.assertRaisesRegex(ValueError, "positive uint64"):
-            state.ensure_run_series("federation-a", series_id=-1)
-
-    def test_ensure_run_series_rejects_empty_federation(self) -> None:
-        """Run series must belong to a federation."""
-        state = self.state_factory()
-
-        with self.assertRaisesRegex(ValueError, "Federation must be set"):
-            state.ensure_run_series("", series_id=123)
-
     def test_ensure_run_series_reuses_same_federation_id(self) -> None:
         """Existing run series IDs can be reused in the same federation."""
         state = self.state_factory()

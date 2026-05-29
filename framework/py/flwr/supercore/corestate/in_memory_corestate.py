@@ -128,10 +128,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                     )
                 return series_id
 
-            new_series_id = generate_rand_int_from_bytes(
-                SERIES_ID_NUM_BYTES,
-                exclude=set(self.run_series_store) | {0},
-            )
+            new_series_id = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
 
             timestamp = now().isoformat()
             self.run_series_store[new_series_id] = RunSeries(
