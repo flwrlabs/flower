@@ -97,9 +97,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertIsNotNone(created_series_id)
         assert created_series_id is not None
 
-        series_id = state.ensure_run_series(
-            "federation-a", series_id=created_series_id
-        )
+        series_id = state.ensure_run_series("federation-a", series_id=created_series_id)
 
         self.assertEqual(series_id, created_series_id)
 
