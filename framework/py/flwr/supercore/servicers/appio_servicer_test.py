@@ -16,6 +16,7 @@
 
 
 import unittest
+from logging import ERROR
 from unittest.mock import Mock, patch
 
 import grpc
@@ -27,6 +28,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
     PullPendingTasksRequest,
     PullTaskMessageRequest,
+    PushTaskEventsRequest,
+    PushTaskEventsResponse,
     PushTaskMessageRequest,
     SendTaskHeartbeatRequest,
 )
@@ -34,7 +37,7 @@ from flwr.proto.log_pb2 import (  # pylint: disable=E0611
     PushLogsRequest,
     PushLogsResponse,
 )
-from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.constant import TASK_TYPES_ALLOWED_TO_CREATE_TASKS, TaskType
 from flwr.supercore.corestate.utils_test import create_task_message
 
@@ -331,6 +334,74 @@ class TestAppIoServicer(unittest.TestCase):
         context.abort.assert_called_once_with(
             grpc.StatusCode.FAILED_PRECONDITION,
             "Task message could not be stored.",
+        )
+
+    def test_push_task_events_derives_authenticated_task_identity(self) -> None:
+        """PushTaskEvents should derive run and task IDs from task auth."""
+        # Prepare
+        self.state.store_task_events.return_value = True
+        request = PushTaskEventsRequest(
+            events=[
+                TaskEvent(
+                    id=999,
+                    timestamp="client-ts",
+                    run_id=111,
+                    task_id=222,
+                    event=" response.created ",
+                    data='{"payload":"preserved"}',
+                )
+            ]
+        )
+
+        # Execute
+        with patch(
+            "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+            return_value=Task(task_id=123, run_id=789),
+        ):
+            response = self.servicer.PushTaskEvents(request, Mock())
+
+        # Assert
+        self.state.store_task_events.assert_called_once()
+        stored_events = self.state.store_task_events.call_args.args[0]
+        self.assertIsInstance(response, PushTaskEventsResponse)
+        self.assertEqual(len(stored_events), 1)
+        self.assertIs(stored_events[0], request.events[0])
+        self.assertEqual(stored_events[0].id, 999)
+        self.assertEqual(stored_events[0].timestamp, "client-ts")
+        self.assertEqual(stored_events[0].run_id, 789)
+        self.assertEqual(stored_events[0].task_id, 123)
+        self.assertEqual(stored_events[0].event, " response.created ")
+        self.assertEqual(stored_events[0].data, '{"payload":"preserved"}')
+
+    def test_push_task_events_logs_when_state_rejects_events(self) -> None:
+        """PushTaskEvents should log when CoreState cannot store events."""
+        # Prepare
+        self.state.store_task_events.return_value = False
+        request = PushTaskEventsRequest(
+            events=[
+                TaskEvent(event="response.created", data="{"),
+            ]
+        )
+        context = Mock(spec=grpc.ServicerContext)
+
+        # Execute
+        with (
+            patch(
+                "flwr.supercore.servicers.appio_servicer.get_authenticated_task",
+                return_value=Task(task_id=123, run_id=789),
+            ),
+            patch("flwr.supercore.servicers.appio_servicer.log") as log_mock,
+        ):
+            response = self.servicer.PushTaskEvents(request, context)
+
+        # Assert
+        self.assertIsInstance(response, PushTaskEventsResponse)
+        context.abort.assert_not_called()
+        log_mock.assert_any_call(
+            ERROR,
+            "Task events could not be stored for task %d of run %d.",
+            123,
+            789,
         )
 
     def test_pull_task_message_uses_authenticated_task_destination(self) -> None:
