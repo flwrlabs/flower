@@ -117,6 +117,10 @@ The GGUF release provides quantized files for local runtimes that support the
 Lizzy GGUF architecture. The Hugging Face quick start uses the ``Q4_K_M``
 variant:
 
+The command below uses the currently tested Lizzy-compatible llama.cpp fork and
+branch. Use upstream llama.cpp or a packaged runtime instead once it includes
+support for ``general.architecture = lizzy``.
+
 .. code-block:: bash
 
     git clone --branch lorenzo-dev https://github.com/relogu/llama.cpp.git

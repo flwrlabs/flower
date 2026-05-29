@@ -100,9 +100,11 @@ Example
 -------
 
 The example below requires a llama.cpp build that supports the Lizzy GGUF
-architecture. The ``lorenzo-dev`` branch of ``relogu/llama.cpp`` includes
-Lizzy support. If another runtime reports ``unknown model architecture:
-'lizzy'``, see :doc:`troubleshooting`.
+architecture. The ``lorenzo-dev`` branch of ``relogu/llama.cpp`` is the
+currently tested compatibility branch for Lizzy. Use upstream llama.cpp or a
+packaged runtime instead once it includes support for
+``general.architecture = lizzy``. If another runtime reports
+``unknown model architecture: 'lizzy'``, see :doc:`troubleshooting`.
 
 .. code-block:: bash
 

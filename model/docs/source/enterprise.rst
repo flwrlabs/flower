@@ -7,6 +7,9 @@ integrate Lizzy and future Flower models.
 Work with us
 ------------
 
+To request Lizzy Enterprise, please use this form to `contact Flower
+<https://flowerlabs.typeform.com/to/oSxsEvgq>`_.
+
 Enterprise work can include:
 
 - confidential evaluations on domain-specific prompts, policies, and workflows
@@ -42,4 +45,3 @@ Useful links
 
 - `Lizzy model page <https://flower.ai/models/lizzy/>`_
 - `Flower Research <https://flower.ai/research/>`_
-- `Contact Flower <https://flowerlabs.typeform.com/to/oSxsEvgq>`_

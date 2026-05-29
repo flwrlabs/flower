@@ -38,17 +38,6 @@ For product details, see the `Lizzy model page <https://flower.ai/models/lizzy/>
 For background on Flower Labs research, see `Flower Research <https://flower.ai/research/>`_.
 
 
-How-to guides
-~~~~~~~~~~~~~
-
-How-to guides provide step-by-step instructions to help you accomplish specific tasks.
-
-.. toctree::
-  :maxdepth: 1
-  :caption: How-to Guides
-
-  how-to-run-lizzy
-
 Model guides
 ~~~~~~~~~~~~
 
@@ -60,6 +49,18 @@ Model guides provide practical information about Flower Labs models.
 
   lizzy-7b
   enterprise
+
+
+How-to guides
+~~~~~~~~~~~~~
+
+How-to guides provide step-by-step instructions to help you accomplish specific tasks.
+
+.. toctree::
+  :maxdepth: 1
+  :caption: How-to Guides
+
+  how-to-run-lizzy
 
 
 Explanations
