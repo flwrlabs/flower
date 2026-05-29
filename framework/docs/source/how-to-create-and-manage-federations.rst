@@ -171,12 +171,14 @@ Create federations:
 
 .. code-block:: shell
 
+    # Create a deployment federation
     $ flwr federation create <federation-name> supergrid \
         --description "<federation-description>"
 
+    # Create a simulation federation
     $ flwr federation create <federation-name> supergrid \
-        --simulation \
-        --description "<federation-description>"
+        --description "<federation-description>" \
+        --simulation
 
 List federations and show federation details:
 
