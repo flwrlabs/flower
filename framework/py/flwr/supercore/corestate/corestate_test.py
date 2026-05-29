@@ -31,7 +31,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 
 from . import CoreState
@@ -693,6 +693,98 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(pulled_next), 1)
         self.assertEqual(pulled[0].metadata.message_id, msg_1.metadata.message_id)
         self.assertEqual(pulled_next[0].metadata.message_id, msg_2.metadata.message_id)
+
+    def test_store_and_get_task_events(self) -> None:
+        """Task events should round-trip in assigned ID order."""
+        # Prepare: Create one run with a task and two valid task events.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+        event_1 = TaskEvent(
+            run_id=run_id,
+            task_id=task_id,
+            event="response.created",
+            data='{"type":"response.created"}',
+        )
+        event_2 = TaskEvent(
+            run_id=run_id,
+            task_id=task_id,
+            event="response.output_text.delta",
+            data='{"type":"response.output_text.delta","delta":"Hel"}',
+        )
+
+        # Execute: Store the events and read them through full and cursored fetches.
+        self.assertFalse(state.store_task_events([]))
+        self.assertTrue(state.store_task_events([event_1, event_2]))
+        events = state.get_task_events(run_id=run_id, after_task_event_id=None)
+        latest_id = events[-1].id
+        after_first = state.get_task_events(
+            run_id=run_id, after_task_event_id=events[0].id
+        )
+        no_new = state.get_task_events(run_id=run_id, after_task_event_id=latest_id)
+
+        # Assert: Events keep assigned ID order and cursor filtering works.
+        self.assertEqual(len(events), 2)
+        self.assertIsInstance(events[0], TaskEvent)
+        self.assertGreater(events[0].id, 0)
+        self.assertGreater(events[1].id, events[0].id)
+        self.assertTrue(events[0].timestamp)
+        self.assertEqual(events[0].run_id, run_id)
+        self.assertEqual(events[1].run_id, run_id)
+        self.assertEqual(
+            (events[0].task_id, events[0].event, events[0].data),
+            (task_id, event_1.event, event_1.data),
+        )
+        self.assertEqual(
+            (events[1].task_id, events[1].event, events[1].data),
+            (task_id, event_2.event, event_2.data),
+        )
+        self.assertEqual(latest_id, events[1].id)
+        self.assertEqual(after_first, [events[1]])
+        self.assertEqual(no_new, [])
+
+    @parameterized.expand(  # type: ignore
+        [
+            ("malformed", "{"),
+            ("array", "[]"),
+            ("string", '"value"'),
+            ("non_finite", '{"value": NaN}'),
+        ]
+    )
+    def test_store_task_events_requires_json_object_payload(
+        self, _name: str, data: str
+    ) -> None:
+        """Task event data should be a JSON object string."""
+        # Prepare: Create one valid event followed by an invalid payload variant.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+
+        # Execute: Attempt to store the mixed event batch.
+        self.assertFalse(
+            state.store_task_events(
+                [
+                    TaskEvent(
+                        run_id=run_id,
+                        task_id=task_id,
+                        event="response.created",
+                        data='{"type":"response.created"}',
+                    ),
+                    TaskEvent(
+                        run_id=run_id,
+                        task_id=task_id,
+                        event="response.output_text.delta",
+                        data=data,
+                    ),
+                ]
+            )
+        )
+
+        # Assert: The invalid payload rejects the whole batch.
+        events = state.get_task_events(run_id=run_id, after_task_event_id=None)
+        self.assertEqual(events, [])
 
     def test_reserve_nonce_first_reservation_succeeds(self) -> None:
         """A new nonce reservation should succeed."""

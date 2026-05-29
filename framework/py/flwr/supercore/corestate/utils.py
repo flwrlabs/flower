@@ -21,6 +21,7 @@ from os import urandom
 from flwr.common import Message
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.supercore.date import now
+from flwr.supercore.utils import strict_json_loads
 
 # unix timestamp of 28 February 2025 00h:00m:00s UTC
 _MIN_VALID_MESSAGE_CREATED_AT = 1740700800.0
@@ -56,6 +57,13 @@ def timestamp_to_iso(value: datetime | str | None) -> str:
         return datetime.fromisoformat(value).isoformat()
     except ValueError:
         return value
+
+
+def validate_task_event_data(data: str) -> None:
+    """Validate that task event data is a JSON object string."""
+    payload = strict_json_loads(data)
+    if not isinstance(payload, dict):
+        raise ValueError("Task event data must be a JSON object.")
 
 
 def validate_task_message(message: Message) -> list[str]:  # pylint: disable=R0912

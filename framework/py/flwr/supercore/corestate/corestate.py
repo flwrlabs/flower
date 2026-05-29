@@ -21,7 +21,7 @@ from typing import Literal
 
 from flwr.common import Message
 from flwr.common.typing import Fab
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 
@@ -289,6 +289,51 @@ class CoreState(ABC):
         -------
         Sequence[Message]
             A sequence of matching messages.
+        """
+
+    @abstractmethod
+    def store_task_events(
+        self,
+        events: Sequence[TaskEvent],
+    ) -> bool:
+        """Store task-produced run events.
+
+        Parameters
+        ----------
+        events : Sequence[TaskEvent]
+            Task events to store. Event IDs and timestamps are assigned by the
+            CoreState implementation. Event payloads are validated before any
+            events are stored, so one invalid event payload rejects the whole
+            batch.
+
+        Returns
+        -------
+        bool
+            True if the events were stored, otherwise False.
+        """
+
+    @abstractmethod
+    def get_task_events(
+        self,
+        *,
+        run_id: int | None = None,
+        after_task_event_id: int | None = None,
+    ) -> Sequence[TaskEvent]:
+        """Return task-produced run events matching the filters.
+
+        Parameters
+        ----------
+        run_id : Optional[int] (default: None)
+            If set, return only events for this run. If set to `None`, return
+            events for all runs.
+        after_task_event_id : Optional[int] (default: None)
+            Return only events with an ID greater than this cursor. If set to
+            `None`, retrieve all events.
+
+        Returns
+        -------
+        Sequence[TaskEvent]
+            Task events ordered by ID.
         """
 
     @abstractmethod

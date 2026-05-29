@@ -44,14 +44,19 @@ from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
 
 # pylint: disable-next=E0611
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
-from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import generate_rand_int_from_bytes, timestamp_to_iso, validate_task_message
+from .utils import (
+    generate_rand_int_from_bytes,
+    timestamp_to_iso,
+    validate_task_event_data,
+    validate_task_message,
+)
 
 # Define SQL conditions for task statuses to ensure consistency across queries
 STATUS_CONDITIONS = {
@@ -492,6 +497,79 @@ class SqlCoreState(CoreState, SqlMixin):
             rows = self._claim_task_message_rows(dst_task_ids, order_by, limit)
 
         return [_task_message_from_row(row) for row in rows]
+
+    def store_task_events(
+        self,
+        events: Sequence[TaskEvent],
+    ) -> bool:
+        """Store task-produced run events."""
+        if not events:
+            return False
+
+        try:
+            for event in events:
+                validate_task_event_data(event.data)
+        except ValueError:
+            return False
+
+        current = now()
+        params = [
+            {
+                "timestamp": current,
+                "run_id": uint64_to_int64(event.run_id),
+                "task_id": uint64_to_int64(event.task_id),
+                "event": event.event,
+                "data": event.data,
+            }
+            for event in events
+        ]
+
+        with self.session():
+            self.query(
+                """
+                INSERT INTO task_event (timestamp, run_id, task_id, event, data)
+                VALUES (:timestamp, :run_id, :task_id, :event, :data)
+                """,
+                params,
+            )
+
+        return True
+
+    def get_task_events(
+        self,
+        *,
+        run_id: int | None = None,
+        after_task_event_id: int | None = None,
+    ) -> Sequence[TaskEvent]:
+        """Return task-produced run events after the cursor."""
+        cursor = after_task_event_id if after_task_event_id is not None else 0
+        conditions = ["id > :after_task_event_id"]
+        params = {"after_task_event_id": cursor}
+        if run_id is not None:
+            conditions.append("run_id = :run_id")
+            params["run_id"] = uint64_to_int64(run_id)
+
+        rows = self.query(
+            f"""
+            SELECT id, timestamp, run_id, task_id, event, data
+            FROM task_event
+            WHERE {" AND ".join(conditions)}
+            ORDER BY id ASC
+            """,
+            params,
+        )
+
+        return [
+            TaskEvent(
+                id=row["id"],
+                timestamp=timestamp_to_iso(row["timestamp"]),
+                run_id=int64_to_uint64(row["run_id"]),
+                task_id=int64_to_uint64(row["task_id"]),
+                event=row["event"],
+                data=row["data"],
+            )
+            for row in rows
+        ]
 
     def _claim_task_message_rows(
         self,

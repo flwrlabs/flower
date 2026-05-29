@@ -127,6 +127,12 @@ erDiagram
     BLOB context "nullable"
   }
 
+  series_runs {
+    BIGINT id PK
+    BIGINT run_id UK
+    BIGINT series_id
+  }
+
   task {
     TIMESTAMP active_until "nullable"
     VARCHAR connector_ref "nullable"
