@@ -960,17 +960,13 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             query = "SELECT COUNT(*) as cnt FROM run WHERE run_id = :run_id"
             rows = self.query(query, {"run_id": uint64_to_int64(run_id)})
             if rows[0]["cnt"] == 0:
-                resolved_series_id = self.ensure_run_series(
-                    federation=federation, series_id=series_id
+                current = now()
+                resolved_series_id = self.store_run_in_series(
+                    run_id=run_id,
+                    federation=federation,
+                    series_id=series_id,
                 )
                 if resolved_series_id is None:
-                    log(ERROR, "Unexpected run series creation failure.")
-                    return 0
-                current = now()
-                if not self.store_run_to_series(
-                    series_id=resolved_series_id,
-                    run_id=run_id,
-                ):
                     log(ERROR, "Unexpected run series membership failure.")
                     return 0
                 self.query(

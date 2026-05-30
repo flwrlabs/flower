@@ -188,9 +188,8 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
     def test_start_run_uses_existing_series_id(self) -> None:
         """Test StartRun links the run to an existing run series."""
         fab_content = b"test FAB content with series ID"
-        series_id = self.state.ensure_run_series(federation=NOOP_FEDERATION)
-        self.assertIsNotNone(series_id)
-        assert series_id is not None
+        initial_run_id = self._create_dummy_run(self.aid)
+        series_id = self.state.get_run_info(run_ids=[initial_run_id])[0].series_id
         request = StartRunRequest(series_id=series_id, federation=NOOP_FEDERATION)
         request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
         request.fab.content = fab_content

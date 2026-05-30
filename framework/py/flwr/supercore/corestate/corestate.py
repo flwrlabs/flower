@@ -43,16 +43,19 @@ class CoreState(ABC):
         """Return the FAB for the given hash, if present."""
 
     @abstractmethod
-    def ensure_run_series(
+    def store_run_in_series(
         self,
         *,
+        run_id: int,
         federation: str,
         series_id: int | None = None,
     ) -> int | None:
-        """Ensure a run series exists and return its ID.
+        """Store a run in a run series and return the series ID.
 
         Parameters
         ----------
+        run_id : int
+            Keyword-only run ID to associate with the run series.
         federation : str
             Keyword-only federation the run series belongs to.
         series_id : int | None (default: None)
@@ -63,25 +66,10 @@ class CoreState(ABC):
         Returns
         -------
         int | None
-            The ID of the ensured run series, or `None` if a new run series
-            could not be created or the caller-provided run series is invalid.
-        """
-
-    @abstractmethod
-    def store_run_to_series(self, *, series_id: int, run_id: int) -> bool:
-        """Associate a run with a run series.
-
-        Parameters
-        ----------
-        series_id : int
-            Keyword-only run series ID.
-        run_id : int
-            Keyword-only run ID to associate with the run series.
-
-        Returns
-        -------
-        bool
-            `True` if the association was stored, otherwise `False`.
+            The ID of the run series the run was stored in, or `None` if a
+            new run series could not be created, the caller-provided run
+            series is invalid, or the run could not be associated with the
+            run series.
         """
 
     @abstractmethod

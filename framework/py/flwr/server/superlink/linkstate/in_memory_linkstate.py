@@ -621,13 +621,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         task_type = primary_task_type_from_run_type(run_type)
 
         with self.lock_task_store, self.lock:
-            resolved_series_id = self.ensure_run_series(
-                federation=federation,
-                series_id=series_id,
-            )
-            if resolved_series_id is None:
-                log(ERROR, "Unexpected run series creation failure.")
-                return 0
             run_id = generate_rand_int_from_bytes(
                 RUN_ID_NUM_BYTES,
                 exclude=set(self.run_ids),
@@ -637,10 +630,12 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 exclude=set(self.task_store),
             )
             current = now().isoformat()
-            if not self.store_run_to_series(
-                series_id=resolved_series_id,
+            resolved_series_id = self.store_run_in_series(
                 run_id=run_id,
-            ):
+                federation=federation,
+                series_id=series_id,
+            )
+            if resolved_series_id is None:
                 log(ERROR, "Unexpected run series membership failure.")
                 return 0
             run_record = RunRecord(

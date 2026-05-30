@@ -118,15 +118,17 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 verifications=dict(fab.verifications),
             )
 
-    def ensure_run_series(
+    def store_run_in_series(
         self,
         *,
+        run_id: int,
         federation: str,
         series_id: int | None = None,
     ) -> int | None:
-        """Ensure a run series exists and return its ID."""
+        """Store a run in a run series and return the series ID."""
         with self.lock_run_series_store:
             if series_id is not None:
+                # Reuse only an existing run series owned by the requested federation.
                 existing = self.run_series_store.get(series_id)
                 if existing is None:
                     log(ERROR, "Run series %d not found", series_id)
@@ -140,31 +142,31 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                         federation,
                     )
                     return None
-                return series_id
+                run_series = existing
+                resolved_series_id = series_id
 
-            new_series_id = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
-            if new_series_id in self.run_series_store:
+            else:
+                # No series was provided, so create a new one before linking the run.
+                new_series_id = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
+                if new_series_id in self.run_series_store:
+                    return None
+
+                timestamp = now().isoformat()
+                run_series = RunSeries(
+                    series_id=new_series_id,
+                    federation=federation,
+                    description="",
+                    created_at=timestamp,
+                    updated_at=timestamp,
+                )
+                self.run_series_store[new_series_id] = run_series
+                resolved_series_id = new_series_id
+
+            # Store the membership last so callers only receive linked series IDs.
+            if run_id in run_series.run_ids:
                 return None
-
-            timestamp = now().isoformat()
-            run_series = RunSeries(
-                series_id=new_series_id,
-                federation=federation,
-                description="",
-                created_at=timestamp,
-                updated_at=timestamp,
-            )
-            self.run_series_store[new_series_id] = run_series
-            return new_series_id
-
-    def store_run_to_series(self, *, series_id: int, run_id: int) -> bool:
-        """Associate a run with a run series."""
-        with self.lock_run_series_store:
-            run_series = self.run_series_store.get(series_id)
-            if run_series is None or run_id in run_series.run_ids:
-                return False
             run_series.run_ids.append(run_id)
-            return True
+            return resolved_series_id
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""

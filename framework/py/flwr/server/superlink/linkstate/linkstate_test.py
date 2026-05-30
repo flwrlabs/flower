@@ -166,9 +166,8 @@ class StateTest(CoreStateTest):
         """Test create_run links the run to an existing run series."""
         # Prepare
         state = self.state_factory()
-        series_id = state.ensure_run_series(federation="health-federation")
-        self.assertIsNotNone(series_id)
-        assert series_id is not None
+        initial_run_id = create_dummy_run(state, federation="health-federation")
+        series_id = state.get_run_info(run_ids=[initial_run_id])[0].series_id
 
         # Execute
         run_id = create_dummy_run(
