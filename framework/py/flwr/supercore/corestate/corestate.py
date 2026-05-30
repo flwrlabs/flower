@@ -43,6 +43,35 @@ class CoreState(ABC):
         """Return the FAB for the given hash, if present."""
 
     @abstractmethod
+    def store_run_in_series(
+        self,
+        run_id: int,
+        federation: str,
+        series_id: int | None,
+    ) -> int | None:
+        """Store a run in a run series and return the series ID.
+
+        Parameters
+        ----------
+        run_id : int
+            Run ID to associate with the run series.
+        federation : str
+            Federation the run series belongs to.
+        series_id : int | None
+            Caller-provided series ID. If `None`, a new series ID is generated
+            and creation is attempted. If set, the matching series must already
+            exist and belong to `federation`.
+
+        Returns
+        -------
+        int | None
+            The ID of the run series the run was stored in, or `None` if a
+            new run series could not be created, the caller-provided run
+            series is invalid, or the run could not be associated with the
+            run series.
+        """
+
+    @abstractmethod
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`.
 

@@ -178,6 +178,41 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(run_info.fab_version, fab_version)
         self.assertEqual(run_info.run_type, RunType.SERVER_APP)
         self.assertFalse(response.HasField("note"))
+        self.assertTrue(response.HasField("series_id"))
+        self.assertGreater(response.series_id, 0)
+        self.assertEqual(run_info.series_id, response.series_id)
+        run_context = self.state.get_serverapp_context(response.run_id)
+        assert run_context is not None
+        self.assertEqual(run_context.series_id, response.series_id)
+
+    def test_start_run_uses_existing_series_id(self) -> None:
+        """Test StartRun links the run to an existing run series."""
+        fab_content = b"test FAB content with series ID"
+        initial_run_id = self._create_dummy_run(self.aid)
+        series_id = self.state.get_run_info(run_ids=[initial_run_id])[0].series_id
+        request = StartRunRequest(series_id=series_id, federation=NOOP_FEDERATION)
+        request.fab.hash_str = hashlib.sha256(fab_content).hexdigest()
+        request.fab.content = fab_content
+
+        with (
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_fab_config"
+            ) as mock_get_fab_config,
+            patch(
+                "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
+            ) as mock_get_metadata_from_config,
+        ):
+            mock_get_fab_config.return_value = {"tool": {"flwr": {"app": {}}}}
+            mock_get_metadata_from_config.return_value = ("flwr/demo", "v1.0.0")
+            response = self.servicer.StartRun(request, Mock())
+
+        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        run_context = self.state.get_serverapp_context(response.run_id)
+
+        self.assertEqual(response.series_id, series_id)
+        self.assertEqual(run.series_id, series_id)
+        assert run_context is not None
+        self.assertEqual(run_context.series_id, series_id)
 
     @parameterized.expand(
         [
