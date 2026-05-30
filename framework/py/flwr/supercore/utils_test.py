@@ -38,6 +38,8 @@ from .utils import (
     request_download_link,
     simulation_config_from_json,
     simulation_config_to_json,
+    strict_json_dumps,
+    strict_json_loads,
     uint64_to_int64,
 )
 
@@ -63,6 +65,30 @@ def test_mask_string() -> None:
     assert mask_string("") == ""
     assert mask_string("1234567890", head=2, tail=3) == "12...890"
     assert mask_string("1234567890", head=5, tail=4) == "12345...7890"
+
+
+def test_strict_json_loads() -> None:
+    """Parse valid JSON values."""
+    assert strict_json_loads('{"key":[1,true,null]}') == {"key": [1, True, None]}
+
+
+def test_strict_json_loads_rejects_non_finite_numbers() -> None:
+    """Reject Python's non-standard JSON number constants."""
+    with pytest.raises(ValueError, match="non-finite number NaN"):
+        strict_json_loads('{"key":NaN}')
+
+
+def test_strict_json_dumps() -> None:
+    """Serialize valid JSON values."""
+    assert strict_json_dumps({"key": [1, True, None]}, compact=True) == (
+        '{"key":[1,true,null]}'
+    )
+
+
+def test_strict_json_dumps_rejects_non_finite_numbers() -> None:
+    """Reject non-finite floating-point values."""
+    with pytest.raises(ValueError, match="Out of range float values"):
+        strict_json_dumps({"key": float("nan")})
 
 
 @pytest.mark.parametrize(

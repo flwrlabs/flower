@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower grid SDK."""
+"""Public Flower AgentApp APIs."""
 
 
-from .grid import Driver, Grid
-from .grpc_grid import GrpcGrid
-from .inmemory_grid import InMemoryGrid
+from .agent_app import AgentApp as AgentApp
+from .base import AgentResponses as AgentResponses
+from .base import AgentSession as AgentSession
 
 __all__ = [
-    "Driver",
-    "Grid",
-    "GrpcGrid",
-    "InMemoryGrid",
+    "AgentApp",
+    "AgentResponses",
+    "AgentSession",
 ]

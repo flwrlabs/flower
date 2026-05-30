@@ -37,11 +37,15 @@ from flwr.common.constant import (
 )
 from flwr.common.logger import log
 from flwr.common.typing import Fab
-from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
-from .utils import generate_rand_int_from_bytes, validate_task_message
+from .utils import (
+    generate_rand_int_from_bytes,
+    validate_task_event_data,
+    validate_task_message,
+)
 
 
 @dataclass
@@ -71,6 +75,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.lock_task_store = Lock()
         self.task_message_store: dict[str, Message] = {}
         self.lock_task_message_store = Lock()
+        self.task_event_store: dict[int, list[TaskEvent]] = {}
+        self.lock_task_event_store = Lock()
+        self._next_task_event_id = 1
 
     @property
     def object_store(self) -> ObjectStore:
@@ -422,6 +429,54 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 del self.task_message_store[msg.metadata.message_id]
 
         return selected_messages
+
+    def store_task_events(
+        self,
+        events: Sequence[TaskEvent],
+    ) -> bool:
+        """Store task-produced run events."""
+        if not events:
+            return False
+
+        try:
+            for event in events:
+                validate_task_event_data(event.data)
+        except ValueError:
+            return False
+
+        with self.lock_task_event_store:
+            current = now().isoformat()
+            for event in events:
+                task_events = self.task_event_store.setdefault(event.run_id, [])
+                event.id = self._next_task_event_id
+                event.timestamp = current
+                task_events.append(event)
+                self._next_task_event_id += 1
+
+        return True
+
+    def get_task_events(
+        self,
+        *,
+        run_id: int | None = None,
+        after_task_event_id: int | None = None,
+    ) -> Sequence[TaskEvent]:
+        """Return task-produced run events after the cursor."""
+        cursor = after_task_event_id if after_task_event_id is not None else 0
+        with self.lock_task_event_store:
+            if run_id is None:
+                events = [
+                    event
+                    for task_events in self.task_event_store.values()
+                    for event in task_events
+                ]
+            else:
+                events = list(self.task_event_store.get(run_id, []))
+            return [
+                event
+                for event in sorted(events, key=lambda event: event.id)
+                if event.id > cursor
+            ]
 
     def _cleanup_expired_task_tokens_locked(self) -> None:
         """Remove expired task tokens.

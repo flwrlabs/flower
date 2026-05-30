@@ -12,21 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Conversion utility functions for Records."""
+"""Flower SuperLink Grid implementations."""
 
 
-from flwr.app.message import Array
+from .grpc_grid import GrpcGrid
+from .inmemory_grid import InMemoryGrid
 
-from ..logger import warn_deprecated_feature
-from ..typing import NDArray
-
-WARN_DEPRECATED_MESSAGE = (
-    "`array_from_numpy` is deprecated. Instead, use the `Array(ndarray)` class "
-    "directly or `Array.from_numpy_ndarray(ndarray)`."
-)
-
-
-def array_from_numpy(ndarray: NDArray) -> Array:
-    """Create Array from NumPy ndarray."""
-    warn_deprecated_feature(WARN_DEPRECATED_MESSAGE)
-    return Array.from_numpy_ndarray(ndarray)
+__all__ = [
+    "GrpcGrid",
+    "InMemoryGrid",
+]

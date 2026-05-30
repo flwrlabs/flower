@@ -28,7 +28,7 @@ from unittest.mock import Mock, patch
 import grpc
 from parameterized import parameterized
 
-from flwr.common import ConfigRecord, Context, Error, Message, RecordDict
+from flwr.app import ConfigRecord, Context, Error, Message, RecordDict
 from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
     SUPERLINK_NODE_ID,

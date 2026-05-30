@@ -27,11 +27,11 @@ from pathlib import Path
 from queue import Empty, Queue
 from uuid import uuid4
 
+from flwr.app import Message
 from flwr.app.error import Error
 from flwr.client.run_info_store import DeprecatedRunInfoStore
 from flwr.clientapp.client_app import ClientApp, ClientAppException, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
-from flwr.common import Message
 from flwr.common.constant import (
     HEARTBEAT_INTERVAL_INF,
     NOOP_ACCOUNT_NAME,
@@ -109,7 +109,7 @@ def worker(
     node_info_store: dict[int, DeprecatedRunInfoStore],
     backend: Backend,
     f_stop: threading.Event,
-    metrics: VceMetrics | None = None,
+    metrics: VceMetrics,
 ) -> None:
     """Process messages from the queue, execute them, update context, and enqueue
     replies."""
@@ -154,7 +154,7 @@ def worker(
             out_mssg = Message(Error(code=e_code, reason=reason), reply_to=message)
 
         finally:
-            if metrics is not None and processing_started_at is not None:
+            if processing_started_at is not None:
                 metrics.add_clientapp_runtime(
                     time.perf_counter() - processing_started_at
                 )
@@ -201,7 +201,7 @@ def run_api(
     state_factory: LinkStateFactory,
     node_info_stores: dict[int, DeprecatedRunInfoStore],
     f_stop: threading.Event,
-    metrics: VceMetrics | None = None,
+    metrics: VceMetrics,
 ) -> None:
     """Run the VCE."""
     messageins_queue: Queue[Message] = Queue()
@@ -284,12 +284,12 @@ def start_vce(
     is_app: bool,
     f_stop: threading.Event,
     run: Run,
+    metrics: VceMetrics,
     client_app: ClientApp | None = None,
     client_app_attr: str | None = None,
     num_supernodes: int | None = None,
     state_factory: LinkStateFactory | None = None,
     existing_nodes_mapping: NodeToPartitionMapping | None = None,
-    metrics: VceMetrics | None = None,
 ) -> None:
     """Start Fleet API with the Simulation Engine."""
     nodes_mapping = {}
