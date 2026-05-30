@@ -52,7 +52,12 @@ from flwr.common.constant import (
     Status,
 )
 from flwr.common.logger import log
-from flwr.common.serde import run_to_proto, user_config_from_proto
+from flwr.common.serde import (
+    context_to_proto,
+    run_status_to_proto,
+    run_to_proto,
+    user_config_from_proto,
+)
 from flwr.common.typing import AccountInfo, Fab, Run
 from flwr.proto import control_pb2_grpc  # pylint: disable=E0611
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
@@ -112,6 +117,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.constant import (
     NOOP_FEDERATION,
@@ -389,17 +395,72 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         self, request: ListRunSeriesRequest, context: grpc.ServicerContext
     ) -> ListRunSeriesResponse:
         """List run series."""
-        log(INFO, "ControlServicer.ListRunSeries")
-        context.abort(grpc.StatusCode.UNIMPLEMENTED, "Method not implemented!")
-        raise grpc.RpcError()  # This line is unreachable
+        log(INFO, rpc_name := self.ListRunSeries.__qualname__)
+
+        state = self.linkstate_factory.state()
+        flwr_aid = _get_flwr_aid(context)
+        updated_before = (
+            request.updated_before if request.HasField("updated_before") else None
+        )
+        limit = request.limit if request.HasField("limit") else None
+
+        with rpc_error_translator(context, rpc_name):
+            federations = state.federation_manager.get_federations(flwr_aid)
+
+        entries: list[RunSeries] = []
+        for federation in federations:
+            entries.extend(
+                state.get_run_series(
+                    federation=federation.name,
+                    updated_before=updated_before,
+                    limit=limit,
+                )
+            )
+        entries.sort(key=lambda entry: entry.updated_at, reverse=True)
+        if limit is not None:
+            entries = entries[:limit]
+
+        return ListRunSeriesResponse(entries=_with_last_run_statuses(state, entries))
 
     def GetRunSeries(
         self, request: GetRunSeriesRequest, context: grpc.ServicerContext
     ) -> GetRunSeriesResponse:
         """Get run series."""
-        log(INFO, "ControlServicer.GetRunSeries")
-        context.abort(grpc.StatusCode.UNIMPLEMENTED, "Method not implemented!")
-        raise grpc.RpcError()  # This line is unreachable
+        log(INFO, self.GetRunSeries.__qualname__)
+
+        if request.series_id == 0:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "Run series ID is required.",
+            )
+            raise grpc.RpcError()  # This line is unreachable
+
+        state = self.linkstate_factory.state()
+        flwr_aid = _get_flwr_aid(context)
+        with rpc_error_translator(context, self.GetRunSeries.__qualname__):
+            federations = state.federation_manager.get_federations(flwr_aid)
+
+        series = None
+        for federation in federations:
+            for candidate in state.get_run_series(federation=federation.name):
+                if candidate.series_id == request.series_id:
+                    series = candidate
+                    break
+            if series is not None:
+                break
+
+        if series is None:
+            context.abort(grpc.StatusCode.NOT_FOUND, "Run series ID not found.")
+            raise grpc.RpcError()  # This line is unreachable
+
+        response = GetRunSeriesResponse(
+            series=_with_last_run_statuses(state, [series])[0]
+        )
+        if (series_context := state.get_run_series_context(request.series_id)) is None:
+            return response
+
+        response.context.CopyFrom(context_to_proto(series_context))
+        return response
 
     def StopRun(
         self, request: StopRunRequest, context: grpc.ServicerContext
@@ -1082,6 +1143,27 @@ def _validate_federation_membership_in_request(
             grpc.StatusCode.FAILED_PRECONDITION,
             FEDERATION_NOT_FOUND_MESSAGE % federation_name,
         )
+
+
+def _with_last_run_statuses(
+    state: LinkState, run_series: Sequence[RunSeries]
+) -> list[RunSeries]:
+    """Return RunSeries copies with last_run_status populated from run state."""
+    last_run_ids = {entry.run_ids[-1] for entry in run_series if entry.run_ids}
+    run_statuses = state.get_run_status(last_run_ids)
+
+    result = []
+    for entry in run_series:
+        entry_with_status = RunSeries()
+        entry_with_status.CopyFrom(entry)
+        if entry_with_status.run_ids:
+            last_run_id = entry_with_status.run_ids[-1]
+            if (run_status := run_statuses.get(last_run_id)) is not None:
+                entry_with_status.last_run_status.CopyFrom(
+                    run_status_to_proto(run_status)
+                )
+        result.append(entry_with_status)
+    return result
 
 
 def _get_account(context: grpc.ServicerContext) -> AccountInfo:
