@@ -26,12 +26,7 @@ from flwr.common import EventType
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
-from flwr.common.logger import (
-    flush_logs,
-    log,
-    start_log_uploader,
-    stop_log_uploader,
-)
+from flwr.common.logger import flush_logs, log, start_log_uploader, stop_log_uploader
 from flwr.common.retry_invoker import (
     RetryInvoker,
     make_simple_grpc_retry_invoker,
