@@ -263,9 +263,9 @@ class TestGrpcGrid(unittest.TestCase):
         with self.assertRaises(TypeError):
             self.grid.set_run(61016)  # type: ignore[arg-type]
 
-    @patch("flwr.server.grid.grpc_grid.wrap_stub")
-    @patch("flwr.server.grid.grpc_grid.ServerAppIoStub")
-    @patch("flwr.server.grid.grpc_grid.create_channel")
+    @patch("flwr.superlink.grid.grpc_grid.wrap_stub")
+    @patch("flwr.superlink.grid.grpc_grid.ServerAppIoStub")
+    @patch("flwr.superlink.grid.grpc_grid.create_channel")
     def test_connect_adds_client_interceptors(
         self,
         mock_create_channel: Mock,

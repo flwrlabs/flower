@@ -34,8 +34,8 @@ from flwr.common.differential_privacy_constants import (
     CLIENTS_DISCREPANCY_WARNING,
     KEY_CLIPPING_NORM,
 )
-from flwr.server import Grid
 
+from ..grid import Grid
 from .strategy import Strategy
 
 

@@ -18,8 +18,8 @@
 from collections.abc import Callable
 
 from flwr.common import Context
+from flwr.serverapp.grid import Grid
 
-from .grid import Grid
 from .serverapp_components import ServerAppComponents
 
 ServerAppCallable = Callable[[Grid, Context], None]
