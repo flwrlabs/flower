@@ -45,23 +45,22 @@ class CoreState(ABC):
     @abstractmethod
     def store_run_in_series(
         self,
-        *,
         run_id: int,
         federation: str,
-        series_id: int | None = None,
+        series_id: int | None,
     ) -> int | None:
         """Store a run in a run series and return the series ID.
 
         Parameters
         ----------
         run_id : int
-            Keyword-only run ID to associate with the run series.
+            Run ID to associate with the run series.
         federation : str
-            Keyword-only federation the run series belongs to.
-        series_id : int | None (default: None)
-            Optional keyword-only caller-provided series ID. If `None`, a
-            new series ID is generated and creation is attempted. If set,
-            the matching series must already exist and belong to `federation`.
+            Federation the run series belongs to.
+        series_id : int | None
+            Caller-provided series ID. If `None`, a new series ID is generated
+            and creation is attempted. If set, the matching series must already
+            exist and belong to `federation`.
 
         Returns
         -------

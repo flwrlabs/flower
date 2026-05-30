@@ -120,10 +120,9 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
 
     def store_run_in_series(
         self,
-        *,
         run_id: int,
         federation: str,
-        series_id: int | None = None,
+        series_id: int | None,
     ) -> int | None:
         """Store a run in a run series and return the series ID."""
         with self.lock_run_series_store:

@@ -77,7 +77,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Storing a run in a run series should create a nonzero ID."""
         state = self.state_factory()
 
-        series_id = state.store_run_in_series(run_id=123, federation="federation-a")
+        series_id = state.store_run_in_series(
+            run_id=123, federation="federation-a", series_id=None
+        )
 
         self.assertIsNotNone(series_id)
         assert series_id is not None
@@ -100,7 +102,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
     def test_store_run_in_series_returns_none_for_duplicate_run_id(self) -> None:
         """Storing the same run ID twice should return None."""
         state = self.state_factory()
-        series_id = state.store_run_in_series(run_id=123, federation="federation-a")
+        series_id = state.store_run_in_series(
+            run_id=123, federation="federation-a", series_id=None
+        )
         assert series_id is not None
 
         stored = state.store_run_in_series(

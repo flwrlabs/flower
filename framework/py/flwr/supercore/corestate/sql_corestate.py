@@ -133,10 +133,9 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def store_run_in_series(
         self,
-        *,
         run_id: int,
         federation: str,
-        series_id: int | None = None,
+        series_id: int | None,
     ) -> int | None:
         """Store a run in a run series and return the series ID."""
         insert_query = """
