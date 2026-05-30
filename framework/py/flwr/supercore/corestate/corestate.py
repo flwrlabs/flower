@@ -95,7 +95,9 @@ class CoreState(ABC):
             The ID of the RunSeries for which to persist shared context.
         context : Context
             The shared context to store.
-    
+        """
+
+    @abstractmethod
     def store_run_in_series(
         self,
         run_id: int,

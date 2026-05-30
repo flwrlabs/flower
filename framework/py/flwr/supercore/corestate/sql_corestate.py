@@ -224,7 +224,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                 """,
                 {"series_id": sint_series_id, "context": context_bytes},
             )
-    
+
     def store_run_in_series(
         self,
         run_id: int,

@@ -157,7 +157,7 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         """Set the shared Context for the specified RunSeries."""
         with self.lock_run_series_context_store:
             self.run_series_context_store[series_id] = context
-    
+
     def store_run_in_series(
         self,
         run_id: int,
