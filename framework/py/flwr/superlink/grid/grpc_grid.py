@@ -22,9 +22,10 @@ from typing import cast
 
 import grpc
 
+from flwr.app import Message, Metadata, RecordDict
 from flwr.app.error import Error
 from flwr.app.message import make_message, remove_content_from_message
-from flwr.common import Message, Metadata, RecordDict, now
+from flwr.common import now
 from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
     SUPERLINK_NODE_ID,

@@ -22,8 +22,8 @@ from unittest.mock import Mock, patch
 import grpc
 from parameterized import parameterized
 
+from flwr.app import ConfigRecord
 from flwr.app.message import get_message_to_descendant_id_mapping
-from flwr.common import ConfigRecord
 from flwr.common.constant import (
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     NOOP_ACCOUNT_NAME,

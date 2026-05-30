@@ -23,6 +23,7 @@ from logging import ERROR, INFO, WARN
 from cryptography.hazmat.primitives.asymmetric import ec
 from grpc import RpcError
 
+from flwr.app import Context, Message
 from flwr.app.error import Error
 from flwr.app.user_config import UserConfig
 from flwr.cli.config_utils import get_fab_metadata
@@ -33,7 +34,7 @@ from flwr.client.numpy_client import NumPyClient
 from flwr.client.run_info_store import DeprecatedRunInfoStore
 from flwr.client.typing import ClientFnExt
 from flwr.clientapp.client_app import ClientApp, LoadClientAppError
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH, Context, EventType, Message, event
+from flwr.common import GRPC_MAX_MESSAGE_LENGTH, EventType, event
 from flwr.common.constant import MAX_RETRY_DELAY, ErrorCode
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log, warn_deprecated_feature

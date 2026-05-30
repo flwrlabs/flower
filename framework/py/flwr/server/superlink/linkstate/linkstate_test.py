@@ -33,8 +33,9 @@ from uuid import uuid4
 
 from parameterized import parameterized
 
+from flwr.app import DEFAULT_TTL, Context, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
-from flwr.common import DEFAULT_TTL, Context, Error, Message, RecordDict, now
+from flwr.common import now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,

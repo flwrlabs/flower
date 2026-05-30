@@ -16,8 +16,9 @@
 
 
 from flwr import common
+from flwr.app import Message, RecordDict
 from flwr.app.message_type import MessageType
-from flwr.common import Message, MessageTypeLegacy, RecordDict
+from flwr.common import MessageTypeLegacy
 from flwr.common import recorddict_compat as compat
 from flwr.server.client_proxy import ClientProxy
 from flwr.serverapp.grid import Grid

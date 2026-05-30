@@ -17,7 +17,7 @@
 
 from collections.abc import Callable
 
-from flwr.common import Context
+from flwr.app import Context
 from flwr.serverapp.grid import Grid
 
 from .serverapp_components import ServerAppComponents

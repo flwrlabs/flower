@@ -20,17 +20,17 @@ from typing import cast
 
 import numpy as np
 
-from flwr.app import Error
-from flwr.clientapp.typing import ClientAppCallable
-from flwr.common import (
+from flwr.app import (
     Array,
     ArrayRecord,
     ConfigRecord,
     Context,
+    Error,
     Message,
     MetricRecord,
-    log,
 )
+from flwr.clientapp.typing import ClientAppCallable
+from flwr.common import log
 from flwr.common.constant import ErrorCode
 from flwr.common.differential_privacy import (
     compute_adaptive_clip_model_update,
