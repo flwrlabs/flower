@@ -20,14 +20,13 @@ from collections.abc import Iterable
 from typing import cast
 from uuid import uuid4
 
-from flwr.common import Message, RecordDict
+from flwr.app import Message, RecordDict
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.logger import warn_deprecated_feature
 from flwr.common.typing import Run
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
-
-from .grid import Grid
+from flwr.serverapp.grid import Grid
 
 
 class InMemoryGrid(Grid):

@@ -31,6 +31,7 @@ from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
+    SERIES_ID_NUM_BYTES,
     TASK_ID_NUM_BYTES,
     Status,
     SubStatus,
@@ -57,7 +58,9 @@ class TokenRecord:
     active_until: datetime
 
 
-class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attributes
+class InMemoryCoreState(
+    CoreState
+):  # pylint: disable=R0904,too-many-instance-attributes
     """In-memory CoreState implementation."""
 
     def __init__(self, object_store: ObjectStore) -> None:
@@ -154,6 +157,57 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         """Set the shared Context for the specified RunSeries."""
         with self.lock_run_series_context_store:
             self.run_series_context_store[series_id] = context
+
+    def store_run_in_series(
+        self,
+        run_id: int,
+        federation: str,
+        series_id: int | None,
+    ) -> int | None:
+        """Store a run in a run series and return the series ID."""
+        with self.lock_run_series_store:
+            if series_id is not None:
+                # Reuse only an existing run series owned by the requested federation.
+                existing = self.run_series_store.get(series_id)
+                if existing is None:
+                    log(ERROR, "Run series %d not found", series_id)
+                    return None
+                if existing.federation != federation:
+                    log(
+                        ERROR,
+                        "Run series %d belongs to federation %r, not %r",
+                        series_id,
+                        existing.federation,
+                        federation,
+                    )
+                    return None
+                run_series = existing
+                resolved_series_id = series_id
+
+            else:
+                # No series was provided, so create a new one before linking the run.
+                new_series_id = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
+                if new_series_id in self.run_series_store:
+                    return None
+
+                timestamp = now().isoformat()
+                run_series = RunSeries(
+                    series_id=new_series_id,
+                    federation=federation,
+                    description="",
+                    created_at=timestamp,
+                    updated_at=timestamp,
+                )
+                self.run_series_store[new_series_id] = run_series
+                resolved_series_id = new_series_id
+
+            # Store the membership last so callers only receive linked series IDs.
+            if run_id in run_series.run_ids:
+                return None
+            run_series.run_ids.append(run_id)
+            if series_id is not None:
+                run_series.updated_at = now().isoformat()
+            return resolved_series_id
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""

@@ -89,7 +89,7 @@ def create_corestate_metadata() -> MetaData:
         metadata,
         Column(
             "id",
-            BigInteger,
+            Integer,
             primary_key=True,
             autoincrement=True,
         ),

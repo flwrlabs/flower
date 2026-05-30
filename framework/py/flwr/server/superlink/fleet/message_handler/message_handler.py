@@ -16,7 +16,8 @@
 
 from logging import ERROR
 
-from flwr.common import Message, log
+from flwr.app import Message
+from flwr.common import log
 from flwr.common.constant import (
     HEARTBEAT_MAX_INTERVAL,
     HEARTBEAT_MIN_INTERVAL,

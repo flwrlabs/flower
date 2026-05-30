@@ -27,7 +27,7 @@ from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from ..object_store import ObjectStore
 
 
-class CoreState(ABC):
+class CoreState(ABC):  # pylint: disable=R0904
     """Abstract base class for core state."""
 
     @property
@@ -95,6 +95,35 @@ class CoreState(ABC):
             The ID of the RunSeries for which to persist shared context.
         context : Context
             The shared context to store.
+        """
+
+    @abstractmethod
+    def store_run_in_series(
+        self,
+        run_id: int,
+        federation: str,
+        series_id: int | None,
+    ) -> int | None:
+        """Store a run in a run series and return the series ID.
+
+        Parameters
+        ----------
+        run_id : int
+            Run ID to associate with the run series.
+        federation : str
+            Federation the run series belongs to.
+        series_id : int | None
+            Caller-provided series ID. If `None`, a new series ID is generated
+            and creation is attempted. If set, the matching series must already
+            exist and belong to `federation`.
+
+        Returns
+        -------
+        int | None
+            The ID of the run series the run was stored in, or `None` if a
+            new run series could not be created, the caller-provided run
+            series is invalid, or the run could not be associated with the
+            run series.
         """
 
     @abstractmethod

@@ -17,8 +17,9 @@
 
 import unittest
 
+from flwr.app import Error, Message, Metadata, RecordDict
 from flwr.app.message import make_message
-from flwr.common import Error, Message, Metadata, RecordDict, now
+from flwr.common import now
 from flwr.common.constant import SUPERLINK_NODE_ID
 
 from .utils import generate_rand_int_from_bytes, validate_task_message

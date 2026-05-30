@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 from parameterized import parameterized
 
-from flwr.common import ArrayRecord
+from flwr.app import ArrayRecord
 
 from ..exception import AggregationError
 from .fedadagrad import FedAdagrad

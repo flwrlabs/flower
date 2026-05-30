@@ -20,8 +20,9 @@ from unittest.mock import Mock, patch
 
 from parameterized import parameterized
 
+from flwr.app import Context
 from flwr.app.message import make_message
-from flwr.common import Context, typing
+from flwr.common import typing
 from flwr.common.constant import SubStatus
 from flwr.common.serde import context_to_proto, fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker

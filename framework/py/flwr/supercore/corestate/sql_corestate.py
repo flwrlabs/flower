@@ -20,6 +20,7 @@ import json
 import secrets
 from collections.abc import Sequence
 from datetime import datetime, timedelta
+from logging import ERROR
 from typing import Any, Literal, cast
 
 from sqlalchemy import MetaData
@@ -33,11 +34,13 @@ from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
+    SERIES_ID_NUM_BYTES,
     SUPERLINK_NODE_ID,
     TASK_ID_NUM_BYTES,
     Status,
     SubStatus,
 )
+from flwr.common.logger import log
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.common.typing import Fab
@@ -72,8 +75,7 @@ STATUS_CONDITIONS = {
 }
 
 
-# pylint: disable-next=too-many-public-methods
-class SqlCoreState(CoreState, SqlMixin):
+class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     """SQLAlchemy-based CoreState implementation."""
 
     def __init__(self, database_path: str, object_store: ObjectStore) -> None:
@@ -170,6 +172,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 FROM run_series
                 {where_clause}
                 ORDER BY updated_at DESC
+                {self.select_lock_sql}
                 {limit_clause}
             )
         """
@@ -221,6 +224,82 @@ class SqlCoreState(CoreState, SqlMixin):
                 """,
                 {"series_id": sint_series_id, "context": context_bytes},
             )
+
+    def store_run_in_series(
+        self,
+        run_id: int,
+        federation: str,
+        series_id: int | None,
+    ) -> int | None:
+        """Store a run in a run series and return the series ID."""
+        insert_query = """
+            INSERT INTO run_series
+            (series_id, federation, description, created_at, updated_at)
+            VALUES
+            (:series_id, :federation, :description, :created_at, :updated_at)
+            ON CONFLICT(series_id) DO NOTHING
+            RETURNING series_id
+        """
+
+        try:
+            with self.session():
+                if series_id is None:
+                    # No series was provided, so create one before linking the run.
+                    candidate = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
+                    timestamp = now()
+                    rows = self.query(
+                        insert_query,
+                        {
+                            "series_id": uint64_to_int64(candidate),
+                            "federation": federation,
+                            "description": None,
+                            "created_at": timestamp,
+                            "updated_at": timestamp,
+                        },
+                    )
+                    if rows:
+                        resolved_series_id = candidate
+                    else:
+                        return None
+
+                else:
+                    rows = self.query(
+                        """
+                        UPDATE run_series
+                        SET updated_at = :updated_at
+                        WHERE series_id = :series_id AND federation = :federation
+                        RETURNING series_id
+                        """,
+                        {
+                            "series_id": uint64_to_int64(series_id),
+                            "federation": federation,
+                            "updated_at": now(),
+                        },
+                    )
+                    if not rows:
+                        log(
+                            ERROR,
+                            "Run series %d not found in federation %r",
+                            series_id,
+                            federation,
+                        )
+                        return None
+                    resolved_series_id = series_id
+
+                # Store the membership last so callers only receive linked series IDs.
+                self.query(
+                    """
+                    INSERT INTO series_runs (series_id, run_id)
+                    VALUES (:series_id, :run_id)
+                    """,
+                    {
+                        "series_id": uint64_to_int64(resolved_series_id),
+                        "run_id": uint64_to_int64(run_id),
+                    },
+                )
+                return resolved_series_id
+        except IntegrityError:
+            return None
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""

@@ -23,8 +23,9 @@ from datetime import UTC, datetime
 from logging import ERROR, WARNING
 from typing import Literal, cast
 
+from flwr.app import Context, Message
 from flwr.app.user_config import UserConfig
-from flwr.common import Context, Message, log, now
+from flwr.common import log, now
 from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     MESSAGE_TTL_TOLERANCE,
@@ -264,6 +265,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 log(
                     ERROR,
                     "Message with ID %s does not exist.",
+                    msg_ins_id,
+                )
+                return None
+
+            if msg_ins_id in self.message_ins_id_to_message_res_id:
+                log(
+                    ERROR,
+                    "Failed to store Message reply: duplicate reply for "
+                    "reply_to_message_id %s.",
                     msg_ins_id,
                 )
                 return None
@@ -595,7 +605,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 return None
             return node_id
 
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
+    # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
     def create_run(
         self,
         fab_id: str | None,
@@ -606,6 +616,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         run_type: str,
+        series_id: int | None = None,
     ) -> int:
         """Create a new run."""
         task_type = primary_task_type_from_run_type(run_type)
@@ -619,7 +630,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 TASK_ID_NUM_BYTES,
                 exclude=set(self.task_store),
             )
-            pending_at = now().isoformat()
+            current = now().isoformat()
+            resolved_series_id = self.store_run_in_series(
+                run_id=run_id,
+                federation=federation,
+                series_id=series_id,
+            )
+            if resolved_series_id is None:
+                log(ERROR, "Unexpected run series membership failure.")
+                return 0
             run_record = RunRecord(
                 run=Run(
                     run_id=run_id,
@@ -643,6 +662,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     bytes_recv=0,
                     clientapp_runtime=0.0,
                     run_type=run_type,
+                    series_id=resolved_series_id,
                 ),
                 federation_config=federation_config,
             )
@@ -660,7 +680,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     sub_status="",
                     details="",
                 ),
-                pending_at=pending_at,
+                pending_at=current,
                 fab_hash=fab_hash,
                 model_ref=None,
                 connector_ref=None,

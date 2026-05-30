@@ -25,8 +25,9 @@ from typing import Any, Literal
 from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
 
+from flwr.app import Context, Message
 from flwr.app.user_config import UserConfig
-from flwr.common import Context, Message, log, now
+from flwr.common import log, now
 from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     MESSAGE_TTL_TOLERANCE,
@@ -437,7 +438,12 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             try:
                 self.query(query, msg_dict)
             except IntegrityError:
-                log(ERROR, "`run` is invalid")
+                log(
+                    ERROR,
+                    "Failed to store Message reply: duplicate reply for "
+                    "reply_to_message_id %s or invalid run.",
+                    msg_ins_id,
+                )
                 return None
 
         return message.metadata.message_id
@@ -919,6 +925,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         run_type: str,
+        series_id: int | None = None,
     ) -> int:
         """Create a new run."""
         task_type = primary_task_type_from_run_type(run_type)
@@ -932,10 +939,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             INSERT INTO run
             (run_id, fab_id, fab_version, fab_hash, override_config, federation,
             primary_task_id, federation_config, run_type, usage_reported_at,
-            flwr_aid, bytes_sent, bytes_recv, clientapp_runtime)
+            series_id, flwr_aid, bytes_sent, bytes_recv, clientapp_runtime)
             VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
             :federation, :primary_task_id, :federation_config, :run_type,
-            :usage_reported_at, :flwr_aid,
+            :usage_reported_at, :series_id, :flwr_aid,
             :bytes_sent, :bytes_recv, :clientapp_runtime)
         """
         task_insert_query = """
@@ -951,12 +958,20 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         override_config_json = json.dumps(override_config)
         run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
-        pending_at = now()
 
         with self.session():
             query = "SELECT COUNT(*) as cnt FROM run WHERE run_id = :run_id"
             rows = self.query(query, {"run_id": uint64_to_int64(run_id)})
             if rows[0]["cnt"] == 0:
+                current = now()
+                resolved_series_id = self.store_run_in_series(
+                    run_id=run_id,
+                    federation=federation,
+                    series_id=series_id,
+                )
+                if resolved_series_id is None:
+                    log(ERROR, "Unexpected run series membership failure.")
+                    return 0
                 self.query(
                     run_insert_query,
                     {
@@ -970,6 +985,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         "federation_config": fed_config_json,
                         "run_type": run_type,
                         "usage_reported_at": "",
+                        "series_id": uint64_to_int64(resolved_series_id),
                         "flwr_aid": flwr_aid or "",
                         "bytes_sent": 0,
                         "bytes_recv": 0,
@@ -987,7 +1003,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         "connector_ref": None,
                         "token": None,
                         "active_until": None,
-                        "pending_at": pending_at,
+                        "pending_at": current,
                         "starting_at": None,
                         "running_at": None,
                         "finished_at": None,
@@ -1066,7 +1082,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             SELECT
                 r.run_id, r.fab_id, r.fab_version, r.fab_hash, r.override_config,
                 r.federation, r.primary_task_id, r.federation_config, r.run_type,
-                r.flwr_aid, r.bytes_sent, r.bytes_recv, r.clientapp_runtime,
+                r.series_id, r.flwr_aid, r.bytes_sent, r.bytes_recv,
+                r.clientapp_runtime,
                 t.pending_at AS pending_at,
                 t.starting_at AS starting_at,
                 t.running_at AS running_at,
@@ -1178,39 +1195,31 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """
         sint64_node_id = uint64_to_int64(node_id)
 
-        # Check if the node exists and is not unregistered
-        query = """
-            SELECT status FROM node WHERE node_id = :node_id AND status != :unregistered
-        """
-        rows = self.query(
-            query, {"node_id": sint64_node_id, "unregistered": NodeStatus.UNREGISTERED}
-        )
-        if not rows:
-            return False
-
-        # Construct query and params
         current_dt = now()
-        query = (
-            "UPDATE node SET online_until = :online_until, "
-            "heartbeat_interval = :heartbeat_interval"
-        )
+        query = """
+            UPDATE node
+            SET online_until = :online_until,
+                heartbeat_interval = :heartbeat_interval,
+                last_activated_at = CASE
+                    WHEN status != :online THEN :last_activated_at
+                    ELSE last_activated_at
+                END,
+                status = :online
+            WHERE node_id = :node_id AND status != :unregistered
+            RETURNING node_id
+        """
         params: dict[str, Any] = {
             "online_until": current_dt.timestamp()
             + HEARTBEAT_PATIENCE * heartbeat_interval,
             "heartbeat_interval": heartbeat_interval,
+            "last_activated_at": current_dt.isoformat(),
+            "online": NodeStatus.ONLINE,
+            "node_id": sint64_node_id,
+            "unregistered": NodeStatus.UNREGISTERED,
         }
 
-        # Set timestamp if the status changes
-        if rows[0]["status"] != NodeStatus.ONLINE:
-            query += ", status = :online, last_activated_at = :last_activated_at"
-            params["online"] = NodeStatus.ONLINE
-            params["last_activated_at"] = current_dt.isoformat()
-
-        # Execute the query, refreshing `online_until` and `heartbeat_interval`
-        query += " WHERE node_id = :node_id"
-        params["node_id"] = sint64_node_id
-        self.query(query, params)
-        return True
+        rows = self.query(query, params)
+        return len(rows) > 0
 
     def get_serverapp_context(self, run_id: int) -> Context | None:
         """Get the context for the specified `run_id`."""
@@ -1363,4 +1372,5 @@ def _run_from_row(row: dict[str, Any]) -> Run:
         bytes_recv=row["bytes_recv"],
         clientapp_runtime=row["clientapp_runtime"],
         run_type=row["run_type"],
+        series_id=int64_to_uint64(row["series_id"]) if row["series_id"] else 0,
     )
