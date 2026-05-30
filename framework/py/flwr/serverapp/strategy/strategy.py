@@ -21,9 +21,10 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from logging import INFO
 
-from flwr.common import ArrayRecord, ConfigRecord, Message, MetricRecord, log
-from flwr.server import Grid
+from flwr.app import ArrayRecord, ConfigRecord, Message, MetricRecord
+from flwr.common import log
 
+from ..grid import Grid
 from .result import Result
 from .strategy_utils import log_strategy_start_info
 

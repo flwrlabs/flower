@@ -25,8 +25,9 @@ from typing import Any, Literal
 from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
 
+from flwr.app import Context, Message
 from flwr.app.user_config import UserConfig
-from flwr.common import Context, Message, log, now
+from flwr.common import log, now
 from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     MESSAGE_TTL_TOLERANCE,
@@ -435,7 +436,12 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             try:
                 self.query(query, msg_dict)
             except IntegrityError:
-                log(ERROR, "`run` is invalid")
+                log(
+                    ERROR,
+                    "Failed to store Message reply: duplicate reply for "
+                    "reply_to_message_id %s or invalid run.",
+                    msg_ins_id,
+                )
                 return None
 
         return message.metadata.message_id
@@ -1176,39 +1182,31 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         """
         sint64_node_id = uint64_to_int64(node_id)
 
-        # Check if the node exists and is not unregistered
-        query = """
-            SELECT status FROM node WHERE node_id = :node_id AND status != :unregistered
-        """
-        rows = self.query(
-            query, {"node_id": sint64_node_id, "unregistered": NodeStatus.UNREGISTERED}
-        )
-        if not rows:
-            return False
-
-        # Construct query and params
         current_dt = now()
-        query = (
-            "UPDATE node SET online_until = :online_until, "
-            "heartbeat_interval = :heartbeat_interval"
-        )
+        query = """
+            UPDATE node
+            SET online_until = :online_until,
+                heartbeat_interval = :heartbeat_interval,
+                last_activated_at = CASE
+                    WHEN status != :online THEN :last_activated_at
+                    ELSE last_activated_at
+                END,
+                status = :online
+            WHERE node_id = :node_id AND status != :unregistered
+            RETURNING node_id
+        """
         params: dict[str, Any] = {
             "online_until": current_dt.timestamp()
             + HEARTBEAT_PATIENCE * heartbeat_interval,
             "heartbeat_interval": heartbeat_interval,
+            "last_activated_at": current_dt.isoformat(),
+            "online": NodeStatus.ONLINE,
+            "node_id": sint64_node_id,
+            "unregistered": NodeStatus.UNREGISTERED,
         }
 
-        # Set timestamp if the status changes
-        if rows[0]["status"] != NodeStatus.ONLINE:
-            query += ", status = :online, last_activated_at = :last_activated_at"
-            params["online"] = NodeStatus.ONLINE
-            params["last_activated_at"] = current_dt.isoformat()
-
-        # Execute the query, refreshing `online_until` and `heartbeat_interval`
-        query += " WHERE node_id = :node_id"
-        params["node_id"] = sint64_node_id
-        self.query(query, params)
-        return True
+        rows = self.query(query, params)
+        return len(rows) > 0
 
     def get_serverapp_context(self, run_id: int) -> Context | None:
         """Get the context for the specified `run_id`."""

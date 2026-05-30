@@ -21,7 +21,7 @@ from unittest.mock import patch
 
 import grpc
 
-from flwr.common import ConfigRecord, Message, RecordDict
+from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.common import recorddict_compat as compat
 from flwr.common.constant import MessageTypeLegacy
 from flwr.common.retry_invoker import RetryInvoker, exponential

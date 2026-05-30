@@ -164,7 +164,17 @@ class SqlObjectStore(ObjectStore, SqlMixin):
             validate_object_content(content=object_content)
 
         with self.session():
-            # Only allow adding the object if it has been preregistered
+            # UPDATE is the authoritative preregistration check: if cleanup
+            # deleted the row concurrently, no row is updated and put must fail.
+            rows = self.query(
+                "UPDATE objects SET content = :content, is_available = 1 "
+                "WHERE object_id = :object_id AND is_available = 0 "
+                "RETURNING object_id",
+                {"content": object_content, "object_id": object_id},
+            )
+            if rows:
+                return
+
             rows = self.query(
                 "SELECT is_available FROM objects WHERE object_id = :object_id",
                 {"object_id": object_id},
@@ -174,16 +184,7 @@ class SqlObjectStore(ObjectStore, SqlMixin):
                     f"Object with ID '{object_id}' was not pre-registered."
                 )
 
-            # Return if object is already present in the store
-            if rows[0]["is_available"]:
-                return
-
-            # Update the object entry in the store
-            self.query(
-                "UPDATE objects SET content = :content, is_available = 1 "
-                "WHERE object_id = :object_id",
-                {"content": object_content, "object_id": object_id},
-            )
+            return
 
     def get(self, object_id: str) -> bytes | None:
         """Get an object from the store."""

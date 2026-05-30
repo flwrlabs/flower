@@ -19,7 +19,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from threading import Lock, RLock
 
-from flwr.common import Context, Error, Message, now
+from flwr.app import Context, Error, Message
+from flwr.common import now
 from flwr.common.constant import ErrorCode
 from flwr.common.typing import Run
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611

@@ -12,28 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Record APIs."""
+"""Flower ServerApp Grid APIs."""
 
 
-from flwr.app.message import Array, ArrayRecord, ConfigRecord, MetricRecord, RecordDict
-from flwr.compat.common.record import (
-    ConfigsRecord,
-    MetricsRecord,
-    ParametersRecord,
-    RecordSet,
-)
-
-from .conversion_utils import array_from_numpy
+from .grid import Grid
 
 __all__ = [
-    "Array",
-    "ArrayRecord",
-    "ConfigRecord",
-    "ConfigsRecord",
-    "MetricRecord",
-    "MetricsRecord",
-    "ParametersRecord",
-    "RecordDict",
-    "RecordSet",
-    "array_from_numpy",
+    "Grid",
 ]

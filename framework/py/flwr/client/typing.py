@@ -17,7 +17,7 @@
 
 from collections.abc import Callable
 
-from flwr.common import Context, Message
+from flwr.app import Context, Message
 
 from .client import Client as Client
 

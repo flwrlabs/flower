@@ -25,9 +25,9 @@ from unittest.mock import Mock, patch
 import grpc
 from parameterized import parameterized
 
+from flwr.app import RecordDict
 from flwr.app.error import Error
 from flwr.app.message import Message
-from flwr.common import RecordDict
 from flwr.common.constant import SUPERLINK_NODE_ID, ErrorCode
 from flwr.common.serde import message_to_proto
 from flwr.common.typing import Run
@@ -263,9 +263,9 @@ class TestGrpcGrid(unittest.TestCase):
         with self.assertRaises(TypeError):
             self.grid.set_run(61016)  # type: ignore[arg-type]
 
-    @patch("flwr.server.grid.grpc_grid.wrap_stub")
-    @patch("flwr.server.grid.grpc_grid.ServerAppIoStub")
-    @patch("flwr.server.grid.grpc_grid.create_channel")
+    @patch("flwr.superlink.grid.grpc_grid.wrap_stub")
+    @patch("flwr.superlink.grid.grpc_grid.ServerAppIoStub")
+    @patch("flwr.superlink.grid.grpc_grid.create_channel")
     def test_connect_adds_client_interceptors(
         self,
         mock_create_channel: Mock,

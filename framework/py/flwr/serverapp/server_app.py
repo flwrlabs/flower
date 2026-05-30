@@ -19,16 +19,16 @@ import inspect
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
-from flwr.common import Context
+from flwr.app import Context
 from flwr.common.logger import warn_deprecated_feature_with_example
+from flwr.server.client_manager import ClientManager
+from flwr.server.compat import start_grid
+from flwr.server.server import Server
+from flwr.server.server_config import ServerConfig
 from flwr.server.strategy import Strategy
+from flwr.server.typing import ServerAppCallable, ServerFn
 
-from .client_manager import ClientManager
-from .compat import start_grid
-from .grid import Driver, Grid
-from .server import Server
-from .server_config import ServerConfig
-from .typing import ServerAppCallable, ServerFn
+from .grid import Grid
 
 SERVER_FN_USAGE_EXAMPLE = """
 
@@ -196,6 +196,10 @@ class ServerApp:  # pylint: disable=too-many-instance-attributes
             sig = inspect.signature(main_fn)
             param = list(sig.parameters.values())[0]
             # Check if parameter name or the annotation should be updated
+            # pylint: disable=import-outside-toplevel
+            from flwr.compat.server.grid import Driver
+
+            # pylint: enable=import-outside-toplevel
             if param.name == "driver" or param.annotation is Driver:
                 warn_deprecated_feature_with_example(
                     deprecation_message=DRIVER_DEPRECATION_MSG,

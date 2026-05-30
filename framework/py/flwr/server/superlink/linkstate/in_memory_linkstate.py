@@ -23,8 +23,9 @@ from datetime import UTC, datetime
 from logging import ERROR, WARNING
 from typing import Literal, cast
 
+from flwr.app import Context, Message
 from flwr.app.user_config import UserConfig
-from flwr.common import Context, Message, log, now
+from flwr.common import log, now
 from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     MESSAGE_TTL_TOLERANCE,
@@ -264,6 +265,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 log(
                     ERROR,
                     "Message with ID %s does not exist.",
+                    msg_ins_id,
+                )
+                return None
+
+            if msg_ins_id in self.message_ins_id_to_message_res_id:
+                log(
+                    ERROR,
+                    "Failed to store Message reply: duplicate reply for "
+                    "reply_to_message_id %s.",
                     msg_ins_id,
                 )
                 return None
