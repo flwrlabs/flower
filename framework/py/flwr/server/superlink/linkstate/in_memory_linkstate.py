@@ -268,6 +268,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 )
                 return None
 
+            if msg_ins_id in self.message_ins_id_to_message_res_id:
+                log(
+                    ERROR,
+                    "Failed to store Message reply: duplicate reply for "
+                    "reply_to_message_id %s.",
+                    msg_ins_id,
+                )
+                return None
+
             # Fail if the Message TTL exceeds the
             # expiration time of the Message it replies to.
             # Condition: ins_metadata.created_at + ins_metadata.ttl ≥
