@@ -290,11 +290,10 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             try:
                 self.query(
                     """
-                    INSERT INTO series_runs (id, series_id, run_id)
-                    VALUES (:id, :series_id, :run_id)
+                    INSERT INTO series_runs (series_id, run_id)
+                    VALUES (:series_id, :run_id)
                     """,
                     {
-                        "id": uint64_to_int64(run_id),
                         "series_id": uint64_to_int64(resolved_series_id),
                         "run_id": uint64_to_int64(run_id),
                     },

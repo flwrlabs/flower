@@ -60,7 +60,7 @@ def upgrade() -> None:
         "series_runs",
         sa.Column(
             "id",
-            sa.BigInteger(),
+            sa.Integer(),
             autoincrement=True,
             nullable=False,
         ),
