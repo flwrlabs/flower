@@ -58,7 +58,7 @@ class TokenRecord:
     active_until: datetime
 
 
-class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attributes
+class InMemoryCoreState(CoreState):  # pylint: disable=R0904,too-many-instance-attributes
     """In-memory CoreState implementation."""
 
     def __init__(self, object_store: ObjectStore) -> None:

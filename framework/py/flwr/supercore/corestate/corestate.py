@@ -27,7 +27,7 @@ from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 from ..object_store import ObjectStore
 
 
-class CoreState(ABC):
+class CoreState(ABC):  # pylint: disable=R0904
     """Abstract base class for core state."""
 
     @property
