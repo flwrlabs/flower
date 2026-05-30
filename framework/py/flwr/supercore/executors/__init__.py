@@ -15,8 +15,8 @@
 """Flower Executors components."""
 
 
-from .run_agentapp import run_agentapp
 from .model.run import run_model
+from .run_agentapp import run_agentapp
 
 __all__ = [
     "run_agentapp",

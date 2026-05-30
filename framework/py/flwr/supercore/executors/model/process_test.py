@@ -24,9 +24,7 @@ from unittest.mock import patch
 import pytest
 
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    PullTaskMessageResponse,
-)
+from flwr.proto.appio_pb2 import PullTaskMessageResponse  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.supercore.model_message import ModelRequest, ModelResponse
 from flwr.supercore.typing import JSONObject
