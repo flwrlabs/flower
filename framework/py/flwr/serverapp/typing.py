@@ -12,17 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower Built-in Mods."""
+"""Custom types for Flower ServerApps."""
 
 
-from .centraldp_mods import adaptiveclipping_mod, fixedclipping_mod
-from .comms_mods import arrays_size_mod, message_size_mod
-from .localdp_mod import LocalDpMod
+from collections.abc import Callable
 
-__all__ = [
-    "LocalDpMod",
-    "adaptiveclipping_mod",
-    "arrays_size_mod",
-    "fixedclipping_mod",
-    "message_size_mod",
-]
+from flwr.app import Context
+
+from .grid import Grid
+
+ServerAppCallable = Callable[[Grid, Context], None]

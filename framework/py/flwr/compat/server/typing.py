@@ -12,18 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Custom types for Flower clients."""
+"""Legacy server type definitions."""
 
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 
-from flwr.app import Context, Message
+from flwr.app import Context
+from flwr.serverapp.grid import Grid
 
-from .client import Client as Client
+if TYPE_CHECKING:
+    from flwr.server.serverapp_components import ServerAppComponents
 
-# Compatibility
-ClientFn = Callable[[str], Client]
-ClientFnExt = Callable[[Context], Client]
-
-ClientAppCallable = Callable[[Message, Context], Message]
-Mod = Callable[[Message, Context, ClientAppCallable], Message]
+ServerFn = Callable[[Context], "ServerAppComponents"]
+Workflow = Callable[[Grid, Context], None]

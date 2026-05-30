@@ -27,7 +27,6 @@ from typing import Any
 import ray
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
-from flwr.client import ClientFnExt
 from flwr.common import EventType, event
 from flwr.common.constant import NODE_ID_NUM_BYTES, SUPERLINK_NODE_ID
 from flwr.common.logger import (
@@ -36,6 +35,7 @@ from flwr.common.logger import (
     warn_deprecated_feature,
     warn_unsupported_feature,
 )
+from flwr.compat.client.typing import ClientFnExt
 from flwr.server.client_manager import ClientManager
 from flwr.server.history import History
 from flwr.server.server import Server, init_defaults, run_fl

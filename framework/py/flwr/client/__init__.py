@@ -15,14 +15,24 @@
 """Flower client."""
 
 
-from flwr.clientapp.client_app import ClientApp
+import importlib
+from typing import TYPE_CHECKING, Any
 
-from ..compat.client.app import start_client as start_client  # Deprecated
-from ..compat.client.app import start_numpy_client as start_numpy_client  # Deprecated
-from .client import Client as Client
-from .numpy_client import NumPyClient as NumPyClient
-from .typing import ClientFn as ClientFn
-from .typing import ClientFnExt as ClientFnExt
+from flwr.compat.client.typing import ClientFn, ClientFnExt
+
+from .client import Client
+from .numpy_client import NumPyClient
+
+if TYPE_CHECKING:
+    from flwr.clientapp.client_app import ClientApp
+
+    from flwr.compat.client.app import start_client, start_numpy_client
+
+_LAZY_EXPORTS = {
+    "ClientApp": ("flwr.clientapp.client_app", "ClientApp"),
+    "start_client": ("flwr.compat.client.app", "start_client"),
+    "start_numpy_client": ("flwr.compat.client.app", "start_numpy_client"),
+}
 
 __all__ = [
     "Client",
@@ -34,3 +44,11 @@ __all__ = [
     "start_client",
     "start_numpy_client",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Get compatibility re-exports lazily."""
+    if name in _LAZY_EXPORTS:
+        module_name, attr = _LAZY_EXPORTS[name]
+        return getattr(importlib.import_module(module_name), attr)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
