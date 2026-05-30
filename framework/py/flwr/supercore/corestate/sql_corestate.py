@@ -141,11 +141,13 @@ class SqlCoreState(CoreState, SqlMixin):
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
         """Return RunSeries metadata, optionally filtered by federation."""
+        # Validate limit before building the SQL query.
         if limit is not None and limit < 0:
             raise AssertionError("`limit` must be >= 0")
         if limit == 0:
             return []
 
+        # Build optional filters for the run-series page.
         conditions: list[str] = []
         params: dict[str, Any] = {}
         if federation is not None:
@@ -156,28 +158,32 @@ class SqlCoreState(CoreState, SqlMixin):
             params["updated_before"] = datetime.fromisoformat(updated_before)
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-        selected_run_series_query = f"""
-            SELECT series_id, federation, description, created_at, updated_at
-            FROM run_series
-            {where_clause}
-            ORDER BY updated_at DESC
-        """
+        limit_clause = ""
         if limit is not None:
-            selected_run_series_query += " LIMIT :limit"
+            limit_clause = "LIMIT :limit"
             params["limit"] = limit
 
-        query = f"""
-            WITH selected_run_series AS (
-                {selected_run_series_query}
+        # Select the requested page before joining run IDs so limit applies to series.
+        run_series_cte = f"""
+            run_series_cte AS (
+                SELECT series_id, federation, description, created_at, updated_at
+                FROM run_series
+                {where_clause}
+                ORDER BY updated_at DESC
+                {limit_clause}
             )
+        """
+        query = f"""
+            WITH {run_series_cte}
             SELECT
-                selected_run_series.*,
+                run_series_cte.*,
                 series_runs.run_id
-            FROM selected_run_series
+            FROM run_series_cte
             LEFT JOIN series_runs
-                ON series_runs.series_id = selected_run_series.series_id
+                ON series_runs.series_id = run_series_cte.series_id
         """
         rows = self.query(query, params)
+        # Fold the joined rows back into one RunSeries per series.
         series_by_id: dict[int, RunSeries] = {}
         for row in rows:
             series_id = row["series_id"]
