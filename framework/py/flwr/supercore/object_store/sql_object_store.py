@@ -164,9 +164,8 @@ class SqlObjectStore(ObjectStore, SqlMixin):
             validate_object_content(content=object_content)
 
         with self.session():
-            # The write is the authoritative preregistration check: if cleanup
-            # deleted the row concurrently, the UPDATE returns no rows and put
-            # must not report success.
+            # UPDATE is the authoritative preregistration check: if cleanup
+            # deleted the row concurrently, no row is updated and put must fail.
             rows = self.query(
                 "UPDATE objects SET content = :content, is_available = 1 "
                 "WHERE object_id = :object_id AND is_available = 0 "
