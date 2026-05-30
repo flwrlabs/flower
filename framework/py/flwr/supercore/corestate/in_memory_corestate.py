@@ -58,7 +58,9 @@ class TokenRecord:
     active_until: datetime
 
 
-class InMemoryCoreState(CoreState):  # pylint: disable=R0904,too-many-instance-attributes
+class InMemoryCoreState(
+    CoreState
+):  # pylint: disable=R0904,too-many-instance-attributes
     """In-memory CoreState implementation."""
 
     def __init__(self, object_store: ObjectStore) -> None:
@@ -203,6 +205,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=R0904,too-many-instance-a
             if run_id in run_series.run_ids:
                 return None
             run_series.run_ids.append(run_id)
+            if series_id is not None:
+                run_series.updated_at = now().isoformat()
             return resolved_series_id
 
     def add_task_log(self, task_id: int, log_message: str) -> None:

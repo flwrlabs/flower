@@ -241,53 +241,52 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             RETURNING series_id
         """
 
-        with self.session():
-            if series_id is None:
-                # No series was provided, so create a new one before linking the run.
-                candidate = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
-                timestamp = now()
-                rows = self.query(
-                    insert_query,
-                    {
-                        "series_id": uint64_to_int64(candidate),
-                        "federation": federation,
-                        "description": None,
-                        "created_at": timestamp,
-                        "updated_at": timestamp,
-                    },
-                )
-                if rows:
-                    resolved_series_id = candidate
-                else:
-                    return None
-
-            else:
-                # Reuse only an existing run series owned by the requested federation.
-                rows = self.query(
-                    """
-                    SELECT federation
-                    FROM run_series
-                    WHERE series_id = :series_id
-                    """,
-                    {"series_id": uint64_to_int64(series_id)},
-                )
-                if not rows:
-                    log(ERROR, "Run series %d not found", series_id)
-                    return None
-                existing = rows[0]
-                if existing["federation"] != federation:
-                    log(
-                        ERROR,
-                        "Run series %d belongs to federation %r, not %r",
-                        series_id,
-                        existing["federation"],
-                        federation,
+        try:
+            with self.session():
+                if series_id is None:
+                    # No series was provided, so create one before linking the run.
+                    candidate = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
+                    timestamp = now()
+                    rows = self.query(
+                        insert_query,
+                        {
+                            "series_id": uint64_to_int64(candidate),
+                            "federation": federation,
+                            "description": None,
+                            "created_at": timestamp,
+                            "updated_at": timestamp,
+                        },
                     )
-                    return None
-                resolved_series_id = series_id
+                    if rows:
+                        resolved_series_id = candidate
+                    else:
+                        return None
 
-            # Store the membership last so callers only receive linked series IDs.
-            try:
+                else:
+                    rows = self.query(
+                        """
+                        UPDATE run_series
+                        SET updated_at = :updated_at
+                        WHERE series_id = :series_id AND federation = :federation
+                        RETURNING series_id
+                        """,
+                        {
+                            "series_id": uint64_to_int64(series_id),
+                            "federation": federation,
+                            "updated_at": now(),
+                        },
+                    )
+                    if not rows:
+                        log(
+                            ERROR,
+                            "Run series %d not found in federation %r",
+                            series_id,
+                            federation,
+                        )
+                        return None
+                    resolved_series_id = series_id
+
+                # Store the membership last so callers only receive linked series IDs.
                 self.query(
                     """
                     INSERT INTO series_runs (series_id, run_id)
@@ -299,8 +298,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
                     },
                 )
                 return resolved_series_id
-            except IntegrityError:
-                return None
+        except IntegrityError:
+            return None
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""
