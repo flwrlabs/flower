@@ -18,8 +18,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from flwr.app import Context, RecordDict
 from flwr.app.user_config import UserConfig
-from flwr.common import Context, RecordDict
 from flwr.common.config import (
     get_fused_config,
     get_fused_config_from_dir,

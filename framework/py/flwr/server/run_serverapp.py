@@ -17,7 +17,7 @@
 
 from logging import DEBUG
 
-from flwr.common import Context
+from flwr.app import Context
 from flwr.common.logger import log
 from flwr.common.object_ref import load_app
 from flwr.serverapp.grid import Grid

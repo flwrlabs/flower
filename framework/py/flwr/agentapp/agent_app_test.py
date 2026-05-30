@@ -20,7 +20,7 @@ from __future__ import annotations
 from unittest.mock import Mock
 
 from flwr.agentapp import AgentApp, AgentSession
-from flwr.common import Context, RecordDict
+from flwr.app import Context, RecordDict
 
 
 def _context() -> Context:
