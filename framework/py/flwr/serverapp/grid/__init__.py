@@ -12,15 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Public Flower ServerApp APIs."""
+"""Flower ServerApp Grid APIs."""
 
 
-from . import strategy
 from .grid import Grid
-from .server_app import ServerApp as ServerApp
 
 __all__ = [
     "Grid",
-    "ServerApp",
-    "strategy",
 ]

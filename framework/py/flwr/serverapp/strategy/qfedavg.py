@@ -33,9 +33,9 @@ from flwr.common import (
     RecordDict,
 )
 from flwr.common.logger import log
-from flwr.server import Grid
 
 from ..exception import AggregationError
+from ..grid import Grid
 from .fedavg import FedAvg
 
 

@@ -34,11 +34,11 @@ from flwr.common import (
     log,
 )
 from flwr.common.constant import MessageTypeLegacy
+from flwr.serverapp.grid import Grid
 
 from ..client_proxy import ClientProxy
 from ..compat.app_utils import start_update_client_manager_thread
 from ..compat.legacy_context import LegacyContext
-from ..grid import Grid
 from ..typing import Workflow
 from .constant import MAIN_CONFIGS_RECORD, MAIN_PARAMS_RECORD, Key
 
