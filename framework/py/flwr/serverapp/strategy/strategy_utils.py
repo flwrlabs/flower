@@ -32,9 +32,9 @@ from flwr.common import (
     RecordDict,
     log,
 )
-from flwr.server import Grid
 
 from ..exception import InconsistentMessageReplies
+from ..grid import Grid
 
 
 def config_to_str(config: ConfigRecord) -> str:

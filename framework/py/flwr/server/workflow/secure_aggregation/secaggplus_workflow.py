@@ -53,7 +53,7 @@ from flwr.common.secure_aggregation.secaggplus_constants import (
 from flwr.common.secure_aggregation.secaggplus_utils import pseudo_rand_gen
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.compat.legacy_context import LegacyContext
-from flwr.server.grid import Grid
+from flwr.serverapp.grid import Grid
 from flwr.supercore.primitives.asymmetric import (
     bytes_to_private_key,
     bytes_to_public_key,

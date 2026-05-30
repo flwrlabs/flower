@@ -2258,6 +2258,45 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             # Assert
             assert sum(len(res) for res in results if res is not None) == 1
 
+    def test_acknowledge_node_heartbeat_does_not_revive_deleted_node(self) -> None:
+        """Ensure a heartbeat cannot move an unregistered node back online."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Prepare
+            db_path = self._shared_sql_database(tmpdir)
+            states = self._create_shared_sql_states(db_path)
+            heartbeat_state = states[0]
+            delete_state = states[1]
+            node_id = create_dummy_node(heartbeat_state, activate=False)
+            original_query = heartbeat_state.query
+            did_delete = False
+
+            def delete_before_heartbeat_update(
+                query: str, data: Any = None
+            ) -> list[dict[str, Any]]:
+                nonlocal did_delete
+                normalized_query = " ".join(query.split())
+                if not did_delete and normalized_query.startswith(
+                    "UPDATE node SET online_until"
+                ):
+                    did_delete = True
+                    delete_state.delete_node("mock_flwr_aid", node_id)
+                return original_query(query, data)
+
+            heartbeat_state.query = (  # type: ignore[method-assign]
+                delete_before_heartbeat_update
+            )
+
+            # Execute
+            acknowledged = heartbeat_state.acknowledge_node_heartbeat(
+                node_id, heartbeat_interval=30
+            )
+
+            # Assert
+            assert did_delete
+            assert not acknowledged
+            node = heartbeat_state.get_node_info(node_ids=[node_id])[0]
+            assert node.status == NodeStatus.UNREGISTERED
+
     # pylint: disable-next=too-many-locals
     def test_get_message_ins_distributes_available_work_under_contention(self) -> None:
         """Ensure two replicas can each claim work when two Messages are available."""

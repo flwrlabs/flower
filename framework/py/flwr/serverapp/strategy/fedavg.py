@@ -27,8 +27,8 @@ from flwr.common import (
     RecordDict,
     log,
 )
-from flwr.server import Grid
 
+from ..grid import Grid
 from .strategy import Strategy
 from .strategy_utils import (
     aggregate_arrayrecords,
