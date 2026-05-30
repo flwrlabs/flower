@@ -26,8 +26,9 @@ from typing import Any, cast
 import grpc
 import requests
 
+from flwr.app import Context, RecordDict
 from flwr.cli.utils import validate_federation_name
-from flwr.common import Context, RecordDict, now
+from flwr.common import now
 from flwr.common.config import (
     flatten_dict,
     fuse_dicts,
