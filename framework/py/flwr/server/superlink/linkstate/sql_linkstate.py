@@ -435,7 +435,12 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             try:
                 self.query(query, msg_dict)
             except IntegrityError:
-                log(ERROR, "`run` is invalid")
+                log(
+                    ERROR,
+                    "Failed to store Message reply: duplicate reply for "
+                    "reply_to_message_id %s or invalid run.",
+                    msg_ins_id,
+                )
                 return None
 
         return message.metadata.message_id
