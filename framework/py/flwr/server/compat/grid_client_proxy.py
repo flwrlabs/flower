@@ -20,8 +20,7 @@ from flwr.app.message_type import MessageType
 from flwr.common import Message, MessageTypeLegacy, RecordDict
 from flwr.common import recorddict_compat as compat
 from flwr.server.client_proxy import ClientProxy
-
-from ..grid.grid import Grid
+from flwr.serverapp.grid import Grid
 
 
 class GridClientProxy(ClientProxy):
