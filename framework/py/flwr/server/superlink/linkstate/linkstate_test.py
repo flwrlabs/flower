@@ -1614,6 +1614,40 @@ class StateTest(CoreStateTest):
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 1
 
+    def test_store_message_res_rejects_duplicate_reply(self) -> None:
+        """Test store_message_res rejects a second reply for one Message."""
+        # Prepare
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
+        )
+        ins_msg_id = state.store_message_ins(msg)
+        assert ins_msg_id
+
+        ins_msg = state.get_message_ins(node_id=node_id, limit=1)[0]
+        first_res_msg = Message(RecordDict(), reply_to=ins_msg)
+        first_res_msg.metadata._message_id = str(uuid4())  # type: ignore
+        second_res_msg = Message(RecordDict(), reply_to=ins_msg)
+        second_res_msg.metadata._message_id = str(uuid4())  # type: ignore
+
+        # Execute
+        first_res_msg_id = state.store_message_res(first_res_msg)
+        second_res_msg_id = state.store_message_res(second_res_msg)
+
+        # Assert
+        assert first_res_msg_id == first_res_msg.metadata.message_id
+        assert second_res_msg_id is None
+        assert state.num_message_res() == 1
+
+        reply_msg = state.get_message_res({ins_msg_id})
+        assert len(reply_msg) == 1
+        assert reply_msg[0].metadata.message_id == first_res_msg_id
+
     def test_store_message_res_fail_if_dst_src_node_id_mismatch(self) -> None:
         """Test store_message_res to fail if there is a mismatch between the dst_node_id
         of orginal Message and the src_node_id of the reply Message."""

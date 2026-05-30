@@ -148,6 +148,11 @@ def create_linkstate_metadata() -> MetaData:
         Column("message_type", String),
         Column("content", LargeBinary, nullable=True),
         Column("error", LargeBinary, nullable=True),
+        Index(
+            "idx_message_res_reply_to_message_id_unique",
+            "reply_to_message_id",
+            unique=True,
+        ),
     )
 
     return metadata
