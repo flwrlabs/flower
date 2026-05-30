@@ -73,6 +73,48 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         mock_datetime.now.side_effect = timestamps
         return stack
 
+    def test_store_run_in_series_creates_id(self) -> None:
+        """Storing a run in a run series should create a nonzero ID."""
+        state = self.state_factory()
+
+        series_id = state.store_run_in_series(
+            run_id=123, federation="federation-a", series_id=None
+        )
+
+        self.assertIsNotNone(series_id)
+        assert series_id is not None
+        self.assertGreater(series_id, 0)
+
+    def test_store_run_in_series_returns_none_for_unknown_id(self) -> None:
+        """Unknown caller-provided run series IDs return None."""
+        state = self.state_factory()
+
+        with self.assertLogs("flwr", level="ERROR") as logs:
+            series_id = state.store_run_in_series(
+                run_id=123,
+                federation="federation-a",
+                series_id=123,
+            )
+
+        self.assertIsNone(series_id)
+        self.assertIn("Run series 123 not found", logs.output[0])
+
+    def test_store_run_in_series_returns_none_for_duplicate_run_id(self) -> None:
+        """Storing the same run ID twice should return None."""
+        state = self.state_factory()
+        series_id = state.store_run_in_series(
+            run_id=123, federation="federation-a", series_id=None
+        )
+        assert series_id is not None
+
+        stored = state.store_run_in_series(
+            run_id=123,
+            federation="federation-a",
+            series_id=series_id,
+        )
+
+        self.assertIsNone(stored)
+
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
         state = self.state_factory()

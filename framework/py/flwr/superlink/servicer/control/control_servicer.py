@@ -250,6 +250,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 resolved_federation_config,
                 flwr_aid,
                 run_type,
+                request.series_id if request.HasField("series_id") else None,
             )
 
             if run_id == 0:
@@ -266,6 +267,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     "tmp_dir": self.artifact_provider.tmp_dir,
                 }
 
+            runs = state.get_run_info(run_ids=[run_id])
+            series_id = runs[0].series_id
+
             # Create an empty context for the Run
             context = Context(
                 run_id=run_id,
@@ -274,6 +278,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 node_config=node_config,  # type: ignore[arg-type]
                 state=RecordDict(),
                 run_config={},
+                series_id=series_id,
             )
 
             # Register the context at the LinkState
@@ -284,7 +289,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
 
         log(INFO, "Created %s run %s", run_type, str(run_id))
-        return StartRunResponse(run_id=run_id, note=note)
+        return StartRunResponse(run_id=run_id, note=note, series_id=series_id)
 
     def StreamLogs(  # pylint: disable=C0103
         self, request: StreamLogsRequest, context: grpc.ServicerContext

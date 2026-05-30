@@ -67,7 +67,6 @@ from flwr.supercore.inflatable.inflatable_object import (
     UnexpectedObjectContentError,
     get_all_nested_objects,
     get_object_tree,
-    iterate_object_tree,
     no_object_id_recompute,
 )
 from flwr.supercore.interceptors import get_authenticated_task
@@ -145,7 +144,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 detail="`Message.metadata` has mismatched `run_id`",
             )
             # Store objects
-            objects_to_push |= set(store.preregister(run_id, object_tree))
+            message_objects_to_push = set(store.preregister(run_id, object_tree))
             # Store message
             message_id: str | None = state.store_message_ins(message=message)
             # This is temporary. We should consider a more robust cleanup
@@ -156,8 +155,8 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 and state.get_run_status({run_id})[run_id].status == Status.FINISHED
             ):
                 store.delete(object_tree.object_id)
-                for tree_node in iterate_object_tree(object_tree):
-                    objects_to_push.discard(tree_node.object_id)
+            else:
+                objects_to_push |= message_objects_to_push
             message_ids.append(message_id)
 
         return PushAppMessagesResponse(

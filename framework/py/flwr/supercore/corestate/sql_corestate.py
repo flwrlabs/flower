@@ -20,6 +20,7 @@ import json
 import secrets
 from collections.abc import Sequence
 from datetime import timedelta
+from logging import ERROR
 from typing import Any, Literal, cast
 
 from sqlalchemy import MetaData
@@ -33,11 +34,13 @@ from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
+    SERIES_ID_NUM_BYTES,
     SUPERLINK_NODE_ID,
     TASK_ID_NUM_BYTES,
     Status,
     SubStatus,
 )
+from flwr.common.logger import log
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
 from flwr.common.typing import Fab
@@ -69,7 +72,7 @@ STATUS_CONDITIONS = {
 }
 
 
-class SqlCoreState(CoreState, SqlMixin):
+class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
     """SQLAlchemy-based CoreState implementation."""
 
     def __init__(self, database_path: str, object_store: ObjectStore) -> None:
@@ -128,6 +131,84 @@ class SqlCoreState(CoreState, SqlMixin):
             content=row["content"],
             verifications=json.loads(row["verifications"]),
         )
+
+    def store_run_in_series(
+        self,
+        run_id: int,
+        federation: str,
+        series_id: int | None,
+    ) -> int | None:
+        """Store a run in a run series and return the series ID."""
+        insert_query = """
+            INSERT INTO run_series
+            (series_id, federation, description, created_at, updated_at)
+            VALUES
+            (:series_id, :federation, :description, :created_at, :updated_at)
+            ON CONFLICT(series_id) DO NOTHING
+            RETURNING series_id
+        """
+
+        with self.session():
+            if series_id is None:
+                # No series was provided, so create a new one before linking the run.
+                candidate = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
+                timestamp = now()
+                rows = self.query(
+                    insert_query,
+                    {
+                        "series_id": uint64_to_int64(candidate),
+                        "federation": federation,
+                        "description": None,
+                        "created_at": timestamp,
+                        "updated_at": timestamp,
+                    },
+                )
+                if rows:
+                    resolved_series_id = candidate
+                else:
+                    return None
+
+            else:
+                # Reuse only an existing run series owned by the requested federation.
+                rows = self.query(
+                    """
+                    SELECT federation
+                    FROM run_series
+                    WHERE series_id = :series_id
+                    """,
+                    {"series_id": uint64_to_int64(series_id)},
+                )
+                if not rows:
+                    log(ERROR, "Run series %d not found", series_id)
+                    return None
+                existing = rows[0]
+                if existing["federation"] != federation:
+                    log(
+                        ERROR,
+                        "Run series %d belongs to federation %r, not %r",
+                        series_id,
+                        existing["federation"],
+                        federation,
+                    )
+                    return None
+                resolved_series_id = series_id
+
+            # Store the membership last so callers only receive linked series IDs.
+            try:
+                self.query(
+                    """
+                    INSERT INTO series_runs (id, series_id, run_id)
+                    VALUES (:id, :series_id, :run_id)
+                    """,
+                    {
+                        "id": uint64_to_int64(run_id),
+                        "series_id": uint64_to_int64(resolved_series_id),
+                        "run_id": uint64_to_int64(run_id),
+                    },
+                )
+                return resolved_series_id
+            except IntegrityError:
+                return None
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""
