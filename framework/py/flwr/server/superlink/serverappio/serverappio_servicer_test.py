@@ -473,6 +473,58 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert isinstance(response, GetNodesResponse)
         assert grpc.StatusCode.OK == call.code()
 
+    def test_push_messages_keeps_shared_upload_hint_after_rejection(self) -> None:
+        """PushMessages should keep accepted-message upload hints."""
+        # Prepare
+        run_id = self._auth_run_id
+        message_1 = create_ins_message(
+            src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
+        )
+        message_2 = create_ins_message(
+            src_node_id=SUPERLINK_NODE_ID, dst_node_id=self.node_id, run_id=run_id
+        )
+        shared_child_id = hashlib.sha256(b"shared-child").hexdigest()
+        object_tree_1 = ObjectTree(
+            object_id=message_1.metadata.message_id,
+            children=[ObjectTree(object_id=shared_child_id)],
+        )
+        object_tree_2 = ObjectTree(
+            object_id=message_2.metadata.message_id,
+            children=[ObjectTree(object_id=shared_child_id)],
+        )
+        request = PushAppMessagesRequest(
+            messages_list=[message_1, message_2],
+            message_object_trees=[object_tree_1, object_tree_2],
+        )
+        original_store_message_ins = self.state.store_message_ins
+        primary_task_id = self._primary_task_id(run_id)
+        call_count = 0
+
+        def store_message_ins_and_finish_run(message: Message) -> str | None:
+            nonlocal call_count
+            call_count += 1
+            message_id = original_store_message_ins(message)
+            if call_count == 1:
+                assert self.state.finish_task(primary_task_id, "", "")
+            return message_id
+
+        # Execute
+        with patch.object(
+            self.state,
+            "store_message_ins",
+            side_effect=store_message_ins_and_finish_run,
+        ):
+            response, call = self._push_messages.with_call(request=request)
+
+        # Assert
+        assert isinstance(response, PushAppMessagesResponse)
+        assert grpc.StatusCode.OK == call.code()
+        assert list(response.message_ids) == [message_1.metadata.message_id, ""]
+        assert set(response.objects_to_push) == {
+            message_1.metadata.message_id,
+            shared_child_id,
+        }
+
     @parameterized.expand(
         [
             # The normal case:
