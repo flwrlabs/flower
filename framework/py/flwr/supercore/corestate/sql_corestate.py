@@ -170,6 +170,7 @@ class SqlCoreState(CoreState, SqlMixin):
                 FROM run_series
                 {where_clause}
                 ORDER BY updated_at DESC
+                {self.select_lock_sql}
                 {limit_clause}
             )
         """
