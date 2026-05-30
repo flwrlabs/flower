@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower grid SDK."""
+"""Flower SuperLink Grid implementations."""
 
 
-from .grid import Grid
 from .grpc_grid import GrpcGrid
 from .inmemory_grid import InMemoryGrid
 
 __all__ = [
-    "Grid",
     "GrpcGrid",
     "InMemoryGrid",
 ]

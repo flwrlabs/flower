@@ -18,7 +18,7 @@
 from datetime import datetime
 from os import urandom
 
-from flwr.common import Message
+from flwr.app import Message
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.supercore.date import now
 from flwr.supercore.utils import strict_json_loads
