@@ -271,7 +271,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             series_id = runs[0].series_id
 
             # Create an empty context for the Run
-            context = Context(
+            run_context = Context(
                 run_id=run_id,
                 node_id=SUPERLINK_NODE_ID,
                 # Dict is invariant in mypy
@@ -281,10 +281,13 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 series_id=series_id,
             )
 
-            # Register the initial context for the run series. If the run joins an
-            # existing series, keep the shared state already stored for that series.
-            if state.get_run_series_context(series_id) is None:
-                state.set_run_series_context(series_id=series_id, context=context)
+            # Register the context for the run series. If the run joins an
+            # existing series, preserve its shared state while refreshing
+            # run-specific fields for the newly created run.
+            existing_context = state.get_run_series_context(series_id)
+            if existing_context is not None:
+                run_context.state = existing_context.state
+            state.set_run_series_context(series_id=series_id, context=run_context)
 
         except ValueError as e:
             log(ERROR, "Could not start run: %s", str(e))

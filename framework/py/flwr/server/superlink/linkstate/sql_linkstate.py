@@ -46,8 +46,6 @@ from flwr.server.utils.validator import validate_message
 from flwr.supercore.constant import NodeStatus
 from flwr.supercore.corestate.sql_corestate import SqlCoreState, determine_task_status
 from flwr.supercore.corestate.utils import (
-    context_from_bytes,
-    context_to_bytes,
     timestamp_to_iso,
 )
 from flwr.supercore.object_store.object_store import ObjectStore
