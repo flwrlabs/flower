@@ -15,8 +15,8 @@
 """Flower task process components."""
 
 
-from .run_agentapp import run_agentapp
-from .run_model import run_model
+from .agent import run_agentapp
+from .model import run_model
 
 __all__ = [
     "run_agentapp",
