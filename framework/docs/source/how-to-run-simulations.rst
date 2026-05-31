@@ -151,6 +151,8 @@ simulation-ready.
 The complete list of examples can be found in `the Flower GitHub
 <https://github.com/flwrlabs/flower/tree/main/examples>`_.
 
+.. _clientappresources:
+
 **********************************
  Customize the Simulation Runtime
 **********************************

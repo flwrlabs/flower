@@ -51,11 +51,13 @@ class FedProx(FedAvg):
     In PyTorch, for example, the loss would go from:
 
     .. code:: python
+
         loss = criterion(net(inputs), labels)
 
     To:
 
     .. code:: python
+
         # Get proximal term weight from message
         mu = msg.content["config"]["proximal-mu"]
 
@@ -71,6 +73,7 @@ class FedProx(FedAvg):
     applying the received global weights but **before** local training begins.
 
     .. code:: python
+
         global_params = copy.deepcopy(net).parameters()
 
     Parameters
