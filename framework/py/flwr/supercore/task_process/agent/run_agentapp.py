@@ -26,22 +26,10 @@ from flwr.app.exception import AppExitException
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
-from flwr.common.config import (
-    flatten_dict,
-    get_project_config,
-    get_project_dir,
-)
-from flwr.common.constant import (
-    RUNTIME_DEPENDENCY_INSTALL,
-    SubStatus,
-)
+from flwr.common.config import flatten_dict, get_project_config, get_project_dir
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
-from flwr.common.logger import (
-    flush_logs,
-    log,
-    start_log_uploader,
-    stop_log_uploader,
-)
+from flwr.common.logger import flush_logs, log, start_log_uploader, stop_log_uploader
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,

@@ -22,12 +22,9 @@ from unittest.mock import Mock, patch
 import pytest
 
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
-
 from flwr.supercore.cli.flwr_agentapp import _parse_args_run_flwr_agentapp
 
-flwr_agentapp_module = importlib.import_module(
-    "flwr.supercore.cli.flwr_agentapp"
-)
+flwr_agentapp_module = importlib.import_module("flwr.supercore.cli.flwr_agentapp")
 
 
 def test_parse_flwr_agentapp_requires_token() -> None:
