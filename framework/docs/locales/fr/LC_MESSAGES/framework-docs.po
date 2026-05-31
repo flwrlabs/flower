@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower Docs\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-05-30 00:28+0000\n"
+"POT-Creation-Date: 2026-05-31 00:29+0000\n"
 "PO-Revision-Date: 2026-05-23 06:55+0000\n"
 "Last-Translator: lco <Leandro.COLLIER@student.umons.ac.be>\n"
 "Language: fr\n"
@@ -300,33 +300,34 @@ msgstr ""
 msgid ""
 "We also use this to define the public API of private subpackages. Public,"
 " in this context, means the API that other ``flwr`` subpackages should "
-"use. For example, ``flwr.server.grid`` is a private subpackage (it's not "
-"exported via ``src/py/flwr/server/__init__.py``'s ``__all__``)."
+"use. For example, ``flwr.superlink.grid`` is a private subpackage (it's "
+"not re-exported via ``src/py/flwr/superlink/__init__.py``)."
 msgstr ""
 
 #: ../../source/contributor-explanation-public-and-private-apis.rst:120
 msgid ""
-"Still, the private sub-package ``flwr.server.grid`` defines a \"public\" "
-"API using ``__all__`` in ``src/py/flwr/server/grid/__init__.py``:"
+"Still, the private sub-package ``flwr.superlink.grid`` defines a "
+"\"public\" API using ``__all__`` in "
+"``src/py/flwr/superlink/grid/__init__.py``:"
 msgstr ""
 
-#: ../../source/contributor-explanation-public-and-private-apis.rst:136
+#: ../../source/contributor-explanation-public-and-private-apis.rst:133
 msgid ""
 "The interesting part is that both ``GrpcGrid`` and ``InMemoryGrid`` are "
 "never used by Flower framework users, only by other parts of the Flower "
 "framework codebase. Those other parts of the codebase import, for "
-"example, ``InMemoryGrid`` using ``from flwr.server.driver import "
+"example, ``InMemoryGrid`` using ``from flwr.superlink.grid import "
 "InMemoryGrid`` (i.e., the ``InMemoryGrid`` exported via ``__all__``), not"
-" ``from flwr.server.driver.in_memory_driver import InMemoryGrid`` "
-"(``in_memory_driver.py`` is the module containing the actual "
+" ``from flwr.superlink.grid.inmemory_grid import InMemoryGrid`` "
+"(``inmemory_grid.py`` is the module containing the actual "
 "``InMemoryGrid`` class definition)."
 msgstr ""
 
-#: ../../source/contributor-explanation-public-and-private-apis.rst:144
+#: ../../source/contributor-explanation-public-and-private-apis.rst:141
 msgid ""
-"This is because ``flwr.server.driver`` defines a public interface for "
+"This is because ``flwr.superlink.grid`` defines a public interface for "
 "other ``flwr`` subpackages. This allows codeowners of "
-"``flwr.server.driver`` to refactor the package without breaking other "
+"``flwr.superlink.grid`` to refactor the package without breaking other "
 "``flwr``-internal users."
 msgstr ""
 
@@ -6700,7 +6701,7 @@ msgstr ""
 #: flwr.clientapp.client_app.ClientApp.evaluate
 #: flwr.clientapp.client_app.ClientApp.query
 #: flwr.clientapp.client_app.ClientApp.train
-#: flwr.server.grid.grid.Grid.send_and_receive of
+#: flwr.serverapp.grid.grid.Grid.send_and_receive of
 #, fuzzy
 msgid "Parameters"
 msgstr "Paramètres du modèle."
@@ -18506,7 +18507,8 @@ msgid "AgentResponses"
 msgstr ""
 
 #: flwr.agentapp.base.AgentResponses:1 flwr.agentapp.base.AgentSession:1
-#: flwr.server.grid.grid.Grid:1 flwr.serverapp.strategy.strategy.Strategy:1 of
+#: flwr.serverapp.grid.grid.Grid:1 flwr.serverapp.strategy.strategy.Strategy:1
+#: of
 msgid "Bases: :py:class:`~abc.ABC`"
 msgstr ""
 
@@ -18555,7 +18557,7 @@ msgstr ""
 #: flwr.clientapp.client_app.ClientApp.evaluate
 #: flwr.clientapp.client_app.ClientApp.query
 #: flwr.clientapp.client_app.ClientApp.train
-#: flwr.server.grid.grid.Grid.send_and_receive of
+#: flwr.serverapp.grid.grid.Grid.send_and_receive of
 #, fuzzy
 msgid "Returns"
 msgstr "Ressources"
@@ -18594,7 +18596,7 @@ msgstr ""
 #: flwr.clientapp.client_app.ClientApp.evaluate
 #: flwr.clientapp.client_app.ClientApp.query
 #: flwr.clientapp.client_app.ClientApp.train
-#: flwr.server.grid.grid.Grid.send_and_receive of
+#: flwr.serverapp.grid.grid.Grid.send_and_receive of
 msgid "Return type"
 msgstr ""
 
@@ -20698,7 +20700,7 @@ msgstr ""
 
 #: flwr.clientapp.mod.centraldp_mods.adaptiveclipping_mod:15
 #: flwr.clientapp.mod.centraldp_mods.fixedclipping_mod:13
-#: flwr.server.grid.grid.Grid.send_and_receive:18
+#: flwr.serverapp.grid.grid.Grid.send_and_receive:18
 #: flwr.serverapp.strategy.multikrum.MultiKrum:42 of
 #, fuzzy
 msgid "Notes"
@@ -20759,7 +20761,7 @@ msgid ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
 msgstr "serveur.stratégie.Stratégie"
 
 #: ../../source/ref-api/flwr.serverapp.rst:23:<autosummary>:1
-#: flwr.server.grid.grid.Grid:1 of
+#: flwr.serverapp.grid.grid.Grid:1 of
 msgid "Abstract base class Grid to send/receive messages."
 msgstr ""
 
@@ -20802,7 +20804,7 @@ msgstr ""
 "...)``"
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
-#: flwr.server.grid.grid.Grid.create_message:1 of
+#: flwr.serverapp.grid.grid.Grid.create_message:1 of
 msgid "Create a new message with specified parameters."
 msgstr ""
 
@@ -20812,7 +20814,7 @@ msgid ":py:obj:`get_node_ids <flwr.serverapp.Grid.get_node_ids>`\\ \\(\\)"
 msgstr "serveur.stratégie.Stratégie"
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
-#: flwr.server.grid.grid.Grid.get_node_ids:1 of
+#: flwr.serverapp.grid.grid.Grid.get_node_ids:1 of
 msgid "Get node IDs."
 msgstr ""
 
@@ -20827,7 +20829,7 @@ msgstr ""
 "...)``"
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
-#: flwr.server.grid.grid.Grid.pull_messages:1 of
+#: flwr.serverapp.grid.grid.Grid.pull_messages:1 of
 msgid "Pull messages based on message IDs."
 msgstr ""
 
@@ -20842,7 +20844,7 @@ msgstr ""
 "...)``"
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
-#: flwr.server.grid.grid.Grid.push_messages:1 of
+#: flwr.serverapp.grid.grid.Grid.push_messages:1 of
 msgid "Push messages to specified node IDs."
 msgstr ""
 
@@ -20857,7 +20859,7 @@ msgstr ""
 "...)``"
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
-#: flwr.server.grid.grid.Grid.send_and_receive:1 of
+#: flwr.serverapp.grid.grid.Grid.send_and_receive:1 of
 msgid "Push messages to specified node IDs and pull the reply messages."
 msgstr ""
 
@@ -20867,50 +20869,50 @@ msgid ":py:obj:`set_run <flwr.serverapp.Grid.set_run>`\\ \\(run\\)"
 msgstr "serveur.stratégie.Stratégie"
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
-#: flwr.server.grid.grid.Grid.set_run:1 of
+#: flwr.serverapp.grid.grid.Grid.set_run:1 of
 msgid "Set the run this ``Grid`` object operates in."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.create_message:1:<autosummary>:1 of
+#: flwr.serverapp.grid.grid.Grid.create_message:1:<autosummary>:1 of
 #, fuzzy
 msgid ":py:obj:`run <flwr.serverapp.Grid.run>`\\"
 msgstr "serveur.stratégie.Stratégie"
 
-#: flwr.server.grid.grid.Grid.create_message:1:<autosummary>:1
-#: flwr.serverapp.Grid.run:1 of
+#: flwr.serverapp.Grid.run:1
+#: flwr.serverapp.grid.grid.Grid.create_message:1:<autosummary>:1 of
 #, fuzzy
 msgid "Run information."
 msgstr "Simulation de moniteur"
 
-#: flwr.server.grid.grid.Grid.create_message:3 of
+#: flwr.serverapp.grid.grid.Grid.create_message:3 of
 msgid ""
 "This method constructs a new ``Message`` with given content and metadata."
 " The ``run_id`` and ``src_node_id`` will be set automatically."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.create_message:6 of
+#: flwr.serverapp.grid.grid.Grid.create_message:6 of
 msgid ""
 "The content for the new message. This holds records that are to be sent "
 "to the destination node."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.create_message:9 of
+#: flwr.serverapp.grid.grid.Grid.create_message:9 of
 msgid ""
 "The type of the message, defining the action to be executed on the "
 "receiving end."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.create_message:12 of
+#: flwr.serverapp.grid.grid.Grid.create_message:12 of
 msgid "The ID of the destination node to which the message is being sent."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.create_message:14 of
+#: flwr.serverapp.grid.grid.Grid.create_message:14 of
 msgid ""
 "The ID of the group to which this message is associated. In some "
 "settings, this is used as the federated learning round."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.create_message:17 of
+#: flwr.serverapp.grid.grid.Grid.create_message:17 of
 msgid ""
 "Time-to-live for the round trip of this message, i.e., the time from "
 "sending this message to receiving a reply. It specifies in seconds the "
@@ -20919,62 +20921,62 @@ msgid ""
 " used."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.create_message:23 of
+#: flwr.serverapp.grid.grid.Grid.create_message:23 of
 msgid ""
 "**message** -- A new `Message` instance with the specified content and "
 "metadata."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.pull_messages:3 of
+#: flwr.serverapp.grid.grid.Grid.pull_messages:3 of
 msgid ""
 "This method is used to collect messages from the SuperLink that "
 "correspond to a set of given message IDs."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.pull_messages:6 of
+#: flwr.serverapp.grid.grid.Grid.pull_messages:6 of
 msgid "An iterable of message IDs for which reply messages are to be retrieved."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.pull_messages:9 of
+#: flwr.serverapp.grid.grid.Grid.pull_messages:9 of
 msgid "**messages** -- An iterable of messages received."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.push_messages:3 of
+#: flwr.serverapp.grid.grid.Grid.push_messages:3 of
 msgid ""
 "This method takes an iterable of messages and sends each message to the "
 "node specified in ``dst_node_id``."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.push_messages:6
-#: flwr.server.grid.grid.Grid.send_and_receive:7 of
+#: flwr.serverapp.grid.grid.Grid.push_messages:6
+#: flwr.serverapp.grid.grid.Grid.send_and_receive:7 of
 msgid "An iterable of messages to be sent."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.push_messages:9 of
+#: flwr.serverapp.grid.grid.Grid.push_messages:9 of
 msgid ""
 "**message_ids** -- An iterable of IDs for the messages that were sent, "
 "which can be used to pull replies."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.send_and_receive:3 of
+#: flwr.serverapp.grid.grid.Grid.send_and_receive:3 of
 msgid ""
 "This method sends a list of messages to their destination node IDs and "
 "then waits for the replies. It continues to pull replies until either all"
 " replies are received or the specified timeout duration is exceeded."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.send_and_receive:9 of
+#: flwr.serverapp.grid.grid.Grid.send_and_receive:9 of
 msgid ""
 "The timeout duration in seconds. If specified, the method will wait for "
 "replies for this duration. If `None`, there is no time limit and the "
 "method will wait until replies for all messages are received."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.send_and_receive:14 of
+#: flwr.serverapp.grid.grid.Grid.send_and_receive:14 of
 msgid "**replies** -- An iterable of reply messages received from the SuperLink."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.send_and_receive:19 of
+#: flwr.serverapp.grid.grid.Grid.send_and_receive:19 of
 msgid ""
 "This method uses ``push_messages`` to send the messages and "
 "``pull_messages`` to collect the replies. If ``timeout`` is set, the "
@@ -20982,7 +20984,7 @@ msgid ""
 "valid until its TTL, which is not affected by ``timeout``."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.set_run:3 of
+#: flwr.serverapp.grid.grid.Grid.set_run:3 of
 msgid "The ``Run`` this ``Grid`` object operates in."
 msgstr ""
 
@@ -80541,5 +80543,48 @@ msgstr ""
 #~ " array needs to be serialized and "
 #~ "represented as a :code:`flwr.common.Array`. "
 #~ "For example::"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "We also use this to define the "
+#~ "public API of private subpackages. "
+#~ "Public, in this context, means the "
+#~ "API that other ``flwr`` subpackages "
+#~ "should use. For example, ``flwr.server.grid``"
+#~ " is a private subpackage (it's not"
+#~ " exported via ``src/py/flwr/server/__init__.py``'s "
+#~ "``__all__``)."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Still, the private sub-package "
+#~ "``flwr.server.grid`` defines a \"public\" API"
+#~ " using ``__all__`` in "
+#~ "``src/py/flwr/server/grid/__init__.py``:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The interesting part is that both "
+#~ "``GrpcGrid`` and ``InMemoryGrid`` are never"
+#~ " used by Flower framework users, only"
+#~ " by other parts of the Flower "
+#~ "framework codebase. Those other parts of"
+#~ " the codebase import, for example, "
+#~ "``InMemoryGrid`` using ``from flwr.server.driver "
+#~ "import InMemoryGrid`` (i.e., the "
+#~ "``InMemoryGrid`` exported via ``__all__``), "
+#~ "not ``from flwr.server.driver.in_memory_driver "
+#~ "import InMemoryGrid`` (``in_memory_driver.py`` is"
+#~ " the module containing the actual "
+#~ "``InMemoryGrid`` class definition)."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "This is because ``flwr.server.driver`` defines"
+#~ " a public interface for other "
+#~ "``flwr`` subpackages. This allows codeowners"
+#~ " of ``flwr.server.driver`` to refactor the"
+#~ " package without breaking other "
+#~ "``flwr``-internal users."
 #~ msgstr ""
 
