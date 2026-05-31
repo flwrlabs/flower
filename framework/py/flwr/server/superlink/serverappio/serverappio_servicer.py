@@ -19,7 +19,7 @@ from logging import DEBUG, ERROR, INFO
 
 import grpc
 
-from flwr.app import Message
+from flwr.app import Context, Message
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.logger import log
 from flwr.common.serde import (
@@ -259,11 +259,15 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         task = get_authenticated_task()
         run_id = task.run_id
 
-        # Retrieve Context, Run and Fab for the run_id
-        serverapp_ctxt = state.get_serverapp_context(run_id)
+        # Retrieve Run, FAB, and shared RunSeries context for the run_id
         runs = state.get_run_info(run_ids=[run_id])
         run = runs[0] if runs else None
         fab = state.get_fab(run.fab_hash) if run and run.fab_hash else None
+        serverapp_ctxt = None
+        if run and run.series_id:
+            series_ctxt = state.get_run_series_context(run.series_id)
+            if series_ctxt is not None:
+                serverapp_ctxt = _context_for_run(series_ctxt, run_id, run.series_id)
         if run and fab and serverapp_ctxt:
             if state.activate_task(task.task_id):
                 log(INFO, "Started task %d of run %d", task.task_id, run_id)
@@ -307,7 +311,17 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         ):
             log(INFO, "Finished task %d of run %d", task.task_id, run_id)
             if request.HasField("context"):
-                state.set_serverapp_context(run_id, context_from_proto(request.context))
+                runs = state.get_run_info(run_ids=[run_id])
+                run = runs[0] if runs else None
+                if run and run.series_id:
+                    state.set_run_series_context(
+                        run.series_id,
+                        _context_for_run(
+                            context_from_proto(request.context),
+                            run_id,
+                            run.series_id,
+                        ),
+                    )
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
         return PushTaskOutputResponse()
@@ -399,6 +413,18 @@ def _get_authenticated_serverapp_run_id(context: grpc.ServicerContext) -> int:
             SERVERAPPIO_ENDPOINT_UNAVAILABLE_MESSAGE,
         )
     return task.run_id
+
+
+def _context_for_run(context: Context, run_id: int, series_id: int) -> Context:
+    """Return a run-materialized copy of the shared RunSeries context."""
+    return Context(
+        run_id=run_id,
+        node_id=context.node_id,
+        node_config=context.node_config,
+        state=context.state,
+        run_config=context.run_config,
+        series_id=series_id,
+    )
 
 
 def _raise_if(validation_error: bool, request_name: str, detail: str) -> None:

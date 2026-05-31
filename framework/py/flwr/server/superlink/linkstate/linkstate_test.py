@@ -1720,32 +1720,35 @@ class StateTest(CoreStateTest):
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 0
 
-    def test_get_set_serverapp_context(self) -> None:
-        """Test get and set serverapp context."""
+    def test_get_set_run_series_context(self) -> None:
+        """Test get and set run series context."""
         # Prepare
         state: LinkState = self.state_factory()
+        run_id = create_dummy_run(state)
+        series_id = state.get_run_info(run_ids=[run_id])[0].series_id
         context = Context(
-            run_id=1,
+            run_id=run_id,
             node_id=SUPERLINK_NODE_ID,
             node_config={"mock": "mock"},
             state=RecordDict(),
             run_config={"test": "test"},
+            series_id=series_id,
         )
-        run_id = create_dummy_run(state)
 
         # Execute
-        init = state.get_serverapp_context(run_id)
-        state.set_serverapp_context(run_id, context)
-        retrieved_context = state.get_serverapp_context(run_id)
+        init = state.get_run_series_context(series_id)
+        state.set_run_series_context(series_id, context)
+        retrieved_context = state.get_run_series_context(series_id)
 
         # Assert
         assert init is None
         assert retrieved_context == context
 
-    def test_set_serverapp_context_after_finished_run(self) -> None:
+    def test_set_run_series_context_after_finished_run(self) -> None:
         """Context can be persisted after normal task completion."""
         state: LinkState = self.state_factory()
         run_id = create_dummy_run(state)
+        series_id = state.get_run_info(run_ids=[run_id])[0].series_id
         task_id = get_primary_task_id(state, run_id)
         context = Context(
             run_id=run_id,
@@ -1753,30 +1756,38 @@ class StateTest(CoreStateTest):
             node_config={},
             state=RecordDict(),
             run_config={},
+            series_id=series_id,
         )
 
         assert state.claim_task(task_id) is not None
         assert state.activate_task(task_id)
         assert state.finish_task(task_id, SubStatus.COMPLETED, "done")
-        state.set_serverapp_context(run_id, context)
+        state.set_run_series_context(series_id, context)
 
-        assert state.get_serverapp_context(run_id) == context
+        assert state.get_run_series_context(series_id) == context
 
-    def test_set_context_invalid_run_id(self) -> None:
-        """Test set_serverapp_context with invalid run_id."""
+    def test_run_series_context_is_shared_by_runs_in_series(self) -> None:
+        """Runs linked to the same series share one persisted context."""
         # Prepare
         state: LinkState = self.state_factory()
+        run_id_1 = create_dummy_run(state)
+        series_id = state.get_run_info(run_ids=[run_id_1])[0].series_id
+        run_id_2 = create_dummy_run(state, series_id=series_id)
         context = Context(
-            run_id=1,
-            node_id=1234,
+            run_id=run_id_1,
+            node_id=SUPERLINK_NODE_ID,
             node_config={"mock": "mock"},
             state=RecordDict(),
             run_config={"test": "test"},
+            series_id=series_id,
         )
 
-        # Execute and assert
-        with self.assertRaises(ValueError):
-            state.set_serverapp_context(61016, context)  # Invalid run_id
+        # Execute
+        state.set_run_series_context(series_id, context)
+
+        # Assert
+        assert state.get_run_info(run_ids=[run_id_2])[0].series_id == series_id
+        assert state.get_run_series_context(series_id) == context
 
     def test_create_run_with_and_without_federation_config(self) -> None:
         """Test that run federation config is stored on the run."""

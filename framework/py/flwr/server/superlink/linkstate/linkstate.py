@@ -19,7 +19,7 @@ import abc
 from collections.abc import Sequence
 from typing import Literal
 
-from flwr.app import Context, Message
+from flwr.app import Message
 from flwr.app.user_config import UserConfig
 from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
@@ -393,34 +393,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         -------
         is_acknowledged : bool
             True if the heartbeat is successfully acknowledged; otherwise, False.
-        """
-
-    @abc.abstractmethod
-    def get_serverapp_context(self, run_id: int) -> Context | None:
-        """Get the context for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run for which to retrieve the context.
-
-        Returns
-        -------
-        Optional[Context]
-            The context associated with the specified `run_id`, or `None` if no context
-            exists for the given `run_id`.
-        """
-
-    @abc.abstractmethod
-    def set_serverapp_context(self, run_id: int, context: Context) -> None:
-        """Set the context for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run for which to set the context.
-        context : Context
-            The context to be associated with the specified `run_id`.
         """
 
     @abc.abstractmethod

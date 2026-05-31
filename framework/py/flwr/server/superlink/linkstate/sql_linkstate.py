@@ -25,7 +25,7 @@ from typing import Any, Literal
 from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
 
-from flwr.app import Context, Message
+from flwr.app import Message
 from flwr.app.user_config import UserConfig
 from flwr.common import log, now
 from flwr.common.constant import (
@@ -46,8 +46,6 @@ from flwr.server.utils.validator import validate_message
 from flwr.supercore.constant import NodeStatus
 from flwr.supercore.corestate.sql_corestate import SqlCoreState, determine_task_status
 from flwr.supercore.corestate.utils import (
-    context_from_bytes,
-    context_to_bytes,
     timestamp_to_iso,
 )
 from flwr.supercore.object_store.object_store import ObjectStore
@@ -1220,52 +1218,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         rows = self.query(query, params)
         return len(rows) > 0
-
-    def get_serverapp_context(self, run_id: int) -> Context | None:
-        """Get the context for the specified `run_id`."""
-        # Retrieve context if any
-        query = "SELECT context FROM context WHERE run_id = :run_id"
-        rows = self.query(query, {"run_id": uint64_to_int64(run_id)})
-        context = context_from_bytes(rows[0]["context"]) if rows else None
-        return context
-
-    def set_serverapp_context(self, run_id: int, context: Context) -> None:
-        """Set the context for the specified `run_id`."""
-        # Convert context to bytes
-        context_bytes = context_to_bytes(context)
-        sint_run_id = uint64_to_int64(run_id)
-
-        with self.session():
-            if not self.query(
-                "SELECT run_id FROM run WHERE run_id = :run_id",
-                {"run_id": sint_run_id},
-            ):
-                raise ValueError(f"Run {run_id} not found")
-
-            # Check if any existing Context assigned to the run_id
-            query = "SELECT COUNT(*) as count FROM context WHERE run_id = :run_id"
-            row = self.query(query, {"run_id": sint_run_id})[0]
-            if row["count"] > 0:
-                # Update context
-                query = """
-                    UPDATE context
-                    SET context = :context_bytes WHERE run_id = :run_id
-                """
-                self.query(
-                    query, {"context_bytes": context_bytes, "run_id": sint_run_id}
-                )
-            else:
-                try:
-                    # Store context
-                    query = (
-                        "INSERT INTO context (run_id, context) "
-                        "VALUES (:run_id, :context_bytes)"
-                    )
-                    self.query(
-                        query, {"run_id": sint_run_id, "context_bytes": context_bytes}
-                    )
-                except IntegrityError:
-                    raise ValueError(f"Run {run_id} not found") from None
 
     def get_valid_message_ins(self, message_id: str) -> dict[str, Any] | None:
         """Check if the Message exists and is valid (not expired).

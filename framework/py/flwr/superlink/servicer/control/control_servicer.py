@@ -281,8 +281,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 series_id=series_id,
             )
 
-            # Register the context at the LinkState
-            state.set_serverapp_context(run_id=run_id, context=context)
+            # Register the initial context for the run series. If the run joins an
+            # existing series, keep the shared state already stored for that series.
+            if state.get_run_series_context(series_id) is None:
+                state.set_run_series_context(series_id=series_id, context=context)
 
         except ValueError as e:
             log(ERROR, "Could not start run: %s", str(e))
