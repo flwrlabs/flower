@@ -19,14 +19,14 @@ import hashlib
 import json
 import secrets
 from collections.abc import Sequence
-from datetime import timedelta
+from datetime import datetime, timedelta
 from logging import ERROR
 from typing import Any, Literal, cast
 
 from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
 
-from flwr.app import Message
+from flwr.app import Context, Message
 from flwr.app.message import make_message
 from flwr.app.metadata import Metadata
 from flwr.common import now
@@ -48,6 +48,7 @@ from flwr.proto.error_pb2 import Error as ProtoError  # pylint: disable=E0611
 
 # pylint: disable-next=E0611
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
+from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.sql_mixin import SqlMixin
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
@@ -56,6 +57,8 @@ from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 from ..object_store import ObjectStore
 from .corestate import CoreState
 from .utils import (
+    context_from_bytes,
+    context_to_bytes,
     generate_rand_int_from_bytes,
     timestamp_to_iso,
     validate_task_event_data,
@@ -132,6 +135,96 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             verifications=json.loads(row["verifications"]),
         )
 
+    def get_run_series(
+        self,
+        *,
+        federation: str | None = None,
+        updated_before: str | None = None,
+        limit: int | None = None,
+    ) -> Sequence[RunSeries]:
+        """Return RunSeries metadata, optionally filtered by federation."""
+        # Validate limit before building the SQL query.
+        if limit is not None and limit < 0:
+            raise ValueError("`limit` must be >= 0")
+        if limit == 0:
+            return []
+
+        # Build optional filters for the run-series page.
+        conditions: list[str] = []
+        params: dict[str, Any] = {}
+        if federation is not None:
+            conditions.append("federation = :federation")
+            params["federation"] = federation
+        if updated_before is not None:
+            conditions.append("updated_at < :updated_before")
+            params["updated_before"] = datetime.fromisoformat(updated_before)
+
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        limit_clause = ""
+        if limit is not None:
+            limit_clause = "LIMIT :limit"
+            params["limit"] = limit
+
+        # Select the requested page before joining run IDs so limit applies to series.
+        run_series_cte = f"""
+            run_series_cte AS (
+                SELECT series_id, federation, description, created_at, updated_at
+                FROM run_series
+                {where_clause}
+                ORDER BY updated_at DESC
+                {self.select_lock_sql}
+                {limit_clause}
+            )
+        """
+        query = f"""
+            WITH {run_series_cte}
+            SELECT
+                run_series_cte.*,
+                series_runs.run_id
+            FROM run_series_cte
+            LEFT JOIN series_runs
+                ON series_runs.series_id = run_series_cte.series_id
+        """
+        rows = self.query(query, params)
+        # Fold the joined rows back into one RunSeries per series.
+        series_by_id: dict[int, RunSeries] = {}
+        for row in rows:
+            series_id = row["series_id"]
+            if series_id not in series_by_id:
+                series_by_id[series_id] = _run_series_from_row(row)
+            if row["run_id"] is not None:
+                series_by_id[series_id].run_ids.append(int64_to_uint64(row["run_id"]))
+        return list(series_by_id.values())
+
+    def get_run_series_context(self, series_id: int) -> Context | None:
+        """Return the shared Context for the specified RunSeries, if present."""
+        rows = self.query(
+            """
+            SELECT context
+            FROM series_context
+            WHERE series_id = :series_id
+            """,
+            {"series_id": uint64_to_int64(series_id)},
+        )
+        if not rows or rows[0]["context"] is None:
+            return None
+        return context_from_bytes(rows[0]["context"])
+
+    def set_run_series_context(self, series_id: int, context: Context) -> None:
+        """Set the shared Context for the specified RunSeries."""
+        sint_series_id = uint64_to_int64(series_id)
+        context_bytes = context_to_bytes(context)
+        with self.session():
+            self.query(
+                """
+                INSERT INTO series_context (series_id, context)
+                VALUES (:series_id, :context)
+                ON CONFLICT(series_id) DO UPDATE SET
+                    context = excluded.context
+                """,
+                {"series_id": sint_series_id, "context": context_bytes},
+            )
+
     def store_run_in_series(
         self,
         run_id: int,
@@ -148,67 +241,65 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             RETURNING series_id
         """
 
-        with self.session():
-            if series_id is None:
-                # No series was provided, so create a new one before linking the run.
-                candidate = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
-                timestamp = now()
-                rows = self.query(
-                    insert_query,
-                    {
-                        "series_id": uint64_to_int64(candidate),
-                        "federation": federation,
-                        "description": None,
-                        "created_at": timestamp,
-                        "updated_at": timestamp,
-                    },
-                )
-                if rows:
-                    resolved_series_id = candidate
-                else:
-                    return None
-
-            else:
-                # Reuse only an existing run series owned by the requested federation.
-                rows = self.query(
-                    """
-                    SELECT federation
-                    FROM run_series
-                    WHERE series_id = :series_id
-                    """,
-                    {"series_id": uint64_to_int64(series_id)},
-                )
-                if not rows:
-                    log(ERROR, "Run series %d not found", series_id)
-                    return None
-                existing = rows[0]
-                if existing["federation"] != federation:
-                    log(
-                        ERROR,
-                        "Run series %d belongs to federation %r, not %r",
-                        series_id,
-                        existing["federation"],
-                        federation,
+        try:
+            with self.session():
+                if series_id is None:
+                    # No series was provided, so create one before linking the run.
+                    candidate = generate_rand_int_from_bytes(SERIES_ID_NUM_BYTES)
+                    timestamp = now()
+                    rows = self.query(
+                        insert_query,
+                        {
+                            "series_id": uint64_to_int64(candidate),
+                            "federation": federation,
+                            "description": None,
+                            "created_at": timestamp,
+                            "updated_at": timestamp,
+                        },
                     )
-                    return None
-                resolved_series_id = series_id
+                    if rows:
+                        resolved_series_id = candidate
+                    else:
+                        return None
 
-            # Store the membership last so callers only receive linked series IDs.
-            try:
+                else:
+                    rows = self.query(
+                        """
+                        UPDATE run_series
+                        SET updated_at = :updated_at
+                        WHERE series_id = :series_id AND federation = :federation
+                        RETURNING series_id
+                        """,
+                        {
+                            "series_id": uint64_to_int64(series_id),
+                            "federation": federation,
+                            "updated_at": now(),
+                        },
+                    )
+                    if not rows:
+                        log(
+                            ERROR,
+                            "Run series %d not found in federation %r",
+                            series_id,
+                            federation,
+                        )
+                        return None
+                    resolved_series_id = series_id
+
+                # Store the membership last so callers only receive linked series IDs.
                 self.query(
                     """
-                    INSERT INTO series_runs (id, series_id, run_id)
-                    VALUES (:id, :series_id, :run_id)
+                    INSERT INTO series_runs (series_id, run_id)
+                    VALUES (:series_id, :run_id)
                     """,
                     {
-                        "id": uint64_to_int64(run_id),
                         "series_id": uint64_to_int64(resolved_series_id),
                         "run_id": uint64_to_int64(run_id),
                     },
                 )
                 return resolved_series_id
-            except IntegrityError:
-                return None
+        except IntegrityError:
+            return None
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
         """Add a log entry to the task logs for the specified `task_id`."""
@@ -822,6 +913,17 @@ def task_from_row(row: dict[str, Any]) -> Task:
         fab_hash=row["fab_hash"],
         model_ref=row["model_ref"],
         connector_ref=row["connector_ref"],
+    )
+
+
+def _run_series_from_row(row: dict[str, Any]) -> RunSeries:
+    """Convert a database row to a RunSeries object."""
+    return RunSeries(
+        series_id=int64_to_uint64(row["series_id"]),
+        federation=row["federation"],
+        description=row["description"] or "",
+        created_at=timestamp_to_iso(row["created_at"]),
+        updated_at=timestamp_to_iso(row["updated_at"]),
     )
 
 
