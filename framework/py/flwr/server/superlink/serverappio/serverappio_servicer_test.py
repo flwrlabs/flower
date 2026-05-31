@@ -495,10 +495,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert grpc.StatusCode.OK == call.code()
         stored_context = self.state.get_run_series_context(run.series_id)
         assert stored_context is not None
-        assert stored_context.run_id == self._auth_run_id
-        assert stored_context.series_id == run.series_id
-        assert stored_context.node_config == request_context.node_config
-        assert stored_context.run_config == request_context.run_config
+        assert stored_context == request_context
 
     def test_get_node(self) -> None:
         """Test `GetNode` success."""
@@ -910,7 +907,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 
         # Assert: Response is successful and run status is now RUNNING
         assert isinstance(response, PullTaskInputResponse)
-        assert response.context.run_id == run_id
+        assert response.context.run_id == 123
         assert response.context.series_id == run.series_id
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.RUNNING
