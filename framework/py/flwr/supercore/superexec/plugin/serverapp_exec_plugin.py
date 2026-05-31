@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Simple Flower SuperExec plugin for ServerApp."""
+"""Simple Flower SuperExec plugin for task processes."""
 
 
 from flwr.supercore.constant import TaskType
@@ -21,7 +21,7 @@ from .base_exec_plugin import BaseExecPlugin
 
 
 class ServerAppExecPlugin(BaseExecPlugin):
-    """Simple Flower SuperExec plugin for ServerApp.
+    """Simple Flower SuperExec plugin for task processes.
 
     The plugin always selects the first candidate task.
     """

@@ -530,6 +530,36 @@ def test_validate_pyproject_toml_agentapp_only() -> None:
     assert not warnings
 
 
+def test_validate_pyproject_toml_agentapp_validates_other_components() -> None:
+    """Test that AgentApp bundles still validate other component references."""
+    config = {
+        "project": {
+            "name": "fedgpt",
+            "version": "1.0.0",
+            "description": "",
+            "license": "",
+            "authors": [],
+        },
+        "tool": {
+            "flwr": {
+                "app": {
+                    "publisher": "flwrlabs",
+                    "components": {
+                        "agentapp": "flwr.cli.run:run",
+                        "clientapp": "flwr.cli.run:runa",
+                    },
+                },
+            },
+        },
+    }
+
+    is_valid, errors, warnings = validate_config(config)
+
+    assert not is_valid
+    assert len(errors) == 1
+    assert not warnings
+
+
 def test_validate_pyproject_toml_with_fab_format_version_derives_metadata() -> None:
     """Test fab-format-version=1 succeeds without mutating authored metadata."""
     config: dict[str, Any] = {

@@ -368,7 +368,7 @@ def validate_fields_in_config(
     return len(errors) == 0, errors, warnings
 
 
-def validate_config(  # pylint: disable=too-many-return-statements
+def validate_config(
     config: dict[str, Any],
     check_module: bool = True,
     project_dir: str | Path | None = None,
@@ -386,32 +386,14 @@ def validate_config(  # pylint: disable=too-many-return-statements
 
     components = config["tool"]["flwr"]["app"]["components"]
 
-    # Validate agentapp
-    if "agentapp" in components:
-        agentapp_ref = components["agentapp"]
-        is_valid, reason = object_ref.validate(agentapp_ref, check_module, project_dir)
+    for component_name in ("agentapp", "serverapp", "clientapp"):
+        if component_name not in components:
+            continue
+
+        component_ref = components[component_name]
+        is_valid, reason = object_ref.validate(component_ref, check_module, project_dir)
 
         if not is_valid and isinstance(reason, str):
             return False, [reason], warnings
-
-    # Validate serverapp
-    if "serverapp" not in components:
-        return True, [], warnings
-
-    serverapp_ref = components["serverapp"]
-    is_valid, reason = object_ref.validate(serverapp_ref, check_module, project_dir)
-
-    if not is_valid and isinstance(reason, str):
-        return False, [reason], warnings
-
-    if "clientapp" not in components:
-        return True, [], warnings
-
-    # Validate clientapp
-    clientapp_ref = components["clientapp"]
-    is_valid, reason = object_ref.validate(clientapp_ref, check_module, project_dir)
-
-    if not is_valid and isinstance(reason, str):
-        return False, [reason], warnings
 
     return True, [], warnings
