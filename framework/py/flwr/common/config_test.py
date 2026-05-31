@@ -421,6 +421,33 @@ def test_validate_pyproject_toml_fields() -> None:
     assert len(warnings) == 0
 
 
+def test_validate_pyproject_toml_fields_agentapp_only() -> None:
+    """Test that AgentApp-only components are accepted."""
+    config = {
+        "project": {
+            "name": "fedgpt",
+            "version": "1.0.0",
+            "description": "",
+            "license": "",
+            "authors": [],
+        },
+        "tool": {
+            "flwr": {
+                "app": {
+                    "publisher": "flwrlabs",
+                    "components": {"agentapp": "fedgpt.agent:app"},
+                },
+            },
+        },
+    }
+
+    is_valid, errors, warnings = validate_fields_in_config(config)
+
+    assert is_valid
+    assert errors == []
+    assert warnings == []
+
+
 @pytest.mark.parametrize("key", ["fab-include", "fab-exclude"])
 @pytest.mark.parametrize(
     "value, valid",
@@ -498,6 +525,33 @@ def test_validate_pyproject_toml() -> None:
     is_valid, errors, warnings = validate_config(config)
 
     # Assert
+    assert is_valid
+    assert not errors
+    assert not warnings
+
+
+def test_validate_pyproject_toml_agentapp_only() -> None:
+    """Test that validate_config accepts AgentApp-only components."""
+    config = {
+        "project": {
+            "name": "fedgpt",
+            "version": "1.0.0",
+            "description": "",
+            "license": "",
+            "authors": [],
+        },
+        "tool": {
+            "flwr": {
+                "app": {
+                    "publisher": "flwrlabs",
+                    "components": {"agentapp": "flwr.cli.run:run"},
+                },
+            },
+        },
+    }
+
+    is_valid, errors, warnings = validate_config(config)
+
     assert is_valid
     assert not errors
     assert not warnings

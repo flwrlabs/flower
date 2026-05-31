@@ -27,4 +27,11 @@ class ServerAppExecPlugin(BaseExecPlugin):
     """
 
     suppress_output = True
-    supported_task_types = frozenset({TaskType.SERVER_APP, TaskType.SIMULATION})
+    supported_task_types = frozenset(
+        {
+            TaskType.AGENT_APP,
+            TaskType.MODEL,
+            TaskType.SERVER_APP,
+            TaskType.SIMULATION,
+        }
+    )
