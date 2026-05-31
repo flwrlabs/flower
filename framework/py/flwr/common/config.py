@@ -368,7 +368,7 @@ def validate_fields_in_config(
     return len(errors) == 0, errors, warnings
 
 
-def validate_config(
+def validate_config(  # pylint: disable=too-many-return-statements
     config: dict[str, Any],
     check_module: bool = True,
     project_dir: str | Path | None = None,
