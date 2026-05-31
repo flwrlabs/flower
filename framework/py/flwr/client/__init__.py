@@ -25,7 +25,6 @@ from .numpy_client import NumPyClient
 
 if TYPE_CHECKING:
     from flwr.clientapp.client_app import ClientApp
-
     from flwr.compat.client.app import start_client, start_numpy_client
 
 _LAZY_EXPORTS = {

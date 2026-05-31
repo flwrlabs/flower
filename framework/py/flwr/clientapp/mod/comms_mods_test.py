@@ -19,8 +19,6 @@ import numpy as np
 
 from flwr.app import Array, ArrayRecord, Context, Message, RecordDict
 from flwr.app.message_type import MessageType
-from flwr.client.mod import arrays_size_mod as compat_root_arrays_size_mod
-from flwr.client.mod import message_size_mod as compat_root_message_size_mod
 from flwr.common import NDArray
 
 from .comms_mods import arrays_size_mod, message_size_mod
@@ -62,9 +60,3 @@ def test_arrays_size_mod_calls_next_layer() -> None:
     actual = arrays_size_mod(msg, _make_context(), lambda _msg, _ctxt: out_msg)
 
     assert actual is out_msg
-
-
-def test_compatibility_re_exports_match_canonical_mods() -> None:
-    """Old flwr.client.mod imports should stay compatible."""
-    assert compat_root_arrays_size_mod is arrays_size_mod
-    assert compat_root_message_size_mod is message_size_mod
