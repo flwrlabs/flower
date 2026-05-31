@@ -18,6 +18,7 @@
 from logging import WARN
 from typing import cast
 
+from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.app.message_type import MessageType
 from flwr.client.client import (
     maybe_call_evaluate,
@@ -27,7 +28,7 @@ from flwr.client.client import (
 )
 from flwr.client.numpy_client import NumPyClient
 from flwr.client.typing import ClientFnExt
-from flwr.common import ConfigRecord, Context, Message, RecordDict, log
+from flwr.common import log
 from flwr.common.constant import MessageTypeLegacy
 from flwr.common.recorddict_compat import (
     evaluateres_to_recorddict,

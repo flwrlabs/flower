@@ -19,9 +19,9 @@ from logging import INFO
 
 import numpy as np
 
+from flwr.app import Array, ArrayRecord
 from flwr.app.message import Context, Message
 from flwr.clientapp.typing import ClientAppCallable
-from flwr.common import Array, ArrayRecord
 from flwr.common.differential_privacy import (
     add_gaussian_noise_inplace,
     compute_clip_model_update,

@@ -25,23 +25,12 @@ from time import sleep
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
+from flwr.app import DEFAULT_TTL, ConfigRecord, Context, Message, Metadata, RecordDict
 from flwr.app.message import make_message
 from flwr.client import Client, NumPyClient
 from flwr.clientapp import ClientApp
 from flwr.clientapp.client_app import LoadClientAppError
-from flwr.common import (
-    DEFAULT_TTL,
-    Config,
-    ConfigRecord,
-    Context,
-    GetPropertiesIns,
-    Message,
-    MessageTypeLegacy,
-    Metadata,
-    RecordDict,
-    Scalar,
-    now,
-)
+from flwr.common import Config, GetPropertiesIns, MessageTypeLegacy, Scalar, now
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.recorddict_compat import getpropertiesins_to_recorddict
 from flwr.common.typing import Run, RunStatus

@@ -26,8 +26,9 @@ from typing import Any, cast
 import grpc
 import requests
 
+from flwr.app import Context, RecordDict
 from flwr.cli.utils import validate_federation_name
-from flwr.common import Context, RecordDict, now
+from flwr.common import now
 from flwr.common.config import (
     flatten_dict,
     fuse_dicts,
@@ -45,6 +46,7 @@ from flwr.common.constant import (
     PUBLIC_KEY_ALREADY_IN_USE_MESSAGE,
     PUBLIC_KEY_NOT_VALID,
     PULL_UNFINISHED_RUN_MESSAGE,
+    RUN_EVENTS_STREAM_INTERVAL,
     RUN_ID_NOT_FOUND_MESSAGE,
     SUPERLINK_NODE_ID,
     TRANSPORT_TYPE_GRPC_ADAPTER,
@@ -248,6 +250,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 resolved_federation_config,
                 flwr_aid,
                 run_type,
+                request.series_id if request.HasField("series_id") else None,
             )
 
             if run_id == 0:
@@ -264,6 +267,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     "tmp_dir": self.artifact_provider.tmp_dir,
                 }
 
+            runs = state.get_run_info(run_ids=[run_id])
+            series_id = runs[0].series_id
+
             # Create an empty context for the Run
             context = Context(
                 run_id=run_id,
@@ -272,6 +278,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 node_config=node_config,  # type: ignore[arg-type]
                 state=RecordDict(),
                 run_config={},
+                series_id=series_id,
             )
 
             # Register the context at the LinkState
@@ -282,7 +289,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
 
         log(INFO, "Created %s run %s", run_type, str(run_id))
-        return StartRunResponse(run_id=run_id, note=note)
+        return StartRunResponse(run_id=run_id, note=note, series_id=series_id)
 
     def StreamLogs(  # pylint: disable=C0103
         self, request: StreamLogsRequest, context: grpc.ServicerContext
@@ -972,15 +979,61 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         return ConfigureSimulationFederationResponse()
 
-    # ***************
-    # Unused for now
-    # ***************
     def StreamRunEvents(
         self, request: StreamRunEventsRequest, context: grpc.ServicerContext
     ) -> Generator[StreamRunEventsResponse, Any, None]:
         """Start run event stream."""
-        _ = request, context
-        raise NotImplementedError("StreamRunEvents is not implemented yet.")
+        log(INFO, rpc_name := self.StreamRunEvents.__qualname__)
+
+        # Init link state
+        state = self.linkstate_factory.state()
+
+        # Retrieve run ID and run
+        run_id = request.run_id
+        runs = state.get_run_info(run_ids=[run_id])
+
+        # Exit if `run_id` not found
+        if not runs:
+            context.abort(grpc.StatusCode.NOT_FOUND, RUN_ID_NOT_FOUND_MESSAGE)
+            raise grpc.RpcError()  # This line is unreachable
+        run = runs[0]
+
+        with rpc_error_translator(context, rpc_name):
+            flwr_aid = _get_flwr_aid(context)
+            _validate_federation_membership_in_request(
+                state, flwr_aid, run.federation, context
+            )
+
+        after_task_event_id = None
+        if request.HasField("after_task_event_id"):
+            after_task_event_id = request.after_task_event_id
+        while context.is_active():
+            should_break = run.status.status == Status.FINISHED
+
+            # Retrieve and yield all task events generated after the latest
+            # streamed task event
+            events = state.get_task_events(
+                run_id=run_id,
+                after_task_event_id=after_task_event_id,
+            )
+            for event in events:
+                after_task_event_id = event.id
+                yield StreamRunEventsResponse(task_event=event)
+
+            # If the run was already finished before fetching this batch, all
+            # events are returned at this point and the server ends the stream.
+            if should_break:
+                log(INFO, "All events for run ID `%s` returned", run_id)
+                break
+
+            # Refresh status after yielding. If streaming this batch raced with
+            # run completion, continue immediately and fetch one final batch.
+            run = state.get_run_info(run_ids=[run_id])[0]
+            if run.status.status == Status.FINISHED:
+                continue
+
+            # Sleep briefly to avoid busy waiting
+            time.sleep(RUN_EVENTS_STREAM_INTERVAL)
 
 
 class FederationNotSpecified(FlowerError):
