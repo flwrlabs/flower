@@ -23,9 +23,11 @@ import pytest
 
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
 
-from .flwr_agentapp import _parse_args_run_flwr_agentapp
+from flwr.supercore.cli.flwr_agentapp import _parse_args_run_flwr_agentapp
 
-flwr_agentapp_module = importlib.import_module("flwr.supercore.cli.flwr_agentapp")
+flwr_agentapp_module = importlib.import_module(
+    "flwr.supercore.cli.flwr_agentapp"
+)
 
 
 def test_parse_flwr_agentapp_requires_token() -> None:
@@ -92,6 +94,7 @@ def test_flwr_agentapp_forwards_cli_args() -> None:
         insecure=True,
         serverappio_api_address="127.0.0.1:9091",
         token="test-token",
+        root_certificates=None,
         parent_pid=321,
         runtime_dependency_install=True,
     )
@@ -124,6 +127,7 @@ def test_flwr_agentapp_forwards_cli_args() -> None:
     assert kwargs["serverappio_api_address"] == "127.0.0.1:9091"
     assert kwargs["log_queue"] is mirror_output_to_queue.call_args.args[0]
     assert kwargs["token"] == "test-token"
+    assert kwargs["insecure"] is True
     assert kwargs["certificates"] is None
     assert kwargs["parent_pid"] == 321
     assert kwargs["runtime_dependency_install"] is True

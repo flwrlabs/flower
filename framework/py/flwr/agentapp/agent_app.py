@@ -73,3 +73,7 @@ class AgentApp:
             return main_fn
 
         return main_decorator
+
+
+class LoadAgentAppError(Exception):
+    """Error when trying to load `AgentApp`."""
