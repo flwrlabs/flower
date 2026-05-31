@@ -145,7 +145,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Return RunSeries metadata, optionally filtered by federation."""
         # Validate limit before building the SQL query.
         if limit is not None and limit < 0:
-            raise AssertionError("`limit` must be >= 0")
+            raise ValueError("`limit` must be >= 0")
         if limit == 0:
             return []
 
