@@ -533,11 +533,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         """Test ListRunSeries returns only series in accessible federations."""
         # Prepare
         run_id = self._create_dummy_run(self.aid)
-        self._create_dummy_run_series(
-            1,
-            updated_at="2026-05-30T00:00:00+00:00",
-            run_ids=[run_id],
-        )
+        accessible_series_id = self.state.get_run_info(run_ids=[run_id])[0].series_id
+        cast(Any, self.state).run_series_store[
+            accessible_series_id
+        ].updated_at = "2026-05-30T00:00:00+00:00"
         self._create_dummy_run_series(
             2,
             federation="@other/default",
@@ -548,7 +547,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         response = self.servicer.ListRunSeries(ListRunSeriesRequest(), Mock())
 
         # Assert
-        self.assertEqual([entry.series_id for entry in response.entries], [1])
+        self.assertEqual(
+            [entry.series_id for entry in response.entries], [accessible_series_id]
+        )
         self.assertEqual(response.entries[0].last_run_status.status, Status.PENDING)
 
     def test_list_run_series_respects_limit(self) -> None:
