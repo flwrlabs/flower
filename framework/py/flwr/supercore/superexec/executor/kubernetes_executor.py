@@ -69,34 +69,21 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
 
     def __post_init__(self) -> None:
         """Validate required object-building inputs."""
-        if not self.namespace.strip():
-            raise ValueError("Kubernetes namespace must not be empty.")
-        if not self.image.strip():
-            raise ValueError("TaskExecutor image must not be empty.")
-        if self.appio_root_certificates is not None and not (
-            self.appio_root_certificates.strip()
-        ):
-            raise ValueError("AppIo root certificates must not be empty.")
-        if self.image_pull_policy is not None and not self.image_pull_policy.strip():
-            raise ValueError("Image pull policy must not be empty.")
-        if self.service_account_name is not None and not (
-            self.service_account_name.strip()
-        ):
-            raise ValueError("Service account name must not be empty.")
-        if self.resource_pool is not None:
-            if not self.resource_pool.strip():
-                raise ValueError("Resource pool must not be empty.")
-            if self.resource_pool != self.resource_pool.strip():
-                raise ValueError(
-                    "Resource pool must not include leading/trailing whitespace."
-                )
-        if self.priority_class_name is not None:
-            if not self.priority_class_name.strip():
-                raise ValueError("Priority class name must not be empty.")
-            if self.priority_class_name != self.priority_class_name.strip():
-                raise ValueError(
-                    "Priority class name must not include leading/trailing whitespace."
-                )
+        _validate_required_string("Kubernetes namespace", self.namespace)
+        _validate_required_string("TaskExecutor image", self.image)
+        _validate_optional_string(
+            "AppIo root certificates", self.appio_root_certificates
+        )
+        _validate_optional_string("Image pull policy", self.image_pull_policy)
+        _validate_optional_string("Service account name", self.service_account_name)
+        _validate_optional_string(
+            "Resource pool", self.resource_pool, reject_outer_whitespace=True
+        )
+        _validate_optional_string(
+            "Priority class name",
+            self.priority_class_name,
+            reject_outer_whitespace=True,
+        )
         if self.labels is not None:
             _validate_labels(self.labels)
         if self.annotations is not None:
@@ -312,6 +299,23 @@ def _validate_labels(labels: dict[str, str]) -> None:
             f"Kubernetes labels must not override stable labels: {conflicts}"
         )
     _validate_string_map("Kubernetes labels", labels)
+
+
+def _validate_required_string(name: str, value: str) -> None:
+    """Validate that a required string field is not empty."""
+    if not value.strip():
+        raise ValueError(f"{name} must not be empty.")
+
+
+def _validate_optional_string(
+    name: str, value: str | None, *, reject_outer_whitespace: bool = False
+) -> None:
+    """Validate that an optional string field is not empty when provided."""
+    if value is None:
+        return
+    _validate_required_string(name, value)
+    if reject_outer_whitespace and value != value.strip():
+        raise ValueError(f"{name} must not include leading/trailing whitespace.")
 
 
 def _validate_string_map(name: str, values: dict[str, str]) -> None:
