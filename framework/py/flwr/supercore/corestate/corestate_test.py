@@ -15,6 +15,7 @@
 """Tests all CoreState implementations have to conform to."""
 
 
+# pylint: disable=too-many-lines
 import unittest
 from contextlib import ExitStack
 from datetime import datetime, timedelta

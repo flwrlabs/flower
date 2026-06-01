@@ -15,6 +15,7 @@
 """SQLAlchemy-based CoreState implementation."""
 
 
+# pylint: disable=too-many-lines
 import hashlib
 import json
 import secrets
