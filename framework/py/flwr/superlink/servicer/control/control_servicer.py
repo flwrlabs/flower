@@ -402,12 +402,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         """Get run series."""
         log(INFO, self.GetRunSeries.__qualname__)
 
-        if request.series_id == 0:
-            context.abort(
-                grpc.StatusCode.INVALID_ARGUMENT,
-                "Run series ID is required.",
-            )
-            raise grpc.RpcError()  # This line is unreachable
 
         state = self.linkstate_factory.state()
         flwr_aid = _get_flwr_aid(context)
