@@ -543,6 +543,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
+        if sub_status not in (SubStatus.COMPLETED, SubStatus.STOPPED, SubStatus.FAILED):
+            err = f"Invalid sub_status '{sub_status}' for finishing task {task_id}"
+            log(ERROR, err)
+            return False
+
         sint64_task_id = uint64_to_int64(task_id)
         with self.session():
             self._cleanup_expired_task_tokens()

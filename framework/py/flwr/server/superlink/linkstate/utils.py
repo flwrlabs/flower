@@ -15,6 +15,7 @@
 """Utility functions for State."""
 
 
+from collections.abc import Sequence
 from typing import Any
 
 from flwr.app import Error, Message, Metadata
@@ -46,6 +47,27 @@ NODE_UNAVAILABLE_ERROR_REASON = (
     "Error: Node Unavailable — The destination node failed to report a heartbeat "
     f"within {HEARTBEAT_PATIENCE} × its expected interval."
 )
+
+
+def build_params(values: Sequence[Any], prefix: str) -> tuple[str, dict[str, Any]]:
+    """Build SQL IN-clause placeholders and a matching parameter dict.
+
+    Parameters
+    ----------
+    values : Sequence[Any]
+        The values to bind, one per placeholder.
+    prefix : str
+        The prefix used to name each placeholder (e.g. ``"pfx"`` yields
+        ``:pfx_0,:pfx_1,...``).
+
+    Returns
+    -------
+    tuple[str, dict[str, Any]]
+        A comma-separated placeholder string and the corresponding parameter dict.
+    """
+    placeholders = ",".join(f":{prefix}_{i}" for i in range(len(values)))
+    params: dict[str, Any] = {f"{prefix}_{i}": v for i, v in enumerate(values)}
+    return placeholders, params
 
 
 def primary_task_type_from_run_type(run_type: str) -> TaskType:

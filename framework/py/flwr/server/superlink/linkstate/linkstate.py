@@ -19,8 +19,9 @@ import abc
 from collections.abc import Sequence
 from typing import Literal
 
-from flwr.app import Context, Message
+from flwr.app import Context, Message, RecordDict
 from flwr.app.user_config import UserConfig
+from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
@@ -396,34 +397,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
-    def get_serverapp_context(self, run_id: int) -> Context | None:
-        """Get the context for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run for which to retrieve the context.
-
-        Returns
-        -------
-        Optional[Context]
-            The context associated with the specified `run_id`, or `None` if no context
-            exists for the given `run_id`.
-        """
-
-    @abc.abstractmethod
-    def set_serverapp_context(self, run_id: int, context: Context) -> None:
-        """Set the context for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run for which to set the context.
-        context : Context
-            The context to be associated with the specified `run_id`.
-        """
-
-    @abc.abstractmethod
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`.
 
@@ -454,3 +427,21 @@ class LinkState(CoreState):  # pylint: disable=R0904
         runtime : float
             The runtime in seconds to add to the `run_id`'s cumulative total.
         """
+
+    def _refresh_run_series_context(
+        self,
+        run_id: int,
+        series_id: int,
+    ) -> None:
+        """Initialize or refresh the Context for a run series."""
+        context = Context(
+            run_id=run_id,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={},
+            state=RecordDict(),
+            run_config={},
+            series_id=series_id,
+        )
+        if existing_context := self.get_run_series_context(series_id):
+            context.state = existing_context.state
+        self.set_run_series_context(series_id=series_id, context=context)
