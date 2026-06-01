@@ -70,7 +70,7 @@ dev = [
     "types-requests==2.31.0.20240125",
     "types-setuptools==80.9.0.20250822",
     "isort==5.13.2",
-    "black[jupyter]==26.3.1",
+    "black[jupyter]==25.11.0",
     "taplo==0.9.3",
     "mypy==1.8.0",
     "pylint==3.3.1",
