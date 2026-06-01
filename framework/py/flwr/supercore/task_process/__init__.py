@@ -15,8 +15,13 @@
 """Flower task process components."""
 
 
+<<<<<<< HEAD:framework/py/flwr/supercore/task_process/__init__.py
 from .agent import run_agentapp
 from .model import run_model
+=======
+from .model.run import run_model
+from .run_agentapp import run_agentapp
+>>>>>>> refs/remotes/origin/add-flwr-model-logic:framework/py/flwr/supercore/executors/__init__.py
 
 __all__ = [
     "run_agentapp",
