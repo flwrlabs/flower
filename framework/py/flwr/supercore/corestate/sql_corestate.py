@@ -158,18 +158,13 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         conditions: list[str] = []
         params: dict[str, Any] = {}
         if series_ids is not None:
-            sint64_series_ids = [
-                uint64_to_int64(series_id) for series_id in series_ids
-            ]
+            sint64_series_ids = [uint64_to_int64(series_id) for series_id in series_ids]
             placeholders = ",".join(
                 [f":sid_{i}" for i in range(len(sint64_series_ids))]
             )
             conditions.append(f"series_id IN ({placeholders})")
             params.update(
-                {
-                    f"sid_{i}": series_id
-                    for i, series_id in enumerate(sint64_series_ids)
-                }
+                {f"sid_{i}": series_id for i, series_id in enumerate(sint64_series_ids)}
             )
         if federations is not None:
             placeholders = ",".join([f":fed_{i}" for i in range(len(federations))])
