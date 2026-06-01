@@ -412,11 +412,22 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
         flwr_aid = _get_flwr_aid(context)
         with rpc_error_translator(context, self.GetRunSeries.__qualname__):
-            federations = state.federation_manager.get_federations(flwr_aid)
             series_matches = state.get_run_series(
                 series_ids=[request.series_id],
-                federations=[federation.name for federation in federations],
             )
+            if series_matches:
+                try:
+                    is_member = state.federation_manager.has_member(
+                        flwr_aid, series_matches[0].federation
+                    )
+                except ValueError:
+                    is_member = False
+                if not is_member:
+                    context.abort(
+                        grpc.StatusCode.NOT_FOUND,
+                        "Run series ID not found.",
+                    )
+                    raise grpc.RpcError()  # This line is unreachable
 
         if not series_matches:
             context.abort(grpc.StatusCode.NOT_FOUND, "Run series ID not found.")
@@ -1118,21 +1129,19 @@ def _validate_federation_membership_in_request(
 def _with_last_run_statuses(
     state: LinkState, run_series: Sequence[RunSeries]
 ) -> list[RunSeries]:
-    """Return RunSeries copies with last_run_status populated from run state."""
+    """Return RunSeries with last_run_status populated from run state."""
     last_run_ids = {entry.run_ids[-1] for entry in run_series if entry.run_ids}
     run_statuses = state.get_run_status(last_run_ids)
 
     result = []
     for entry in run_series:
-        entry_with_status = RunSeries()
-        entry_with_status.CopyFrom(entry)
-        if entry_with_status.run_ids:
-            last_run_id = entry_with_status.run_ids[-1]
+        if entry.run_ids:
+            last_run_id = entry.run_ids[-1]
             if (run_status := run_statuses.get(last_run_id)) is not None:
-                entry_with_status.last_run_status.CopyFrom(
+                entry.last_run_status.CopyFrom(
                     run_status_to_proto(run_status)
                 )
-        result.append(entry_with_status)
+        result.append(entry)
     return result
 
 
