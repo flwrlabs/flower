@@ -1949,7 +1949,6 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     flwr_aid: str | None = "mock_flwr_aid",
     run_type: str = RunType.SERVER_APP,
     series_id: int | None = None,
-    context_node_config: UserConfig | None = None,
 ) -> int:
     """Create a dummy run."""
     return state.create_run(
@@ -1962,7 +1961,6 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
         flwr_aid=flwr_aid,
         run_type=run_type,
         series_id=series_id,
-        context_node_config=context_node_config,
     )
 
 

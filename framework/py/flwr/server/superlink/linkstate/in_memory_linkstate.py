@@ -616,7 +616,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         flwr_aid: str | None,
         run_type: str,
         series_id: int | None = None,
-        context_node_config: UserConfig | None = None,
     ) -> int:
         """Create a new run."""
         task_type = primary_task_type_from_run_type(run_type)
@@ -642,7 +641,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             self._refresh_run_series_context(
                 run_id=run_id,
                 series_id=resolved_series_id,
-                context_node_config=context_node_config,
             )
             run_record = RunRecord(
                 run=Run(

@@ -26,7 +26,6 @@ from typing import Any, cast
 import grpc
 import requests
 
-from flwr.app.user_config import UserConfig
 from flwr.cli.utils import validate_federation_name
 from flwr.common import now
 from flwr.common.config import (
@@ -240,13 +239,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 )
             fab_id, fab_version = get_metadata_from_config(fab_config)
 
-            node_config: UserConfig = {}
-            if self.artifact_provider is not None:
-                node_config = {
-                    "output_dir": self.artifact_provider.output_dir,
-                    "tmp_dir": self.artifact_provider.tmp_dir,
-                }
-
             run_id = state.create_run(
                 fab_id,
                 fab_version,
@@ -257,7 +249,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 flwr_aid,
                 run_type,
                 request.series_id if request.HasField("series_id") else None,
-                context_node_config=node_config,
             )
 
             if run_id == 0:

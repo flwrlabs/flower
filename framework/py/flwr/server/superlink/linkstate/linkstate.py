@@ -268,7 +268,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         flwr_aid: str | None,
         run_type: str,
         series_id: int | None = None,
-        context_node_config: UserConfig | None = None,
     ) -> int:
         """Create a new run.
 
@@ -294,8 +293,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Optional run series ID. If `None`, a new run series is created for
             the federation. If set, the series must already exist and belong to
             the federation.
-        context_node_config : UserConfig | None (default: None)
-            Optional node config for the initialized run series context.
 
         Returns
         -------
@@ -435,15 +432,13 @@ class LinkState(CoreState):  # pylint: disable=R0904
         self,
         run_id: int,
         series_id: int,
-        context_node_config: UserConfig | None = None,
     ) -> None:
         """Initialize or refresh the Context for a run series."""
         existing_context = self.get_run_series_context(series_id)
-        node_config = context_node_config if context_node_config is not None else {}
         run_context = Context(
             run_id=run_id,
             node_id=SUPERLINK_NODE_ID,
-            node_config=node_config,
+            node_config={},
             state=(
                 existing_context.state if existing_context is not None else RecordDict()
             ),
