@@ -19,14 +19,15 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Literal
 
-from flwr.app import Message
+from flwr.app import Context, Message
 from flwr.common.typing import Fab
+from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
 
 from ..object_store import ObjectStore
 
 
-class CoreState(ABC):
+class CoreState(ABC):  # pylint: disable=R0904
     """Abstract base class for core state."""
 
     @property
@@ -41,6 +42,66 @@ class CoreState(ABC):
     @abstractmethod
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return the FAB for the given hash, if present."""
+
+    @abstractmethod
+    def get_run_series(
+        self,
+        *,
+        series_ids: Sequence[int] | None = None,
+        federations: Sequence[str] | None = None,
+        updated_before: str | None = None,
+        limit: int | None = None,
+    ) -> Sequence[RunSeries]:
+        """Return RunSeries metadata, optionally filtered by the given filters.
+
+        - If a filter is set to None, it is ignored.
+        - If multiple filters are provided, they are combined using AND logic.
+        - Within each filter, provided values are combined using OR logic.
+
+        Parameters
+        ----------
+        series_ids : Optional[Sequence[int]] (default: None)
+            Sequence of RunSeries IDs to filter by.
+        federations : Optional[Sequence[str]] (default: None)
+            Sequence of federation names to filter by.
+        updated_before : str | None (default: None)
+            If set, return only RunSeries updated before this ISO timestamp.
+        limit : int | None (default: None)
+            Maximum number of RunSeries records to return. If `None`, no limit is
+            applied.
+
+        Returns
+        -------
+        Sequence[RunSeries]
+            RunSeries records ordered by `updated_at` descending.
+        """
+
+    @abstractmethod
+    def get_run_series_context(self, series_id: int) -> Context | None:
+        """Return the shared Context for the specified RunSeries, if present.
+
+        Parameters
+        ----------
+        series_id : int
+            The ID of the RunSeries for which to retrieve shared context.
+
+        Returns
+        -------
+        Context | None
+            The shared RunSeries context, or `None` if no context is stored.
+        """
+
+    @abstractmethod
+    def set_run_series_context(self, series_id: int, context: Context) -> None:
+        """Set the shared Context for the specified RunSeries.
+
+        Parameters
+        ----------
+        series_id : int
+            The ID of the RunSeries for which to persist shared context.
+        context : Context
+            The shared context to store.
+        """
 
     @abstractmethod
     def store_run_in_series(

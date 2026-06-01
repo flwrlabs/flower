@@ -115,6 +115,43 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertIsNone(stored)
 
+    def test_get_run_series_filters_by_series_ids_and_federations(self) -> None:
+        """RunSeries lookup should filter by IDs and federations."""
+        state = self.state_factory()
+        series_id_a = state.store_run_in_series(
+            run_id=123, federation="federation-a", series_id=None
+        )
+        series_id_b = state.store_run_in_series(
+            run_id=456, federation="federation-b", series_id=None
+        )
+        series_id_c = state.store_run_in_series(
+            run_id=789, federation="federation-a", series_id=None
+        )
+        assert series_id_a is not None
+        assert series_id_b is not None
+        assert series_id_c is not None
+
+        fed_a_series = state.get_run_series(federations=["federation-a"])
+        self.assertSetEqual(
+            {entry.series_id for entry in fed_a_series},
+            {series_id_a, series_id_c},
+        )
+
+        id_filtered_series = state.get_run_series(series_ids=[series_id_b])
+        self.assertEqual(
+            [entry.series_id for entry in id_filtered_series],
+            [series_id_b],
+        )
+
+        combined_series = state.get_run_series(
+            series_ids=[series_id_a, series_id_b],
+            federations=["federation-a"],
+        )
+        self.assertEqual([entry.series_id for entry in combined_series], [series_id_a])
+
+        self.assertEqual(state.get_run_series(series_ids=[]), [])
+        self.assertEqual(state.get_run_series(federations=[]), [])
+
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
         state = self.state_factory()
