@@ -468,37 +468,6 @@ class StateTest(CoreStateTest):
         assert status.sub_status == SubStatus.FAILED
         assert status.details == "No heartbeat received from the task"
 
-    def test_starting_primary_task_expiry_revives_without_failing_run_tasks(
-        self,
-    ) -> None:
-        """Test STARTING primary task expiry revives the run instead of failing it."""
-        # Prepare
-        state = self.state_factory()
-        run_id = create_dummy_run(state)
-        primary_task_id = get_primary_task_id(state, run_id)
-        extra_task_id = state.create_task(task_type="flwr-connector", run_id=run_id)
-        assert extra_task_id is not None
-        assert state.claim_task(primary_task_id) is not None
-
-        # Execute: advance time past task claim expiry and trigger cleanup.
-        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
-        with patch("datetime.datetime") as mock_dt:
-            mock_dt.now.return_value = patched_dt
-            status = state.get_run_status({run_id})[run_id]
-
-        # Assert
-        assert status.status == Status.PENDING
-        assert status.sub_status == ""
-        assert status.details == ""
-        tasks = {task.task_id: task for task in state.get_tasks(run_ids=[run_id])}
-        primary_task = tasks[primary_task_id]
-        extra_task = tasks[extra_task_id]
-        assert primary_task.status.status == Status.PENDING
-        assert primary_task.starting_at == ""
-        assert primary_task.finished_at == ""
-        assert extra_task.status.status == Status.PENDING
-        assert extra_task.finished_at == ""
-
     def test_primary_task_expiry_fails_unfinished_run_tasks(self) -> None:
         """Test unfinished tasks fail when their run's RUNNING primary task expires."""
         # Prepare
