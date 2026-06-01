@@ -415,7 +415,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                 context.state = existing_context.state
 
             # Store in the state
-            state.set_run_series_context(run_info.series_id, run_ctx)
+            state.set_run_series_context(run_info.series_id, context)
             state.store_run(run_info)
             state.store_fab(fab)
 
