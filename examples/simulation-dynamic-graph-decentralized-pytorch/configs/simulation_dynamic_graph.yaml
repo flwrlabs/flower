@@ -1,0 +1,42 @@
+simulation:
+  nb_nodes: 4
+  timeout: 60
+  max_sim_time: 20
+  time_step_ms: 100
+  real_time_factor: 1.0
+  multi_thread: false
+  verbose: false
+
+network:
+  enable_sampling: true
+  sampling_period: 1000
+  sampling:
+    config_file: ./config_sampling.json
+    algorithm: gbps
+    view_size: 4
+    heal: 0
+    swap: 0
+    selection_policy: old
+    propagation_policy: pushpull
+    delay: 2
+    age: 1
+  topology:
+    kind: random
+    seed: 42
+    random:
+      mode: exact
+      send_to: 2
+      receive_from: 2
+
+latency:
+  base_latency_ms: 30
+  jitter_factor: 0.05
+
+disconnection:
+  failure_probability: 0.0
+  recovery_time: 10
+
+synchronization:
+  sync_node_count: 0
+  sync_interval_ms: 500
+  max_drift_ms: 0

@@ -69,6 +69,10 @@ simulation = [
     "ray==2.55.1; python_version >= '3.13' and python_version < '3.15' and sys_platform != 'win32'",
 ]
 rest = ["starlette>=0.50.0,<0.51.0", "uvicorn[standard]>=0.40.0,<0.41.0"]
+decentralized = [
+    "nodemanager>=0.1.3",
+]
+
 
 [project.scripts]
 # `flwr` CLI
@@ -83,6 +87,9 @@ flwr-serverapp = "flwr.server.serverapp:flwr_serverapp"
 flwr-clientapp = "flwr.supernode.cli:flwr_clientapp"
 flwr-agentapp = "flwr.supercore.cli:flwr_agentapp"
 flwr-model = "flwr.supercore.cli:flwr_model"
+# DNode CLI for decentralized learning
+flower-super-dnode = "flwr.decentralized.superdnode.cli.flower_super_dnode:flower_super_dnode"
+flwr-super-dnode = "flwr.decentralized.superdnode.cli.flower_super_dnode:flower_super_dnode"
 
 [project.urls]
 homepage = "https://flower.ai"

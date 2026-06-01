@@ -1,0 +1,36 @@
+simulation:
+  nb_nodes: 6
+  timeout: 60
+  max_sim_time: 25
+  time_step_ms: 100
+  real_time_factor: 1.0
+  multi_thread: false
+  verbose: false
+
+network:
+  enable_sampling: true
+  sampling_period: 1000
+  sampling:
+    config_file: ./config_sampling.json # don't change this name
+    algorithm: brahams
+    view_size: 5
+    sampler_size: 8
+    alpha: 0.5
+    beta: 0.5
+    delay: 2
+  topology:
+    kind: ring
+    seed: 123
+
+latency:
+  base_latency_ms: 35
+  jitter_factor: 0.08
+
+disconnection:
+  failure_probability: 0.0
+  recovery_time: 10
+
+synchronization:
+  sync_node_count: 0
+  sync_interval_ms: 500
+  max_drift_ms: 0

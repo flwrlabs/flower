@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "deploy-static-decentralized-pytorch"
+version = "0.1.0"
+description = "Flower decentralized deploy example with static topology (PyTorch)"
+dependencies = [
+  "flwr[decentralized]>=1.30.0",
+  "flwr-datasets[vision]>=0.6.0",
+  "torch==2.8.0",
+  "torchvision==0.23.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["quickstart_decentralized_pytorch"]
+
+[project.scripts]
+run-deploy-static-decentralized-pytorch = "quickstart_decentralized_pytorch.run:deploy_static"
+
+[tool.flwr.app.components]
+nodeapp1 = "quickstart_decentralized_pytorch.node_apps:app"

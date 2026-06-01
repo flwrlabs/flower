@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "simulation-pytorch"
+version = "0.1.0"
+description = "PyTorch discrete-event simulation example with Flower Super DNode"
+dependencies = [
+    "flwr[decentralized]>=1.30.0",
+    "flwr-datasets[vision]>=0.6.0",
+    "torch==2.8.0",
+    "torchvision==0.23.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["simulation_pytorch"]
+
+[project.scripts]
+run-simulation-pytorch = "simulation_pytorch.run:main"
+
+[tool.flwr.app.components]
+nodeapp1 = "simulation_pytorch.node_apps:app"

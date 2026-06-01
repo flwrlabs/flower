@@ -1,0 +1,48 @@
+# ---------------------------------------------------------------------------
+# Flower Decentralized Node — configuration example (static topology)
+# ---------------------------------------------------------------------------
+# This file configures a single DNode using a pre-defined (static) topology.
+#
+# Option A — reference an existing topology YAML:
+#   topology.file: /path/to/my_topology.yaml
+#
+# Option B — auto-generate the topology YAML at startup:
+#   topology.generate.kind: ring | star | fullconnected | random
+#
+# Usage (after generating or pointing to a topology file):
+#   python -m quickstart_decentralized.run_static --node-name node_0
+# Or via CLI:
+#   flwr-super-dnode run --config configs/node_static.yaml --node-name node_0
+# ---------------------------------------------------------------------------
+
+context: quickstart
+
+address: 0.0.0.0
+port: 9100
+
+tcp: true
+udp: false
+
+topology:
+  mode: static
+  # Name of THIS node as it appears in the topology YAML. Can also be
+  # provided via --node-name CLI flag.
+  node_name: node_1
+
+  # Option A: use an existing topology YAML.
+  # file: /path/to/topology.yaml
+
+  # Option B: auto-generate one at startup (comment out `file` above and
+  # uncomment `generate` below).
+  generate:
+    node_count: 4
+    kind: ring             # ring | star | fullconnected | random
+    output_path: /tmp/flwr_topology_static.yaml
+    # Only needed when kind=random:
+    # random:
+    #   mode: exact        # exact | range
+    #   send_to: 2
+    #   receive_from: 2
+
+network:
+  idle_connection_timeout_secs: 60

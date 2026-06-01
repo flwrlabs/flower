@@ -1,0 +1,10 @@
+context: pytorch-deploy-static
+address: 0.0.0.0
+port: 9200
+tcp: true
+udp: false
+
+topology:
+  mode: static
+  node_name: node_1   # overridden at runtime by --node-name
+  file: ./configs/generated_static_topology.yaml

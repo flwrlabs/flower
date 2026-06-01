@@ -1,0 +1,54 @@
+# ---------------------------------------------------------------------------
+# Flower Decentralized Node — TOML configuration alternative
+# ---------------------------------------------------------------------------
+# Same as node_dynamic.yaml but in TOML format.
+#
+# Usage:
+#   flwr-super-dnode run --config configs/node_dynamic.toml
+# ---------------------------------------------------------------------------
+
+context = "quickstart"
+address = "0.0.0.0"
+port    = 9100
+tcp     = true
+udp     = false
+
+[topology]
+mode = "dynamic"
+
+[sampling]
+algorithm   = "gbps"
+config_file = "/tmp/flwr_decentralized_sampling.json"
+
+[sampling.params]
+view_size          = 10
+heal               = 2
+swap               = 3
+selection_policy   = "rand"
+propagation_policy = "pushpull"
+delay              = 5
+age                = 1
+
+[network]
+idle_connection_timeout_secs = 60
+enable_mdns                  = true
+enable_kad                   = true
+
+[network.yamux]
+max_buffer_size = 1048576
+receive_window  = 262144
+max_num_streams = 8192
+
+[network.request_response]
+request_timeout_secs  = 30
+max_concurrent_streams = 100
+
+[network.kademlia]
+query_timeout_secs = 60
+kbucket_size       = 20
+
+[network.mdns]
+query_interval_secs          = 300
+ttl_secs                     = 360
+enable_ipv6                  = false
+idle_discovery_timeout_secs  = -1

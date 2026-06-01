@@ -201,3 +201,10 @@ pyrightconfig.json
 
 # pylint cache
 .pylint.d/
+
+
+*.csv
+*.out
+*.pth
+config_*.json
+*.json

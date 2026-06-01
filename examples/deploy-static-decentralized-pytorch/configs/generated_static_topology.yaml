@@ -1,0 +1,30 @@
+topology:
+  nodes:
+    node_1:
+      can_send_to:
+      - node_2
+      - node_4
+      can_receive_from:
+      - node_2
+      - node_4
+    node_2:
+      can_send_to:
+      - node_1
+      - node_3
+      can_receive_from:
+      - node_1
+      - node_3
+    node_3:
+      can_send_to:
+      - node_2
+      - node_4
+      can_receive_from:
+      - node_2
+      - node_4
+    node_4:
+      can_send_to:
+      - node_1
+      - node_3
+      can_receive_from:
+      - node_1
+      - node_3

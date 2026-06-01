@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "quickstart-decentralized"
+version = "0.1.0"
+description = "Quickstart example for Flower decentralized federated learning (DNode)"
+
+dependencies = [
+    "flwr[decentralized]>=1.30.0",
+    "pyyaml>=6.0",
+    "scikit-learn>=1.3.0",
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+pytorch = [
+    "flwr-datasets[vision]>=0.6.0",
+    "torch==2.8.0",
+    "torchvision==0.23.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["quickstart_decentralized"]
+
+[project.scripts]
+run-dynamic     = "quickstart_decentralized.run_dynamic:main"
+run-static      = "quickstart_decentralized.run_static:main"
+run-programmatic = "quickstart_decentralized.run_programmatic:main"
+
+[tool.flwr.app.components]
+nodeapp1 = "quickstart_decentralized.node_apps:app1"
+nodeapp2 = "quickstart_decentralized.node_apps:app2"

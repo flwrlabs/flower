@@ -1,0 +1,83 @@
+# Copyright 2026 Inria (cyrille kenfack & davide frey). All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""Unit tests for decentralized node orchestration."""
+
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
+from flwr.decentralized.node import DNode, start_node
+
+
+def test_dnode_dynamic_without_sampling_raises_value_error() -> None:
+    """Dynamic topology without sampling should fail fast."""
+    dynamic_mode = object()
+
+    with (
+        patch("flwr.decentralized.node.TopologyMode") as topology_mode,
+        patch(
+            "flwr.decentralized.node.Node.__init__",
+            return_value=None,
+        ) as node_init,
+    ):
+        topology_mode.dynamic.return_value = dynamic_mode
+
+        try:
+            DNode(
+                context="ctx",
+                address="0.0.0.0",
+                port=1234,
+                topology_mode=dynamic_mode,
+                sampling_conf=None,
+            )
+            raised = False
+        except ValueError:
+            raised = True
+
+    assert raised
+    node_init.assert_not_called()
+
+
+def test_dnode_uses_sampling_config_file_when_sampling_is_provided() -> None:
+    """Sampling config should be created and forwarded as `config_path`."""
+    sampling = SimpleNamespace(config_file="sampling.json", create=MagicMock())
+
+    with patch("flwr.decentralized.node.Node.__init__", return_value=None) as node_init:
+        DNode(
+            context="ctx",
+            address="0.0.0.0",
+            port=1234,
+            topology_mode=object(),
+            sampling_conf=sampling,
+        )
+
+    sampling.create.assert_called_once()
+    assert node_init.call_args.kwargs["config_path"] == "sampling.json"
+
+
+def test_start_node_registers_runs_and_unregisters_apps() -> None:
+    """`start_node` should wire apps and clean them up in order."""
+    node = MagicMock(name="node")
+    app_a = SimpleNamespace(name="app_a", node=None)
+    app_b = SimpleNamespace(name="app_b", node=None)
+
+    start_node(node=node, applications=[app_a, app_b], timeout=77)
+
+    assert app_a.node is node
+    assert app_b.node is node
+    node.register.assert_any_call(app_name="app_a", app=app_a)
+    node.register.assert_any_call(app_name="app_b", app=app_b)
+    node.run.assert_called_once_with(timeout=77)
+    node.unregister.assert_any_call(app_name="app_a")
+    node.unregister.assert_any_call(app_name="app_b")
