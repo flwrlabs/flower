@@ -387,7 +387,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Claiming a task should create a token and move it to starting."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type="flwr-model", run_id=self.task_run_id(state)
+            task_type=TaskType.MODEL, run_id=self.task_run_id(state)
         )
         assert task_id is not None
 
@@ -413,8 +413,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         # Missing tasks cannot be claimed.
         self.assertIsNone(state.claim_task(61016))
 
-        claimed_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
-        finished_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+        claimed_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        finished_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
         assert claimed_task_id is not None and finished_task_id is not None
 
         # Claiming is single-owner and cannot be repeated.
@@ -429,7 +429,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Only starting tasks should transition to running."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type="flwr-model", run_id=self.task_run_id(state)
+            task_type=TaskType.MODEL, run_id=self.task_run_id(state)
         )
         assert task_id is not None
 
@@ -463,7 +463,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Finishing a task should store the terminal status details."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type="flwr-model", run_id=self.task_run_id(state)
+            task_type=TaskType.MODEL, run_id=self.task_run_id(state)
         )
         assert task_id is not None
 
@@ -504,7 +504,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
             assert task_id is not None
             token = state.claim_task(task_id)
             assert token is not None
@@ -530,25 +530,28 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
     def test_expired_starting_task_token_revives_task_to_pending(self) -> None:
         """Expired STARTING task claims should make tasks pending again."""
+        # Prepare: create and claim a model task.
         state = self.state_factory()
         fixed_now = now()
         run_id = self.task_run_id(state)
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
             assert task_id is not None
             pending_at = state.get_tasks(task_ids=[task_id])[0].pending_at
 
             token = state.claim_task(task_id)
             assert token is not None
 
+            # Execute: advance past claim expiry and trigger cleanup.
             mock_dt.now.return_value = fixed_now + timedelta(
                 seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
             )
             self.assertIsNone(state.get_task_by_token(token))
             self.assertFalse(state.acknowledge_task_heartbeat(task_id))
 
+        # Assert: task is pending again and can be claimed with a fresh token.
         tasks = state.get_tasks(task_ids=[task_id])
         self.assertEqual(len(tasks), 1)
         self.assertEqual(
@@ -579,7 +582,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
             assert task_id is not None
 
             token = state.claim_task(task_id)
@@ -613,7 +616,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
             assert task_id is not None
             assert state.claim_task(task_id) is not None
 
@@ -638,7 +641,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            revived_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+            revived_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
             assert revived_task_id is not None
             revived_pending_at = state.get_tasks(task_ids=[revived_task_id])[
                 0
@@ -646,7 +649,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             assert state.claim_task(revived_task_id) is not None
 
             mock_dt.now.return_value = fixed_now + timedelta(seconds=1)
-            later_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+            later_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
             assert later_task_id is not None
 
             mock_dt.now.return_value = fixed_now + timedelta(
@@ -675,7 +678,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         ) as on_expired:
             with patch("datetime.datetime") as mock_dt:
                 mock_dt.now.return_value = fixed_now
-                task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+                task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
                 assert task_id is not None
                 assert state.claim_task(task_id) is not None
 
