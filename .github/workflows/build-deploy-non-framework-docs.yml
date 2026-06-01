@@ -60,6 +60,7 @@ jobs:
           uv run --no-sync ../dev/build-hub-docs.sh
       - name: Build model docs
         run: |
+          # Reuse the framework docs environment for the shared Sphinx toolchain.
           cd framework
           uv run --no-sync ../dev/build-model-docs.sh
       - name: Deploy docs
