@@ -922,6 +922,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         flwr_aid: str | None,
         run_type: str,
         series_id: int | None = None,
+        context_node_config: UserConfig | None = None,
     ) -> int:
         """Create a new run."""
         task_type = primary_task_type_from_run_type(run_type)
@@ -968,6 +969,11 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 if resolved_series_id is None:
                     log(ERROR, "Unexpected run series membership failure.")
                     return 0
+                self._refresh_run_series_context(
+                    run_id=run_id,
+                    series_id=resolved_series_id,
+                    context_node_config=context_node_config,
+                )
                 self.query(
                     run_insert_query,
                     {

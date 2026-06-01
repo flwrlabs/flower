@@ -33,7 +33,7 @@ from uuid import uuid4
 
 from parameterized import parameterized
 
-from flwr.app import DEFAULT_TTL, Context, Error, Message, RecordDict
+from flwr.app import DEFAULT_TTL, ConfigRecord, Context, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
 from flwr.common import now
 from flwr.common.constant import (
@@ -180,6 +180,72 @@ class StateTest(CoreStateTest):
         # Assert
         run = state.get_run_info(run_ids=[run_id])[0]
         self.assertEqual(run.series_id, series_id)
+
+    def test_create_run_initializes_run_series_context(self) -> None:
+        """Test create_run initializes the run series context."""
+        # Prepare
+        state = self.state_factory()
+        context_node_config = {"output_dir": "out", "tmp_dir": "tmp"}
+
+        # Execute
+        run_id = state.create_run(
+            None,
+            None,
+            "9f86d08",
+            {},
+            "health-federation",
+            None,
+            "i1r9f",
+            RunType.SERVER_APP,
+            context_node_config=context_node_config,
+        )
+
+        # Assert
+        run = state.get_run_info(run_ids=[run_id])[0]
+        run_context = state.get_run_series_context(run.series_id)
+        assert run_context is not None
+        self.assertEqual(run_context.run_id, run_id)
+        self.assertEqual(run_context.node_id, SUPERLINK_NODE_ID)
+        self.assertEqual(run_context.node_config, context_node_config)
+        self.assertEqual(run_context.state, RecordDict())
+        self.assertEqual(run_context.run_config, {})
+        self.assertEqual(run_context.series_id, run.series_id)
+
+    def test_create_run_refreshes_existing_run_series_context(self) -> None:
+        """Test create_run refreshes context for an existing run series."""
+        # Prepare
+        state = self.state_factory()
+        initial_run_id = create_dummy_run(state, federation="health-federation")
+        series_id = state.get_run_info(run_ids=[initial_run_id])[0].series_id
+        shared_state = RecordDict({"shared": ConfigRecord({"value": "kept"})})
+        initial_context = Context(
+            run_id=initial_run_id,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={"stale": "node-config"},
+            state=shared_state,
+            run_config={"existing": "context"},
+            series_id=series_id,
+        )
+        state.set_run_series_context(series_id, initial_context)
+        context_node_config = {"output_dir": "out", "tmp_dir": "tmp"}
+
+        # Execute
+        run_id = create_dummy_run(
+            state,
+            federation="health-federation",
+            series_id=series_id,
+            context_node_config=context_node_config,
+        )
+
+        # Assert
+        run_context = state.get_run_series_context(series_id)
+        assert run_context is not None
+        self.assertEqual(run_context.run_id, run_id)
+        self.assertEqual(run_context.node_id, SUPERLINK_NODE_ID)
+        self.assertEqual(run_context.node_config, context_node_config)
+        self.assertEqual(run_context.state, shared_state)
+        self.assertEqual(run_context.run_config, {})
+        self.assertEqual(run_context.series_id, series_id)
 
     def test_create_run_reuses_series_id_in_same_federation(self) -> None:
         """Test multiple runs can link to the same federation run series."""
@@ -1720,75 +1786,6 @@ class StateTest(CoreStateTest):
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 0
 
-    def test_get_set_run_series_context(self) -> None:
-        """Test get and set run series context."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state)
-        series_id = state.get_run_info(run_ids=[run_id])[0].series_id
-        context = Context(
-            run_id=run_id,
-            node_id=SUPERLINK_NODE_ID,
-            node_config={"mock": "mock"},
-            state=RecordDict(),
-            run_config={"test": "test"},
-            series_id=series_id,
-        )
-
-        # Execute
-        init = state.get_run_series_context(series_id)
-        state.set_run_series_context(series_id, context)
-        retrieved_context = state.get_run_series_context(series_id)
-
-        # Assert
-        assert init is None
-        assert retrieved_context == context
-
-    def test_set_run_series_context_after_finished_run(self) -> None:
-        """Context can be persisted after normal task completion."""
-        state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state)
-        series_id = state.get_run_info(run_ids=[run_id])[0].series_id
-        task_id = get_primary_task_id(state, run_id)
-        context = Context(
-            run_id=run_id,
-            node_id=SUPERLINK_NODE_ID,
-            node_config={},
-            state=RecordDict(),
-            run_config={},
-            series_id=series_id,
-        )
-
-        assert state.claim_task(task_id) is not None
-        assert state.activate_task(task_id)
-        assert state.finish_task(task_id, SubStatus.COMPLETED, "done")
-        state.set_run_series_context(series_id, context)
-
-        assert state.get_run_series_context(series_id) == context
-
-    def test_run_series_context_is_shared_by_runs_in_series(self) -> None:
-        """Runs linked to the same series share one persisted context."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        run_id_1 = create_dummy_run(state)
-        series_id = state.get_run_info(run_ids=[run_id_1])[0].series_id
-        run_id_2 = create_dummy_run(state, series_id=series_id)
-        context = Context(
-            run_id=run_id_1,
-            node_id=SUPERLINK_NODE_ID,
-            node_config={"mock": "mock"},
-            state=RecordDict(),
-            run_config={"test": "test"},
-            series_id=series_id,
-        )
-
-        # Execute
-        state.set_run_series_context(series_id, context)
-
-        # Assert
-        assert state.get_run_info(run_ids=[run_id_2])[0].series_id == series_id
-        assert state.get_run_series_context(series_id) == context
-
     def test_create_run_with_and_without_federation_config(self) -> None:
         """Test that run federation config is stored on the run."""
         # Prepare
@@ -2018,6 +2015,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     flwr_aid: str | None = "mock_flwr_aid",
     run_type: str = RunType.SERVER_APP,
     series_id: int | None = None,
+    context_node_config: UserConfig | None = None,
 ) -> int:
     """Create a dummy run."""
     return state.create_run(
@@ -2030,6 +2028,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
         flwr_aid=flwr_aid,
         run_type=run_type,
         series_id=series_id,
+        context_node_config=context_node_config,
     )
 
 

@@ -26,7 +26,7 @@ from typing import Any, cast
 import grpc
 import requests
 
-from flwr.app import Context, RecordDict
+from flwr.app.user_config import UserConfig
 from flwr.cli.utils import validate_federation_name
 from flwr.common import now
 from flwr.common.config import (
@@ -48,7 +48,6 @@ from flwr.common.constant import (
     PULL_UNFINISHED_RUN_MESSAGE,
     RUN_EVENTS_STREAM_INTERVAL,
     RUN_ID_NOT_FOUND_MESSAGE,
-    SUPERLINK_NODE_ID,
     TRANSPORT_TYPE_GRPC_ADAPTER,
     Status,
 )
@@ -241,6 +240,13 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 )
             fab_id, fab_version = get_metadata_from_config(fab_config)
 
+            node_config: UserConfig = {}
+            if self.artifact_provider is not None:
+                node_config = {
+                    "output_dir": self.artifact_provider.output_dir,
+                    "tmp_dir": self.artifact_provider.tmp_dir,
+                }
+
             run_id = state.create_run(
                 fab_id,
                 fab_version,
@@ -251,6 +257,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 flwr_aid,
                 run_type,
                 request.series_id if request.HasField("series_id") else None,
+                context_node_config=node_config,
             )
 
             if run_id == 0:
@@ -259,35 +266,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     "Failed to create or initialize the run.",
                 )
 
-            # Initialize node config
-            node_config = {}
-            if self.artifact_provider is not None:
-                node_config = {
-                    "output_dir": self.artifact_provider.output_dir,
-                    "tmp_dir": self.artifact_provider.tmp_dir,
-                }
-
             runs = state.get_run_info(run_ids=[run_id])
             series_id = runs[0].series_id
-
-            # Create an empty context for the Run
-            run_context = Context(
-                run_id=run_id,
-                node_id=SUPERLINK_NODE_ID,
-                # Dict is invariant in mypy
-                node_config=node_config,  # type: ignore[arg-type]
-                state=RecordDict(),
-                run_config={},
-                series_id=series_id,
-            )
-
-            # Register the context for the run series. If the run joins an
-            # existing series, preserve its shared state while refreshing
-            # run-specific fields for the newly created run.
-            existing_context = state.get_run_series_context(series_id)
-            if existing_context is not None:
-                run_context.state = existing_context.state
-            state.set_run_series_context(series_id=series_id, context=run_context)
 
         except ValueError as e:
             log(ERROR, "Could not start run: %s", str(e))
