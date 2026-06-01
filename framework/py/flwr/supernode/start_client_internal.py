@@ -407,11 +407,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                 run_id=run_id,
                 node_id=state.get_node_id(),
                 node_config=node_config,
-                state=(
-                    existing_context.state
-                    if existing_context is not None
-                    else RecordDict()
-                ),
+                state=RecordDict(),
                 run_config=run_cfg,
                 series_id=run_info.series_id,
             )
