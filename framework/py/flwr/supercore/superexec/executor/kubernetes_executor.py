@@ -340,6 +340,9 @@ def _validate_string_map(name: str, values: dict[str, str]) -> None:
 
 def _copy_json_object(value: object) -> JSONObject:
     """Return a plain dict/list copy of a JSON object."""
+    # Keep config objects normal and copy only when rendering Kubernetes payloads.
+    # This avoids recursive freeze/thaw while preventing rendered bodies from sharing
+    # mutable nested structures with caller-owned config.
     return cast(JSONObject, _copy_json_value(value))
 
 
@@ -348,6 +351,7 @@ def _copy_json_value(value: object) -> object:
     if isinstance(value, Mapping):
         return {key: _copy_json_value(nested) for key, nested in value.items()}
     if isinstance(value, Sequence) and not isinstance(value, str):
+        # Normalize tuples and other sequences to JSON lists at the API boundary.
         return [_copy_json_value(nested) for nested in value]
     return value
 
@@ -382,6 +386,8 @@ def _exception_status(exc: Exception) -> int | None:
 
 def _is_capacity_message(message: str) -> bool:
     """Return true for quota/admission capacity rejection messages."""
+    # Status codes are preferred above; this intentionally brittle fallback covers
+    # common Kubernetes quota/scheduler wording when clients only expose messages.
     capacity_markers = (
         "exceeded quota",
         "resourcequota",
