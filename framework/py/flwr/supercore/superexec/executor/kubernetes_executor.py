@@ -83,12 +83,20 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
             self.service_account_name.strip()
         ):
             raise ValueError("Service account name must not be empty.")
-        if self.resource_pool is not None and not self.resource_pool.strip():
-            raise ValueError("Resource pool must not be empty.")
-        if self.priority_class_name is not None and not (
-            self.priority_class_name.strip()
-        ):
-            raise ValueError("Priority class name must not be empty.")
+        if self.resource_pool is not None:
+            if not self.resource_pool.strip():
+                raise ValueError("Resource pool must not be empty.")
+            if self.resource_pool != self.resource_pool.strip():
+                raise ValueError(
+                    "Resource pool must not include leading/trailing whitespace."
+                )
+        if self.priority_class_name is not None:
+            if not self.priority_class_name.strip():
+                raise ValueError("Priority class name must not be empty.")
+            if self.priority_class_name != self.priority_class_name.strip():
+                raise ValueError(
+                    "Priority class name must not include leading/trailing whitespace."
+                )
         if self.labels is not None:
             _validate_labels(self.labels)
         if self.annotations is not None:
