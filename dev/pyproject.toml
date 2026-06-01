@@ -10,7 +10,7 @@ license = "Apache-2.0"
 authors = [{ name = "The Flower Authors", email = "hello@flower.ai" }]
 requires-python = ">=3.11"
 dependencies = [
-    "black==25.11.0",
+    "black==26.3.1",
     "grpcio-tools==1.70.0",
     "mypy-protobuf==3.6.0",
     "PyYAML>=6.0.2,<7.0.0",
@@ -45,7 +45,7 @@ dev = [
     "mdformat-frontmatter==2.0.10",
     "mdformat-beautysh==1.0.0",
     "beautysh==6.4.2",
-    "GitPython==3.1.41",
+    "GitPython==3.1.50",
     "sphinx-substitution-extensions==2022.2.16",
     "sphinxext-opengraph==0.9.1",
     "docstrfmt",

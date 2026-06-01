@@ -444,7 +444,7 @@ provides-extras = ["vision", "audio"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "black", extras = ["jupyter"], specifier = "==25.11.0" },
+    { name = "black", extras = ["jupyter"], specifier = "==26.3.1" },
     { name = "devtool", editable = "../../../dev" },
     { name = "isort", specifier = "==5.13.2" },
     { name = "mypy", specifier = "==1.8.0" },
