@@ -135,26 +135,41 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             verifications=json.loads(row["verifications"]),
         )
 
-    def get_run_series(
+    def get_run_series(  # pylint: disable=R0914
         self,
         *,
-        federation: str | None = None,
+        series_ids: Sequence[int] | None = None,
+        federations: Sequence[str] | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
-        """Return RunSeries metadata, optionally filtered by federation."""
+        """Return RunSeries metadata, optionally filtered by the given filters."""
         # Validate limit before building the SQL query.
         if limit is not None and limit < 0:
             raise ValueError("`limit` must be >= 0")
-        if limit == 0:
+        if (
+            limit == 0
+            or (series_ids is not None and not series_ids)
+            or (federations is not None and not federations)
+        ):
             return []
 
         # Build optional filters for the run-series page.
         conditions: list[str] = []
         params: dict[str, Any] = {}
-        if federation is not None:
-            conditions.append("federation = :federation")
-            params["federation"] = federation
+        if series_ids is not None:
+            sint64_series_ids = [uint64_to_int64(series_id) for series_id in series_ids]
+            placeholders = ",".join(
+                [f":sid_{i}" for i in range(len(sint64_series_ids))]
+            )
+            conditions.append(f"series_id IN ({placeholders})")
+            params.update(
+                {f"sid_{i}": series_id for i, series_id in enumerate(sint64_series_ids)}
+            )
+        if federations is not None:
+            placeholders = ",".join([f":fed_{i}" for i in range(len(federations))])
+            conditions.append(f"federation IN ({placeholders})")
+            params.update({f"fed_{i}": fed for i, fed in enumerate(federations)})
         if updated_before is not None:
             conditions.append("updated_at < :updated_before")
             params["updated_before"] = datetime.fromisoformat(updated_before)

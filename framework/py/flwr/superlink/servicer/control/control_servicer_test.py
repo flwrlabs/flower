@@ -23,7 +23,7 @@ import time
 import unittest
 from datetime import datetime
 from types import SimpleNamespace
-from typing import cast
+from typing import Any, cast
 from unittest.mock import MagicMock, Mock, patch
 
 import grpc
@@ -51,6 +51,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     CreateFederationRequest,
     CreateInvitationRequest,
     CreateInvitationResponse,
+    GetRunSeriesRequest,
     ListFederationsRequest,
     ListFederationsResponse,
     ListInvitationsRequest,
@@ -79,6 +80,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
+from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
 from flwr.supercore.constant import (
@@ -144,6 +146,23 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             None,
             flwr_aid,
             RunType.SERVER_APP,
+        )
+
+    def _create_dummy_run_series(
+        self,
+        series_id: int,
+        *,
+        federation: str = NOOP_FEDERATION,
+        updated_at: str = "2026-05-30T00:00:00+00:00",
+        run_ids: list[int] | None = None,
+    ) -> None:
+        cast(Any, self.state).run_series_store[series_id] = RunSeries(
+            series_id=series_id,
+            federation=federation,
+            description=f"series {series_id}",
+            created_at="2026-05-29T00:00:00+00:00",
+            updated_at=updated_at,
+            run_ids=run_ids or [],
         )
 
     def test_start_run(self) -> None:
@@ -526,6 +545,48 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Assert
         self.assertLess(abs(retrieved_timestamp - now().timestamp()), 1e-3)
         self.assertEqual(set(response.run_dict.keys()), {run_id})
+
+    def test_get_run_series_returns_context(self) -> None:
+        """Test GetRunSeries returns series metadata and shared Context."""
+        # Prepare
+        series_id = 10
+        run_id = self._create_dummy_run(self.aid)
+        self._create_dummy_run_series(series_id, run_ids=[run_id])
+        shared_context = Context(
+            run_id=0,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={},
+            state=RecordDict(),
+            run_config={},
+            series_id=series_id,
+        )
+        self.state.set_run_series_context(series_id, shared_context)
+
+        # Execute
+        response = self.servicer.GetRunSeries(
+            GetRunSeriesRequest(series_id=series_id), Mock()
+        )
+
+        # Assert
+        self.assertEqual(response.series.series_id, series_id)
+        self.assertEqual(response.series.last_run_status.status, Status.PENDING)
+        self.assertTrue(response.HasField("context"))
+        self.assertEqual(response.context.series_id, series_id)
+
+    def test_get_run_series_aborts_for_unknown_series(self) -> None:
+        """Test GetRunSeries returns NOT_FOUND for unknown RunSeries IDs."""
+        # Prepare
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        # Execute/Assert
+        with self.assertRaises(grpc.RpcError):
+            self.servicer.GetRunSeries(GetRunSeriesRequest(series_id=999), context)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.NOT_FOUND,
+            "Run series ID not found.",
+        )
 
     def test_stop_run(self) -> None:
         """Test StopRun method of ControlServicer."""
