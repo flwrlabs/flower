@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for Alembic migration helpers."""
 
+
 import unittest
 from collections.abc import Sequence
 from pathlib import Path
