@@ -12,9 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+<<<<<<<< HEAD:framework/py/flwr/supercore/task_process/agent/__init__.py
 """Private agent task process helpers."""
 
 
 from .run_agentapp import run_agentapp
 
 __all__ = ["run_agentapp"]
+========
+"""Private model task process helpers."""
+
+
+from .run_model import run_model
+
+__all__ = ["run_model"]
+>>>>>>>> origin:framework/py/flwr/supercore/task_process/model/__init__.py

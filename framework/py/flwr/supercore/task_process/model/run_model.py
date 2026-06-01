@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+<<<<<<< HEAD
 """Flower model task process."""
 
 
@@ -52,6 +53,25 @@ _UNKNOWN_ERROR_DETAILS = "Model task failed with unknown error."
 
 
 def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
+=======
+"""Flower ModelApp process."""
+
+
+from pathlib import Path
+from queue import Queue
+
+from flwr.common import EventType
+from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
+from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
+from flwr.common.logger import stop_log_uploader
+from flwr.supercore.app_utils import start_parent_process_monitor
+from flwr.supercore.superexec.dependency_installer import (
+    cleanup_app_runtime_environment,
+)
+
+
+def run_model(  # pylint: disable=R0913, R0917
+>>>>>>> origin
     serverappio_api_address: str,
     log_queue: Queue[str | None],
     token: str,
@@ -59,11 +79,19 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
     parent_pid: int | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
+<<<<<<< HEAD
     """Run Flower model task process."""
+=======
+    """Run Flower ModelApp process.
+
+    This runtime is intentionally a stub until ModelApp execution support is added.
+    """
+>>>>>>> origin
     # Monitor the main process in case of SIGKILL
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
 
+<<<<<<< HEAD
     channel, stub, retry_invoker = _create_serverappio_stub(
         serverappio_api_address=serverappio_api_address,
         token=token,
@@ -76,10 +104,20 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
     sub_status = SubStatus.FAILED
     details = _UNKNOWN_ERROR_DETAILS
     exit_code = ExitCode.SUCCESS
+=======
+    log_uploader = None
+    runtime_env_dir: Path | None = None
+
+    def on_exit() -> None:
+        if log_uploader:
+            stop_log_uploader(log_queue, log_uploader)
+        cleanup_app_runtime_environment(runtime_env_dir)
+>>>>>>> origin
 
     register_signal_handlers(
         event_type=EventType.FLWR_MODEL_RUN_LEAVE,
         exit_message="Run stopped by user.",
+<<<<<<< HEAD
     )
 
     try:
@@ -179,3 +217,22 @@ def _create_serverappio_stub(
     retry_invoker = make_simple_grpc_retry_invoker()
     wrap_stub(stub, retry_invoker)
     return channel, stub, retry_invoker
+=======
+        exit_handlers=[on_exit],
+    )
+
+    _ = (
+        serverappio_api_address,
+        log_queue,
+        token,
+        certificates,
+        parent_pid,
+        runtime_dependency_install,
+    )
+    flwr_exit(
+        ExitCode.SERVERAPP_EXCEPTION,
+        "`flwr-model` is not implemented yet.",
+        event_type=EventType.FLWR_MODEL_RUN_LEAVE,
+        event_details={"success": False},
+    )
+>>>>>>> origin
