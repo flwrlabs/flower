@@ -47,17 +47,23 @@ class CoreState(ABC):  # pylint: disable=R0904
     def get_run_series(
         self,
         *,
-        federation: str | None = None,
+        series_ids: Sequence[int] | None = None,
+        federations: Sequence[str] | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
-        """Return RunSeries metadata, optionally filtered by federation.
+        """Return RunSeries metadata, optionally filtered by the given filters.
+
+        - If a filter is set to None, it is ignored.
+        - If multiple filters are provided, they are combined using AND logic.
+        - Within each filter, provided values are combined using OR logic.
 
         Parameters
         ----------
-        federation : str | None (default: None)
-            Federation name used to filter RunSeries. If `None`, RunSeries from all
-            federations are returned.
+        series_ids : Optional[Sequence[int]] (default: None)
+            Sequence of RunSeries IDs to filter by.
+        federations : Optional[Sequence[str]] (default: None)
+            Sequence of federation names to filter by.
         updated_before : str | None (default: None)
             If set, return only RunSeries updated before this ISO timestamp.
         limit : int | None (default: None)

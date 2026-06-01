@@ -125,20 +125,33 @@ class InMemoryCoreState(
     def get_run_series(
         self,
         *,
-        federation: str | None = None,
+        series_ids: Sequence[int] | None = None,
+        federations: Sequence[str] | None = None,
         updated_before: str | None = None,
         limit: int | None = None,
     ) -> Sequence[RunSeries]:
-        """Return RunSeries metadata, optionally filtered by federation."""
+        """Return RunSeries metadata, optionally filtered by the given filters."""
         if limit is not None and limit < 0:
             raise AssertionError("`limit` must be >= 0")
-        if limit == 0:
+        if (
+            limit == 0
+            or (series_ids is not None and not series_ids)
+            or (federations is not None and not federations)
+        ):
             return []
+
+        series_id_set = set(series_ids) if series_ids is not None else None
+        federation_set = set(federations) if federations is not None else None
 
         with self.lock_run_series_store:
             run_series = []
             for record in self.run_series_store.values():
-                if federation is not None and record.federation != federation:
+                if series_id_set is not None and record.series_id not in series_id_set:
+                    continue
+                if (
+                    federation_set is not None
+                    and record.federation not in federation_set
+                ):
                     continue
                 if updated_before is not None and record.updated_at >= updated_before:
                     continue
