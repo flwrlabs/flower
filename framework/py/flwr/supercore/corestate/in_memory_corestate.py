@@ -384,6 +384,11 @@ class InMemoryCoreState(
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
+        if sub_status not in (SubStatus.COMPLETED, SubStatus.STOPPED, SubStatus.FAILED):
+            err = f"Invalid sub_status '{sub_status}' for finishing task {task_id}"
+            log(ERROR, err)
+            return False
+
         with self.lock_task_store:
             # Expire non-responsive tasks before transitioning task status.
             self._cleanup_expired_task_tokens_locked()
