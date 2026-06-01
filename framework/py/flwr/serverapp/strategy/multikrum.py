@@ -26,7 +26,8 @@ from typing import cast
 
 import numpy as np
 
-from flwr.common import ArrayRecord, Message, MetricRecord, NDArray, RecordDict, log
+from flwr.app import ArrayRecord, Message, MetricRecord, RecordDict
+from flwr.common import NDArray, log
 
 from .fedavg import FedAvg
 from .strategy_utils import aggregate_arrayrecords

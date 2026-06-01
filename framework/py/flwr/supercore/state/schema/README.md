@@ -118,7 +118,6 @@ erDiagram
     TIMESTAMP created_at
     VARCHAR description "nullable"
     VARCHAR federation
-    BIGINT last_run_id "nullable"
     TIMESTAMP updated_at
   }
 
@@ -128,7 +127,7 @@ erDiagram
   }
 
   series_runs {
-    BIGINT id PK
+    INTEGER id PK
     BIGINT run_id UK
     BIGINT series_id
   }

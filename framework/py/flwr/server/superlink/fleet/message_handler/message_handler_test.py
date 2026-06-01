@@ -17,8 +17,9 @@
 
 from unittest.mock import MagicMock
 
+from flwr.app import Metadata, RecordDict
 from flwr.app.message import make_message
-from flwr.common import Metadata, RecordDict, now
+from flwr.common import now
 from flwr.common.constant import Status
 from flwr.common.serde import message_to_proto
 from flwr.common.typing import RunStatus

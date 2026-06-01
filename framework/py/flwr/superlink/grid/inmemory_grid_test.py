@@ -22,7 +22,8 @@ from collections.abc import Iterable
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from flwr.common import Message, RecordDict, now
+from flwr.app import Message, RecordDict
+from flwr.common import now
 from flwr.common.constant import (
     HEARTBEAT_INTERVAL_INF,
     NODE_ID_NUM_BYTES,

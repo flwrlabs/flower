@@ -20,7 +20,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
-from flwr.common import Context
+from flwr.app import Context
 from flwr.supercore.typing import JSONObject
 
 

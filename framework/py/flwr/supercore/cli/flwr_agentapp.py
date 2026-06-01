@@ -23,7 +23,7 @@ from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log, mirror_output_to_queue, restore_output
-from flwr.supercore.executors.run_agentapp import run_agentapp
+from flwr.supercore.task_process import run_agentapp
 
 
 def flwr_agentapp() -> None:

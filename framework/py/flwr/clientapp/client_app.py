@@ -19,6 +19,7 @@ import inspect
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
+from flwr.app import Context, Message
 from flwr.app.message_type import MessageType
 from flwr.app.metadata import validate_message_type
 from flwr.client.client import Client
@@ -27,7 +28,6 @@ from flwr.client.message_handler.message_handler import (
 )
 from flwr.client.mod.utils import make_ffn
 from flwr.client.typing import ClientFnExt, Mod
-from flwr.common import Context, Message
 from flwr.common.logger import warn_deprecated_feature
 
 from .typing import ClientAppCallable
@@ -40,7 +40,7 @@ def _alert_erroneous_client_fn() -> None:
         "A `ClientApp` cannot make use of a `client_fn` that does "
         "not have a signature in the form: `def client_fn(context: "
         "Context)`. You can import the `Context` like this: "
-        "`from flwr.common import Context`"
+        "`from flwr.app import Context`"
     )
 
 
@@ -59,7 +59,7 @@ def _inspect_maybe_adapt_client_fn_signature(client_fn: ClientFnExt) -> ClientFn
             "`client_fn` now expects a signature `def client_fn(context: Context)`."
             "The provided `client_fn` has signature: "
             f"{dict(client_fn_args.items())}. You can import the `Context` like this:"
-            " `from flwr.common import Context`"
+            " `from flwr.app import Context`"
         )
 
         # Wrap depcreated client_fn inside a function with the expected signature

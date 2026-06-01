@@ -31,10 +31,11 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from cryptography.hazmat.primitives.serialization.ssh import load_ssh_public_key
 from grpc import RpcError
 
+from flwr.app import Context, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
 from flwr.client.grpc_adapter_client.connection import grpc_adapter
 from flwr.client.grpc_rere_client.connection import grpc_request_response
-from flwr.common import GRPC_MAX_MESSAGE_LENGTH, Context, Error, Message, RecordDict
+from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.config import get_fused_config_from_fab
 from flwr.common.constant import (
     CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
@@ -400,18 +401,21 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                     _insert_message(reply, state, object_store)
                     return run_id
 
-            # Initialize the context
+            # Initialize or refresh the context
             run_cfg = get_fused_config_from_fab(fab.content, run_info)
-            run_ctx = Context(
+            context = Context(
                 run_id=run_id,
                 node_id=state.get_node_id(),
                 node_config=node_config,
                 state=RecordDict(),
                 run_config=run_cfg,
+                series_id=run_info.series_id,
             )
+            if existing_context := state.get_run_series_context(run_info.series_id):
+                context.state = existing_context.state
 
             # Store in the state
-            state.store_context(run_ctx)
+            state.set_run_series_context(run_info.series_id, context)
             state.store_run(run_info)
             state.store_fab(fab)
 
