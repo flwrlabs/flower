@@ -18,7 +18,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
-from flwr.common import Message, RecordDict
+from flwr.app import Message, RecordDict
 from flwr.common.typing import Run
 
 

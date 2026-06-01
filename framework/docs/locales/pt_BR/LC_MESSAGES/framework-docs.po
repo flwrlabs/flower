@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-05-29 00:30+0000\n"
+"POT-Creation-Date: 2026-05-31 00:29+0000\n"
 "PO-Revision-Date: 2026-05-23 06:54+0000\n"
 "Last-Translator: Gustavo Bertoli <gubertoli@gmail.com>\n"
 "Language: pt_BR\n"
@@ -260,33 +260,34 @@ msgstr ""
 msgid ""
 "We also use this to define the public API of private subpackages. Public,"
 " in this context, means the API that other ``flwr`` subpackages should "
-"use. For example, ``flwr.server.grid`` is a private subpackage (it's not "
-"exported via ``src/py/flwr/server/__init__.py``'s ``__all__``)."
+"use. For example, ``flwr.superlink.grid`` is a private subpackage (it's "
+"not re-exported via ``src/py/flwr/superlink/__init__.py``)."
 msgstr ""
 
 #: ../../source/contributor-explanation-public-and-private-apis.rst:120
 msgid ""
-"Still, the private sub-package ``flwr.server.grid`` defines a \"public\" "
-"API using ``__all__`` in ``src/py/flwr/server/grid/__init__.py``:"
+"Still, the private sub-package ``flwr.superlink.grid`` defines a "
+"\"public\" API using ``__all__`` in "
+"``src/py/flwr/superlink/grid/__init__.py``:"
 msgstr ""
 
-#: ../../source/contributor-explanation-public-and-private-apis.rst:136
+#: ../../source/contributor-explanation-public-and-private-apis.rst:133
 msgid ""
 "The interesting part is that both ``GrpcGrid`` and ``InMemoryGrid`` are "
 "never used by Flower framework users, only by other parts of the Flower "
 "framework codebase. Those other parts of the codebase import, for "
-"example, ``InMemoryGrid`` using ``from flwr.server.driver import "
+"example, ``InMemoryGrid`` using ``from flwr.superlink.grid import "
 "InMemoryGrid`` (i.e., the ``InMemoryGrid`` exported via ``__all__``), not"
-" ``from flwr.server.driver.in_memory_driver import InMemoryGrid`` "
-"(``in_memory_driver.py`` is the module containing the actual "
+" ``from flwr.superlink.grid.inmemory_grid import InMemoryGrid`` "
+"(``inmemory_grid.py`` is the module containing the actual "
 "``InMemoryGrid`` class definition)."
 msgstr ""
 
-#: ../../source/contributor-explanation-public-and-private-apis.rst:144
+#: ../../source/contributor-explanation-public-and-private-apis.rst:141
 msgid ""
-"This is because ``flwr.server.driver`` defines a public interface for "
+"This is because ``flwr.superlink.grid`` defines a public interface for "
 "other ``flwr`` subpackages. This allows codeowners of "
-"``flwr.server.driver`` to refactor the package without breaking other "
+"``flwr.superlink.grid`` to refactor the package without breaking other "
 "``flwr``-internal users."
 msgstr ""
 
@@ -6077,6 +6078,7 @@ msgstr ""
 
 #: ../../source/helm/how-to-deploy-superlink-using-helm.md:681
 #: ../../source/helm/how-to-deploy-supernode-using-helm.md:236
+#: ../../source/ref-api/flwr.agentapp.AgentResponses.rst
 #: ../../source/ref-api/flwr.app.Array.rst
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst
 #: ../../source/ref-api/flwr.app.ConfigRecord.rst
@@ -6110,7 +6112,7 @@ msgstr ""
 #: flwr.clientapp.client_app.ClientApp.evaluate
 #: flwr.clientapp.client_app.ClientApp.query
 #: flwr.clientapp.client_app.ClientApp.train
-#: flwr.server.grid.grid.Grid.send_and_receive of
+#: flwr.serverapp.grid.grid.Grid.send_and_receive of
 msgid "Parameters"
 msgstr ""
 
@@ -17335,43 +17337,300 @@ msgstr ""
 msgid "Modules"
 msgstr ""
 
-#: ../../source/ref-api/flwr.rst:34:<autosummary>:1
+#: ../../source/ref-api/flwr.rst:35:<autosummary>:1
+msgid ":py:obj:`agentapp <flwr.agentapp>`\\"
+msgstr ""
+
+#: ../../source/ref-api/flwr.rst:35:<autosummary>:1 flwr.agentapp:1 of
+#, fuzzy
+msgid "Public Flower AgentApp APIs."
+msgstr "``FLWR_VERSION``"
+
+#: ../../source/ref-api/flwr.rst:35:<autosummary>:1
 msgid ":py:obj:`app <flwr.app>`\\"
 msgstr ""
 
-#: ../../source/ref-api/flwr.rst:34:<autosummary>:1 flwr.app:1 of
+#: ../../source/ref-api/flwr.rst:35:<autosummary>:1 flwr.app:1 of
 #, fuzzy
 msgid "Public Flower App APIs."
 msgstr "O nome do repositório da imagem base."
 
-#: ../../source/ref-api/flwr.rst:34:<autosummary>:1
+#: ../../source/ref-api/flwr.rst:35:<autosummary>:1
 msgid ":py:obj:`clientapp <flwr.clientapp>`\\"
 msgstr ""
 
-#: ../../source/ref-api/flwr.rst:34:<autosummary>:1 flwr.clientapp:1 of
+#: ../../source/ref-api/flwr.rst:35:<autosummary>:1 flwr.clientapp:1 of
 #, fuzzy
 msgid "Public Flower ClientApp APIs."
 msgstr "``FLWR_VERSION``"
 
-#: ../../source/ref-api/flwr.rst:34:<autosummary>:1
+#: ../../source/ref-api/flwr.rst:35:<autosummary>:1
 msgid ":py:obj:`serverapp <flwr.serverapp>`\\"
 msgstr ""
 
-#: ../../source/ref-api/flwr.rst:34:<autosummary>:1 flwr.serverapp:1 of
+#: ../../source/ref-api/flwr.rst:35:<autosummary>:1 flwr.serverapp:1 of
 #, fuzzy
 msgid "Public Flower ServerApp APIs."
 msgstr "Clone o repositório do flower."
 
-#: ../../source/ref-api/flwr.app.rst:2
-msgid "app"
-msgstr ""
+#: ../../source/ref-api/flwr.agentapp.rst:2
+#, fuzzy
+msgid "agentapp"
+msgstr "O nome do repositório da imagem base."
 
+#: ../../source/ref-api/flwr.agentapp.rst:17
 #: ../../source/ref-api/flwr.app.rst:17
 #: ../../source/ref-api/flwr.clientapp.mod.rst:27
 #: ../../source/ref-api/flwr.clientapp.rst:17
 #: ../../source/ref-api/flwr.serverapp.rst:17
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:17
 msgid "Classes"
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.rst:24:<autosummary>:1
+msgid ":py:obj:`AgentApp <flwr.agentapp.AgentApp>`\\ \\(\\)"
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.rst:24:<autosummary>:1
+#: flwr.agentapp.agent_app.AgentApp:1 of
+#, fuzzy
+msgid "Flower AgentApp."
+msgstr "O nome do repositório da imagem base."
+
+#: ../../source/ref-api/flwr.agentapp.rst:24:<autosummary>:1
+msgid ":py:obj:`AgentResponses <flwr.agentapp.AgentResponses>`\\ \\(\\)"
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.rst:24:<autosummary>:1
+#: flwr.agentapp.base.AgentResponses:1 of
+msgid "Abstract base class for AgentApp model response creation."
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.rst:24:<autosummary>:1
+msgid ":py:obj:`AgentSession <flwr.agentapp.AgentSession>`\\ \\(\\)"
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.rst:24:<autosummary>:1
+#: flwr.agentapp.base.AgentSession:1 of
+msgid "Abstract base class for AgentApp runtime capabilities."
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.AgentApp.rst:2
+#, fuzzy
+msgid "AgentApp"
+msgstr "O nome do repositório da imagem base."
+
+#: flwr.agentapp.agent_app.AgentApp:1 flwr.app.error.Error:1
+#: flwr.app.message.context.Context:1 flwr.app.message_type.MessageType:1
+#: flwr.app.metadata.Metadata:1 flwr.clientapp.client_app.ClientApp:1
+#: flwr.clientapp.mod.localdp_mod.LocalDpMod:1
+#: flwr.serverapp.server_app.ServerApp:1
+#: flwr.serverapp.strategy.result.Result:1 of
+msgid "Bases: :py:class:`object`"
+msgstr ""
+
+#: flwr.agentapp.agent_app.AgentApp:4 flwr.agentapp.agent_app.AgentApp.main:4
+#: flwr.app.message.array.Array:35 flwr.app.message.arrayrecord.ArrayRecord:36
+#: flwr.app.message.configrecord.ConfigRecord:20
+#: flwr.app.message.metricrecord.MetricRecord:19
+#: flwr.app.message.recorddict.RecordDict:14
+#: flwr.clientapp.client_app.ClientApp:4
+#: flwr.clientapp.client_app.ClientApp.evaluate:12
+#: flwr.clientapp.client_app.ClientApp.lifespan:7
+#: flwr.clientapp.client_app.ClientApp.query:12
+#: flwr.clientapp.client_app.ClientApp.train:12
+#: flwr.clientapp.mod.localdp_mod.LocalDpMod:22
+#: flwr.serverapp.server_app.ServerApp:4
+#: flwr.serverapp.server_app.ServerApp.lifespan:7
+#: flwr.serverapp.server_app.ServerApp.main:4
+#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:31
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:21
+#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:14
+#: of
+msgid "Examples"
+msgstr ""
+
+#: flwr.agentapp.agent_app.AgentApp:5 of
+msgid "Define an AgentApp with a single main function::"
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.AgentApp.rst:15
+#: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:15
+#: ../../source/ref-api/flwr.agentapp.AgentSession.rst:15
+#: ../../source/ref-api/flwr.app.Array.rst:15
+#: ../../source/ref-api/flwr.app.ArrayRecord.rst:15
+#: ../../source/ref-api/flwr.app.ConfigRecord.rst:15
+#: ../../source/ref-api/flwr.app.Context.rst:15
+#: ../../source/ref-api/flwr.app.Error.rst:15
+#: ../../source/ref-api/flwr.app.Message.rst:15
+#: ../../source/ref-api/flwr.app.MessageType.rst:15
+#: ../../source/ref-api/flwr.app.Metadata.rst:15
+#: ../../source/ref-api/flwr.app.MetricRecord.rst:15
+#: ../../source/ref-api/flwr.app.RecordDict.rst:15
+#: ../../source/ref-api/flwr.clientapp.ClientApp.rst:15
+#: ../../source/ref-api/flwr.clientapp.mod.LocalDpMod.rst:15
+#: ../../source/ref-api/flwr.serverapp.Grid.rst:15
+#: ../../source/ref-api/flwr.serverapp.ServerApp.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.Bulyan.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideAdaptiveClipping.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideFixedClipping.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideAdaptiveClipping.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideFixedClipping.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAdagrad.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAdam.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAvg.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAvgM.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.FedMedian.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.FedProx.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.FedTrimmedAvg.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbCyclic.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.FedYogi.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.Krum.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.MultiKrum.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.QFedAvg.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.Result.rst:15
+#: ../../source/ref-api/flwr.serverapp.strategy.Strategy.rst:15
+msgid "Methods"
+msgstr ""
+
+#: flwr.agentapp.agent_app.AgentApp.main:1:<autosummary>:1 of
+msgid ":py:obj:`main <flwr.agentapp.AgentApp.main>`\\ \\(\\)"
+msgstr ""
+
+#: flwr.agentapp.agent_app.AgentApp.main:1
+#: flwr.agentapp.agent_app.AgentApp.main:1:<autosummary>:1 of
+msgid "Return a decorator that registers the main fn with the agent app."
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.AgentResponses.rst:2
+msgid "AgentResponses"
+msgstr ""
+
+#: flwr.agentapp.base.AgentResponses:1 flwr.agentapp.base.AgentSession:1
+#: flwr.serverapp.grid.grid.Grid:1 flwr.serverapp.strategy.strategy.Strategy:1
+#: of
+msgid "Bases: :py:class:`~abc.ABC`"
+msgstr ""
+
+#: flwr.agentapp.base.AgentResponses.create:1:<autosummary>:1 of
+msgid ":py:obj:`create <flwr.agentapp.AgentResponses.create>`\\ \\(request\\)"
+msgstr ""
+
+#: flwr.agentapp.base.AgentResponses.create:1
+#: flwr.agentapp.base.AgentResponses.create:1:<autosummary>:1 of
+#, fuzzy
+msgid "Create a model response."
+msgstr "``FLWR_VERSION``"
+
+#: flwr.agentapp.base.AgentResponses.create:3 of
+msgid "Open Responses-compatible create request."
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.AgentResponses.rst
+#: ../../source/ref-api/flwr.app.Array.rst
+#: ../../source/ref-api/flwr.app.ArrayRecord.rst
+#: ../../source/ref-api/flwr.app.ConfigRecord.rst
+#: ../../source/ref-api/flwr.app.Message.rst
+#: ../../source/ref-api/flwr.app.MetricRecord.rst
+#: ../../source/ref-api/flwr.app.RecordDict.rst
+#: ../../source/ref-api/flwr.serverapp.Grid.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.Bulyan.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideAdaptiveClipping.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideFixedClipping.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideAdaptiveClipping.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideFixedClipping.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAdagrad.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAdam.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAvg.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAvgM.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedMedian.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedProx.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedTrimmedAvg.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbCyclic.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedYogi.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.Krum.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.MultiKrum.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.QFedAvg.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.Strategy.rst
+#: flwr.clientapp.client_app.ClientApp.evaluate
+#: flwr.clientapp.client_app.ClientApp.query
+#: flwr.clientapp.client_app.ClientApp.train
+#: flwr.serverapp.grid.grid.Grid.send_and_receive of
+msgid "Returns"
+msgstr ""
+
+#: flwr.agentapp.base.AgentResponses.create:6 of
+msgid "**response** -- Open Responses-compatible response."
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.AgentResponses.rst
+#: ../../source/ref-api/flwr.app.Array.rst
+#: ../../source/ref-api/flwr.app.ArrayRecord.rst
+#: ../../source/ref-api/flwr.app.ConfigRecord.rst
+#: ../../source/ref-api/flwr.app.Message.rst
+#: ../../source/ref-api/flwr.app.MetricRecord.rst
+#: ../../source/ref-api/flwr.app.RecordDict.rst
+#: ../../source/ref-api/flwr.serverapp.Grid.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.Bulyan.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideAdaptiveClipping.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideFixedClipping.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideAdaptiveClipping.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideFixedClipping.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAdagrad.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAdam.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAvg.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedAvgM.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedMedian.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedProx.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedTrimmedAvg.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbCyclic.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.FedYogi.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.Krum.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.MultiKrum.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.QFedAvg.rst
+#: ../../source/ref-api/flwr.serverapp.strategy.Strategy.rst
+#: flwr.clientapp.client_app.ClientApp.evaluate
+#: flwr.clientapp.client_app.ClientApp.query
+#: flwr.clientapp.client_app.ClientApp.train
+#: flwr.serverapp.grid.grid.Grid.send_and_receive of
+msgid "Return type"
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.AgentSession.rst:2
+msgid "AgentSession"
+msgstr ""
+
+#: ../../source/ref-api/flwr.agentapp.AgentSession.rst:25
+#: ../../source/ref-api/flwr.app.Array.rst:43
+#: ../../source/ref-api/flwr.app.ArrayRecord.rst:79
+#: ../../source/ref-api/flwr.app.ConfigRecord.rst:64
+#: ../../source/ref-api/flwr.app.Context.rst:25
+#: ../../source/ref-api/flwr.app.Error.rst:25
+#: ../../source/ref-api/flwr.app.Message.rst:43
+#: ../../source/ref-api/flwr.app.MessageType.rst:25
+#: ../../source/ref-api/flwr.app.Metadata.rst:25
+#: ../../source/ref-api/flwr.app.MetricRecord.rst:64
+#: ../../source/ref-api/flwr.app.RecordDict.rst:61
+#: ../../source/ref-api/flwr.serverapp.Grid.rst:43
+#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst:43
+#: ../../source/ref-api/flwr.serverapp.strategy.Result.rst:25
+msgid "Attributes"
+msgstr ""
+
+#: flwr.agentapp.AgentSession.responses:1:<autosummary>:1 of
+msgid ":py:obj:`responses <flwr.agentapp.AgentSession.responses>`\\"
+msgstr ""
+
+#: flwr.agentapp.AgentSession.responses:1
+#: flwr.agentapp.AgentSession.responses:1:<autosummary>:1 of
+msgid "Model response creation API."
+msgstr ""
+
+#: ../../source/ref-api/flwr.app.rst:2
+msgid "app"
 msgstr ""
 
 #: ../../source/ref-api/flwr.app.rst:31:<autosummary>:1
@@ -17549,26 +17808,6 @@ msgid ""
 "will be derived automatically from it."
 msgstr ""
 
-#: flwr.app.message.array.Array:35 flwr.app.message.arrayrecord.ArrayRecord:36
-#: flwr.app.message.configrecord.ConfigRecord:20
-#: flwr.app.message.metricrecord.MetricRecord:19
-#: flwr.app.message.recorddict.RecordDict:14
-#: flwr.clientapp.client_app.ClientApp:4
-#: flwr.clientapp.client_app.ClientApp.evaluate:12
-#: flwr.clientapp.client_app.ClientApp.lifespan:7
-#: flwr.clientapp.client_app.ClientApp.query:12
-#: flwr.clientapp.client_app.ClientApp.train:12
-#: flwr.clientapp.mod.localdp_mod.LocalDpMod:22
-#: flwr.server.server_app.ServerApp:4
-#: flwr.server.server_app.ServerApp.lifespan:7
-#: flwr.server.server_app.ServerApp.main:4
-#: flwr.serverapp.strategy.dp_adaptive_clipping.DifferentialPrivacyClientSideAdaptiveClipping:31
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyClientSideFixedClipping:21
-#: flwr.serverapp.strategy.dp_fixed_clipping.DifferentialPrivacyServerSideFixedClipping:14
-#: of
-msgid "Examples"
-msgstr ""
-
 #: flwr.app.message.array.Array:36 of
 msgid "Initializing by specifying all fields directly::"
 msgstr ""
@@ -17579,43 +17818,6 @@ msgstr ""
 
 #: flwr.app.message.array.Array:50 of
 msgid "Initializing with a PyTorch tensor::"
-msgstr ""
-
-#: ../../source/ref-api/flwr.app.Array.rst:15
-#: ../../source/ref-api/flwr.app.ArrayRecord.rst:15
-#: ../../source/ref-api/flwr.app.ConfigRecord.rst:15
-#: ../../source/ref-api/flwr.app.Context.rst:15
-#: ../../source/ref-api/flwr.app.Error.rst:15
-#: ../../source/ref-api/flwr.app.Message.rst:15
-#: ../../source/ref-api/flwr.app.MessageType.rst:15
-#: ../../source/ref-api/flwr.app.Metadata.rst:15
-#: ../../source/ref-api/flwr.app.MetricRecord.rst:15
-#: ../../source/ref-api/flwr.app.RecordDict.rst:15
-#: ../../source/ref-api/flwr.clientapp.ClientApp.rst:15
-#: ../../source/ref-api/flwr.clientapp.mod.LocalDpMod.rst:15
-#: ../../source/ref-api/flwr.serverapp.Grid.rst:15
-#: ../../source/ref-api/flwr.serverapp.ServerApp.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.Bulyan.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideAdaptiveClipping.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideFixedClipping.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideAdaptiveClipping.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideFixedClipping.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAdagrad.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAdam.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAvg.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAvgM.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.FedMedian.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.FedProx.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.FedTrimmedAvg.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbCyclic.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.FedYogi.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.Krum.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.MultiKrum.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.QFedAvg.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.Result.rst:15
-#: ../../source/ref-api/flwr.serverapp.strategy.Strategy.rst:15
-msgid "Methods"
 msgstr ""
 
 #: ../../source/ref-api/flwr.app.Array.rst:41:<autosummary>:1
@@ -17678,22 +17880,6 @@ msgstr ""
 msgid "Slice Array data and construct a list of ArrayChunks."
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.Array.rst:43
-#: ../../source/ref-api/flwr.app.ArrayRecord.rst:79
-#: ../../source/ref-api/flwr.app.ConfigRecord.rst:64
-#: ../../source/ref-api/flwr.app.Context.rst:25
-#: ../../source/ref-api/flwr.app.Error.rst:25
-#: ../../source/ref-api/flwr.app.Message.rst:43
-#: ../../source/ref-api/flwr.app.MessageType.rst:25
-#: ../../source/ref-api/flwr.app.Metadata.rst:25
-#: ../../source/ref-api/flwr.app.MetricRecord.rst:64
-#: ../../source/ref-api/flwr.app.RecordDict.rst:61
-#: ../../source/ref-api/flwr.serverapp.Grid.rst:43
-#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst:43
-#: ../../source/ref-api/flwr.serverapp.strategy.Result.rst:25
-msgid "Attributes"
-msgstr ""
-
 #: flwr.app.Array.children:1:<autosummary>:1 of
 msgid ":py:obj:`children <flwr.app.Array.children>`\\"
 msgstr ""
@@ -17754,74 +17940,8 @@ msgid ""
 "children will raise a ``ValueError``."
 msgstr ""
 
-#: ../../source/ref-api/flwr.app.Array.rst
-#: ../../source/ref-api/flwr.app.ArrayRecord.rst
-#: ../../source/ref-api/flwr.app.ConfigRecord.rst
-#: ../../source/ref-api/flwr.app.Message.rst
-#: ../../source/ref-api/flwr.app.MetricRecord.rst
-#: ../../source/ref-api/flwr.app.RecordDict.rst
-#: ../../source/ref-api/flwr.serverapp.Grid.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.Bulyan.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideAdaptiveClipping.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideFixedClipping.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideAdaptiveClipping.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideFixedClipping.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAdagrad.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAdam.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAvg.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAvgM.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedMedian.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedProx.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedTrimmedAvg.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbCyclic.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedYogi.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.Krum.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.MultiKrum.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.QFedAvg.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.Strategy.rst
-#: flwr.clientapp.client_app.ClientApp.evaluate
-#: flwr.clientapp.client_app.ClientApp.query
-#: flwr.clientapp.client_app.ClientApp.train
-#: flwr.server.grid.grid.Grid.send_and_receive of
-msgid "Returns"
-msgstr ""
-
 #: flwr.app.message.array.Array.inflate:9 of
 msgid "The inflated Array."
-msgstr ""
-
-#: ../../source/ref-api/flwr.app.Array.rst
-#: ../../source/ref-api/flwr.app.ArrayRecord.rst
-#: ../../source/ref-api/flwr.app.ConfigRecord.rst
-#: ../../source/ref-api/flwr.app.Message.rst
-#: ../../source/ref-api/flwr.app.MetricRecord.rst
-#: ../../source/ref-api/flwr.app.RecordDict.rst
-#: ../../source/ref-api/flwr.serverapp.Grid.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.Bulyan.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideAdaptiveClipping.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyClientSideFixedClipping.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideAdaptiveClipping.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.DifferentialPrivacyServerSideFixedClipping.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAdagrad.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAdam.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAvg.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedAvgM.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedMedian.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedProx.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedTrimmedAvg.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbBagging.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedXgbCyclic.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.FedYogi.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.Krum.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.MultiKrum.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.QFedAvg.rst
-#: ../../source/ref-api/flwr.serverapp.strategy.Strategy.rst
-#: flwr.clientapp.client_app.ClientApp.evaluate
-#: flwr.clientapp.client_app.ClientApp.query
-#: flwr.clientapp.client_app.ClientApp.train
-#: flwr.server.grid.grid.Grid.send_and_receive of
-msgid "Return type"
 msgstr ""
 
 #: ../../source/ref-api/flwr.app.ArrayRecord.rst:2
@@ -18317,15 +18437,6 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.app.Context.rst:2
 msgid "Context"
-msgstr ""
-
-#: flwr.app.error.Error:1 flwr.app.message.context.Context:1
-#: flwr.app.message_type.MessageType:1 flwr.app.metadata.Metadata:1
-#: flwr.clientapp.client_app.ClientApp:1
-#: flwr.clientapp.mod.localdp_mod.LocalDpMod:1
-#: flwr.server.server_app.ServerApp:1 flwr.serverapp.strategy.result.Result:1
-#: of
-msgid "Bases: :py:class:`object`"
 msgstr ""
 
 #: flwr.app.message.context.Context:3 of
@@ -19215,7 +19326,7 @@ msgid "Registering an evaluate function with a function-specific Flower Mod::"
 msgstr ""
 
 #: flwr.clientapp.client_app.ClientApp.lifespan:3
-#: flwr.server.server_app.ServerApp.lifespan:3 of
+#: flwr.serverapp.server_app.ServerApp.lifespan:3 of
 msgid ""
 "The decorated function should accept a `Context` object and use `yield` "
 "to define enter and exit behavior."
@@ -19392,7 +19503,7 @@ msgstr ""
 
 #: flwr.clientapp.mod.centraldp_mods.adaptiveclipping_mod:15
 #: flwr.clientapp.mod.centraldp_mods.fixedclipping_mod:13
-#: flwr.server.grid.grid.Grid.send_and_receive:18
+#: flwr.serverapp.grid.grid.Grid.send_and_receive:18
 #: flwr.serverapp.strategy.multikrum.MultiKrum:42 of
 msgid "Notes"
 msgstr ""
@@ -19449,7 +19560,7 @@ msgid ":py:obj:`Grid <flwr.serverapp.Grid>`\\ \\(\\)"
 msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.rst:23:<autosummary>:1
-#: flwr.server.grid.grid.Grid:1 of
+#: flwr.serverapp.grid.grid.Grid:1 of
 msgid "Abstract base class Grid to send/receive messages."
 msgstr ""
 
@@ -19460,7 +19571,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.rst:23:<autosummary>:1
-#: flwr.server.server_app.ServerApp:1 of
+#: flwr.serverapp.server_app.ServerApp:1 of
 msgid "Flower ServerApp."
 msgstr ""
 
@@ -19478,10 +19589,6 @@ msgstr "Construindo a imagem do servidor"
 msgid "Grid"
 msgstr ""
 
-#: flwr.server.grid.grid.Grid:1 flwr.serverapp.strategy.strategy.Strategy:1 of
-msgid "Bases: :py:class:`~abc.ABC`"
-msgstr ""
-
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
 msgid ""
 ":py:obj:`create_message <flwr.serverapp.Grid.create_message>`\\ "
@@ -19489,7 +19596,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
-#: flwr.server.grid.grid.Grid.create_message:1 of
+#: flwr.serverapp.grid.grid.Grid.create_message:1 of
 msgid "Create a new message with specified parameters."
 msgstr ""
 
@@ -19498,7 +19605,7 @@ msgid ":py:obj:`get_node_ids <flwr.serverapp.Grid.get_node_ids>`\\ \\(\\)"
 msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
-#: flwr.server.grid.grid.Grid.get_node_ids:1 of
+#: flwr.serverapp.grid.grid.Grid.get_node_ids:1 of
 msgid "Get node IDs."
 msgstr ""
 
@@ -19509,7 +19616,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
-#: flwr.server.grid.grid.Grid.pull_messages:1 of
+#: flwr.serverapp.grid.grid.Grid.pull_messages:1 of
 msgid "Pull messages based on message IDs."
 msgstr ""
 
@@ -19520,7 +19627,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
-#: flwr.server.grid.grid.Grid.push_messages:1 of
+#: flwr.serverapp.grid.grid.Grid.push_messages:1 of
 msgid "Push messages to specified node IDs."
 msgstr ""
 
@@ -19531,7 +19638,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
-#: flwr.server.grid.grid.Grid.send_and_receive:1 of
+#: flwr.serverapp.grid.grid.Grid.send_and_receive:1 of
 msgid "Push messages to specified node IDs and pull the reply messages."
 msgstr ""
 
@@ -19540,48 +19647,48 @@ msgid ":py:obj:`set_run <flwr.serverapp.Grid.set_run>`\\ \\(run\\)"
 msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.Grid.rst:41:<autosummary>:1
-#: flwr.server.grid.grid.Grid.set_run:1 of
+#: flwr.serverapp.grid.grid.Grid.set_run:1 of
 msgid "Set the run this ``Grid`` object operates in."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.create_message:1:<autosummary>:1 of
+#: flwr.serverapp.grid.grid.Grid.create_message:1:<autosummary>:1 of
 msgid ":py:obj:`run <flwr.serverapp.Grid.run>`\\"
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.create_message:1:<autosummary>:1
-#: flwr.serverapp.Grid.run:1 of
+#: flwr.serverapp.Grid.run:1
+#: flwr.serverapp.grid.grid.Grid.create_message:1:<autosummary>:1 of
 msgid "Run information."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.create_message:3 of
+#: flwr.serverapp.grid.grid.Grid.create_message:3 of
 msgid ""
 "This method constructs a new ``Message`` with given content and metadata."
 " The ``run_id`` and ``src_node_id`` will be set automatically."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.create_message:6 of
+#: flwr.serverapp.grid.grid.Grid.create_message:6 of
 msgid ""
 "The content for the new message. This holds records that are to be sent "
 "to the destination node."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.create_message:9 of
+#: flwr.serverapp.grid.grid.Grid.create_message:9 of
 msgid ""
 "The type of the message, defining the action to be executed on the "
 "receiving end."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.create_message:12 of
+#: flwr.serverapp.grid.grid.Grid.create_message:12 of
 msgid "The ID of the destination node to which the message is being sent."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.create_message:14 of
+#: flwr.serverapp.grid.grid.Grid.create_message:14 of
 msgid ""
 "The ID of the group to which this message is associated. In some "
 "settings, this is used as the federated learning round."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.create_message:17 of
+#: flwr.serverapp.grid.grid.Grid.create_message:17 of
 msgid ""
 "Time-to-live for the round trip of this message, i.e., the time from "
 "sending this message to receiving a reply. It specifies in seconds the "
@@ -19590,62 +19697,62 @@ msgid ""
 " used."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.create_message:23 of
+#: flwr.serverapp.grid.grid.Grid.create_message:23 of
 msgid ""
 "**message** -- A new `Message` instance with the specified content and "
 "metadata."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.pull_messages:3 of
+#: flwr.serverapp.grid.grid.Grid.pull_messages:3 of
 msgid ""
 "This method is used to collect messages from the SuperLink that "
 "correspond to a set of given message IDs."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.pull_messages:6 of
+#: flwr.serverapp.grid.grid.Grid.pull_messages:6 of
 msgid "An iterable of message IDs for which reply messages are to be retrieved."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.pull_messages:9 of
+#: flwr.serverapp.grid.grid.Grid.pull_messages:9 of
 msgid "**messages** -- An iterable of messages received."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.push_messages:3 of
+#: flwr.serverapp.grid.grid.Grid.push_messages:3 of
 msgid ""
 "This method takes an iterable of messages and sends each message to the "
 "node specified in ``dst_node_id``."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.push_messages:6
-#: flwr.server.grid.grid.Grid.send_and_receive:7 of
+#: flwr.serverapp.grid.grid.Grid.push_messages:6
+#: flwr.serverapp.grid.grid.Grid.send_and_receive:7 of
 msgid "An iterable of messages to be sent."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.push_messages:9 of
+#: flwr.serverapp.grid.grid.Grid.push_messages:9 of
 msgid ""
 "**message_ids** -- An iterable of IDs for the messages that were sent, "
 "which can be used to pull replies."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.send_and_receive:3 of
+#: flwr.serverapp.grid.grid.Grid.send_and_receive:3 of
 msgid ""
 "This method sends a list of messages to their destination node IDs and "
 "then waits for the replies. It continues to pull replies until either all"
 " replies are received or the specified timeout duration is exceeded."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.send_and_receive:9 of
+#: flwr.serverapp.grid.grid.Grid.send_and_receive:9 of
 msgid ""
 "The timeout duration in seconds. If specified, the method will wait for "
 "replies for this duration. If `None`, there is no time limit and the "
 "method will wait until replies for all messages are received."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.send_and_receive:14 of
+#: flwr.serverapp.grid.grid.Grid.send_and_receive:14 of
 msgid "**replies** -- An iterable of reply messages received from the SuperLink."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.send_and_receive:19 of
+#: flwr.serverapp.grid.grid.Grid.send_and_receive:19 of
 msgid ""
 "This method uses ``push_messages`` to send the messages and "
 "``pull_messages`` to collect the replies. If ``timeout`` is set, the "
@@ -19653,33 +19760,33 @@ msgid ""
 "valid until its TTL, which is not affected by ``timeout``."
 msgstr ""
 
-#: flwr.server.grid.grid.Grid.set_run:3 of
+#: flwr.serverapp.grid.grid.Grid.set_run:3 of
 msgid "The ``Run`` this ``Grid`` object operates in."
 msgstr ""
 
-#: flwr.server.server_app.ServerApp:5 of
+#: flwr.serverapp.server_app.ServerApp:5 of
 msgid "Use the ``ServerApp`` with an existing ``Strategy``::"
 msgstr ""
 
-#: flwr.server.server_app.ServerApp:17 of
+#: flwr.serverapp.server_app.ServerApp:17 of
 msgid "Use the ``ServerApp`` with a custom main function::"
 msgstr ""
 
-#: flwr.server.server_app.ServerApp.lifespan:1:<autosummary>:1 of
+#: flwr.serverapp.server_app.ServerApp.lifespan:1:<autosummary>:1 of
 msgid ":py:obj:`lifespan <flwr.serverapp.ServerApp.lifespan>`\\ \\(\\)"
 msgstr ""
 
-#: flwr.server.server_app.ServerApp.lifespan:1
-#: flwr.server.server_app.ServerApp.lifespan:1:<autosummary>:1 of
+#: flwr.serverapp.server_app.ServerApp.lifespan:1
+#: flwr.serverapp.server_app.ServerApp.lifespan:1:<autosummary>:1 of
 msgid "Return a decorator that registers the lifespan fn with the server app."
 msgstr ""
 
-#: flwr.server.server_app.ServerApp.lifespan:1:<autosummary>:1 of
+#: flwr.serverapp.server_app.ServerApp.lifespan:1:<autosummary>:1 of
 msgid ":py:obj:`main <flwr.serverapp.ServerApp.main>`\\ \\(\\)"
 msgstr ""
 
-#: flwr.server.server_app.ServerApp.lifespan:1:<autosummary>:1
-#: flwr.server.server_app.ServerApp.main:1 of
+#: flwr.serverapp.server_app.ServerApp.lifespan:1:<autosummary>:1
+#: flwr.serverapp.server_app.ServerApp.main:1 of
 msgid "Return a decorator that registers the main fn with the server app."
 msgstr ""
 
@@ -78689,5 +78796,48 @@ msgstr ""
 #~ " array needs to be serialized and "
 #~ "represented as a :code:`flwr.common.Array`. "
 #~ "For example::"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "We also use this to define the "
+#~ "public API of private subpackages. "
+#~ "Public, in this context, means the "
+#~ "API that other ``flwr`` subpackages "
+#~ "should use. For example, ``flwr.server.grid``"
+#~ " is a private subpackage (it's not"
+#~ " exported via ``src/py/flwr/server/__init__.py``'s "
+#~ "``__all__``)."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Still, the private sub-package "
+#~ "``flwr.server.grid`` defines a \"public\" API"
+#~ " using ``__all__`` in "
+#~ "``src/py/flwr/server/grid/__init__.py``:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The interesting part is that both "
+#~ "``GrpcGrid`` and ``InMemoryGrid`` are never"
+#~ " used by Flower framework users, only"
+#~ " by other parts of the Flower "
+#~ "framework codebase. Those other parts of"
+#~ " the codebase import, for example, "
+#~ "``InMemoryGrid`` using ``from flwr.server.driver "
+#~ "import InMemoryGrid`` (i.e., the "
+#~ "``InMemoryGrid`` exported via ``__all__``), "
+#~ "not ``from flwr.server.driver.in_memory_driver "
+#~ "import InMemoryGrid`` (``in_memory_driver.py`` is"
+#~ " the module containing the actual "
+#~ "``InMemoryGrid`` class definition)."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "This is because ``flwr.server.driver`` defines"
+#~ " a public interface for other "
+#~ "``flwr`` subpackages. This allows codeowners"
+#~ " of ``flwr.server.driver`` to refactor the"
+#~ " package without breaking other "
+#~ "``flwr``-internal users."
 #~ msgstr ""
 

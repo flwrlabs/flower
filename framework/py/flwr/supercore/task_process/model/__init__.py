@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,15 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower grid SDK."""
+"""Private model task process helpers."""
 
 
-from .grid import Grid
-from .grpc_grid import GrpcGrid
-from .inmemory_grid import InMemoryGrid
+from .run_model import run_model
 
-__all__ = [
-    "Grid",
-    "GrpcGrid",
-    "InMemoryGrid",
-]
+__all__ = ["run_model"]

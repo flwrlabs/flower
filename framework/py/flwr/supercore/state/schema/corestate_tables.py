@@ -69,7 +69,6 @@ def create_corestate_metadata() -> MetaData:
         Column("description", String, nullable=True),
         Column("created_at", TIMESTAMP(timezone=True), nullable=False),
         Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
-        Column("last_run_id", BigInteger, nullable=True),
     )
 
     # --------------------------------------------------------------------------
@@ -90,7 +89,7 @@ def create_corestate_metadata() -> MetaData:
         metadata,
         Column(
             "id",
-            BigInteger,
+            Integer,
             primary_key=True,
             autoincrement=True,
         ),
