@@ -388,19 +388,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         with rpc_error_translator(context, rpc_name):
             federations = state.federation_manager.get_federations(flwr_aid)
-
-        entries: list[RunSeries] = []
-        for federation in federations:
-            entries.extend(
-                state.get_run_series(
-                    federation=federation.name,
-                    updated_before=updated_before,
-                    limit=limit,
-                )
+            entries = state.get_run_series(
+                federations=[federation.name for federation in federations],
+                updated_before=updated_before,
+                limit=limit,
             )
-        entries.sort(key=lambda entry: entry.updated_at, reverse=True)
-        if limit is not None:
-            entries = entries[:limit]
 
         return ListRunSeriesResponse(entries=_with_last_run_statuses(state, entries))
 
@@ -421,20 +413,16 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         flwr_aid = _get_flwr_aid(context)
         with rpc_error_translator(context, self.GetRunSeries.__qualname__):
             federations = state.federation_manager.get_federations(flwr_aid)
+            series_matches = state.get_run_series(
+                series_ids=[request.series_id],
+                federations=[federation.name for federation in federations],
+            )
 
-        series = None
-        for federation in federations:
-            for candidate in state.get_run_series(federation=federation.name):
-                if candidate.series_id == request.series_id:
-                    series = candidate
-                    break
-            if series is not None:
-                break
-
-        if series is None:
+        if not series_matches:
             context.abort(grpc.StatusCode.NOT_FOUND, "Run series ID not found.")
             raise grpc.RpcError()  # This line is unreachable
 
+        series = series_matches[0]
         response = GetRunSeriesResponse(
             series=_with_last_run_statuses(state, [series])[0]
         )

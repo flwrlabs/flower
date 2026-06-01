@@ -624,6 +624,25 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             "Run series ID not found.",
         )
 
+    def test_get_run_series_aborts_for_inaccessible_series(self) -> None:
+        """Test GetRunSeries returns NOT_FOUND for inaccessible RunSeries IDs."""
+        # Prepare
+        series_id = 999
+        self._create_dummy_run_series(series_id, federation="@other/default")
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        # Execute/Assert
+        with self.assertRaises(grpc.RpcError):
+            self.servicer.GetRunSeries(
+                GetRunSeriesRequest(series_id=series_id), context
+            )
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.NOT_FOUND,
+            "Run series ID not found.",
+        )
+
     def test_stop_run(self) -> None:
         """Test StopRun method of ControlServicer."""
         # Prepare
