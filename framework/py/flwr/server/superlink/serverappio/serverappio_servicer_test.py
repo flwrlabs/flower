@@ -35,7 +35,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.serde import message_from_proto
+from flwr.common.serde import context_to_proto, message_from_proto
 from flwr.common.typing import Fab
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
@@ -203,10 +203,18 @@ def _create_shared_runtime(
         "",
         RunType.SERVER_APP,
     )
-    state_0.set_serverapp_context(
-        run_id, Context(run_id, SUPERLINK_NODE_ID, {}, RecordDict(), {})
-    )
     run = state_0.get_run_info(run_ids=[run_id])[0]
+    state_0.set_run_series_context(
+        run.series_id,
+        Context(
+            run_id,
+            SUPERLINK_NODE_ID,
+            {},
+            RecordDict(),
+            {},
+            series_id=run.series_id,
+        ),
+    )
     assert run.primary_task_id is not None
     task_id = run.primary_task_id
     server_0 = _start_serverappio_with_port_retry(
@@ -461,6 +469,34 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert grpc.StatusCode.OK == call.code()
         run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
         assert run.clientapp_runtime == 7.89
+
+    def test_push_task_output_stores_run_series_context(self) -> None:
+        """PushTaskOutput should persist context in the authenticated run series."""
+        # Prepare
+        run = self.state.get_run_info(run_ids=[self._auth_run_id])[0]
+        request_context = Context(
+            run_id=123,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={"key": "value"},
+            state=RecordDict(),
+            run_config={"test": "test"},
+            series_id=456,
+        )
+        request = PushTaskOutputRequest(
+            sub_status="completed",
+            details="",
+            context=context_to_proto(request_context),
+        )
+
+        # Execute
+        response, call = self._push_task_output.with_call(request=request)
+
+        # Assert
+        assert isinstance(response, PushTaskOutputResponse)
+        assert grpc.StatusCode.OK == call.code()
+        stored_context = self.state.get_run_series_context(run.series_id)
+        assert stored_context is not None
+        assert stored_context == request_context
 
     def test_get_node(self) -> None:
         """Test `GetNode` success."""
@@ -846,9 +882,17 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         claim_response = servicer.ClaimTask(ClaimTaskRequest(task_id=task_id), Mock())
         assert claim_response.HasField("token")
 
-        # Set serverapp context
-        context = Context(run_id, SUPERLINK_NODE_ID, {}, RecordDict(), {})
-        self.state.set_serverapp_context(run_id, context)
+        # Set run series context as if it was persisted by an earlier run.
+        run = self.state.get_run_info(run_ids=[run_id])[0]
+        context = Context(
+            123,
+            SUPERLINK_NODE_ID,
+            {},
+            RecordDict(),
+            {},
+            series_id=run.series_id,
+        )
+        self.state.set_run_series_context(run.series_id, context)
 
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.STARTING
@@ -864,6 +908,8 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
 
         # Assert: Response is successful and run status is now RUNNING
         assert isinstance(response, PullTaskInputResponse)
+        assert response.context.run_id == 123
+        assert response.context.series_id == run.series_id
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.RUNNING
 

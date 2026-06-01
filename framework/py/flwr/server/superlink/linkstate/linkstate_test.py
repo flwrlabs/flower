@@ -33,7 +33,7 @@ from uuid import uuid4
 
 from parameterized import parameterized
 
-from flwr.app import DEFAULT_TTL, Context, Error, Message, RecordDict
+from flwr.app import DEFAULT_TTL, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
 from flwr.common import now
 from flwr.common.constant import (
@@ -1773,64 +1773,6 @@ class StateTest(CoreStateTest):
         assert msg_res_id is None
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 0
-
-    def test_get_set_serverapp_context(self) -> None:
-        """Test get and set serverapp context."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        context = Context(
-            run_id=1,
-            node_id=SUPERLINK_NODE_ID,
-            node_config={"mock": "mock"},
-            state=RecordDict(),
-            run_config={"test": "test"},
-        )
-        run_id = create_dummy_run(state)
-
-        # Execute
-        init = state.get_serverapp_context(run_id)
-        state.set_serverapp_context(run_id, context)
-        retrieved_context = state.get_serverapp_context(run_id)
-
-        # Assert
-        assert init is None
-        assert retrieved_context == context
-
-    def test_set_serverapp_context_after_finished_run(self) -> None:
-        """Context can be persisted after normal task completion."""
-        state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state)
-        task_id = get_primary_task_id(state, run_id)
-        context = Context(
-            run_id=run_id,
-            node_id=SUPERLINK_NODE_ID,
-            node_config={},
-            state=RecordDict(),
-            run_config={},
-        )
-
-        assert state.claim_task(task_id) is not None
-        assert state.activate_task(task_id)
-        assert state.finish_task(task_id, SubStatus.COMPLETED, "done")
-        state.set_serverapp_context(run_id, context)
-
-        assert state.get_serverapp_context(run_id) == context
-
-    def test_set_context_invalid_run_id(self) -> None:
-        """Test set_serverapp_context with invalid run_id."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        context = Context(
-            run_id=1,
-            node_id=1234,
-            node_config={"mock": "mock"},
-            state=RecordDict(),
-            run_config={"test": "test"},
-        )
-
-        # Execute and assert
-        with self.assertRaises(ValueError):
-            state.set_serverapp_context(61016, context)  # Invalid run_id
 
     def test_create_run_with_and_without_federation_config(self) -> None:
         """Test that run federation config is stored on the run."""

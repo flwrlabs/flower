@@ -23,7 +23,7 @@ from datetime import UTC, datetime
 from logging import ERROR, WARNING
 from typing import Literal, cast
 
-from flwr.app import Context, Message
+from flwr.app import Message
 from flwr.app.user_config import UserConfig
 from flwr.common import log, now
 from flwr.common.constant import (
@@ -83,7 +83,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
         # Map run_id to RunRecord
         self.run_ids: dict[int, RunRecord] = {}
-        self.contexts: dict[int, Context] = {}
         self.message_ins_store: dict[str, Message] = {}
         self.message_res_store: dict[str, Message] = {}
         self.message_ins_id_to_message_res_id: dict[str, str] = {}
@@ -630,6 +629,10 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             if resolved_series_id is None:
                 log(ERROR, "Unexpected run series membership failure.")
                 return 0
+            self._refresh_run_series_context(
+                run_id=run_id,
+                series_id=resolved_series_id,
+            )
             run_record = RunRecord(
                 run=Run(
                     run_id=run_id,
@@ -863,17 +866,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 node.heartbeat_interval = heartbeat_interval
                 return True
             return False
-
-    def get_serverapp_context(self, run_id: int) -> Context | None:
-        """Get the context for the specified `run_id`."""
-        return self.contexts.get(run_id)
-
-    def set_serverapp_context(self, run_id: int, context: Context) -> None:
-        """Set the context for the specified `run_id`."""
-        with self.lock:
-            if run_id not in self.run_ids:
-                raise ValueError(f"Run {run_id} not found")
-            self.contexts[run_id] = context
 
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`."""

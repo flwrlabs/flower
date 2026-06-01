@@ -25,7 +25,7 @@ from typing import Any, Literal, cast
 from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
 
-from flwr.app import Context, Message
+from flwr.app import Message
 from flwr.app.user_config import UserConfig
 from flwr.common import log, now
 from flwr.common.constant import (
@@ -45,11 +45,7 @@ from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.utils.validator import validate_message
 from flwr.supercore.constant import NodeStatus
 from flwr.supercore.corestate.sql_corestate import SqlCoreState, determine_task_status
-from flwr.supercore.corestate.utils import (
-    context_from_bytes,
-    context_to_bytes,
-    timestamp_to_iso,
-)
+from flwr.supercore.corestate.utils import timestamp_to_iso
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
@@ -976,6 +972,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 if resolved_series_id is None:
                     log(ERROR, "Unexpected run series membership failure.")
                     return 0
+                self._refresh_run_series_context(
+                    run_id=run_id,
+                    series_id=resolved_series_id,
+                )
                 self.query(
                     run_insert_query,
                     {
@@ -1290,52 +1290,6 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         rows = self.query(query, params)
         return len(rows) > 0
-
-    def get_serverapp_context(self, run_id: int) -> Context | None:
-        """Get the context for the specified `run_id`."""
-        # Retrieve context if any
-        query = "SELECT context FROM context WHERE run_id = :run_id"
-        rows = self.query(query, {"run_id": uint64_to_int64(run_id)})
-        context = context_from_bytes(rows[0]["context"]) if rows else None
-        return context
-
-    def set_serverapp_context(self, run_id: int, context: Context) -> None:
-        """Set the context for the specified `run_id`."""
-        # Convert context to bytes
-        context_bytes = context_to_bytes(context)
-        sint_run_id = uint64_to_int64(run_id)
-
-        with self.session():
-            if not self.query(
-                "SELECT run_id FROM run WHERE run_id = :run_id",
-                {"run_id": sint_run_id},
-            ):
-                raise ValueError(f"Run {run_id} not found")
-
-            # Check if any existing Context assigned to the run_id
-            query = "SELECT COUNT(*) as count FROM context WHERE run_id = :run_id"
-            row = self.query(query, {"run_id": sint_run_id})[0]
-            if row["count"] > 0:
-                # Update context
-                query = """
-                    UPDATE context
-                    SET context = :context_bytes WHERE run_id = :run_id
-                """
-                self.query(
-                    query, {"context_bytes": context_bytes, "run_id": sint_run_id}
-                )
-            else:
-                try:
-                    # Store context
-                    query = (
-                        "INSERT INTO context (run_id, context) "
-                        "VALUES (:run_id, :context_bytes)"
-                    )
-                    self.query(
-                        query, {"run_id": sint_run_id, "context_bytes": context_bytes}
-                    )
-                except IntegrityError:
-                    raise ValueError(f"Run {run_id} not found") from None
 
     def get_valid_message_ins(self, message_id: str) -> dict[str, Any] | None:
         """Check if the Message exists and is valid (not expired).

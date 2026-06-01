@@ -107,7 +107,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         state = self.state_factory.state()
 
         # Retrieve context, run and fab for this run
-        serverapp_context = cast(Context, state.get_context(run_id))
+        app_context = cast(Context, state.get_context(run_id))
         run = cast(Run, state.get_run(run_id))
 
         # Retrieve FAB from NodeState
@@ -130,7 +130,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         if state.activate_task(task_id=task.task_id):
             log(DEBUG, "Started task %d of run %s", task.task_id, run_id)
             return PullTaskInputResponse(
-                context=context_to_proto(serverapp_context),
+                context=context_to_proto(app_context),
                 run=run_to_proto(run),
                 fab=fab_to_proto(fab),
             )
