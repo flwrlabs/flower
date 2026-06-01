@@ -249,5 +249,5 @@ Optionally, remove the SuperNode from a federation or unregister it:
         @<username>/<federation-name> supergrid
 
     # Unregister the SuperNode from SuperGrid. This cannot be undone, and the SuperNode
-    # cannot be used again unless it is registered again with a key.
+    # cannot be used again unless it is registered again with a different key.
     $ flwr supernode unregister <supernode-id> supergrid
