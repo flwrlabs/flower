@@ -18,7 +18,7 @@
 from abc import abstractmethod
 from collections.abc import Sequence
 
-from flwr.app import Context, Message
+from flwr.app import Message
 from flwr.common.typing import Run
 from flwr.supercore.corestate import CoreState
 
@@ -129,31 +129,6 @@ class NodeState(CoreState):
         -------
         Optional[Run]
             The `Run` instance if found, otherwise None.
-        """
-
-    @abstractmethod
-    def store_context(self, context: Context) -> None:
-        """Store a context.
-
-        Parameters
-        ----------
-        context : Context
-            The context to store.
-        """
-
-    @abstractmethod
-    def get_context(self, run_id: int) -> Context | None:
-        """Retrieve a context by its run ID.
-
-        Parameters
-        ----------
-        run_id : int
-            The ID of the run with which the context is associated.
-
-        Returns
-        -------
-        Optional[Context]
-            The `Context` instance if found, otherwise None.
         """
 
     @abstractmethod
