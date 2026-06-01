@@ -106,9 +106,9 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         # Initialize state connection
         state = self.state_factory.state()
 
-        # Retrieve context, run and fab for this run
-        app_context = cast(Context, state.get_context(run_id))
+        # Retrieve run, context, and FAB for this run
         run = cast(Run, state.get_run(run_id))
+        app_context = cast(Context, state.get_run_series_context(run.series_id))
 
         # Retrieve FAB from NodeState
         if fab := state.get_fab(run.fab_hash):
@@ -161,7 +161,12 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
             log(DEBUG, "Finished task %d of run %s", task.task_id, run_id)
             # Save the context to the state
             if request.HasField("context"):
-                state.store_context(context_from_proto(request.context))
+                run = state.get_run(run_id)
+                if run is not None:
+                    state.set_run_series_context(
+                        run.series_id,
+                        context_from_proto(request.context),
+                    )
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
 

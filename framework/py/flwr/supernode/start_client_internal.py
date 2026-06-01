@@ -403,16 +403,22 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
 
             # Initialize the context
             run_cfg = get_fused_config_from_fab(fab.content, run_info)
+            existing_context = state.get_run_series_context(run_info.series_id)
             run_ctx = Context(
                 run_id=run_id,
                 node_id=state.get_node_id(),
                 node_config=node_config,
-                state=RecordDict(),
+                state=(
+                    existing_context.state
+                    if existing_context is not None
+                    else RecordDict()
+                ),
                 run_config=run_cfg,
+                series_id=run_info.series_id,
             )
 
             # Store in the state
-            state.store_context(run_ctx)
+            state.set_run_series_context(run_info.series_id, run_ctx)
             state.store_run(run_info)
             state.store_fab(fab)
 
