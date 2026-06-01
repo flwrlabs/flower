@@ -37,6 +37,7 @@ def _execution_spec(**overrides: Any) -> ExecutionSpec:
         "runtime_dependency_install": False,
         "parent_pid": None,
         "suppress_output": False,
+        "task_id": 1,
     }
     base.update(overrides)
     return ExecutionSpec(**base)

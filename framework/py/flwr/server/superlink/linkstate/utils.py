@@ -15,18 +15,18 @@
 """Utility functions for State."""
 
 
+from collections.abc import Sequence
 from typing import Any
 
-from flwr.app import Context, Error, Message, Metadata
+from flwr.app import Error, Message, Metadata
 from flwr.app.message import make_message
-from flwr.common import now, serde
+from flwr.common import now
 from flwr.common.constant import HEARTBEAT_PATIENCE, SUPERLINK_NODE_ID, ErrorCode
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
 
 # pylint: disable=E0611
 from flwr.proto.error_pb2 import Error as ProtoError
-from flwr.proto.message_pb2 import Context as ProtoContext
 from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE, RunType, TaskType
 from flwr.supercore.corestate.utils import (
@@ -47,6 +47,27 @@ NODE_UNAVAILABLE_ERROR_REASON = (
     "Error: Node Unavailable — The destination node failed to report a heartbeat "
     f"within {HEARTBEAT_PATIENCE} × its expected interval."
 )
+
+
+def build_params(values: Sequence[Any], prefix: str) -> tuple[str, dict[str, Any]]:
+    """Build SQL IN-clause placeholders and a matching parameter dict.
+
+    Parameters
+    ----------
+    values : Sequence[Any]
+        The values to bind, one per placeholder.
+    prefix : str
+        The prefix used to name each placeholder (e.g. ``"pfx"`` yields
+        ``:pfx_0,:pfx_1,...``).
+
+    Returns
+    -------
+    tuple[str, dict[str, Any]]
+        A comma-separated placeholder string and the corresponding parameter dict.
+    """
+    placeholders = ",".join(f":{prefix}_{i}" for i in range(len(values)))
+    params: dict[str, Any] = {f"{prefix}_{i}": v for i, v in enumerate(values)}
+    return placeholders, params
 
 
 def primary_task_type_from_run_type(run_type: str) -> TaskType:
@@ -99,16 +120,6 @@ def convert_sint64_values_in_dict_to_uint64(
     for key in keys:
         if key in data_dict:
             data_dict[key] = int64_to_uint64(data_dict[key])
-
-
-def context_to_bytes(context: Context) -> bytes:
-    """Serialize `Context` to bytes."""
-    return serde.context_to_proto(context).SerializeToString()
-
-
-def context_from_bytes(context_bytes: bytes) -> Context:
-    """Deserialize `Context` from bytes."""
-    return serde.context_from_proto(ProtoContext.FromString(context_bytes))
 
 
 def create_message_error_unavailable_res_message(

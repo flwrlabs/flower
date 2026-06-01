@@ -259,16 +259,18 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         task = get_authenticated_task()
         run_id = task.run_id
 
-        # Retrieve Context, Run and Fab for the run_id
-        serverapp_ctxt = state.get_serverapp_context(run_id)
+        # Retrieve Run, FAB, and shared RunSeries context for the run_id
         runs = state.get_run_info(run_ids=[run_id])
         run = runs[0] if runs else None
         fab = state.get_fab(run.fab_hash) if run and run.fab_hash else None
-        if run and fab and serverapp_ctxt:
+        series_context = None
+        if run and run.series_id:
+            series_context = state.get_run_series_context(run.series_id)
+        if run and fab and series_context:
             if state.activate_task(task.task_id):
                 log(INFO, "Started task %d of run %d", task.task_id, run_id)
                 return PullTaskInputResponse(
-                    context=context_to_proto(serverapp_ctxt),
+                    context=context_to_proto(series_context),
                     run=run_to_proto(run),
                     fab=fab_to_proto(fab),
                     federation_config=state.get_federation_config(run_id),
@@ -307,7 +309,13 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         ):
             log(INFO, "Finished task %d of run %d", task.task_id, run_id)
             if request.HasField("context"):
-                state.set_serverapp_context(run_id, context_from_proto(request.context))
+                runs = state.get_run_info(run_ids=[run_id])
+                run = runs[0] if runs else None
+                if run and run.series_id and run.primary_task_id == task.task_id:
+                    state.set_run_series_context(
+                        run.series_id,
+                        context_from_proto(request.context),
+                    )
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
         return PushTaskOutputResponse()
