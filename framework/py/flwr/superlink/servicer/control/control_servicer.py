@@ -405,32 +405,23 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         state = self.linkstate_factory.state()
         flwr_aid = _get_flwr_aid(context)
         with rpc_error_translator(context, self.GetRunSeries.__qualname__):
-            series_matches = state.get_run_series(
-                series_ids=[request.series_id],
-            )
-            if series_matches:
-                is_member = state.federation_manager.has_member(
-                    flwr_aid, series_matches[0].federation
-                )
-                if not is_member:
-                    context.abort(
-                        grpc.StatusCode.NOT_FOUND,
-                        "Run series ID not found.",
-                    )
-                    raise grpc.RpcError()  # This line is unreachable
+            series_matches = state.get_run_series(series_ids=[request.series_id])
 
-        if not series_matches:
-            context.abort(grpc.StatusCode.NOT_FOUND, "Run series ID not found.")
-            raise grpc.RpcError()  # This line is unreachable
+            # The caller must be a member of the federation
+            if not series_matches or state.federation_manager.has_member(
+                flwr_aid, series_matches[0].federation
+            ):
+                context.abort(grpc.StatusCode.NOT_FOUND, "Run series ID not found.")
+                raise grpc.RpcError()  # This line is unreachable
 
-        series = series_matches[0]
+        # Get the run series context and construct the response
+        # Run series context is created atomically by LinkState.create_run(...)
+        # and should never be None.
+        series_context = state.get_run_series_context(request.series_id)
         response = GetRunSeriesResponse(
-            series=_with_last_run_statuses(state, [series])[0]
+            series=_with_last_run_statuses(state, series_matches)[0],
+            context=context_to_proto(series_context) if series_context else None,
         )
-        if (series_context := state.get_run_series_context(request.series_id)) is None:
-            return response
-
-        response.context.CopyFrom(context_to_proto(series_context))
         return response
 
     def StopRun(

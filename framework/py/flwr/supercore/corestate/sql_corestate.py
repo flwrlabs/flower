@@ -135,7 +135,7 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
             verifications=json.loads(row["verifications"]),
         )
 
-    def get_run_series(
+    def get_run_series(  # pylint: disable=R0914
         self,
         *,
         series_ids: Sequence[int] | None = None,
