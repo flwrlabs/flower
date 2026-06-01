@@ -12,4 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Private model executor helpers."""
+"""Private model task process helpers."""
+
+
+from .run_model import run_model
+
+__all__ = ["run_model"]
