@@ -434,15 +434,14 @@ class LinkState(CoreState):  # pylint: disable=R0904
         series_id: int,
     ) -> None:
         """Initialize or refresh the Context for a run series."""
-        existing_context = self.get_run_series_context(series_id)
-        run_context = Context(
+        context = Context(
             run_id=run_id,
             node_id=SUPERLINK_NODE_ID,
             node_config={},
-            state=(
-                existing_context.state if existing_context is not None else RecordDict()
-            ),
+            state=RecordDict(),
             run_config={},
             series_id=series_id,
         )
-        self.set_run_series_context(series_id=series_id, context=run_context)
+        if existing_context := self.get_run_series_context(series_id):
+            context.state = existing_context.state
+        self.set_run_series_context(series_id=series_id, context=context)
