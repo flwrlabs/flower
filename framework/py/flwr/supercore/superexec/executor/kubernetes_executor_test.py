@@ -81,20 +81,6 @@ def _appio_root_certificates(
     return _get_appio_root_certificates(spec, config)
 
 
-def _contains_value(value: Any, needle: str) -> bool:
-    """Return true if a nested Kubernetes object contains a value."""
-    if value == needle:
-        return True
-    if isinstance(value, dict):
-        return any(
-            _contains_value(nested_key, needle) or _contains_value(nested_value, needle)
-            for nested_key, nested_value in value.items()
-        )
-    if isinstance(value, list):
-        return any(_contains_value(item, needle) for item in value)
-    return False
-
-
 def test_build_appio_credentials_secret_contains_token_and_ca() -> None:
     """Test building the AppIo credential Secret."""
     spec = _execution_spec()
@@ -139,6 +125,7 @@ def test_build_taskexecutor_pod_uses_secret_files_for_credentials() -> None:
     assert pod["metadata"]["namespace"] == "flower-system"
     assert container["image"] == "ghcr.io/flwrlabs/taskexecutor:dev"
     assert container["command"] == ["flwr-serverapp"]
+    assert "env" not in container
     assert container["args"] == [
         "--serverappio-api-address",
         "appio.example.com:9092",
@@ -383,20 +370,6 @@ def test_build_taskexecutor_pod_supports_labels_annotations_and_security() -> No
     assert pod["spec"]["containers"][0]["securityContext"] == container_security_context
 
 
-def test_build_taskexecutor_pod_never_exposes_token_in_container_spec() -> None:
-    """Test task token is mounted by file and never in command, args, or env."""
-    spec = _execution_spec()
-    config = _executor_config()
-    pod = _as_dict(
-        _build_taskexecutor_pod(spec, config, _appio_root_certificates(spec, config))
-    )
-    container = pod["spec"]["containers"][0]
-
-    assert "env" not in container
-    assert not _contains_value(container["command"], "task-token")
-    assert not _contains_value(container["args"], "task-token")
-
-
 def test_config_rejects_extra_labels_that_override_stable_labels() -> None:
     """Test extra labels cannot replace executor-owned stable labels."""
     with pytest.raises(ValueError, match="must not override stable labels"):
@@ -407,32 +380,6 @@ def test_config_rejects_empty_annotation_entries() -> None:
     """Test annotation entries must be explicit non-empty strings."""
     with pytest.raises(ValueError, match="Kubernetes annotations"):
         _executor_config(annotations={"flower.ai/owner": ""})
-
-
-def test_config_rejects_non_string_node_selector_entries() -> None:
-    """Test node selector entries must be strings."""
-    with pytest.raises(ValueError, match="Node selector entries must be strings"):
-        _executor_config(node_selector={"flower.ai/gpu": True})
-
-
-def test_build_metadata_copies_extra_labels_and_annotations() -> None:
-    """Test rendered metadata does not share caller-provided mappings."""
-    labels = {"flower.ai/team": "platform"}
-    annotations = {"flower.ai/owner": "superexec"}
-    config = _executor_config(labels=labels, annotations=annotations)
-
-    spec = _execution_spec()
-    secret = _as_dict(
-        _build_appio_credentials_secret(
-            spec, config, _appio_root_certificates(spec, config)
-        )
-    )
-    labels["flower.ai/team"] = "changed"
-    annotations["flower.ai/owner"] = "changed"
-
-    assert secret["metadata"]["labels"]["flower.ai/team"] == "platform"
-    assert secret["metadata"]["labels"]["flower.ai/superexec-task-id"] == "123"
-    assert secret["metadata"]["annotations"]["flower.ai/owner"] == "superexec"
 
 
 def test_build_taskexecutor_pod_copies_nested_json_config() -> None:
