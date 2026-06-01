@@ -408,7 +408,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             series_matches = state.get_run_series(series_ids=[request.series_id])
 
             # The caller must be a member of the federation
-            if not series_matches or state.federation_manager.has_member(
+            if not series_matches or not state.federation_manager.has_member(
                 flwr_aid, series_matches[0].federation
             ):
                 context.abort(grpc.StatusCode.NOT_FOUND, "Run series ID not found.")
