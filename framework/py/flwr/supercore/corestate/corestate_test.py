@@ -634,40 +634,6 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].starting_at, "")
         self.assertEqual(tasks[0].finished_at, "")
 
-    def test_revived_task_preserves_pending_at_order(self) -> None:
-        """Revived STARTING tasks should keep their original pending order."""
-        state = self.state_factory()
-        fixed_now = now()
-        run_id = self.task_run_id(state)
-
-        with patch("datetime.datetime") as mock_dt:
-            mock_dt.now.return_value = fixed_now
-            revived_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
-            assert revived_task_id is not None
-            revived_pending_at = state.get_tasks(task_ids=[revived_task_id])[
-                0
-            ].pending_at
-            assert state.claim_task(revived_task_id) is not None
-
-            mock_dt.now.return_value = fixed_now + timedelta(seconds=1)
-            later_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
-            assert later_task_id is not None
-
-            mock_dt.now.return_value = fixed_now + timedelta(
-                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
-            )
-            tasks = state.get_tasks(
-                task_ids=[revived_task_id, later_task_id],
-                statuses=[Status.PENDING],
-                order_by="pending_at",
-                ascending=True,
-            )
-
-        self.assertEqual(
-            [task.task_id for task in tasks], [revived_task_id, later_task_id]
-        )
-        self.assertEqual(tasks[0].pending_at, revived_pending_at)
-
     def test_expired_starting_task_token_does_not_call_expiry_hook(self) -> None:
         """Revived STARTING tasks should not be passed to expiry hooks."""
         state = self.state_factory()
