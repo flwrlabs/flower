@@ -17,7 +17,6 @@
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from types import MappingProxyType
 from typing import Protocol, cast
 
 from flwr.supercore.constant import (
@@ -96,7 +95,6 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
             _validate_string_map("Kubernetes annotations", self.annotations)
         if self.node_selector is not None:
             _validate_string_map("Node selector", self.node_selector)
-        _freeze_mutable_config(self)
 
 
 class KubernetesExecutor:
@@ -317,60 +315,8 @@ def _validate_string_map(name: str, values: dict[str, str]) -> None:
             raise ValueError(f"{name} entries must not be empty.")
 
 
-def _freeze_mutable_config(config: KubernetesExecutorConfig) -> None:
-    """Replace mutable config inputs with immutable defensive copies."""
-    if config.labels is not None:
-        object.__setattr__(config, "labels", MappingProxyType(dict(config.labels)))
-    if config.annotations is not None:
-        object.__setattr__(
-            config, "annotations", MappingProxyType(dict(config.annotations))
-        )
-    if config.resources is not None:
-        object.__setattr__(config, "resources", _freeze_json_object(config.resources))
-    if config.node_selector is not None:
-        object.__setattr__(
-            config, "node_selector", MappingProxyType(dict(config.node_selector))
-        )
-    if config.tolerations is not None:
-        object.__setattr__(
-            config,
-            "tolerations",
-            tuple(_freeze_json_object(toleration) for toleration in config.tolerations),
-        )
-    if config.affinity is not None:
-        object.__setattr__(config, "affinity", _freeze_json_object(config.affinity))
-    if config.pod_security_context is not None:
-        object.__setattr__(
-            config,
-            "pod_security_context",
-            _freeze_json_object(config.pod_security_context),
-        )
-    if config.container_security_context is not None:
-        object.__setattr__(
-            config,
-            "container_security_context",
-            _freeze_json_object(config.container_security_context),
-        )
-
-
-def _freeze_json_object(value: JSONObject) -> Mapping[str, object]:
-    """Return an immutable copy of a JSON object."""
-    return cast(Mapping[str, object], _freeze_json_value(value))
-
-
-def _freeze_json_value(value: object) -> object:
-    """Return an immutable copy of a JSON-compatible value."""
-    if isinstance(value, Mapping):
-        return MappingProxyType(
-            {key: _freeze_json_value(nested) for key, nested in value.items()}
-        )
-    if isinstance(value, Sequence) and not isinstance(value, str):
-        return tuple(_freeze_json_value(nested) for nested in value)
-    return value
-
-
 def _copy_json_object(value: object) -> JSONObject:
-    """Return a mutable plain-dict copy of a frozen JSON object."""
+    """Return a plain dict/list copy of a JSON object."""
     return cast(JSONObject, _copy_json_value(value))
 
 

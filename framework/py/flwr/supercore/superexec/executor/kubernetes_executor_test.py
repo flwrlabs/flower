@@ -415,11 +415,11 @@ def test_config_rejects_non_string_node_selector_entries() -> None:
         _executor_config(node_selector={"flower.ai/gpu": True})
 
 
-def test_config_freezes_extra_labels_after_validation() -> None:
-    """Test validated labels cannot be mutated after config construction."""
+def test_build_metadata_copies_extra_labels_and_annotations() -> None:
+    """Test rendered metadata does not share caller-provided mappings."""
     labels = {"flower.ai/team": "platform"}
-    config = _executor_config(labels=labels)
-    labels["flower.ai/superexec-task-id"] = "999"
+    annotations = {"flower.ai/owner": "superexec"}
+    config = _executor_config(labels=labels, annotations=annotations)
 
     spec = _execution_spec()
     secret = _as_dict(
@@ -427,29 +427,34 @@ def test_config_freezes_extra_labels_after_validation() -> None:
             spec, config, _appio_root_certificates(spec, config)
         )
     )
+    labels["flower.ai/team"] = "changed"
+    annotations["flower.ai/owner"] = "changed"
 
     assert secret["metadata"]["labels"]["flower.ai/team"] == "platform"
     assert secret["metadata"]["labels"]["flower.ai/superexec-task-id"] == "123"
-    assert config.labels is not None
-    with pytest.raises(TypeError):
-        config.labels["flower.ai/other"] = "value"
+    assert secret["metadata"]["annotations"]["flower.ai/owner"] == "superexec"
 
 
-def test_config_freezes_nested_json_config_after_validation() -> None:
-    """Test nested JSON config cannot be mutated after config construction."""
+def test_build_taskexecutor_pod_copies_nested_json_config() -> None:
+    """Test rendered Pod JSON does not share nested config objects."""
     resources = {"requests": {"cpu": "500m", "memory": "1Gi"}}
     tolerations = [{"key": "flower.ai/taskexecutor", "value": "true"}]
     config = _executor_config(resources=resources, tolerations=tolerations)
-    resources["requests"]["cpu"] = "4"
-    tolerations[0]["value"] = "false"
 
     pod = _as_dict(_build_taskexecutor_pod(_execution_spec(), config, "root-ca"))
+    pod_resources = _as_dict(pod["spec"]["containers"][0]["resources"])
+    pod_requests = _as_dict(pod_resources["requests"])
+    pod_toleration = _as_dict(pod["spec"]["tolerations"][0])
 
-    assert pod["spec"]["containers"][0]["resources"]["requests"]["cpu"] == "500m"
-    assert pod["spec"]["tolerations"][0]["value"] == "true"
-    assert config.resources is not None
-    with pytest.raises(TypeError):
-        cast(dict[str, Any], config.resources["requests"])["cpu"] = "4"
+    pod_requests["cpu"] = "2"
+    pod_toleration["value"] = "pod-only"
+    resources["requests"]["memory"] = "4Gi"
+    tolerations[0]["key"] = "changed"
+
+    assert resources["requests"]["cpu"] == "500m"
+    assert tolerations[0]["value"] == "true"
+    assert pod_resources["requests"]["memory"] == "1Gi"
+    assert pod_toleration["key"] == "flower.ai/taskexecutor"
 
 
 def test_launch_submits_secret_before_pod_and_returns_accepted() -> None:
