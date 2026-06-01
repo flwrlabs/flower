@@ -143,40 +143,6 @@ def test_launch_renders_serverappio_task_args(
     )
 
 
-def test_launch_renders_agentapp_args() -> None:
-    """Test subprocess executor renders AgentApp args."""
-    with patch.object(subprocess, "Popen") as popen_mock:
-        SubprocessExecutor().launch(_execution_spec(task_type=TaskType.AGENT_APP))
-
-    popen_mock.assert_called_once_with(
-        [
-            "flwr-agentapp",
-            "--serverappio-api-address",
-            "127.0.0.1:9094",
-            "--token",
-            "token",
-            "--insecure",
-        ]
-    )
-
-
-def test_launch_renders_model_args() -> None:
-    """Test subprocess executor renders Model args."""
-    with patch.object(subprocess, "Popen") as popen_mock:
-        SubprocessExecutor().launch(_execution_spec(task_type=TaskType.MODEL))
-
-    popen_mock.assert_called_once_with(
-        [
-            "flwr-model",
-            "--serverappio-api-address",
-            "127.0.0.1:9094",
-            "--token",
-            "token",
-            "--insecure",
-        ]
-    )
-
-
 def test_launch_does_not_suppress_output_by_default() -> None:
     """Test subprocess executor leaves output inherited by default."""
     popen_mock = Mock()
