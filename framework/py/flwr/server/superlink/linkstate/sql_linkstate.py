@@ -917,6 +917,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         run_type: str,
+        series_id: int | None = None,
     ) -> int:
         """Create a new run."""
         task_type = primary_task_type_from_run_type(run_type)
@@ -929,10 +930,10 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         run_insert_query = """
             INSERT INTO run
             (run_id, fab_id, fab_version, fab_hash, override_config, federation,
-            primary_task_id, federation_config, run_type, usage_reported_at,
+            primary_task_id, federation_config, run_type, series_id, usage_reported_at,
             flwr_aid, bytes_sent, bytes_recv, clientapp_runtime)
             VALUES (:run_id, :fab_id, :fab_version, :fab_hash, :override_config,
-            :federation, :primary_task_id, :federation_config, :run_type,
+            :federation, :primary_task_id, :federation_config, :run_type, :series_id,
             :usage_reported_at, :flwr_aid,
             :bytes_sent, :bytes_recv, :clientapp_runtime)
         """
@@ -950,11 +951,48 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
         run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
         task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
         pending_at = now()
+        sint_series_id = uint64_to_int64(series_id) if series_id is not None else None
 
         with self.session():
             query = "SELECT COUNT(*) as cnt FROM run WHERE run_id = :run_id"
             rows = self.query(query, {"run_id": uint64_to_int64(run_id)})
             if rows[0]["cnt"] == 0:
+                if series_id is not None:
+                    if self.query(
+                        "SELECT series_id FROM run_series WHERE series_id = :series_id",
+                        {"series_id": sint_series_id},
+                    ):
+                        self.query(
+                            """
+                            UPDATE run_series
+                            SET updated_at = :updated_at, last_run_id = :last_run_id
+                            WHERE series_id = :series_id
+                            """,
+                            {
+                                "series_id": sint_series_id,
+                                "updated_at": pending_at,
+                                "last_run_id": uint64_to_int64(run_id),
+                            },
+                        )
+                    else:
+                        self.query(
+                            """
+                            INSERT INTO run_series
+                            (series_id, federation, description, created_at,
+                             updated_at, last_run_id)
+                            VALUES
+                            (:series_id, :federation, :description, :created_at,
+                             :updated_at, :last_run_id)
+                            """,
+                            {
+                                "series_id": sint_series_id,
+                                "federation": federation,
+                                "description": None,
+                                "created_at": pending_at,
+                                "updated_at": pending_at,
+                                "last_run_id": uint64_to_int64(run_id),
+                            },
+                        )
                 self.query(
                     run_insert_query,
                     {
@@ -967,6 +1005,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                         "primary_task_id": uint64_to_int64(task_id),
                         "federation_config": fed_config_json,
                         "run_type": run_type,
+                        "series_id": sint_series_id,
                         "usage_reported_at": "",
                         "flwr_aid": flwr_aid or "",
                         "bytes_sent": 0,
@@ -1064,6 +1103,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             SELECT
                 r.run_id, r.fab_id, r.fab_version, r.fab_hash, r.override_config,
                 r.federation, r.primary_task_id, r.federation_config, r.run_type,
+                r.series_id,
                 r.flwr_aid, r.bytes_sent, r.bytes_recv, r.clientapp_runtime,
                 t.pending_at AS pending_at,
                 t.starting_at AS starting_at,
@@ -1256,6 +1296,46 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 except IntegrityError:
                     raise ValueError(f"Run {run_id} not found") from None
 
+    def get_run_series_context(self, series_id: int) -> Context | None:
+        """Get the context for the specified `series_id`."""
+        query = "SELECT context FROM series_context WHERE series_id = :series_id"
+        rows = self.query(query, {"series_id": uint64_to_int64(series_id)})
+        context = context_from_bytes(rows[0]["context"]) if rows else None
+        return context
+
+    def set_run_series_context(self, series_id: int, context: Context) -> None:
+        """Set the context for the specified `series_id`."""
+        context_bytes = context_to_bytes(context)
+        sint_series_id = uint64_to_int64(series_id)
+
+        with self.session():
+            if not self.query(
+                "SELECT series_id FROM run_series WHERE series_id = :series_id",
+                {"series_id": sint_series_id},
+            ):
+                raise ValueError(f"Run series {series_id} not found")
+
+            if self.query(
+                "SELECT series_id FROM series_context WHERE series_id = :series_id",
+                {"series_id": sint_series_id},
+            ):
+                self.query(
+                    """
+                    UPDATE series_context
+                    SET context = :context_bytes
+                    WHERE series_id = :series_id
+                    """,
+                    {"series_id": sint_series_id, "context_bytes": context_bytes},
+                )
+            else:
+                self.query(
+                    """
+                    INSERT INTO series_context (series_id, context)
+                    VALUES (:series_id, :context_bytes)
+                    """,
+                    {"series_id": sint_series_id, "context_bytes": context_bytes},
+                )
+
     def get_valid_message_ins(self, message_id: str) -> dict[str, Any] | None:
         """Check if the Message exists and is valid (not expired).
 
@@ -1361,4 +1441,7 @@ def _run_from_row(row: dict[str, Any]) -> Run:
         bytes_recv=row["bytes_recv"],
         clientapp_runtime=row["clientapp_runtime"],
         run_type=row["run_type"],
+        series_id=(
+            int64_to_uint64(row["series_id"]) if row["series_id"] is not None else 0
+        ),
     )

@@ -266,6 +266,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         run_type: str,
+        series_id: int | None = None,
     ) -> int:
         """Create a new run.
 
@@ -287,6 +288,8 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Flower Account ID of the creator.
         run_type : str
             The type of run being created.
+        series_id : int | None
+            Optional run series identifier to associate with the run.
 
         Returns
         -------
@@ -416,6 +419,34 @@ class LinkState(CoreState):  # pylint: disable=R0904
             The identifier of the run for which to set the context.
         context : Context
             The context to be associated with the specified `run_id`.
+        """
+
+    @abc.abstractmethod
+    def get_run_series_context(self, series_id: int) -> Context | None:
+        """Get the context for the specified `series_id`.
+
+        Parameters
+        ----------
+        series_id : int
+            The identifier of the run series for which to retrieve the context.
+
+        Returns
+        -------
+        Optional[Context]
+            The context associated with the specified `series_id`, or `None` if no
+            context exists for the given `series_id`.
+        """
+
+    @abc.abstractmethod
+    def set_run_series_context(self, series_id: int, context: Context) -> None:
+        """Set the context for the specified `series_id`.
+
+        Parameters
+        ----------
+        series_id : int
+            The identifier of the run series for which to set the context.
+        context : Context
+            The context to be associated with the specified `series_id`.
         """
 
     @abc.abstractmethod

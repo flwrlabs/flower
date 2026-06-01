@@ -201,6 +201,59 @@ class StateTest(CoreStateTest):
         self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
 
+    def test_get_set_run_series_context(self) -> None:
+        """Test get and set run series context."""
+        # Prepare
+        state = self.state_factory()
+        series_id = 123
+        run_id = state.create_run(
+            "flwr/gpt-chat",
+            "v0.0.1",
+            "hash123",
+            {},
+            NOOP_FEDERATION,
+            None,
+            None,
+            RunType.AGENT_APP,
+            series_id,
+        )
+        context = Context(
+            run_id=run_id,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={},
+            state=RecordDict(),
+            run_config={"agent.ref": "gpt-chat", "agent.input": "hello"},
+            series_id=series_id,
+        )
+
+        # Execute
+        init = state.get_run_series_context(series_id)
+        state.set_run_series_context(series_id, context)
+        retrieved_context = state.get_run_series_context(series_id)
+        run = state.get_run_info(run_ids=[run_id])[0]
+
+        # Assert
+        assert init is None
+        assert retrieved_context == context
+        assert run.series_id == series_id
+
+    def test_set_run_series_context_invalid_series_id(self) -> None:
+        """Test set_run_series_context with invalid series_id."""
+        # Prepare
+        state = self.state_factory()
+        context = Context(
+            run_id=0,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={},
+            state=RecordDict(),
+            run_config={},
+            series_id=123,
+        )
+
+        # Execute/Assert
+        with self.assertRaises(ValueError):
+            state.set_run_series_context(123, context)
+
     def test_store_messages_rejects_stopped_run(self) -> None:
         """Messages cannot be stored after a run is stopped."""
         state = self.state_factory()

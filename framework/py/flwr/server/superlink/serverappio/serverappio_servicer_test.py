@@ -34,7 +34,7 @@ from flwr.common.constant import (
     SUPERLINK_NODE_ID,
     Status,
 )
-from flwr.common.serde import message_from_proto
+from flwr.common.serde import context_from_proto, message_from_proto
 from flwr.common.typing import Fab
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
@@ -813,6 +813,54 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
         assert isinstance(response, PullTaskInputResponse)
         run_status = self.state.get_run_status({run_id})[run_id]
         assert run_status.status == Status.RUNNING
+
+    def test_pull_task_input_uses_run_series_context(self) -> None:
+        """Test `PullTaskInput` returns series context for associated runs."""
+        # Prepare: Create an AgentApp run with FAB and series context
+        fab_content = b"mock agent fab content"
+        fab_hash = self.state.store_fab(
+            Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
+        )
+        series_id = 123
+        run_id = self.state.create_run(
+            "flwr/gpt-chat",
+            "v0.0.1",
+            fab_hash,
+            {},
+            NOOP_FEDERATION,
+            None,
+            "",
+            RunType.AGENT_APP,
+            series_id,
+        )
+        task_id = self._primary_task_id(run_id)
+        servicer = ServerAppIoServicer(self.state_factory, self.objectstore_factory)
+
+        claim_response = servicer.ClaimTask(ClaimTaskRequest(task_id=task_id), Mock())
+        assert claim_response.HasField("token")
+
+        series_context = Context(
+            run_id,
+            SUPERLINK_NODE_ID,
+            {},
+            RecordDict(),
+            {"agent.ref": "gpt-chat", "agent.input": "hello"},
+            series_id,
+        )
+        self.state.set_run_series_context(series_id, series_context)
+
+        # Execute: Pull task input
+        with patch(
+            "flwr.server.superlink.serverappio.serverappio_servicer."
+            "get_authenticated_task",
+            return_value=Mock(task_id=task_id, run_id=run_id),
+        ):
+            response = servicer.PullTaskInput(PullTaskInputRequest(), Mock())
+
+        # Assert
+        returned_context = context_from_proto(response.context)
+        assert response.fab.content == fab_content
+        assert returned_context == series_context
 
 
 def test_ha_pull_task_input_claim_is_unique_across_replicas() -> None:

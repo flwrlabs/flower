@@ -47,6 +47,7 @@ from flwr.common.constant import (
     PUBLIC_KEY_ALREADY_IN_USE_MESSAGE,
     PUBLIC_KEY_NOT_VALID,
     PULL_UNFINISHED_RUN_MESSAGE,
+    RUN_ID_NUM_BYTES,
     RUN_ID_NOT_FOUND_MESSAGE,
     SUPERLINK_NODE_ID,
     TRANSPORT_TYPE_GRPC_ADAPTER,
@@ -114,6 +115,7 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.proto.federation_pb2 import Federation  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
+from flwr.server.superlink.linkstate.utils import generate_rand_int_from_bytes
 from flwr.supercore.constant import (
     NOOP_FEDERATION,
     PLATFORM_API_URL,
@@ -135,13 +137,12 @@ from flwr.supercore.utils import parse_app_spec, request_download_link
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
+from .builtin_agent import BUILTIN_GPT_CHAT_AGENT_REF, resolve_builtin_agent_fab
 from .control_account_auth_interceptor import get_current_account_info
 
 
-_AGENT_REF_CONFIG_KEY = "agent_ref"
-_AGENT_INPUT_JSON_CONFIG_KEY = "input_json"
-_AGENT_MODEL_CONFIG_KEY = "model"
-_BUILTIN_GPT_CHAT_AGENT_REF = "gpt-chat"
+_AGENT_REF_CONFIG_KEY = "agent.ref"
+_AGENT_INPUT_CONFIG_KEY = "agent.input"
 
 
 @dataclass(frozen=True)
@@ -149,8 +150,7 @@ class _AgentStartConfig:
     """Parsed AgentApp start fields from Control override config."""
 
     agent_ref: str
-    input_json: str
-    model: str | None
+    agent_input: str
 
 
 def _parse_agent_start_config(override_config: UserConfig) -> _AgentStartConfig | None:
@@ -160,37 +160,15 @@ def _parse_agent_start_config(override_config: UserConfig) -> _AgentStartConfig 
 
     agent_ref = override_config[_AGENT_REF_CONFIG_KEY]
     if not isinstance(agent_ref, str) or not agent_ref:
-        raise ValueError("Agent run requires a non-empty string 'agent_ref'.")
-    if agent_ref != _BUILTIN_GPT_CHAT_AGENT_REF:
-        raise ValueError(f"Unsupported agent_ref: {agent_ref}.")
+        raise ValueError("Agent run requires a non-empty string 'agent.ref'.")
+    if agent_ref != BUILTIN_GPT_CHAT_AGENT_REF:
+        raise ValueError(f"Unsupported agent.ref: {agent_ref}.")
 
-    input_json = override_config.get(_AGENT_INPUT_JSON_CONFIG_KEY)
-    if not isinstance(input_json, str):
-        raise ValueError("Agent run requires string 'input_json'.")
-    _validate_agent_input_json(input_json)
+    agent_input = override_config.get(_AGENT_INPUT_CONFIG_KEY)
+    if not isinstance(agent_input, str):
+        raise ValueError("Agent run requires string 'agent.input'.")
 
-    model = override_config.get(_AGENT_MODEL_CONFIG_KEY)
-    if model is not None and not isinstance(model, str):
-        raise ValueError("Agent run optional 'model' must be a string.")
-
-    return _AgentStartConfig(agent_ref=agent_ref, input_json=input_json, model=model)
-
-
-def _validate_agent_input_json(input_json: str) -> None:
-    """Validate AgentApp input JSON shape."""
-    try:
-        decoded = json.loads(input_json)
-    except json.JSONDecodeError as exc:
-        raise ValueError("Agent input_json must be valid JSON.") from exc
-
-    if isinstance(decoded, dict):
-        return
-    if isinstance(decoded, list) and all(isinstance(item, dict) for item in decoded):
-        return
-
-    raise ValueError(
-        "Agent input_json must be a JSON object or an array of JSON objects."
-    )
+    return _AgentStartConfig(agent_ref=agent_ref, agent_input=agent_input)
 
 
 # pylint: disable=too-many-public-methods
@@ -218,9 +196,22 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         log(INFO, rpc_name := self.StartRun.__qualname__)
         state = self.linkstate_factory.state()
 
+        flwr_aid = _get_flwr_aid(context)
+        override_config = user_config_from_proto(request.override_config)
+        try:
+            agent_start_config = _parse_agent_start_config(override_config)
+        except ValueError as e:
+            log(ERROR, "Could not start run: %s", str(e))
+            context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
+            raise grpc.RpcError() from None  # This line is unreachable
+
         verification_dict: dict[str, str] = {}
         note: str | None = None
-        if request.app_spec:
+        if agent_start_config is not None:
+            fab_file, verification_dict = resolve_builtin_agent_fab(
+                agent_start_config.agent_ref
+            )
+        elif request.app_spec:
             fab_file, verification_dict, note = _get_remote_fab(
                 self.fleet_api_type, request.app_spec, context
             )
@@ -234,9 +225,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 FAB_MAX_SIZE,
             )
             return StartRunResponse()
-
-        flwr_aid = _get_flwr_aid(context)
-        override_config = user_config_from_proto(request.override_config)
 
         with rpc_error_translator(context, rpc_name):
             # Check (1) federation exists and (2) the flwr_aid is a member
@@ -260,10 +248,20 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
             # Derive run type based on the presence of simulation config and apply
             # federation config overrides
-            run_type = RunType.SERVER_APP
+            run_type = (
+                RunType.AGENT_APP
+                if agent_start_config is not None
+                else RunType.SERVER_APP
+            )
             resolved_federation_config = None
             runtime = RunTime.DEPLOYMENT
             if sim_cfg := state.federation_manager.get_simulation_config(federation):
+                if agent_start_config is not None:
+                    context.abort(
+                        grpc.StatusCode.FAILED_PRECONDITION,
+                        "AgentApp runs are not supported in simulation federations.",
+                    )
+                    raise grpc.RpcError()  # This line is unreachable
                 run_type = RunType.SIMULATION
                 runtime = RunTime.SIMULATION
                 resolved_federation_config = SimulationConfig()
@@ -277,6 +275,14 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             )
 
         try:
+            series_id = None
+            if agent_start_config is not None:
+                series_id = (
+                    request.series_id
+                    if request.HasField("series_id")
+                    else generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
+                )
+
             # Validate user config overrides matches keys in run config in FAB
             fab_config = get_fab_config(fab_file)
             run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
@@ -305,6 +311,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 resolved_federation_config,
                 flwr_aid,
                 run_type,
+                series_id,
             )
 
             if run_id == 0:
@@ -321,25 +328,40 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                     "tmp_dir": self.artifact_provider.tmp_dir,
                 }
 
+            run_config = {}
+            if agent_start_config is not None:
+                run_config = {
+                    "agent.ref": agent_start_config.agent_ref,
+                    "agent.input": agent_start_config.agent_input,
+                }
+
             # Create an empty context for the Run
-            context = Context(
+            run_context = Context(
                 run_id=run_id,
                 node_id=SUPERLINK_NODE_ID,
                 # Dict is invariant in mypy
                 node_config=node_config,  # type: ignore[arg-type]
                 state=RecordDict(),
-                run_config={},
+                run_config=run_config,
+                series_id=series_id or 0,
             )
 
             # Register the context at the LinkState
-            state.set_serverapp_context(run_id=run_id, context=context)
+            if series_id is not None:
+                state.set_run_series_context(series_id=series_id, context=run_context)
+            else:
+                state.set_serverapp_context(run_id=run_id, context=run_context)
 
         except ValueError as e:
             log(ERROR, "Could not start run: %s", str(e))
             context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
+            raise grpc.RpcError() from None  # This line is unreachable
 
         log(INFO, "Created %s run %s", run_type, str(run_id))
-        return StartRunResponse(run_id=run_id, note=note)
+        response = StartRunResponse(run_id=run_id, note=note)
+        if series_id is not None:
+            response.series_id = series_id
+        return response
 
     def StreamLogs(  # pylint: disable=C0103
         self, request: StreamLogsRequest, context: grpc.ServicerContext

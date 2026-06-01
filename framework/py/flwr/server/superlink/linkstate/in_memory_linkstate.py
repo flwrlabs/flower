@@ -83,6 +83,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         # Map run_id to RunRecord
         self.run_ids: dict[int, RunRecord] = {}
         self.contexts: dict[int, Context] = {}
+        self.run_series_last_run_ids: dict[int, int] = {}
+        self.series_contexts: dict[int, Context] = {}
         self.message_ins_store: dict[str, Message] = {}
         self.message_res_store: dict[str, Message] = {}
         self.message_ins_id_to_message_res_id: dict[str, str] = {}
@@ -606,6 +608,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         run_type: str,
+        series_id: int | None = None,
     ) -> int:
         """Create a new run."""
         task_type = primary_task_type_from_run_type(run_type)
@@ -643,10 +646,13 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     bytes_recv=0,
                     clientapp_runtime=0.0,
                     run_type=run_type,
+                    series_id=series_id or 0,
                 ),
                 federation_config=federation_config,
             )
             self.run_ids[run_id] = run_record
+            if series_id is not None:
+                self.run_series_last_run_ids[series_id] = run_id
             # Add run_id to the flwr_aid_to_run_ids mapping if flwr_aid is provided
             if flwr_aid:
                 self.flwr_aid_to_run_ids[flwr_aid].add(run_id)
@@ -809,6 +815,17 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             if run_id not in self.run_ids:
                 raise ValueError(f"Run {run_id} not found")
             self.contexts[run_id] = context
+
+    def get_run_series_context(self, series_id: int) -> Context | None:
+        """Get the context for the specified `series_id`."""
+        return self.series_contexts.get(series_id)
+
+    def set_run_series_context(self, series_id: int, context: Context) -> None:
+        """Set the context for the specified `series_id`."""
+        with self.lock:
+            if series_id not in self.run_series_last_run_ids:
+                raise ValueError(f"Run series {series_id} not found")
+            self.series_contexts[series_id] = context
 
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`."""

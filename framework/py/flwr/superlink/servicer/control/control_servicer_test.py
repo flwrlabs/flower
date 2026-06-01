@@ -30,6 +30,7 @@ import grpc
 from parameterized import parameterized
 
 from flwr.common import now
+from flwr.common.config import get_fab_config
 from flwr.common.constant import (
     NODE_NOT_FOUND_MESSAGE,
     NOOP_ACCOUNT_NAME,
@@ -137,48 +138,24 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         self.assertIsNone(config)
 
-    def test_parse_agent_start_config_accepts_gpt_chat_object_input(self) -> None:
-        """Agent start config parser should accept GPT Chat object input."""
-        input_json = json.dumps({"role": "user", "content": "hello"})
-
+    def test_parse_agent_start_config_accepts_gpt_chat_input(self) -> None:
+        """Agent start config parser should accept GPT Chat input."""
         config = _parse_agent_start_config(
             {
-                "agent_ref": "gpt-chat",
-                "input_json": input_json,
-                "model": "openai/gpt-5.5",
+                "agent.ref": "gpt-chat",
+                "agent.input": "hello",
             }
         )
 
         assert config is not None
         self.assertEqual(config.agent_ref, "gpt-chat")
-        self.assertEqual(config.input_json, input_json)
-        self.assertEqual(config.model, "openai/gpt-5.5")
-
-    def test_parse_agent_start_config_accepts_gpt_chat_list_input(self) -> None:
-        """Agent start config parser should accept a list of input objects."""
-        input_json = json.dumps([{"role": "user", "content": "hello"}])
-
-        config = _parse_agent_start_config(
-            {"agent_ref": "gpt-chat", "input_json": input_json}
-        )
-
-        assert config is not None
-        self.assertEqual(config.model, None)
+        self.assertEqual(config.agent_input, "hello")
 
     @parameterized.expand(
         [
-            ("unsupported", {"agent_ref": "other-agent", "input_json": "{}"}),
-            ("missing_input", {"agent_ref": "gpt-chat"}),
-            ("malformed_input", {"agent_ref": "gpt-chat", "input_json": "{"}),
-            ("scalar_input", {"agent_ref": "gpt-chat", "input_json": '"hello"'}),
-            (
-                "mixed_list_input",
-                {"agent_ref": "gpt-chat", "input_json": '[{"role": "user"}, 1]'},
-            ),
-            (
-                "non_string_model",
-                {"agent_ref": "gpt-chat", "input_json": "{}", "model": 3},
-            ),
+            ("unsupported", {"agent.ref": "other-agent", "agent.input": "hello"}),
+            ("missing_input", {"agent.ref": "gpt-chat"}),
+            ("non_string_input", {"agent.ref": "gpt-chat", "agent.input": 3}),
         ]
     )  # type: ignore
     def test_parse_agent_start_config_rejects_invalid_values(
@@ -280,6 +257,87 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, expected_task_type)
+
+    def test_start_run_creates_agentapp_run(self) -> None:
+        """Test StartRun creates an AgentApp run from built-in agent config."""
+        request = StartRunRequest(federation=NOOP_FEDERATION)
+        for key, value in user_config_to_proto(
+            {"agent.ref": "gpt-chat", "agent.input": "hello"}
+        ).items():
+            request.override_config[key].CopyFrom(value)
+
+        response = self.servicer.StartRun(request, Mock())
+
+        runs = self.state.get_run_info(run_ids=[response.run_id])
+        tasks = self.state.get_tasks(run_ids=[response.run_id])
+        run = runs[0] if runs else None
+        assert run is not None
+        self.assertEqual(run.run_type, RunType.AGENT_APP)
+        self.assertTrue(response.HasField("series_id"))
+        self.assertEqual(run.series_id, response.series_id)
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
+        self.assertEqual(tasks[0].fab_hash, run.fab_hash)
+
+        fab = self.state.get_fab(run.fab_hash)
+        assert fab is not None
+        fab_config = get_fab_config(fab.content)
+        self.assertEqual(fab_config["project"]["name"], "gpt-chat")
+        self.assertEqual(
+            fab_config["tool"]["flwr"]["app"]["components"]["agentapp"],
+            "flwr.agentapp.builtin.gpt_chat:app",
+        )
+
+        series_context = self.state.get_run_series_context(response.series_id)
+        assert series_context is not None
+        self.assertEqual(series_context.run_id, response.run_id)
+        self.assertEqual(series_context.series_id, response.series_id)
+        self.assertEqual(series_context.run_config["agent.ref"], "gpt-chat")
+        self.assertEqual(series_context.run_config["agent.input"], "hello")
+        self.assertIsNone(self.state.get_serverapp_context(response.run_id))
+
+    def test_start_run_agentapp_preserves_series_id(self) -> None:
+        """Test AgentApp StartRun preserves caller-provided series_id."""
+        request = StartRunRequest(federation=NOOP_FEDERATION)
+        request.series_id = 123
+        for key, value in user_config_to_proto(
+            {"agent.ref": "gpt-chat", "agent.input": "hello"}
+        ).items():
+            request.override_config[key].CopyFrom(value)
+
+        response = self.servicer.StartRun(request, Mock())
+
+        run = self.state.get_run_info(run_ids=[response.run_id])[0]
+        series_context = self.state.get_run_series_context(123)
+        self.assertEqual(response.series_id, 123)
+        self.assertEqual(run.series_id, 123)
+        assert series_context is not None
+        self.assertEqual(series_context.series_id, 123)
+
+    def test_start_run_rejects_agentapp_in_simulation_federation(self) -> None:
+        """Test AgentApp StartRun rejects simulation federations."""
+        request = StartRunRequest(federation=NOOP_FEDERATION)
+        for key, value in user_config_to_proto(
+            {"agent.ref": "gpt-chat", "agent.input": "hello"}
+        ).items():
+            request.override_config[key].CopyFrom(value)
+        context = Mock()
+        context.abort.side_effect = grpc.RpcError()
+
+        with (
+            patch.object(
+                self.state.federation_manager,
+                "get_simulation_config",
+                return_value=SimulationConfig(),
+            ),
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.servicer.StartRun(request, context)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            "AgentApp runs are not supported in simulation federations.",
+        )
 
     def test_start_run_aborts_if_create_run_fails(self) -> None:
         """Test StartRun aborts with INTERNAL if the initial task cannot be created."""

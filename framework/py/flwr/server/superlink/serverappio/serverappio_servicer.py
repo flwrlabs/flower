@@ -261,9 +261,12 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         run_id = task.run_id
 
         # Retrieve Context, Run and Fab for the run_id
-        serverapp_ctxt = state.get_serverapp_context(run_id)
         runs = state.get_run_info(run_ids=[run_id])
         run = runs[0] if runs else None
+        if run and run.series_id:
+            serverapp_ctxt = state.get_run_series_context(run.series_id)
+        else:
+            serverapp_ctxt = state.get_serverapp_context(run_id)
         fab = state.get_fab(run.fab_hash) if run and run.fab_hash else None
         if run and fab and serverapp_ctxt:
             if state.activate_task(task.task_id):
@@ -308,7 +311,13 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         ):
             log(INFO, "Finished task %d of run %d", task.task_id, run_id)
             if request.HasField("context"):
-                state.set_serverapp_context(run_id, context_from_proto(request.context))
+                task_context = context_from_proto(request.context)
+                runs = state.get_run_info(run_ids=[run_id])
+                run = runs[0] if runs else None
+                if run and run.series_id:
+                    state.set_run_series_context(run.series_id, task_context)
+                else:
+                    state.set_serverapp_context(run_id, task_context)
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
         return PushTaskOutputResponse()
