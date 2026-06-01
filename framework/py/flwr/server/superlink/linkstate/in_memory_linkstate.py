@@ -402,27 +402,18 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
     def stop_run(self, run_id: int) -> bool:
         """Stop a run and clean up its messages and objects."""
-        update_success = False
-        for task in self.get_tasks(run_ids=[run_id]):
-            update_success |= self.finish_task(task.task_id, SubStatus.STOPPED, "")
-
-        if not update_success:
+        # Check if the run exists
+        run_record = self.run_ids.get(run_id)
+        if run_record is None:
             return False
 
-        with self.lock:
-            message_ids = {
-                message_id
-                for message_id, message in self.message_ins_store.items()
-                if message.metadata.run_id == run_id
-            }
-            for message_id in message_ids:
-                self.message_ins_store.pop(message_id, None)
-                if message_id in self.message_ins_id_to_message_res_id:
-                    message_res_id = self.message_ins_id_to_message_res_id.pop(
-                        message_id
-                    )
-                    self.message_res_store.pop(message_res_id, None)
+        # Stop the run's primary task, which will cascade to stop all its tasks
+        primary_task_id = cast(int, run_record.run.primary_task_id)
+        if not self.finish_task(primary_task_id, SubStatus.STOPPED, ""):
+            return False
 
+        # Clean up messages and their objects related to the run
+        self.delete_messages(self.get_message_ids_from_run_id(run_id))
         self.object_store.delete_objects_in_run(run_id)
         return True
 
@@ -778,17 +769,71 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 if run_id in self.run_ids
             }
 
+    def _finish_run_tasks(
+        self, run_primary_pairs: list[tuple[int, int]], sub_status: str, details: str
+    ) -> None:
+        """Finish all unfinished tasks of the run for the given run/primary-task pairs.
+
+        Each task's ``finished_at`` is copied from its run's primary task.
+        """
+        for run_id, primary_task_id in run_primary_pairs:
+            primary_task = self.task_store.get(primary_task_id)
+            if primary_task is None:
+                continue
+            finished_at = primary_task.finished_at
+            for task in self.task_store.values():
+                if task.run_id == run_id and task.status.status != Status.FINISHED:
+                    task.finished_at = finished_at
+                    task.status.status = Status.FINISHED
+                    task.status.sub_status = sub_status
+                    task.status.details = details
+                    if record := self.task_token_store.pop(task.task_id, None):
+                        self.task_token_to_task_id.pop(record.token, None)
+
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
         result = super().finish_task(task_id, sub_status, details)
         if result and self._is_primary_task(task_id):
+            with self.lock_task_store:
+                task = self.task_store.get(task_id)
+                if task is not None:
+                    # Stop all tasks of the run when the run is stopped
+                    if sub_status == SubStatus.STOPPED:
+                        finish_sub_status = SubStatus.STOPPED
+                        finish_details = "Task stopped because the run was stopped"
+                    # Otherwise, fail all tasks of the run
+                    else:
+                        finish_sub_status = SubStatus.FAILED
+                        finish_details = "Task failed because the run finished"
+                    self._finish_run_tasks(
+                        [(task.run_id, task_id)],
+                        sub_status=finish_sub_status,
+                        details=finish_details,
+                    )
             self.federation_manager.report_run_usage()
         return result
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
-        """Report usage when an expired task is the primary task of its run."""
-        if any(self._is_primary_task(task.task_id) for task in tasks):
-            self.federation_manager.report_run_usage()
+        """Fail unfinished tasks for runs whose primary task expired and report usage.
+
+        When an expired task is the primary task of a run, this hook marks all
+        unfinished tasks in that run as finished with FAILED status, removes any
+        associated task tokens, and reports run usage.
+        """
+        pairs = [
+            (task.run_id, task.task_id)
+            for task in tasks
+            if self._is_primary_task(task.task_id)
+        ]
+        if not pairs:
+            return
+
+        self._finish_run_tasks(
+            pairs,
+            sub_status=SubStatus.FAILED,
+            details="Task failed because the run expired",
+        )
+        self.federation_manager.report_run_usage()
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float

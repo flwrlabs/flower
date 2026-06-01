@@ -20,7 +20,7 @@ import json
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from logging import ERROR, WARNING
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from sqlalchemy import MetaData
 from sqlalchemy.exc import IntegrityError
@@ -63,6 +63,7 @@ from flwr.superlink.federation import FederationManager
 
 from .linkstate import LinkState
 from .utils import (
+    build_params,
     check_node_availability_for_in_message,
     convert_sint64_values_in_dict_to_uint64,
     convert_uint64_values_in_dict_to_sint64,
@@ -604,15 +605,18 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
     def stop_run(self, run_id: int) -> bool:
         """Stop a run and clean up run-scoped messages and objects."""
-        update_success = False
-        for task in self.get_tasks(run_ids=[run_id]):
-            update_success |= self.finish_task(task.task_id, SubStatus.STOPPED, "")
-
-        if not update_success:
+        # Check if the run exists
+        runs = self.get_run_info(run_ids=[run_id])
+        if not runs:
             return False
 
-        self.delete_messages(self.get_message_ids_from_run_id(run_id))
+        # Stop the run's primary task, which will cascade to stop all its tasks
+        primary_task_id = cast(int, runs[0].primary_task_id)
+        if not self.finish_task(primary_task_id, SubStatus.STOPPED, ""):
+            return False
 
+        # Clean up messages and their objects related to the run
+        self.delete_messages(self.get_message_ids_from_run_id(run_id))
         self.object_store.delete_objects_in_run(run_id)
         return True
 
@@ -1153,35 +1157,101 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
         return simulation_config_from_json(json.loads(fed_config_json))
 
+    def _finish_run_tasks(
+        self, run_primary_pairs: list[tuple[int, int]], sub_status: str, details: str
+    ) -> None:
+        """Finish all unfinished tasks of the run for the given run/primary-task pairs.
+
+        The IDs must be sint64 DB values. Each task's ``finished_at`` is copied from
+        its run's primary task.
+        """
+        if not run_primary_pairs:
+            return
+
+        sint_run_ids = [pair[0] for pair in run_primary_pairs]
+        sint_task_ids = [pair[1] for pair in run_primary_pairs]
+        run_id_ph, run_id_params = build_params(sint_run_ids, "run_id")
+        pt_id_ph, pt_id_params = build_params(sint_task_ids, "pt_id")
+
+        self.query(
+            f"""
+            UPDATE task
+            SET finished_at = (
+                    SELECT pt.finished_at FROM task pt
+                    WHERE pt.task_id IN ({pt_id_ph}) AND pt.run_id = task.run_id
+                ),
+                sub_status = :sub_status,
+                details = :details,
+                active_until = NULL,
+                token = NULL
+            WHERE run_id IN ({run_id_ph}) AND finished_at IS NULL
+            """,
+            {
+                **run_id_params,
+                **pt_id_params,
+                "sub_status": sub_status,
+                "details": details,
+            },
+        )
+
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
         result = super().finish_task(task_id, sub_status, details)
         if result:
+            sint64_task_id = uint64_to_int64(task_id)
             # Check whether this task is referenced as a run's primary task
             rows = self.query(
-                "SELECT 1 FROM run WHERE primary_task_id = :task_id",
-                {"task_id": uint64_to_int64(task_id)},
+                "SELECT run_id FROM run WHERE primary_task_id = :task_id",
+                {"task_id": sint64_task_id},
             )
-            # If yes, report usage for the run
             if rows:
+                # Stop all tasks of the run when the run is stopped
+                if sub_status == SubStatus.STOPPED:
+                    finish_sub_status = SubStatus.STOPPED
+                    finish_details = "Task stopped because the run was stopped"
+                # Otherwise, fail all tasks of the run
+                else:
+                    finish_sub_status = SubStatus.FAILED
+                    finish_details = "Task failed because the run finished"
+                self._finish_run_tasks(
+                    [(rows[0]["run_id"], sint64_task_id)],
+                    sub_status=finish_sub_status,
+                    details=finish_details,
+                )
                 self.federation_manager.report_run_usage()
         return result
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
-        """Report usage when an expired task is the primary task of its run."""
+        """Fail unfinished tasks for runs whose primary task expired and report usage.
+
+        When an expired task is the primary task of a run, this hook marks all
+        unfinished tasks in that run as finished with FAILED status, removes any
+        associated task tokens, and reports run usage.
+        """
         if not tasks:
             return
 
-        # Check if any of the expired tasks is referenced as a run's primary task
-        task_ids = [uint64_to_int64(task.task_id) for task in tasks]
-        placeholders = ",".join([f":task_id_{i}" for i in range(len(task_ids))])
-        rows = self.query(
-            f"SELECT 1 FROM run WHERE primary_task_id IN ({placeholders}) LIMIT 1",
-            {f"task_id_{i}": task_id for i, task_id in enumerate(task_ids)},
+        # Check if any of the expired tasks is referenced as a run's primary task.
+        task_id_ph, task_id_params = build_params(
+            [uint64_to_int64(task.task_id) for task in tasks], "task_id"
         )
-        # If yes, report usage for the run
-        if rows:
-            self.federation_manager.report_run_usage()
+        rows = self.query(
+            f"SELECT run_id, primary_task_id FROM run"
+            f" WHERE primary_task_id IN ({task_id_ph})",
+            task_id_params,
+        )
+        if not rows:
+            return
+
+        # Fail any remaining tasks for expired runs
+        self._finish_run_tasks(
+            [(row["run_id"], row["primary_task_id"]) for row in rows],
+            sub_status=SubStatus.FAILED,
+            details="Task failed because the run expired",
+        )
+
+        # Report usage for the run
+        self.federation_manager.report_run_usage()
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float

@@ -33,6 +33,7 @@ from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
     SUPERLINK_NODE_ID,
     Status,
+    SubStatus,
 )
 from flwr.common.serde import message_from_proto
 from flwr.common.typing import Fab
@@ -505,7 +506,7 @@ class TestServerAppIoServicer(unittest.TestCase):  # pylint: disable=R0902, R090
             call_count += 1
             message_id = original_store_message_ins(message)
             if call_count == 1:
-                assert self.state.finish_task(primary_task_id, "", "")
+                assert self.state.finish_task(primary_task_id, SubStatus.COMPLETED, "")
             return message_id
 
         # Execute
