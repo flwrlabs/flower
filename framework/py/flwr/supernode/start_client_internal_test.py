@@ -20,8 +20,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.app.message import remove_content_from_message
-from flwr.common import ConfigRecord, Context, Message, RecordDict
 from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE, SubStatus
 from flwr.common.typing import Fab
 from flwr.supercore.constant import TaskType

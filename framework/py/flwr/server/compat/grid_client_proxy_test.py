@@ -24,7 +24,7 @@ from unittest.mock import Mock, patch
 import numpy as np
 
 import flwr
-from flwr.common import Error, Message, RecordDict
+from flwr.app import Error, Message, RecordDict
 from flwr.common import recorddict_compat as compat
 from flwr.common.typing import (
     Code,

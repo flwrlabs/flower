@@ -20,7 +20,7 @@ from typing import cast
 
 import grpc
 
-from flwr.common import Context
+from flwr.app import Context
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
