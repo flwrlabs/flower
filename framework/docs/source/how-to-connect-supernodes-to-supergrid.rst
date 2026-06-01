@@ -207,10 +207,11 @@ selected by runs launched in the federation.
     :target: ./_static/supernode_added_to_federation.png
 
 **********
-Advanced
+ Advanced
 **********
 
-Everything shown above in the SuperGrid UI can also be done with the :doc:`Flower CLI <ref-api-cli>`.
+Everything shown above in the SuperGrid UI can also be done with the :doc:`Flower CLI
+<ref-api-cli>`.
 
 Log in to SuperGrid:
 

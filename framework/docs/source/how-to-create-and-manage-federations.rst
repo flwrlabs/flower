@@ -155,10 +155,11 @@ historical record instead of an active workspace. New runs cannot be launched, a
 or SuperNodes can no longer be added or removed.
 
 **********
-Advanced
+ Advanced
 **********
 
-Everything shown above in the SuperGrid UI can also be done with the :doc:`Flower CLI <ref-api-cli>`.
+Everything shown above in the SuperGrid UI can also be done with the :doc:`Flower CLI
+<ref-api-cli>`.
 
 Log in to SuperGrid:
 
