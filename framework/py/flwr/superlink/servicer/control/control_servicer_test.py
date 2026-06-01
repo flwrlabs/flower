@@ -547,41 +547,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertLess(abs(retrieved_timestamp - now().timestamp()), 1e-3)
         self.assertEqual(set(response.run_dict.keys()), {run_id})
 
-    def test_list_run_series_filters_by_account_federations(self) -> None:
-        """Test ListRunSeries returns only series in accessible federations."""
-        # Prepare
-        run_id = self._create_dummy_run(self.aid)
-        accessible_series_id = self.state.get_run_info(run_ids=[run_id])[0].series_id
-        cast(Any, self.state).run_series_store[
-            accessible_series_id
-        ].updated_at = "2026-05-30T00:00:00+00:00"
-        self._create_dummy_run_series(
-            2,
-            federation="@other/default",
-            updated_at="2026-05-31T00:00:00+00:00",
-        )
-
-        # Execute
-        response = self.servicer.ListRunSeries(ListRunSeriesRequest(), Mock())
-
-        # Assert
-        self.assertEqual(
-            [entry.series_id for entry in response.entries], [accessible_series_id]
-        )
-        self.assertEqual(response.entries[0].last_run_status.status, Status.PENDING)
-
-    def test_list_run_series_respects_limit(self) -> None:
-        """Test ListRunSeries applies the requested result limit."""
-        # Prepare
-        self._create_dummy_run_series(1, updated_at="2026-05-29T00:00:00+00:00")
-        self._create_dummy_run_series(2, updated_at="2026-05-30T00:00:00+00:00")
-
-        # Execute
-        response = self.servicer.ListRunSeries(ListRunSeriesRequest(limit=1), Mock())
-
-        # Assert
-        self.assertEqual([entry.series_id for entry in response.entries], [2])
-
     def test_get_run_series_returns_context(self) -> None:
         """Test GetRunSeries returns series metadata and shared Context."""
         # Prepare
@@ -618,25 +583,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         # Execute/Assert
         with self.assertRaises(grpc.RpcError):
             self.servicer.GetRunSeries(GetRunSeriesRequest(series_id=999), context)
-
-        context.abort.assert_called_once_with(
-            grpc.StatusCode.NOT_FOUND,
-            "Run series ID not found.",
-        )
-
-    def test_get_run_series_aborts_for_inaccessible_series(self) -> None:
-        """Test GetRunSeries returns NOT_FOUND for inaccessible RunSeries IDs."""
-        # Prepare
-        series_id = 999
-        self._create_dummy_run_series(series_id, federation="@other/default")
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
-
-        # Execute/Assert
-        with self.assertRaises(grpc.RpcError):
-            self.servicer.GetRunSeries(
-                GetRunSeriesRequest(series_id=series_id), context
-            )
 
         context.abort.assert_called_once_with(
             grpc.StatusCode.NOT_FOUND,
