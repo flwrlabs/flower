@@ -197,6 +197,11 @@ SuperNodes:
     $ flwr federation simulation-config @<username>/<federation-name> supergrid \
         --num-supernodes 20
 
+.. note::
+
+    For more Simulation Runtime options, see the ``Customize the Simulation Runtime``
+    section in the :doc:`Simulation Runtime documentation <how-to-run-simulations>`.
+
 Manage federation invitations:
 
 .. code-block:: shell
