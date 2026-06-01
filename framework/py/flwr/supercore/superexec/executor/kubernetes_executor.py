@@ -84,12 +84,9 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
             self.priority_class_name,
             reject_outer_whitespace=True,
         )
-        if self.labels is not None:
-            _validate_labels(self.labels)
-        if self.annotations is not None:
-            _validate_string_map("Kubernetes annotations", self.annotations)
-        if self.node_selector is not None:
-            _validate_string_map("Node selector", self.node_selector)
+        _validate_optional_labels(self.labels)
+        _validate_optional_string_map("Kubernetes annotations", self.annotations)
+        _validate_optional_string_map("Node selector", self.node_selector)
 
 
 class KubernetesExecutor:
@@ -301,6 +298,13 @@ def _validate_labels(labels: dict[str, str]) -> None:
     _validate_string_map("Kubernetes labels", labels)
 
 
+def _validate_optional_labels(labels: dict[str, str] | None) -> None:
+    """Validate optional caller-provided labels."""
+    if labels is None:
+        return
+    _validate_labels(labels)
+
+
 def _validate_required_string(name: str, value: str) -> None:
     """Validate that a required string field is not empty."""
     if not value.strip():
@@ -316,6 +320,13 @@ def _validate_optional_string(
     _validate_required_string(name, value)
     if reject_outer_whitespace and value != value.strip():
         raise ValueError(f"{name} must not include leading/trailing whitespace.")
+
+
+def _validate_optional_string_map(name: str, values: dict[str, str] | None) -> None:
+    """Validate optional string mapping entries when provided."""
+    if values is None:
+        return
+    _validate_string_map(name, values)
 
 
 def _validate_string_map(name: str, values: dict[str, str]) -> None:
