@@ -138,11 +138,10 @@ to ``5``:
     :doc:`how-to-configure-pyproject-toml`.
 
 **********
- Advanced
+Advanced
 **********
 
-Everything shown above in the SuperGrid UI can also be done with the :doc:`Flower CLI
-<ref-api-cli>`.
+Everything shown above in the SuperGrid UI can also be done with the :doc:`Flower CLI <ref-api-cli>`.
 
 Log in to SuperGrid:
 
@@ -166,7 +165,7 @@ Inspect runs and logs from the terminal:
     $ flwr list supergrid
     # Show additional details of a run
     $ flwr list --run-id <run-id> supergrid
-    # List runs in a specific federation
+    # Show federation details (including runs) for a specific federation
     $ flwr federation list supergrid --federation @<username>/<federation-name>
     # Show logs of a run
     $ flwr log <run-id> supergrid
