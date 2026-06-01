@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,26 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Simple Flower SuperExec plugin for task processes."""
+"""Flower task process components."""
 
 
-from flwr.supercore.constant import TaskType
+from .agent import run_agentapp
+from .model import run_model
 
-from .base_exec_plugin import BaseExecPlugin
-
-
-class ServerAppExecPlugin(BaseExecPlugin):
-    """Simple Flower SuperExec plugin for task processes.
-
-    The plugin always selects the first candidate task.
-    """
-
-    suppress_output = True
-    supported_task_types = frozenset(
-        {
-            TaskType.AGENT_APP,
-            TaskType.MODEL,
-            TaskType.SERVER_APP,
-            TaskType.SIMULATION,
-        }
-    )
+__all__ = [
+    "run_agentapp",
+    "run_model",
+]

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Open Responses-compatible provider client for Model executors."""
+"""Open Responses-compatible provider client for Model task processes."""
 
 
 from __future__ import annotations

@@ -47,7 +47,7 @@ class _Response:
 def _patch_post(monkeypatch: pytest.MonkeyPatch, response: _Response) -> Mock:
     post_mock = Mock(return_value=response)
     monkeypatch.setattr(
-        "flwr.supercore.executors.model.provider.requests.post",
+        "flwr.supercore.task_process.model.provider.requests.post",
         post_mock,
     )
     return post_mock
