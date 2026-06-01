@@ -111,8 +111,8 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
                 f"Run {run_id} not found in NodeState.",
             )
             raise RuntimeError("This line should never be reached.")
-        app_context = state.get_run_series_context(run.series_id)
-        if app_context is None:
+        series_context = state.get_run_series_context(run.series_id)
+        if series_context is None:
             context.abort(
                 grpc.StatusCode.NOT_FOUND,
                 f"Context for RunSeries {run.series_id} not found in NodeState.",
@@ -139,7 +139,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         if state.activate_task(task_id=task.task_id):
             log(DEBUG, "Started task %d of run %s", task.task_id, run_id)
             return PullTaskInputResponse(
-                context=context_to_proto(app_context),
+                context=context_to_proto(series_context),
                 run=run_to_proto(run),
                 fab=fab_to_proto(fab),
             )
