@@ -34,7 +34,7 @@ Then load the base checkpoint with ``trust_remote_code=True``:
     model = AutoModelForCausalLM.from_pretrained(
         repo_id,
         trust_remote_code=True,
-        dtype=torch.bfloat16,
+        torch_dtype=torch.bfloat16,
         device_map="auto",
     )
 
@@ -73,7 +73,7 @@ Linux GPU server or another environment supported by your vLLM version:
 .. code-block:: bash
 
     pip install vllm
-    vllm serve "flwrlabs/Lizzy-7B"
+    vllm serve "flwrlabs/Lizzy-7B" --trust-remote-code
 
 Then create ``request.json``:
 
