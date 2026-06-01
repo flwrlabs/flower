@@ -18,8 +18,10 @@
 from datetime import datetime
 from os import urandom
 
-from flwr.app import Message
+from flwr.app import Context, Message
+from flwr.common import serde
 from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.proto.message_pb2 import Context as ProtoContext  # pylint: disable=E0611
 from flwr.supercore.date import now
 from flwr.supercore.utils import strict_json_loads
 
@@ -57,6 +59,16 @@ def timestamp_to_iso(value: datetime | str | None) -> str:
         return datetime.fromisoformat(value).isoformat()
     except ValueError:
         return value
+
+
+def context_to_bytes(context: Context) -> bytes:
+    """Serialize `Context` to bytes."""
+    return serde.context_to_proto(context).SerializeToString()
+
+
+def context_from_bytes(context_bytes: bytes) -> Context:
+    """Deserialize `Context` from bytes."""
+    return serde.context_from_proto(ProtoContext.FromString(context_bytes))
 
 
 def validate_task_event_data(data: str) -> None:

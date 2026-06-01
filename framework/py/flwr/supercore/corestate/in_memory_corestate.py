@@ -25,7 +25,7 @@ from logging import ERROR
 from threading import Lock
 from typing import Literal, cast
 
-from flwr.app.message import Message
+from flwr.app import Context, Message
 from flwr.common import now
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
@@ -58,7 +58,9 @@ class TokenRecord:
     active_until: datetime
 
 
-class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attributes
+class InMemoryCoreState(
+    CoreState
+):  # pylint: disable=R0904,too-many-instance-attributes
     """In-memory CoreState implementation."""
 
     def __init__(self, object_store: ObjectStore) -> None:
@@ -67,6 +69,10 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.lock_fab_store = Lock()
         self.nonce_store: dict[tuple[str, str], float] = {}
         self.lock_nonce_store = Lock()
+        self.run_series_store: dict[int, RunSeries] = {}
+        self.lock_run_series_store = Lock()
+        self.run_series_context_store: dict[int, Context] = {}
+        self.lock_run_series_context_store = Lock()
         self.task_store: dict[int, Task] = {}
         # Store task ID to token mapping
         self.task_token_store: dict[int, TokenRecord] = {}
@@ -77,10 +83,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
         self.lock_task_store = Lock()
         self.task_message_store: dict[str, Message] = {}
         self.lock_task_message_store = Lock()
-        self.run_series_store: dict[int, RunSeries] = {}
         self.task_event_store: dict[int, list[TaskEvent]] = {}
         self.lock_task_event_store = Lock()
-        self.lock_run_series_store = Lock()
         self._next_task_event_id = 1
 
     @property
@@ -117,6 +121,42 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
                 content=fab.content,
                 verifications=dict(fab.verifications),
             )
+
+    def get_run_series(
+        self,
+        *,
+        federation: str | None = None,
+        updated_before: str | None = None,
+        limit: int | None = None,
+    ) -> Sequence[RunSeries]:
+        """Return RunSeries metadata, optionally filtered by federation."""
+        if limit is not None and limit < 0:
+            raise AssertionError("`limit` must be >= 0")
+        if limit == 0:
+            return []
+
+        with self.lock_run_series_store:
+            run_series = []
+            for record in self.run_series_store.values():
+                if federation is not None and record.federation != federation:
+                    continue
+                if updated_before is not None and record.updated_at >= updated_before:
+                    continue
+                run_series.append(record)
+            run_series.sort(key=lambda record: record.updated_at, reverse=True)
+            if limit is not None:
+                run_series = run_series[:limit]
+            return list(run_series)
+
+    def get_run_series_context(self, series_id: int) -> Context | None:
+        """Return the shared Context for the specified RunSeries, if present."""
+        with self.lock_run_series_context_store:
+            return self.run_series_context_store.get(series_id)
+
+    def set_run_series_context(self, series_id: int, context: Context) -> None:
+        """Set the shared Context for the specified RunSeries."""
+        with self.lock_run_series_context_store:
+            self.run_series_context_store[series_id] = context
 
     def store_run_in_series(
         self,
@@ -165,6 +205,8 @@ class InMemoryCoreState(CoreState):  # pylint: disable=too-many-instance-attribu
             if run_id in run_series.run_ids:
                 return None
             run_series.run_ids.append(run_id)
+            if series_id is not None:
+                run_series.updated_at = now().isoformat()
             return resolved_series_id
 
     def add_task_log(self, task_id: int, log_message: str) -> None:
