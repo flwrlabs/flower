@@ -24,7 +24,9 @@ update-text:
 	make gettext
 
 update-lang:
-	sphinx-intl update -p build/gettext -l $(lang)
+	# Match the wrapping used by the committed/Weblate PO files. The
+	# sphinx-intl default is 76 columns, which rewrites most multiline entries.
+	sphinx-intl update -p build/gettext -l $(lang) -w 88
 
 serve:
 	make docs

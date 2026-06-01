@@ -354,11 +354,13 @@ def validate_fields_in_config(
         if "components" not in config["tool"]["flwr"]["app"]:
             errors.append("Missing [tool.flwr.app.components] section")
         else:
-            if "serverapp" not in config["tool"]["flwr"]["app"]["components"]:
+            components = config["tool"]["flwr"]["app"]["components"]
+            is_agentapp_bundle = "agentapp" in components
+            if not is_agentapp_bundle and "serverapp" not in components:
                 errors.append(
                     'Property "serverapp" missing in [tool.flwr.app.components]'
                 )
-            if "clientapp" not in config["tool"]["flwr"]["app"]["components"]:
+            if not is_agentapp_bundle and "clientapp" not in components:
                 errors.append(
                     'Property "clientapp" missing in [tool.flwr.app.components]'
                 )
@@ -382,18 +384,16 @@ def validate_config(
     except ValueError as err:
         return False, [str(err)], warnings
 
-    # Validate serverapp
-    serverapp_ref = config["tool"]["flwr"]["app"]["components"]["serverapp"]
-    is_valid, reason = object_ref.validate(serverapp_ref, check_module, project_dir)
+    components = config["tool"]["flwr"]["app"]["components"]
 
-    if not is_valid and isinstance(reason, str):
-        return False, [reason], warnings
+    for component_name in ("agentapp", "serverapp", "clientapp"):
+        if component_name not in components:
+            continue
 
-    # Validate clientapp
-    clientapp_ref = config["tool"]["flwr"]["app"]["components"]["clientapp"]
-    is_valid, reason = object_ref.validate(clientapp_ref, check_module, project_dir)
+        component_ref = components[component_name]
+        is_valid, reason = object_ref.validate(component_ref, check_module, project_dir)
 
-    if not is_valid and isinstance(reason, str):
-        return False, [reason], warnings
+        if not is_valid and isinstance(reason, str):
+            return False, [reason], warnings
 
     return True, [], warnings
