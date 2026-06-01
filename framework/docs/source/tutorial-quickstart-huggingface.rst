@@ -88,6 +88,7 @@ With default arguments you will see streamed output like this:
     INFO :      Final results:
     INFO :          ServerApp-side Evaluate Metrics:
     INFO :          {}
+
 You can also run the project with GPU as follows:
 
 .. code-block:: shell
