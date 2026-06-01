@@ -402,7 +402,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         """Get run series."""
         log(INFO, self.GetRunSeries.__qualname__)
 
-
         state = self.linkstate_factory.state()
         flwr_aid = _get_flwr_aid(context)
         with rpc_error_translator(context, self.GetRunSeries.__qualname__):
@@ -410,12 +409,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
                 series_ids=[request.series_id],
             )
             if series_matches:
-                try:
-                    is_member = state.federation_manager.has_member(
-                        flwr_aid, series_matches[0].federation
-                    )
-                except ValueError:
-                    is_member = False
+                is_member = state.federation_manager.has_member(
+                    flwr_aid, series_matches[0].federation
+                )
                 if not is_member:
                     context.abort(
                         grpc.StatusCode.NOT_FOUND,
@@ -1132,9 +1128,7 @@ def _with_last_run_statuses(
         if entry.run_ids:
             last_run_id = entry.run_ids[-1]
             if (run_status := run_statuses.get(last_run_id)) is not None:
-                entry.last_run_status.CopyFrom(
-                    run_status_to_proto(run_status)
-                )
+                entry.last_run_status.CopyFrom(run_status_to_proto(run_status))
         result.append(entry)
     return result
 
