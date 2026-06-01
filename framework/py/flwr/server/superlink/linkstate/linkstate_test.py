@@ -15,7 +15,6 @@
 """Tests all LinkState implemenations have to conform to."""
 # pylint: disable=invalid-name, too-many-lines, R0904, R0913
 
-
 import hashlib
 import multiprocessing
 import os
@@ -27,17 +26,19 @@ import time
 import unittest
 from abc import abstractmethod
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import Mock, PropertyMock, patch
 from uuid import uuid4
 
 from parameterized import parameterized
 
+from flwr.app import DEFAULT_TTL, Context, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
-from flwr.common import DEFAULT_TTL, Context, Error, Message, RecordDict, now
+from flwr.common import now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
+    HEARTBEAT_PATIENCE,
     SUPERLINK_NODE_ID,
     ErrorCode,
     Status,
@@ -160,6 +161,46 @@ class StateTest(CoreStateTest):
         assert run.federation == "health-federation"
         assert run.override_config["test_key"] == "test_value"
         assert run.flwr_aid == "i1r9f"
+        assert run.series_id > 0
+
+    def test_create_run_uses_existing_series_id(self) -> None:
+        """Test create_run links the run to an existing run series."""
+        # Prepare
+        state = self.state_factory()
+        initial_run_id = create_dummy_run(state, federation="health-federation")
+        series_id = state.get_run_info(run_ids=[initial_run_id])[0].series_id
+
+        # Execute
+        run_id = create_dummy_run(
+            state,
+            federation="health-federation",
+            series_id=series_id,
+        )
+
+        # Assert
+        run = state.get_run_info(run_ids=[run_id])[0]
+        self.assertEqual(run.series_id, series_id)
+
+    def test_create_run_reuses_series_id_in_same_federation(self) -> None:
+        """Test multiple runs can link to the same federation run series."""
+        # Prepare
+        state = self.state_factory()
+
+        # Execute
+        run_id_1 = create_dummy_run(
+            state,
+            federation="health-federation",
+        )
+        first_run = state.get_run_info(run_ids=[run_id_1])[0]
+        run_id_2 = create_dummy_run(
+            state,
+            federation="health-federation",
+            series_id=first_run.series_id,
+        )
+
+        # Assert
+        runs = state.get_run_info(run_ids=[run_id_1, run_id_2])
+        self.assertEqual({run.series_id for run in runs}, {first_run.series_id})
 
     def test_create_run_creates_primary_task(self) -> None:
         """Creating a run should also create its primary task."""
@@ -175,6 +216,27 @@ class StateTest(CoreStateTest):
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].type, TaskType.SERVER_APP)
         self.assertEqual(run.primary_task_id, tasks[0].task_id)
+
+    def test_store_messages_rejects_stopped_run(self) -> None:
+        """Messages cannot be stored after a run is stopped."""
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
+        )
+        self.assertIsNotNone(state.store_message_ins(message=msg))
+        pulled = state.get_message_ins(node_id=node_id, limit=1)[0]
+        reply_msg = Message(RecordDict(), reply_to=pulled)
+
+        self.assertTrue(state.stop_run(run_id))
+
+        self.assertIsNone(state.store_message_ins(message=msg))
+        self.assertIsNone(state.store_message_res(message=reply_msg))
+        self.assertEqual(state.num_message_ins(), 0)
+        self.assertEqual(state.num_message_res(), 0)
 
     def test_get_run_info_without_filters_returns_all_runs(self) -> None:
         """Test get_run_info returns all runs when no filter is provided."""
@@ -384,7 +446,9 @@ class StateTest(CoreStateTest):
 
         # Execute
         # The run should be marked as failed after HEARTBEAT_DEFAULT_INTERVAL
-        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        patched_dt = now() + timedelta(
+            seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
+        )
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = patched_dt
@@ -505,6 +569,16 @@ class StateTest(CoreStateTest):
         # Assert
         state.federation_manager.report_run_usage.assert_called_once()
 
+    def test_usage_report_hook_called_on_stop_run(self) -> None:
+        """Test report_run_usage hook is called when a run is stopped."""
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        state.federation_manager.report_run_usage = Mock()  # type: ignore
+
+        assert state.stop_run(run_id)
+
+        state.federation_manager.report_run_usage.assert_called_once()
+
     def test_usage_report_hook_not_called_on_non_primary_task_expired(self) -> None:
         """Test report_run_usage is not called when a non-primary task expires."""
         state = self.state_factory()
@@ -543,7 +617,7 @@ class StateTest(CoreStateTest):
         """Test store_message_ins."""
         # Prepare
         state = self.state_factory()
-        dt = datetime.now(tz=timezone.utc)
+        dt = datetime.now(tz=UTC)
         node_id = create_dummy_node(state)
         run_id = create_dummy_run(state)
         msg = message_from_proto(
@@ -1382,7 +1456,6 @@ class StateTest(CoreStateTest):
             msg_res_ttl,
             expected_store_result,
         ) in test_cases:
-
             # Prepare
             state: LinkState = self.state_factory()
             run_id = create_dummy_run(state)
@@ -1636,6 +1709,40 @@ class StateTest(CoreStateTest):
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 1
 
+    def test_store_message_res_rejects_duplicate_reply(self) -> None:
+        """Test store_message_res rejects a second reply for one Message."""
+        # Prepare
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
+        )
+        ins_msg_id = state.store_message_ins(msg)
+        assert ins_msg_id
+
+        ins_msg = state.get_message_ins(node_id=node_id, limit=1)[0]
+        first_res_msg = Message(RecordDict(), reply_to=ins_msg)
+        first_res_msg.metadata._message_id = str(uuid4())  # type: ignore
+        second_res_msg = Message(RecordDict(), reply_to=ins_msg)
+        second_res_msg.metadata._message_id = str(uuid4())  # type: ignore
+
+        # Execute
+        first_res_msg_id = state.store_message_res(first_res_msg)
+        second_res_msg_id = state.store_message_res(second_res_msg)
+
+        # Assert
+        assert first_res_msg_id == first_res_msg.metadata.message_id
+        assert second_res_msg_id is None
+        assert state.num_message_res() == 1
+
+        reply_msg = state.get_message_res({ins_msg_id})
+        assert len(reply_msg) == 1
+        assert reply_msg[0].metadata.message_id == first_res_msg_id
+
     def test_store_message_res_fail_if_dst_src_node_id_mismatch(self) -> None:
         """Test store_message_res to fail if there is a mismatch between the dst_node_id
         of orginal Message and the src_node_id of the reply Message."""
@@ -1688,6 +1795,26 @@ class StateTest(CoreStateTest):
         # Assert
         assert init is None
         assert retrieved_context == context
+
+    def test_set_serverapp_context_after_finished_run(self) -> None:
+        """Context can be persisted after normal task completion."""
+        state: LinkState = self.state_factory()
+        run_id = create_dummy_run(state)
+        task_id = get_primary_task_id(state, run_id)
+        context = Context(
+            run_id=run_id,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={},
+            state=RecordDict(),
+            run_config={},
+        )
+
+        assert state.claim_task(task_id) is not None
+        assert state.activate_task(task_id)
+        assert state.finish_task(task_id, SubStatus.COMPLETED, "done")
+        state.set_serverapp_context(run_id, context)
+
+        assert state.get_serverapp_context(run_id) == context
 
     def test_set_context_invalid_run_id(self) -> None:
         """Test set_serverapp_context with invalid run_id."""
@@ -1933,6 +2060,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     federation_config: SimulationConfig | None = None,
     flwr_aid: str | None = "mock_flwr_aid",
     run_type: str = RunType.SERVER_APP,
+    series_id: int | None = None,
 ) -> int:
     """Create a dummy run."""
     return state.create_run(
@@ -1944,6 +2072,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
         federation_config=federation_config,
         flwr_aid=flwr_aid,
         run_type=run_type,
+        series_id=series_id,
     )
 
 
@@ -2067,13 +2196,13 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state = self.state_factory()
         run_id = create_dummy_run(state)
         task_id = get_primary_task_id(state, run_id)
-        assert state.claim_task(task_id) is not None
-        assert state.activate_task(task_id)
-        assert state.finish_task(task_id, SubStatus.COMPLETED, "done")
-
         extra_task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
         assert extra_task_id is not None
         assert state.claim_task(extra_task_id) is not None
+
+        assert state.claim_task(task_id) is not None
+        assert state.activate_task(task_id)
+        assert state.finish_task(task_id, SubStatus.COMPLETED, "done")
 
         # Execute: force token expiry and trigger cleanup
         patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
@@ -2225,6 +2354,45 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
 
             # Assert
             assert sum(len(res) for res in results if res is not None) == 1
+
+    def test_acknowledge_node_heartbeat_does_not_revive_deleted_node(self) -> None:
+        """Ensure a heartbeat cannot move an unregistered node back online."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Prepare
+            db_path = self._shared_sql_database(tmpdir)
+            states = self._create_shared_sql_states(db_path)
+            heartbeat_state = states[0]
+            delete_state = states[1]
+            node_id = create_dummy_node(heartbeat_state, activate=False)
+            original_query = heartbeat_state.query
+            did_delete = False
+
+            def delete_before_heartbeat_update(
+                query: str, data: Any = None
+            ) -> list[dict[str, Any]]:
+                nonlocal did_delete
+                normalized_query = " ".join(query.split())
+                if not did_delete and normalized_query.startswith(
+                    "UPDATE node SET online_until"
+                ):
+                    did_delete = True
+                    delete_state.delete_node("mock_flwr_aid", node_id)
+                return original_query(query, data)
+
+            heartbeat_state.query = (  # type: ignore[method-assign]
+                delete_before_heartbeat_update
+            )
+
+            # Execute
+            acknowledged = heartbeat_state.acknowledge_node_heartbeat(
+                node_id, heartbeat_interval=30
+            )
+
+            # Assert
+            assert did_delete
+            assert not acknowledged
+            node = heartbeat_state.get_node_info(node_ids=[node_id])[0]
+            assert node.status == NodeStatus.UNREGISTERED
 
     # pylint: disable-next=too-many-locals
     def test_get_message_ins_distributes_available_work_under_contention(self) -> None:

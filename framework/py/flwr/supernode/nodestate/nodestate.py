@@ -18,7 +18,7 @@
 from abc import abstractmethod
 from collections.abc import Sequence
 
-from flwr.common import Context, Message
+from flwr.app import Context, Message
 from flwr.common.typing import Run
 from flwr.supercore.corestate import CoreState
 

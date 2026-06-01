@@ -20,19 +20,12 @@ Workflow Details:
 
 import argparse
 import json
-import sys
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Callable, Dict, List, Optional
 
-# when we switch to Python 3.11 in the ci, we need to change the DistroName to:
-# class DistroName(StrEnum):
-#     ALPINE = "alpine"
-#     UBUNTU = "ubuntu"
-assert sys.version_info < (3, 11), "Script requires Python 3.9 or lower."
 
-
-class DistroName(str, Enum):
+class DistroName(StrEnum):
     ALPINE = "alpine"
     UBUNTU = "ubuntu"
 
@@ -45,7 +38,6 @@ class Distro:
 
 LATEST_SUPPORTED_PYTHON_VERSION = "3.13"
 SUPPORTED_PYTHON_VERSIONS = [
-    "3.10",
     "3.11",
     "3.12",
     LATEST_SUPPORTED_PYTHON_VERSION,

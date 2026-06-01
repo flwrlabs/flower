@@ -21,16 +21,10 @@ Paper: arxiv.org/abs/1812.06127
 from collections.abc import Callable, Iterable
 from logging import INFO, WARN
 
-from flwr.common import (
-    ArrayRecord,
-    ConfigRecord,
-    Message,
-    MetricRecord,
-    RecordDict,
-    log,
-)
-from flwr.server import Grid
+from flwr.app import ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
+from flwr.common import log
 
+from ..grid import Grid
 from .fedavg import FedAvg
 
 

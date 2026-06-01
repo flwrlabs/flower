@@ -9,18 +9,18 @@ The Flower `framework` project also uses `uv` for CI and local developer workflo
 ## Prerequisites
 
 - Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
-- Use Python 3.10+ (as defined in `pyproject.toml`)
+- Use Python 3.11+ (as defined in `pyproject.toml`)
 
 ## Quick Start
 
 From the repository root:
 
 ```bash
-cd dev
-uv sync --frozen
+./dev/bootstrap.sh
 ```
 
-This creates/updates `dev/.venv` from `uv.lock`.
+This creates/updates `framework/.venv` from `framework/uv.lock`. To work on
+`devtool` itself, run `uv sync --frozen` from the `dev` directory.
 
 ## Run `devtool` Commands
 

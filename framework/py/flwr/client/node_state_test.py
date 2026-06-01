@@ -17,8 +17,8 @@
 
 from typing import cast
 
+from flwr.app import ConfigRecord, Context
 from flwr.client.run_info_store import DeprecatedRunInfoStore
-from flwr.common import ConfigRecord, Context
 
 
 def _run_dummy_task(context: Context) -> Context:

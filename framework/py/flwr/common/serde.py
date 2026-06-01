@@ -17,6 +17,17 @@
 
 from typing import Any, cast
 
+from flwr.app.message import (
+    Array,
+    ArrayRecord,
+    ConfigRecord,
+    Context,
+    Message,
+    MetricRecord,
+    RecordDict,
+    make_message,
+)
+from flwr.app.typing import ConfigRecordValues, MetricRecordValues
 from flwr.app.user_config import UserConfig, UserConfigValue
 
 # pylint: disable=E0611
@@ -43,17 +54,8 @@ from flwr.proto.transport_pb2 import (
 )
 
 # pylint: enable=E0611
-from . import (
-    Array,
-    ArrayRecord,
-    ConfigRecord,
-    Context,
-    MetricRecord,
-    RecordDict,
-    typing,
-)
+from . import typing
 from .constant import INT64_MAX_VALUE
-from .message import Message, make_message
 from .serde_utils import (
     error_from_proto,
     error_to_proto,
@@ -431,7 +433,7 @@ def metric_record_from_proto(record_proto: ProtoMetricRecord) -> MetricRecord:
     protos = {item.key: item.value for item in record_proto.items}
     return MetricRecord(
         metric_dict=cast(
-            dict[str, typing.MetricRecordValues],
+            dict[str, MetricRecordValues],
             record_value_dict_from_proto(protos),
         ),
         keep_input=False,
@@ -455,7 +457,7 @@ def config_record_from_proto(record_proto: ProtoConfigRecord) -> ConfigRecord:
     protos = {item.key: item.value for item in record_proto.items}
     return ConfigRecord(
         config_dict=cast(
-            dict[str, typing.ConfigRecordValues],
+            dict[str, ConfigRecordValues],
             record_value_dict_from_proto(protos),
         ),
         keep_input=False,
@@ -600,6 +602,7 @@ def context_to_proto(context: Context) -> ProtoContext:
         node_config=user_config_to_proto(context.node_config),
         state=recorddict_to_proto(context.state),
         run_config=user_config_to_proto(context.run_config),
+        series_id=context.series_id,
     )
     return proto
 
@@ -612,6 +615,7 @@ def context_from_proto(context_proto: ProtoContext) -> Context:
         node_config=user_config_from_proto(context_proto.node_config),
         state=recorddict_from_proto(context_proto.state),
         run_config=user_config_from_proto(context_proto.run_config),
+        series_id=context_proto.series_id,
     )
     return context
 
@@ -638,6 +642,7 @@ def run_to_proto(run: typing.Run) -> ProtoRun:
         bytes_recv=run.bytes_recv,
         clientapp_runtime=run.clientapp_runtime,
         run_type=run.run_type,
+        series_id=run.series_id,
     )
     if run.primary_task_id is not None:
         proto.primary_task_id = run.primary_task_id
@@ -666,6 +671,7 @@ def run_from_proto(run_proto: ProtoRun) -> typing.Run:
         bytes_recv=run_proto.bytes_recv,
         clientapp_runtime=run_proto.clientapp_runtime,
         run_type=run_proto.run_type,
+        series_id=run_proto.series_id,
     )
     return run
 

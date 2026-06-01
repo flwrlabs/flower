@@ -34,8 +34,9 @@ def main(grid: Grid, context: Context) -> None:
         num_rounds=num_rounds,
     )
 
-    # Save final model to disk
-    print("\nSaving final model to disk...")
-    ndarrays = result.arrays.to_numpy_ndarrays()
-    set_params(model, ndarrays)
-    model.save_weights("final_model.npz")
+    if context.run_config["save-model"]:
+        # Save final model to disk
+        print("\nSaving final model to disk...")
+        ndarrays = result.arrays.to_numpy_ndarrays()
+        set_params(model, ndarrays)
+        model.save_weights("final_model.npz")

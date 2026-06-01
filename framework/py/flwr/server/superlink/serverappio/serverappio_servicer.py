@@ -19,8 +19,8 @@ from logging import DEBUG, ERROR, INFO
 
 import grpc
 
-from flwr.common import Message
-from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.app import Message
+from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -144,9 +144,19 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 detail="`Message.metadata` has mismatched `run_id`",
             )
             # Store objects
-            objects_to_push |= set(store.preregister(run_id, object_tree))
+            message_objects_to_push = set(store.preregister(run_id, object_tree))
             # Store message
             message_id: str | None = state.store_message_ins(message=message)
+            # This is temporary. We should consider a more robust cleanup
+            # mechanism that protects duplicate messages from premature deletion.
+            # Once that is in place, we can remove the run status check below.
+            if (
+                message_id is None
+                and state.get_run_status({run_id})[run_id].status == Status.FINISHED
+            ):
+                store.delete(object_tree.object_id)
+            else:
+                objects_to_push |= message_objects_to_push
             message_ids.append(message_id)
 
         return PushAppMessagesResponse(
@@ -285,6 +295,11 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
 
         # Init state and store
         state = self.state_factory.state()
+
+        # Store Simulation Runtime usage before finishing the primary task.
+        # This ensures usage is captured even if the task fails to finish properly.
+        if request.HasField("clientapp_runtime"):
+            state.add_clientapp_runtime(run_id, request.clientapp_runtime)
 
         # Finish the task
         if state.finish_task(

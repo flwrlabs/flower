@@ -19,8 +19,8 @@ import abc
 from collections.abc import Sequence
 from typing import Literal
 
+from flwr.app import Context, Message
 from flwr.app.user_config import UserConfig
-from flwr.common import Context, Message
 from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
@@ -135,6 +135,14 @@ class LinkState(CoreState):  # pylint: disable=R0904
     @abc.abstractmethod
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""
+
+    @abc.abstractmethod
+    def stop_run(self, run_id: int) -> bool:
+        """Stop a run and clean up run-scoped messages and objects.
+
+        Returns True if at least one unfinished task in the run transitioned to
+        stopped, otherwise False.
+        """
 
     @abc.abstractmethod
     def create_node(
@@ -258,6 +266,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         run_type: str,
+        series_id: int | None = None,
     ) -> int:
         """Create a new run.
 
@@ -279,6 +288,10 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Flower Account ID of the creator.
         run_type : str
             The type of run being created.
+        series_id : int | None (default: None)
+            Optional run series ID. If `None`, a new run series is created for
+            the federation. If set, the series must already exist and belong to
+            the federation.
 
         Returns
         -------

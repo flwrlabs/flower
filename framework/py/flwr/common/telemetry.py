@@ -225,7 +225,7 @@ def create_event(event_type: EventType, event_details: dict[str, Any] | None) ->
     if event_details is None:
         event_details = {}
 
-    date = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+    date = datetime.datetime.now(tz=datetime.UTC).isoformat()
     context = {
         "partner": state["partner"],
         "source": state["source"],

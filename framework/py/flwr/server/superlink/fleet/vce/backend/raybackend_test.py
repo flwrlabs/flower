@@ -21,24 +21,13 @@ from unittest import TestCase
 
 import ray
 
+from flwr.app import DEFAULT_TTL, ConfigRecord, Context, Message, Metadata, RecordDict
+from flwr.app.message import make_message
 from flwr.client import Client, NumPyClient
 from flwr.client.run_info_store import DeprecatedRunInfoStore
 from flwr.clientapp import ClientApp
-from flwr.common import (
-    DEFAULT_TTL,
-    Config,
-    ConfigRecord,
-    Context,
-    GetPropertiesIns,
-    Message,
-    MessageTypeLegacy,
-    Metadata,
-    RecordDict,
-    Scalar,
-    now,
-)
+from flwr.common import Config, GetPropertiesIns, MessageTypeLegacy, Scalar, now
 from flwr.common.constant import PARTITION_ID_KEY
-from flwr.common.message import make_message
 from flwr.common.recorddict_compat import getpropertiesins_to_recorddict
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
 from flwr.server.superlink.fleet.vce.backend.raybackend import RayBackend
@@ -190,7 +179,7 @@ class TestRayBackend(TestCase):
         RayBackend(
             backend_config=backend_config_4,
         )
-        nodes = ray.nodes()
+        nodes = ray.nodes()  # type: ignore[no-untyped-call]
 
         assert nodes[0]["Resources"]["CPU"] == backend_config_4["init_args"]["num_cpus"]
 
@@ -199,7 +188,7 @@ class TestRayBackend(TestCase):
         RayBackend(
             backend_config=backend_config_2,
         )
-        nodes = ray.nodes()
+        nodes = ray.nodes()  # type: ignore[no-untyped-call]
 
         assert nodes[0]["Resources"]["CPU"] == backend_config_2["init_args"]["num_cpus"]
 
@@ -212,7 +201,7 @@ class TestRayBackend(TestCase):
             # Mock ray.nodes() to return both head node and worker node
             original_nodes = ray.nodes
 
-            head_node = ray.nodes()[0].copy()
+            head_node = ray.nodes()[0].copy()  # type: ignore[no-untyped-call]
 
             ray.nodes = lambda: [
                 head_node,  # Head node initialized with no cpu
