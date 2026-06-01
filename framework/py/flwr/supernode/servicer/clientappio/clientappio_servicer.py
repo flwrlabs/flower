@@ -16,11 +16,9 @@
 
 
 from logging import DEBUG, ERROR
-from typing import cast
 
 import grpc
 
-from flwr.app import Context
 from flwr.common.logger import log
 from flwr.common.serde import (
     context_from_proto,
@@ -30,7 +28,6 @@ from flwr.common.serde import (
     message_to_proto,
     run_to_proto,
 )
-from flwr.common.typing import Run
 
 # pylint: disable=E0611
 from flwr.proto import clientappio_pb2_grpc
@@ -107,8 +104,20 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         state = self.state_factory.state()
 
         # Retrieve run, context, and FAB for this run
-        run = cast(Run, state.get_run(run_id))
-        app_context = cast(Context, state.get_run_series_context(run.series_id))
+        run = state.get_run(run_id)
+        if run is None:
+            context.abort(
+                grpc.StatusCode.NOT_FOUND,
+                f"Run {run_id} not found in NodeState.",
+            )
+            raise RuntimeError("This line should never be reached.")
+        app_context = state.get_run_series_context(run.series_id)
+        if app_context is None:
+            context.abort(
+                grpc.StatusCode.NOT_FOUND,
+                f"Context for RunSeries {run.series_id} not found in NodeState.",
+            )
+            raise RuntimeError("This line should never be reached.")
 
         # Retrieve FAB from NodeState
         if fab := state.get_fab(run.fab_hash):
