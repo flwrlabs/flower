@@ -57,6 +57,7 @@ def handle_task(stub: ServerAppIoStub, task_id: int, run_id: int) -> None:
 
     request_payload = request_message.payload
     if request_payload.get("stream") is True:
+        # Stream events are exposed through Control.StreamRunEvents.
         events: list[TaskEvent] = []
 
         def _flush_events() -> None:
@@ -68,6 +69,7 @@ def handle_task(stub: ServerAppIoStub, task_id: int, run_id: int) -> None:
             try:
                 stub.PushTaskEvents(PushTaskEventsRequest(events=batch))
             except Exception:
+                # Keep the batch available for the final flush retry.
                 events[:0] = batch
                 raise
 
@@ -78,13 +80,19 @@ def handle_task(stub: ServerAppIoStub, task_id: int, run_id: int) -> None:
             if len(events) >= _DEFAULT_TASK_EVENT_BATCH_SIZE:
                 _flush_events()
 
+        response = None
         try:
-            invoke_model_provider(
+            response = invoke_model_provider(
                 request_payload,
                 on_stream_event=_publish_event,
             )
         finally:
+            # Flush partial batches after the provider stream ends or fails.
             _flush_events()
+
+        if response is not None:
+            # AgentApp still receives the terminal response object.
+            _push_model_response(response)
         return
 
     try:

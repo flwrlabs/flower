@@ -83,7 +83,7 @@ def test_invoke_model_provider_collects_stream_events(
         on_stream_event=streamed_events.append,
     )
 
-    assert result is None
+    assert result == {"id": "resp_1", "output_text": "hel"}
     assert streamed_events == [
         {"type": "response.created", "response": {"id": "resp_1"}},
         {"delta": "hel", "type": "response.output_text.delta"},

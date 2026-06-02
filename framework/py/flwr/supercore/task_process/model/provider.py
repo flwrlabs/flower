@@ -60,15 +60,14 @@ def invoke_model_provider(
     request: JSONObject,
     *,
     on_stream_event: Callable[[JSONObject], None] | None = None,
-) -> JSONObject | None:
+) -> JSONObject:
     """Invoke the configured Open Responses-compatible model provider.
 
     Control flow:
     1. Read API key, endpoint, and timeout settings from the environment.
     2. Copy the request payload to avoid mutating the caller's object.
     3. Send the request through one provider path that handles normal and
-       streaming responses. Streaming calls with `on_stream_event` return `None`
-       after forwarding the terminal event.
+       streaming responses.
     """
     # Resolve provider configuration from environment variables.
     api_key = os.getenv("FLWR_MODEL_API_KEY", "").strip()
@@ -117,7 +116,7 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
     timeout: float,
     request: JSONObject,
     on_stream_event: Callable[[JSONObject], None] | None,
-) -> JSONObject | None:
+) -> JSONObject:
     """Run a normal or streaming provider request.
 
     Control flow:
@@ -207,12 +206,8 @@ def _invoke_provider_response(  # pylint: disable=too-many-locals,too-many-branc
                 detail=event,
             )
 
-        # Terminal success events carry the final response object. If the caller
-        # receives stream events through the callback, the terminal event has
-        # already been delivered and no separate response should be returned.
+        # Terminal success events carry the final response object.
         if isinstance(event_type, str) and event_type in _TERMINAL_SUCCESS_EVENTS:
-            if on_stream_event is not None:
-                return None
             response_payload = event.get("response")
             if isinstance(response_payload, dict):
                 return cast(JSONObject, response_payload)
