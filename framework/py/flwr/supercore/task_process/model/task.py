@@ -66,6 +66,8 @@ def handle_task(stub: ServerAppIoStub, task_id: int, run_id: int) -> None:
 
 def _pull_model_request(stub: ServerAppIoStub) -> ModelRequest:
     """Pull one model request, waiting until it becomes available."""
+    # Keep polling until flwr-agentapp produces a request. If it exits, cleanup
+    # forces flwr-model to stop, with auth handling revoked tokens.
     while True:
         pull_response = stub.PullTaskMessage(PullTaskMessageRequest(limit=1))
         messages = [message_from_proto(message) for message in pull_response.messages]
