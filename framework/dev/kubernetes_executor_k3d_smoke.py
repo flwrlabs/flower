@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import os
 import shlex
 import shutil
@@ -27,6 +28,7 @@ import time
 import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from flwr.supercore.constant import TaskType
@@ -44,10 +46,13 @@ DEFAULT_CLUSTER_NAME = "flwr-k8s-executor-smoke"
 DEFAULT_NAMESPACE = "flwr-k8s-executor-smoke"
 DEFAULT_IMAGE = "ghcr.io/flwrlabs/taskexecutor:dev"
 DEFAULT_IMAGE_PULL_POLICY = "Never"
+DEFAULT_PROBE_IMAGE = "flwr-kubernetes-executor-k3d-probe:dev"
 DEFAULT_APPIO_API_ADDRESS = "127.0.0.1:9092"
 DEFAULT_ACTIVE_POD_BUDGET = 1
 DEFAULT_CAPACITY_TIMEOUT = 30.0
 DEFAULT_CAPACITY_POLL_INTERVAL = 0.25
+DEFAULT_POD_SUCCEEDED_TIMEOUT = 60.0
+DEFAULT_POD_SUCCEEDED_POLL_INTERVAL = 0.5
 DIAGNOSTIC_POD_STATUS_TIMEOUT = 3.0
 DIAGNOSTIC_POD_STATUS_POLL = 0.50
 LOCAL_RESOURCE_POOL = "local-k3d-smoke"
@@ -77,6 +82,11 @@ class SmokeConfig:
     capacity_poll_interval: float
     keep_resources: bool
     delete_cluster: bool
+    probe_image: bool = False
+    probe_image_tag: str = DEFAULT_PROBE_IMAGE
+    require_pod_succeeded: bool = False
+    pod_succeeded_timeout: float = DEFAULT_POD_SUCCEEDED_TIMEOUT
+    pod_succeeded_poll_interval: float = DEFAULT_POD_SUCCEEDED_POLL_INTERVAL
 
 
 class CoreV1ApiAdapter:
@@ -126,10 +136,20 @@ def _print_run_overview(config: SmokeConfig) -> None:
     _print_detail("namespace", config.namespace)
     _print_detail("image", config.image)
     _print_detail("image pull policy", config.image_pull_policy)
+    _print_detail("probe image mode", str(config.probe_image))
+    if config.probe_image:
+        _print_detail("probe image tag", config.probe_image_tag)
     _print_detail("AppIo API address", config.appio_api_address)
     _print_detail("active Pod budget", str(config.active_pod_budget))
     _print_detail("capacity timeout", f"{config.capacity_timeout}s")
     _print_detail("capacity poll interval", f"{config.capacity_poll_interval}s")
+    _print_detail("require Pod succeeded", str(config.require_pod_succeeded))
+    if config.require_pod_succeeded:
+        _print_detail("Pod succeeded timeout", f"{config.pod_succeeded_timeout}s")
+        _print_detail(
+            "Pod succeeded poll interval",
+            f"{config.pod_succeeded_poll_interval}s",
+        )
     _print_detail("keep resources", str(config.keep_resources))
     _print_detail("delete cluster", str(config.delete_cluster))
 
@@ -271,10 +291,11 @@ def _print_started_container_logs(
             print(f"  WARN: could not read logs for `{container_name}`: {exc}")
             continue
 
-        if not str(logs).strip():
+        logs_text = _command_output_text(logs)
+        if not logs_text.strip():
             print("  (empty)")
             continue
-        for line in str(logs).strip().splitlines():
+        for line in logs_text.strip().splitlines():
             print(f"  {line}")
 
 
@@ -283,6 +304,21 @@ def _print_command_output(label: str, output: str) -> None:
     print(f"{label}:")
     for line in output.strip().splitlines():
         print(f"  {line}")
+
+
+def _command_output_text(output: object) -> str:
+    """Return command or log output as printable text."""
+    if isinstance(output, bytes):
+        return output.decode("utf-8", errors="replace")
+    text = str(output)
+    if text.startswith(("b'", 'b"')):
+        try:
+            literal = ast.literal_eval(text)
+        except (SyntaxError, ValueError):
+            return text
+        if isinstance(literal, bytes):
+            return literal.decode("utf-8", errors="replace")
+    return text
 
 
 def _format_command(command: Sequence[str]) -> str:
@@ -319,6 +355,21 @@ def parse_args(argv: Sequence[str] | None = None) -> SmokeConfig:
         ),
     )
     parser.add_argument(
+        "--probe-image",
+        action="store_true",
+        default=_env_bool("PROBE_IMAGE", False),
+        help=(
+            "Build and import the dev-only probe image into k3d, use it as "
+            "the TaskExecutor image with imagePullPolicy=Never, and require "
+            "the executor-created Pod to reach Succeeded."
+        ),
+    )
+    parser.add_argument(
+        "--probe-image-tag",
+        default=_env("PROBE_IMAGE_TAG", DEFAULT_PROBE_IMAGE),
+        help="Local Docker image tag used when --probe-image is enabled.",
+    )
+    parser.add_argument(
         "--appio-api-address",
         default=_env("APPIO_API_ADDRESS", DEFAULT_APPIO_API_ADDRESS),
         help="AppIo API address passed into the rendered TaskExecutor Pod.",
@@ -342,6 +393,29 @@ def parse_args(argv: Sequence[str] | None = None) -> SmokeConfig:
         help="Capacity polling interval used by the executor.",
     )
     parser.add_argument(
+        "--require-pod-succeeded",
+        action="store_true",
+        default=_env_bool("REQUIRE_POD_SUCCEEDED", False),
+        help=(
+            "Require smoke Pods selected by the run label to reach Succeeded "
+            "within the bounded Pod completion timeout."
+        ),
+    )
+    parser.add_argument(
+        "--pod-succeeded-timeout",
+        type=float,
+        default=_env_float("POD_SUCCEEDED_TIMEOUT", DEFAULT_POD_SUCCEEDED_TIMEOUT),
+        help="Harness-level timeout for the required Pod Succeeded proof.",
+    )
+    parser.add_argument(
+        "--pod-succeeded-poll-interval",
+        type=float,
+        default=_env_float(
+            "POD_SUCCEEDED_POLL_INTERVAL", DEFAULT_POD_SUCCEEDED_POLL_INTERVAL
+        ),
+        help="Polling interval used while waiting for smoke Pods to succeed.",
+    )
+    parser.add_argument(
         "--keep-resources",
         action="store_true",
         default=_env_bool("KEEP_RESOURCES", False),
@@ -354,18 +428,27 @@ def parse_args(argv: Sequence[str] | None = None) -> SmokeConfig:
         help="Delete the k3d cluster at the end only if this harness created it.",
     )
     args = parser.parse_args(argv)
+    image = args.probe_image_tag if args.probe_image else args.image
+    image_pull_policy = (
+        DEFAULT_IMAGE_PULL_POLICY if args.probe_image else args.image_pull_policy
+    )
 
     return SmokeConfig(
         cluster_name=args.cluster_name,
         namespace=args.namespace,
-        image=args.image,
-        image_pull_policy=args.image_pull_policy,
+        image=image,
+        image_pull_policy=image_pull_policy,
         appio_api_address=args.appio_api_address,
         active_pod_budget=args.active_pod_budget,
         capacity_timeout=args.capacity_timeout,
         capacity_poll_interval=args.capacity_poll_interval,
         keep_resources=args.keep_resources,
         delete_cluster=args.delete_cluster,
+        probe_image=args.probe_image,
+        probe_image_tag=args.probe_image_tag,
+        require_pod_succeeded=args.require_pod_succeeded or args.probe_image,
+        pod_succeeded_timeout=args.pod_succeeded_timeout,
+        pod_succeeded_poll_interval=args.pod_succeeded_poll_interval,
     )
 
 
@@ -399,6 +482,8 @@ def run_smoke(config: SmokeConfig) -> None:
     cleanup_completed = False
     cluster_created = ensure_k3d_cluster(config.cluster_name)
     try:
+        prepare_probe_image(config)
+
         _print_section("Load kubeconfig and create Kubernetes API client")
         print(
             "Loading kubeconfig for the current context selected by "
@@ -455,6 +540,15 @@ def run_smoke(config: SmokeConfig) -> None:
             "OK: capacity selector found at least the configured active Pod "
             f"budget ({len(pods)} of {config.active_pod_budget})."
         )
+        if config.require_pod_succeeded:
+            pods = wait_for_pods_succeeded(
+                api,
+                config.namespace,
+                selector,
+                expected_count=config.active_pod_budget,
+                timeout=config.pod_succeeded_timeout,
+                poll_interval=config.pod_succeeded_poll_interval,
+            )
         report_pod_lifecycle_diagnostics(api, config.namespace, pods)
 
         if config.keep_resources:
@@ -467,6 +561,18 @@ def run_smoke(config: SmokeConfig) -> None:
                 "Inspect preserved resources with: "
                 f"kubectl get pods,secrets -n {config.namespace} -l '{selector}'"
             )
+        elif config.require_pod_succeeded:
+            _print_section("Skip active-capacity wait proof")
+            print(
+                "Skipping wait_for_capacity() blocking proof because the probe "
+                "mode requires the smoke Pod to complete first. Terminal Pods "
+                "do not count against active capacity."
+            )
+            cleanup_labeled_objects(api, config.namespace, selector)
+            wait_for_no_labeled_objects(
+                api, config.namespace, selector, timeout=config.capacity_timeout
+            )
+            cleanup_completed = True
         else:
             prove_wait_for_capacity_blocks_and_unblocks(
                 executor=executor,
@@ -508,6 +614,7 @@ def validate_smoke_config(config: SmokeConfig) -> None:
         ("Namespace", config.namespace),
         ("TaskExecutor image", config.image),
         ("Image pull policy", config.image_pull_policy),
+        ("Probe image tag", config.probe_image_tag),
         ("AppIo API address", config.appio_api_address),
     ):
         if not value.strip():
@@ -518,8 +625,19 @@ def validate_smoke_config(config: SmokeConfig) -> None:
         raise SmokeFailure("Capacity timeout must be positive.")
     if config.capacity_poll_interval <= 0:
         raise SmokeFailure("Capacity poll interval must be positive.")
+    if config.pod_succeeded_timeout <= 0:
+        raise SmokeFailure("Pod succeeded timeout must be positive.")
+    if config.pod_succeeded_poll_interval <= 0:
+        raise SmokeFailure("Pod succeeded poll interval must be positive.")
     if config.keep_resources and config.delete_cluster:
         raise SmokeFailure("--keep-resources cannot be combined with --delete-cluster.")
+    if config.probe_image and config.image != config.probe_image_tag:
+        raise SmokeFailure(
+            "Probe image mode must use the probe image tag as the "
+            "TaskExecutor image."
+        )
+    if config.probe_image and config.image_pull_policy != DEFAULT_IMAGE_PULL_POLICY:
+        raise SmokeFailure("Probe image mode requires imagePullPolicy=Never.")
 
 
 def ensure_k3d_cluster(cluster_name: str) -> bool:
@@ -546,6 +664,51 @@ def ensure_k3d_cluster(cluster_name: str) -> bool:
     )
     print(f"OK: kubeconfig now points at k3d cluster `{cluster_name}`.")
     return cluster_created
+
+
+def prepare_probe_image(config: SmokeConfig) -> None:
+    """Build and import the dev-only probe image when probe mode is enabled."""
+    if not config.probe_image:
+        return
+
+    _print_section("Build and import controlled probe image")
+    probe_dir = _probe_image_dir()
+    print(
+        "Building the dev-only probe image locally. The image exposes the "
+        "TaskExecutor command names expected by KubernetesExecutor and exits "
+        "successfully only after validating mounted credentials and rendered "
+        "arguments."
+    )
+    _print_detail("probe image directory", str(probe_dir))
+    _print_detail("probe image tag", config.probe_image_tag)
+    _run_command(
+        [
+            "docker",
+            "build",
+            "--tag",
+            config.probe_image_tag,
+            str(probe_dir),
+        ]
+    )
+    print(
+        f"Importing `{config.probe_image_tag}` into k3d cluster "
+        f"`{config.cluster_name}`."
+    )
+    _run_command(
+        [
+            "k3d",
+            "image",
+            "import",
+            config.probe_image_tag,
+            "--cluster",
+            config.cluster_name,
+        ]
+    )
+
+
+def _probe_image_dir() -> Path:
+    """Return the dev-only probe image build directory."""
+    return Path(__file__).resolve().parent / "kubernetes_executor_k3d_probe"
 
 
 def ensure_namespace(api: Any, namespace: str) -> None:
@@ -695,6 +858,72 @@ def report_pod_lifecycle_diagnostics(
         _print_container_statuses(container_statuses)
         _print_pod_events(api, namespace, name)
         _print_started_container_logs(api, namespace, name, container_statuses)
+
+
+def wait_for_pods_succeeded(
+    api: Any,
+    namespace: str,
+    label_selector: str,
+    *,
+    expected_count: int,
+    timeout: float,
+    poll_interval: float,
+) -> list[Any]:
+    """Wait until all smoke Pods selected by the run label reach Succeeded."""
+    _print_section("Require smoke Pods to reach Succeeded")
+    print(
+        "Probe mode requires the executor-created Pod to start and complete. "
+        "The probe container validates the mounted token file and rendered "
+        "TaskExecutor arguments without printing token contents."
+    )
+    _print_detail("namespace", namespace)
+    _print_detail("label selector", label_selector)
+    _print_detail("expected Pod count", str(expected_count))
+    _print_detail("timeout", f"{timeout}s")
+
+    deadline = time.monotonic() + timeout
+    last_summary: str | None = None
+    pods: list[Any] = []
+    while time.monotonic() < deadline:
+        pods = _list_items(
+            api.list_namespaced_pod(namespace=namespace, label_selector=label_selector)
+        )
+        summary = _pod_phase_summary(pods)
+        if summary != last_summary:
+            print(f"Current selected Pods: {summary}")
+            last_summary = summary
+
+        if len(pods) >= expected_count and all(
+            _object_phase(pod) == "Succeeded" for pod in pods
+        ):
+            print("OK: all selected smoke Pods reached Succeeded.")
+            return pods
+
+        failed = [pod for pod in pods if _object_phase(pod) == "Failed"]
+        if failed:
+            report_pod_lifecycle_diagnostics(api, namespace, pods)
+            failed_names = ", ".join(_object_name(pod) or "<unknown>" for pod in failed)
+            raise SmokeFailure(f"Smoke Pod(s) failed before Succeeded: {failed_names}.")
+
+        time.sleep(poll_interval)
+
+    report_pod_lifecycle_diagnostics(api, namespace, pods)
+    raise SmokeFailure(
+        "Smoke Pod(s) did not reach Succeeded before timeout. Inspect with: "
+        f"kubectl get pods -n {namespace} -l '{label_selector}'"
+    )
+
+
+def _pod_phase_summary(pods: Sequence[Any]) -> str:
+    """Return a compact Pod phase summary for completion polling output."""
+    if not pods:
+        return "0 Pod(s)"
+    values = []
+    for pod in pods:
+        name = _object_name(pod) or "<unknown>"
+        phase = _object_phase(pod) or "<unknown>"
+        values.append(f"{name}:{phase}")
+    return ", ".join(values)
 
 
 def _refresh_pods_for_lifecycle_diagnostics(

@@ -20,6 +20,7 @@ import threading
 from typing import Any
 from unittest.mock import Mock, call
 
+import kubernetes_executor_k3d_probe.probe_taskexecutor as probe
 import kubernetes_executor_k3d_smoke as smoke
 import pytest
 
@@ -54,6 +55,49 @@ def test_parse_args_uses_environment_defaults(monkeypatch: pytest.MonkeyPatch) -
     assert config.capacity_poll_interval == 0.1
     assert config.keep_resources is True
     assert config.delete_cluster is True
+
+
+def test_parse_args_probe_image_forces_local_image_and_completion() -> None:
+    """Test probe image mode selects the controlled image and strict Pod wait."""
+    config = smoke.parse_args(["--probe-image"])
+
+    assert config.probe_image is True
+    assert config.image == smoke.DEFAULT_PROBE_IMAGE
+    assert config.image_pull_policy == "Never"
+    assert config.require_pod_succeeded is True
+
+
+def test_parse_args_can_require_pod_succeeded_without_building_probe() -> None:
+    """Test strict Pod completion can be requested for a caller-provided image."""
+    config = smoke.parse_args(
+        ["--require-pod-succeeded", "--image", "example/taskexecutor:local"]
+    )
+
+    assert config.probe_image is False
+    assert config.image == "example/taskexecutor:local"
+    assert config.require_pod_succeeded is True
+
+
+def test_probe_taskexecutor_validates_mounted_token_and_insecure_args(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    """Test the probe command accepts executor-rendered insecure args."""
+    token_path = tmp_path / "token"
+    token_path.write_text(
+        "smoke-token-0123456789abcdef0123456789abcdef-0", encoding="utf-8"
+    )
+    monkeypatch.setattr(probe, "APPIO_TOKEN_FILE_PATH", str(token_path))
+
+    probe._run_probe(
+        [
+            "flwr-serverapp",
+            "--serverappio-api-address",
+            "appio:9092",
+            "--token-file",
+            str(token_path),
+            "--insecure",
+        ]
+    )
 
 
 def test_core_v1_api_adapter_forwards_executor_calls() -> None:
@@ -195,7 +239,7 @@ def test_pod_lifecycle_diagnostics_reads_started_container_logs(
     """Test lifecycle diagnostics read logs for a started container."""
     api = Mock()
     api.list_namespaced_event.return_value = {"items": []}
-    api.read_namespaced_pod_log.return_value = "hello from taskexecutor\n"
+    api.read_namespaced_pod_log.return_value = b"hello from taskexecutor\n"
     pod = {
         "metadata": {"name": "pod-a"},
         "status": {
@@ -228,6 +272,13 @@ def test_pod_lifecycle_diagnostics_reads_started_container_logs(
         namespace="namespace",
         container="taskexecutor",
         tail_lines=80,
+    )
+
+
+def test_command_output_text_decodes_bytes_literal_string() -> None:
+    """Test Kubernetes log byte-literal strings print as normal text."""
+    assert smoke._command_output_text("b'hello from taskexecutor\\n'") == (
+        "hello from taskexecutor\n"
     )
 
 
@@ -267,6 +318,68 @@ def test_validate_smoke_config_rejects_keep_resources_with_delete_cluster() -> N
 
     with pytest.raises(smoke.SmokeFailure, match="cannot be combined"):
         smoke.validate_smoke_config(config)
+
+
+def test_validate_smoke_config_rejects_probe_mode_without_never_pull() -> None:
+    """Test controlled probe mode keeps imagePullPolicy=Never."""
+    config = smoke.SmokeConfig(
+        cluster_name="cluster",
+        namespace="namespace",
+        image=smoke.DEFAULT_PROBE_IMAGE,
+        image_pull_policy="IfNotPresent",
+        appio_api_address="appio:9092",
+        active_pod_budget=1,
+        capacity_timeout=5.0,
+        capacity_poll_interval=0.1,
+        keep_resources=False,
+        delete_cluster=False,
+        probe_image=True,
+    )
+
+    with pytest.raises(smoke.SmokeFailure, match="imagePullPolicy=Never"):
+        smoke.validate_smoke_config(config)
+
+
+def test_prepare_probe_image_builds_and_imports(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    """Test probe mode builds the local image and imports it into k3d."""
+    commands = []
+    monkeypatch.setattr(smoke, "_run_command", commands.append)
+    monkeypatch.setattr(smoke, "_probe_image_dir", lambda: tmp_path)
+    config = smoke.SmokeConfig(
+        cluster_name="cluster",
+        namespace="namespace",
+        image=smoke.DEFAULT_PROBE_IMAGE,
+        image_pull_policy="Never",
+        appio_api_address="appio:9092",
+        active_pod_budget=1,
+        capacity_timeout=5.0,
+        capacity_poll_interval=0.1,
+        keep_resources=False,
+        delete_cluster=False,
+        probe_image=True,
+    )
+
+    smoke.prepare_probe_image(config)
+
+    assert commands == [
+        [
+            "docker",
+            "build",
+            "--tag",
+            smoke.DEFAULT_PROBE_IMAGE,
+            str(tmp_path),
+        ],
+        [
+            "k3d",
+            "image",
+            "import",
+            smoke.DEFAULT_PROBE_IMAGE,
+            "--cluster",
+            "cluster",
+        ],
+    ]
 
 
 def test_cleanup_deletes_only_objects_matching_selector() -> None:
@@ -336,4 +449,49 @@ def test_wait_for_capacity_proof_rejects_immediate_return() -> None:
             cleanup=Mock(),
             timeout=1.0,
             block_check_timeout=0.01,
+        )
+
+
+def test_wait_for_pods_succeeded_returns_when_all_selected_pods_succeed() -> None:
+    """Test strict probe wait returns selected Pods once they reach Succeeded."""
+    api = Mock()
+    pending = {"metadata": {"name": "pod-a"}, "status": {"phase": "Pending"}}
+    succeeded = {"metadata": {"name": "pod-a"}, "status": {"phase": "Succeeded"}}
+    api.list_namespaced_pod.side_effect = [
+        {"items": [pending]},
+        {"items": [succeeded]},
+    ]
+
+    pods = smoke.wait_for_pods_succeeded(
+        api,
+        "namespace",
+        "label=value",
+        expected_count=1,
+        timeout=1.0,
+        poll_interval=0.01,
+    )
+
+    assert pods == [succeeded]
+
+
+def test_wait_for_pods_succeeded_fails_fast_for_failed_pod() -> None:
+    """Test strict probe wait fails when a selected Pod enters Failed."""
+    api = Mock()
+    api.list_namespaced_pod.return_value = {
+        "items": [{"metadata": {"name": "pod-a"}, "status": {"phase": "Failed"}}]
+    }
+    api.list_namespaced_event.return_value = {"items": []}
+    api.read_namespaced_pod.return_value = {
+        "metadata": {"name": "pod-a"},
+        "status": {"phase": "Failed"},
+    }
+
+    with pytest.raises(smoke.SmokeFailure, match="failed before Succeeded"):
+        smoke.wait_for_pods_succeeded(
+            api,
+            "namespace",
+            "label=value",
+            expected_count=1,
+            timeout=1.0,
+            poll_interval=0.01,
         )
