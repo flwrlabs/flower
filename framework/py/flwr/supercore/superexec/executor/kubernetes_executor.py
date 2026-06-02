@@ -14,10 +14,12 @@
 # ==============================================================================
 """Kubernetes executor for SuperExec TaskExecutor processes."""
 
+import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, cast
+from uuid import uuid4
 
 from flwr.supercore.constant import (
     TASK_TYPE_TO_APPIO_API_ADDRESS_ARG,
@@ -30,6 +32,9 @@ from .types import ExecutionSpec, LaunchResult
 APPIO_CREDENTIALS_MOUNT_PATH = "/run/flwr/appio"
 APPIO_TOKEN_FILE_PATH = f"{APPIO_CREDENTIALS_MOUNT_PATH}/token"
 APPIO_ROOT_CERTIFICATES_FILE_PATH = f"{APPIO_CREDENTIALS_MOUNT_PATH}/ca.crt"
+LAUNCH_ATTEMPT_LABEL = "flower.ai/launch-attempt"
+
+LOGGER = logging.getLogger(__name__)
 
 
 class KubernetesClient(Protocol):
@@ -40,6 +45,9 @@ class KubernetesClient(Protocol):
 
     def create_namespaced_pod(self, namespace: str, body: JSONObject) -> object:
         """Create a Kubernetes Pod in the selected namespace."""
+
+    def delete_namespaced_secret(self, name: str, namespace: str) -> object:
+        """Delete a Kubernetes Secret from the selected namespace."""
 
 
 @dataclass(frozen=True)
@@ -111,14 +119,27 @@ class KubernetesExecutor:
         """Submit the TaskExecutor Pod and credential Secret."""
         try:
             appio_root_certificates = _get_appio_root_certificates(spec, self._config)
+            launch_attempt = _new_launch_attempt_suffix()
+            secret_name = _credential_secret_name(spec, launch_attempt)
             secret = _build_appio_credentials_secret(
-                spec, self._config, appio_root_certificates
+                spec, self._config, appio_root_certificates, launch_attempt
             )
-            pod = _build_taskexecutor_pod(spec, self._config, appio_root_certificates)
+            pod = _build_taskexecutor_pod(
+                spec, self._config, appio_root_certificates, launch_attempt
+            )
             self._client.create_namespaced_secret(self._config.namespace, secret)
-            self._client.create_namespaced_pod(self._config.namespace, pod)
         except Exception as exc:  # pylint: disable=broad-exception-caught
             return _launch_result_from_exception(exc)
+
+        try:
+            self._client.create_namespaced_pod(self._config.namespace, pod)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            result = _launch_result_from_exception(exc)
+            if _is_definite_pod_rejection(exc):
+                _delete_secret_best_effort(
+                    self._client, self._config.namespace, secret_name
+                )
+            return result
 
         return LaunchResult.accepted()
 
@@ -127,6 +148,7 @@ def _build_appio_credentials_secret(
     spec: ExecutionSpec,
     config: KubernetesExecutorConfig,
     appio_root_certificates: str | None,
+    launch_attempt: str,
 ) -> JSONObject:
     """Build the AppIo credential Secret for a TaskExecutor Pod."""
     data: JSONObject = {"token": spec.token}
@@ -136,7 +158,9 @@ def _build_appio_credentials_secret(
     return {
         "apiVersion": "v1",
         "kind": "Secret",
-        "metadata": _metadata(_credential_secret_name(spec), spec, config),
+        "metadata": _metadata(
+            _credential_secret_name(spec, launch_attempt), spec, config, launch_attempt
+        ),
         "type": "Opaque",
         "stringData": data,
     }
@@ -146,6 +170,7 @@ def _build_taskexecutor_pod(
     spec: ExecutionSpec,
     config: KubernetesExecutorConfig,
     appio_root_certificates: str | None,
+    launch_attempt: str,
 ) -> JSONObject:
     """Build the TaskExecutor Pod for a claimed SuperExec task."""
     container: JSONObject = {
@@ -178,7 +203,7 @@ def _build_taskexecutor_pod(
             {
                 "name": "appio-credentials",
                 "secret": {
-                    "secretName": _credential_secret_name(spec),
+                    "secretName": _credential_secret_name(spec, launch_attempt),
                     "defaultMode": 0o444,
                 },
             }
@@ -202,7 +227,9 @@ def _build_taskexecutor_pod(
     return {
         "apiVersion": "v1",
         "kind": "Pod",
-        "metadata": _metadata(_pod_name(spec), spec, config),
+        "metadata": _metadata(
+            _pod_name(spec, launch_attempt), spec, config, launch_attempt
+        ),
         "spec": pod_spec,
     }
 
@@ -242,37 +269,48 @@ def _get_appio_root_certificates(
     return None
 
 
-def _pod_name(spec: ExecutionSpec) -> str:
+def _new_launch_attempt_suffix() -> str:
+    """Return a DNS-label-safe identifier for one local launch attempt."""
+    return uuid4().hex[:12]
+
+
+def _pod_name(spec: ExecutionSpec, launch_attempt: str) -> str:
     """Return the TaskExecutor Pod name."""
-    return f"flwr-taskexecutor-{spec.task_id}"
+    return f"flwr-taskexecutor-{spec.task_id}-{launch_attempt}"
 
 
-def _credential_secret_name(spec: ExecutionSpec) -> str:
+def _credential_secret_name(spec: ExecutionSpec, launch_attempt: str) -> str:
     """Return the AppIo credential Secret name."""
-    return f"{_pod_name(spec)}-appio"
+    return f"{_pod_name(spec, launch_attempt)}-appio"
 
 
 def _metadata(
-    name: str, spec: ExecutionSpec, config: KubernetesExecutorConfig
+    name: str,
+    spec: ExecutionSpec,
+    config: KubernetesExecutorConfig,
+    launch_attempt: str,
 ) -> JSONObject:
     """Return Kubernetes object metadata."""
     metadata: JSONObject = {
         "name": name,
         "namespace": config.namespace,
-        "labels": _labels(spec, config),
+        "labels": _labels(spec, config, launch_attempt),
     }
     if config.annotations is not None:
         metadata["annotations"] = cast(JSONObject, dict(config.annotations))
     return metadata
 
 
-def _labels(spec: ExecutionSpec, config: KubernetesExecutorConfig) -> JSONObject:
+def _labels(
+    spec: ExecutionSpec, config: KubernetesExecutorConfig, launch_attempt: str
+) -> JSONObject:
     """Return stable labels for Kubernetes objects."""
     labels: JSONObject = {
         "app.kubernetes.io/name": "flower",
         "app.kubernetes.io/component": "taskexecutor",
         "flower.ai/superexec-task-id": str(spec.task_id),
         "flower.ai/task-type": spec.task_type.value,
+        LAUNCH_ATTEMPT_LABEL: launch_attempt,
     }
     if config.resource_pool is not None:
         labels["flower.ai/resource-pool"] = config.resource_pool
@@ -288,6 +326,7 @@ def _validate_labels(labels: dict[str, str]) -> None:
         "app.kubernetes.io/component",
         "flower.ai/superexec-task-id",
         "flower.ai/task-type",
+        LAUNCH_ATTEMPT_LABEL,
         "flower.ai/resource-pool",
     }
     conflicts = sorted(stable_label_names.intersection(labels))
@@ -372,6 +411,33 @@ def _launch_result_from_exception(exc: Exception) -> LaunchResult:
         return LaunchResult.unknown(message)
 
     return LaunchResult.failed(message)
+
+
+def _is_definite_pod_rejection(exc: Exception) -> bool:
+    """Return true when Pod submission definitely failed before acceptance."""
+    status = _exception_status(exc)
+    if status is None:
+        return False
+
+    # Cleanup only relies on the Kubernetes API status contract. Message matching
+    # remains useful for LaunchResult mapping, but it is too heuristic to decide
+    # whether deleting the just-created Secret is safe.
+    return 400 <= status < 500 and status != 408
+
+
+def _delete_secret_best_effort(
+    client: KubernetesClient, namespace: str, secret_name: str
+) -> None:
+    """Best-effort cleanup for a Secret whose Pod was definitely rejected."""
+    try:
+        client.delete_namespaced_secret(secret_name, namespace)
+    except Exception:  # pylint: disable=broad-exception-caught
+        LOGGER.warning(
+            "Failed to delete Kubernetes credential Secret %r in namespace %r",
+            secret_name,
+            namespace,
+            exc_info=True,
+        )
 
 
 def _exception_status(exc: Exception) -> int | None:
