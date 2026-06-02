@@ -48,6 +48,8 @@ DEFAULT_APPIO_API_ADDRESS = "127.0.0.1:9092"
 DEFAULT_ACTIVE_POD_BUDGET = 1
 DEFAULT_CAPACITY_TIMEOUT = 30.0
 DEFAULT_CAPACITY_POLL_INTERVAL = 0.25
+DIAGNOSTIC_POD_STATUS_TIMEOUT = 3.0
+DIAGNOSTIC_POD_STATUS_POLL = 0.50
 LOCAL_RESOURCE_POOL = "local-k3d-smoke"
 RUN_LABEL_KEY = "flower.ai/k8s-executor-smoke-run"
 ENV_PREFIX = "FLWR_K8S_EXECUTOR_SMOKE_"
@@ -158,6 +160,122 @@ def _print_objects(
             if _object_deletion_timestamp(value) is not None:
                 details.append("deleting=true")
         print(f"  - {' '.join(details)}")
+
+
+def _print_pod_conditions(pod: Any) -> None:
+    """Print Pod status conditions."""
+    conditions = _pod_conditions(pod)
+    print(f"Pod conditions: {len(conditions)}")
+    for condition in conditions:
+        condition_type = _field_as_str(condition, "type") or "<unknown>"
+        status = _field_as_str(condition, "status") or "<unknown>"
+        reason = _field_as_str(condition, "reason")
+        message = _field_as_str(condition, "message")
+        last_transition_time = _field_as_str(
+            condition, "last_transition_time", "lastTransitionTime"
+        )
+        details = [f"type={condition_type}", f"status={status}"]
+        if reason:
+            details.append(f"reason={reason}")
+        if last_transition_time:
+            details.append(f"lastTransitionTime={last_transition_time}")
+        print(f"  - {' '.join(details)}")
+        if message:
+            print(f"    message: {message}")
+
+
+def _print_container_statuses(container_statuses: Sequence[Any]) -> None:
+    """Print container lifecycle state from Pod status."""
+    print(f"Container statuses: {len(container_statuses)}")
+    for container_status in container_statuses:
+        name = _field_as_str(container_status, "name") or "<unknown>"
+        ready = _field_as_str(container_status, "ready")
+        restart_count = _field_as_str(container_status, "restart_count", "restartCount")
+        image = _field_as_str(container_status, "image")
+        details = [f"name={name}"]
+        if ready is not None:
+            details.append(f"ready={ready}")
+        if restart_count is not None:
+            details.append(f"restartCount={restart_count}")
+        if image:
+            details.append(f"image={image}")
+        print(f"  - {' '.join(details)}")
+        print(f"    state: {_container_state_summary(container_status)}")
+        last_state = _container_last_state_summary(container_status)
+        if last_state is not None:
+            print(f"    last state: {last_state}")
+
+
+def _print_pod_events(api: Any, namespace: str, pod_name: str) -> None:
+    """Print Kubernetes Events for one Pod without failing the smoke."""
+    field_selector = f"involvedObject.kind=Pod,involvedObject.name={pod_name}"
+    print("Pod events:")
+    try:
+        events = _list_items(
+            api.list_namespaced_event(
+                namespace=namespace, field_selector=field_selector
+            )
+        )
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        print(f"  WARN: could not list Pod events: {exc}")
+        return
+
+    if not events:
+        print("  (none)")
+        return
+
+    for event in events:
+        event_type = _field_as_str(event, "type") or "<unknown>"
+        reason = _field_as_str(event, "reason") or "<unknown>"
+        count = _field_as_str(event, "count")
+        timestamp = _event_timestamp(event)
+        message = _field_as_str(event, "message")
+        details = [f"type={event_type}", f"reason={reason}"]
+        if count is not None:
+            details.append(f"count={count}")
+        if timestamp is not None:
+            details.append(f"time={timestamp}")
+        print(f"  - {' '.join(details)}")
+        if message:
+            print(f"    message: {message}")
+
+
+def _print_started_container_logs(
+    api: Any, namespace: str, pod_name: str, container_statuses: Sequence[Any]
+) -> None:
+    """Print logs for containers that reached running or terminated state."""
+    started_containers = [
+        container_status
+        for container_status in container_statuses
+        if _container_started(container_status)
+    ]
+    if not started_containers:
+        print("Container logs: no container has started yet; skipping log read.")
+        return
+
+    print("Container logs:")
+    for container_status in started_containers:
+        container_name = _field_as_str(container_status, "name")
+        if container_name is None:
+            print("  WARN: skipping started container without a name.")
+            continue
+        print(f"  Reading logs from container `{container_name}`.")
+        try:
+            logs = api.read_namespaced_pod_log(
+                name=pod_name,
+                namespace=namespace,
+                container=container_name,
+                tail_lines=80,
+            )
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            print(f"  WARN: could not read logs for `{container_name}`: {exc}")
+            continue
+
+        if not str(logs).strip():
+            print("  (empty)")
+            continue
+        for line in str(logs).strip().splitlines():
+            print(f"  {line}")
 
 
 def _print_command_output(label: str, output: str) -> None:
@@ -337,6 +455,7 @@ def run_smoke(config: SmokeConfig) -> None:
             "OK: capacity selector found at least the configured active Pod "
             f"budget ({len(pods)} of {config.active_pod_budget})."
         )
+        report_pod_lifecycle_diagnostics(api, config.namespace, pods)
 
         if config.keep_resources:
             _print_section("Skip cleanup-sensitive wait proof")
@@ -527,6 +646,100 @@ def launch_smoke_pods(
             message = result.message or "No message."
             raise SmokeFailure(f"KubernetesExecutor.launch was not accepted: {message}")
         print("OK: launch was accepted by KubernetesExecutor.")
+
+
+def report_pod_lifecycle_diagnostics(
+    api: Any, namespace: str, pods: Sequence[Any]
+) -> None:
+    """Print diagnostic-only Pod lifecycle details for smoke Pods."""
+    _print_section("Report smoke Pod lifecycle diagnostics")
+    print(
+        "These diagnostics are informational. Image pull failures, Pending "
+        "Pods, and missing logs do not fail the default smoke test."
+    )
+    if not pods:
+        print("No Pods were provided for lifecycle diagnostics.")
+        return
+
+    pods = _refresh_pods_for_lifecycle_diagnostics(api, namespace, pods)
+
+    for pod in pods:
+        name = _object_name(pod)
+        if name is None:
+            print("")
+            print("Skipping lifecycle diagnostics for Pod without metadata.name.")
+            continue
+
+        print("")
+        print(f"Pod `{name}`")
+        _print_detail("phase", _object_phase(pod) or "<unknown>")
+        deletion_timestamp = _object_deletion_timestamp(pod)
+        _print_detail(
+            "deletion timestamp",
+            str(deletion_timestamp) if deletion_timestamp is not None else "<none>",
+        )
+        print("Manual follow-up commands:")
+        print(f"  kubectl describe pod -n {namespace} {name}")
+        container_statuses = _pod_container_statuses(pod)
+        container_names = _container_names(container_statuses)
+        if container_names:
+            for container_name in container_names:
+                print(
+                    f"  kubectl logs -n {namespace} {name} "
+                    f"-c {container_name} --tail=80"
+                )
+        else:
+            print(f"  kubectl logs -n {namespace} {name} --tail=80")
+
+        _print_pod_conditions(pod)
+        _print_container_statuses(container_statuses)
+        _print_pod_events(api, namespace, name)
+        _print_started_container_logs(api, namespace, name, container_statuses)
+
+
+def _refresh_pods_for_lifecycle_diagnostics(
+    api: Any, namespace: str, pods: Sequence[Any]
+) -> list[Any]:
+    """Refresh Pods briefly so diagnostic status fields can populate."""
+    print(
+        "Refreshing Pod status before diagnostics "
+        f"(up to {DIAGNOSTIC_POD_STATUS_TIMEOUT}s)."
+    )
+    current_pods = list(pods)
+    with_status = sum(1 for pod in current_pods if _pod_container_statuses(pod))
+    if with_status == len(current_pods):
+        print(
+            "Pod status refresh: "
+            f"{with_status} of {len(current_pods)} Pod(s) already have "
+            "container status."
+        )
+        return current_pods
+
+    deadline = time.monotonic() + DIAGNOSTIC_POD_STATUS_TIMEOUT
+    while True:
+        refreshed_pods = []
+        for pod in current_pods:
+            name = _object_name(pod)
+            if name is None:
+                refreshed_pods.append(pod)
+                continue
+            try:
+                refreshed_pods.append(
+                    api.read_namespaced_pod(name=name, namespace=namespace)
+                )
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                print(f"WARN: could not refresh Pod `{name}`: {exc}")
+                refreshed_pods.append(pod)
+
+        current_pods = refreshed_pods
+        with_status = sum(1 for pod in current_pods if _pod_container_statuses(pod))
+        print(
+            "Pod status refresh: "
+            f"{with_status} of {len(current_pods)} Pod(s) have container status."
+        )
+        if with_status == len(current_pods) or time.monotonic() >= deadline:
+            return current_pods
+        time.sleep(DIAGNOSTIC_POD_STATUS_POLL)
 
 
 def prove_wait_for_capacity_blocks_and_unblocks(
@@ -764,6 +977,120 @@ def _list_items(value: object) -> list[Any]:
     if items is None:
         return []
     return list(items)
+
+
+def _field(value: object, *names: str) -> Any | None:
+    """Return the first named field from a Kubernetes dict or model object."""
+    if value is None:
+        return None
+    for name in names:
+        if isinstance(value, dict):
+            if name in value:
+                return value[name]
+        elif hasattr(value, name):
+            return getattr(value, name)
+    return None
+
+
+def _field_as_str(value: object, *names: str) -> str | None:
+    """Return a Kubernetes object field formatted for diagnostic output."""
+    field = _field(value, *names)
+    if field is None:
+        return None
+    return str(field)
+
+
+def _pod_conditions(pod: object) -> list[Any]:
+    """Return Pod status conditions."""
+    status = _field(pod, "status")
+    conditions = _field(status, "conditions")
+    if conditions is None:
+        return []
+    return list(conditions)
+
+
+def _pod_container_statuses(pod: object) -> list[Any]:
+    """Return Pod container statuses."""
+    status = _field(pod, "status")
+    container_statuses = _field(status, "container_statuses", "containerStatuses")
+    if container_statuses is None:
+        return []
+    return list(container_statuses)
+
+
+def _container_names(container_statuses: Sequence[Any]) -> list[str]:
+    """Return named containers from container statuses."""
+    names = []
+    for container_status in container_statuses:
+        name = _field_as_str(container_status, "name")
+        if name is not None:
+            names.append(name)
+    return names
+
+
+def _container_state_summary(container_status: object) -> str:
+    """Return a concise current container state summary."""
+    state = _field(container_status, "state")
+    return _state_summary(state) or "<unknown>"
+
+
+def _container_last_state_summary(container_status: object) -> str | None:
+    """Return a concise previous container state summary, if present."""
+    last_state = _field(container_status, "last_state", "lastState")
+    return _state_summary(last_state)
+
+
+def _state_summary(state: object) -> str | None:
+    """Return a concise waiting/running/terminated state summary."""
+    if state is None:
+        return None
+    for state_name in ("waiting", "running", "terminated"):
+        state_detail = _field(state, state_name)
+        if state_detail is not None:
+            detail_summary = _state_detail_summary(state_detail)
+            if detail_summary:
+                return f"{state_name} {detail_summary}"
+            return state_name
+    return None
+
+
+def _state_detail_summary(state_detail: object) -> str:
+    """Return key fields from a Kubernetes container state detail."""
+    field_names = (
+        ("reason", "reason"),
+        ("message", "message"),
+        ("exitCode", "exit_code", "exitCode"),
+        ("signal", "signal"),
+        ("startedAt", "started_at", "startedAt"),
+        ("finishedAt", "finished_at", "finishedAt"),
+    )
+    details = []
+    for output_name, *lookup_names in field_names:
+        value = _field_as_str(state_detail, *lookup_names)
+        if value is not None:
+            details.append(f"{output_name}={value}")
+    return " ".join(details)
+
+
+def _container_started(container_status: object) -> bool:
+    """Return whether a container reached running or terminated state."""
+    state = _field(container_status, "state")
+    return (
+        _field(state, "running") is not None or _field(state, "terminated") is not None
+    )
+
+
+def _event_timestamp(event: object) -> str | None:
+    """Return a useful Kubernetes Event timestamp for diagnostics."""
+    return _field_as_str(
+        event,
+        "event_time",
+        "eventTime",
+        "last_timestamp",
+        "lastTimestamp",
+        "first_timestamp",
+        "firstTimestamp",
+    )
 
 
 def _object_name(value: object) -> str | None:

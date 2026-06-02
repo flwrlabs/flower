@@ -124,6 +124,113 @@ def test_build_execution_spec_uses_unique_task_ids_and_tokens() -> None:
     assert first.token != second.token
 
 
+def test_pod_lifecycle_diagnostics_reports_waiting_pod_without_logs(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Test lifecycle diagnostics print waiting state without failing."""
+    api = Mock()
+    api.list_namespaced_event.return_value = {
+        "items": [
+            {
+                "type": "Warning",
+                "reason": "ErrImageNeverPull",
+                "message": "Container image is not present with pull policy Never",
+                "count": 2,
+                "lastTimestamp": "2026-06-02T12:00:00Z",
+            }
+        ]
+    }
+    pod = {
+        "metadata": {
+            "name": "pod-a",
+            "deletionTimestamp": "2026-06-02T12:00:01Z",
+        },
+        "status": {
+            "phase": "Pending",
+            "conditions": [
+                {
+                    "type": "PodScheduled",
+                    "status": "True",
+                    "lastTransitionTime": "2026-06-02T12:00:01Z",
+                }
+            ],
+            "containerStatuses": [
+                {
+                    "name": "taskexecutor",
+                    "ready": False,
+                    "restartCount": 0,
+                    "image": "image:dev",
+                    "state": {
+                        "waiting": {
+                            "reason": "ErrImageNeverPull",
+                            "message": "image is absent locally",
+                        }
+                    },
+                }
+            ],
+        },
+    }
+
+    smoke.report_pod_lifecycle_diagnostics(api, "namespace", [pod])
+
+    output = capsys.readouterr().out
+    assert "phase: Pending" in output
+    assert "deletion timestamp: 2026-06-02T12:00:01Z" in output
+    assert "kubectl describe pod -n namespace pod-a" in output
+    assert "kubectl logs -n namespace pod-a -c taskexecutor --tail=80" in output
+    assert "state: waiting reason=ErrImageNeverPull" in output
+    assert "type=Warning reason=ErrImageNeverPull count=2" in output
+    assert "Container logs: no container has started yet" in output
+
+    api.list_namespaced_event.assert_called_once_with(
+        namespace="namespace",
+        field_selector="involvedObject.kind=Pod,involvedObject.name=pod-a",
+    )
+    api.read_namespaced_pod_log.assert_not_called()
+
+
+def test_pod_lifecycle_diagnostics_reads_started_container_logs(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Test lifecycle diagnostics read logs for a started container."""
+    api = Mock()
+    api.list_namespaced_event.return_value = {"items": []}
+    api.read_namespaced_pod_log.return_value = "hello from taskexecutor\n"
+    pod = {
+        "metadata": {"name": "pod-a"},
+        "status": {
+            "phase": "Succeeded",
+            "containerStatuses": [
+                {
+                    "name": "taskexecutor",
+                    "ready": False,
+                    "restartCount": 0,
+                    "state": {
+                        "terminated": {
+                            "reason": "Completed",
+                            "exitCode": 0,
+                            "finishedAt": "2026-06-02T12:00:01Z",
+                        }
+                    },
+                }
+            ],
+        },
+    }
+
+    smoke.report_pod_lifecycle_diagnostics(api, "namespace", [pod])
+
+    output = capsys.readouterr().out
+    assert "phase: Succeeded" in output
+    assert "state: terminated reason=Completed exitCode=0" in output
+    assert "hello from taskexecutor" in output
+    api.read_namespaced_pod_log.assert_called_once_with(
+        name="pod-a",
+        namespace="namespace",
+        container="taskexecutor",
+        tail_lines=80,
+    )
+
+
 def test_validate_smoke_config_rejects_invalid_budget() -> None:
     """Test harness config rejects a non-positive active Pod budget."""
     config = smoke.SmokeConfig(
