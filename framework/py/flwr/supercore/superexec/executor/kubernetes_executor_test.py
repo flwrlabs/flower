@@ -27,9 +27,9 @@ from .kubernetes_executor import (
     APPIO_CREDENTIALS_MOUNT_PATH,
     APPIO_ROOT_CERTIFICATES_FILE_PATH,
     APPIO_TOKEN_FILE_PATH,
+    LAUNCH_ATTEMPT_LABEL,
     KubernetesExecutor,
     KubernetesExecutorConfig,
-    LAUNCH_ATTEMPT_LABEL,
     _build_appio_credentials_secret,
     _build_taskexecutor_pod,
     _get_appio_root_certificates,
@@ -202,9 +202,7 @@ def test_build_taskexecutor_pod_supports_secure_default_trust_store() -> None:
         )
     )
     pod = _as_dict(
-        _build_taskexecutor_pod(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT
-        )
+        _build_taskexecutor_pod(spec, config, appio_root_certificates, _LAUNCH_ATTEMPT)
     )
 
     assert secret["stringData"] == {"token": "task-token"}
@@ -232,9 +230,7 @@ def test_build_taskexecutor_objects_use_execution_spec_root_certificates(
         )
     )
     pod = _as_dict(
-        _build_taskexecutor_pod(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT
-        )
+        _build_taskexecutor_pod(spec, config, appio_root_certificates, _LAUNCH_ATTEMPT)
     )
 
     assert secret["stringData"] == {"token": "task-token", "ca.crt": "spec-root-ca"}
@@ -265,9 +261,7 @@ def test_build_taskexecutor_objects_expand_user_root_certificates_path(
         )
     )
     pod = _as_dict(
-        _build_taskexecutor_pod(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT
-        )
+        _build_taskexecutor_pod(spec, config, appio_root_certificates, _LAUNCH_ATTEMPT)
     )
 
     assert secret["stringData"] == {"token": "task-token", "ca.crt": "home-root-ca"}
@@ -390,9 +384,7 @@ def test_build_taskexecutor_pod_supports_labels_annotations_and_security() -> No
         )
     )
     pod = _as_dict(
-        _build_taskexecutor_pod(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT
-        )
+        _build_taskexecutor_pod(spec, config, appio_root_certificates, _LAUNCH_ATTEMPT)
     )
 
     expected_labels = {
@@ -468,9 +460,7 @@ def test_launch_submits_secret_before_pod_and_returns_accepted(
         )
     )
     pod = _as_dict(
-        _build_taskexecutor_pod(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT
-        )
+        _build_taskexecutor_pod(spec, config, appio_root_certificates, _LAUNCH_ATTEMPT)
     )
     assert result.status == LaunchResultStatus.ACCEPTED
     assert client.mock_calls == [
@@ -518,8 +508,7 @@ def test_launch_generates_distinct_object_names_for_same_task(
         pod["spec"]["volumes"][0]["secret"]["secretName"] for pod in pod_bodies
     ] == [secret["metadata"]["name"] for secret in secret_bodies]
     assert [
-        secret["metadata"]["labels"][LAUNCH_ATTEMPT_LABEL]
-        for secret in secret_bodies
+        secret["metadata"]["labels"][LAUNCH_ATTEMPT_LABEL] for secret in secret_bodies
     ] == [_LAUNCH_ATTEMPT, _NEXT_LAUNCH_ATTEMPT]
 
 
