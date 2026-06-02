@@ -1,4 +1,4 @@
-# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower Executors components."""
+"""Flower ServerApp Grid APIs."""
 
 
-from .run_agentapp import run_agentapp
-from .run_model import run_model
+from .grid import Grid
 
 __all__ = [
-    "run_agentapp",
-    "run_model",
+    "Grid",
 ]

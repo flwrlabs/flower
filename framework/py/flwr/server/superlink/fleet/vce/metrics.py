@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,28 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Record APIs."""
+"""Metrics collected by the Virtual Client Engine."""
 
 
-from flwr.app.message import Array, ArrayRecord, ConfigRecord, MetricRecord, RecordDict
-from flwr.compat.common.record import (
-    ConfigsRecord,
-    MetricsRecord,
-    ParametersRecord,
-    RecordSet,
-)
+import threading
+from dataclasses import dataclass, field
 
-from .conversion_utils import array_from_numpy
 
-__all__ = [
-    "Array",
-    "ArrayRecord",
-    "ConfigRecord",
-    "ConfigsRecord",
-    "MetricRecord",
-    "MetricsRecord",
-    "ParametersRecord",
-    "RecordDict",
-    "RecordSet",
-    "array_from_numpy",
-]
+@dataclass
+class VceMetrics:
+    """Thread-safe runtime accumulator for Simulation Runtime runs."""
+
+    clientapp_runtime: float = 0.0
+    _lock: threading.Lock = field(
+        default_factory=threading.Lock, init=False, repr=False, compare=False
+    )
+
+    def add_clientapp_runtime(self, runtime: float) -> None:
+        """Add ClientApp execution runtime in seconds."""
+        with self._lock:
+            self.clientapp_runtime += runtime

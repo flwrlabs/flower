@@ -39,3 +39,12 @@ message TaskStatus {
   // failure details
   string details = 3;
 }
+
+message TaskEvent {
+  uint64 id = 1;
+  string timestamp = 2;
+  uint64 run_id = 3;
+  uint64 task_id = 4;
+  string event = 5;
+  string data = 6;
+}

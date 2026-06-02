@@ -118,13 +118,18 @@ erDiagram
     TIMESTAMP created_at
     VARCHAR description "nullable"
     VARCHAR federation
-    BIGINT last_run_id "nullable"
     TIMESTAMP updated_at
   }
 
   series_context {
     BIGINT series_id PK
     BLOB context "nullable"
+  }
+
+  series_runs {
+    INTEGER id PK
+    BIGINT run_id UK
+    BIGINT series_id
   }
 
   task {
