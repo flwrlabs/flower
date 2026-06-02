@@ -72,6 +72,8 @@ def build_params(values: Sequence[Any], prefix: str) -> tuple[str, dict[str, Any
 
 def primary_task_type_from_run_type(run_type: str) -> TaskType:
     """Return the primary task type for a run type."""
+    if run_type == RunType.AGENT_APP:
+        return TaskType.AGENT_APP
     if run_type == RunType.SIMULATION:
         return TaskType.SIMULATION
     if run_type == RunType.SERVER_APP:

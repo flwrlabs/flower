@@ -19,7 +19,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from threading import Lock, RLock
 
-from flwr.app import Context, Error, Message
+from flwr.app import Error, Message
 from flwr.common import now
 from flwr.common.constant import ErrorCode
 from flwr.common.typing import Run
@@ -71,9 +71,6 @@ class InMemoryNodeState(
         # Store run ID to Run mapping
         self.run_store: dict[int, Run] = {}
         self.lock_run_store = Lock()
-        # Store run ID to Context mapping
-        self.ctx_store: dict[int, Context] = {}
-        self.lock_ctx_store = Lock()
         # Store msg ID to TimeEntry mapping
         self.time_store: dict[str, TimeEntry] = {}
         self.lock_time_store = Lock()
@@ -170,16 +167,6 @@ class InMemoryNodeState(
         """Retrieve a run by its ID."""
         with self.lock_run_store:
             return self.run_store.get(run_id)
-
-    def store_context(self, context: Context) -> None:
-        """Store a context."""
-        with self.lock_ctx_store:
-            self.ctx_store[context.run_id] = context
-
-    def get_context(self, run_id: int) -> Context | None:
-        """Retrieve a context by its run ID."""
-        with self.lock_ctx_store:
-            return self.ctx_store.get(run_id)
 
     def _store_error_replies(self, run_ids: set[int]) -> None:
         """Insert error replies for retrieved messages associated with run IDs."""
