@@ -25,6 +25,9 @@ You will need:
   how to create these with ``ssh-keygen`` in the terminal.
 - A machine where the SuperNode process can keep running.
 
+The sections below show the SuperGrid UI workflow. At the end of this page, the same
+steps are shown in compact form with the Flower CLI.
+
 ************************************
  Register SuperNodes with SuperGrid
 ************************************
@@ -202,3 +205,49 @@ selected by runs launched in the federation.
     :alt: SuperNode added to federation
     :align: center
     :target: ./_static/supernode_added_to_federation.png
+
+**********
+ Advanced
+**********
+
+Everything shown above in the SuperGrid UI can also be done with the :doc:`Flower CLI
+<ref-api-cli>`.
+
+Log in to SuperGrid:
+
+.. code-block:: shell
+
+    $ flwr login supergrid
+
+Register a SuperNode public key:
+
+.. code-block:: shell
+
+    # Register a SuperNode with a public key
+    $ flwr supernode register ~/supernodes_keys/supernode-1.pub supergrid
+
+List registered SuperNodes and note the SuperNode ID:
+
+.. code-block:: shell
+
+    # List registered SuperNodes under your account
+    $ flwr supernode list supergrid --verbose
+
+Add the SuperNode to a deployment federation you are a member of:
+
+.. code-block:: shell
+
+    $ flwr federation add-supernode <supernode-id> \
+        @<username>/<federation-name> supergrid
+
+Optionally, remove the SuperNode from a federation or unregister it:
+
+.. code-block:: shell
+
+    # Remove the SuperNode from the federation
+    $ flwr federation remove-supernode <supernode-id> \
+        @<username>/<federation-name> supergrid
+
+    # Unregister the SuperNode from SuperGrid. This cannot be undone, and the SuperNode
+    # cannot be used again unless it is registered again with a different key.
+    $ flwr supernode unregister <supernode-id> supergrid
