@@ -17,9 +17,9 @@
 
 from __future__ import annotations
 
+import time
 from typing import cast
 
-from flwr.common.retry_invoker import RetryInvoker, constant
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskMessageRequest,
@@ -32,109 +32,64 @@ from flwr.supercore.typing import JSONObject
 from .provider import ModelProviderError, invoke_model_provider
 
 
-class _ModelRequestUnavailable(Exception):
-    """No model request is available yet."""
-
-
 def handle_task(stub: ServerAppIoStub, task_id: int, run_id: int) -> None:
     """Run one model task request."""
     request_message = _pull_model_request(stub)
-
     if request_message.metadata.src_task_id is None:
         raise RuntimeError("Model request source task is not set.")
 
-    model_request = ModelRequest.from_message(request_message)
-
-    def on_stream_event(event_data: JSONObject) -> None:
-        _push_model_response(
-            stub,
-            request_message,
-            task_id,
-            run_id,
-            event_data,
+    def _push_model_response(response: JSONObject) -> None:
+        """Push a ModelResponse back to the requesting task."""
+        message = ModelResponse(
+            dst_task_id=cast(int, request_message.metadata.src_task_id),
+            response=response,
+            reply_to_message_id=request_message.metadata.message_id,
         )
+        message.metadata.__dict__["_run_id"] = run_id
+        message.metadata.src_task_id = task_id
+        message.metadata.__dict__["_message_id"] = message.object_id
+        stub.PushTaskMessage(PushTaskMessageRequest(message=message_to_proto(message)))
 
+    response = None
     try:
-        provider_response = invoke_model_provider(
-            model_request.payload,
-            on_stream_event=on_stream_event,
+        response = invoke_model_provider(
+            request_message.payload,
+            on_stream_event=_push_model_response,
         )
     except Exception as ex:
-        error_code = (
-            "model_provider_error"
-            if isinstance(ex, ModelProviderError)
-            else "internal_error"
-        )
-
-        _push_model_response(
-            stub,
-            request_message,
-            task_id,
-            run_id,
-            {
-                "type": "response.failed",
-                "response": {
-                    "object": "response",
-                    "status": "failed",
-                    "error": {
-                        "code": error_code,
-                        "message": str(ex),
-                    },
-                    "output": [],
-                },
-            },
-        )
+        response = _make_error_response(ex)
         raise
-
-    if provider_response is not None:
-        _push_model_response(
-            stub,
-            request_message,
-            task_id,
-            run_id,
-            provider_response,
-        )
+    finally:
+        if response is not None:
+            _push_model_response(response)
 
 
 def _pull_model_request(stub: ServerAppIoStub) -> ModelRequest:
     """Pull one model request, waiting until it becomes available."""
-
-    def pull_model_request_once(stub: ServerAppIoStub) -> ModelRequest:
-        """Pull one model request without retrying."""
+    while True:
         pull_response = stub.PullTaskMessage(PullTaskMessageRequest(limit=1))
         messages = [message_from_proto(message) for message in pull_response.messages]
-        if not messages:
-            raise _ModelRequestUnavailable
-        return cast(ModelRequest, messages[0])
-
-    return cast(
-        ModelRequest,
-        RetryInvoker(
-            wait_gen_factory=lambda: constant(1.0),
-            recoverable_exceptions=_ModelRequestUnavailable,
-            max_tries=None,
-            max_time=None,
-            jitter=None,
-        ).invoke(pull_model_request_once, stub),
-    )
+        if messages:
+            return ModelRequest.from_message(messages[0])
+        time.sleep(1)  # Wait for 1 second before trying again.
 
 
-def _push_model_response(
-    stub: ServerAppIoStub,
-    request_message: ModelRequest,
-    src_task_id: int,
-    run_id: int,
-    response: JSONObject,
-) -> None:
-    """Push a ModelResponse back to the requesting task."""
-    if request_message.metadata.src_task_id is None:
-        raise RuntimeError("Model request source task is not set.")
-    message = ModelResponse(
-        dst_task_id=request_message.metadata.src_task_id,
-        response=response,
-        reply_to_message_id=request_message.metadata.message_id,
-    )
-    message.metadata.__dict__["_run_id"] = run_id
-    message.metadata.src_task_id = src_task_id
-    message.metadata.__dict__["_message_id"] = message.object_id
-    stub.PushTaskMessage(PushTaskMessageRequest(message=message_to_proto(message)))
+def _make_error_response(ex: Exception) -> JSONObject:
+    """Create a JSON error response from an exception."""
+    if isinstance(ex, ModelProviderError):
+        error_code = "model_provider_error"
+    else:
+        error_code = "internal_error"
+
+    return {
+        "type": "response.failed",
+        "response": {
+            "object": "response",
+            "status": "failed",
+            "error": {
+                "code": error_code,
+                "message": str(ex),
+            },
+            "output": [],
+        },
+    }

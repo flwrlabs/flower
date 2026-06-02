@@ -18,12 +18,10 @@
 from __future__ import annotations
 
 from logging import DEBUG, ERROR
-from queue import Queue
 
 import grpc
 
-from flwr.common import EventType
-from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
+from flwr.common.constant import SubStatus
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
@@ -32,6 +30,7 @@ from flwr.common.retry_invoker import (
     make_simple_grpc_retry_invoker,
     wrap_stub,
 )
+from flwr.common.telemetry import EventType, event
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
     PullTaskInputResponse,
@@ -47,16 +46,12 @@ from flwr.supercore.interceptors import (
 
 from .task import handle_task
 
-_UNKNOWN_ERROR_DETAILS = "Model task failed with unknown error."
 
-
-def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
+def run_model(
     serverappio_api_address: str,
-    log_queue: Queue[str | None],
     token: str,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
-    runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
     """Run Flower model task process."""
     # Monitor the main process in case of SIGKILL
@@ -72,7 +67,7 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
     # Initialize variables for exit handler
     heartbeat_sender = None
     sub_status = SubStatus.FAILED
-    details = _UNKNOWN_ERROR_DETAILS
+    details = "Model task failed with unknown error."
     exit_code = ExitCode.SUCCESS
 
     register_signal_handlers(
@@ -81,8 +76,6 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
     )
 
     try:
-        _ = (log_queue, runtime_dependency_install)
-
         # Set up heartbeat sender
         heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
         heartbeat_sender.start()
@@ -90,6 +83,8 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
         # Pull task input from SuperLink
         log(DEBUG, "[flwr-model] Pull task input")
         task_input: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
+
+        event(EventType.FLWR_MODEL_RUN_ENTER)
 
         handle_task(
             stub=stub,
@@ -134,13 +129,7 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
         # Close the Grpc connection
         channel.close()
 
-    flwr_exit(
-        exit_code,
-        event_type=EventType.FLWR_MODEL_RUN_LEAVE,
-        event_details={
-            "success": exit_code == ExitCode.SUCCESS,
-        },
-    )
+    flwr_exit(exit_code, event_type=EventType.FLWR_MODEL_RUN_LEAVE)
 
 
 def _create_serverappio_stub(
