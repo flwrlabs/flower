@@ -22,7 +22,7 @@ from collections.abc import Sequence
 from typing import cast
 
 from flwr.agentapp import AgentResponses, AgentSession
-from flwr.app import Message
+from flwr.app import Context, Message
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     CreateTaskRequest,
@@ -33,6 +33,8 @@ from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E
 from flwr.supercore.constant import TaskType
 from flwr.supercore.model_message import ModelRequest, ModelResponse
 from flwr.supercore.typing import JSONObject
+
+from .context_items import append_items
 
 _DEFAULT_MODEL_REPLY_TIMEOUT = 300.0
 _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
@@ -60,18 +62,16 @@ class RuntimeAgentResponses(AgentResponses):
         stub: ServerAppIoStub,
         run_id: int,
         task_id: int,
+        context: Context,
     ) -> None:
         self._stub = stub
-        self._messages = _RuntimeTaskMessages(
-            stub=stub,
-            run_id=run_id,
-            task_id=task_id,
-        )
+        self._context = context
+        self._run_id = run_id
+        self._task_id = task_id
 
     def create(self, request: JSONObject) -> JSONObject:
         """Create a model response through a child model task."""
-        payload = dict(request)
-        model = payload.get("model")
+        model = request.get("model")
         if not isinstance(model, str) or not model:
             raise ValueError(
                 "AgentResponses request requires a non-empty string 'model' field."
@@ -86,80 +86,58 @@ class RuntimeAgentResponses(AgentResponses):
         model_task_id = create_res.task_id
         message = ModelRequest(
             dst_task_id=model_task_id,
-            input_=cast(str | Sequence[JSONObject], payload.get("input")),
+            input_=cast(str | Sequence[JSONObject], request.get("input")),
             model=model,
-            stream=cast(bool, payload.get("stream", False)),
-            tools=cast(Sequence[JSONObject] | None, payload.get("tools")),
-            tool_choice=payload.get("tool_choice"),
-            reasoning=cast(JSONObject | None, payload.get("reasoning")),
-            previous_response_id=cast(str | None, payload.get("previous_response_id")),
-            instructions=cast(str | None, payload.get("instructions")),
-            max_output_tokens=cast(int | None, payload.get("max_output_tokens")),
-            metadata=cast(JSONObject | None, payload.get("metadata")),
-            text=cast(JSONObject | None, payload.get("text")),
+            stream=cast(bool, request.get("stream", False)),
+            tools=cast(Sequence[JSONObject] | None, request.get("tools")),
+            tool_choice=request.get("tool_choice"),
+            reasoning=cast(JSONObject | None, request.get("reasoning")),
+            previous_response_id=cast(str | None, request.get("previous_response_id")),
+            instructions=cast(str | None, request.get("instructions")),
+            max_output_tokens=cast(int | None, request.get("max_output_tokens")),
+            metadata=cast(JSONObject | None, request.get("metadata")),
+            text=cast(JSONObject | None, request.get("text")),
         )
-        response_message = self._messages.send_and_receive(message)
+        reply_to_message_id = self._push_task_message(message)
+        response_message = self._pull_matching_reply(reply_to_message_id)
         response = ModelResponse.from_message(response_message)
-        return response.payload
+        response_payload = response.payload
+        output = response_payload.get("output")
+        if output is not None:
+            append_items(self._context, output)
+        return response_payload
 
-
-class _RuntimeTaskMessages:
-    """Private task-message runtime helper."""
-
-    def __init__(
-        self,
-        *,
-        stub: ServerAppIoStub,
-        run_id: int,
-        task_id: int,
-    ) -> None:
-        self._stub = stub
-        self._run_id = run_id
-        self._task_id = task_id
-        self._inbox: list[Message] = []
-
-    def send_and_receive(self, message: Message) -> Message:
-        """Push one task message and wait for its matching reply."""
+    def _push_task_message(self, message: Message) -> str:
+        """Push one task message and return its message ID."""
         message.metadata.__dict__["_run_id"] = self._run_id
         message.metadata.src_task_id = self._task_id
         message.metadata.__dict__["_message_id"] = message.object_id
-        push_res = self._stub.PushTaskMessage(
+        res = self._stub.PushTaskMessage(
             PushTaskMessageRequest(message=message_to_proto(message))
         )
-        return self._pull_matching_reply(push_res.message_id)
+        return str(res.message_id)
+
+    def _pull_task_messages(self) -> list[Message]:
+        """Pull pending task messages."""
+        res = self._stub.PullTaskMessage(
+            PullTaskMessageRequest(limit=_DEFAULT_PULL_LIMIT)
+        )
+        return [message_from_proto(message) for message in res.messages]
 
     def _pull_matching_reply(self, reply_to_message_id: str) -> Message:
+        """Pull until a matching reply arrives or the request times out."""
         deadline = time.monotonic() + _DEFAULT_MODEL_REPLY_TIMEOUT
 
         while True:
-            for idx, message in enumerate(self._inbox):
-                if _matches_reply(message, self._task_id, reply_to_message_id):
-                    return self._inbox.pop(idx)
+            for message in self._pull_task_messages():
+                if (
+                    message.metadata.dst_task_id == self._task_id
+                    and message.metadata.reply_to_message_id == reply_to_message_id
+                ):
+                    return message
 
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise TimeoutError("Timed out waiting for model response.")
 
-            res = self._stub.PullTaskMessage(
-                PullTaskMessageRequest(limit=_DEFAULT_PULL_LIMIT)
-            )
-            messages = [message_from_proto(message) for message in res.messages]
-            if not messages:
-                time.sleep(min(_DEFAULT_MODEL_REPLY_POLL_INTERVAL, remaining))
-                continue
-
-            for message in messages:
-                if _matches_reply(message, self._task_id, reply_to_message_id):
-                    return message
-                self._inbox.append(message)
-
-
-def _matches_reply(
-    message: Message,
-    dst_task_id: int,
-    reply_to_message_id: str,
-) -> bool:
-    return (
-        message.metadata.dst_task_id == dst_task_id
-        and message.metadata.reply_to_message_id == reply_to_message_id
-    )
+            time.sleep(min(_DEFAULT_MODEL_REPLY_POLL_INTERVAL, remaining))

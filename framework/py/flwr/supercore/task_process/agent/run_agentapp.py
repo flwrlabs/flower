@@ -21,12 +21,17 @@ from queue import Queue
 
 import grpc
 
-from flwr.app import Context, RecordDict
+from flwr.app import Context
 from flwr.app.exception import AppExitException
+from flwr.app.user_config import UserConfig
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
-from flwr.common.config import flatten_dict, get_project_config, get_project_dir
+from flwr.common.config import (
+    get_fused_config_from_dir,
+    get_project_config,
+    get_project_dir,
+)
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import flush_logs, log, start_log_uploader, stop_log_uploader
@@ -50,8 +55,37 @@ from flwr.supercore.superexec.dependency_installer import (
 )
 from flwr.superlink.grid import GrpcGrid
 
-from .app import run as run_
+from .context_items import append_items
 from .session import RuntimeAgentResponses, RuntimeAgentSession
+from .task import handle_task
+
+_AGENT_INPUT_KEY = "agent.input"
+
+
+def _set_agentapp_run_config(
+    context: Context, app_path: str, override_config: UserConfig
+) -> None:
+    """Set AgentApp run config and append initial user input."""
+    context.run_config = get_fused_config_from_dir(Path(app_path), override_config)
+    agent_input = context.run_config.get(_AGENT_INPUT_KEY)
+    if agent_input is None:
+        return
+
+    if not isinstance(agent_input, str):
+        raise ValueError("context.run_config['agent.input'] must be a string.")
+    if not agent_input:
+        return
+
+    append_items(
+        context,
+        [
+            {
+                "type": "message",
+                "role": "user",
+                "content": agent_input,
+            }
+        ],
+    )
 
 
 def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
@@ -146,15 +180,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         config = get_project_config(app_path)
 
         agent_app_attr = config["tool"]["flwr"]["app"]["components"]["agentapp"]
-        agent_app_default_config = flatten_dict(
-            config["tool"]["flwr"]["app"].get("config", {})
-        )
-        agent_app_run_config = {
-            **agent_app_default_config,
-            **run.override_config,
-        }
-
-        context.run_config = agent_app_run_config
+        _set_agentapp_run_config(context, app_path, run.override_config)
 
         log(
             DEBUG,
@@ -172,10 +198,11 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             stub=grid._stub,
             run_id=context.run_id,
             task_id=task_id,
+            context=context,
         )
         session = RuntimeAgentSession(responses=responses)
 
-        context = run_(
+        handle_task(
             agent=session,
             context=context,
             agent_app_dir=app_path,
@@ -185,16 +212,13 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         sub_status = SubStatus.COMPLETED
         details = ""
 
-        # Temporarily disable pushing resulting state to servicer.
-        context.state = RecordDict()
-
     except Exception as ex:  # pylint: disable=broad-exception-caught
         log(ERROR, "AgentApp raised an exception", exc_info=ex)
 
         sub_status = SubStatus.FAILED
         details = f"AgentApp failed with exception: {str(ex)}"
 
-        exit_code = ExitCode.SERVERAPP_EXCEPTION
+        exit_code = ExitCode.TASK_PROC_EXCEPTION
         if isinstance(ex, AppExitException):
             exit_code = ex.exit_code
 
