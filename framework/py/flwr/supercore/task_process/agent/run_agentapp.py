@@ -23,7 +23,6 @@ import grpc
 
 from flwr.app import Context
 from flwr.app.exception import AppExitException
-from flwr.app.user_config import UserConfig
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
@@ -60,32 +59,6 @@ from .session import RuntimeAgentResponses, RuntimeAgentSession
 from .task import handle_task
 
 _AGENT_INPUT_KEY = "agent.input"
-
-
-def _set_agentapp_run_config(
-    context: Context, app_path: str, override_config: UserConfig
-) -> None:
-    """Set AgentApp run config and append initial user input."""
-    context.run_config = get_fused_config_from_dir(Path(app_path), override_config)
-    agent_input = context.run_config.get(_AGENT_INPUT_KEY)
-    if agent_input is None:
-        return
-
-    if not isinstance(agent_input, str):
-        raise ValueError("context.run_config['agent.input'] must be a string.")
-    if not agent_input:
-        return
-
-    append_items(
-        context,
-        [
-            {
-                "type": "message",
-                "role": "user",
-                "content": agent_input,
-            }
-        ],
-    )
 
 
 def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
@@ -180,7 +153,24 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         config = get_project_config(app_path)
 
         agent_app_attr = config["tool"]["flwr"]["app"]["components"]["agentapp"]
-        _set_agentapp_run_config(context, app_path, run.override_config)
+        context.run_config = get_fused_config_from_dir(
+            Path(app_path), run.override_config
+        )
+        agent_input = context.run_config.get(_AGENT_INPUT_KEY)
+        if agent_input is not None:
+            if not isinstance(agent_input, str):
+                raise ValueError("context.run_config['agent.input'] must be a string.")
+            if agent_input:
+                append_items(
+                    context,
+                    [
+                        {
+                            "type": "message",
+                            "role": "user",
+                            "content": agent_input,
+                        }
+                    ],
+                )
 
         log(
             DEBUG,

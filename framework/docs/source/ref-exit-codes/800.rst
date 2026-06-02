@@ -1,0 +1,15 @@
+###########################
+ [800] TASK_PROC_EXCEPTION
+###########################
+
+*************
+ Description
+*************
+
+An unhandled exception occurred in a task process.
+
+****************
+ How to Resolve
+****************
+
+Review the task process logs to identify the exception and fix the underlying issue.
