@@ -32,6 +32,17 @@ if $RUN_FULL_FORMAT; then
   docstrfmt docs/source
 fi
 
+# Helm chart READMEs (if available in the synced internal repository)
+if [ -f helm/flower-client/README.md ] && [ -f helm/flower-client/values.yaml ] \
+  && [ -f helm/flower-server/README.md ] && [ -f helm/flower-server/values.yaml ]; then
+  npx --yes --package=@bitnami/readme-generator-for-helm@2.7.2 readme-generator \
+    --readme=helm/flower-client/README.md \
+    --values=helm/flower-client/values.yaml
+  npx --yes --package=@bitnami/readme-generator-for-helm@2.7.2 readme-generator \
+    --readme=helm/flower-server/README.md \
+    --values=helm/flower-server/values.yaml
+fi
+
 # Core SQLAlchemy schema
 paracelsus inject py/flwr/supercore/state/schema/README.md dev.get_schema_base:Base \
   --import-module "flwr.supercore.state.schema.linkstate_tables:*" \
