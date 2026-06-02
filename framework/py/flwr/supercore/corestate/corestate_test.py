@@ -565,7 +565,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].finished_at, "")
         self.assertIsNone(state.get_task_by_token(token))
         new_token = state.claim_task(task_id)
-        self.assertIsNotNone(new_token)
+        self.self.assertNotEqual(new_token, token)
         assert new_token is not None
         new_task = state.get_task_by_token(new_token)
         self.assertIsNotNone(new_task)
