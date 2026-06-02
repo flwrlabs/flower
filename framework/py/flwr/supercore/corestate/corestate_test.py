@@ -565,7 +565,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].finished_at, "")
         self.assertIsNone(state.get_task_by_token(token))
         new_token = state.claim_task(task_id)
-        self.self.assertNotEqual(new_token, token)
+        self.assertNotEqual(new_token, token)
         assert new_token is not None
         new_task = state.get_task_by_token(new_token)
         self.assertIsNotNone(new_task)
@@ -619,7 +619,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             mock_dt.now.return_value = fixed_now
             task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
             assert task_id is not None
-            assert token := state.claim_task(task_id)
+            assert (token := state.claim_task(task_id))
 
             mock_dt.now.return_value = fixed_now + timedelta(
                 seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
