@@ -102,8 +102,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         heartbeat_sender.start()
 
         log(DEBUG, "[flwr-agentapp] Pull task input")
-        req = PullTaskInputRequest()
-        res: PullTaskInputResponse = grid._stub.PullTaskInput(req)
+        res: PullTaskInputResponse = grid._stub.PullTaskInput(PullTaskInputRequest())
 
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
