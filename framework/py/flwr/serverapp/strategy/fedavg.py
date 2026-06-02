@@ -18,17 +18,17 @@
 from collections.abc import Callable, Iterable
 from logging import INFO, WARNING
 
-from flwr.app import MessageType
-from flwr.common import (
+from flwr.app import (
     ArrayRecord,
     ConfigRecord,
     Message,
+    MessageType,
     MetricRecord,
     RecordDict,
-    log,
 )
-from flwr.server import Grid
+from flwr.common import log
 
+from ..grid import Grid
 from .strategy import Strategy
 from .strategy_utils import (
     aggregate_arrayrecords,

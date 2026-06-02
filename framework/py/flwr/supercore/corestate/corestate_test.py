@@ -31,7 +31,7 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.proto.task_pb2 import TaskStatus  # pylint: disable=E0611
+from flwr.proto.task_pb2 import TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 
 from . import CoreState
@@ -72,6 +72,85 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         mock_datetime.now.side_effect = timestamps
         return stack
+
+    def test_store_run_in_series_creates_id(self) -> None:
+        """Storing a run in a run series should create a nonzero ID."""
+        state = self.state_factory()
+
+        series_id = state.store_run_in_series(
+            run_id=123, federation="federation-a", series_id=None
+        )
+
+        self.assertIsNotNone(series_id)
+        assert series_id is not None
+        self.assertGreater(series_id, 0)
+
+    def test_store_run_in_series_returns_none_for_unknown_id(self) -> None:
+        """Unknown caller-provided run series IDs return None."""
+        state = self.state_factory()
+
+        with self.assertLogs("flwr", level="ERROR") as logs:
+            series_id = state.store_run_in_series(
+                run_id=123,
+                federation="federation-a",
+                series_id=123,
+            )
+
+        self.assertIsNone(series_id)
+        self.assertIn("Run series 123 not found", logs.output[0])
+
+    def test_store_run_in_series_returns_none_for_duplicate_run_id(self) -> None:
+        """Storing the same run ID twice should return None."""
+        state = self.state_factory()
+        series_id = state.store_run_in_series(
+            run_id=123, federation="federation-a", series_id=None
+        )
+        assert series_id is not None
+
+        stored = state.store_run_in_series(
+            run_id=123,
+            federation="federation-a",
+            series_id=series_id,
+        )
+
+        self.assertIsNone(stored)
+
+    def test_get_run_series_filters_by_series_ids_and_federations(self) -> None:
+        """RunSeries lookup should filter by IDs and federations."""
+        state = self.state_factory()
+        series_id_a = state.store_run_in_series(
+            run_id=123, federation="federation-a", series_id=None
+        )
+        series_id_b = state.store_run_in_series(
+            run_id=456, federation="federation-b", series_id=None
+        )
+        series_id_c = state.store_run_in_series(
+            run_id=789, federation="federation-a", series_id=None
+        )
+        assert series_id_a is not None
+        assert series_id_b is not None
+        assert series_id_c is not None
+
+        fed_a_series = state.get_run_series(federations=["federation-a"])
+        self.assertSetEqual(
+            {entry.series_id for entry in fed_a_series},
+            {series_id_a, series_id_c},
+        )
+
+        id_filtered_series = state.get_run_series(series_ids=[series_id_b])
+        self.assertEqual(
+            [entry.series_id for entry in id_filtered_series],
+            [series_id_b],
+        )
+
+        combined_series = state.get_run_series(
+            series_ids=[series_id_a, series_id_b],
+            federations=["federation-a"],
+        )
+        self.assertEqual([entry.series_id for entry in combined_series], [series_id_a])
+
+        self.assertEqual(state.get_run_series(series_ids=[]), [])
+        self.assertEqual(state.get_run_series(federations=[]), [])
 
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
@@ -693,6 +772,98 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(pulled_next), 1)
         self.assertEqual(pulled[0].metadata.message_id, msg_1.metadata.message_id)
         self.assertEqual(pulled_next[0].metadata.message_id, msg_2.metadata.message_id)
+
+    def test_store_and_get_task_events(self) -> None:
+        """Task events should round-trip in assigned ID order."""
+        # Prepare: Create one run with a task and two valid task events.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+        event_1 = TaskEvent(
+            run_id=run_id,
+            task_id=task_id,
+            event="response.created",
+            data='{"type":"response.created"}',
+        )
+        event_2 = TaskEvent(
+            run_id=run_id,
+            task_id=task_id,
+            event="response.output_text.delta",
+            data='{"type":"response.output_text.delta","delta":"Hel"}',
+        )
+
+        # Execute: Store the events and read them through full and cursored fetches.
+        self.assertFalse(state.store_task_events([]))
+        self.assertTrue(state.store_task_events([event_1, event_2]))
+        events = state.get_task_events(run_id=run_id, after_task_event_id=None)
+        latest_id = events[-1].id
+        after_first = state.get_task_events(
+            run_id=run_id, after_task_event_id=events[0].id
+        )
+        no_new = state.get_task_events(run_id=run_id, after_task_event_id=latest_id)
+
+        # Assert: Events keep assigned ID order and cursor filtering works.
+        self.assertEqual(len(events), 2)
+        self.assertIsInstance(events[0], TaskEvent)
+        self.assertGreater(events[0].id, 0)
+        self.assertGreater(events[1].id, events[0].id)
+        self.assertTrue(events[0].timestamp)
+        self.assertEqual(events[0].run_id, run_id)
+        self.assertEqual(events[1].run_id, run_id)
+        self.assertEqual(
+            (events[0].task_id, events[0].event, events[0].data),
+            (task_id, event_1.event, event_1.data),
+        )
+        self.assertEqual(
+            (events[1].task_id, events[1].event, events[1].data),
+            (task_id, event_2.event, event_2.data),
+        )
+        self.assertEqual(latest_id, events[1].id)
+        self.assertEqual(after_first, [events[1]])
+        self.assertEqual(no_new, [])
+
+    @parameterized.expand(  # type: ignore
+        [
+            ("malformed", "{"),
+            ("array", "[]"),
+            ("string", '"value"'),
+            ("non_finite", '{"value": NaN}'),
+        ]
+    )
+    def test_store_task_events_requires_json_object_payload(
+        self, _name: str, data: str
+    ) -> None:
+        """Task event data should be a JSON object string."""
+        # Prepare: Create one valid event followed by an invalid payload variant.
+        state = self.state_factory()
+        run_id = self.task_run_id(state)
+        task_id = state.create_task(task_type=TaskType.AGENT_APP, run_id=run_id)
+        assert task_id is not None
+
+        # Execute: Attempt to store the mixed event batch.
+        self.assertFalse(
+            state.store_task_events(
+                [
+                    TaskEvent(
+                        run_id=run_id,
+                        task_id=task_id,
+                        event="response.created",
+                        data='{"type":"response.created"}',
+                    ),
+                    TaskEvent(
+                        run_id=run_id,
+                        task_id=task_id,
+                        event="response.output_text.delta",
+                        data=data,
+                    ),
+                ]
+            )
+        )
+
+        # Assert: The invalid payload rejects the whole batch.
+        events = state.get_task_events(run_id=run_id, after_task_event_id=None)
+        self.assertEqual(events, [])
 
     def test_reserve_nonce_first_reservation_succeeds(self) -> None:
         """A new nonce reservation should succeed."""

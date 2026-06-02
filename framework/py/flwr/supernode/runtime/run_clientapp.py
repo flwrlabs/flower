@@ -19,12 +19,12 @@ from logging import DEBUG, ERROR
 
 import grpc
 
+from flwr.app import Context, Message
 from flwr.app.error import Error
 from flwr.app.message import remove_content_from_message
 from flwr.cli.install import install_from_fab
 from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
-from flwr.common import Context, Message
 from flwr.common.config import get_project_dir
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode, SubStatus
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers

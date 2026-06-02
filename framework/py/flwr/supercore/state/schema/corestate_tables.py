@@ -69,7 +69,6 @@ def create_corestate_metadata() -> MetaData:
         Column("description", String, nullable=True),
         Column("created_at", TIMESTAMP(timezone=True), nullable=False),
         Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
-        Column("last_run_id", BigInteger, nullable=True),
     )
 
     # --------------------------------------------------------------------------
@@ -81,6 +80,23 @@ def create_corestate_metadata() -> MetaData:
         Column("series_id", BigInteger, primary_key=True, nullable=False),
         Column("context", LargeBinary),
     )
+
+    # --------------------------------------------------------------------------
+    #  Table: series_runs
+    # --------------------------------------------------------------------------
+    series_runs = Table(
+        "series_runs",
+        metadata,
+        Column(
+            "id",
+            Integer,
+            primary_key=True,
+            autoincrement=True,
+        ),
+        Column("series_id", BigInteger, nullable=False),
+        Column("run_id", BigInteger, unique=True, nullable=False),
+    )
+    Index("idx_series_runs_series_id", series_runs.c.series_id)
 
     # --------------------------------------------------------------------------
     #  Table: task

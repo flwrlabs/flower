@@ -19,7 +19,7 @@ from logging import DEBUG, ERROR, INFO
 
 import grpc
 
-from flwr.common import Message
+from flwr.app import Message
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.logger import log
 from flwr.common.serde import (
@@ -67,7 +67,6 @@ from flwr.supercore.inflatable.inflatable_object import (
     UnexpectedObjectContentError,
     get_all_nested_objects,
     get_object_tree,
-    iterate_object_tree,
     no_object_id_recompute,
 )
 from flwr.supercore.interceptors import get_authenticated_task
@@ -145,7 +144,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 detail="`Message.metadata` has mismatched `run_id`",
             )
             # Store objects
-            objects_to_push |= set(store.preregister(run_id, object_tree))
+            message_objects_to_push = set(store.preregister(run_id, object_tree))
             # Store message
             message_id: str | None = state.store_message_ins(message=message)
             # This is temporary. We should consider a more robust cleanup
@@ -156,8 +155,8 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 and state.get_run_status({run_id})[run_id].status == Status.FINISHED
             ):
                 store.delete(object_tree.object_id)
-                for tree_node in iterate_object_tree(object_tree):
-                    objects_to_push.discard(tree_node.object_id)
+            else:
+                objects_to_push |= message_objects_to_push
             message_ids.append(message_id)
 
         return PushAppMessagesResponse(
@@ -260,16 +259,18 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         task = get_authenticated_task()
         run_id = task.run_id
 
-        # Retrieve Context, Run and Fab for the run_id
-        serverapp_ctxt = state.get_serverapp_context(run_id)
+        # Retrieve Run, FAB, and shared RunSeries context for the run_id
         runs = state.get_run_info(run_ids=[run_id])
         run = runs[0] if runs else None
         fab = state.get_fab(run.fab_hash) if run and run.fab_hash else None
-        if run and fab and serverapp_ctxt:
+        series_context = None
+        if run and run.series_id:
+            series_context = state.get_run_series_context(run.series_id)
+        if run and fab and series_context:
             if state.activate_task(task.task_id):
                 log(INFO, "Started task %d of run %d", task.task_id, run_id)
                 return PullTaskInputResponse(
-                    context=context_to_proto(serverapp_ctxt),
+                    context=context_to_proto(series_context),
                     run=run_to_proto(run),
                     fab=fab_to_proto(fab),
                     federation_config=state.get_federation_config(run_id),
@@ -297,13 +298,24 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
         # Init state and store
         state = self.state_factory.state()
 
+        # Store Simulation Runtime usage before finishing the primary task.
+        # This ensures usage is captured even if the task fails to finish properly.
+        if request.HasField("clientapp_runtime"):
+            state.add_clientapp_runtime(run_id, request.clientapp_runtime)
+
         # Finish the task
         if state.finish_task(
             task.task_id, sub_status=request.sub_status, details=request.details
         ):
             log(INFO, "Finished task %d of run %d", task.task_id, run_id)
             if request.HasField("context"):
-                state.set_serverapp_context(run_id, context_from_proto(request.context))
+                runs = state.get_run_info(run_ids=[run_id])
+                run = runs[0] if runs else None
+                if run and run.series_id and run.primary_task_id == task.task_id:
+                    state.set_run_series_context(
+                        run.series_id,
+                        context_from_proto(request.context),
+                    )
         else:
             log(ERROR, "Failed to finish task %d of run %s", task.task_id, run_id)
         return PushTaskOutputResponse()
