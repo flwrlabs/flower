@@ -21,6 +21,7 @@ from queue import Queue
 
 import grpc
 
+from flwr.agentapp import AgentApp, LoadAgentAppError
 from flwr.app import Context
 from flwr.app.exception import AppExitException
 from flwr.cli.config_utils import get_fab_metadata
@@ -30,6 +31,7 @@ from flwr.common.config import get_project_config, get_project_dir
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import flush_logs, log, start_log_uploader, stop_log_uploader
+from flwr.common.object_ref import load_app
 from flwr.common.serde import (
     context_from_proto,
     context_to_proto,
@@ -52,7 +54,6 @@ from flwr.superlink.grid import GrpcGrid
 
 from .context_items import append_items
 from .session import RuntimeAgentResponses, RuntimeAgentSession
-from .task import handle_task
 
 _AGENT_INPUT_KEY = "agent.input"
 
@@ -181,15 +182,17 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             task_id=task_id,
             context=context,
         )
-        session = RuntimeAgentSession(responses=responses)
+        agent = RuntimeAgentSession(responses=responses)
 
-        handle_task(
-            agent=session,
-            context=context,
-            agent_app_dir=app_path,
-            agent_app_attr=agent_app_attr,
-        )
+        # Load and run the AgentApp
+        agent_app = load_app(agent_app_attr, LoadAgentAppError, app_path)
+        if not isinstance(agent_app, AgentApp):
+            raise LoadAgentAppError(
+                f"Attribute '{agent_app_attr}' is not of type '{AgentApp.__name__}'.",
+            ) from None
+        agent_app(agent=agent, context=context)
 
+        # Set sub_status and details for successful completion
         sub_status = SubStatus.COMPLETED
         details = ""
 
