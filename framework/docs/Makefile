@@ -24,9 +24,24 @@ update-text:
 	make gettext
 
 update-lang:
-	# Match the wrapping used by the committed/Weblate PO files. The
-	# sphinx-intl default is 76 columns, which rewrites most multiline entries.
-	sphinx-intl update -p build/gettext -l $(lang) -w 88
+	@test -n "$(lang)" || (echo "Usage: make update-lang lang=<locale>" >&2; exit 1)
+	@if [ "$(lang)" = "fr" ]; then \
+		command -v msgmerge >/dev/null || (echo "msgmerge is required; install gettext" >&2; exit 1); \
+		command -v msginit >/dev/null || (echo "msginit is required; install gettext" >&2; exit 1); \
+		mkdir -p locales/$(lang)/LC_MESSAGES; \
+		for pot in build/gettext/*.pot; do \
+			[ -e "$$pot" ] || { echo "No POT files found in build/gettext" >&2; exit 1; }; \
+			domain=$$(basename "$$pot" .pot); \
+			po="locales/$(lang)/LC_MESSAGES/$$domain.po"; \
+			if [ -f "$$po" ]; then \
+				msgmerge --update --backup=off --width=88 "$$po" "$$pot"; \
+			else \
+				msginit --no-translator --locale="$(lang)" --input="$$pot" --output-file="$$po" --width=88; \
+			fi; \
+		done; \
+	else \
+		sphinx-intl update -p build/gettext -l $(lang); \
+	fi
 
 serve:
 	make docs
