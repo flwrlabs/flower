@@ -619,13 +619,14 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             mock_dt.now.return_value = fixed_now
             task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
             assert task_id is not None
-            assert state.claim_task(task_id) is not None
+            assert token := state.claim_task(task_id)
 
             mock_dt.now.return_value = fixed_now + timedelta(
                 seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
             )
             tasks = state.get_tasks(task_ids=[task_id])
 
+        self.assertIsNone(state.get_task_by_token(token))
         self.assertEqual(len(tasks), 1)
         self.assertEqual(
             tasks[0].status,
