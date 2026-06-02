@@ -507,7 +507,8 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
         """Atomically claim a pending task."""
         token = secrets.token_hex(FLWR_TASK_TOKEN_LENGTH)
         claimed_at = now()
-        active_until = claimed_at + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
+        ttl = timedelta(seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL)
+        active_until = claimed_at + ttl
         sint64_task_id = uint64_to_int64(task_id)
         try:
             # The conditional UPDATE is the atomic claim: exactly one caller can

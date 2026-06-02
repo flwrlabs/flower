@@ -373,7 +373,8 @@ class InMemoryCoreState(
             )
             self.task_token_store[task_id] = TokenRecord(
                 token=token,
-                active_until=claimed_at + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL),
+                active_until=claimed_at
+                + timedelta(seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL),
             )
             self.task_token_to_task_id[token] = task_id
             return token

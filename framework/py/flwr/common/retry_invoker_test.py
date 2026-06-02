@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from flwr.common.retry_invoker import RetryInvoker, constant
+from flwr.common.retry_invoker import RetryInvoker, constant, wrap_stub
 
 
 def successful_function() -> str:
@@ -185,3 +185,26 @@ def test_giveup_condition() -> None:
     # Execute and Assert
     with pytest.raises(ValueError):
         invoker.invoke(failing_function)
+
+
+def test_wrap_stub_excludes_task_heartbeat() -> None:
+    """Ensure task heartbeats are not wrapped by the generic retry invoker."""
+    stub = Mock()
+    stub.PullTaskInput = Mock(return_value="task-input")
+    stub.SendTaskHeartbeat = Mock(return_value="heartbeat")
+    pull_task_input = stub.PullTaskInput
+    send_task_heartbeat = stub.SendTaskHeartbeat
+    retry_invoker = Mock()
+    retry_invoker.invoke.side_effect = lambda fn, *args, **kwargs: fn(*args, **kwargs)
+
+    wrap_stub(stub, retry_invoker)
+
+    assert stub.SendTaskHeartbeat is send_task_heartbeat
+    assert stub.PullTaskInput is not pull_task_input
+
+    stub.PullTaskInput("request", timeout=1)
+    retry_invoker.invoke.assert_called_once_with(pull_task_input, "request", timeout=1)
+
+    retry_invoker.invoke.reset_mock()
+    stub.SendTaskHeartbeat("heartbeat-request", timeout=1)
+    retry_invoker.invoke.assert_not_called()

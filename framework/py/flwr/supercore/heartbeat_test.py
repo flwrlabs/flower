@@ -19,7 +19,12 @@ import time
 import unittest
 from unittest.mock import Mock
 
-from .heartbeat import HeartbeatSender
+import grpc
+
+from flwr.common.constant import HEARTBEAT_CALL_TIMEOUT
+from flwr.proto.appio_pb2 import SendTaskHeartbeatResponse  # pylint:disable=E0611
+
+from .heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
 
 
 # pylint: disable=protected-access
@@ -90,3 +95,41 @@ class TestHeartbeatSender(unittest.TestCase):
     def test_thread_is_daemon(self) -> None:
         """Test that the thread is a daemon thread."""
         self.assertTrue(self.heartbeat_sender._thread.daemon)
+
+
+class TestMakeTaskHeartbeatFnGrpc(unittest.TestCase):
+    """Test task heartbeat gRPC function factory."""
+
+    def test_send_task_heartbeat_uses_call_timeout(self) -> None:
+        """Test that task heartbeats use a bounded gRPC call deadline."""
+        # Prepare
+        stub = Mock()
+        stub.SendTaskHeartbeat.return_value = SendTaskHeartbeatResponse(success=True)
+        heartbeat_fn = make_task_heartbeat_fn_grpc(stub)
+
+        # Execute
+        success = heartbeat_fn()
+
+        # Assert
+        self.assertTrue(success)
+        stub.SendTaskHeartbeat.assert_called_once()
+        _, kwargs = stub.SendTaskHeartbeat.call_args
+        self.assertEqual(kwargs["timeout"], HEARTBEAT_CALL_TIMEOUT)
+
+    def test_send_task_heartbeat_deadline_exceeded_returns_false(self) -> None:
+        """Test that a heartbeat deadline returns false for retry."""
+
+        class DeadlineExceededRpcError(grpc.RpcError):  # type: ignore[misc]
+            """gRPC error with DEADLINE_EXCEEDED status."""
+
+            def code(self) -> grpc.StatusCode:
+                """Return gRPC status code."""
+                return grpc.StatusCode.DEADLINE_EXCEEDED
+
+        # Prepare
+        stub = Mock()
+        stub.SendTaskHeartbeat.side_effect = DeadlineExceededRpcError()
+        heartbeat_fn = make_task_heartbeat_fn_grpc(stub)
+
+        # Execute & assert
+        self.assertFalse(heartbeat_fn())

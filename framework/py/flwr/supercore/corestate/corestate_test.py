@@ -532,7 +532,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Expired task claims should transition tasks to FINISHED:FAILED."""
         state = self.state_factory()
         fixed_now = now()
-        active_until = fixed_now + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
+        task_lease = HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+        active_until = fixed_now + timedelta(seconds=task_lease)
         run_id = self.task_run_id(state)
 
         with patch("datetime.datetime") as mock_dt:
@@ -543,9 +544,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             token = state.claim_task(task_id)
             assert token is not None
 
-            mock_dt.now.return_value = fixed_now + timedelta(
-                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
-            )
+            mock_dt.now.return_value = active_until + timedelta(seconds=1)
             self.assertIsNone(state.get_task_by_token(token))
             self.assertFalse(state.acknowledge_task_heartbeat(task_id))
 
@@ -566,18 +565,23 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Reading tasks should expire stale claimed task tokens first."""
         state = self.state_factory()
         fixed_now = now()
-        active_until = fixed_now + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
+        task_lease = HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+        active_until = fixed_now + timedelta(seconds=task_lease)
         run_id = self.task_run_id(state)
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
             task_id = state.create_task(task_type="flwr-model", run_id=run_id)
             assert task_id is not None
-            assert state.claim_task(task_id) is not None
+            token = state.claim_task(task_id)
+            assert token is not None
 
             mock_dt.now.return_value = fixed_now + timedelta(
                 seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
             )
+            assert state.get_task_by_token(token)
+
+            mock_dt.now.return_value = active_until + timedelta(seconds=1)
             tasks = state.get_tasks(task_ids=[task_id])
 
         self.assertEqual(len(tasks), 1)
