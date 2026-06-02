@@ -38,7 +38,7 @@ from .context_items import append_items
 
 _DEFAULT_MODEL_REPLY_TIMEOUT = 300.0
 _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
-_DEFAULT_PULL_LIMIT = 10
+_DEFAULT_PULL_LIMIT = 1
 
 
 class RuntimeAgentSession(AgentSession):
@@ -117,12 +117,12 @@ class RuntimeAgentResponses(AgentResponses):
         )
         return str(res.message_id)
 
-    def _pull_task_messages(self) -> list[Message]:
+    def _pull_task_messages(self) -> Message | None:
         """Pull pending task messages."""
         res = self._stub.PullTaskMessage(
             PullTaskMessageRequest(limit=_DEFAULT_PULL_LIMIT)
         )
-        return [message_from_proto(message) for message in res.messages]
+        return None if not res.messages else message_from_proto(res.messages[0])
 
     def _pull_matching_reply(self, reply_to_message_id: str) -> Message:
         """Pull until a matching reply arrives or the request times out."""
