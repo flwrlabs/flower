@@ -105,7 +105,7 @@ class ModelRequest(Message):
 
 
 class ModelResponse(Message):
-    """Task-routed model response or stream event payload."""
+    """Task-routed model response in Open Responses object shape."""
 
     def __init__(
         self,
@@ -280,21 +280,6 @@ def _validate_model_request_payload(payload: JSONObject) -> None:
 
 
 def _validate_model_response_payload(payload: JSONObject) -> None:
-    """Validate the minimal model response payload shape."""
-    if isinstance(payload.get("type"), str):
-        response = payload.get("response")
-        if response is not None:
-            if not isinstance(response, dict):
-                raise ValueError(
-                    "ModelResponse payload field 'response' must be a JSON object."
-                )
-            _validate_model_response_object_payload(cast(JSONObject, response))
-        return
-
-    _validate_model_response_object_payload(payload)
-
-
-def _validate_model_response_object_payload(payload: JSONObject) -> None:
     """Validate the minimal Open Responses object shape."""
     if payload.get("object") != "response":
         raise ValueError("ModelResponse payload field 'object' must be 'response'.")
