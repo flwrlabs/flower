@@ -47,6 +47,27 @@ DEFAULT_NAMESPACE = "flwr-k8s-executor-smoke"
 DEFAULT_IMAGE = "ghcr.io/flwrlabs/taskexecutor:dev"
 DEFAULT_IMAGE_PULL_POLICY = "Never"
 DEFAULT_PROBE_IMAGE = "flwr-kubernetes-executor-k3d-probe:dev"
+PROBE_ROOT_CERTIFICATE_COMMON_NAME = "flwr-k8s-executor-smoke-ca"
+PROBE_ROOT_CERTIFICATE = """-----BEGIN CERTIFICATE-----
+MIIDKzCCAhOgAwIBAgIUYtO398ah/BPXfS9K+brpsqbASW4wDQYJKoZIhvcNAQEL
+BQAwJTEjMCEGA1UEAwwaZmx3ci1rOHMtZXhlY3V0b3Itc21va2UtY2EwHhcNMjYw
+NjAyMjAzNzU1WhcNMzYwNTMwMjAzNzU1WjAlMSMwIQYDVQQDDBpmbHdyLWs4cy1l
+eGVjdXRvci1zbW9rZS1jYTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB
+ALYGcPOoD1Gz/mBIVU+SL6C8+1I7d0dq20txhbhqaV4kftxv+2Wxw/dUjrurjDQe
+/97/BKLXgBNwUam26CeFcwnsMyqWFXGCnNNfLToMop1bMUAev06PScPaRJ0RnjIF
+4+Ov5cAVNPkFxR+Nw6ayOpkwjSXTIiqD7fug+wqxEKJRfg/QEc4zFa2V6zaQFOJa
+vb0WGUFm7MzPa+32tEbH1pN6VW5wAT0JghLVx5FRA2cpH8sCieov8L7IVXM5aMu9
+upcne7FQ99sSErER9sEjqFNK7byTP9xZIIjGT4Ep4DqWzORphwwEEzC4BrvTzLJm
+HgskFwljSadTOg/dZu/wXo0CAwEAAaNTMFEwHQYDVR0OBBYEFNB+hF1kkiZ2RraA
+/yN44RPK3v+RMB8GA1UdIwQYMBaAFNB+hF1kkiZ2RraA/yN44RPK3v+RMA8GA1Ud
+EwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBABgKx51NWCvPFHN0eGyfZ+Yo
+3a85eBT9xPhnmBViffZcRb9OOlaz9+5mFTpQqVH+E7SLuB44gyWiHw4DSNj3cidh
+vW2+dhHxfi/1zAnP32fHM8CKd8qYooX1nCK+yXwePNX0k/Fl5AdjmHbVn5M71ivx
+Qd2OwBmMat8bHy3nKML7zU3T2kkycfrUxxfxXVjnBWHjGHZs9jaecoL3nid8Iy3C
+SFu6f/R8MZ63Y8fw8Wx+CEo7OZC8mm+/Fcx9dvB+TsjW+xDkHTUcjBdKhMPQ791b
+4D1rmzythc7HsGmlE2RiXxZY5VTk02cxASo31+zWia4erpwGY3yWcZFe62Tjw6k=
+-----END CERTIFICATE-----
+"""
 DEFAULT_APPIO_API_ADDRESS = "127.0.0.1:9092"
 DEFAULT_ACTIVE_POD_BUDGET = 1
 DEFAULT_CAPACITY_TIMEOUT = 30.0
@@ -139,6 +160,10 @@ def _print_run_overview(config: SmokeConfig) -> None:
     _print_detail("probe image mode", str(config.probe_image))
     if config.probe_image:
         _print_detail("probe image tag", config.probe_image_tag)
+        _print_detail(
+            "probe root certificate commonName",
+            PROBE_ROOT_CERTIFICATE_COMMON_NAME,
+        )
     _print_detail("AppIo API address", config.appio_api_address)
     _print_detail("active Pod budget", str(config.active_pod_budget))
     _print_detail("capacity timeout", f"{config.capacity_timeout}s")
@@ -510,6 +535,11 @@ def run_smoke(config: SmokeConfig) -> None:
         _print_detail("TaskExecutor image", config.image)
         _print_detail("image pull policy", config.image_pull_policy)
         _print_detail("AppIo API address", config.appio_api_address)
+        if config.probe_image:
+            _print_detail(
+                "AppIo root certificate commonName",
+                PROBE_ROOT_CERTIFICATE_COMMON_NAME,
+            )
         _print_detail("active Pod budget", str(config.active_pod_budget))
         _print_detail("capacity poll interval", f"{config.capacity_poll_interval}s")
         print(
@@ -736,6 +766,9 @@ def build_executor_config(config: SmokeConfig, run_id: str) -> KubernetesExecuto
     return KubernetesExecutorConfig(
         namespace=config.namespace,
         image=config.image,
+        appio_root_certificates=(
+            PROBE_ROOT_CERTIFICATE if config.probe_image else None
+        ),
         image_pull_policy=config.image_pull_policy,
         resource_pool=LOCAL_RESOURCE_POOL,
         labels={RUN_LABEL_KEY: run_id},
@@ -764,7 +797,7 @@ def build_execution_spec(
         task_type=TaskType.SERVER_APP,
         appio_api_address=config.appio_api_address,
         token=f"smoke-token-{run_id}-{task_offset}",
-        insecure=True,
+        insecure=not config.probe_image,
         root_certificates_path=None,
         runtime_dependency_install=False,
         parent_pid=None,
@@ -797,6 +830,11 @@ def launch_smoke_pods(
         _print_detail("task id", str(spec.task_id))
         _print_detail("AppIo API address", spec.appio_api_address)
         _print_detail("insecure AppIo", str(spec.insecure))
+        if not spec.insecure:
+            _print_detail(
+                "root certificates",
+                f"mounted dev certificate CN={PROBE_ROOT_CERTIFICATE_COMMON_NAME}",
+            )
         _print_detail(
             "runtime dependency install", str(spec.runtime_dependency_install)
         )

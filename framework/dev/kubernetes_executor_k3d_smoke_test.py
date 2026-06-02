@@ -100,6 +100,71 @@ def test_probe_taskexecutor_validates_mounted_token_and_insecure_args(
     )
 
 
+def test_probe_taskexecutor_validates_root_certificate_common_name(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
+    """Test the probe parses the mounted root certificate and emits the CN."""
+    token_path = tmp_path / "token"
+    token_path.write_text(
+        "smoke-token-0123456789abcdef0123456789abcdef-0", encoding="utf-8"
+    )
+    root_certificates_path = tmp_path / "ca.crt"
+    root_certificates_path.write_text(smoke.PROBE_ROOT_CERTIFICATE, encoding="utf-8")
+    monkeypatch.setattr(probe, "APPIO_TOKEN_FILE_PATH", str(token_path))
+    monkeypatch.setattr(
+        probe, "APPIO_ROOT_CERTIFICATES_FILE_PATH", str(root_certificates_path)
+    )
+
+    probe._run_probe(
+        [
+            "flwr-serverapp",
+            "--serverappio-api-address",
+            "appio:9092",
+            "--token-file",
+            str(token_path),
+            "--root-certificates",
+            str(root_certificates_path),
+        ]
+    )
+
+    output = capsys.readouterr().out
+    assert (
+        "probe: verified root certificate "
+        f"commonName={smoke.PROBE_ROOT_CERTIFICATE_COMMON_NAME}"
+    ) in output
+
+
+def test_probe_taskexecutor_rejects_invalid_root_certificate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    """Test the probe rejects a mounted root certificate that is not parseable."""
+    token_path = tmp_path / "token"
+    token_path.write_text(
+        "smoke-token-0123456789abcdef0123456789abcdef-0", encoding="utf-8"
+    )
+    root_certificates_path = tmp_path / "ca.crt"
+    root_certificates_path.write_text("not a cert", encoding="utf-8")
+    monkeypatch.setattr(probe, "APPIO_TOKEN_FILE_PATH", str(token_path))
+    monkeypatch.setattr(
+        probe, "APPIO_ROOT_CERTIFICATES_FILE_PATH", str(root_certificates_path)
+    )
+
+    with pytest.raises(probe.ProbeFailure, match="not a valid certificate"):
+        probe._run_probe(
+            [
+                "flwr-serverapp",
+                "--serverappio-api-address",
+                "appio:9092",
+                "--token-file",
+                str(token_path),
+                "--root-certificates",
+                str(root_certificates_path),
+            ]
+        )
+
+
 def test_core_v1_api_adapter_forwards_executor_calls() -> None:
     """Test CoreV1Api calls are adapted to the executor client protocol."""
     api = Mock()
@@ -166,6 +231,32 @@ def test_build_execution_spec_uses_unique_task_ids_and_tokens() -> None:
     assert first.task_id > 0
     assert second.task_id == first.task_id + 1
     assert first.token != second.token
+    assert first.insecure is True
+
+
+def test_probe_mode_mounts_dev_root_certificate_and_uses_secure_spec() -> None:
+    """Test probe mode exercises the root-certificates TaskExecutor path."""
+    config = smoke.SmokeConfig(
+        cluster_name="cluster",
+        namespace="namespace",
+        image=smoke.DEFAULT_PROBE_IMAGE,
+        image_pull_policy="Never",
+        appio_api_address="appio:9092",
+        active_pod_budget=1,
+        capacity_timeout=5.0,
+        capacity_poll_interval=0.1,
+        keep_resources=False,
+        delete_cluster=False,
+        probe_image=True,
+    )
+    run_id = "0123456789abcdef0123456789abcdef"
+
+    executor_config = smoke.build_executor_config(config, run_id)
+    spec = smoke.build_execution_spec(config, run_id)
+
+    assert executor_config.appio_root_certificates == smoke.PROBE_ROOT_CERTIFICATE
+    assert spec.insecure is False
+    assert spec.root_certificates_path is None
 
 
 def test_pod_lifecycle_diagnostics_reports_waiting_pod_without_logs(

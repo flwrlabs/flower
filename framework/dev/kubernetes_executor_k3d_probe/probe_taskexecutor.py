@@ -21,6 +21,9 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import Any
+
+import _ssl
 
 APPIO_TOKEN_FILE_PATH = "/run/flwr/appio/token"
 APPIO_ROOT_CERTIFICATES_FILE_PATH = "/run/flwr/appio/ca.crt"
@@ -120,9 +123,43 @@ def _verify_tls_args(args: list[str]) -> None:
             raise ProbeFailure(
                 f"root certificates file does not exist at {root_certificates_path}"
             )
-        print("probe: verified root certificates file")
+        common_name = _verify_root_certificate(Path(root_certificates_path))
+        print(f"probe: verified root certificate commonName={common_name}")
         return
     raise ProbeFailure("expected either --insecure or --root-certificates")
+
+
+def _verify_root_certificate(root_certificates_path: Path) -> str:
+    """Verify root certificates file is parseable and return its common name."""
+    try:
+        decoded = _ssl._test_decode_cert(str(root_certificates_path))
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        raise ProbeFailure("root certificates file is not a valid certificate") from exc
+
+    common_name = _certificate_common_name(decoded)
+    if common_name is None:
+        raise ProbeFailure("root certificate subject does not include commonName")
+    return common_name
+
+
+def _certificate_common_name(decoded_certificate: dict[str, Any]) -> str | None:
+    """Return the commonName from a decoded certificate subject."""
+    subject = decoded_certificate.get("subject")
+    if not isinstance(subject, tuple):
+        return None
+    for relative_distinguished_name in subject:
+        if not isinstance(relative_distinguished_name, tuple):
+            continue
+        for attribute in relative_distinguished_name:
+            if (
+                isinstance(attribute, tuple)
+                and len(attribute) == 2
+                and attribute[0] == "commonName"
+            ):
+                value = attribute[1]
+                if isinstance(value, str) and value.strip():
+                    return value
+    return None
 
 
 if __name__ == "__main__":
