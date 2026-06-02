@@ -46,7 +46,7 @@ from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
 )
 
-from .app import run as run_
+from .task import handle_task
 
 _UNKNOWN_ERROR_DETAILS = "Model task failed with unknown error."
 
@@ -102,7 +102,7 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
             stub=stub,
         )
 
-        run_(stub=stub, task_id=task_input.task_id, run_id=run.run_id)
+        handle_task(stub=stub, task_id=task_input.task_id, run_id=run.run_id)
 
         # Update sub_status and details for successful completion
         sub_status = SubStatus.COMPLETED

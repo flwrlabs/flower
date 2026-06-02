@@ -167,12 +167,26 @@ def test_model_request_accepts_string_input_and_default_stream() -> None:
         (
             ModelResponse.from_message,
             _message_with_payload(
-                {"object": "response", "id": "resp_123"},
+                {
+                    "type": "response.failed",
+                    "response": {
+                        "object": "response",
+                        "status": "failed",
+                        "error": {"code": "server_error", "message": "failed"},
+                    },
+                },
                 message_type=MessageType.QUERY,
                 reply_to_message_id="request-message-id",
             ),
             ModelResponse,
-            {"object": "response", "id": "resp_123"},
+            {
+                "type": "response.failed",
+                "response": {
+                    "object": "response",
+                    "status": "failed",
+                    "error": {"code": "server_error", "message": "failed"},
+                },
+            },
         ),
     ],
 )
@@ -344,6 +358,19 @@ def test_invalid_model_messages_raise(
             lambda: ModelResponse.from_message(
                 _message_with_payload(
                     {"object": "not_response"},
+                    message_type=MessageType.QUERY,
+                    reply_to_message_id="request-message-id",
+                )
+            ),
+            "ModelResponse payload field 'object' must be 'response'.",
+        ),
+        (
+            lambda: ModelResponse.from_message(
+                _message_with_payload(
+                    {
+                        "type": "response.failed",
+                        "response": {"object": "not_response"},
+                    },
                     message_type=MessageType.QUERY,
                     reply_to_message_id="request-message-id",
                 )
