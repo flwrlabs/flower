@@ -130,10 +130,7 @@ class RuntimeAgentResponses(AgentResponses):
 
         while True:
             for message in self._pull_task_messages():
-                if (
-                    message.metadata.dst_task_id == self._task_id
-                    and message.metadata.reply_to_message_id == reply_to_message_id
-                ):
+                if message.metadata.reply_to_message_id == reply_to_message_id:
                     return message
 
             remaining = deadline - time.monotonic()
