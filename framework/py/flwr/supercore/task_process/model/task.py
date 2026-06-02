@@ -23,13 +23,18 @@ from typing import cast
 from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskMessageRequest,
+    PushTaskEventsRequest,
     PushTaskMessageRequest,
 )
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
+from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.supercore.model_message import ModelRequest, ModelResponse
 from flwr.supercore.typing import JSONObject
+from flwr.supercore.utils import strict_json_dumps
 
 from .provider import ModelProviderError, invoke_model_provider
+
+_DEFAULT_TASK_EVENT_BATCH_SIZE = 16
 
 
 def handle_task(stub: ServerAppIoStub, task_id: int, run_id: int) -> None:
@@ -50,12 +55,40 @@ def handle_task(stub: ServerAppIoStub, task_id: int, run_id: int) -> None:
         message.metadata.__dict__["_message_id"] = message.object_id
         stub.PushTaskMessage(PushTaskMessageRequest(message=message_to_proto(message)))
 
-    response = None
+    request_payload = request_message.payload
+    if request_payload.get("stream") is True:
+        events: list[TaskEvent] = []
+
+        def _flush_events() -> None:
+            """Push buffered stream events."""
+            if not events:
+                return
+            batch = list(events)
+            events.clear()
+            try:
+                stub.PushTaskEvents(PushTaskEventsRequest(events=batch))
+            except Exception:
+                events[:0] = batch
+                raise
+
+        def _publish_event(event: JSONObject) -> None:
+            """Buffer one Open Responses stream event."""
+            encoded = strict_json_dumps(event, compact=True)
+            events.append(TaskEvent(event=cast(str, event["type"]), data=encoded))
+            if len(events) >= _DEFAULT_TASK_EVENT_BATCH_SIZE:
+                _flush_events()
+
+        try:
+            invoke_model_provider(
+                request_payload,
+                on_stream_event=_publish_event,
+            )
+        finally:
+            _flush_events()
+        return
+
     try:
-        response = invoke_model_provider(
-            request_message.payload,
-            on_stream_event=_push_model_response,
-        )
+        response = invoke_model_provider(request_payload)
     except Exception as ex:
         response = _make_error_response(ex)
         raise
@@ -78,20 +111,19 @@ def _pull_model_request(stub: ServerAppIoStub) -> ModelRequest:
 
 def _make_error_response(ex: Exception) -> JSONObject:
     """Create a JSON error response from an exception."""
-    if isinstance(ex, ModelProviderError):
-        error_code = "model_provider_error"
-    else:
-        error_code = "internal_error"
-
     return {
-        "type": "response.failed",
-        "response": {
-            "object": "response",
-            "status": "failed",
-            "error": {
-                "code": error_code,
-                "message": str(ex),
-            },
-            "output": [],
+        "object": "response",
+        "status": "failed",
+        "error": {
+            "code": _error_code(ex),
+            "message": str(ex),
         },
+        "output": [],
     }
+
+
+def _error_code(ex: Exception) -> str:
+    """Return the error code for a model task exception."""
+    if isinstance(ex, ModelProviderError):
+        return "model_provider_error"
+    return "internal_error"
