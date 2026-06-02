@@ -26,13 +26,12 @@ from flwr.common import EventType
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
-from flwr.common.logger import flush_logs, log, start_log_uploader, stop_log_uploader
+from flwr.common.logger import log
 from flwr.common.retry_invoker import (
     RetryInvoker,
     make_simple_grpc_retry_invoker,
     wrap_stub,
 )
-from flwr.common.serde import run_from_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
     PullTaskInputResponse,
@@ -71,7 +70,6 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
     )
 
     # Initialize variables for exit handler
-    log_uploader = None
     heartbeat_sender = None
     sub_status = SubStatus.FAILED
     details = _UNKNOWN_ERROR_DETAILS
@@ -83,7 +81,7 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
     )
 
     try:
-        _ = runtime_dependency_install
+        _ = (log_queue, runtime_dependency_install)
 
         # Set up heartbeat sender
         heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
@@ -92,17 +90,12 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
         # Pull task input from SuperLink
         log(DEBUG, "[flwr-model] Pull task input")
         task_input: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
-        run = run_from_proto(task_input.run)
 
-        # Start log uploader for this run
-        log_uploader = start_log_uploader(
-            log_queue=log_queue,
-            node_id=0,
-            run_id=run.run_id,
+        handle_task(
             stub=stub,
+            task_id=task_input.task_id,
+            run_id=task_input.run.run_id,
         )
-
-        handle_task(stub=stub, task_id=task_input.task_id, run_id=run.run_id)
 
         # Update sub_status and details for successful completion
         sub_status = SubStatus.COMPLETED
@@ -116,17 +109,13 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
         details = f"Model task failed with exception: {str(ex)}"
 
         # Set exit code
-        exit_code = ExitCode.SERVERAPP_EXCEPTION
+        exit_code = ExitCode.TASK_PROC_EXCEPTION
 
     finally:
         log(DEBUG, "[flwr-model] Will push Model task output")
 
         # Set Grpc max retries to 1 to avoid blocking on exit
         retry_invoker.max_tries = 1
-
-        # Upload any remaining logs before pushing final output
-        if log_uploader:
-            flush_logs(log_queue)
 
         # Push final status
         pushoutput_req = PushTaskOutputRequest(
@@ -137,10 +126,6 @@ def run_model(  # pylint: disable=R0912, R0913, R0914, R0915, R0917
             stub.PushTaskOutput(pushoutput_req)
         except grpc.RpcError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
-
-        # Stop log uploader for this run and upload final logs
-        if log_uploader:
-            stop_log_uploader(log_queue, log_uploader)
 
         # Stop heartbeat sender
         if heartbeat_sender and heartbeat_sender.is_running:

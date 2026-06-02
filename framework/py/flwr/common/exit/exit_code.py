@@ -71,6 +71,9 @@ class ExitCode:
     SIMULATION_EXCEPTION = 700
     SIMULATION_MISSING_EXTRA = 701
 
+    # Task process exit codes (800-899)
+    TASK_PROC_EXCEPTION = 800
+
     def __new__(cls) -> ExitCode:
         """Prevent instantiation."""
         raise TypeError(f"{cls.__name__} cannot be instantiated.")
@@ -199,4 +202,8 @@ To use simulation with the Ray backend, install `flwr` with the `simulation` ext
 
     `pip install "flwr[simulation]"`.
 """,
+    # Task process exit codes (800-899)
+    ExitCode.TASK_PROC_EXCEPTION: (
+        "An unhandled exception occurred in a task process."
+    ),
 }
