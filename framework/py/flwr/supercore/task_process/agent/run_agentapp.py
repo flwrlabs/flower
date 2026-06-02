@@ -160,16 +160,12 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             if not isinstance(agent_input, str):
                 raise ValueError("context.run_config['agent.input'] must be a string.")
             if agent_input:
-                append_items(
-                    context,
-                    [
-                        {
-                            "type": "message",
-                            "role": "user",
-                            "content": agent_input,
-                        }
-                    ],
-                )
+                item = {
+                    "type": "message",
+                    "role": "user",
+                    "content": agent_input,
+                }
+                append_items(context, [item])
 
         log(
             DEBUG,
