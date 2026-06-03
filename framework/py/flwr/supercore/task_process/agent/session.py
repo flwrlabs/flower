@@ -98,8 +98,7 @@ class RuntimeAgentResponses(AgentResponses):
             metadata=cast(JSONObject | None, request.get("metadata")),
             text=cast(JSONObject | None, request.get("text")),
         )
-        reply_to_message_id = self._push_task_message(message)
-        response_message = self._pull_matching_reply(reply_to_message_id)
+        response_message = self._send_and_receive(message)
         response = ModelResponse.from_message(response_message)
         response_payload = response.payload
         output = response_payload.get("output")
@@ -107,31 +106,39 @@ class RuntimeAgentResponses(AgentResponses):
             append_items(self._context, output)
         return response_payload
 
-    def _push_task_message(self, message: Message) -> str:
+    def _push_task_message(self, message: Message) -> None:
         """Push one task message and return its message ID."""
         message.metadata.__dict__["_run_id"] = self._run_id
         message.metadata.src_task_id = self._task_id
         message.metadata.__dict__["_message_id"] = message.object_id
-        res = self._stub.PushTaskMessage(
+        self._stub.PushTaskMessage(
             PushTaskMessageRequest(message=message_to_proto(message))
         )
-        return str(res.message_id)
 
-    def _pull_task_messages(self) -> Message | None:
+    def _pull_task_messages(self) -> list[Message]:
         """Pull pending task messages."""
-        res = self._stub.PullTaskMessage(
-            PullTaskMessageRequest(limit=_DEFAULT_PULL_LIMIT)
-        )
-        return None if not res.messages else message_from_proto(res.messages[0])
+        res = self._stub.PullTaskMessage(PullTaskMessageRequest(limit=1))
+        return [message_from_proto(msg) for msg in res.messages]
 
-    def _pull_matching_reply(self, reply_to_message_id: str) -> Message:
-        """Pull until a matching reply arrives or the request times out."""
+    def _send_and_receive(self, message: Message) -> Message:
+        """Send one message and wait for its direct reply.
+
+        For now, `flwr-agentapp` expects a strict one-request-one-reply exchange with
+        `flwr-model`, so any non-matching pulled message is treated as an error.
+        """
+        # Push the message to the flwr-model
+        self._push_task_message(message)
+        message_id = message.metadata.message_id
+
+        # Pull until a message arrives that replies to the pushed message, or timeout
         deadline = time.monotonic() + _DEFAULT_MODEL_REPLY_TIMEOUT
-
         while True:
-            for message in self._pull_task_messages():
-                if message.metadata.reply_to_message_id == reply_to_message_id:
-                    return message
+            for pulled_msg in self._pull_task_messages():
+                if pulled_msg.metadata.reply_to_message_id != message_id:
+                    raise RuntimeError(
+                        "Received a message that does not reply to the request."
+                    )
+                return pulled_msg
 
             remaining = deadline - time.monotonic()
             if remaining <= 0:
