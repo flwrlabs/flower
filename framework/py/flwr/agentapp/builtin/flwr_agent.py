@@ -19,7 +19,7 @@ from flwr.agentapp import AgentApp, AgentSession
 from flwr.app import Context
 
 # The model to use
-_MODEL = "openai/gpt-5.5"
+_MODEL = "hf/flwrlabs/lizzy-dpo-gptq"
 
 app = AgentApp()
 

@@ -15,6 +15,6 @@
 """Private built-in AgentApp implementations."""
 
 
-from .resolver import try_resolve_builtin_agent_fab as try_resolve_builtin_agent_fab
+from .resolver import try_resolve_builtin_agent_fab
 
 __all__ = ["try_resolve_builtin_agent_fab"]
