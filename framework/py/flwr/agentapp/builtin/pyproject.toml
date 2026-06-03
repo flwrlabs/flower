@@ -1,0 +1,11 @@
+[project]
+name = "gpt-chat"
+version = "0.1.0"
+description = "Built-in GPT chat AgentApp."
+license = "Apache-2.0"
+
+[tool.flwr.app]
+publisher = "flwrlabs"
+
+[tool.flwr.app.components]
+agentapp = "flwr.agentapp.builtin.gpt_chat:app"
