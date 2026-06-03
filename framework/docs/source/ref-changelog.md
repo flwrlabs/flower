@@ -32,7 +32,7 @@ We would like to give our special thanks to all the contributors who made the ne
 
 - **Add task-to-task communication** ([#7156](https://github.com/flwrlabs/flower/pull/7156), [#7178](https://github.com/flwrlabs/flower/pull/7178), [#7194](https://github.com/flwrlabs/flower/pull/7194), [#7213](https://github.com/flwrlabs/flower/pull/7213))
 
-  Adds the base structure for task process-to-task process communication on the same host.
+  Adds the base structure for task-process-to-task-process communication on the same host.
 
 - **Restructure framework modules** ([#7242](https://github.com/flwrlabs/flower/pull/7242), [#7246](https://github.com/flwrlabs/flower/pull/7246), [#7259](https://github.com/flwrlabs/flower/pull/7259), [#7278](https://github.com/flwrlabs/flower/pull/7278))
 
