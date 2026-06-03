@@ -301,22 +301,12 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, expected_task_type)
 
-    def test_parse_builtin_agent_app_spec_returns_none_for_non_builtin(self) -> None:
-        """Test built-in agent parsing ignores non-reserved app specs."""
-        self.assertIsNone(_parse_builtin_agent_app_spec(""))
-        self.assertIsNone(_parse_builtin_agent_app_spec("@alice/app"))
-
     def test_parse_builtin_agent_app_spec_accepts_gpt_chat(self) -> None:
         """Test built-in agent parsing accepts GPT chat."""
         self.assertEqual(
             _parse_builtin_agent_app_spec("@flwragent/gpt-chat"),
             "@flwragent/gpt-chat",
         )
-
-    def test_parse_builtin_agent_app_spec_rejects_unknown_builtin(self) -> None:
-        """Test built-in agent parsing rejects unknown reserved app specs."""
-        with self.assertRaisesRegex(ValueError, "Unsupported built-in agent app spec"):
-            _parse_builtin_agent_app_spec("@flwragent/unknown")
 
     def test_start_run_creates_builtin_agentapp_run_from_app_spec(self) -> None:
         """Test StartRun creates an AgentApp run for the built-in GPT chat app spec."""
@@ -333,7 +323,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
 
         runs = self.state.get_run_info(run_ids=[response.run_id])
         tasks = self.state.get_tasks()
-        run_context = self.state.get_run_series_context(response.series_id)
 
         self.assertEqual(len(runs), 1)
         self.assertEqual(runs[0].fab_id, "flwrlabs/gpt-chat")
@@ -345,8 +334,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
         self.assertEqual(tasks[0].fab_hash, runs[0].fab_hash)
-        assert run_context is not None
-        self.assertEqual(run_context.run_config["agent.input"], "Hello")
 
     def test_start_run_rejects_unknown_builtin_agent_app_spec(self) -> None:
         """Test StartRun rejects unsupported built-in agent app specs."""

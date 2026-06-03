@@ -175,31 +175,36 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         verification_dict: dict[str, str] = {}
         note: str | None = None
 
-        try:
-            builtin_agent_app_spec = _parse_builtin_agent_app_spec(request.app_spec)
-            if builtin_agent_app_spec is not None:
-                fab_file, verification_dict = _resolve_builtin_agent_fab(
-                    builtin_agent_app_spec
-                )
-            elif request.app_spec:
-                fab_file, verification_dict, note = _get_remote_fab(
-                    self.fleet_api_type, request.app_spec, context
-                )
-            else:
-                fab_file = request.fab.content
+        builtin_agent_app_spec = _parse_builtin_agent_app_spec(request.app_spec)
+        if (
+            builtin_agent_app_spec is None
+            and request.app_spec.startswith(f"{_BUILTIN_AGENT_APP_SPEC_PREFIX}/")
+        ):
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                f"Unsupported built-in agent app spec '{request.app_spec}'. "
+                f"Supported built-in agent app specs: "
+                f"'{_BUILTIN_AGENT_GPT_CHAT_APP_SPEC}'.",
+            )
 
-            if len(fab_file) > FAB_MAX_SIZE:
-                log(
-                    ERROR,
-                    "FAB size exceeds maximum allowed size of %d bytes.",
-                    FAB_MAX_SIZE,
-                )
-                return StartRunResponse()
+        if builtin_agent_app_spec is not None:
+            fab_file, verification_dict = _resolve_builtin_agent_fab(
+                builtin_agent_app_spec
+            )
+        elif request.app_spec:
+            fab_file, verification_dict, note = _get_remote_fab(
+                self.fleet_api_type, request.app_spec, context
+            )
+        else:
+            fab_file = request.fab.content
 
-        except ValueError as e:
-            log(ERROR, "Could not start run: %s", str(e))
-            context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
-            raise RuntimeError("Unreachable code") from e
+        if len(fab_file) > FAB_MAX_SIZE:
+            log(
+                ERROR,
+                "FAB size exceeds maximum allowed size of %d bytes.",
+                FAB_MAX_SIZE,
+            )
+            return StartRunResponse()
 
         flwr_aid = _get_flwr_aid(context)
         override_config = user_config_from_proto(request.override_config)
@@ -245,20 +250,13 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         try:
             if builtin_agent_app_spec is not None:
-                if sim_cfg:
-                    raise ValueError(
-                        "AgentApp runs are not supported for simulation federations."
-                    )
                 run_type = RunType.AGENT_APP
                 resolved_federation_config = None
 
             # Validate user config overrides matches keys in run config in FAB
             fab_config = get_fab_config(fab_file)
-            if builtin_agent_app_spec is None:
-                run_config = flatten_dict(
-                    fab_config["tool"]["flwr"]["app"].get("config")
-                )
-                _ = fuse_dicts(run_config, override_config)
+            run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
+            _ = fuse_dicts(run_config, override_config)
 
             # Create run
             fab = Fab(
@@ -294,11 +292,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
             runs = state.get_run_info(run_ids=[run_id])
             series_id = runs[0].series_id
-            if builtin_agent_app_spec is not None:
-                run_context = state.get_run_series_context(series_id)
-                if run_context is not None:
-                    run_context.run_config = override_config
-                    state.set_run_series_context(series_id, run_context)
 
         except ValueError as e:
             log(ERROR, "Could not start run: %s", str(e))
@@ -1211,14 +1204,9 @@ def _format_verification(verifications: list[dict[str, str]]) -> dict[str, str]:
 
 def _parse_builtin_agent_app_spec(app_spec: str) -> str | None:
     """Return the built-in agent app spec if the reserved namespace is used."""
-    if not app_spec.startswith(f"{_BUILTIN_AGENT_APP_SPEC_PREFIX}/"):
-        return None
-    if app_spec != _BUILTIN_AGENT_GPT_CHAT_APP_SPEC:
-        raise ValueError(
-            f"Unsupported built-in agent app spec '{app_spec}'. "
-            f"Supported built-in agent app specs: '{_BUILTIN_AGENT_GPT_CHAT_APP_SPEC}'."
-        )
-    return app_spec
+    if app_spec == _BUILTIN_AGENT_GPT_CHAT_APP_SPEC:
+        return app_spec
+    return None
 
 
 def _resolve_builtin_agent_fab(app_spec: str) -> tuple[bytes, dict[str, str]]:

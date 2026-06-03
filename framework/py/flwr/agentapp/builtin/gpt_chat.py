@@ -27,9 +27,11 @@ app = AgentApp()
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
     """Forward the initial user input to the GPT chat model with streaming enabled."""
-    agent_input = context.run_config[_AGENT_INPUT_KEY]
-    if not isinstance(agent_input, str):
-        raise ValueError("context.run_config['agent.input'] must be a string.")
+    agent_input = context.run_config.get(_AGENT_INPUT_KEY)
+    if not isinstance(agent_input, str) or not agent_input:
+        raise ValueError(
+            "context.run_config['agent.input'] must be a non-empty string."
+        )
     agent.responses.create(
         {
             "model": _MODEL,
@@ -37,4 +39,3 @@ def main(agent: AgentSession, context: Context) -> None:
             "stream": True,
         }
     )
-
