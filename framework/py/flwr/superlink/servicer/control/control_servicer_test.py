@@ -301,9 +301,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].type, expected_task_type)
 
     def test_start_run_creates_builtin_agentapp_run_from_app_spec(self) -> None:
-        """Test StartRun creates an AgentApp run for the built-in GPT chat app spec."""
+        """Test StartRun creates an AgentApp run for the built-in flwr agent."""
         request = StartRunRequest(
-            app_spec="@flwragent/gpt-chat",
+            app_spec="@flwragent/flwr-agent",
             federation=NOOP_FEDERATION,
         )
         for key, value in user_config_to_proto({"agent.input": "Hello"}).items():
@@ -317,7 +317,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         tasks = self.state.get_tasks()
 
         self.assertEqual(len(runs), 1)
-        self.assertEqual(runs[0].fab_id, "flwrlabs/gpt-chat")
+        self.assertEqual(runs[0].fab_id, "flwrlabs/flwr-agent")
         self.assertEqual(runs[0].fab_version, "0.1.0")
         self.assertEqual(runs[0].fab_hash, expected_fab_hash)
         self.assertEqual(runs[0].run_type, RunType.AGENT_APP)

@@ -1,7 +1,7 @@
 [project]
-name = "gpt-chat"
+name = "flwr-agent"
 version = "0.1.0"
-description = "Built-in GPT chat AgentApp."
+description = "Built-in flwr agent."
 license = "Apache-2.0"
 
 [tool.flwr.app]
@@ -11,4 +11,4 @@ publisher = "flwrlabs"
 input = ""
 
 [tool.flwr.app.components]
-agentapp = "flwr.agentapp.builtin.gpt_chat:app"
+agentapp = "flwr.agentapp.builtin.flwr_agent:app"

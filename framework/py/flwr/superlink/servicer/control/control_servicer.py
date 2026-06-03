@@ -144,7 +144,7 @@ from flwr.superlink.auth_plugin import ControlAuthnPlugin
 from .control_account_auth_interceptor import get_current_account_info
 
 _BUILTIN_AGENT_APP_SPEC_PREFIX = "@flwragent"
-_BUILTIN_AGENT_GPT_CHAT_APP_SPEC = f"{_BUILTIN_AGENT_APP_SPEC_PREFIX}/gpt-chat"
+_BUILTIN_AGENT_APP_SPEC = f"{_BUILTIN_AGENT_APP_SPEC_PREFIX}/flwr-agent"
 
 
 # pylint: disable=too-many-public-methods
@@ -175,7 +175,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         verification_dict: dict[str, str] = {}
         note: str | None = None
 
-        is_builtin_agent_app = request.app_spec == _BUILTIN_AGENT_GPT_CHAT_APP_SPEC
+        is_builtin_agent_app = request.app_spec == _BUILTIN_AGENT_APP_SPEC
         if is_builtin_agent_app:
             fab_file, verification_dict = _resolve_builtin_agent_fab()
         elif request.app_spec:

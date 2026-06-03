@@ -12,21 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Built-in pass-through GPT chat AgentApp."""
+"""Built-in pass-through flwr agent."""
 
 
 from flwr.agentapp import AgentApp, AgentSession
 from flwr.app import Context
 
 _AGENT_INPUT_KEY = "agent.input"
-_MODEL = "openai/gpt-5.5"
+_MODEL = "hf/flwrlabs/lizzy-long-context"
 
 app = AgentApp()
 
 
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
-    """Forward the initial user input to the GPT chat model with streaming enabled."""
+    """Forward the initial user input to the flwr agent model."""
     agent_input = context.run_config.get(_AGENT_INPUT_KEY)
     if not isinstance(agent_input, str) or not agent_input:
         raise ValueError(
