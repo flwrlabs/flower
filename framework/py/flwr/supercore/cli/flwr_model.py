@@ -17,17 +17,16 @@
 
 import argparse
 from logging import DEBUG, INFO
-from queue import Queue
 
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
 from flwr.common.exit import ExitCode, flwr_exit
-from flwr.common.logger import log, mirror_output_to_queue, restore_output
+from flwr.common.logger import log, restore_output
 from flwr.supercore.task_process import run_model
 
 
 def flwr_model() -> None:
-    """Run process-isolated Flower ModelApp."""
+    """Run process-isolated Flower model task."""
     args = _parse_args_run_flwr_model().parse_args()
 
     if not args.insecure:
@@ -38,10 +37,6 @@ def flwr_model() -> None:
 
     token = try_obtain_flwr_app_token(args)
 
-    # Capture stdout/stderr
-    log_queue: Queue[str | None] = Queue()
-    mirror_output_to_queue(log_queue)
-
     log(INFO, "Start `flwr-model` process")
     log(
         DEBUG,
@@ -50,11 +45,9 @@ def flwr_model() -> None:
     )
     run_model(
         serverappio_api_address=args.serverappio_api_address,
-        log_queue=log_queue,
         token=token,
         certificates=None,
         parent_pid=args.parent_pid,
-        runtime_dependency_install=args.runtime_dependency_install,
     )
 
     # Restore stdout/stderr
@@ -64,7 +57,7 @@ def flwr_model() -> None:
 def _parse_args_run_flwr_model() -> argparse.ArgumentParser:
     """Parse `flwr-model` command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Run a Flower ModelApp",
+        description="Run a Flower model task",
     )
     parser.add_argument(
         "--serverappio-api-address",
