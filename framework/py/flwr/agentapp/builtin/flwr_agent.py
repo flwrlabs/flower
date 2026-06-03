@@ -19,7 +19,7 @@ from flwr.agentapp import AgentApp, AgentSession
 from flwr.app import Context
 
 _AGENT_INPUT_KEY = "agent.input"
-_MODEL = "hf/flwrlabs/lizzy-long-context"
+_MODEL = "hf/flwrlabs/lizzy-dpo-gptq"
 
 app = AgentApp()
 
