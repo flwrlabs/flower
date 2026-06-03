@@ -21,7 +21,7 @@ from typing import cast
 
 from flwr.app import ConfigRecord, Context
 from flwr.supercore.typing import JSONObject
-from flwr.supercore.utils import strict_json_dumps, strict_json_loads
+from flwr.supercore.utils import strict_json_dumps
 
 ITEMS_KEY = "items"
 JSON_KEY = "json"
