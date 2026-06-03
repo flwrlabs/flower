@@ -18,6 +18,9 @@ This guide shows two ways to run a Flower App on SuperGrid: directly from `Flowe
 as an example, but the same workflow applies to other Flower Apps, whether or not they
 are listed on Flower Hub.
 
+The sections below show the SuperGrid UI workflow. At the end of this page, the same
+steps are shown in compact form with the Flower CLI.
+
 *********************************
  Run Flower Apps from Flower Hub
 *********************************
@@ -133,3 +136,37 @@ to ``5``:
 
     For more details on Flower App configuration in ``pyproject.toml``, see
     :doc:`how-to-configure-pyproject-toml`.
+
+**********
+ Advanced
+**********
+
+Everything shown above in the SuperGrid UI can also be done with the :doc:`Flower CLI
+<ref-api-cli>`.
+
+Log in to SuperGrid:
+
+.. code-block:: shell
+
+    $ flwr login supergrid
+
+Run an app directly from Flower Hub:
+
+.. code-block:: shell
+
+    $ flwr run @flwrlabs/quickstart-numpy supergrid \
+        --federation @<username>/<federation-name> \
+        --stream
+
+Inspect runs and logs from the terminal:
+
+.. code-block:: shell
+
+    # List all your runs (across federations)
+    $ flwr list supergrid
+    # Show additional details of a run
+    $ flwr list --run-id <run-id> supergrid
+    # Show federation details (including runs) for a specific federation
+    $ flwr federation list supergrid --federation @<username>/<federation-name>
+    # Show logs of a run
+    $ flwr log <run-id> supergrid

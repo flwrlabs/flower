@@ -28,6 +28,9 @@ SuperGrid supports two federation types:
 All federation members can see runs launched by other members. They can also launch new
 runs in the federation.
 
+The sections below show the SuperGrid UI workflow. At the end of this page, the same
+steps are shown in compact form with the Flower CLI.
+
 *********************
  Create a Federation
 *********************
@@ -150,3 +153,80 @@ Before archiving a federation, make sure the collaboration is complete and membe
 longer need to launch workloads in it. Once archived, the federation is kept as a
 historical record instead of an active workspace. New runs cannot be launched, and users
 or SuperNodes can no longer be added or removed.
+
+**********
+ Advanced
+**********
+
+Everything shown above in the SuperGrid UI can also be done with the :doc:`Flower CLI
+<ref-api-cli>`.
+
+Log in to SuperGrid:
+
+.. code-block:: shell
+
+    $ flwr login supergrid
+
+Create federations:
+
+.. code-block:: shell
+
+    # Create a deployment federation
+    $ flwr federation create <federation-name> supergrid \
+        --description "<federation-description>"
+
+    # Create a simulation federation
+    $ flwr federation create <federation-name> supergrid \
+        --description "<federation-description>" \
+        --simulation
+
+List federations and show federation details:
+
+.. code-block:: shell
+
+    # List all federations you are a member of
+    $ flwr federation list supergrid
+    # Show details of a federation (i.e. members, SuperNodes, runs)
+    $ flwr federation list supergrid --federation @<username>/<federation-name>
+
+Configure a simulation federation. For example, change the number of simulated
+SuperNodes:
+
+.. code-block:: shell
+
+    $ flwr federation simulation-config @<username>/<federation-name> supergrid \
+        --num-supernodes 20
+
+.. note::
+
+    For more Simulation Runtime options, see the ``Customize the Simulation Runtime``
+    section in the :doc:`Simulation Runtime documentation <how-to-run-simulations>`.
+
+Manage federation invitations:
+
+.. code-block:: shell
+
+    # Create an invitation for a user to join a federation
+    $ flwr federation invite create <account-name> \
+        @<username>/<federation-name> supergrid
+    # List invitations for your account (created and received)
+    $ flwr federation invite list supergrid
+    # Accept an invitation to join a federation
+    $ flwr federation invite accept @<username>/<federation-name> supergrid
+    # Revoke an invitation you created
+    $ flwr federation invite revoke <account-name> \
+        @<username>/<federation-name> supergrid
+
+Remove an account from a federation. This can only be done by the federation owner.
+
+.. code-block:: shell
+
+    $ flwr federation remove-account @<username>/<federation-name> \
+        <account-name> supergrid
+
+Archive a federation. This action can only be done by the federation owner and cannot be
+undone.
+
+.. code-block:: shell
+
+    $ flwr federation archive @<username>/<federation-name> supergrid

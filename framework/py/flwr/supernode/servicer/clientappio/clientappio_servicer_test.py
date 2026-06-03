@@ -189,6 +189,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         run.fab_id = "mock/mock"
         run.fab_version = "v1.0.0"
         run.fab_hash = "fab-hash"
+        run.series_id = 777
 
         app_context = Context(
             run_id=run_id,
@@ -196,6 +197,7 @@ class TestClientAppIoServicer(unittest.TestCase):
             node_config={"nodeconfig1": 4.2},
             state=self.maker.recorddict(1, 1, 1),
             run_config={"runconfig1": 6.1},
+            series_id=run.series_id,
         )
         fab = typing.Fab(
             hash_str="fab-hash",
@@ -203,7 +205,7 @@ class TestClientAppIoServicer(unittest.TestCase):
             verifications={"sig": "value"},
         )
 
-        self.mock_state.get_context.return_value = app_context
+        self.mock_state.get_run_series_context.return_value = app_context
         self.mock_state.get_run.return_value = run
         self.mock_state.get_fab.return_value = fab
 
@@ -215,23 +217,28 @@ class TestClientAppIoServicer(unittest.TestCase):
             response = self.servicer.PullTaskInput(request, Mock())
 
         self.assertIsInstance(response, PullTaskInputResponse)
+        self.mock_state.get_run_series_context.assert_called_once_with(run.series_id)
         self.mock_state.activate_task.assert_called_once_with(task_id=task_id)
 
     def test_servicer_push_task_output_finishes_task(self) -> None:
         """PushTaskOutput should finish the authenticated task."""
         run_id = 61016
         task_id = 123
+        run = typing.Run.create_empty(run_id=run_id)
+        run.series_id = 777
         app_context = Context(
             run_id=run_id,
             node_id=1,
             node_config={"nodeconfig1": 4.2},
             state=self.maker.recorddict(1, 1, 1),
             run_config={"runconfig1": 6.1},
+            series_id=run.series_id,
         )
         request = PushTaskOutputRequest(
             context=context_to_proto(app_context),
             sub_status=SubStatus.COMPLETED,
         )
+        self.mock_state.get_run.return_value = run
 
         with patch(
             "flwr.supernode.servicer.clientappio.clientappio_servicer."
@@ -241,7 +248,9 @@ class TestClientAppIoServicer(unittest.TestCase):
             response = self.servicer.PushTaskOutput(request, Mock())
 
         self.assertIsInstance(response, PushTaskOutputResponse)
-        self.mock_state.store_context.assert_called_once()
+        self.mock_state.set_run_series_context.assert_called_once()
+        args, _ = self.mock_state.set_run_series_context.call_args
+        self.assertEqual(args[0], run.series_id)
         self.mock_state.finish_task.assert_called_once()
         finish_task_kwargs = self.mock_state.finish_task.call_args.kwargs
         self.assertEqual(finish_task_kwargs["task_id"], task_id)

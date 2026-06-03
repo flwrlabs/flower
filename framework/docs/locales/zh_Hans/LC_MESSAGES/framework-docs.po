@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Flower main\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-05-31 00:29+0000\n"
+"POT-Creation-Date: 2026-06-02 00:34+0000\n"
 "PO-Revision-Date: 2026-05-23 06:56+0000\n"
 "Last-Translator: reducedradius <feixiang512@outlook.com>\n"
 "Language: zh_Hans\n"
@@ -44,10 +44,12 @@ msgid ""
 msgstr "以问题为导向的 \"如何做 \"指南逐步展示如何实现特定目标。"
 
 #: ../../source/contribute.rst:18
+#, fuzzy
 msgid "Contributor tutorials"
 msgstr "贡献者教程"
 
 #: ../../source/contribute.rst:50
+#, fuzzy
 msgid "Contributor explanations"
 msgstr "贡献者解释"
 
@@ -6574,6 +6576,7 @@ msgstr ""
 #: flwr.clientapp.client_app.ClientApp.query
 #: flwr.clientapp.client_app.ClientApp.train
 #: flwr.serverapp.grid.grid.Grid.send_and_receive of
+#, fuzzy
 msgid "Parameters"
 msgstr "参数"
 
@@ -10575,7 +10578,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-connect-supernodes-to-supergrid.rst:7
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:90
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:93
 #, fuzzy
 msgid "Connect SuperNodes to SuperGrid"
 msgstr "flower-superlink"
@@ -10619,85 +10622,93 @@ msgstr ""
 msgid "A machine where the SuperNode process can keep running."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:30
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:28
+#: ../../source/how-to-create-and-manage-federations.rst:31
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:21
+msgid ""
+"The sections below show the SuperGrid UI workflow. At the end of this "
+"page, the same steps are shown in compact form with the Flower CLI."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:33
 #, fuzzy
 msgid "Register SuperNodes with SuperGrid"
 msgstr "验证超级节点"
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:32
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:35
 msgid ""
 "Each SuperNode uses its own key pair. The public key is registered with "
 "SuperGrid, and the private key stays on the machine that runs the "
 "SuperNode."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:35
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:38
 msgid "Create a key pair for the first SuperNode:"
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:43
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:46
 #, fuzzy
 msgid "This creates two files:"
 msgstr "这种方法是幂等的。"
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:45
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:48
 msgid ""
 "``~/supernodes_keys/supernode-1``: the private key, used when starting "
 "the SuperNode. Never share the private key or upload it anywhere. This "
 "key should only be used to start the SuperNode."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:48
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:51
 msgid ""
 "``~/supernodes_keys/supernode-1.pub``: the public key, used when "
 "registering the SuperNode in SuperGrid."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:51
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:54
 msgid ""
 "Copy the contents of ``supernode-1.pub`` to your clipboard. One way to "
 "inspect the public key is with the ``cat`` command:"
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:61
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:64
 msgid ""
 "Copy the full key printed in the terminal, including the key type at the "
 "beginning and the optional comment at the end."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:64
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:67
 msgid ""
 "Then, go to https://flower.ai/supernodes/ and click ``Register "
 "SuperNode``."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:66
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:69
 msgid "SuperNodes page before registering a SuperNode"
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:71
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:74
 msgid "In the dialog, paste the public key and click ``Register``."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:73
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:76
 msgid "Register SuperNode dialog with a public key"
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:78
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:81
 msgid "The SuperNode should then appear in the list of registered SuperNodes."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:80
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:83
 msgid "SuperNodes page showing a registered SuperNode"
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:85
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:88
 msgid ""
 "To connect more SuperNodes, create and register a separate key pair for "
 "each one. Do not reuse a key pair across multiple SuperNodes."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:92
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:95
 msgid ""
 "There are two common ways to run a SuperNode: directly from a Python "
 "environment, or with the official SuperNode Docker image. In both cases, "
@@ -10705,7 +10716,7 @@ msgid ""
 "SuperGrid."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:98
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:101
 msgid ""
 "A SuperNode must be able to run the ClientApps assigned to it. Make sure "
 "the SuperNode environment or Docker image includes the dependencies those"
@@ -10716,42 +10727,42 @@ msgid ""
 "app dependencies are installed at runtime."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:107
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:110
 #, fuzzy
 msgid "Start from a Python environment"
 msgstr "设置编码环境"
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:109
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:112
 msgid ""
 "Install Flower in a Python environment on the machine that will run the "
 "SuperNode:"
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:115
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:118
 #, fuzzy
 msgid "Start the SuperNode:"
 msgstr "启动服务器"
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:123
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:126
 msgid ""
 "Keep this process running for as long as you want the SuperNode to remain"
 " connected."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:125
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:128
 msgid "Your SuperNode should appear as ``online``:"
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:127
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:130
 msgid "SuperNodes page showing an online SuperNode"
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:133
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:136
 #, fuzzy
 msgid "Start with Docker"
 msgstr "快速入门 iOS"
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:135
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:138
 msgid ""
 "You can also run the SuperNode with the official `flwr/supernode Docker "
 "image <https://hub.docker.com/r/flwr/supernode>`__. Mount the directory "
@@ -10759,11 +10770,11 @@ msgid ""
 "``flower-supernode``:"
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:152
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:155
 msgid "``--rm``: Remove the container after it exits."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:153
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:156
 msgid ""
 "``--user \"$(id -u):$(id -g)\"``: Run the container as the host user that"
 " owns the mounted private key. Flower Docker images run as a non-root "
@@ -10772,14 +10783,14 @@ msgid ""
 "permissions."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:157
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:160
 msgid ""
 "``-e FLWR_HOME=/tmp/flwr-home``: Set Flower's home directory to a "
 "container-local writable location. The SuperNode uses this directory to "
 "store Flower Apps received during runs."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:160
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:163
 msgid ""
 "``-v \"$HOME/supernodes_keys:/keys:ro\"``: Mount the host directory "
 "containing the SuperNode private key into the container as read-only. You"
@@ -10787,72 +10798,114 @@ msgid ""
 "different location."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:163
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:166
 msgid "``flwr/supernode:XYZ``: Use the official SuperNode Docker image."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:164
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:167
 msgid ""
 "``--superlink fleet-supergrid.flower.ai:443``: Connect the SuperNode to "
 "SuperGrid."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:166
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:169
 msgid ""
 "``--auth-supernode-private-key /keys/supernode-1``: Use the mounted "
 "private key to authenticate this SuperNode. You may need to adjust the "
 "path if your key has a different name or is in a different location."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:170
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:173
 msgid ""
 "Use this form when you prefer to run SuperNodes from a container image "
 "instead of installing Flower directly in a Python environment."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:175
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:178
 #, fuzzy
 msgid "Add a SuperNode to a Deployment Federation"
 msgstr "flower-superlink"
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:177
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:180
 msgid ""
 "After registering a SuperNode in SuperGrid, you can add it to any "
 "deployment federation you are a member of. The SuperNode can then "
 "participate in runs launched in that federation."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:181
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:184
 msgid ""
 "Navigate to the federation page in SuperGrid and open the ``SuperNodes`` "
 "tab. If the federation does not have any SuperNodes yet, the list will be"
 " empty. Click ``Add SuperNode``."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:185
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:188
 msgid "Deployment federation SuperNodes tab before adding a SuperNode"
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:190
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:193
 msgid ""
 "Select the SuperNode you want to add. You can search by SuperNode ID or "
 "owner if the list contains many SuperNodes. Then click ``Add SuperNode``."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:193
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:196
 #, fuzzy
 msgid "Add SuperNode to federation dialog"
 msgstr "flower-superlink"
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:198
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:201
 msgid ""
 "Once added, the SuperNode is listed in the federation's ``SuperNodes`` "
 "tab and can be selected by runs launched in the federation."
 msgstr ""
 
-#: ../../source/how-to-connect-supernodes-to-supergrid.rst:201
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:204
 #, fuzzy
 msgid "SuperNode added to federation"
+msgstr "flower-superlink"
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:211
+#: ../../source/how-to-create-and-manage-federations.rst:159
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:142
+#, fuzzy
+msgid "Advanced"
+msgstr "高级安装选项"
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:213
+#: ../../source/how-to-create-and-manage-federations.rst:161
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:144
+msgid ""
+"Everything shown above in the SuperGrid UI can also be done with the "
+":doc:`Flower CLI <ref-api-cli>`."
+msgstr ""
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:216
+#: ../../source/how-to-create-and-manage-federations.rst:164
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:147
+#, fuzzy
+msgid "Log in to SuperGrid:"
+msgstr "flower-superlink"
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:222
+#, fuzzy
+msgid "Register a SuperNode public key:"
+msgstr "验证超级节点"
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:229
+#, fuzzy
+msgid "List registered SuperNodes and note the SuperNode ID:"
+msgstr "验证超级节点"
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:236
+#, fuzzy
+msgid "Add the SuperNode to a deployment federation you are a member of:"
+msgstr "flower-superlink"
+
+#: ../../source/how-to-connect-supernodes-to-supergrid.rst:243
+#, fuzzy
+msgid "Optionally, remove the SuperNode from a federation or unregister it:"
 msgstr "flower-superlink"
 
 #: ../../source/how-to-create-and-manage-federations.rst:-1
@@ -10905,13 +10958,13 @@ msgid ""
 "also launch new runs in the federation."
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:33
+#: ../../source/how-to-create-and-manage-federations.rst:36
 #: ../../source/tutorial-series-get-started-with-flower.rst:32
 #, fuzzy
 msgid "Create a Federation"
 msgstr "创建新页面"
 
-#: ../../source/how-to-create-and-manage-federations.rst:35
+#: ../../source/how-to-create-and-manage-federations.rst:38
 msgid ""
 "Open SuperGrid and go to `the Federations page "
 "<https://flower.ai/federations/>`__. Choose whether you want to create a "
@@ -10919,11 +10972,11 @@ msgid ""
 "federation name and the required configuration."
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:41
+#: ../../source/how-to-create-and-manage-federations.rst:44
 msgid "There is no limit on the number of federations you can create."
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:43
+#: ../../source/how-to-create-and-manage-federations.rst:46
 msgid ""
 "To create a simulation federation, click ``New Federation``, select "
 "``Simulation``, choose a federation name, set the number of simulated "
@@ -10932,25 +10985,25 @@ msgid ""
 "SuperNodes, such as 5 or 10, to keep runs fast."
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:48
+#: ../../source/how-to-create-and-manage-federations.rst:51
 msgid ""
 "For a deployment federation, choose ``Deployment`` instead of "
 "``Simulation`` when creating the federation. Choose a meaningful name and"
 " click ``Create``."
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:51
+#: ../../source/how-to-create-and-manage-federations.rst:54
 msgid ""
 "In the federations dashboard, you can identify the type of each "
 "federation by the label next to its name. The screenshot below shows two "
 "federations, one for simulation and one for deployment."
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:55
+#: ../../source/how-to-create-and-manage-federations.rst:58
 msgid "Federation list showing the newly created federations"
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:60
+#: ../../source/how-to-create-and-manage-federations.rst:63
 msgid ""
 "For deployment federations, you also need to add SuperNodes to the "
 "federation. You can add your own SuperNodes now by following the "
@@ -10961,12 +11014,12 @@ msgid ""
 " join."
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:68
+#: ../../source/how-to-create-and-manage-federations.rst:71
 #, fuzzy
 msgid "Manage a Federation"
 msgstr "运行模拟"
 
-#: ../../source/how-to-create-and-manage-federations.rst:70
+#: ../../source/how-to-create-and-manage-federations.rst:73
 msgid ""
 "After creating a federation, the owner can invite other Flower users to "
 "collaborate. Invited users become federation members after accepting the "
@@ -10974,34 +11027,34 @@ msgid ""
 "launched in the federation, and submit their own runs."
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:75
-msgid "Federation ownership controls administrative actions:"
-msgstr ""
-
-#: ../../source/how-to-create-and-manage-federations.rst:77
-#, fuzzy
-msgid "The owner can invite users."
-msgstr "加入 Flower 社区"
-
 #: ../../source/how-to-create-and-manage-federations.rst:78
-#, fuzzy
-msgid "The owner can remove users from the federation."
-msgstr "flower-superlink"
-
-#: ../../source/how-to-create-and-manage-federations.rst:79
-msgid "The owner can archive the federation when the collaboration is complete."
+msgid "Federation ownership controls administrative actions:"
 msgstr ""
 
 #: ../../source/how-to-create-and-manage-federations.rst:80
 #, fuzzy
+msgid "The owner can invite users."
+msgstr "加入 Flower 社区"
+
+#: ../../source/how-to-create-and-manage-federations.rst:81
+#, fuzzy
+msgid "The owner can remove users from the federation."
+msgstr "flower-superlink"
+
+#: ../../source/how-to-create-and-manage-federations.rst:82
+msgid "The owner can archive the federation when the collaboration is complete."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:83
+#, fuzzy
 msgid "Members can leave the federation themselves."
 msgstr "flower-superlink"
 
-#: ../../source/how-to-create-and-manage-federations.rst:83
+#: ../../source/how-to-create-and-manage-federations.rst:86
 msgid "Invite Users"
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:85
+#: ../../source/how-to-create-and-manage-federations.rst:88
 msgid ""
 "Invite users when you want multiple people to collaborate in the same "
 "federation, inspect runs, launch new runs, and contribute their own "
@@ -11010,52 +11063,52 @@ msgid ""
 "connected to them."
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:90
+#: ../../source/how-to-create-and-manage-federations.rst:93
 msgid ""
 "Open your federation and navigate to the ``Members`` tab. If this is a "
 "new federation, you will see only your own account listed as the owner."
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:93
+#: ../../source/how-to-create-and-manage-federations.rst:96
 #, fuzzy
 msgid "Members tab showing the federation owner"
 msgstr "flower-superlink"
 
-#: ../../source/how-to-create-and-manage-federations.rst:98
+#: ../../source/how-to-create-and-manage-federations.rst:101
 msgid ""
 "Click ``Invite User``, enter the username of the Flower account you want "
 "to invite, and click ``Send Invitation``."
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:101
+#: ../../source/how-to-create-and-manage-federations.rst:104
 #, fuzzy
 msgid "Invite user dialog in SuperGrid"
 msgstr "使用模拟引擎运行花朵应用程序。"
 
-#: ../../source/how-to-create-and-manage-federations.rst:106
+#: ../../source/how-to-create-and-manage-federations.rst:109
 msgid ""
 "The invitation appears in the member list with status ``Pending`` until "
 "the invited user accepts it. While it is pending, the owner can revoke "
 "the invitation by clicking the delete icon."
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:110
+#: ../../source/how-to-create-and-manage-federations.rst:113
 #, fuzzy
 msgid "Pending invitation in the federation members list"
 msgstr "flower-superlink"
 
-#: ../../source/how-to-create-and-manage-federations.rst:115
+#: ../../source/how-to-create-and-manage-federations.rst:118
 msgid ""
 "The invited user will see the invitation when they sign in to `flower.ai "
 "<https://flower.ai/>`__ and open their profile page. The invitation shows"
 " the federation name and the username of the user who sent it."
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:119
+#: ../../source/how-to-create-and-manage-federations.rst:122
 msgid "Pending federation invitation on the invited user's profile page"
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:124
+#: ../../source/how-to-create-and-manage-federations.rst:127
 msgid ""
 "After accepting the invitation, the user becomes a member of the "
 "federation. From that point on, the user can see the federation in their "
@@ -11064,22 +11117,22 @@ msgid ""
 "federation at any time."
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:129
+#: ../../source/how-to-create-and-manage-federations.rst:132
 msgid "Federation members list showing an accepted invitation"
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:135
+#: ../../source/how-to-create-and-manage-federations.rst:138
 #, fuzzy
 msgid "Archive a Federation"
 msgstr "使用现有策略"
 
-#: ../../source/how-to-create-and-manage-federations.rst:137
+#: ../../source/how-to-create-and-manage-federations.rst:140
 msgid ""
 "Archive a federation when a project or collaboration has ended. Only the "
 "federation owner can archive it."
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:140
+#: ../../source/how-to-create-and-manage-federations.rst:143
 msgid ""
 "To archive a federation, click the archive icon shown in the federations "
 "dashboard. After confirming, the federation is archived and moved to the "
@@ -11087,11 +11140,11 @@ msgid ""
 "/another-federation`` after it has been archived."
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:144
+#: ../../source/how-to-create-and-manage-federations.rst:147
 msgid "Archived federation view in SuperGrid"
 msgstr ""
 
-#: ../../source/how-to-create-and-manage-federations.rst:149
+#: ../../source/how-to-create-and-manage-federations.rst:152
 msgid ""
 "Before archiving a federation, make sure the collaboration is complete "
 "and members no longer need to launch workloads in it. Once archived, the "
@@ -11099,6 +11152,53 @@ msgid ""
 " New runs cannot be launched, and users or SuperNodes can no longer be "
 "added or removed."
 msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:170
+#, fuzzy
+msgid "Create federations:"
+msgstr "创建新页面"
+
+#: ../../source/how-to-create-and-manage-federations.rst:183
+#, fuzzy
+msgid "List federations and show federation details:"
+msgstr "基础镜像的存储库名称。"
+
+#: ../../source/how-to-create-and-manage-federations.rst:192
+msgid ""
+"Configure a simulation federation. For example, change the number of "
+"simulated SuperNodes:"
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:202
+#, fuzzy
+msgid ""
+"For more Simulation Runtime options, see the ``Customize the Simulation "
+"Runtime`` section in the :doc:`Simulation Runtime documentation <how-to-"
+"run-simulations>`."
+msgstr ""
+"Pour plus de détails sur le Runtime Simulation et sa configuration, "
+"consultez la :doc:`Simulation Runtime documentation <how-to-run-"
+"simulations>`."
+
+#: ../../source/how-to-create-and-manage-federations.rst:205
+#, fuzzy
+msgid "Manage federation invitations:"
+msgstr "运行模拟"
+
+#: ../../source/how-to-create-and-manage-federations.rst:220
+msgid ""
+"Remove an account from a federation. This can only be done by the "
+"federation owner."
+msgstr ""
+
+#: ../../source/how-to-create-and-manage-federations.rst:227
+#, fuzzy
+msgid ""
+"Archive a federation. This action can only be done by the federation "
+"owner and cannot be undone."
+msgstr ""
+"Archivez une fédération lorsque un projet ou une collaboration est "
+"terminé. Seul le propriétaire de la fédération peut l'archiver."
 
 #: ../../source/how-to-design-stateful-clients.rst:-1
 msgid ""
@@ -11750,6 +11850,7 @@ msgid "Install Flower"
 msgstr "安装Flower"
 
 #: ../../source/how-to-install-flower.rst:11
+#, fuzzy
 msgid "Python version"
 msgstr "Python 版本"
 
@@ -12300,12 +12401,12 @@ msgid ""
 "are listed on Flower Hub."
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:23
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:26
 #, fuzzy
 msgid "Run Flower Apps from Flower Hub"
 msgstr "使用模拟引擎运行花朵应用程序。"
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:25
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:28
 msgid ""
 "Running directly from Flower Hub is the quickest way to get started. Open"
 " an app page, for example `@flwrlabs/quickstart-numpy "
@@ -12313,57 +12414,57 @@ msgid ""
 "``Run``."
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:29
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:32
 #, fuzzy
 msgid "Flower App page on Flower Hub"
 msgstr "使用模拟引擎运行花朵应用程序。"
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:34
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:37
 msgid "Select the federation to run the app on, then click ``Run app``."
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:36
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:39
 #: ../../source/tutorial-series-get-started-with-flower.rst:98
 msgid "Run app dialog in SuperGrid"
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:41
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:44
 msgid ""
 "After the run starts, open the federation in the `SuperGrid dashboard "
 "<https://flower.ai/federations/>`__ to inspect the run status."
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:44
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:47
 #: ../../source/tutorial-series-get-started-with-flower.rst:107
 msgid "Run details page showing the progress of the app execution"
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:49
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:52
 msgid "Open the ``Logs`` tab to inspect the app logs."
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:51
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:54
 #: ../../source/tutorial-series-get-started-with-flower.rst:118
 msgid "Logs tab showing logs from the app execution"
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:56
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:59
 msgid ""
 "If you return to the federation page, the run appears in the list of runs"
 " for that federation."
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:59
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:62
 #: ../../source/tutorial-series-get-started-with-flower.rst:137
 msgid "Federation details page showing the run that was launched"
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:66
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:69
 #, fuzzy
 msgid "Run Flower apps from your machine"
 msgstr "Flower 服务器。"
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:68
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:71
 msgid ""
 "You can also run a Flower App on SuperGrid from your local machine. Use "
 "this workflow when you want to inspect or modify an app before submitting"
@@ -12371,17 +12472,17 @@ msgid ""
 "not want to list it on Flower Hub."
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:72
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:75
 msgid ""
 "This section assumes you have a Python environment set up. Install Flower"
 " with ``pip``:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:78
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:81
 msgid "Pull the app locally with ``flwr new``:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:85
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:88
 msgid ""
 "Then, log in to SuperGrid with ``flwr login``. This opens a browser "
 "window where you can authenticate with your SuperGrid account. Finally, "
@@ -12389,27 +12490,27 @@ msgid ""
 "federation:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:91
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:94
 msgid ""
 "Replace ``@<username>/<federation-name>`` with the unique name of your "
 "federation, for example ``@peter123/my-federation``."
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:101
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:104
 msgid "The run appears in the same SuperGrid federation dashboard."
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:103
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:106
 #: ../../source/tutorial-series-write-your-first-flower-app.rst:110
 msgid "SuperGrid dashboard showing the newly started run in the federation"
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:109
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:112
 #, fuzzy
 msgid "Customize the run configuration"
 msgstr "配置值"
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:111
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:114
 msgid ""
 "Flower Apps can define default runtime settings in the "
 "``[tool.flwr.app.config]`` section of their ``pyproject.toml``. The "
@@ -12417,24 +12518,33 @@ msgid ""
 " to control how many rounds its ``ServerApp`` runs:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:120
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:123
 msgid ""
 "Apps can define additional settings in this section and read them from "
 "the app code, for example learning rates, model sizes, batch sizes, or "
 "dataset-specific options."
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:123
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:126
 msgid ""
 "You can override app-defined values for a single run with the ``--run-"
 "config`` flag. The following command runs ``quickstart-numpy`` on "
 "SuperGrid with ``num-server-rounds`` set to ``5``:"
 msgstr ""
 
-#: ../../source/how-to-run-flower-apps-on-supergrid.rst:134
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:137
 msgid ""
 "For more details on Flower App configuration in ``pyproject.toml``, see "
 ":doc:`how-to-configure-pyproject-toml`."
+msgstr ""
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:153
+#, fuzzy
+msgid "Run an app directly from Flower Hub:"
+msgstr "使用模拟引擎运行花朵应用程序。"
+
+#: ../../source/how-to-run-flower-apps-on-supergrid.rst:161
+msgid "Inspect runs and logs from the terminal:"
 msgstr ""
 
 #: ../../source/how-to-run-flower-locally.rst:-1
@@ -14837,6 +14947,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-run-simulations.rst:31
+#, fuzzy
 msgid "Run simulations"
 msgstr "运行模拟"
 
@@ -14995,6 +15106,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/how-to-run-simulations.rst:133
+#, fuzzy
 msgid "Simulation examples"
 msgstr "模拟示例"
 
@@ -15062,12 +15174,12 @@ msgstr ""
 "有关安全连接的完整代码示例，请参见 <https://github.com/adap/flower/tree/main/examples"
 "/advanced-tensorflow>`_ 。"
 
-#: ../../source/how-to-run-simulations.rst:156
+#: ../../source/how-to-run-simulations.rst:158
 #, fuzzy
 msgid "Customize the Simulation Runtime"
 msgstr "笔记本中的模拟"
 
-#: ../../source/how-to-run-simulations.rst:158
+#: ../../source/how-to-run-simulations.rst:160
 msgid ""
 "By default, the Simulation Runtime simulates a cohort of 10 SuperNodes "
 "and assigns two CPU cores to each backend worker. This means that if your"
@@ -15075,7 +15187,7 @@ msgid ""
 " each executing a different ``ClientApp`` instance."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:163
+#: ../../source/how-to-run-simulations.rst:165
 #, fuzzy
 msgid ""
 "More often than not, you would probably like to adjust the resources your"
@@ -15088,7 +15200,7 @@ msgstr ""
 "flwr.html#flwr.simulation.start_simulation>`_ 。Ray "
 "内部使用两个键来调度和生成工作负载（在我们的例子中是 Flower 客户端）："
 
-#: ../../source/how-to-run-simulations.rst:169
+#: ../../source/how-to-run-simulations.rst:171
 #, python-format
 msgid ""
 "Note that the resources the backend assigns to each worker (and hence to "
@@ -15101,7 +15213,7 @@ msgid ""
 "``ClientApp`` instances to crash throwing an out-of-memory (OOM) error."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:177
+#: ../../source/how-to-run-simulations.rst:179
 msgid ""
 "Customizing resources can be done in two ways: either by changing the "
 "default simulation configuration used by your local SuperLink; or by "
@@ -15109,12 +15221,12 @@ msgid ""
 " to do both."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:182
+#: ../../source/how-to-run-simulations.rst:184
 #, fuzzy
 msgid "Permanently set Simulation Runtime configuration"
 msgstr "配置值"
 
-#: ../../source/how-to-run-simulations.rst:184
+#: ../../source/how-to-run-simulations.rst:186
 #, python-format
 msgid ""
 "The |flwr_fed_sim_config_link|_ command allows you to permanently set the"
@@ -15125,19 +15237,19 @@ msgid ""
 "``ClientApp`` is assigned 4 CPUs and 25% of a GPU, you would run:"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:197
+#: ../../source/how-to-run-simulations.rst:199
 msgid ""
 "Then, for every subsequent runs, the SuperLink will use the above "
 "configuration by default. Use ``flwr federation simulation-config "
 "--help`` to see all the options you can set."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:202
+#: ../../source/how-to-run-simulations.rst:204
 #, fuzzy
 msgid "Per-run override of Simulation Runtime configuration"
 msgstr "配置值"
 
-#: ../../source/how-to-run-simulations.rst:204
+#: ../../source/how-to-run-simulations.rst:206
 msgid ""
 "Sometimes, you might want to override the default simulation "
 "configuration for a specific run. You can do so by passing the same "
@@ -15148,19 +15260,19 @@ msgid ""
 "the GPU allocation unchanged. You would run:"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:217
+#: ../../source/how-to-run-simulations.rst:219
 msgid ""
 "The `--federation-config` flag accepts any of the options that can be set"
 " with ``flwr federation simulation-config`` using the same syntax but "
 "expressed as a single string and without the ``--`` prefix."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:222
+#: ../../source/how-to-run-simulations.rst:224
 #, fuzzy
 msgid "Understanding Simulation Runtime resource assignment"
 msgstr "虚拟客户端引擎资源"
 
-#: ../../source/how-to-run-simulations.rst:224
+#: ../../source/how-to-run-simulations.rst:226
 #, python-format
 msgid ""
 "Let's see how the above configuration, i.e. 1x CPU and 25% of a GPU per "
@@ -15169,46 +15281,46 @@ msgid ""
 "system has:"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:228
+#: ../../source/how-to-run-simulations.rst:230
 #, python-format
 msgid ""
 "10x CPUs and 1x GPU: at most 4 ``ClientApps`` will run in parallel since "
 "each requires 25% of the available VRAM."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:230
+#: ../../source/how-to-run-simulations.rst:232
 msgid ""
 "10x CPUs and 2x GPUs: at most 8 ``ClientApps`` will run in parallel "
 "(VRAM-limited)."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:231
+#: ../../source/how-to-run-simulations.rst:233
 msgid ""
 "6x CPUs and 4x GPUs: at most 6 ``ClientApps`` will run in parallel (CPU-"
 "limited)."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:232
+#: ../../source/how-to-run-simulations.rst:234
 msgid ""
 "10x CPUs but 0x GPUs: you won't be able to run the simulation since not "
 "even the resources for a single ``ClientApp`` can be met."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:235
+#: ../../source/how-to-run-simulations.rst:237
 msgid ""
 "A generalization of this is given by the following equation. It gives the"
 " maximum number of ``ClientApps`` that can be executed in parallel on "
 "available CPU cores (SYS_CPUS) and VRAM (SYS_GPUS)."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:239
+#: ../../source/how-to-run-simulations.rst:241
 msgid ""
 "N = \\min\\left(\\left\\lfloor \\frac{\\text{SYS_CPUS}}{\\text{num_cpus}}"
 " \\right\\rfloor, \\left\\lfloor "
 "\\frac{\\text{SYS_GPUS}}{\\text{num_gpus}} \\right\\rfloor\\right)"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:243
+#: ../../source/how-to-run-simulations.rst:245
 msgid ""
 "Both ``num_cpus`` (an integer higher than 1) and ``num_gpus`` (a non-"
 "negative real number) should be set on a per ``ClientApp`` basis. If, for"
@@ -15217,7 +15329,7 @@ msgid ""
 " two whole GPUs, you'd set ``num_gpus=2``."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:248
+#: ../../source/how-to-run-simulations.rst:250
 #, fuzzy, python-brace-format
 msgid ""
 "While the ``client-resources-{num-cpus,num-gpus}`` can be used to control"
@@ -15235,12 +15347,12 @@ msgstr ""
 "个客户端。:code:`VirtualClientEngine` 将安排运行 100 "
 "个工作（每个工作模拟策略采样的一个客户端），然后以资源感知的方式分批执行。"
 
-#: ../../source/how-to-run-simulations.rst:258
+#: ../../source/how-to-run-simulations.rst:260
 #, fuzzy
 msgid "Simulation Runtime resources"
 msgstr "虚拟客户端引擎资源"
 
-#: ../../source/how-to-run-simulations.rst:260
+#: ../../source/how-to-run-simulations.rst:262
 msgid ""
 "By default, the ``Simulation Runtime`` has **access to all system "
 "resources** (i.e., all CPUs, all GPUs). However, in some settings, you "
@@ -15249,7 +15361,7 @@ msgid ""
 "flower-configuration>` by passing a value to the ``init-args`` flags."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:269
+#: ../../source/how-to-run-simulations.rst:271
 msgid ""
 "With the above setup, the Backend will be initialized with a single CPU "
 "and no GPUs. Therefore, even if more CPUs and GPUs are available in your "
@@ -15257,23 +15369,23 @@ msgid ""
 "results in a single ``ClientApp`` running at any given point."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:274
+#: ../../source/how-to-run-simulations.rst:276
 msgid ""
 "For a complete list of settings you can configure, check the `ray.init "
 "<https://docs.ray.io/en/latest/ray-core/api/doc/ray.init.html#ray-init>`_"
 " documentation."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:277
+#: ../../source/how-to-run-simulations.rst:279
 #, python-brace-format
 msgid "For the highest performance, do not set ``--init-args-{...}`` flags."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:283
+#: ../../source/how-to-run-simulations.rst:285
 msgid "Multi-node Flower simulations"
 msgstr "多节点 Flower 模拟"
 
-#: ../../source/how-to-run-simulations.rst:285
+#: ../../source/how-to-run-simulations.rst:287
 #, fuzzy
 msgid ""
 "Flower's ``Simulation Runtime`` allows you to run FL simulations across "
@@ -15282,17 +15394,17 @@ msgid ""
 "simulation, ensure that you:"
 msgstr "Flower 的 :code:`VirtualClientEngine` 允许您在多个计算节点上运行 FL 模拟。在开始多节点模拟之前，请确保："
 
-#: ../../source/how-to-run-simulations.rst:289
+#: ../../source/how-to-run-simulations.rst:291
 #, fuzzy
 msgid "Have the same Python environment on all nodes."
 msgstr "所有节点都有相同的 Python 环境。"
 
-#: ../../source/how-to-run-simulations.rst:290
+#: ../../source/how-to-run-simulations.rst:292
 #, fuzzy
 msgid "Have a copy of your code on all nodes."
 msgstr "在所有节点上都有一份代码副本（例如整个软件包）。"
 
-#: ../../source/how-to-run-simulations.rst:291
+#: ../../source/how-to-run-simulations.rst:293
 msgid ""
 "Have a copy of your dataset on all nodes. If you are using partitions "
 "from `Flower Datasets <https://flower.ai/docs/datasets>`_, ensure the "
@@ -15300,7 +15412,7 @@ msgid ""
 "is that the i-th dataset partition is identical in all nodes."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:295
+#: ../../source/how-to-run-simulations.rst:297
 #, fuzzy
 msgid ""
 "Start Ray on your head node: on the terminal, type ``ray start --head``. "
@@ -15310,7 +15422,7 @@ msgstr ""
 "在头部节点上启动 Ray：在终端上输入 :code:`raystart--"
 "head`。该命令将打印几行输出，其中一行说明如何将其他节点连接到头部节点。"
 
-#: ../../source/how-to-run-simulations.rst:298
+#: ../../source/how-to-run-simulations.rst:300
 #, fuzzy
 msgid ""
 "Attach other nodes to the head node: copy the command shown after "
@@ -15322,14 +15434,14 @@ msgstr ""
 "将其他节点附加到头部节点：复制启动头部后显示的命令，并在新节点的终端上执行：例如 :code:`ray start "
 "--address='192.168.1.132:6379'`"
 
-#: ../../source/how-to-run-simulations.rst:303
+#: ../../source/how-to-run-simulations.rst:305
 #, fuzzy
 msgid ""
 "With all the above done, you can run your code from the head node as you "
 "would if the simulation were running on a single node. In other words:"
 msgstr "完成上述所有操作后，您就可以在头部节点上运行代码了，就像在单个节点上运行模拟一样。"
 
-#: ../../source/how-to-run-simulations.rst:311
+#: ../../source/how-to-run-simulations.rst:313
 #, fuzzy
 msgid ""
 "Once your simulation is finished, if you'd like to dismantle your "
@@ -15337,7 +15449,7 @@ msgid ""
 "terminal (including the head node)."
 msgstr "模拟结束后，如果要拆除集群，只需在每个节点（包括头部节点）的终端运行 :code:`ray stop` 命令即可。"
 
-#: ../../source/how-to-run-simulations.rst:316
+#: ../../source/how-to-run-simulations.rst:318
 #, fuzzy
 msgid ""
 "When attaching a new node to the head, all its resources (i.e., all CPUs,"
@@ -15354,7 +15466,7 @@ msgstr ""
 " start` 命令（包括启动头部时）中添加 `--num-cpus=<NUM_CPUS_FROM_NODE>`和/或 `--num-"
 "gpus=<NUM_GPUS_FROM_NODE>`"
 
-#: ../../source/how-to-run-simulations.rst:326
+#: ../../source/how-to-run-simulations.rst:328
 #, fuzzy
 msgid "FAQ for Simulations"
 msgstr "运行模拟"
@@ -15363,7 +15475,7 @@ msgstr "运行模拟"
 msgid "Can I make my ``ClientApp`` instances stateful?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:330
+#: ../../source/how-to-run-simulations.rst:332
 msgid ""
 "Yes. Use the ``state`` attribute of the |context_link|_ object that is "
 "passed to the ``ClientApp`` to save variables, parameters, or results to "
@@ -15375,7 +15487,7 @@ msgstr ""
 msgid "Can I run multiple simulations on the same machine?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:334
+#: ../../source/how-to-run-simulations.rst:336
 msgid ""
 "Yes, but bear in mind that each simulation isn't aware of the resource "
 "usage of the other. If your simulations make use of GPUs, consider "
@@ -15390,7 +15502,7 @@ msgid ""
 "compute/memory these make use of?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:338
+#: ../../source/how-to-run-simulations.rst:340
 msgid ""
 "No. These resources are exclusively used by the simulation backend to "
 "control how many workers can be created on startup. Let's say N backend "
@@ -15404,35 +15516,35 @@ msgstr ""
 msgid "My ``ClientApp`` is triggering OOM on my GPU. What should I do?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:342
+#: ../../source/how-to-run-simulations.rst:344
 msgid ""
 "It is likely that your `num_gpus` setting, which controls the number of "
 "``ClientApp`` instances that can share a GPU, is too low (meaning too "
 "many ``ClientApps`` share the same GPU). Try the following:"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:344
+#: ../../source/how-to-run-simulations.rst:346
 msgid ""
 "Set your ``num_gpus=1``. This will make a single ``ClientApp`` run on a "
 "GPU."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:345
+#: ../../source/how-to-run-simulations.rst:347
 msgid "Inspect how much VRAM is being used (use ``nvidia-smi`` for this)."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:346
+#: ../../source/how-to-run-simulations.rst:348
 msgid ""
 "Based on the VRAM you see your single ``ClientApp`` using, calculate how "
 "many more would fit within the remaining VRAM. One divided by the total "
 "number of ``ClientApps`` is the ``num_gpus`` value you should set."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:348
+#: ../../source/how-to-run-simulations.rst:350
 msgid "Refer to :ref:`clientappresources` for more details."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:350
+#: ../../source/how-to-run-simulations.rst:352
 msgid ""
 "If your ``ClientApp`` is using TensorFlow, make sure you are exporting "
 "``TF_FORCE_GPU_ALLOW_GROWTH=\"1\"`` before starting your simulation. For "
@@ -15445,7 +15557,7 @@ msgid ""
 "``ClientApp``?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:354
+#: ../../source/how-to-run-simulations.rst:356
 msgid ""
 "A good practice is to start by running the simulation for a few rounds "
 "with higher ``num_cpus`` and ``num_gpus`` than what is really needed "
@@ -15457,7 +15569,7 @@ msgid ""
 "until you see a satisfactory system resource utilization."
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:356
+#: ../../source/how-to-run-simulations.rst:358
 msgid ""
 "Note that if the workload on your ``ClientApp`` instances is not "
 "homogeneous (i.e., some come with a larger compute or memory footprint), "
@@ -15469,7 +15581,7 @@ msgstr ""
 msgid "Can I assign different resources to each ``ClientApp`` instance?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:360
+#: ../../source/how-to-run-simulations.rst:362
 msgid ""
 "No. All ``ClientApp`` objects are assumed to make use of the same "
 "``num_cpus`` and ``num_gpus``. When setting these values (refer to "
@@ -15484,7 +15596,7 @@ msgid ""
 "servers)?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:364
+#: ../../source/how-to-run-simulations.rst:366
 msgid ""
 "Yes. If you are using the ``RayBackend`` (the *default* backend) you can "
 "first interconnect your nodes through Ray's cli and then launch the "
@@ -15499,7 +15611,7 @@ msgid ""
 "taken into account by the ``Simulation Runtime``?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:368
+#: ../../source/how-to-run-simulations.rst:370
 msgid ""
 "No. The ``Simulation Runtime`` only manages ``ClientApps`` and therefore "
 "is only aware of the system resources they require. If your ``ServerApp``"
@@ -15513,7 +15625,7 @@ msgid ""
 "should run? Can I do resource placement?"
 msgstr ""
 
-#: ../../source/how-to-run-simulations.rst:372
+#: ../../source/how-to-run-simulations.rst:374
 msgid ""
 "Currently, the placement of ``ClientApp`` instances is managed by the "
 "``RayBackend`` (the only backend available as of ``flwr==1.13.0``) and "
@@ -17597,6 +17709,7 @@ msgid ""
 msgstr "查看主 Flower Framework 的文档，轻松实现联邦学习的 Python 开发。"
 
 #: ../../source/index.rst:3
+#, fuzzy
 msgid "Flower Framework Documentation"
 msgstr "Flower 框架文档"
 
@@ -17667,6 +17780,7 @@ msgstr ""
 "android>` | :doc:`iOS <tutorial-quickstart-ios>`"
 
 #: ../../source/ref-api-cli.rst:3
+#, fuzzy
 msgid "Flower CLI reference"
 msgstr "Flower CLI 参考"
 
@@ -18546,6 +18660,7 @@ msgstr ""
 #: flwr.clientapp.client_app.ClientApp.query
 #: flwr.clientapp.client_app.ClientApp.train
 #: flwr.serverapp.grid.grid.Grid.send_and_receive of
+#, fuzzy
 msgid "Returns"
 msgstr "返回"
 
@@ -21271,6 +21386,7 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 #: flwr.serverapp.strategy.fedadagrad.FedAdagrad:1 of
+#, fuzzy
 msgid "FedAdagrad strategy - Adaptive Federated Optimization using Adagrad."
 msgstr "FedAdagrad 策略 - 使用 Adagrad 进行自适应联合优化。"
 
@@ -21313,6 +21429,7 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 #: flwr.serverapp.strategy.fedavgm.FedAvgM:1 of
+#, fuzzy
 msgid "Federated Averaging with Momentum strategy."
 msgstr "联邦平均动量策略。"
 
@@ -21342,6 +21459,7 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 #: flwr.serverapp.strategy.fedprox.FedProx:1 of
+#, fuzzy
 msgid "Federated Optimization strategy."
 msgstr "联邦优化策略。"
 
@@ -21400,6 +21518,7 @@ msgstr ""
 
 #: ../../source/ref-api/flwr.serverapp.strategy.rst:41:<autosummary>:1
 #: flwr.serverapp.strategy.fedyogi.FedYogi:1 of
+#, fuzzy
 msgid "FedYogi [Reddi et al., 2020] strategy."
 msgstr "FedYogi [Reddi 等人，2020] 策略。"
 
@@ -21500,7 +21619,7 @@ msgstr "实施基于 https://arxiv.org/abs/1802.07927。"
 #: flwr.serverapp.strategy.fedavg.FedAvg:5
 #: flwr.serverapp.strategy.fedavgm.FedAvgM:5
 #: flwr.serverapp.strategy.fedmedian.FedMedian:5
-#: flwr.serverapp.strategy.fedprox.FedProx:45
+#: flwr.serverapp.strategy.fedprox.FedProx:48
 #: flwr.serverapp.strategy.fedtrimmedavg.FedTrimmedAvg:5
 #: flwr.serverapp.strategy.fedxgb_bagging.FedXgbBagging:3
 #: flwr.serverapp.strategy.fedxgb_cyclic.FedXgbCyclic:3
@@ -21523,7 +21642,7 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavg.FedAvg:9
 #: flwr.serverapp.strategy.fedavgm.FedAvgM:9
 #: flwr.serverapp.strategy.fedmedian.FedMedian:9
-#: flwr.serverapp.strategy.fedprox.FedProx:49
+#: flwr.serverapp.strategy.fedprox.FedProx:52
 #: flwr.serverapp.strategy.fedtrimmedavg.FedTrimmedAvg:9
 #: flwr.serverapp.strategy.fedxgb_bagging.FedXgbBagging:7
 #: flwr.serverapp.strategy.fedxgb_cyclic.FedXgbCyclic:7
@@ -21546,7 +21665,7 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavg.FedAvg:13
 #: flwr.serverapp.strategy.fedavgm.FedAvgM:13
 #: flwr.serverapp.strategy.fedmedian.FedMedian:13
-#: flwr.serverapp.strategy.fedprox.FedProx:53
+#: flwr.serverapp.strategy.fedprox.FedProx:56
 #: flwr.serverapp.strategy.fedtrimmedavg.FedTrimmedAvg:13
 #: flwr.serverapp.strategy.fedxgb_bagging.FedXgbBagging:11
 #: flwr.serverapp.strategy.fedyogi.FedYogi:14
@@ -21563,7 +21682,7 @@ msgstr "训练期间使用的最少客户数。默认为 2。"
 #: flwr.serverapp.strategy.fedavg.FedAvg:15
 #: flwr.serverapp.strategy.fedavgm.FedAvgM:15
 #: flwr.serverapp.strategy.fedmedian.FedMedian:15
-#: flwr.serverapp.strategy.fedprox.FedProx:55
+#: flwr.serverapp.strategy.fedprox.FedProx:58
 #: flwr.serverapp.strategy.fedtrimmedavg.FedTrimmedAvg:15
 #: flwr.serverapp.strategy.fedxgb_bagging.FedXgbBagging:13
 #: flwr.serverapp.strategy.fedyogi.FedYogi:16
@@ -21580,7 +21699,7 @@ msgstr "验证过程中使用的最少客户端数量。默认为 2。"
 #: flwr.serverapp.strategy.fedavg.FedAvg:17
 #: flwr.serverapp.strategy.fedavgm.FedAvgM:17
 #: flwr.serverapp.strategy.fedmedian.FedMedian:17
-#: flwr.serverapp.strategy.fedprox.FedProx:57
+#: flwr.serverapp.strategy.fedprox.FedProx:60
 #: flwr.serverapp.strategy.fedtrimmedavg.FedTrimmedAvg:17
 #: flwr.serverapp.strategy.fedxgb_bagging.FedXgbBagging:15
 #: flwr.serverapp.strategy.fedxgb_cyclic.FedXgbCyclic:11
@@ -21614,7 +21733,7 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavg.FedAvg:22
 #: flwr.serverapp.strategy.fedavgm.FedAvgM:22
 #: flwr.serverapp.strategy.fedmedian.FedMedian:22
-#: flwr.serverapp.strategy.fedprox.FedProx:62
+#: flwr.serverapp.strategy.fedprox.FedProx:65
 #: flwr.serverapp.strategy.fedtrimmedavg.FedTrimmedAvg:22
 #: flwr.serverapp.strategy.fedxgb_bagging.FedXgbBagging:20
 #: flwr.serverapp.strategy.fedxgb_cyclic.FedXgbCyclic:16
@@ -21631,7 +21750,7 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavg.FedAvg:24
 #: flwr.serverapp.strategy.fedavgm.FedAvgM:24
 #: flwr.serverapp.strategy.fedmedian.FedMedian:24
-#: flwr.serverapp.strategy.fedprox.FedProx:64
+#: flwr.serverapp.strategy.fedprox.FedProx:67
 #: flwr.serverapp.strategy.fedtrimmedavg.FedTrimmedAvg:24
 #: flwr.serverapp.strategy.fedxgb_bagging.FedXgbBagging:22
 #: flwr.serverapp.strategy.fedxgb_cyclic.FedXgbCyclic:18
@@ -21654,8 +21773,8 @@ msgstr ""
 #: flwr.serverapp.strategy.fedavgm.FedAvgM:31
 #: flwr.serverapp.strategy.fedmedian.FedMedian:26
 #: flwr.serverapp.strategy.fedmedian.FedMedian:31
-#: flwr.serverapp.strategy.fedprox.FedProx:66
-#: flwr.serverapp.strategy.fedprox.FedProx:71
+#: flwr.serverapp.strategy.fedprox.FedProx:69
+#: flwr.serverapp.strategy.fedprox.FedProx:74
 #: flwr.serverapp.strategy.fedtrimmedavg.FedTrimmedAvg:26
 #: flwr.serverapp.strategy.fedtrimmedavg.FedTrimmedAvg:31
 #: flwr.serverapp.strategy.fedxgb_bagging.FedXgbBagging:24
@@ -22390,6 +22509,7 @@ msgstr "Bases: :py:class:`~flwr.server.strategy.fedopt.FedOpt`"
 #: flwr.serverapp.strategy.fedadagrad.FedAdagrad:3
 #: flwr.serverapp.strategy.fedadam.FedAdam:3
 #: flwr.serverapp.strategy.fedyogi.FedYogi:3 of
+#, fuzzy
 msgid "Implementation based on https://arxiv.org/abs/2003.00295v5"
 msgstr "实施基于 https://arxiv.org/abs/2003.00295v5"
 
@@ -22397,7 +22517,7 @@ msgstr "实施基于 https://arxiv.org/abs/2003.00295v5"
 #: flwr.serverapp.strategy.fedadam.FedAdam:19
 #: flwr.serverapp.strategy.fedavg.FedAvg:19
 #: flwr.serverapp.strategy.fedavgm.FedAvgM:19
-#: flwr.serverapp.strategy.fedprox.FedProx:59
+#: flwr.serverapp.strategy.fedprox.FedProx:62
 #: flwr.serverapp.strategy.fedtrimmedavg.FedTrimmedAvg:19
 #: flwr.serverapp.strategy.fedyogi.FedYogi:20
 #: flwr.serverapp.strategy.multikrum.MultiKrum:23 of
@@ -22837,11 +22957,11 @@ msgstr ""
 msgid "In PyTorch, for example, the loss would go from:"
 msgstr "例如，在 PyTorch 中，损失将从："
 
-#: flwr.serverapp.strategy.fedprox.FedProx:25 of
+#: flwr.serverapp.strategy.fedprox.FedProx:26 of
 msgid "To:"
 msgstr "致："
 
-#: flwr.serverapp.strategy.fedprox.FedProx:39 of
+#: flwr.serverapp.strategy.fedprox.FedProx:41 of
 #, fuzzy
 msgid ""
 "With ``global_params`` being a copy of the model parameters, created "
@@ -22849,7 +22969,7 @@ msgid ""
 "training begins."
 msgstr "其中，\"global_params \"是训练前的参数副本。"
 
-#: flwr.serverapp.strategy.fedprox.FedProx:76 of
+#: flwr.serverapp.strategy.fedprox.FedProx:79 of
 msgid ""
 "The weight of the proximal term used in the optimization. 0.0 makes this "
 "strategy equivalent to FedAvg, and the higher the coefficient, the more "
@@ -23600,6 +23720,7 @@ msgstr ""
 
 #: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:1:<autosummary>:1
 #: flwr.serverapp.strategy.strategy.Strategy.configure_evaluate:1 of
+#, fuzzy
 msgid "Configure the next round of evaluation."
 msgstr "配置下一轮评估。"
 
@@ -23633,6 +23754,7 @@ msgstr "server.strategy.Strategy"
 #: flwr.serverapp.strategy.strategy.Strategy.aggregate_evaluate:3
 #: flwr.serverapp.strategy.strategy.Strategy.configure_evaluate:3
 #: flwr.serverapp.strategy.strategy.Strategy.configure_train:3 of
+#, fuzzy
 msgid "The current round of federated learning."
 msgstr "本轮联邦学习。"
 
@@ -34401,10 +34523,12 @@ msgid ""
 msgstr "新的测试设施可确保新的变更与现有的框架集成或策略保持兼容。"
 
 #: ../../source/ref-changelog.md:1947
+#, fuzzy
 msgid "**Deprecate Python 3.7**"
 msgstr "** 过时的 Python 3.7**"
 
 #: ../../source/ref-changelog.md:1949
+#, fuzzy
 msgid ""
 "Since Python 3.7 reached its end of life (EOL) on 2023-06-27, support for"
 " Python 3.7 is now deprecated and will be removed in an upcoming release."
@@ -34511,6 +34635,7 @@ msgstr ""
 "应用程序接口，它使用请求-响应模型与客户端节点通信。"
 
 #: ../../source/ref-changelog.md:1973
+#, fuzzy
 msgid ""
 "Please note: The gRPC request-response API is still experimental and will"
 " likely change significantly over time."
@@ -37643,6 +37768,7 @@ msgstr ""
 "docstrings（[#470](https://github.com/adap/flower/pull/470)）。"
 
 #: ../../source/ref-example-projects.rst:3
+#, fuzzy
 msgid "Example projects"
 msgstr "项目实例"
 
@@ -40041,6 +40167,7 @@ msgid ""
 msgstr "阅读本联邦学习快速入门教程，了解如何使用 Flower 创建 Android 应用程序。"
 
 #: ../../source/tutorial-quickstart-android.rst:5
+#, fuzzy
 msgid "Quickstart Android"
 msgstr "快速入门 Android"
 
@@ -40151,7 +40278,7 @@ msgid "With default arguments you will see streamed output like this:"
 msgstr ""
 
 #: ../../source/tutorial-quickstart-fastai.rst:87
-#: ../../source/tutorial-quickstart-huggingface.rst:101
+#: ../../source/tutorial-quickstart-huggingface.rst:102
 #: ../../source/tutorial-quickstart-jax.rst:92
 #: ../../source/tutorial-quickstart-pytorch-lightning.rst:97
 #: ../../source/tutorial-quickstart-pytorch.rst:128
@@ -40163,7 +40290,7 @@ msgid ""
 msgstr ""
 
 #: ../../source/tutorial-quickstart-fastai.rst:97
-#: ../../source/tutorial-quickstart-huggingface.rst:373
+#: ../../source/tutorial-quickstart-huggingface.rst:374
 #: ../../source/tutorial-quickstart-jax.rst:413
 #: ../../source/tutorial-quickstart-mlx.rst:455
 #: ../../source/tutorial-quickstart-pytorch-lightning.rst:107
@@ -40261,17 +40388,17 @@ msgstr ""
 msgid "To run the project, do:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:91
+#: ../../source/tutorial-quickstart-huggingface.rst:92
 msgid "You can also run the project with GPU as follows:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:98
+#: ../../source/tutorial-quickstart-huggingface.rst:99
 msgid ""
 "This will use the default arguments where each ``ClientApp`` will use 4 "
 "CPUs and at most 4 ``ClientApp``\\s will run in a given GPU."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:109
+#: ../../source/tutorial-quickstart-huggingface.rst:110
 #: ../../source/tutorial-quickstart-jax.rst:100
 #: ../../source/tutorial-quickstart-pytorch.rst:136
 #: ../../source/tutorial-quickstart-scikitlearn.rst:127
@@ -40281,7 +40408,7 @@ msgid ""
 "defining the ``ServerApp``."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:113
+#: ../../source/tutorial-quickstart-huggingface.rst:114
 #: ../../source/tutorial-quickstart-jax.rst:105
 #: ../../source/tutorial-quickstart-mlx.rst:141
 #: ../../source/tutorial-quickstart-pytorch.rst:141
@@ -40292,7 +40419,7 @@ msgstr ""
 msgid "The Data"
 msgstr "加载数据"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:115
+#: ../../source/tutorial-quickstart-huggingface.rst:116
 msgid ""
 "This tutorial uses |flowerdatasets|_ to easily download and partition the"
 " `IMDB <https://huggingface.co/datasets/stanfordnlp/imdb>`_ dataset. In "
@@ -40305,7 +40432,7 @@ msgid ""
 "their data partition."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:160
+#: ../../source/tutorial-quickstart-huggingface.rst:161
 #: ../../source/tutorial-quickstart-jax.rst:149
 #: ../../source/tutorial-quickstart-mlx.rst:184
 #: ../../source/tutorial-quickstart-pytorch.rst:180
@@ -40315,7 +40442,7 @@ msgstr ""
 msgid "The Model"
 msgstr "训练模型"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:162
+#: ../../source/tutorial-quickstart-huggingface.rst:163
 #, fuzzy
 msgid ""
 "We will leverage 🤗 Hugging Face to federate the training of language "
@@ -40328,13 +40455,13 @@ msgstr ""
 "我们将利用Hugging Face技术，使用 Flower 在多个客户端上联邦训练语言模型。更具体地说，我们将对预先训练好的 "
 "Transformer 模型（distilBERT）进行微调，以便在 IMDB 评分数据集上进行序列分类。最终目标是检测电影评分是正面还是负面。"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:174
+#: ../../source/tutorial-quickstart-huggingface.rst:175
 msgid ""
 "Note that here, ``model_name`` is a string that will be loaded from the "
 "``Context`` in the ClientApp and ServerApp."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:177
+#: ../../source/tutorial-quickstart-huggingface.rst:178
 msgid ""
 "In addition to loading the pretrained model weights and architecture, we "
 "also include two utility functions to perform both training (i.e. "
@@ -40347,7 +40474,7 @@ msgid ""
 "perform local training or evaluation:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:217
+#: ../../source/tutorial-quickstart-huggingface.rst:218
 #: ../../source/tutorial-quickstart-jax.rst:230
 #: ../../source/tutorial-quickstart-mlx.rst:228
 #: ../../source/tutorial-quickstart-pytorch.rst:255
@@ -40358,7 +40485,7 @@ msgstr ""
 msgid "The ClientApp"
 msgstr "客户端"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:219
+#: ../../source/tutorial-quickstart-huggingface.rst:220
 msgid ""
 "The main changes we have to make to use 🤗 Hugging Face with Flower have "
 "to do with converting the |arrayrecord_link|_ received in the "
@@ -40367,7 +40494,7 @@ msgid ""
 "the built-in methods in the ``ArrayRecord`` to make these conversions:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:240
+#: ../../source/tutorial-quickstart-huggingface.rst:241
 #: ../../source/tutorial-quickstart-jax.rst:274
 #: ../../source/tutorial-quickstart-pytorch.rst:279
 #: ../../source/tutorial-quickstart-scikitlearn.rst:210
@@ -40384,7 +40511,7 @@ msgid ""
 "``train`` and ``evaluate``."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:248
+#: ../../source/tutorial-quickstart-huggingface.rst:249
 #: ../../source/tutorial-quickstart-jax.rst:282
 #: ../../source/tutorial-quickstart-pytorch.rst:287
 #: ../../source/tutorial-quickstart-scikitlearn.rst:218
@@ -40396,7 +40523,7 @@ msgid ""
 "carries:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:251
+#: ../../source/tutorial-quickstart-huggingface.rst:252
 #: ../../source/tutorial-quickstart-jax.rst:285
 #: ../../source/tutorial-quickstart-pytorch.rst:290
 #: ../../source/tutorial-quickstart-scikitlearn.rst:221
@@ -40408,7 +40535,7 @@ msgid ""
 "content."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:253
+#: ../../source/tutorial-quickstart-huggingface.rst:254
 #: ../../source/tutorial-quickstart-jax.rst:287
 #: ../../source/tutorial-quickstart-pytorch.rst:292
 #: ../../source/tutorial-quickstart-scikitlearn.rst:223
@@ -40420,7 +40547,7 @@ msgid ""
 "message content."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:256
+#: ../../source/tutorial-quickstart-huggingface.rst:257
 #: ../../source/tutorial-quickstart-jax.rst:290
 #: ../../source/tutorial-quickstart-scikitlearn.rst:226
 #: ../../source/tutorial-quickstart-tensorflow.rst:230
@@ -40432,7 +40559,7 @@ msgid ""
 "directly configurable during simulations."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:296
+#: ../../source/tutorial-quickstart-huggingface.rst:297
 #: ../../source/tutorial-quickstart-jax.rst:332
 #: ../../source/tutorial-quickstart-pytorch.rst:347
 #: ../../source/tutorial-quickstart-tensorflow.rst:285
@@ -40445,7 +40572,7 @@ msgid ""
 "is not locally modified."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:302
+#: ../../source/tutorial-quickstart-huggingface.rst:303
 #: ../../source/tutorial-quickstart-jax.rst:339
 #: ../../source/tutorial-quickstart-mlx.rst:386
 #: ../../source/tutorial-quickstart-mlx.rst:390
@@ -40457,7 +40584,7 @@ msgstr ""
 msgid "The ServerApp"
 msgstr "服务器"
 
-#: ../../source/tutorial-quickstart-huggingface.rst:304
+#: ../../source/tutorial-quickstart-huggingface.rst:305
 #: ../../source/tutorial-quickstart-jax.rst:341
 #: ../../source/tutorial-quickstart-pytorch.rst:356
 #: ../../source/tutorial-quickstart-scikitlearn.rst:286
@@ -40467,7 +40594,7 @@ msgid ""
 "This method receive as input arguments:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:307
+#: ../../source/tutorial-quickstart-huggingface.rst:308
 #: ../../source/tutorial-quickstart-jax.rst:344
 #: ../../source/tutorial-quickstart-mlx.rst:395
 #: ../../source/tutorial-quickstart-pytorch.rst:359
@@ -40480,7 +40607,7 @@ msgid ""
 "other."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:309
+#: ../../source/tutorial-quickstart-huggingface.rst:310
 #: ../../source/tutorial-quickstart-jax.rst:346
 #: ../../source/tutorial-quickstart-mlx.rst:397
 #: ../../source/tutorial-quickstart-pytorch.rst:361
@@ -40490,7 +40617,7 @@ msgstr ""
 msgid "a ``Context`` object that provides access to the run configuration."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:311
+#: ../../source/tutorial-quickstart-huggingface.rst:312
 msgid ""
 "In this example we use the |fedavg|_ and configure it with a specific "
 "value of ``fraction_train`` which is read from the run config. You can "
@@ -40499,7 +40626,7 @@ msgid ""
 "|strategy_start_link|_ method. To it we pass:"
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:316
+#: ../../source/tutorial-quickstart-huggingface.rst:317
 #: ../../source/tutorial-quickstart-jax.rst:353
 #: ../../source/tutorial-quickstart-mlx.rst:404
 #: ../../source/tutorial-quickstart-pytorch.rst:368
@@ -40509,14 +40636,14 @@ msgstr ""
 msgid "the ``Grid`` object."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:317
+#: ../../source/tutorial-quickstart-huggingface.rst:318
 #: ../../source/tutorial-quickstart-jax.rst:354
 msgid ""
 "an ``ArrayRecord`` carrying a randomly initialized model that will serve "
 "as the global model to be federated."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:319
+#: ../../source/tutorial-quickstart-huggingface.rst:320
 #: ../../source/tutorial-quickstart-pytorch.rst:371
 #: ../../source/tutorial-quickstart-scikitlearn.rst:301
 msgid ""
@@ -40525,7 +40652,7 @@ msgid ""
 "config before sending it to the participating nodes."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:322
+#: ../../source/tutorial-quickstart-huggingface.rst:323
 #: ../../source/tutorial-quickstart-jax.rst:359
 #: ../../source/tutorial-quickstart-mlx.rst:407
 #: ../../source/tutorial-quickstart-pytorch.rst:374
@@ -40536,7 +40663,7 @@ msgid ""
 "perform."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:360
+#: ../../source/tutorial-quickstart-huggingface.rst:361
 msgid ""
 "Note the ``start`` method of the strategy returns a result object. This "
 "object contains all the relevant information about the FL process, "
@@ -40548,13 +40675,13 @@ msgid ""
 "``torch.save``."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:367
+#: ../../source/tutorial-quickstart-huggingface.rst:368
 msgid ""
 "Congratulations! You've successfully built and run your first federated "
 "learning system for an LLM."
 msgstr ""
 
-#: ../../source/tutorial-quickstart-huggingface.rst:379
+#: ../../source/tutorial-quickstart-huggingface.rst:380
 msgid ""
 "Check the source code of the extended version of this tutorial in "
 "|quickstart_hf_link|_ in the Flower GitHub repository. For a "
@@ -40569,6 +40696,7 @@ msgid ""
 msgstr "阅读本联邦学习快速入门教程，了解如何使用 Flower 创建 iOS 应用程序，并在 MNIST 上训练神经网络。"
 
 #: ../../source/tutorial-quickstart-ios.rst:5
+#, fuzzy
 msgid "Quickstart iOS"
 msgstr "快速入门 iOS"
 
@@ -40619,6 +40747,7 @@ msgid ""
 msgstr "*客户端*负责根据其本地数据集为模型生成独立的模型参数。然后，这些参数更新会被发送到*服务器*，由*服务器*汇总后生成一个更好的模型。最后，*服务器*将改进后的模型发送回每个*客户端*。一个完整的参数更新周期称为一*轮*。"
 
 #: ../../source/tutorial-quickstart-ios.rst:35
+#, fuzzy
 msgid ""
 "Now that we have a rough idea of what is going on, let's get started to "
 "setup our Flower server environment. We first need to install Flower. You"
@@ -73879,4 +74008,3 @@ msgstr ""
 #~ " package without breaking other "
 #~ "``flwr``-internal users."
 #~ msgstr ""
-
