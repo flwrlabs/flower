@@ -18,9 +18,9 @@ We would like to give our special thanks to all the contributors who made the ne
 
   Adds new and expanded SuperGrid guides, including Flower CLI usage and instructions for running apps on SuperGrid. To learn more about using SuperGrid, see the [Get started with Flower tutorial](https://flower.ai/docs/framework/1.31/en/tutorial-series-get-started-with-flower.html).
 
-- **Add Kubernetes executor(TDB)** ([#7155](https://github.com/flwrlabs/flower/pull/7155), [#7174](https://github.com/flwrlabs/flower/pull/7174), [#7206](https://github.com/flwrlabs/flower/pull/7206), [#7231](https://github.com/flwrlabs/flower/pull/7231), [#7232](https://github.com/flwrlabs/flower/pull/7232), [#7233](https://github.com/flwrlabs/flower/pull/7233), [#7234](https://github.com/flwrlabs/flower/pull/7234), [#7235](https://github.com/flwrlabs/flower/pull/7235))
+- **Add Executor Abstraction for SuperExecs** ([#7155](https://github.com/flwrlabs/flower/pull/7155), [#7174](https://github.com/flwrlabs/flower/pull/7174), [#7206](https://github.com/flwrlabs/flower/pull/7206), [#7231](https://github.com/flwrlabs/flower/pull/7231), [#7232](https://github.com/flwrlabs/flower/pull/7232), [#7233](https://github.com/flwrlabs/flower/pull/7233), [#7234](https://github.com/flwrlabs/flower/pull/7234), [#7235](https://github.com/flwrlabs/flower/pull/7235))
 
-  summary-TBH
+  Introduces a SuperExec Executor framework that separates task selection from how tasks are launched. The new execution specification, launch result handling, token-file support, and capacity hook make it easier to add and enrich launch paths for different execution environments, from local subprocesses to containers, Kubernetes pods, and other managed runtimes.
 
 - **Improve high availability** ([#7169](https://github.com/flwrlabs/flower/pull/7169), [#7173](https://github.com/flwrlabs/flower/pull/7173), [#7265](https://github.com/flwrlabs/flower/pull/7265), [#7266](https://github.com/flwrlabs/flower/pull/7266), [#7282](https://github.com/flwrlabs/flower/pull/7282), [#7284](https://github.com/flwrlabs/flower/pull/7284), [#7285](https://github.com/flwrlabs/flower/pull/7285))
 
