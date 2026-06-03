@@ -30,8 +30,13 @@ def try_resolve_builtin_agent_fab(
     if app_spec != _BUILTIN_AGENT_APP_SPEC:
         return None
 
-    pyproject_toml = (
-        files("flwr.agentapp.builtin").joinpath("pyproject.toml").read_bytes()
+    builtin_files = files("flwr.agentapp.builtin")
+    pyproject_toml = builtin_files.joinpath("pyproject.toml").read_bytes()
+    flwr_agent_py = builtin_files.joinpath("flwr_agent.py").read_bytes()
+    fab_file, _ = build_fab_from_files(
+        {
+            "pyproject.toml": pyproject_toml,
+            "flwr_agent.py": flwr_agent_py,
+        }
     )
-    fab_file, _ = build_fab_from_files({"pyproject.toml": pyproject_toml})
     return fab_file, {}
