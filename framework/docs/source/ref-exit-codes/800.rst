@@ -12,4 +12,5 @@ An unhandled exception occurred in a task process.
  How to Resolve
 ****************
 
-Check the task process logs for detailed information about the exception and the stack trace.
+Check the task process logs for detailed information about the exception and the stack
+trace.

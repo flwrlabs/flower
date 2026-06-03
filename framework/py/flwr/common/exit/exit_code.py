@@ -203,5 +203,7 @@ To use simulation with the Ray backend, install `flwr` with the `simulation` ext
     `pip install "flwr[simulation]"`.
 """,
     # Task process exit codes (800-899)
-    ExitCode.TASK_PROC_EXCEPTION: "An unhandled exception occurred in a task process.",
+    ExitCode.TASK_PROC_EXCEPTION: (
+        "An unhandled exception occurred in a task process."
+    ),
 }

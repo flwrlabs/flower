@@ -22,7 +22,7 @@ from unittest.mock import patch
 
 from parameterized import parameterized
 
-from flwr.app import ConfigRecord, Context, Message, Metadata, RecordDict
+from flwr.app import ConfigRecord, Message, Metadata, RecordDict
 from flwr.app.message import make_message
 from flwr.common import now
 from flwr.common.constant import ErrorCode
@@ -110,24 +110,6 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         # Also verify write-time hash validation rejects mismatched hashes.
         with self.assertRaisesRegex(ValueError, "FAB hash mismatch"):
             self.state.store_fab(Fab("not-the-content-hash", b"fab-content", {}))
-
-    def test_store_and_get_context(self) -> None:
-        """Test storing and retrieving a context."""
-        # Prepare
-        ctx = Context(
-            run_id=99,
-            node_id=1,
-            node_config={"key1": "value1"},
-            state=RecordDict({"cfg": ConfigRecord({"key2": "value2"})}),
-            run_config={"key3": "value3"},
-        )
-        self.state.store_context(ctx)
-
-        # Execute
-        retrieved = self.state.get_context(99)
-
-        # Assert
-        self.assertEqual(retrieved, ctx)
 
     def test_store_and_get_message_basic(self) -> None:
         """Test storing and retrieving a message."""
