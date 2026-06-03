@@ -38,7 +38,6 @@ from .context_items import append_items
 
 _DEFAULT_MODEL_REPLY_TIMEOUT = 300.0
 _DEFAULT_MODEL_REPLY_POLL_INTERVAL = 0.25
-_DEFAULT_PULL_LIMIT = 1
 
 
 class RuntimeAgentSession(AgentSession):
