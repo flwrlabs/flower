@@ -17,4 +17,6 @@
 
 from .resolver import try_resolve_builtin_agent_fab
 
-__all__ = ["try_resolve_builtin_agent_fab"]
+__all__ = [
+    "try_resolve_builtin_agent_fab",
+]
