@@ -129,9 +129,12 @@ class RuntimeAgentResponses(AgentResponses):
         deadline = time.monotonic() + _DEFAULT_MODEL_REPLY_TIMEOUT
 
         while True:
-            for message in self._pull_task_messages():
-                if message.metadata.reply_to_message_id == reply_to_message_id:
-                    return message
+            message = self._pull_task_messages()
+            if (
+                message is not None
+                and message.metadata.reply_to_message_id == reply_to_message_id
+            ):
+                return message
 
             remaining = deadline - time.monotonic()
             if remaining <= 0:
