@@ -45,7 +45,9 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_state = Mock()
         self.node_id = 111
         self.run_id = 110
+        self.series_id = 112
         self.mock_state.get_node_id.return_value = self.node_id
+        self.mock_state.get_run_series_context.return_value = None
         self.mock_object_store = Mock()
         self.mock_receive = Mock()
         self.mock_get_run = Mock()
@@ -159,7 +161,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_get_fab.assert_not_called()
         self.mock_state.store_fab.assert_not_called()
         self.mock_state.store_run.assert_not_called()
-        self.mock_state.store_context.assert_not_called()
+        self.mock_state.set_run_series_context.assert_not_called()
 
     def test_pull_and_store_message_returns_none_if_create_task_fails(self) -> None:
         """Test that message processing stops if task creation fails."""
@@ -247,9 +249,19 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
             run_id=self.run_id,
             fab_hash=fab.hash_str,
             override_config={},
+            series_id=self.series_id,
         )
         self.mock_get_run.return_value = mock_run
         self.mock_get_fab.return_value = fab
+        shared_state = RecordDict({"shared": ConfigRecord({"value": "kept"})})
+        self.mock_state.get_run_series_context.return_value = Context(
+            run_id=109,
+            node_id=self.node_id,
+            node_config={},
+            state=shared_state,
+            run_config={},
+            series_id=self.series_id,
+        )
 
         # Execute
         mock_fused_run_config = {"mock_key": "mock_value"}
@@ -278,16 +290,20 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         self.mock_get_fab.assert_called_once_with(fab.hash_str, self.run_id)
         self.mock_state.store_fab.assert_called_once_with(fab)
         self.mock_state.store_run.assert_called_once_with(mock_run)
+        self.mock_state.get_run_series_context.assert_called_once_with(self.series_id)
 
         # Assert: the Context should be created and stored if run_id is unknown
-        self.mock_state.store_context.assert_called_once()
-        args, _ = self.mock_state.store_context.call_args
-        ctxt = args[0]
+        self.mock_state.set_run_series_context.assert_called_once()
+        args, _ = self.mock_state.set_run_series_context.call_args
+        assert args[0] == self.series_id
+        ctxt = args[1]
         assert isinstance(ctxt, Context)
         assert ctxt.run_id == self.run_id
         assert ctxt.node_id == self.node_id
         assert ctxt.node_config == {}
+        assert ctxt.state is shared_state
         assert ctxt.run_config == mock_fused_run_config
+        assert ctxt.series_id == self.series_id
 
     def test_pull_and_store_message_rejects_missing_verification_metadata(self) -> None:
         """Test that trusted-entity verification fails closed without metadata."""
@@ -327,7 +343,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         mock_verify_fab.assert_not_called()
         self.mock_get_run.assert_called_once_with(self.run_id)
         self.mock_get_fab.assert_called_once_with(fab.hash_str, self.run_id)
-        self.mock_state.store_context.assert_not_called()
+        self.mock_state.set_run_series_context.assert_not_called()
         self.mock_state.store_run.assert_not_called()
         self.mock_confirm_message_received.assert_not_called()
 
@@ -381,7 +397,7 @@ class TestStartClientInternal(unittest.TestCase):  # pylint: disable=R0902
         mock_verify_fab.assert_called_once_with(
             fab, {"trusted": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA"}
         )
-        self.mock_state.store_context.assert_not_called()
+        self.mock_state.set_run_series_context.assert_not_called()
         self.mock_state.store_run.assert_not_called()
         self.mock_confirm_message_received.assert_not_called()
 
