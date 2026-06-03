@@ -14,13 +14,14 @@
 # ==============================================================================
 """Kubernetes executor for SuperExec TaskExecutor processes."""
 
-import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from logging import WARNING
 from pathlib import Path
 from typing import Protocol, cast
 from uuid import uuid4
 
+from flwr.common.logger import log
 from flwr.supercore.constant import (
     TASK_TYPE_TO_APPIO_API_ADDRESS_ARG,
     TASK_TYPE_TO_COMMAND,
@@ -33,8 +34,6 @@ APPIO_CREDENTIALS_MOUNT_PATH = "/run/flwr/appio"
 APPIO_TOKEN_FILE_PATH = f"{APPIO_CREDENTIALS_MOUNT_PATH}/token"
 APPIO_ROOT_CERTIFICATES_FILE_PATH = f"{APPIO_CREDENTIALS_MOUNT_PATH}/ca.crt"
 LAUNCH_ATTEMPT_LABEL = "flower.ai/launch-attempt"
-
-LOGGER = logging.getLogger(__name__)
 
 
 class KubernetesClient(Protocol):
@@ -54,8 +53,41 @@ class KubernetesClient(Protocol):
 class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
     """Configuration needed to build one TaskExecutor Pod and Secret.
 
-    appio_root_certificates contains optional PEM data mounted as ca.crt. If unset,
-    launch uses ExecutionSpec.root_certificates_path when provided.
+    Parameters
+    ----------
+    namespace : str
+        Kubernetes namespace for TaskExecutor Pods and credential Secrets.
+    image : str
+        Container image used for TaskExecutor Pods.
+    appio_root_certificates : str | None
+        Optional PEM data mounted as ca.crt. If unset, launch uses
+        ExecutionSpec.root_certificates_path when provided.
+    image_pull_policy : str | None
+        Optional Kubernetes imagePullPolicy for the TaskExecutor container.
+    labels : dict[str, str] | None
+        Extra labels added to generated Pods and Secrets. Executor-owned labels
+        cannot be overridden.
+    annotations : dict[str, str] | None
+        Extra annotations added to generated Pods and Secrets.
+    resource_pool : str | None
+        Optional Flower resource-pool label value.
+    resources : JSONObject | None
+        Optional Kubernetes container resource requests and limits.
+    node_selector : dict[str, str] | None
+        Optional Kubernetes nodeSelector.
+    tolerations : list[JSONObject] | None
+        Optional Kubernetes tolerations.
+    affinity : JSONObject | None
+        Optional Kubernetes affinity.
+    priority_class_name : str | None
+        Optional Kubernetes priorityClassName.
+    pod_security_context : JSONObject | None
+        Optional Kubernetes Pod securityContext.
+    container_security_context : JSONObject | None
+        Optional TaskExecutor container securityContext.
+    service_account_name : str | None
+        Optional Kubernetes serviceAccountName. Service account policy/RBAC is
+        decided outside this executor.
     """
 
     namespace: str
@@ -84,17 +116,10 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
         )
         _validate_optional_string("Image pull policy", self.image_pull_policy)
         _validate_optional_string("Service account name", self.service_account_name)
-        _validate_optional_string(
-            "Resource pool", self.resource_pool, reject_outer_whitespace=True
-        )
-        _validate_optional_string(
-            "Priority class name",
-            self.priority_class_name,
-            reject_outer_whitespace=True,
-        )
-        _validate_optional_labels(self.labels)
-        _validate_optional_string_map("Kubernetes annotations", self.annotations)
-        _validate_optional_string_map("Node selector", self.node_selector)
+        _validate_optional_string("Resource pool", self.resource_pool)
+        _validate_optional_string("Priority class name", self.priority_class_name)
+        if self.labels is not None:
+            _validate_labels(self.labels)
 
 
 class KubernetesExecutor:
@@ -119,13 +144,13 @@ class KubernetesExecutor:
         """Submit the TaskExecutor Pod and credential Secret."""
         try:
             appio_root_certificates = _get_appio_root_certificates(spec, self._config)
-            launch_attempt = _new_launch_attempt_suffix()
-            secret_name = _credential_secret_name(spec, launch_attempt)
+            launch_attempt_id = _new_launch_attempt_id()
+            secret_name = _credential_secret_name(spec, launch_attempt_id)
             secret = _build_appio_credentials_secret(
-                spec, self._config, appio_root_certificates, launch_attempt
+                spec, self._config, appio_root_certificates, launch_attempt_id
             )
             pod = _build_taskexecutor_pod(
-                spec, self._config, appio_root_certificates, launch_attempt
+                spec, self._config, appio_root_certificates, launch_attempt_id
             )
             self._client.create_namespaced_secret(self._config.namespace, secret)
         except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -148,7 +173,7 @@ def _build_appio_credentials_secret(
     spec: ExecutionSpec,
     config: KubernetesExecutorConfig,
     appio_root_certificates: str | None,
-    launch_attempt: str,
+    launch_attempt_id: str,
 ) -> JSONObject:
     """Build the AppIo credential Secret for a TaskExecutor Pod."""
     data: JSONObject = {"token": spec.token}
@@ -159,7 +184,10 @@ def _build_appio_credentials_secret(
         "apiVersion": "v1",
         "kind": "Secret",
         "metadata": _metadata(
-            _credential_secret_name(spec, launch_attempt), spec, config, launch_attempt
+            _credential_secret_name(spec, launch_attempt_id),
+            spec,
+            config,
+            launch_attempt_id,
         ),
         "type": "Opaque",
         "stringData": data,
@@ -170,7 +198,7 @@ def _build_taskexecutor_pod(
     spec: ExecutionSpec,
     config: KubernetesExecutorConfig,
     appio_root_certificates: str | None,
-    launch_attempt: str,
+    launch_attempt_id: str,
 ) -> JSONObject:
     """Build the TaskExecutor Pod for a claimed SuperExec task."""
     container: JSONObject = {
@@ -203,7 +231,7 @@ def _build_taskexecutor_pod(
             {
                 "name": "appio-credentials",
                 "secret": {
-                    "secretName": _credential_secret_name(spec, launch_attempt),
+                    "secretName": _credential_secret_name(spec, launch_attempt_id),
                     "defaultMode": 0o444,
                 },
             }
@@ -228,7 +256,7 @@ def _build_taskexecutor_pod(
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": _metadata(
-            _pod_name(spec, launch_attempt), spec, config, launch_attempt
+            _pod_name(spec, launch_attempt_id), spec, config, launch_attempt_id
         ),
         "spec": pod_spec,
     }
@@ -269,32 +297,32 @@ def _get_appio_root_certificates(
     return None
 
 
-def _new_launch_attempt_suffix() -> str:
-    """Return a DNS-label-safe identifier for one local launch attempt."""
+def _new_launch_attempt_id() -> str:
+    """Return a DNS-label-safe opaque identifier for one local launch call."""
     return uuid4().hex[:12]
 
 
-def _pod_name(spec: ExecutionSpec, launch_attempt: str) -> str:
+def _pod_name(spec: ExecutionSpec, launch_attempt_id: str) -> str:
     """Return the TaskExecutor Pod name."""
-    return f"flwr-taskexecutor-{spec.task_id}-{launch_attempt}"
+    return f"flwr-taskexecutor-{spec.task_id}-{launch_attempt_id}"
 
 
-def _credential_secret_name(spec: ExecutionSpec, launch_attempt: str) -> str:
+def _credential_secret_name(spec: ExecutionSpec, launch_attempt_id: str) -> str:
     """Return the AppIo credential Secret name."""
-    return f"{_pod_name(spec, launch_attempt)}-appio"
+    return f"{_pod_name(spec, launch_attempt_id)}-appio"
 
 
 def _metadata(
     name: str,
     spec: ExecutionSpec,
     config: KubernetesExecutorConfig,
-    launch_attempt: str,
+    launch_attempt_id: str,
 ) -> JSONObject:
     """Return Kubernetes object metadata."""
     metadata: JSONObject = {
         "name": name,
         "namespace": config.namespace,
-        "labels": _labels(spec, config, launch_attempt),
+        "labels": _labels(spec, config, launch_attempt_id),
     }
     if config.annotations is not None:
         metadata["annotations"] = cast(JSONObject, dict(config.annotations))
@@ -302,7 +330,7 @@ def _metadata(
 
 
 def _labels(
-    spec: ExecutionSpec, config: KubernetesExecutorConfig, launch_attempt: str
+    spec: ExecutionSpec, config: KubernetesExecutorConfig, launch_attempt_id: str
 ) -> JSONObject:
     """Return stable labels for Kubernetes objects."""
     labels: JSONObject = {
@@ -310,7 +338,7 @@ def _labels(
         "app.kubernetes.io/component": "taskexecutor",
         "flower.ai/superexec-task-id": str(spec.task_id),
         "flower.ai/task-type": spec.task_type.value,
-        LAUNCH_ATTEMPT_LABEL: launch_attempt,
+        LAUNCH_ATTEMPT_LABEL: launch_attempt_id,
     }
     if config.resource_pool is not None:
         labels["flower.ai/resource-pool"] = config.resource_pool
@@ -334,14 +362,6 @@ def _validate_labels(labels: dict[str, str]) -> None:
         raise ValueError(
             f"Kubernetes labels must not override stable labels: {conflicts}"
         )
-    _validate_string_map("Kubernetes labels", labels)
-
-
-def _validate_optional_labels(labels: dict[str, str] | None) -> None:
-    """Validate optional caller-provided labels."""
-    if labels is None:
-        return
-    _validate_labels(labels)
 
 
 def _validate_required_string(name: str, value: str) -> None:
@@ -350,31 +370,11 @@ def _validate_required_string(name: str, value: str) -> None:
         raise ValueError(f"{name} must not be empty.")
 
 
-def _validate_optional_string(
-    name: str, value: str | None, *, reject_outer_whitespace: bool = False
-) -> None:
+def _validate_optional_string(name: str, value: str | None) -> None:
     """Validate that an optional string field is not empty when provided."""
     if value is None:
         return
     _validate_required_string(name, value)
-    if reject_outer_whitespace and value != value.strip():
-        raise ValueError(f"{name} must not include leading/trailing whitespace.")
-
-
-def _validate_optional_string_map(name: str, values: dict[str, str] | None) -> None:
-    """Validate optional string mapping entries when provided."""
-    if values is None:
-        return
-    _validate_string_map(name, values)
-
-
-def _validate_string_map(name: str, values: dict[str, str]) -> None:
-    """Validate that mapping entries are non-empty strings."""
-    for key, value in values.items():
-        if not isinstance(key, str) or not isinstance(value, str):
-            raise ValueError(f"{name} entries must be strings.")
-        if not key.strip() or not value.strip():
-            raise ValueError(f"{name} entries must not be empty.")
 
 
 def _copy_json_object(value: object) -> JSONObject:
@@ -432,7 +432,8 @@ def _delete_secret_best_effort(
     try:
         client.delete_namespaced_secret(secret_name, namespace)
     except Exception:  # pylint: disable=broad-exception-caught
-        LOGGER.warning(
+        log(
+            WARNING,
             "Failed to delete Kubernetes credential Secret %r in namespace %r",
             secret_name,
             namespace,

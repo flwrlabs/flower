@@ -45,10 +45,10 @@ class _KubernetesApiError(Exception):
         self.status = status
 
 
-_LAUNCH_ATTEMPT = "abc123def456"
-_NEXT_LAUNCH_ATTEMPT = "def456abc123"
-_POD_NAME = f"flwr-taskexecutor-123-{_LAUNCH_ATTEMPT}"
-_NEXT_POD_NAME = f"flwr-taskexecutor-123-{_NEXT_LAUNCH_ATTEMPT}"
+_LAUNCH_ATTEMPT_ID = "abc123def456"
+_NEXT_LAUNCH_ATTEMPT_ID = "def456abc123"
+_POD_NAME = f"flwr-taskexecutor-123-{_LAUNCH_ATTEMPT_ID}"
+_NEXT_POD_NAME = f"flwr-taskexecutor-123-{_NEXT_LAUNCH_ATTEMPT_ID}"
 _SECRET_NAME = f"{_POD_NAME}-appio"
 _NEXT_SECRET_NAME = f"{_NEXT_POD_NAME}-appio"
 
@@ -98,7 +98,7 @@ def test_build_appio_credentials_secret_contains_token_and_ca() -> None:
 
     secret = _as_dict(
         _build_appio_credentials_secret(
-            spec, config, _appio_root_certificates(spec, config), _LAUNCH_ATTEMPT
+            spec, config, _appio_root_certificates(spec, config), _LAUNCH_ATTEMPT_ID
         )
     )
 
@@ -113,7 +113,7 @@ def test_build_appio_credentials_secret_contains_token_and_ca() -> None:
                 "app.kubernetes.io/component": "taskexecutor",
                 "flower.ai/superexec-task-id": "123",
                 "flower.ai/task-type": "flwr-serverapp",
-                LAUNCH_ATTEMPT_LABEL: _LAUNCH_ATTEMPT,
+                LAUNCH_ATTEMPT_LABEL: _LAUNCH_ATTEMPT_ID,
             },
         },
         "type": "Opaque",
@@ -128,7 +128,7 @@ def test_build_taskexecutor_pod_uses_secret_files_for_credentials() -> None:
 
     pod = _as_dict(
         _build_taskexecutor_pod(
-            spec, config, _appio_root_certificates(spec, config), _LAUNCH_ATTEMPT
+            spec, config, _appio_root_certificates(spec, config), _LAUNCH_ATTEMPT_ID
         )
     )
     container = pod["spec"]["containers"][0]
@@ -176,7 +176,7 @@ def test_build_taskexecutor_pod_supports_clientapp_insecure_args() -> None:
             _execution_spec(task_type=TaskType.CLIENT_APP, insecure=True),
             _executor_config(appio_root_certificates=None),
             None,
-            _LAUNCH_ATTEMPT,
+            _LAUNCH_ATTEMPT_ID,
         )
     )
 
@@ -198,11 +198,13 @@ def test_build_taskexecutor_pod_supports_secure_default_trust_store() -> None:
 
     secret = _as_dict(
         _build_appio_credentials_secret(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
         )
     )
     pod = _as_dict(
-        _build_taskexecutor_pod(spec, config, appio_root_certificates, _LAUNCH_ATTEMPT)
+        _build_taskexecutor_pod(
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+        )
     )
 
     assert secret["stringData"] == {"token": "task-token"}
@@ -226,11 +228,13 @@ def test_build_taskexecutor_objects_use_execution_spec_root_certificates(
 
     secret = _as_dict(
         _build_appio_credentials_secret(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
         )
     )
     pod = _as_dict(
-        _build_taskexecutor_pod(spec, config, appio_root_certificates, _LAUNCH_ATTEMPT)
+        _build_taskexecutor_pod(
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+        )
     )
 
     assert secret["stringData"] == {"token": "task-token", "ca.crt": "spec-root-ca"}
@@ -257,11 +261,13 @@ def test_build_taskexecutor_objects_expand_user_root_certificates_path(
 
     secret = _as_dict(
         _build_appio_credentials_secret(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
         )
     )
     pod = _as_dict(
-        _build_taskexecutor_pod(spec, config, appio_root_certificates, _LAUNCH_ATTEMPT)
+        _build_taskexecutor_pod(
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+        )
     )
 
     assert secret["stringData"] == {"token": "task-token", "ca.crt": "home-root-ca"}
@@ -282,7 +288,7 @@ def test_build_taskexecutor_pod_supports_simulation_args() -> None:
             _execution_spec(task_type=TaskType.SIMULATION),
             _executor_config(),
             "root-ca",
-            _LAUNCH_ATTEMPT,
+            _LAUNCH_ATTEMPT_ID,
         )
     )
 
@@ -307,7 +313,7 @@ def test_build_taskexecutor_pod_supports_optional_container_config() -> None:
                 service_account_name="flower-superexec",
             ),
             "root-ca",
-            _LAUNCH_ATTEMPT,
+            _LAUNCH_ATTEMPT_ID,
         )
     )
     container = pod["spec"]["containers"][0]
@@ -347,7 +353,7 @@ def test_build_taskexecutor_pod_supports_resources_and_placement() -> None:
                 priority_class_name="taskexecutor-priority",
             ),
             "root-ca",
-            _LAUNCH_ATTEMPT,
+            _LAUNCH_ATTEMPT_ID,
         )
     )
 
@@ -380,11 +386,13 @@ def test_build_taskexecutor_pod_supports_labels_annotations_and_security() -> No
     appio_root_certificates = _appio_root_certificates(spec, config)
     secret = _as_dict(
         _build_appio_credentials_secret(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
         )
     )
     pod = _as_dict(
-        _build_taskexecutor_pod(spec, config, appio_root_certificates, _LAUNCH_ATTEMPT)
+        _build_taskexecutor_pod(
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+        )
     )
 
     expected_labels = {
@@ -392,7 +400,7 @@ def test_build_taskexecutor_pod_supports_labels_annotations_and_security() -> No
         "app.kubernetes.io/component": "taskexecutor",
         "flower.ai/superexec-task-id": "123",
         "flower.ai/task-type": "flwr-serverapp",
-        LAUNCH_ATTEMPT_LABEL: _LAUNCH_ATTEMPT,
+        LAUNCH_ATTEMPT_LABEL: _LAUNCH_ATTEMPT_ID,
         "flower.ai/resource-pool": "gpu-pool",
         "flower.ai/team": "platform",
     }
@@ -410,12 +418,6 @@ def test_config_rejects_extra_labels_that_override_stable_labels() -> None:
         _executor_config(labels={"flower.ai/superexec-task-id": "999"})
 
 
-def test_config_rejects_empty_annotation_entries() -> None:
-    """Test annotation entries must be explicit non-empty strings."""
-    with pytest.raises(ValueError, match="Kubernetes annotations"):
-        _executor_config(annotations={"flower.ai/owner": ""})
-
-
 def test_build_taskexecutor_pod_copies_nested_json_config() -> None:
     """Test rendered Pod JSON does not share nested config objects."""
     resources = {"requests": {"cpu": "500m", "memory": "1Gi"}}
@@ -423,7 +425,9 @@ def test_build_taskexecutor_pod_copies_nested_json_config() -> None:
     config = _executor_config(resources=resources, tolerations=tolerations)
 
     pod = _as_dict(
-        _build_taskexecutor_pod(_execution_spec(), config, "root-ca", _LAUNCH_ATTEMPT)
+        _build_taskexecutor_pod(
+            _execution_spec(), config, "root-ca", _LAUNCH_ATTEMPT_ID
+        )
     )
     pod_resources = _as_dict(pod["spec"]["containers"][0]["resources"])
     pod_requests = _as_dict(pod_resources["requests"])
@@ -448,7 +452,7 @@ def test_launch_submits_secret_before_pod_and_returns_accepted(
     config = _executor_config()
     spec = _execution_spec()
     monkeypatch.setattr(
-        kube, "_new_launch_attempt_suffix", Mock(return_value=_LAUNCH_ATTEMPT)
+        kube, "_new_launch_attempt_id", Mock(return_value=_LAUNCH_ATTEMPT_ID)
     )
 
     result = KubernetesExecutor(client=client, config=config).launch(spec)
@@ -456,11 +460,13 @@ def test_launch_submits_secret_before_pod_and_returns_accepted(
     appio_root_certificates = _appio_root_certificates(spec, config)
     secret = _as_dict(
         _build_appio_credentials_secret(
-            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
         )
     )
     pod = _as_dict(
-        _build_taskexecutor_pod(spec, config, appio_root_certificates, _LAUNCH_ATTEMPT)
+        _build_taskexecutor_pod(
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+        )
     )
     assert result.status == LaunchResultStatus.ACCEPTED
     assert client.mock_calls == [
@@ -476,8 +482,8 @@ def test_launch_generates_distinct_object_names_for_same_task(
     client = Mock()
     monkeypatch.setattr(
         kube,
-        "_new_launch_attempt_suffix",
-        Mock(side_effect=[_LAUNCH_ATTEMPT, _NEXT_LAUNCH_ATTEMPT]),
+        "_new_launch_attempt_id",
+        Mock(side_effect=[_LAUNCH_ATTEMPT_ID, _NEXT_LAUNCH_ATTEMPT_ID]),
     )
     executor = KubernetesExecutor(client=client, config=_executor_config())
     spec = _execution_spec()
@@ -509,7 +515,7 @@ def test_launch_generates_distinct_object_names_for_same_task(
     ] == [secret["metadata"]["name"] for secret in secret_bodies]
     assert [
         secret["metadata"]["labels"][LAUNCH_ATTEMPT_LABEL] for secret in secret_bodies
-    ] == [_LAUNCH_ATTEMPT, _NEXT_LAUNCH_ATTEMPT]
+    ] == [_LAUNCH_ATTEMPT_ID, _NEXT_LAUNCH_ATTEMPT_ID]
 
 
 def test_launch_returns_capacity_rejected_if_secret_create_hits_quota() -> None:
@@ -538,7 +544,7 @@ def test_launch_deletes_new_secret_if_pod_create_is_rate_limited(
         429, "too many requests"
     )
     monkeypatch.setattr(
-        kube, "_new_launch_attempt_suffix", Mock(return_value=_LAUNCH_ATTEMPT)
+        kube, "_new_launch_attempt_id", Mock(return_value=_LAUNCH_ATTEMPT_ID)
     )
 
     result = KubernetesExecutor(client=client, config=_executor_config()).launch(
@@ -566,7 +572,7 @@ def test_launch_delete_failure_does_not_mask_pod_rejection(
         500, "delete failed"
     )
     monkeypatch.setattr(
-        kube, "_new_launch_attempt_suffix", Mock(return_value=_LAUNCH_ATTEMPT)
+        kube, "_new_launch_attempt_id", Mock(return_value=_LAUNCH_ATTEMPT_ID)
     )
 
     result = KubernetesExecutor(client=client, config=_executor_config()).launch(
