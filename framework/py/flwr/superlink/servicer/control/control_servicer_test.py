@@ -110,7 +110,6 @@ from flwr.superlink.servicer.control.control_account_auth_interceptor import (
 from .control_servicer import (
     ControlServicer,
     _format_verification,
-    _parse_builtin_agent_app_spec,
     _resolve_builtin_agent_fab,
     _validate_federation_and_node_in_request,
     _validate_federation_membership_in_request,
@@ -301,13 +300,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, expected_task_type)
 
-    def test_parse_builtin_agent_app_spec_accepts_gpt_chat(self) -> None:
-        """Test built-in agent parsing accepts GPT chat."""
-        self.assertEqual(
-            _parse_builtin_agent_app_spec("@flwragent/gpt-chat"),
-            "@flwragent/gpt-chat",
-        )
-
     def test_start_run_creates_builtin_agentapp_run_from_app_spec(self) -> None:
         """Test StartRun creates an AgentApp run for the built-in GPT chat app spec."""
         request = StartRunRequest(
@@ -316,7 +308,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         )
         for key, value in user_config_to_proto({"agent.input": "Hello"}).items():
             request.override_config[key].CopyFrom(value)
-        fab_file, _ = _resolve_builtin_agent_fab("@flwragent/gpt-chat")
+        fab_file, _ = _resolve_builtin_agent_fab()
         expected_fab_hash = hashlib.sha256(fab_file).hexdigest()
 
         response = self.servicer.StartRun(request, Mock())
@@ -334,23 +326,6 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
         self.assertEqual(tasks[0].fab_hash, runs[0].fab_hash)
-
-    def test_start_run_rejects_unknown_builtin_agent_app_spec(self) -> None:
-        """Test StartRun rejects unsupported built-in agent app specs."""
-        request = StartRunRequest(
-            app_spec="@flwragent/unknown",
-            federation=NOOP_FEDERATION,
-        )
-        context = Mock()
-        context.abort.side_effect = grpc.RpcError()
-
-        with self.assertRaises(grpc.RpcError):
-            self.servicer.StartRun(request, context)
-
-        context.abort.assert_called_once()
-        status_code, details = context.abort.call_args.args
-        self.assertEqual(status_code, grpc.StatusCode.FAILED_PRECONDITION)
-        self.assertIn("Unsupported built-in agent app spec", details)
 
     def test_start_run_aborts_if_create_run_fails(self) -> None:
         """Test StartRun aborts with INTERNAL if the initial task cannot be created."""

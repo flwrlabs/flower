@@ -175,22 +175,9 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         verification_dict: dict[str, str] = {}
         note: str | None = None
 
-        builtin_agent_app_spec = _parse_builtin_agent_app_spec(request.app_spec)
-        if (
-            builtin_agent_app_spec is None
-            and request.app_spec.startswith(f"{_BUILTIN_AGENT_APP_SPEC_PREFIX}/")
-        ):
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION,
-                f"Unsupported built-in agent app spec '{request.app_spec}'. "
-                f"Supported built-in agent app specs: "
-                f"'{_BUILTIN_AGENT_GPT_CHAT_APP_SPEC}'.",
-            )
-
-        if builtin_agent_app_spec is not None:
-            fab_file, verification_dict = _resolve_builtin_agent_fab(
-                builtin_agent_app_spec
-            )
+        is_builtin_agent_app = request.app_spec == _BUILTIN_AGENT_GPT_CHAT_APP_SPEC
+        if is_builtin_agent_app:
+            fab_file, verification_dict = _resolve_builtin_agent_fab()
         elif request.app_spec:
             fab_file, verification_dict, note = _get_remote_fab(
                 self.fleet_api_type, request.app_spec, context
@@ -231,11 +218,13 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
             # Derive run type based on the presence of simulation config and apply
             # federation config overrides
-            run_type = RunType.SERVER_APP
+            run_type = (
+                RunType.AGENT_APP if is_builtin_agent_app else RunType.SERVER_APP
+            )
             resolved_federation_config = None
             runtime = RunTime.DEPLOYMENT
             sim_cfg = state.federation_manager.get_simulation_config(federation)
-            if sim_cfg and builtin_agent_app_spec is None:
+            if sim_cfg and not is_builtin_agent_app:
                 run_type = RunType.SIMULATION
                 runtime = RunTime.SIMULATION
                 resolved_federation_config = SimulationConfig()
@@ -249,10 +238,6 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
             )
 
         try:
-            if builtin_agent_app_spec is not None:
-                run_type = RunType.AGENT_APP
-                resolved_federation_config = None
-
             # Validate user config overrides matches keys in run config in FAB
             fab_config = get_fab_config(fab_file)
             run_config = flatten_dict(fab_config["tool"]["flwr"]["app"].get("config"))
@@ -1202,18 +1187,8 @@ def _format_verification(verifications: list[dict[str, str]]) -> dict[str, str]:
     return verification_dict
 
 
-def _parse_builtin_agent_app_spec(app_spec: str) -> str | None:
-    """Return the built-in agent app spec if the reserved namespace is used."""
-    if app_spec == _BUILTIN_AGENT_GPT_CHAT_APP_SPEC:
-        return app_spec
-    return None
-
-
-def _resolve_builtin_agent_fab(app_spec: str) -> tuple[bytes, dict[str, str]]:
+def _resolve_builtin_agent_fab() -> tuple[bytes, dict[str, str]]:
     """Resolve a built-in AgentApp app spec into FAB bytes and verifications."""
-    if app_spec != _BUILTIN_AGENT_GPT_CHAT_APP_SPEC:
-        raise ValueError(f"Unsupported built-in agent app spec: {app_spec}")
-
     pyproject_toml = (
         files("flwr.agentapp.builtin").joinpath("pyproject.toml").read_bytes()
     )
