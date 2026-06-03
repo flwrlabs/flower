@@ -32,7 +32,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
 from flwr.supercore.model_message import ModelRequest, ModelResponse
-from flwr.supercore.typing import JSONObject
+from flwr.supercore.typing import JSONObject, JSONValue
 
 from .context_items import append_items
 
@@ -102,8 +102,8 @@ class RuntimeAgentResponses(AgentResponses):
         response = ModelResponse.from_message(response_message)
         response_payload = response.payload
         output = response_payload.get("output")
-        if output is not None:
-            append_items(self._context, output)
+        if _is_json_object_list(output):
+            append_items(self._context, cast(list[JSONObject], output))
         return response_payload
 
     def _push_task_message(self, message: Message) -> None:
@@ -145,3 +145,8 @@ class RuntimeAgentResponses(AgentResponses):
                 raise TimeoutError("Timed out waiting for model response.")
 
             time.sleep(min(_DEFAULT_MODEL_REPLY_POLL_INTERVAL, remaining))
+
+
+def _is_json_object_list(obj: JSONValue) -> bool:
+    """Check if the given object is a list of JSON objects."""
+    return isinstance(obj, list) and all(isinstance(item, dict) for item in obj)

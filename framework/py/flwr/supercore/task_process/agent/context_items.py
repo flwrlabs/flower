@@ -20,42 +20,18 @@ from __future__ import annotations
 from typing import cast
 
 from flwr.app import ConfigRecord, Context
-from flwr.supercore.typing import JSONObject, JSONValue
-from flwr.supercore.utils import strict_json_dumps, strict_json_loads
+from flwr.supercore.typing import JSONObject
+from flwr.supercore.utils import strict_json_dumps
 
 ITEMS_KEY = "items"
 JSON_KEY = "json"
 
 
-def get_items(context: Context) -> list[JSONObject]:
-    """Return OpenResponses items stored in ``context.state``."""
-    record = context.state.config_records.get(ITEMS_KEY)
-    if record is None:
-        return []
-
-    raw = record.get(JSON_KEY)
-    if not isinstance(raw, str):
-        raise ValueError("context.state['items'] must contain a JSON string.")
-
-    return _validate_items(strict_json_loads(raw), "context.state['items']")
-
-
-def append_items(context: Context, new_items: JSONValue) -> None:
+def append_items(context: Context, new_items: list[JSONObject]) -> None:
     """Append OpenResponses items to ``context.state``."""
-    items = [*get_items(context), *_validate_items(new_items, "new items")]
-    context.state[ITEMS_KEY] = ConfigRecord(
-        {JSON_KEY: strict_json_dumps(cast(JSONValue, items), compact=True)}
-    )
+    # Initialize the items storage if it doesn't exist yet
+    record = context.state.setdefault(ITEMS_KEY, ConfigRecord({JSON_KEY: []}))
+    items = cast(list[str], record[JSON_KEY])
 
-
-def _validate_items(value: JSONValue, source: str) -> list[JSONObject]:
-    """Validate a JSON object array."""
-    if not isinstance(value, list):
-        raise ValueError(f"{source} must be a JSON array of item objects.")
-
-    items: list[JSONObject] = []
-    for idx, item in enumerate(value):
-        if not isinstance(item, dict):
-            raise ValueError(f"{source}[{idx}] must be a JSON object.")
-        items.append(cast(JSONObject, item))
-    return items
+    # Add the new items to the list
+    items.extend(strict_json_dumps(item, compact=True) for item in new_items)
