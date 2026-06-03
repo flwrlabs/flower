@@ -1,6 +1,195 @@
 # Changelog
 
-## Unreleased
+## v1.31.0 (2026-06-03)
+
+### Thanks to our contributors
+
+We would like to give our special thanks to all the contributors who made the new version of Flower possible (in `git shortlog` order):
+
+`Charles Beauville`, `Chong Shen Ng`, `Daniel J. Beutel`, `Daniel Nata Nugraha`, `Gustavo Bertoli`, `Heng Pan`, `Javier`, `Leandro`, `Lorenzo Sani`, `Micah Sheller`, `Mohammad Naseri`, `Nyam2C`, `Patrick Foley`, `Seulki Yun`, `Sijiaomg Ohoh`, `Taner Topal`, `Yan Gao`, `Young D. Kwon`, `reducedradius` <!---TOKEN_v1.31.0-->
+
+
+### New features
+
+- **feat(framework): Fail non-finished tasks when the run expires or finishes** ([#7155](https://github.com/flwrlabs/flower/pull/7155))
+
+- **feat(framework): Add K8s Executor CI tests and partial k8s Executor implementation** ([#7235](https://github.com/flwrlabs/flower/pull/7235))
+
+- **feat(framework): Forward simulation run metrics** ([#7251](https://github.com/flwrlabs/flower/pull/7251))
+
+- **feat(framework): Collect VCE run metrics** ([#7250](https://github.com/flwrlabs/flower/pull/7250))
+
+- **feat(framework): Add run metrics to AppIo proto** ([#7248](https://github.com/flwrlabs/flower/pull/7248))
+
+- **feat(framework): Upgrade ray to support Python 3.14** ([#7181](https://github.com/flwrlabs/flower/pull/7181))
+
+- **feat(framework): Add SuperExec wiring for Executor.wait_for_capacity()** ([#7234](https://github.com/flwrlabs/flower/pull/7234))
+
+- **feat(framework): Add wait for capacity** ([#7233](https://github.com/flwrlabs/flower/pull/7233))
+
+- **feat(framework): Add minimal launch result handling via logging** ([#7232](https://github.com/flwrlabs/flower/pull/7232))
+
+- **feat(framework): Add LaunchResult to Executor Protocol** ([#7231](https://github.com/flwrlabs/flower/pull/7231))
+
+- **feat(framework): Add token-file support to Task Executors** ([#7206](https://github.com/flwrlabs/flower/pull/7206))
+
+- **feat(framework): Add SuperExec Executor abstraction** ([#7174](https://github.com/flwrlabs/flower/pull/7174))
+
+
+### Documentation improvements
+
+- **docs(framework:skip): Update source texts for translations (auto)** ([#7309](https://github.com/flwrlabs/flower/pull/7309))
+
+- **docs(framework): Extend** `how-to` **pages for** `SuperGrid` **to include Flower CLI usage** ([#7279](https://github.com/flwrlabs/flower/pull/7279))
+
+- **docs(framework): Update translation job format** ([#7302](https://github.com/flwrlabs/flower/pull/7302))
+
+- **docs(framework): Fix local docs generation** ([#7296](https://github.com/flwrlabs/flower/pull/7296))
+
+- **docs(model): Add model docs and Lizzy-7B pages** ([#7274](https://github.com/flwrlabs/flower/pull/7274))
+
+- **docs(framework): Update French translation** ([#7295](https://github.com/flwrlabs/flower/pull/7295))
+
+- **docs(framework:skip): Update source texts for translations (auto)** ([#7289](https://github.com/flwrlabs/flower/pull/7289))
+
+- **docs(framework:skip): Update source texts for translations (auto)** ([#7286](https://github.com/flwrlabs/flower/pull/7286))
+
+- **docs(framework:skip): Update source texts for translations (auto)** ([#7270](https://github.com/flwrlabs/flower/pull/7270))
+
+- **docs(framework): Add** `how-to` **run app on** `SuperGrid` ([#7257](https://github.com/flwrlabs/flower/pull/7257))
+
+- **docs(framework:skip): Update source texts for translations (auto)** ([#7255](https://github.com/flwrlabs/flower/pull/7255))
+
+- **docs(framework:skip): Update source texts for translations (auto)** ([#7245](https://github.com/flwrlabs/flower/pull/7245))
+
+- **docs(framework): Add new how-tos pages about SuperGrid** ([#7221](https://github.com/flwrlabs/flower/pull/7221))
+
+- **docs(framework): Revamp get-started-with-flower tutorial** ([#7188](https://github.com/flwrlabs/flower/pull/7188))
+
+- **docs(framework:skip): Update source texts for translations (auto)** ([#7230](https://github.com/flwrlabs/flower/pull/7230))
+
+- **docs(framework): Add latest Hosted Weblate translation updates** ([#7228](https://github.com/flwrlabs/flower/pull/7228))
+
+- **docs(framework): Fix Weblate conflict** ([#7227](https://github.com/flwrlabs/flower/pull/7227))
+
+- **docs(framework:skip): Update source texts for translations (auto)** ([#7222](https://github.com/flwrlabs/flower/pull/7222))
+
+
+### Incompatible changes
+
+
+### Other changes
+
+- **refactor(framework): Bump dependencies** ([#7306](https://github.com/flwrlabs/flower/pull/7306))
+
+- **refactor(framework): Update agent plumbing** ([#7293](https://github.com/flwrlabs/flower/pull/7293))
+
+- **refactor(framework): Update imports** ([#7281](https://github.com/flwrlabs/flower/pull/7281))
+
+- **refactor(framework): Move Grid to flwr.serverapp** ([#7278](https://github.com/flwrlabs/flower/pull/7278))
+
+- **ci(devtool): Add model to PR title projects** ([#7275](https://github.com/flwrlabs/flower/pull/7275))
+
+- **refactor(framework): Move ServerApp to flwr.serverapp** ([#7259](https://github.com/flwrlabs/flower/pull/7259))
+
+- **refactor(examples): Update secagg example** ([#7267](https://github.com/flwrlabs/flower/pull/7267))
+
+- **refactor(examples): Update** `quickstart-` **examples** ([#7262](https://github.com/flwrlabs/flower/pull/7262))
+
+- **refactor(framework): Remove AppIo traffic metrics** ([#7260](https://github.com/flwrlabs/flower/pull/7260))
+
+- **refactor(framework): Remove unused code** ([#7254](https://github.com/flwrlabs/flower/pull/7254))
+
+- **refactor(framework): Move Context/Message/RecordDict to flwr.app** ([#7246](https://github.com/flwrlabs/flower/pull/7246))
+
+- **refactor(framework): Move RecordValues** ([#7242](https://github.com/flwrlabs/flower/pull/7242))
+
+- **fix(framework): Fix test.sh to work with uv** ([#7243](https://github.com/flwrlabs/flower/pull/7243))
+
+- **refactor(framework): Remove module unloading from object_ref** ([#7229](https://github.com/flwrlabs/flower/pull/7229))
+
+- **ci(framework:skip): Switch framework build backend to uv-build** ([#7223](https://github.com/flwrlabs/flower/pull/7223))
+
+- **ci(framework:skip): Replace framework Poetry setup with uv** ([#7202](https://github.com/flwrlabs/flower/pull/7202))
+
+- **refactor(examples): Disable saving of local model** ([#7219](https://github.com/flwrlabs/flower/pull/7219))
+
+- **refactor(framework): Remove unused validation utility function** ([#7218](https://github.com/flwrlabs/flower/pull/7218))
+
+- **ci(:skip): Migrate CI to uv** ([#6693](https://github.com/flwrlabs/flower/pull/6693))
+
+- **ci(:skip): Bump dev version to** `1.31.0` ([#7214](https://github.com/flwrlabs/flower/pull/7214))
+
+
+### Unknown changes
+
+
+### task-to-task communication
+
+- **feat(framework): Add** `AppIo` **task to task communication** ([#7178](https://github.com/flwrlabs/flower/pull/7178))
+
+- **feat(framework): Add corestate methods for task to task communication** ([#7156](https://github.com/flwrlabs/flower/pull/7156))
+
+- **feat(framework): Add** `ModelRequest` **and** `ModelResponse` ([#7213](https://github.com/flwrlabs/flower/pull/7213))
+
+- **feat(framework): Add** `src_task_id` **and** `dst_task_id` **to Message class** ([#7194](https://github.com/flwrlabs/flower/pull/7194))
+
+
+### High Availability
+
+- **fix(framework): Guard startup migrations on Postgres** ([#7285](https://github.com/flwrlabs/flower/pull/7285))
+
+- **fix(framework): Preserve PushMessages upload hints** ([#7284](https://github.com/flwrlabs/flower/pull/7284))
+
+- **fix(framework): Prevent heartbeats reviving deleted nodes** ([#7282](https://github.com/flwrlabs/flower/pull/7282))
+
+- **fix(framework): Prevent ObjectStore put success after delete** ([#7265](https://github.com/flwrlabs/flower/pull/7265))
+
+- **fix(framework): Prevent duplicate message replies** ([#7266](https://github.com/flwrlabs/flower/pull/7266))
+
+- **fix(framework): Make SQL object store cleanup concurrency-safe** ([#7169](https://github.com/flwrlabs/flower/pull/7169))
+
+- **fix(framework): Resolve StopRun race condition** ([#7173](https://github.com/flwrlabs/flower/pull/7173))
+
+
+### codex
+
+- **break(framework): Drop Python 3.10 support** ([#7190](https://github.com/flwrlabs/flower/pull/7190))
+
+
+### agentapp
+
+- **feat(framework): Add flwr-agentapp implementation** ([#7292](https://github.com/flwrlabs/flower/pull/7292))
+
+- **feat(framework): Add flwr-model implementation** ([#7272](https://github.com/flwrlabs/flower/pull/7272))
+
+- **refactor(framework): Migrate SuperNode to RunSeries Context** ([#7301](https://github.com/flwrlabs/flower/pull/7301))
+
+- **feat(framework): Add RunSeries Control implementation** ([#7287](https://github.com/flwrlabs/flower/pull/7287))
+
+- **feat(framework): Migrate to RunSeries Context** ([#7291](https://github.com/flwrlabs/flower/pull/7291))
+
+- **feat(framework): Add RunSeries in CoreState** ([#7261](https://github.com/flwrlabs/flower/pull/7261))
+
+- **feat(framework): Add RunSeries to CreateRun** ([#7264](https://github.com/flwrlabs/flower/pull/7264))
+
+- **feat(framework): Add series runs table** ([#7277](https://github.com/flwrlabs/flower/pull/7277))
+
+- **feat(framework): Add StreamRunEvents and PushTaskEvents implementation** ([#7273](https://github.com/flwrlabs/flower/pull/7273))
+
+- **feat(framework): Add AgentApp API** ([#7216](https://github.com/flwrlabs/flower/pull/7216))
+
+- **feat(framework): Add TaskEvents in CoreState** ([#7256](https://github.com/flwrlabs/flower/pull/7256))
+
+- **feat(framework): Add open responses compatible model provider** ([#7215](https://github.com/flwrlabs/flower/pull/7215))
+
+- **feat(framework): Add RunSeries RPCs** ([#7253](https://github.com/flwrlabs/flower/pull/7253))
+
+- **feat(framework): Add RunEvents RPC** ([#7252](https://github.com/flwrlabs/flower/pull/7252))
+
+- **feat(framework): Add** `RunSeries` **tables** ([#7238](https://github.com/flwrlabs/flower/pull/7238))
+
+- **feat(framework): Add task events table** ([#7220](https://github.com/flwrlabs/flower/pull/7220))
 
 ## v1.30.0 (2026-05-20)
 
