@@ -15,7 +15,7 @@
 """Deprecated grid compatibility APIs."""
 
 
-from flwr.server.grid import Grid
+from flwr.serverapp.grid import Grid
 
 
 class Driver(Grid):

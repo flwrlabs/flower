@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from flwr.common import Context
+from flwr.app import Context
 
 from .base import AgentAppCallable, AgentSession
 
@@ -73,3 +73,7 @@ class AgentApp:
             return main_fn
 
         return main_decorator
+
+
+class LoadAgentAppError(Exception):
+    """Error when trying to load `AgentApp`."""

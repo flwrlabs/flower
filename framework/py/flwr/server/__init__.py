@@ -23,7 +23,6 @@ from . import workflow as workflow
 from .client_manager import ClientManager as ClientManager
 from .client_manager import SimpleClientManager as SimpleClientManager
 from .compat import LegacyContext as LegacyContext
-from .grid import Grid as Grid
 from .history import History as History
 from .server import Server as Server
 from .server_config import ServerConfig as ServerConfig
@@ -31,6 +30,7 @@ from .serverapp_components import ServerAppComponents as ServerAppComponents
 
 if TYPE_CHECKING:
     from flwr.compat.server.grid import Driver as Driver
+    from flwr.serverapp import Grid as Grid
     from flwr.serverapp import ServerApp as ServerApp
 
 
@@ -43,6 +43,13 @@ def __getattr__(name: str) -> Any:
         # pylint: enable=import-outside-toplevel
         globals()[name] = Driver
         return Driver
+    if name == "Grid":
+        # pylint: disable=import-outside-toplevel
+        from flwr.serverapp import Grid
+
+        # pylint: enable=import-outside-toplevel
+        globals()[name] = Grid
+        return Grid
     if name == "ServerApp":
         from flwr.serverapp import ServerApp  # pylint: disable=import-outside-toplevel
 

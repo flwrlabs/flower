@@ -73,6 +73,85 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         mock_datetime.now.side_effect = timestamps
         return stack
 
+    def test_store_run_in_series_creates_id(self) -> None:
+        """Storing a run in a run series should create a nonzero ID."""
+        state = self.state_factory()
+
+        series_id = state.store_run_in_series(
+            run_id=123, federation="federation-a", series_id=None
+        )
+
+        self.assertIsNotNone(series_id)
+        assert series_id is not None
+        self.assertGreater(series_id, 0)
+
+    def test_store_run_in_series_returns_none_for_unknown_id(self) -> None:
+        """Unknown caller-provided run series IDs return None."""
+        state = self.state_factory()
+
+        with self.assertLogs("flwr", level="ERROR") as logs:
+            series_id = state.store_run_in_series(
+                run_id=123,
+                federation="federation-a",
+                series_id=123,
+            )
+
+        self.assertIsNone(series_id)
+        self.assertIn("Run series 123 not found", logs.output[0])
+
+    def test_store_run_in_series_returns_none_for_duplicate_run_id(self) -> None:
+        """Storing the same run ID twice should return None."""
+        state = self.state_factory()
+        series_id = state.store_run_in_series(
+            run_id=123, federation="federation-a", series_id=None
+        )
+        assert series_id is not None
+
+        stored = state.store_run_in_series(
+            run_id=123,
+            federation="federation-a",
+            series_id=series_id,
+        )
+
+        self.assertIsNone(stored)
+
+    def test_get_run_series_filters_by_series_ids_and_federations(self) -> None:
+        """RunSeries lookup should filter by IDs and federations."""
+        state = self.state_factory()
+        series_id_a = state.store_run_in_series(
+            run_id=123, federation="federation-a", series_id=None
+        )
+        series_id_b = state.store_run_in_series(
+            run_id=456, federation="federation-b", series_id=None
+        )
+        series_id_c = state.store_run_in_series(
+            run_id=789, federation="federation-a", series_id=None
+        )
+        assert series_id_a is not None
+        assert series_id_b is not None
+        assert series_id_c is not None
+
+        fed_a_series = state.get_run_series(federations=["federation-a"])
+        self.assertSetEqual(
+            {entry.series_id for entry in fed_a_series},
+            {series_id_a, series_id_c},
+        )
+
+        id_filtered_series = state.get_run_series(series_ids=[series_id_b])
+        self.assertEqual(
+            [entry.series_id for entry in id_filtered_series],
+            [series_id_b],
+        )
+
+        combined_series = state.get_run_series(
+            series_ids=[series_id_a, series_id_b],
+            federations=["federation-a"],
+        )
+        self.assertEqual([entry.series_id for entry in combined_series], [series_id_a])
+
+        self.assertEqual(state.get_run_series(series_ids=[]), [])
+        self.assertEqual(state.get_run_series(federations=[]), [])
+
     def test_create_and_get_task(self) -> None:
         """Test creating and retrieving a task."""
         state = self.state_factory()

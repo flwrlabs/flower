@@ -17,6 +17,6 @@
 
 from collections.abc import Callable
 
-from flwr.common import Context, Message
+from flwr.app import Context, Message
 
 ClientAppCallable = Callable[[Message, Context], Message]

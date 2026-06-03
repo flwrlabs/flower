@@ -21,18 +21,9 @@ from logging import DEBUG, ERROR, INFO, WARN
 from typing import cast
 
 import flwr.common.recorddict_compat as compat
+from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.app.message_type import MessageType
-from flwr.common import (
-    ConfigRecord,
-    Context,
-    FitRes,
-    Message,
-    NDArrays,
-    RecordDict,
-    bytes_to_ndarray,
-    log,
-    ndarrays_to_parameters,
-)
+from flwr.common import FitRes, NDArrays, bytes_to_ndarray, log, ndarrays_to_parameters
 from flwr.common.secure_aggregation.crypto.shamir import combine_shares
 from flwr.common.secure_aggregation.crypto.symmetric_encryption import (
     generate_shared_key,
@@ -53,7 +44,7 @@ from flwr.common.secure_aggregation.secaggplus_constants import (
 from flwr.common.secure_aggregation.secaggplus_utils import pseudo_rand_gen
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.compat.legacy_context import LegacyContext
-from flwr.server.grid import Grid
+from flwr.serverapp.grid import Grid
 from flwr.supercore.primitives.asymmetric import (
     bytes_to_private_key,
     bytes_to_public_key,
