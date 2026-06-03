@@ -218,9 +218,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
             # Derive run type based on the presence of simulation config and apply
             # federation config overrides
-            run_type = (
-                RunType.AGENT_APP if is_builtin_agent_app else RunType.SERVER_APP
-            )
+            run_type = RunType.AGENT_APP if is_builtin_agent_app else RunType.SERVER_APP
             resolved_federation_config = None
             runtime = RunTime.DEPLOYMENT
             sim_cfg = state.federation_manager.get_simulation_config(federation)
