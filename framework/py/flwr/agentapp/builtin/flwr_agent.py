@@ -18,16 +18,16 @@
 from flwr.agentapp import AgentApp, AgentSession
 from flwr.app import Context
 
-_AGENT_INPUT_KEY = "agent.input"
-_MODEL = "hf/flwrlabs/lizzy-dpo-gptq"
+# The model to use
+_MODEL = "openai/gpt-5.5"
 
 app = AgentApp()
 
 
 @app.main()
 def main(agent: AgentSession, context: Context) -> None:
-    """Forward the initial user input to the flwr agent model."""
-    agent_input = context.run_config.get(_AGENT_INPUT_KEY)
+    """Forward the initial user input to the GPT chat model with streaming enabled."""
+    agent_input = context.run_config.get("agent.input")
     if not isinstance(agent_input, str) or not agent_input:
         raise ValueError(
             "context.run_config['agent.input'] must be a non-empty string."
