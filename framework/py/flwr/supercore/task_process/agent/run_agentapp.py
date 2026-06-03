@@ -50,6 +50,7 @@ from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
 )
+from flwr.supercore.typing import JSONObject
 from flwr.superlink.grid import GrpcGrid
 
 from .context_items import append_items
@@ -157,12 +158,12 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
             if not isinstance(agent_input, str):
                 raise ValueError("context.run_config['agent.input'] must be a string.")
             if agent_input:
-                item = {
+                item: JSONObject = {
                     "type": "message",
                     "role": "user",
                     "content": agent_input,
                 }
-                append_items(context, [item])  # type: ignore
+                append_items(context, [item])
 
         log(
             DEBUG,
