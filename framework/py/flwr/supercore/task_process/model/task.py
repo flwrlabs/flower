@@ -40,6 +40,7 @@ _DEFAULT_TASK_EVENT_BATCH_SIZE = 16
 def handle_task(stub: ServerAppIoStub, task_id: int, run_id: int) -> None:
     """Run one model task request."""
     request_message = _pull_model_request(stub)
+    is_stream = request_message.payload.get("stream") is True
     if request_message.metadata.src_task_id is None:
         raise RuntimeError("Model request source task is not set.")
 
@@ -55,52 +56,38 @@ def handle_task(stub: ServerAppIoStub, task_id: int, run_id: int) -> None:
         message.metadata.__dict__["_message_id"] = message.object_id
         stub.PushTaskMessage(PushTaskMessageRequest(message=message_to_proto(message)))
 
-    request_payload = request_message.payload
-    if request_payload.get("stream") is True:
-        # Stream events are exposed through Control.StreamRunEvents.
-        events: list[TaskEvent] = []
+    # Stream events are exposed through Control.StreamRunEvents.
+    events: list[TaskEvent] = []
 
-        def _flush_events() -> None:
-            """Push buffered stream events."""
-            if not events:
-                return
-            batch = list(events)
-            events.clear()
-            try:
-                stub.PushTaskEvents(PushTaskEventsRequest(events=batch))
-            except Exception:
-                # Keep the batch available for the final flush retry.
-                events[:0] = batch
-                raise
+    def _flush_events() -> None:
+        """Push buffered stream events."""
+        if not is_stream or not events:
+            return
+        stub.PushTaskEvents(PushTaskEventsRequest(events=events))
+        events.clear()
 
-        def _publish_event(event: JSONObject) -> None:
-            """Buffer one Open Responses stream event."""
-            encoded = strict_json_dumps(event, compact=True)
-            events.append(TaskEvent(event=cast(str, event["type"]), data=encoded))
-            if len(events) >= _DEFAULT_TASK_EVENT_BATCH_SIZE:
-                _flush_events()
-
-        response = None
-        try:
-            response = invoke_model_provider(
-                request_payload,
-                on_stream_event=_publish_event,
-            )
-        finally:
-            # Flush partial batches after the provider stream ends or fails.
+    def _buffer_event(event: JSONObject) -> None:
+        """Buffer one Open Responses stream event."""
+        if not is_stream:
+            return
+        encoded = strict_json_dumps(event, compact=True)
+        events.append(TaskEvent(event=cast(str, event["type"]), data=encoded))
+        if len(events) >= _DEFAULT_TASK_EVENT_BATCH_SIZE:
             _flush_events()
 
-        if response is not None:
-            # AgentApp still receives the terminal response object.
-            _push_model_response(response)
-        return
-
+    response = None
     try:
-        response = invoke_model_provider(request_payload)
+        response = invoke_model_provider(
+            request_message.payload,
+            on_stream_event=_buffer_event,
+        )
     except Exception as ex:
         response = _make_error_response(ex)
         raise
     finally:
+        # Flush partial batches after the provider stream ends or fails
+        _flush_events()
+        # Push the response
         if response is not None:
             _push_model_response(response)
 
@@ -119,19 +106,15 @@ def _pull_model_request(stub: ServerAppIoStub) -> ModelRequest:
 
 def _make_error_response(ex: Exception) -> JSONObject:
     """Create a JSON error response from an exception."""
+    error_code = "internal_error"
+    if isinstance(ex, ModelProviderError):
+        error_code = "model_provider_error"
     return {
         "object": "response",
         "status": "failed",
         "error": {
-            "code": _error_code(ex),
+            "code": error_code,
             "message": str(ex),
         },
         "output": [],
     }
-
-
-def _error_code(ex: Exception) -> str:
-    """Return the error code for a model task exception."""
-    if isinstance(ex, ModelProviderError):
-        return "model_provider_error"
-    return "internal_error"
