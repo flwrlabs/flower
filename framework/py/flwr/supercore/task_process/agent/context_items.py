@@ -27,18 +27,6 @@ ITEMS_KEY = "items"
 JSON_KEY = "json"
 
 
-def get_items(context: Context) -> list[JSONObject]:
-    """Return OpenResponses items stored in ``context.state``."""
-    record = context.state.config_records.get(ITEMS_KEY)
-    if record is None:
-        return []
-
-    return [
-        cast(JSONObject, strict_json_loads(item))
-        for item in cast(list[str], record[JSON_KEY])
-    ]
-
-
 def append_items(context: Context, new_items: list[JSONObject]) -> None:
     """Append OpenResponses items to ``context.state``."""
     # Initialize the items storage if it doesn't exist yet
