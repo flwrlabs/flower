@@ -29,6 +29,7 @@ from unittest.mock import MagicMock, Mock, patch
 import grpc
 from parameterized import parameterized
 
+from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
 from flwr.common import ConfigRecord, Context, RecordDict, now
 from flwr.common.constant import (
     NODE_NOT_FOUND_MESSAGE,
@@ -110,7 +111,6 @@ from flwr.superlink.servicer.control.control_account_auth_interceptor import (
 from .control_servicer import (
     ControlServicer,
     _format_verification,
-    _resolve_builtin_agent_fab,
     _validate_federation_and_node_in_request,
     _validate_federation_membership_in_request,
 )
@@ -308,7 +308,9 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         )
         for key, value in user_config_to_proto({"agent.input": "Hello"}).items():
             request.override_config[key].CopyFrom(value)
-        fab_file, _ = _resolve_builtin_agent_fab()
+        builtin_agent_fab = try_resolve_builtin_agent_fab("@flwragent/flwr-agent")
+        assert builtin_agent_fab is not None
+        fab_file, _ = builtin_agent_fab
         expected_fab_hash = hashlib.sha256(fab_file).hexdigest()
 
         response = self.servicer.StartRun(request, Mock())

@@ -12,9 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Private built-in AgentApp implementations."""
+"""Built-in AgentApp FAB resolution."""
 
 
-from .resolver import try_resolve_builtin_agent_fab as try_resolve_builtin_agent_fab
+from importlib.resources import files
 
-__all__ = ["try_resolve_builtin_agent_fab"]
+from flwr.cli.build import build_fab_from_files
+
+_BUILTIN_AGENT_APP_SPEC_PREFIX = "@flwragent"
+_BUILTIN_AGENT_APP_SPEC = f"{_BUILTIN_AGENT_APP_SPEC_PREFIX}/flwr-agent"
+
+
+def try_resolve_builtin_agent_fab(
+    app_spec: str,
+) -> tuple[bytes, dict[str, str]] | None:
+    """Try to resolve a built-in AgentApp app spec into FAB bytes."""
+    if app_spec != _BUILTIN_AGENT_APP_SPEC:
+        return None
+
+    pyproject_toml = (
+        files("flwr.agentapp.builtin").joinpath("pyproject.toml").read_bytes()
+    )
+    fab_file, _ = build_fab_from_files({"pyproject.toml": pyproject_toml})
+    return fab_file, {}

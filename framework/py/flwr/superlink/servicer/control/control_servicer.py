@@ -20,14 +20,13 @@ import hashlib
 import json
 import time
 from collections.abc import Generator, Sequence
-from importlib.resources import files
 from logging import ERROR, INFO
 from typing import Any, cast
 
 import grpc
 import requests
 
-from flwr.cli.build import build_fab_from_files
+from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
 from flwr.cli.utils import validate_federation_name
 from flwr.common import now
 from flwr.common.config import (
@@ -143,9 +142,6 @@ from flwr.superlink.auth_plugin import ControlAuthnPlugin
 
 from .control_account_auth_interceptor import get_current_account_info
 
-_BUILTIN_AGENT_APP_SPEC_PREFIX = "@flwragent"
-_BUILTIN_AGENT_APP_SPEC = f"{_BUILTIN_AGENT_APP_SPEC_PREFIX}/flwr-agent"
-
 
 # pylint: disable=too-many-public-methods
 class ControlServicer(control_pb2_grpc.ControlServicer):
@@ -175,9 +171,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         verification_dict: dict[str, str] = {}
         note: str | None = None
 
-        is_builtin_agent_app = request.app_spec == _BUILTIN_AGENT_APP_SPEC
-        if is_builtin_agent_app:
-            fab_file, verification_dict = _resolve_builtin_agent_fab()
+        builtin_agent_fab = try_resolve_builtin_agent_fab(request.app_spec)
+        is_builtin_agent_app = builtin_agent_fab is not None
+        if builtin_agent_fab is not None:
+            fab_file, verification_dict = builtin_agent_fab
         elif request.app_spec:
             fab_file, verification_dict, note = _get_remote_fab(
                 self.fleet_api_type, request.app_spec, context
@@ -1183,15 +1180,6 @@ def _format_verification(verifications: list[dict[str, str]]) -> dict[str, str]:
     verification_dict.update({"valid_license": "Valid"})
 
     return verification_dict
-
-
-def _resolve_builtin_agent_fab() -> tuple[bytes, dict[str, str]]:
-    """Resolve a built-in AgentApp app spec into FAB bytes and verifications."""
-    pyproject_toml = (
-        files("flwr.agentapp.builtin").joinpath("pyproject.toml").read_bytes()
-    )
-    fab_file, _ = build_fab_from_files({"pyproject.toml": pyproject_toml})
-    return fab_file, {}
 
 
 def _get_remote_fab(
