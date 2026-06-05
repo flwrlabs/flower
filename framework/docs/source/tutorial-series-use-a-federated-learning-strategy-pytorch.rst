@@ -375,6 +375,7 @@ experimentation:
     local-epochs = 3
     learning-rate = 0.1
     batch-size = 32
+    save-model = false
 
 Then, we update the initialization of our strategy in ``server_app.py`` to the
 following:
@@ -402,7 +403,7 @@ Finally, run the simulation with the following command:
 
 .. code-block:: shell
 
-    $ flwr run . local --stream
+    $ flwr run . local --stream --federation-config="num-supernodes=50"
 
 *******
  Recap
