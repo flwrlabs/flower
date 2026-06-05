@@ -14,7 +14,6 @@
 # ==============================================================================
 """Runtime version metadata interceptors."""
 
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -53,7 +52,7 @@ class RuntimeVersionClientInterceptor(
         if incompat_message:
             log(WARN, incompat_message)
 
-    def _maybe_exit_on_incompat_error(self, grpc_error: grpc.RpcError) -> None:
+    def _maybe_exit_on_incompat_error(self, grpc_error: grpc.RpcError) -> bool:
         """Exit on runtime-version rejections encoded as FlowerError JSON."""
         details = grpc_error.details() if hasattr(grpc_error, "details") else None
         flower_error = FlowerError.from_json(details)
@@ -65,6 +64,8 @@ class RuntimeVersionClientInterceptor(
             if flower_error.public_details:
                 exit_message += f"\n{flower_error.public_details}"
             flwr_exit(ExitCode.RUNTIME_VERSION_INCOMPATIBLE, exit_message)
+            return True
+        return False
 
     def _intercept_call(
         self,
@@ -78,15 +79,28 @@ class RuntimeVersionClientInterceptor(
                 client_call_details.metadata
             )
         )
-        call: grpc.Call = continuation(details, request)
 
-        def _handle_completion() -> None:
-            self._maybe_log_incompat_warning(call.trailing_metadata())
+        incompat_error_handled = False
+
+        def _maybe_exit_on_call_error(call: grpc.Call) -> None:
+            nonlocal incompat_error_handled
             # Some successful call objects (e.g., unary-stream) can also be
             # subclasses of grpc.RpcError. Do not treat RpcError alone as failure;
             # _maybe_exit_on_incompat_error checks the actual RPC details.
-            if isinstance(call, grpc.RpcError):
-                self._maybe_exit_on_incompat_error(call)
+            if isinstance(call, grpc.RpcError) and not incompat_error_handled:
+                incompat_error_handled = self._maybe_exit_on_incompat_error(call)
+
+        try:
+            call: grpc.Call = continuation(details, request)
+        except grpc.RpcError as err:
+            self._maybe_exit_on_incompat_error(err)
+            raise
+
+        _maybe_exit_on_call_error(call)
+
+        def _handle_completion() -> None:
+            self._maybe_log_incompat_warning(call.trailing_metadata())
+            _maybe_exit_on_call_error(call)
 
         # NOTE: Some gRPC call objects expose callback registration without
         # implementing it.
