@@ -12,17 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Public Flower AgentApp APIs."""
+"""Private built-in AgentApp implementations."""
 
 
-from .agent_app import AgentApp as AgentApp
-from .agent_app import LoadAgentAppError as LoadAgentAppError
-from .base import AgentResponses as AgentResponses
-from .base import AgentSession as AgentSession
+from .resolver import try_resolve_builtin_agent_fab
 
 __all__ = [
-    "AgentApp",
-    "AgentResponses",
-    "AgentSession",
-    "LoadAgentAppError",
+    "try_resolve_builtin_agent_fab",
 ]
