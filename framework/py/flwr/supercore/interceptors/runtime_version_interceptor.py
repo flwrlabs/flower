@@ -100,6 +100,7 @@ class RuntimeVersionClientInterceptor(
             self._maybe_exit_on_incompat_error(err)
             raise
 
+        # Avoid duplicate handling when tests mock flwr_exit and execution continues
         incompat_error_handled = False
         if inspect_errors_immediately and isinstance(call, grpc.RpcError):
             if exit_message := self._get_incompat_exit_message(call):
