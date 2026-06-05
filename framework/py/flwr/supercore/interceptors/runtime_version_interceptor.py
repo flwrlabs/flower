@@ -102,8 +102,8 @@ class RuntimeVersionClientInterceptor(
         incompat_error_handled = False
         if isinstance(call, grpc.RpcError):
             if exit_message := self._get_incompat_exit_message(call):
-                flwr_exit(ExitCode.RUNTIME_VERSION_INCOMPATIBLE, exit_message)
                 incompat_error_handled = True
+                flwr_exit(ExitCode.RUNTIME_VERSION_INCOMPATIBLE, exit_message)
 
         def _handle_completion() -> None:
             self._maybe_log_incompat_warning(call.trailing_metadata())
