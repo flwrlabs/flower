@@ -53,20 +53,25 @@ class RuntimeVersionClientInterceptor(
         if incompat_message:
             log(WARN, incompat_message)
 
-    def _maybe_exit_on_incompat_error(self, grpc_error: grpc.RpcError) -> bool:
-        """Exit on runtime-version rejections encoded as FlowerError JSON."""
+    def _get_incompat_exit_message(self, grpc_error: grpc.RpcError) -> str | None:
+        """Return the exit message for a runtime-version rejection, if present."""
         details = grpc_error.details() if hasattr(grpc_error, "details") else None
         flower_error = FlowerError.from_json(details)
         if (
-            flower_error is not None
-            and flower_error.code == ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
+            flower_error is None
+            or flower_error.code != ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE
         ):
-            exit_message = flower_error.message
-            if flower_error.public_details:
-                exit_message += f"\n{flower_error.public_details}"
+            return None
+
+        exit_message = flower_error.message
+        if flower_error.public_details:
+            exit_message += f"\n{flower_error.public_details}"
+        return exit_message
+
+    def _maybe_exit_on_incompat_error(self, grpc_error: grpc.RpcError) -> None:
+        """Exit on runtime-version rejections encoded as FlowerError JSON."""
+        if exit_message := self._get_incompat_exit_message(grpc_error):
             flwr_exit(ExitCode.RUNTIME_VERSION_INCOMPATIBLE, exit_message)
-            return True
-        return False
 
     def _intercept_call(
         self,
@@ -81,15 +86,12 @@ class RuntimeVersionClientInterceptor(
             )
         )
 
-        incompat_error_handled = False
-
         def _maybe_exit_on_call_error(call: grpc.Call) -> None:
-            nonlocal incompat_error_handled
             # Some successful call objects (e.g., unary-stream) can also be
             # subclasses of grpc.RpcError. Do not treat RpcError alone as failure;
-            # _maybe_exit_on_incompat_error checks the actual RPC details.
-            if isinstance(call, grpc.RpcError) and not incompat_error_handled:
-                incompat_error_handled = self._maybe_exit_on_incompat_error(call)
+            # _get_incompat_exit_message checks the actual RPC details.
+            if isinstance(call, grpc.RpcError):
+                self._maybe_exit_on_incompat_error(call)
 
         try:
             call: grpc.Call = continuation(details, request)
@@ -97,11 +99,16 @@ class RuntimeVersionClientInterceptor(
             self._maybe_exit_on_incompat_error(err)
             raise
 
-        _maybe_exit_on_call_error(call)
+        incompat_error_handled = False
+        if isinstance(call, grpc.RpcError):
+            if exit_message := self._get_incompat_exit_message(call):
+                flwr_exit(ExitCode.RUNTIME_VERSION_INCOMPATIBLE, exit_message)
+                incompat_error_handled = True
 
         def _handle_completion() -> None:
             self._maybe_log_incompat_warning(call.trailing_metadata())
-            _maybe_exit_on_call_error(call)
+            if not incompat_error_handled:
+                _maybe_exit_on_call_error(call)
 
         # NOTE: Some gRPC call objects expose callback registration without
         # implementing it.
