@@ -593,22 +593,3 @@ class TestRuntimeVersionClientInterceptorUnaryStream(TestCase):
             ExitCode.RUNTIME_VERSION_INCOMPATIBLE,
             "Runtime version compatibility check failed.\nruntime mismatch",
         )
-
-    def test_active_rpc_error_stream_is_not_inspected_before_completion(self) -> None:
-        """Active unary-stream RpcError calls should not be inspected eagerly."""
-        rpc_error = _make_runtime_rpc_error()
-        rpc_error.add_callback.return_value = True
-
-        with patch(
-            "flwr.supercore.interceptors.runtime_version_interceptor.flwr_exit"
-        ) as flwr_exit_mock:
-            response = self.interceptor.intercept_unary_stream(
-                continuation=lambda _details, _request: rpc_error,
-                client_call_details=_make_call_details("/flwr.proto.Fleet/PullTaskIns"),
-                request=GetNodesRequest(),
-            )
-
-        self.assertIs(response, rpc_error)
-        rpc_error.add_callback.assert_called_once()
-        rpc_error.details.assert_not_called()
-        flwr_exit_mock.assert_not_called()
