@@ -15,6 +15,7 @@
 """Tests for Alembic migration helpers."""
 
 
+import os
 import unittest
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -226,6 +227,31 @@ class TestAlembicRun(unittest.TestCase):
         mock_run_migrations.assert_called_once_with(engine, connection)
 
     @patch("flwr.supercore.state.alembic.utils._run_migration_workflow")
+    def test_run_migrations_unlocks_postgresql_when_migration_leaves_no_transaction(
+        self, mock_run_migrations: MagicMock
+    ) -> None:
+        """Ensure PostgreSQL migration locks are released without extra commits."""
+        # Prepare
+        events: list[str] = []
+        engine, connection = self.create_mock_engine("postgresql")
+        connection.in_transaction.return_value = False
+        connection.execute.side_effect = self.create_advisory_lock_event_recorder(
+            events
+        )
+        connection.commit.side_effect = lambda: events.append("commit")
+        mock_run_migrations.side_effect = lambda _engine, _bind: events.append(
+            "migrate"
+        )
+
+        # Execute
+        run_migrations(engine)
+
+        # Assert
+        self.assertEqual(events, ["lock", "commit", "migrate", "unlock", "commit"])
+        self.assertEqual(connection.commit.call_count, 2)
+        mock_run_migrations.assert_called_once_with(engine, connection)
+
+    @patch("flwr.supercore.state.alembic.utils._run_migration_workflow")
     def test_run_migrations_releases_postgresql_advisory_lock_on_error(
         self, mock_run_migrations: MagicMock
     ) -> None:
@@ -284,6 +310,46 @@ class TestAlembicRun(unittest.TestCase):
             self.assertEqual(diffs, [])
         finally:
             engine.dispose()
+
+    @unittest.skipUnless(
+        os.environ.get("FLWR_TEST_POSTGRES_DISPOSABLE_URL"),
+        "Set FLWR_TEST_POSTGRES_DISPOSABLE_URL to run real PostgreSQL migrations.",
+    )
+    def test_run_migrations_on_real_disposable_postgresql(self) -> None:
+        """Verify current migrations apply cleanly on a real PostgreSQL backend."""
+        # Prepare
+        engine = create_engine(os.environ["FLWR_TEST_POSTGRES_DISPOSABLE_URL"])
+        try:
+            # Reset the disposable database schema to keep this test reproducible.
+            with engine.connect() as connection:
+                connection.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+                connection.execute(text("CREATE SCHEMA public"))
+                connection.commit()
+
+            # Execute
+            run_migrations(engine)
+
+            # Assert
+            current = get_current_revisions(engine)
+            script = ScriptDirectory.from_config(build_alembic_config(engine))
+            self.assertEqual(current, set(script.get_heads()))
+            self.assertFalse(check_migrations_pending(engine))
+
+            table_names = set(inspect(engine).get_table_names())
+            self.assertIn("alembic_version", table_names)
+            self.assertIn("run", table_names)
+            self.assertIn("message_ins", table_names)
+            self.assertIn("message_res", table_names)
+            self.assertIn("objects", table_names)
+            self.assertIn("run_objects", table_names)
+        finally:
+            try:
+                with engine.connect() as connection:
+                    connection.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+                    connection.execute(text("CREATE SCHEMA public"))
+                    connection.commit()
+            finally:
+                engine.dispose()
 
     def test_primary_task_backfill_populates_historical_runs(self) -> None:
         """Ensure historical runs get backfilled primary tasks during migration."""

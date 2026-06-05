@@ -2297,6 +2297,48 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
             # Assert
             assert sum(len(res) for res in results if res is not None) == 1
 
+    def test_store_message_res_rejects_concurrent_duplicate_across_replicas(
+        self,
+    ) -> None:
+        """Ensure concurrent replicas cannot both reply to the same instruction."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Prepare
+            db_path = self._shared_sql_database(tmpdir)
+            state = self._create_shared_sql_states(db_path)[0]
+
+            node_id = create_dummy_node(state)
+            run_id = create_dummy_run(state)
+            assert state.store_message_ins(
+                create_ins_message_obj(
+                    src_node_id=SUPERLINK_NODE_ID,
+                    dst_node_id=node_id,
+                    run_id=run_id,
+                )
+            )
+            pulled_ins = state.get_message_ins(node_id=node_id, limit=1)[0]
+
+            replies_by_state_id = {}
+            for replica in self.states:
+                msg_res = Message(RecordDict(), reply_to=pulled_ins)
+                msg_res.metadata.__dict__["_message_id"] = str(uuid4())
+                replies_by_state_id[id(replica)] = msg_res
+
+            # Execute
+            results = self._query_states_in_parallel(
+                lambda replica: replica.store_message_res(
+                    replies_by_state_id[id(replica)]
+                )
+            )
+
+            # Assert
+            stored_message_ids = [message_id for message_id in results if message_id]
+            assert len(stored_message_ids) == 1
+            assert state.num_message_res() == 1
+
+            replies = state.get_message_res({pulled_ins.metadata.message_id})
+            assert len(replies) == 1
+            assert replies[0].metadata.message_id == stored_message_ids[0]
+
     def test_acknowledge_node_heartbeat_does_not_revive_deleted_node(self) -> None:
         """Ensure a heartbeat cannot move an unregistered node back online."""
         with tempfile.TemporaryDirectory() as tmpdir:
