@@ -120,12 +120,14 @@ def _make_stream_call(
     return call
 
 
-def _make_runtime_rpc_error() -> grpc.RpcError:
+def _make_runtime_rpc_error(
+    code: ApiErrorCode = ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
+) -> grpc.RpcError:
     rpc_error = grpc.RpcError()
     rpc_error.trailing_metadata = Mock(return_value=())
     rpc_error.details = Mock(
         return_value=FlowerError(
-            ApiErrorCode.RUNTIME_VERSION_INCOMPATIBLE,
+            code,
             "internal diagnostic message",
             public_details="runtime mismatch",
         ).to_json("Runtime version compatibility check failed.")
@@ -214,6 +216,62 @@ class TestRuntimeVersionClientInterceptor(TestCase):
             ExitCode.RUNTIME_VERSION_INCOMPATIBLE,
             "Runtime version compatibility check failed.\nruntime mismatch",
         )
+
+    def test_log_unary_incompatibility_from_raised_rpc_error(self) -> None:
+        """Raised unary-unary RpcError outcomes should trigger Flower exits."""
+        rpc_error = _make_runtime_rpc_error()
+
+        def continuation(
+            _client_call_details: grpc.ClientCallDetails,
+            _request: GrpcMessage,
+        ) -> grpc.Call:
+            raise rpc_error
+
+        with (
+            patch(
+                "flwr.supercore.interceptors.runtime_version_interceptor.flwr_exit"
+            ) as flwr_exit_mock,
+            self.assertRaises(grpc.RpcError),
+        ):
+            self.interceptor.intercept_unary_unary(
+                continuation=continuation,
+                client_call_details=_make_call_details(
+                    "/flwr.proto.ServerAppIo/GetNodes"
+                ),
+                request=GetNodesRequest(),
+            )
+
+        flwr_exit_mock.assert_called_once_with(
+            ExitCode.RUNTIME_VERSION_INCOMPATIBLE,
+            "Runtime version compatibility check failed.\nruntime mismatch",
+        )
+
+    def test_raised_non_incompatibility_rpc_error_is_reraised(self) -> None:
+        """Raised non-runtime-version RpcError outcomes should pass through."""
+        rpc_error = _make_runtime_rpc_error(ApiErrorCode.ENTITLEMENT_ERROR)
+
+        def continuation(
+            _client_call_details: grpc.ClientCallDetails,
+            _request: GrpcMessage,
+        ) -> grpc.Call:
+            raise rpc_error
+
+        with (
+            patch(
+                "flwr.supercore.interceptors.runtime_version_interceptor.flwr_exit"
+            ) as flwr_exit_mock,
+            self.assertRaises(grpc.RpcError) as exc,
+        ):
+            self.interceptor.intercept_unary_unary(
+                continuation=continuation,
+                client_call_details=_make_call_details(
+                    "/flwr.proto.ServerAppIo/GetNodes"
+                ),
+                request=GetNodesRequest(),
+            )
+
+        self.assertIs(exc.exception, rpc_error)
+        flwr_exit_mock.assert_not_called()
 
 
 class TestRuntimeVersionServerInterceptor(TestCase):
