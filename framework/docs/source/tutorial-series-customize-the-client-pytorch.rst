@@ -134,10 +134,12 @@ execution of the ``ClientApp`` took. We can do this by adding a new metric to th
 for example:
 
 .. code-block:: python
-    :emphasize-lines: 1,8,12,13,20
+    :emphasize-lines: 3,10,14,15,22
 
+    # ... unchanged
+    # add this to the imports
     import time
-
+    # ... unchanged
 
     @app.train()
     def train(msg: Message, context: Context):
@@ -177,6 +179,8 @@ Let's go ahead and define this in ``task.py``:
 
 .. code-block:: python
 
+    # ... unchanged imports at the top of the file
+    # add this at the bottom of the imports
     from dataclasses import dataclass
 
 
@@ -187,6 +191,9 @@ Let's go ahead and define this in ``task.py``:
         training_time: float
         converged: bool
         training_losses: dict[str, float]  # e.g. { "epoch_1": 0.5, "epoch_2": 0.3 }
+
+
+    # ... unchanged code starting with class Net(nn.Module):
 
 Now, let's see how the ``ClientApp`` can serialize this object, send it to the
 ``ServerApp``, make the strategy deserialize it back to the original object, and use it.
