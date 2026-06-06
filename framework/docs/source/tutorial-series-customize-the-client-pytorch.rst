@@ -219,19 +219,23 @@ setup from your existing ``train`` function unchanged.
     complex. ``pickle`` is used here solely for simplicity.
 
 .. code-block:: python
-    :emphasize-lines: 1-2,11,21,23,36
+    :emphasize-lines: 3-5,18-22,25,27,43
 
+    # ... unchanged
+    # add this to the imports
     import pickle
-    import time
-
+    from pytorchexample.task import TrainProcessMetadata
+    from flwr.app import ConfigRecord
+    # ... unchanged
 
     @app.train()
     def train(msg: Message, context: Context):
         """Train the model on local data."""
 
+        start_time = time.time()
+
         # ... prepare model, load data, train locally
         # The train function returns the training loss
-        start_time = time.time()
         train_loss = train_fn(...)
         # Construct a TrainProcessMetadata object
         train_metadata = TrainProcessMetadata(
@@ -244,6 +248,9 @@ setup from your existing ``train`` function unchanged.
         train_meta_bytes = pickle.dumps(train_metadata)
         # Construct a ConfigRecord
         config_record = ConfigRecord({"meta": train_meta_bytes})
+
+        end_time = time.time()
+        training_time = end_time - start_time
 
         # Construct and return reply Message
         model_record = ArrayRecord(model.state_dict())
@@ -284,11 +291,14 @@ the ``aggregate_train`` method to deserialize the ``TrainProcessMetadata`` objec
 each client and print the training time and convergence status:
 
 .. code-block:: python
-    :emphasize-lines: 1,8,18,19,21
+    :emphasize-lines: 3-5,11,21-22,24
 
+    # ... make sure you have these imports.
+    # ... Some may exist from previous tutorials
     import pickle
     from dataclasses import asdict
     from typing import Iterable, Optional
+    # ... unchanged
 
 
     class CustomFedAdagrad(FedAdagrad):
@@ -311,7 +321,18 @@ each client and print the training time and convergence status:
             # Aggregate the ArrayRecords and MetricRecords as usual
             return super().aggregate_train(server_round, replies)
 
+    # ... unchanged
+
 Finally, we run the Flower App.
+
+If you are coming from the previous tutorial and are still set to require 50 
+supernodes, you can run:
+
+.. code-block:: shell
+
+    $ flwr run . local --stream --federation-config="num-supernodes=50"
+
+Otherwise, you can run:
 
 .. code-block:: shell
 
