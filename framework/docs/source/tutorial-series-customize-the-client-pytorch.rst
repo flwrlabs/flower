@@ -134,12 +134,14 @@ execution of the ``ClientApp`` took. We can do this by adding a new metric to th
 for example:
 
 .. code-block:: python
-    :emphasize-lines: 3,10,14,15,22
+    :emphasize-lines: 3,12,16,17,24
 
     # ... unchanged
     # add this to the imports
     import time
+
     # ... unchanged
+
 
     @app.train()
     def train(msg: Message, context: Context):
@@ -219,14 +221,16 @@ setup from your existing ``train`` function unchanged.
     complex. ``pickle`` is used here solely for simplicity.
 
 .. code-block:: python
-    :emphasize-lines: 3-5,18-22,25,27,43
+    :emphasize-lines: 3-5,20-24,27,29,45
 
     # ... unchanged
     # add this to the imports
     import pickle
     from pytorchexample.task import TrainProcessMetadata
     from flwr.app import ConfigRecord
+
     # ... unchanged
+
 
     @app.train()
     def train(msg: Message, context: Context):
@@ -291,13 +295,14 @@ the ``aggregate_train`` method to deserialize the ``TrainProcessMetadata`` objec
 each client and print the training time and convergence status:
 
 .. code-block:: python
-    :emphasize-lines: 3-5,11,21-22,24
+    :emphasize-lines: 3-5,12,22-23,25
 
     # ... make sure you have these imports.
     # ... Some may exist from previous tutorials
     import pickle
     from dataclasses import asdict
     from typing import Iterable, Optional
+
     # ... unchanged
 
 
@@ -321,12 +326,13 @@ each client and print the training time and convergence status:
             # Aggregate the ArrayRecords and MetricRecords as usual
             return super().aggregate_train(server_round, replies)
 
+
     # ... unchanged
 
 Finally, we run the Flower App.
 
-If you are coming from the previous tutorial and are still set to require 50 
-supernodes, you can run:
+If you are coming from the previous tutorial and are still set to require 50 supernodes,
+you can run:
 
 .. code-block:: shell
 

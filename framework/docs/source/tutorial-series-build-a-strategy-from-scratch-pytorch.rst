@@ -310,13 +310,15 @@ directory based on the current date and time, this means that each time you do `
 run`` a new directory will be used. Let's see how this looks in code:
 
 .. code-block:: python
-    :emphasize-lines: 3,4,24
+    :emphasize-lines: 3,4,26
 
     # ... unchanged
     # add this to the imports
     from datetime import datetime
     from pathlib import Path
+
     # ... unchanged
+
 
     @app.main()
     def main(grid: Grid, context: Context) -> None:
@@ -343,8 +345,8 @@ Finally, let's run the Flower App locally. This tutorial writes model checkpoint
 your working directory and logs metrics to Weights & Biases, so a local run makes it
 easy to inspect the outputs.
 
-If you are coming from the previous tutorial and are still set to require 50 
-supernodes, you can run:
+If you are coming from the previous tutorial and are still set to require 50 supernodes,
+you can run:
 
 .. code-block:: shell
 
