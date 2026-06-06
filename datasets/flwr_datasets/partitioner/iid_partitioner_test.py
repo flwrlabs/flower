@@ -235,6 +235,27 @@ class TestIidPartitioner(unittest.TestCase):
 
         self.assertEqual(partition_1, partition_2)
 
+    def test_shuffle_true_with_no_seed_uses_consistent_partitioning(self) -> None:
+        """Test that seed=None shuffles once and then reuses the same ordering."""
+        num_partitions = 4
+        num_rows = 40
+        _, partitioner = _dummy_setup(
+            num_partitions=num_partitions,
+            num_rows=num_rows,
+            shuffle=True,
+            seed=None,
+        )
+
+        first_partition = partitioner.load_partition(0)["features"]
+        repeated_first_partition = partitioner.load_partition(0)["features"]
+        all_features = []
+        for partition_id in range(num_partitions):
+            all_features.extend(partitioner.load_partition(partition_id)["features"])
+
+        self.assertEqual(first_partition, repeated_first_partition)
+        self.assertEqual(len(all_features), len(set(all_features)))
+        self.assertEqual(sorted(all_features), list(range(num_rows)))
+
 
 if __name__ == "__main__":
     unittest.main()

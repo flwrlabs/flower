@@ -20,7 +20,7 @@ from flwr_datasets.partitioner.partitioner import Partitioner
 
 
 class IidPartitioner(Partitioner):
-    """Partition the dataset into equal-sized shards.
+    """Partition a dataset into contiguous shards, optionally after shuffling.
 
     Parameters
     ----------
@@ -54,9 +54,10 @@ class IidPartitioner(Partitioner):
         self._num_partitions = num_partitions
         self._shuffle = shuffle
         self._seed = seed
+        self._shuffled_dataset: datasets.Dataset | None = None
 
     def load_partition(self, partition_id: int) -> datasets.Dataset:
-        """Load a single IID partition based on the partition index.
+        """Load a single partition based on the partition index.
 
         Parameters
         ----------
@@ -70,7 +71,9 @@ class IidPartitioner(Partitioner):
         """
         dataset = self.dataset
         if self._shuffle:
-            dataset = dataset.shuffle(seed=self._seed)
+            if self._shuffled_dataset is None:
+                self._shuffled_dataset = dataset.shuffle(seed=self._seed)
+            dataset = self._shuffled_dataset
         return dataset.shard(
             num_shards=self._num_partitions, index=partition_id, contiguous=True
         )
