@@ -79,10 +79,12 @@ The strategy encapsulates the federated learning approach/algorithm, for example
 lines in your ``server_app.py`` to switch from ``FedAvg`` to |fedadagrad_link|_.
 
 .. code-block:: python
-    :emphasize-lines: 1,18
+    :emphasize-lines: 3,20
 
+    # ... unchanged
+    # add this to the imports
     from flwr.serverapp.strategy import FedAdagrad
-
+    # ... unchanged
 
     @app.main()
     def main(grid: Grid, context: Context) -> None:
@@ -284,10 +286,12 @@ Next, we use this new strategy in our ``ServerApp`` by importing it in your
 ``server_app.py`` and using it instead of the standard ``FedAdagrad``:
 
 .. code-block:: python
-    :emphasize-lines: 1,11
+    :emphasize-lines: 3,13
 
+    # ... unchanged
+    # add this to the imports
     from pytorchexample.custom_strategy import CustomFedAdagrad
-
+    # ... unchanged
 
     @app.main()
     def main(grid: Grid, context: Context) -> None:
