@@ -33,9 +33,7 @@ from flwr.cli.constant import (
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
 )
 from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
-from flwr.common.constant import (
-    FLWR_DIR,
-)
+from flwr.common.constant import FLWR_DIR
 from flwr.common.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
 from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
