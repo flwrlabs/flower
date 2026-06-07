@@ -331,7 +331,7 @@ each client and print the training time and convergence status:
 
 Finally, we run the Flower App.
 
-If you are coming from the previous tutorial and are still set to require 50 supernodes,
+If you are coming from the previous tutorial and are still set to require 50 SuperNodes,
 you can run:
 
 .. code-block:: shell
