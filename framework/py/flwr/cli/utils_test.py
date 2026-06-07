@@ -16,7 +16,6 @@
 
 
 import hashlib
-import json
 import os
 import tempfile
 import unittest
@@ -35,10 +34,7 @@ from flwr.cli.constant import (
 )
 from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
 from flwr.common.constant import (
-    ACCESS_TOKEN_KEY,
-    AUTHN_TYPE_JSON_KEY,
     FLWR_DIR,
-    REFRESH_TOKEN_KEY,
 )
 from flwr.common.grpc import GRPC_MAX_MESSAGE_LENGTH
 from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
@@ -56,7 +52,6 @@ from .utils import (
     get_sha256_hash,
     init_channel_from_connection,
     load_gitignore_patterns,
-    validate_credentials_content,
     validate_federation_name,
 )
 
@@ -160,19 +155,6 @@ class TestGetSHA256Hash(unittest.TestCase):
         # Execute & assert
         with self.assertRaises(FileNotFoundError):
             get_sha256_hash(nonexistent_path)
-
-
-def test_validate_credentials_content_success(tmp_path: Path) -> None:
-    """Test the credentials content loading."""
-    creds = {
-        AUTHN_TYPE_JSON_KEY: "userpass",
-        ACCESS_TOKEN_KEY: "abc",
-        REFRESH_TOKEN_KEY: "def",
-    }
-    path = tmp_path / "creds.json"
-    path.write_text(json.dumps(creds), encoding="utf-8")
-    token = validate_credentials_content(path)
-    assert token == "abc"
 
 
 def test_load_gitignore_patterns(tmp_path: Path) -> None:
