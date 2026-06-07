@@ -345,7 +345,7 @@ Finally, let's run the Flower App locally. This tutorial writes model checkpoint
 your working directory and logs metrics to Weights & Biases, so a local run makes it
 easy to inspect the outputs.
 
-If you are coming from the previous tutorial and are still set to require 50 supernodes,
+If you are coming from the previous tutorial and are still set to require 50 SuperNodes,
 you can run:
 
 .. code-block:: shell
