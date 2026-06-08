@@ -79,9 +79,13 @@ The strategy encapsulates the federated learning approach/algorithm, for example
 lines in your ``server_app.py`` to switch from ``FedAvg`` to |fedadagrad_link|_.
 
 .. code-block:: python
-    :emphasize-lines: 1,18
+    :emphasize-lines: 3,22
 
+    # ... unchanged
+    # add this to the imports
     from flwr.serverapp.strategy import FedAdagrad
+
+    # ... unchanged
 
 
     @app.main()
@@ -284,9 +288,13 @@ Next, we use this new strategy in our ``ServerApp`` by importing it in your
 ``server_app.py`` and using it instead of the standard ``FedAdagrad``:
 
 .. code-block:: python
-    :emphasize-lines: 1,11
+    :emphasize-lines: 3,15
 
+    # ... unchanged
+    # add this to the imports
     from pytorchexample.custom_strategy import CustomFedAdagrad
+
+    # ... unchanged
 
 
     @app.main()
@@ -337,73 +345,6 @@ How do we know the ``ClientApp`` is using that new learning rate? Recall that in
 Congratulations! You have created your first custom strategy adding dynamism to the
 ``ConfigRecord`` that is sent to clients.
 
-****************************
- Scaling federated learning
-****************************
-
-As a last step in this tutorial, let's see how we can use Flower to experiment with a
-large number of clients. The most straightforward way to do this is by overriding the
-default Simulation Runtime configuration via the ``--federation-config`` flag:
-
-.. code-block:: shell
-
-    # Run with 50 clients
-    $ flwr run . local --stream --federation-config="num-supernodes=50"
-
-For more details on the Simulation Runtime and its configuration, check out the
-:doc:`Simulation Runtime documentation <how-to-run-simulations>`.
-
-Note that we can reuse the ``ClientApp`` for different ``num-supernodes`` since the
-``Context`` carries the ``num-partitions`` key and for simulations with Flower, the
-number of partitions is equal to the number of SuperNodes.
-
-We now have 50 partitions, each holding 800 training and 200 validation examples. We
-configure the clients to perform 3 local training epochs and adjust the fraction of
-clients selected for training during each round. Since we don't want all 50 clients
-participating in every round, we add ``fraction-train = 0.1`` and adjust
-``fraction-evaluate`` to ``0.2``, which means that 10% of available clients will be
-selected for training each round (so 5 clients) and 20% of them for evaluation (so 10
-clients). We can add and adjust values in the ``pyproject.toml`` for ease of
-experimentation:
-
-.. code-block:: toml
-
-    [tool.flwr.app.config]
-    num-server-rounds = 3
-    fraction-train = 0.1     # <-- new
-    fraction-evaluate = 0.2  # <-- updated
-    local-epochs = 3
-    learning-rate = 0.1
-    batch-size = 32
-
-Then, we update the initialization of our strategy in ``server_app.py`` to the
-following:
-
-.. code-block:: python
-
-    @app.main()
-    def main(grid: Grid, context: Context) -> None:
-        """Main entry point for the ServerApp."""
-
-        # ... unchanged
-        fraction_train: float = context.run_config["fraction-train"]
-        # Initialize FedAdagrad strategy
-        strategy = CustomFedAdagrad(
-            fraction_train=fraction_train,
-            fraction_evaluate=fraction_evaluate,
-            min_train_nodes=5,  # Optional config
-            min_evaluate_nodes=10,  # Optional config
-            min_available_nodes=50,  # Optional config
-        )
-
-        # ... rest unchanged
-
-Finally, run the simulation with the following command:
-
-.. code-block:: shell
-
-    $ flwr run . local --stream
-
 *******
  Recap
 *******
@@ -415,8 +356,7 @@ so little code, right?
 
 In the later sections, we've seen how we can communicate arbitrary values between server
 and clients to fully customize client-side execution. With that capability, we built a
-larger Federated Learning simulation using the Flower Simulation Runtime and ran an
-experiment involving 50 clients in the same workload -- all in the same Flower project!
+larger Federated Learning simulation using the Flower Simulation Runtime.
 
 ************
  Next steps
