@@ -29,6 +29,7 @@ from unittest.mock import MagicMock, Mock, patch
 import grpc
 from parameterized import parameterized
 
+from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
 from flwr.common import ConfigRecord, Context, RecordDict, now
 from flwr.common.constant import (
     NODE_NOT_FOUND_MESSAGE,
@@ -298,6 +299,35 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         self.assertEqual(len(tasks), 1)
         self.assertEqual(tasks[0].run_id, response.run_id)
         self.assertEqual(tasks[0].type, expected_task_type)
+
+    def test_start_run_creates_builtin_agentapp_run_from_app_spec(self) -> None:
+        """Test StartRun creates an AgentApp run for the built-in flwr agent."""
+        request = StartRunRequest(
+            app_spec="@flwragent/flwr-agent",
+            federation=NOOP_FEDERATION,
+        )
+        for key, value in user_config_to_proto({"agent.input": "Hello"}).items():
+            request.override_config[key].CopyFrom(value)
+        builtin_agent_fab = try_resolve_builtin_agent_fab("@flwragent/flwr-agent")
+        assert builtin_agent_fab is not None
+        fab_file, _ = builtin_agent_fab
+        expected_fab_hash = hashlib.sha256(fab_file).hexdigest()
+
+        response = self.servicer.StartRun(request, Mock())
+
+        runs = self.state.get_run_info(run_ids=[response.run_id])
+        tasks = self.state.get_tasks()
+
+        self.assertEqual(len(runs), 1)
+        self.assertEqual(runs[0].fab_id, "flwrlabs/flwr-agent")
+        self.assertEqual(runs[0].fab_version, "0.1.0")
+        self.assertEqual(runs[0].fab_hash, expected_fab_hash)
+        self.assertEqual(runs[0].run_type, RunType.AGENT_APP)
+        self.assertEqual(runs[0].override_config["agent.input"], "Hello")
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].run_id, response.run_id)
+        self.assertEqual(tasks[0].type, TaskType.AGENT_APP)
+        self.assertEqual(tasks[0].fab_hash, runs[0].fab_hash)
 
     def test_start_run_aborts_if_create_run_fails(self) -> None:
         """Test StartRun aborts with INTERNAL if the initial task cannot be created."""
