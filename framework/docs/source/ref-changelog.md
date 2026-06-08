@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.31.0 (<REPLACE-WITH-ACTUAL-DATE>)
+## v1.31.0 (2026-06-08)
 
 ### Thanks to our contributors
 
@@ -14,11 +14,11 @@ We would like to give our special thanks to all the contributors who made the ne
 
   Prepares the foundation for running agents with Flower and on SuperGrid, introducing the infrastructure and building blocks needed for upcoming agent workflows.
 
-- **Add SuperGrid guides** ([#7188](https://github.com/flwrlabs/flower/pull/7188), [#7221](https://github.com/flwrlabs/flower/pull/7221), [#7257](https://github.com/flwrlabs/flower/pull/7257), [#7279](https://github.com/flwrlabs/flower/pull/7279))
+- **Add SuperGrid guides** ([#7188](https://github.com/flwrlabs/flower/pull/7188), [#7221](https://github.com/flwrlabs/flower/pull/7221), [#7257](https://github.com/flwrlabs/flower/pull/7257), [#7279](https://github.com/flwrlabs/flower/pull/7279), [#7328](https://github.com/flwrlabs/flower/pull/7328), [#7334](https://github.com/flwrlabs/flower/pull/7334))
 
   Adds new and expanded SuperGrid guides, including Flower CLI usage and instructions for running apps on SuperGrid. To learn more about using SuperGrid, see the [Get started with Flower tutorial](https://flower.ai/docs/framework/1.31/en/tutorial-series-get-started-with-flower.html).
 
-- **Add Executor Abstraction for SuperExecs** ([#7155](https://github.com/flwrlabs/flower/pull/7155), [#7174](https://github.com/flwrlabs/flower/pull/7174), [#7206](https://github.com/flwrlabs/flower/pull/7206), [#7231](https://github.com/flwrlabs/flower/pull/7231), [#7232](https://github.com/flwrlabs/flower/pull/7232), [#7233](https://github.com/flwrlabs/flower/pull/7233), [#7234](https://github.com/flwrlabs/flower/pull/7234), [#7235](https://github.com/flwrlabs/flower/pull/7235))
+- **Add Executor Abstraction for SuperExecs** ([#7174](https://github.com/flwrlabs/flower/pull/7174), [#7206](https://github.com/flwrlabs/flower/pull/7206), [#7231](https://github.com/flwrlabs/flower/pull/7231), [#7232](https://github.com/flwrlabs/flower/pull/7232), [#7233](https://github.com/flwrlabs/flower/pull/7233), [#7234](https://github.com/flwrlabs/flower/pull/7234), [#7235](https://github.com/flwrlabs/flower/pull/7235))
 
   Introduces a SuperExec Executor framework that separates task selection from how tasks are launched. The new execution specification, launch result handling, token-file support, and capacity hook make it easier to add and enrich launch paths for different execution environments, from local subprocesses to containers, Kubernetes pods, and other managed runtimes.
 
@@ -46,7 +46,7 @@ We would like to give our special thanks to all the contributors who made the ne
 
 - **Upgrade Ray to 2.55.1** ([#7181](https://github.com/flwrlabs/flower/pull/7181))
 
-- **General improvements** ([#7155](https://github.com/flwrlabs/flower/pull/7155), [#7218](https://github.com/flwrlabs/flower/pull/7218), [#7219](https://github.com/flwrlabs/flower/pull/7219), [#7229](https://github.com/flwrlabs/flower/pull/7229), [#7243](https://github.com/flwrlabs/flower/pull/7243), [#7254](https://github.com/flwrlabs/flower/pull/7254), [#7262](https://github.com/flwrlabs/flower/pull/7262), [#7267](https://github.com/flwrlabs/flower/pull/7267), [#7281](https://github.com/flwrlabs/flower/pull/7281), [#7306](https://github.com/flwrlabs/flower/pull/7306), [#7315](https://github.com/flwrlabs/flower/pull/7315))
+- **General improvements** ([#7155](https://github.com/flwrlabs/flower/pull/7155), [#7218](https://github.com/flwrlabs/flower/pull/7218), [#7219](https://github.com/flwrlabs/flower/pull/7219), [#7229](https://github.com/flwrlabs/flower/pull/7229), [#7243](https://github.com/flwrlabs/flower/pull/7243), [#7254](https://github.com/flwrlabs/flower/pull/7254), [#7262](https://github.com/flwrlabs/flower/pull/7262), [#7267](https://github.com/flwrlabs/flower/pull/7267), [#7281](https://github.com/flwrlabs/flower/pull/7281), [#7306](https://github.com/flwrlabs/flower/pull/7306), [#7315](https://github.com/flwrlabs/flower/pull/7315), [#7331](https://github.com/flwrlabs/flower/pull/7331))
 
   As always, many parts of the Flower framework and quality infrastructure were improved and updated.
 
