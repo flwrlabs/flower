@@ -10,9 +10,9 @@ We would like to give our special thanks to all the contributors who made the ne
 
 ### What's new?
 
-- **Prepare agent support** ([#7215](https://github.com/flwrlabs/flower/pull/7215), [#7216](https://github.com/flwrlabs/flower/pull/7216), [#7220](https://github.com/flwrlabs/flower/pull/7220), [#7238](https://github.com/flwrlabs/flower/pull/7238), [#7252](https://github.com/flwrlabs/flower/pull/7252), [#7253](https://github.com/flwrlabs/flower/pull/7253), [#7256](https://github.com/flwrlabs/flower/pull/7256), [#7261](https://github.com/flwrlabs/flower/pull/7261), [#7264](https://github.com/flwrlabs/flower/pull/7264), [#7272](https://github.com/flwrlabs/flower/pull/7272), [#7273](https://github.com/flwrlabs/flower/pull/7273), [#7277](https://github.com/flwrlabs/flower/pull/7277), [#7287](https://github.com/flwrlabs/flower/pull/7287), [#7291](https://github.com/flwrlabs/flower/pull/7291), [#7292](https://github.com/flwrlabs/flower/pull/7292), [#7293](https://github.com/flwrlabs/flower/pull/7293), [#7301](https://github.com/flwrlabs/flower/pull/7301), [#7314](https://github.com/flwrlabs/flower/pull/7314), [#7324](https://github.com/flwrlabs/flower/pull/7324, [#7337](https://github.com/flwrlabs/flower/pull/7337)))
+- **Prepare support for Flower Agent** ([#7215](https://github.com/flwrlabs/flower/pull/7215), [#7216](https://github.com/flwrlabs/flower/pull/7216), [#7220](https://github.com/flwrlabs/flower/pull/7220), [#7238](https://github.com/flwrlabs/flower/pull/7238), [#7252](https://github.com/flwrlabs/flower/pull/7252), [#7253](https://github.com/flwrlabs/flower/pull/7253), [#7256](https://github.com/flwrlabs/flower/pull/7256), [#7261](https://github.com/flwrlabs/flower/pull/7261), [#7264](https://github.com/flwrlabs/flower/pull/7264), [#7272](https://github.com/flwrlabs/flower/pull/7272), [#7273](https://github.com/flwrlabs/flower/pull/7273), [#7277](https://github.com/flwrlabs/flower/pull/7277), [#7287](https://github.com/flwrlabs/flower/pull/7287), [#7291](https://github.com/flwrlabs/flower/pull/7291), [#7292](https://github.com/flwrlabs/flower/pull/7292), [#7293](https://github.com/flwrlabs/flower/pull/7293), [#7301](https://github.com/flwrlabs/flower/pull/7301), [#7314](https://github.com/flwrlabs/flower/pull/7314), [#7324](https://github.com/flwrlabs/flower/pull/7324, [#7337](https://github.com/flwrlabs/flower/pull/7337)))
 
-  Prepares the foundation for running agents with Flower and on SuperGrid, introducing the infrastructure and building blocks needed for upcoming agent workflows.
+  Prepares the foundation for running Flower Agent on SuperGrid, introducing the infrastructure and building blocks needed for upcoming agentic AI workflows.
 
 - **Add SuperGrid guides** ([#7188](https://github.com/flwrlabs/flower/pull/7188), [#7221](https://github.com/flwrlabs/flower/pull/7221), [#7257](https://github.com/flwrlabs/flower/pull/7257), [#7279](https://github.com/flwrlabs/flower/pull/7279), [#7328](https://github.com/flwrlabs/flower/pull/7328), [#7334](https://github.com/flwrlabs/flower/pull/7334))
 
@@ -26,9 +26,9 @@ We would like to give our special thanks to all the contributors who made the ne
 
   Improves high availability by making cleanup and startup operations safer, and strengthening concurrent node, message, and run handling.
 
-- **Track ClientApp runtime metrics in simulation runs** ([#7248](https://github.com/flwrlabs/flower/pull/7248), [#7250](https://github.com/flwrlabs/flower/pull/7250), [#7251](https://github.com/flwrlabs/flower/pull/7251), [#7260](https://github.com/flwrlabs/flower/pull/7260))
+- **Track `ClientApp` runtime metrics in simulation runs** ([#7248](https://github.com/flwrlabs/flower/pull/7248), [#7250](https://github.com/flwrlabs/flower/pull/7250), [#7251](https://github.com/flwrlabs/flower/pull/7251), [#7260](https://github.com/flwrlabs/flower/pull/7260))
 
-  Tracks ClientApp runtime metrics in simulation runs by adding run metrics to the `AppIo` proto, collecting run metrics, and forwarding simulation run metrics.
+  Tracks `ClientApp` runtime metrics in simulation runs by adding run metrics to the `AppIo` proto, collecting run metrics, and forwarding simulation run metrics.
 
 - **Add task-to-task communication** ([#7156](https://github.com/flwrlabs/flower/pull/7156), [#7178](https://github.com/flwrlabs/flower/pull/7178), [#7194](https://github.com/flwrlabs/flower/pull/7194), [#7213](https://github.com/flwrlabs/flower/pull/7213))
 
