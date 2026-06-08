@@ -17,17 +17,16 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Sequence
 from typing import cast
 
+from flwr.app.message import ConfigRecord, Message, RecordDict
 from flwr.app.message_type import MessageType
 from flwr.app.metadata import Metadata
 from flwr.common.constant import SUPERLINK_NODE_ID
-from flwr.common.message import Message
-from flwr.common.record import ConfigRecord, RecordDict
 from flwr.supercore.date import now
 from flwr.supercore.typing import JSONObject, JSONValue
+from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
 _PAYLOAD_RECORD_KEY = "payload"
 _PAYLOAD_JSON_KEY = "json"
@@ -35,7 +34,7 @@ _DEFAULT_TASK_MESSAGE_TTL = 3600.0
 
 
 class ModelRequest(Message):
-    """Task-routed model request in OpenAI Responses create-request shape."""
+    """Task-routed model request in Open Responses create-request shape."""
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
         self,
@@ -106,7 +105,7 @@ class ModelRequest(Message):
 
 
 class ModelResponse(Message):
-    """Task-routed model response in OpenAI Responses object shape."""
+    """Task-routed model response in Open Responses object shape."""
 
     def __init__(
         self,
@@ -132,7 +131,7 @@ class ModelResponse(Message):
 
     @property
     def payload(self) -> JSONObject:
-        """Return this response's OpenAI Responses object payload."""
+        """Return this response's Open Responses object payload."""
         if not self.has_content():
             raise ValueError("Expected a message with content.")
         return _payload_from_content(self.content)
@@ -188,17 +187,10 @@ def _build_metadata_and_content(
 def _payload_to_content(payload: JSONObject) -> RecordDict:
     """Serialize a JSON object payload into message content."""
     try:
-        # Store compact, strict JSON without unnecessary whitespace;
-        # Python's NaN/Infinity extensions are invalid.
-        encoded = json.dumps(payload, separators=(",", ":"), allow_nan=False)
+        encoded = strict_json_dumps(payload, compact=True)
     except (TypeError, ValueError) as err:
         raise ValueError("Payload must be JSON serializable.") from err
     return RecordDict({_PAYLOAD_RECORD_KEY: ConfigRecord({_PAYLOAD_JSON_KEY: encoded})})
-
-
-def _reject_non_finite_json_number(value: str) -> None:
-    """Reject non-finite JSON number constants accepted by Python's decoder."""
-    raise ValueError(f"Payload JSON contains non-finite number {value}.")
 
 
 def _payload_from_content(content: RecordDict) -> JSONObject:
@@ -212,8 +204,7 @@ def _payload_from_content(content: RecordDict) -> JSONObject:
         raise ValueError("Expected payload JSON to be a string.")
 
     try:
-        # Reject Python's NaN/Infinity extensions while parsing inbound JSON.
-        payload = json.loads(raw, parse_constant=_reject_non_finite_json_number)
+        payload = strict_json_loads(raw)
     except ValueError as err:
         raise ValueError("Payload JSON is malformed.") from err
 
@@ -289,7 +280,7 @@ def _validate_model_request_payload(payload: JSONObject) -> None:
 
 
 def _validate_model_response_payload(payload: JSONObject) -> None:
-    """Validate the minimal OpenAI Responses object shape."""
+    """Validate the minimal Open Responses object shape."""
     if payload.get("object") != "response":
         raise ValueError("ModelResponse payload field 'object' must be 'response'.")
     for field in ("id", "status"):

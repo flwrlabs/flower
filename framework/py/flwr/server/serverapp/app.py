@@ -22,8 +22,8 @@ from queue import Queue
 
 import grpc
 
-from flwr.app import RecordDict
 from flwr.app.exception import AppExitException
+from flwr.app.message import Context, RecordDict
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
@@ -38,7 +38,6 @@ from flwr.common.constant import (
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
     SubStatus,
 )
-from flwr.common.context import Context
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import (
     flush_logs,
@@ -60,7 +59,6 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputResponse,
     PushTaskOutputRequest,
 )
-from flwr.server.grid.grpc_grid import GrpcGrid
 from flwr.server.run_serverapp import run as run_
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
@@ -69,6 +67,7 @@ from flwr.supercore.superexec.dependency_installer import (
     install_app_dependencies,
 )
 from flwr.supercore.tls import validate_and_resolve_root_certificates
+from flwr.superlink.grid import GrpcGrid
 
 
 def flwr_serverapp() -> None:

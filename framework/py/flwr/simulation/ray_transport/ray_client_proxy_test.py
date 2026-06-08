@@ -20,18 +20,11 @@ from random import shuffle
 
 import ray
 
+from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.client import Client, NumPyClient
 from flwr.client.run_info_store import DeprecatedRunInfoStore
 from flwr.clientapp import ClientApp
-from flwr.common import (
-    Config,
-    ConfigRecord,
-    Context,
-    Message,
-    MessageTypeLegacy,
-    RecordDict,
-    Scalar,
-)
+from flwr.common import Config, MessageTypeLegacy, Scalar
 from flwr.common.constant import NUM_PARTITIONS_KEY, PARTITION_ID_KEY
 from flwr.common.recorddict_compat import (
     getpropertiesins_to_recorddict,

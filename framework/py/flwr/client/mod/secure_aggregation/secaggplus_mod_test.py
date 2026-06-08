@@ -19,16 +19,16 @@ import unittest
 from collections.abc import Callable
 from itertools import product
 
+from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.app.message_type import MessageType
+from flwr.app.typing import ConfigRecordValues
 from flwr.client.mod import make_ffn
-from flwr.common import ConfigRecord, Context, Message, RecordDict
 from flwr.common.secure_aggregation.secaggplus_constants import (
     RECORD_KEY_CONFIGS,
     RECORD_KEY_STATE,
     Key,
     Stage,
 )
-from flwr.common.typing import ConfigRecordValues
 
 from .secaggplus_mod import SecAggPlusState, check_configs, secaggplus_mod
 

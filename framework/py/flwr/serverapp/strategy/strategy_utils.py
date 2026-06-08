@@ -23,18 +23,11 @@ from typing import cast
 
 import numpy as np
 
-from flwr.common import (
-    Array,
-    ArrayRecord,
-    ConfigRecord,
-    MetricRecord,
-    NDArray,
-    RecordDict,
-    log,
-)
-from flwr.server import Grid
+from flwr.app import Array, ArrayRecord, ConfigRecord, MetricRecord, RecordDict
+from flwr.common import NDArray, log
 
 from ..exception import InconsistentMessageReplies
+from ..grid import Grid
 
 
 def config_to_str(config: ConfigRecord) -> str:

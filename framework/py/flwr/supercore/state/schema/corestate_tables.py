@@ -22,6 +22,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Index,
+    Integer,
     LargeBinary,
     MetaData,
     String,
@@ -58,6 +59,46 @@ def create_corestate_metadata() -> MetaData:
     )
 
     # --------------------------------------------------------------------------
+    #  Table: run_series
+    # --------------------------------------------------------------------------
+    Table(
+        "run_series",
+        metadata,
+        Column("series_id", BigInteger, primary_key=True, nullable=False),
+        Column("federation", String, nullable=False),
+        Column("description", String, nullable=True),
+        Column("created_at", TIMESTAMP(timezone=True), nullable=False),
+        Column("updated_at", TIMESTAMP(timezone=True), nullable=False),
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: series_context
+    # --------------------------------------------------------------------------
+    Table(
+        "series_context",
+        metadata,
+        Column("series_id", BigInteger, primary_key=True, nullable=False),
+        Column("context", LargeBinary),
+    )
+
+    # --------------------------------------------------------------------------
+    #  Table: series_runs
+    # --------------------------------------------------------------------------
+    series_runs = Table(
+        "series_runs",
+        metadata,
+        Column(
+            "id",
+            Integer,
+            primary_key=True,
+            autoincrement=True,
+        ),
+        Column("series_id", BigInteger, nullable=False),
+        Column("run_id", BigInteger, unique=True, nullable=False),
+    )
+    Index("idx_series_runs_series_id", series_runs.c.series_id)
+
+    # --------------------------------------------------------------------------
     #  Table: task
     # --------------------------------------------------------------------------
     task = Table(
@@ -81,6 +122,22 @@ def create_corestate_metadata() -> MetaData:
     Index("idx_task_run_id", task.c.run_id)
     Index("idx_task_token", task.c.token)
     Index("idx_task_active_until", task.c.active_until)
+
+    # --------------------------------------------------------------------------
+    #  Table: task_event
+    # --------------------------------------------------------------------------
+    task_event = Table(
+        "task_event",
+        metadata,
+        Column("id", Integer, primary_key=True, autoincrement=True),
+        Column("timestamp", TIMESTAMP(timezone=True), nullable=False),
+        Column("run_id", BigInteger, nullable=False),
+        Column("task_id", BigInteger, ForeignKey("task.task_id"), nullable=False),
+        Column("event", String, nullable=False),
+        Column("data", String, nullable=False),
+    )
+    Index("idx_task_event_run_id_id", task_event.c.run_id, task_event.c.id)
+    Index("idx_task_event_task_id", task_event.c.task_id)
 
     # --------------------------------------------------------------------------
     #  Table: task_message

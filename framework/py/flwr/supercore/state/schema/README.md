@@ -104,12 +104,32 @@ erDiagram
     BIGINT primary_task_id
     BIGINT run_id UK "nullable"
     VARCHAR run_type
+    BIGINT series_id "nullable"
     VARCHAR usage_reported_at
   }
 
   run_objects {
     VARCHAR object_id PK,FK
     BIGINT run_id PK
+  }
+
+  run_series {
+    BIGINT series_id PK
+    TIMESTAMP created_at
+    VARCHAR description "nullable"
+    VARCHAR federation
+    TIMESTAMP updated_at
+  }
+
+  series_context {
+    BIGINT series_id PK
+    BLOB context "nullable"
+  }
+
+  series_runs {
+    INTEGER id PK
+    BIGINT run_id UK
+    BIGINT series_id
   }
 
   task {
@@ -127,6 +147,15 @@ erDiagram
     BIGINT task_id UK
     VARCHAR token "nullable"
     VARCHAR type
+  }
+
+  task_event {
+    INTEGER id PK
+    BIGINT task_id FK
+    VARCHAR data
+    VARCHAR event
+    BIGINT run_id
+    TIMESTAMP timestamp
   }
 
   task_logs {
@@ -155,6 +184,7 @@ erDiagram
   objects ||--o| object_children : parent_id
   objects ||--o| object_children : child_id
   objects ||--o| run_objects : object_id
+  task ||--o{ task_event : task_id
   task ||--o{ task_logs : task_id
   task ||--o{ task_message : src_task_id
   task ||--o{ task_message : dst_task_id

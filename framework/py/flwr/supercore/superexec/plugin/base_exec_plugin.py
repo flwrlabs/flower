@@ -14,7 +14,6 @@
 # ==============================================================================
 """Simple base Flower SuperExec plugin for app processes."""
 
-
 import os
 from collections.abc import Callable, Sequence
 from logging import ERROR
@@ -25,7 +24,7 @@ from flwr.common.logger import log
 from flwr.common.typing import Run
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
-from flwr.supercore.superexec.executor import ExecutionSpec, Executor
+from flwr.supercore.superexec.executor import ExecutionSpec, Executor, LaunchResult
 
 from .exec_plugin import ExecPlugin
 
@@ -72,16 +71,24 @@ class BaseExecPlugin(ExecPlugin):
             return None
         return candidate_tasks[0]
 
-    def launch_task(self, token: str, task: Task) -> None:
+    def launch_task(self, token: str, task: Task) -> LaunchResult:
         """Launch the process to execute the given task using the given token."""
         task_type = self._get_supported_task_type(task)
         if task_type is None:
-            return
-        self.executor.launch(
-            self._build_execution_spec(token=token, task_type=task_type)
+            return LaunchResult.failed(
+                f"Unknown task type '{task.type}' for task_id {task.task_id}."
+            )
+        return self.executor.launch(
+            self._build_execution_spec(
+                token=token,
+                task_type=task_type,
+                task_id=task.task_id,
+            )
         )
 
-    def _build_execution_spec(self, token: str, task_type: TaskType) -> ExecutionSpec:
+    def _build_execution_spec(
+        self, token: str, task_type: TaskType, task_id: int
+    ) -> ExecutionSpec:
         """Build the execution spec for the selected task."""
         return ExecutionSpec(
             task_type=task_type,
@@ -92,6 +99,7 @@ class BaseExecPlugin(ExecPlugin):
             runtime_dependency_install=self.runtime_dependency_install,
             parent_pid=os.getpid(),
             suppress_output=self.suppress_output,
+            task_id=task_id,
         )
 
     def _get_supported_task_type(self, task: Task) -> TaskType | None:

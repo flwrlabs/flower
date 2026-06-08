@@ -16,12 +16,13 @@
 
 
 from abc import ABC, abstractmethod
-from logging import DEBUG
+from logging import DEBUG, ERROR
 
 import grpc
 
 from flwr.common.constant import Status
 from flwr.common.logger import log
+from flwr.common.serde import message_from_proto, message_to_proto
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     ClaimTaskRequest,
     ClaimTaskResponse,
@@ -31,6 +32,8 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullPendingTasksResponse,
     PullTaskMessageRequest,
     PullTaskMessageResponse,
+    PushTaskEventsRequest,
+    PushTaskEventsResponse,
     PushTaskMessageRequest,
     PushTaskMessageResponse,
     SendTaskHeartbeatRequest,
@@ -125,20 +128,67 @@ class AppIoServicer(ABC):
     ) -> PushTaskMessageResponse:
         """Push a task message."""
         log(DEBUG, "AppIoServicer.PushTaskMessage")
-        context.abort(
-            grpc.StatusCode.UNIMPLEMENTED, "PushTaskMessage is not implemented"
-        )
-        raise RuntimeError("This line should never be reached.")
+
+        task = get_authenticated_task()
+
+        if request.message.metadata.src_task_id != task.task_id:
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "`Message.metadata.src_task_id` does not match the authenticated task.",
+            )
+
+        message = message_from_proto(request.message)
+
+        state = self.state()
+        stored = state.store_task_message(message)
+        if not stored:
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "Task message could not be stored.",
+            )
+
+        return PushTaskMessageResponse(message_id=message.metadata.message_id)
+
+    def PushTaskEvents(
+        self, request: PushTaskEventsRequest, context: grpc.ServicerContext
+    ) -> PushTaskEventsResponse:
+        """Push task events."""
+        log(DEBUG, "AppIoServicer.PushTaskEvents")
+
+        task = get_authenticated_task()
+        if not request.events:
+            return PushTaskEventsResponse()
+
+        for event in request.events:
+            event.run_id = task.run_id
+            event.task_id = task.task_id
+
+        if not self.state().store_task_events(request.events):
+            log(
+                ERROR,
+                "Task events could not be stored for task %d of run %d.",
+                task.task_id,
+                task.run_id,
+            )
+
+        return PushTaskEventsResponse()
 
     def PullTaskMessage(
         self, request: PullTaskMessageRequest, context: grpc.ServicerContext
     ) -> PullTaskMessageResponse:
         """Pull task messages."""
         log(DEBUG, "AppIoServicer.PullTaskMessage")
-        context.abort(
-            grpc.StatusCode.UNIMPLEMENTED, "PullTaskMessage is not implemented"
+
+        task = get_authenticated_task()
+        limit = request.limit if request.HasField("limit") else None
+        messages = self.state().get_task_message(
+            dst_task_ids=[task.task_id],
+            limit=limit,
+            order_by="created_at",
         )
-        raise RuntimeError("This line should never be reached.")
+        return PullTaskMessageResponse(
+            messages=[message_to_proto(message) for message in messages]
+        )
 
     def PushLogs(
         self, request: PushLogsRequest, context: grpc.ServicerContext
