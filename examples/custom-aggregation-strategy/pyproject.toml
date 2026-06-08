@@ -1,0 +1,55 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "custom-aggregation-strategy"
+version = "0.1.0"
+description = "Custom aggregation on the Flower Message API: norm-based trust-weighted FedAvg"
+license = "Apache-2.0"
+dependencies = [
+    "flwr[simulation]>=1.28.0",
+    "flwr-datasets[vision]>=0.6.0",
+    "torch==2.8.0",
+    "torchvision==0.23.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.flwr.app]
+publisher = "sunjun"
+
+[tool.flwr.app.components]
+serverapp = "customagg.server_app:app"
+clientapp = "customagg.client_app:app"
+
+[tool.flwr.app.config]
+num-server-rounds = 5
+fraction-evaluate = 0.5
+local-epochs = 1
+learning-rate = 0.1
+batch-size = 32
+# Aggregation strategy: "trust" (TrustAwareFedAvg) or "fedavg" (vanilla baseline)
+strategy = "trust"
+# Number of clients (lowest partition ids) that poison their update, and the
+# std of the Gaussian noise they add. Set num-malicious=0 for a clean run.
+num-malicious = 3
+attack-scale = 1.0
+# trust-z: width of the "normal" dead zone in robust-std (MAD) units; only
+# updates beyond it are down-weighted. trust-beta: decay rate past the dead zone.
+trust-z = 3.5
+trust-beta = 5.0
+
+[tool.flwr.federations]
+default = "local-simulation"
+
+[tool.flwr.federations.local-simulation]
+options.num-supernodes = 10
+
+# Pack 10 clients onto a single GPU (0.1 GPU each). Requires a CUDA build of
+# torch. Run with:  flwr run . gpu-simulation
+[tool.flwr.federations.gpu-simulation]
+options.num-supernodes = 10
+options.backend.client-resources.num-cpus = 2
+options.backend.client-resources.num-gpus = 0.1
