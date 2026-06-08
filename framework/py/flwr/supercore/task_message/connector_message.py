@@ -18,16 +18,17 @@
 from __future__ import annotations
 
 from flwr.app.message import Message
-from flwr.app.message_type import MessageType
+from flwr.supercore.task_message.base import TaskMessage
 from flwr.supercore.task_message.constant import DEFAULT_TASK_MESSAGE_TTL
-from flwr.supercore.task_message.utils import (
-    build_task_message_metadata_and_content,
-    task_message_payload_from_content,
+from flwr.supercore.task_message.validation import (
+    require_json_object,
+    require_non_empty_string,
+    require_present,
 )
 from flwr.supercore.typing import JSONObject, JSONValue
 
 
-class ConnectorRequest(Message):
+class ConnectorRequest(TaskMessage):
     """Task-routed connector request."""
 
     def __init__(
@@ -45,43 +46,22 @@ class ConnectorRequest(Message):
             "arguments": arguments,
         }
         _validate_connector_request_payload(payload)
-        message_metadata, content = build_task_message_metadata_and_content(
-            dst_task_id,
-            payload,
-            "",
-            ttl,
+        super().__init__(
+            dst_task_id=dst_task_id,
+            payload=payload,
+            ttl=ttl,
         )
-        super().__init__(  # type: ignore[call-overload]
-            metadata=message_metadata,
-            content=content,
-        )
-
-    @property
-    def payload(self) -> JSONObject:
-        """Return this connector request payload."""
-        if not self.has_content():
-            raise ValueError("Expected a message with content.")
-        return task_message_payload_from_content(self.content)
 
     @classmethod
     def from_message(cls, message: Message) -> ConnectorRequest:
         """Parse a generic message into a connector request."""
-        if message.metadata.message_type != MessageType.QUERY:
-            raise ValueError(
-                f"Expected message type {MessageType.QUERY}, "
-                f"got {message.metadata.message_type}."
-            )
-        if not message.has_content():
-            raise ValueError("Expected a message with content.")
-
-        payload = task_message_payload_from_content(message.content)
-        _validate_connector_request_payload(payload)
-        request = cls.__new__(cls)
-        request.__dict__.update(message.__dict__)
-        return request
+        return cls._from_message(
+            message,
+            validate_payload=_validate_connector_request_payload,
+        )
 
 
-class ConnectorResponse(Message):
+class ConnectorResponse(TaskMessage):
     """Task-routed connector response."""
 
     def __init__(
@@ -105,78 +85,47 @@ class ConnectorResponse(Message):
             "error": error,
         }
         _validate_connector_response_payload(payload)
-        metadata, content = build_task_message_metadata_and_content(
-            dst_task_id,
-            payload,
-            reply_to_message_id,
-            ttl,
+        super().__init__(
+            dst_task_id=dst_task_id,
+            payload=payload,
+            reply_to_message_id=reply_to_message_id,
+            ttl=ttl,
         )
-        super().__init__(  # type: ignore[call-overload]
-            metadata=metadata,
-            content=content,
-        )
-
-    @property
-    def payload(self) -> JSONObject:
-        """Return this connector response payload."""
-        if not self.has_content():
-            raise ValueError("Expected a message with content.")
-        return task_message_payload_from_content(self.content)
 
     @classmethod
     def from_message(cls, message: Message) -> ConnectorResponse:
         """Parse a generic message into a connector response."""
-        if message.metadata.message_type != MessageType.QUERY:
-            raise ValueError(
-                f"Expected message type {MessageType.QUERY}, "
-                f"got {message.metadata.message_type}."
-            )
-        if not message.metadata.reply_to_message_id:
-            raise ValueError("ConnectorResponse requires reply_to_message_id.")
-        if not message.has_content():
-            raise ValueError("Expected a message with content.")
-
-        payload = task_message_payload_from_content(message.content)
-        _validate_connector_response_payload(payload)
-        response = cls.__new__(cls)
-        response.__dict__.update(message.__dict__)
-        return response
-
-
-def _validate_string_field(payload: JSONObject, field: str, *, owner: str) -> None:
-    """Validate that a payload field is a non-empty string."""
-    value = payload.get(field)
-    if not isinstance(value, str) or not value:
-        raise ValueError(
-            f"{owner} payload requires a non-empty string field '{field}'."
+        return cls._from_message(
+            message,
+            validate_payload=_validate_connector_response_payload,
+            require_reply_to_message_id=True,
+            reply_to_message_id_error="ConnectorResponse requires reply_to_message_id.",
         )
 
 
 def _validate_connector_request_payload(payload: JSONObject) -> None:
     """Validate the connector request payload shape."""
-    _validate_string_field(payload, "name", owner="ConnectorRequest")
-    _validate_string_field(payload, "call_id", owner="ConnectorRequest")
-    if not isinstance(payload.get("arguments"), dict):
-        raise ValueError(
-            "ConnectorRequest payload requires a JSON object field 'arguments'."
-        )
+    require_non_empty_string(payload, "name", owner="ConnectorRequest")
+    require_non_empty_string(payload, "call_id", owner="ConnectorRequest")
+    require_json_object(payload, "arguments", owner="ConnectorRequest")
 
 
 def _validate_connector_response_payload(payload: JSONObject) -> None:
     """Validate the connector response payload shape."""
-    _validate_string_field(payload, "name", owner="ConnectorResponse")
-    _validate_string_field(payload, "call_id", owner="ConnectorResponse")
+    require_non_empty_string(payload, "name", owner="ConnectorResponse")
+    require_non_empty_string(payload, "call_id", owner="ConnectorResponse")
 
-    if "output" not in payload:
-        raise ValueError("ConnectorResponse payload requires field 'output'.")
-    if "error" not in payload:
-        raise ValueError("ConnectorResponse payload requires field 'error'.")
+    require_present(payload, "output", owner="ConnectorResponse")
+    require_present(payload, "error", owner="ConnectorResponse")
 
     error = payload["error"]
-    if error is not None and not isinstance(error, dict):
-        raise ValueError(
-            "ConnectorResponse payload field 'error' must be a JSON object."
-        )
+    require_json_object(
+        payload,
+        "error",
+        owner="ConnectorResponse",
+        required=False,
+        allow_none=True,
+    )
     if error is not None and payload["output"] is not None:
         raise ValueError(
             "ConnectorResponse payload field 'output' must be null when "
