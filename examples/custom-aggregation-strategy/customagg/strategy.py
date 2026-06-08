@@ -33,6 +33,9 @@ class TrustAwareFedAvg(FedAvg):
         self.trust_beta = trust_beta
         self.trust_z = trust_z
         self._global: ArrayRecord | None = None
+        # Aggregation weight derived from trust; kept separate so the client-reported
+        # `num-examples` metric is never overwritten.
+        self._effective_weight_key = "trust-weighted-num-examples"
 
     def configure_train(
         self, server_round: int, arrays: ArrayRecord, config: ConfigRecord, grid: Grid
@@ -75,10 +78,13 @@ class TrustAwareFedAvg(FedAvg):
             excess = np.maximum(0.0, z - self.trust_z)
             trust = np.exp(-self.trust_beta * excess)
 
-        # 3) fold trust into the weighting key, then reuse FedAvg's weighted aggregation
+        # 3) Aggregate metrics first using the original (data-size) weights, then store a
+        #    SEPARATE effective weight for model aggregation. This never overwrites the
+        #    client-reported `num-examples`, which stays intact for downstream use.
+        metrics = self.train_metrics_aggr_fn(contents, self.weighted_by_key)
         for c, t in zip(contents, trust):
             mr = next(iter(c.metric_records.values()))
-            mr[self.weighted_by_key] = float(mr[self.weighted_by_key]) * float(t)
+            mr[self._effective_weight_key] = float(mr[self.weighted_by_key]) * float(t)
 
         # Transparency: show what got down-weighted
         flagged = [
@@ -96,6 +102,5 @@ class TrustAwareFedAvg(FedAvg):
             [f"#{i}(norm={n:.1f},trust={tr:.2f})" for i, n, tr in flagged],
         )
 
-        arrays = aggregate_arrayrecords(contents, self.weighted_by_key)
-        metrics = self.train_metrics_aggr_fn(contents, self.weighted_by_key)
+        arrays = aggregate_arrayrecords(contents, self._effective_weight_key)
         return arrays, metrics
