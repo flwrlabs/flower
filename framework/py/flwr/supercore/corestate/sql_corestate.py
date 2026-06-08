@@ -383,11 +383,11 @@ class SqlCoreState(CoreState, SqlMixin):  # pylint: disable=R0904
              :task_id, :type, :run_id, :fab_hash, :model_ref, :connector_ref, :token,
              :active_until, :pending_at, :starting_at, :running_at, :finished_at,
              :sub_status, :details
-            WHERE :requesting_task_id IS NULL
+            WHERE CAST(:requesting_task_id AS BIGINT) IS NULL
             OR EXISTS (
                 SELECT 1
                 FROM task
-                WHERE task_id = :requesting_task_id
+                WHERE task_id = CAST(:requesting_task_id AS BIGINT)
                 AND finished_at IS NULL
             )
             RETURNING task_id;

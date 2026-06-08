@@ -310,10 +310,14 @@ directory based on the current date and time, this means that each time you do `
 run`` a new directory will be used. Let's see how this looks in code:
 
 .. code-block:: python
-    :emphasize-lines: 22
+    :emphasize-lines: 3,4,26
 
+    # ... unchanged
+    # add this to the imports
     from datetime import datetime
     from pathlib import Path
+
+    # ... unchanged
 
 
     @app.main()
