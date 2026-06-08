@@ -105,7 +105,7 @@ def run_simulation(
     enable_tf_gpu_growth: bool = False,
     verbose_logging: bool = False,
 ) -> None:
-    r"""Run a Flower App using the Simulation Engine.
+    r"""Run a Flower App using the Simulation Runtime.
 
     Parameters
     ----------
@@ -204,7 +204,7 @@ def run_serverapp_th(
     ) -> None:
         """Run SeverApp, after check if GPU memory growth has to be set.
 
-        Upon exception, trigger stop event for Simulation Engine.
+        Upon exception, trigger stop event for Simulation Runtime.
         """
         try:
             if tf_gpu_growth:
@@ -266,7 +266,7 @@ def _main_loop(
     server_app_context: Context | None = None,
     metrics: VceMetrics | None = None,
 ) -> SimulationRunResult:
-    """Start ServerApp on a separate thread, then launch Simulation Engine."""
+    """Start ServerApp on a separate thread, then launch Simulation Runtime."""
     # Initialize StateFactory
     state_factory = LinkStateFactory(
         FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), ObjectStoreFactory()
@@ -316,7 +316,7 @@ def _main_loop(
             ctx_queue=output_context_queue,
         )
 
-        # Start Simulation Engine
+        # Start Simulation Runtime
         vce.start_vce(
             num_supernodes=num_supernodes,
             client_app_attr=client_app_attr,
@@ -378,7 +378,7 @@ def _run_simulation(
     is_app: bool = False,
     metrics: VceMetrics | None = None,
 ) -> SimulationRunResult:
-    """Launch the Simulation Engine."""
+    """Launch the Simulation Runtime."""
     if backend_config is None:
         backend_config = {}
     elif backend_config:
