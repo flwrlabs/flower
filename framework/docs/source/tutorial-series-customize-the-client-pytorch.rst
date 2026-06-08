@@ -226,6 +226,7 @@ setup from your existing ``train`` function unchanged.
     # ... unchanged
     # add this to the imports
     import pickle
+    from pytorchexample.task import TrainProcessMetadata
     from flwr.app import ConfigRecord
 
     # ... unchanged
