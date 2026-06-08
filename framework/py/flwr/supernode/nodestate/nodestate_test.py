@@ -180,12 +180,13 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         self.assertNotIn("msg1", msg_ids)
         self.assertIn("msg2", msg_ids)
 
-    def test_get_error_reply_when_task_claim_expires(self) -> None:
-        """Test that error replies are created when task claims expire."""
-        # Prepare: Create a claimed task for a run
+    def test_get_error_reply_when_running_task_claim_expires(self) -> None:
+        """Test that error replies are created when running task claims expire."""
+        # Prepare: Create a running task for a run
         run_id = 110
         created_at = now()
-        self._claim_client_task(run_id)
+        task_id = self._claim_client_task(run_id)
+        assert self.state.activate_task(task_id)
 
         # Prepare: store and retrieve a message for the run
         msg = make_dummy_message(run_id=run_id)
