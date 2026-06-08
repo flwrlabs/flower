@@ -345,15 +345,6 @@ Finally, let's run the Flower App locally. This tutorial writes model checkpoint
 your working directory and logs metrics to Weights & Biases, so a local run makes it
 easy to inspect the outputs.
 
-If you are coming from the previous tutorial and are still set to require 50 SuperNodes,
-you can run:
-
-.. code-block:: shell
-
-    $ flwr run . local --stream --federation-config="num-supernodes=50"
-
-Otherwise, you can run:
-
 .. code-block:: shell
 
     $ flwr run . local --stream

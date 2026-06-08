@@ -226,7 +226,6 @@ setup from your existing ``train`` function unchanged.
     # ... unchanged
     # add this to the imports
     import pickle
-    from pytorchexample.task import TrainProcessMetadata
     from flwr.app import ConfigRecord
 
     # ... unchanged
@@ -252,9 +251,6 @@ setup from your existing ``train`` function unchanged.
         train_meta_bytes = pickle.dumps(train_metadata)
         # Construct a ConfigRecord
         config_record = ConfigRecord({"meta": train_meta_bytes})
-
-        end_time = time.time()
-        training_time = end_time - start_time
 
         # Construct and return reply Message
         model_record = ArrayRecord(model.state_dict())
@@ -330,15 +326,6 @@ each client and print the training time and convergence status:
     # ... unchanged
 
 Finally, we run the Flower App.
-
-If you are coming from the previous tutorial and are still set to require 50 SuperNodes,
-you can run:
-
-.. code-block:: shell
-
-    $ flwr run . local --stream --federation-config="num-supernodes=50"
-
-Otherwise, you can run:
 
 .. code-block:: shell
 
