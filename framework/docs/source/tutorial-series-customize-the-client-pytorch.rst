@@ -221,7 +221,7 @@ setup from your existing ``train`` function unchanged.
     complex. ``pickle`` is used here solely for simplicity.
 
 .. code-block:: python
-    :emphasize-lines: 3-5,20-24,27,29,45
+    :emphasize-lines: 3-5,20-24,27,29,42
 
     # ... unchanged
     # add this to the imports
