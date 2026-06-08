@@ -15,6 +15,7 @@
 """Tests all CoreState implementations have to conform to."""
 
 
+# pylint: disable=too-many-lines
 import unittest
 from contextlib import ExitStack
 from datetime import datetime, timedelta
@@ -387,7 +388,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Claiming a task should create a token and move it to starting."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type="flwr-model", run_id=self.task_run_id(state)
+            task_type=TaskType.MODEL, run_id=self.task_run_id(state)
         )
         assert task_id is not None
 
@@ -413,8 +414,8 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         # Missing tasks cannot be claimed.
         self.assertIsNone(state.claim_task(61016))
 
-        claimed_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
-        finished_task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+        claimed_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+        finished_task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
         assert claimed_task_id is not None and finished_task_id is not None
 
         # Claiming is single-owner and cannot be repeated.
@@ -429,7 +430,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Only starting tasks should transition to running."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type="flwr-model", run_id=self.task_run_id(state)
+            task_type=TaskType.MODEL, run_id=self.task_run_id(state)
         )
         assert task_id is not None
 
@@ -463,7 +464,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Finishing a task should store the terminal status details."""
         state = self.state_factory()
         task_id = state.create_task(
-            task_type="flwr-model", run_id=self.task_run_id(state)
+            task_type=TaskType.MODEL, run_id=self.task_run_id(state)
         )
         assert task_id is not None
 
@@ -504,7 +505,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
             assert task_id is not None
             token = state.claim_task(task_id)
             assert token is not None
@@ -528,8 +529,53 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             self.assertIsNone(state.get_task_by_token(token))
             self.assertFalse(state.acknowledge_task_heartbeat(task_id))
 
-    def test_expired_task_token_transitions_task_to_finished_failed(self) -> None:
-        """Expired task claims should transition tasks to FINISHED:FAILED."""
+    def test_expired_starting_task_token_revives_task_to_pending(self) -> None:
+        """Expired STARTING task claims should make tasks pending again."""
+        # Prepare: create and claim a model task.
+        state = self.state_factory()
+        fixed_now = now()
+        run_id = self.task_run_id(state)
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+            assert task_id is not None
+            pending_at = state.get_tasks(task_ids=[task_id])[0].pending_at
+
+            token = state.claim_task(task_id)
+            assert token is not None
+
+            # Execute: advance past claim expiry and trigger cleanup.
+            mock_dt.now.return_value = fixed_now + timedelta(
+                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
+            )
+            self.assertIsNone(state.get_task_by_token(token))
+            self.assertFalse(state.acknowledge_task_heartbeat(task_id))
+
+        # Assert: task is pending again and can be claimed with a fresh token.
+        tasks = state.get_tasks(task_ids=[task_id])
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(
+            tasks[0].status,
+            TaskStatus(status=Status.PENDING, sub_status="", details=""),
+        )
+        self.assertEqual(tasks[0].pending_at, pending_at)
+        self.assertEqual(tasks[0].starting_at, "")
+        self.assertEqual(tasks[0].running_at, "")
+        self.assertEqual(tasks[0].finished_at, "")
+        self.assertIsNone(state.get_task_by_token(token))
+        new_token = state.claim_task(task_id)
+        self.assertNotEqual(new_token, token)
+        assert new_token is not None
+        new_task = state.get_task_by_token(new_token)
+        self.assertIsNotNone(new_task)
+        assert new_task is not None
+        self.assertEqual(new_task.task_id, task_id)
+
+    def test_expired_running_task_token_transitions_task_to_finished_failed(
+        self,
+    ) -> None:
+        """Expired RUNNING task claims should transition tasks to FINISHED:FAILED."""
         state = self.state_factory()
         fixed_now = now()
         active_until = fixed_now + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
@@ -537,11 +583,12 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
             assert task_id is not None
 
             token = state.claim_task(task_id)
             assert token is not None
+            self.assertTrue(state.activate_task(task_id))
 
             mock_dt.now.return_value = fixed_now + timedelta(
                 seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
@@ -566,30 +613,49 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Reading tasks should expire stale claimed task tokens first."""
         state = self.state_factory()
         fixed_now = now()
-        active_until = fixed_now + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
         run_id = self.task_run_id(state)
 
         with patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fixed_now
-            task_id = state.create_task(task_type="flwr-model", run_id=run_id)
+            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
             assert task_id is not None
-            assert state.claim_task(task_id) is not None
+            assert (token := state.claim_task(task_id))
 
             mock_dt.now.return_value = fixed_now + timedelta(
                 seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
             )
             tasks = state.get_tasks(task_ids=[task_id])
 
+        self.assertIsNone(state.get_task_by_token(token))
         self.assertEqual(len(tasks), 1)
         self.assertEqual(
             tasks[0].status,
-            TaskStatus(
-                status=Status.FINISHED,
-                sub_status=SubStatus.FAILED,
-                details="No heartbeat received from the task",
-            ),
+            TaskStatus(status=Status.PENDING, sub_status="", details=""),
         )
-        self.assertEqual(datetime.fromisoformat(tasks[0].finished_at), active_until)
+        self.assertEqual(tasks[0].starting_at, "")
+        self.assertEqual(tasks[0].finished_at, "")
+
+    def test_expired_starting_task_token_does_not_call_expiry_hook(self) -> None:
+        """Revived STARTING tasks should not be passed to expiry hooks."""
+        state = self.state_factory()
+        fixed_now = now()
+        run_id = self.task_run_id(state)
+
+        with patch.object(  # pylint: disable=protected-access
+            state, "_on_task_tokens_expired"
+        ) as on_expired:
+            with patch("datetime.datetime") as mock_dt:
+                mock_dt.now.return_value = fixed_now
+                task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+                assert task_id is not None
+                assert state.claim_task(task_id) is not None
+
+                mock_dt.now.return_value = fixed_now + timedelta(
+                    seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
+                )
+                state.get_tasks(task_ids=[task_id])
+
+            on_expired.assert_not_called()
 
     def test_get_task_by_token_returns_none_for_unknown_token(self) -> None:
         """Unknown task tokens should not resolve to a task."""
