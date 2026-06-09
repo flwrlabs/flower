@@ -47,15 +47,20 @@ class ExaWebSearchProvider:
             raise ValueError("web-search requires a non-empty string field 'query'.")
         query = query.strip()
 
-        response = requests.post(
-            EXA_SEARCH_URL,
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": self._api_key,
-            },
-            json={"query": query},
-            timeout=REQUEST_TIMEOUT,
-        )
+        try:
+            response = requests.post(
+                EXA_SEARCH_URL,
+                headers={
+                    "Content-Type": "application/json",
+                    "x-api-key": self._api_key,
+                },
+                json={"query": query},
+                timeout=REQUEST_TIMEOUT,
+            )
+        except requests.RequestException as exc:
+            raise RuntimeError(
+                f"{EXA_WEB_SEARCH_PROVIDER} web-search request failed: {exc}"
+            ) from exc
         if response.status_code >= 400:
             raise RuntimeError(
                 f"{EXA_WEB_SEARCH_PROVIDER} web-search request failed: "
@@ -64,10 +69,14 @@ class ExaWebSearchProvider:
 
         try:
             payload = response.json()
-        except ValueError:
-            payload = {}
+        except ValueError as exc:
+            raise RuntimeError(
+                f"{EXA_WEB_SEARCH_PROVIDER} web-search returned invalid JSON."
+            ) from exc
         if not isinstance(payload, dict):
-            payload = {}
+            raise RuntimeError(
+                f"{EXA_WEB_SEARCH_PROVIDER} web-search returned invalid JSON."
+            )
 
         return {
             "results": cast(
