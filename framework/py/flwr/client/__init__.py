@@ -30,7 +30,9 @@ if TYPE_CHECKING:
 
 _LAZY_EXPORTS: dict[str, tuple[str, str | None]] = {
     "ClientApp": ("flwr.clientapp.client_app", "ClientApp"),
+    # Deprecated
     "start_client": ("flwr.compat.client.app", "start_client"),
+    # Deprecated
     "start_numpy_client": ("flwr.compat.client.app", "start_numpy_client"),
 }
 
