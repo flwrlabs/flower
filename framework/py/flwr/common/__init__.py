@@ -72,7 +72,7 @@ if TYPE_CHECKING:
     from ..compat.common.record import RecordSet as RecordSet
     from ..compat.common.record import array_from_numpy as array_from_numpy
 
-_LAZY_EXPORTS = {
+_LAZY_EXPORTS: dict[str, tuple[str, str | None]] = {
     "Array": ("flwr.app.message", "Array"),
     "ArrayRecord": ("flwr.app.message", "ArrayRecord"),
     "ConfigRecord": ("flwr.app.message", "ConfigRecord"),
@@ -90,12 +90,13 @@ _LAZY_EXPORTS = {
 
 def __getattr__(name: str) -> Any:
     """Lazily resolve compatibility exports that depend on app.message."""
-    if name not in _LAZY_EXPORTS:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    module_name, attr_name = _LAZY_EXPORTS[name]
-    value = getattr(import_module(module_name), attr_name)
-    globals()[name] = value
-    return value
+    if name in _LAZY_EXPORTS:
+        module_name, attr_name = _LAZY_EXPORTS[name]
+        module = import_module(module_name)
+        value = module if attr_name is None else getattr(module, attr_name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 __all__ = [

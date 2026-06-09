@@ -15,6 +15,7 @@
 """Flower server."""
 
 
+from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 from ..compat.server.app import start_server as start_server  # Deprecated
@@ -33,28 +34,21 @@ if TYPE_CHECKING:
     from flwr.serverapp import Grid as Grid
     from flwr.serverapp import ServerApp as ServerApp
 
+_LAZY_EXPORTS: dict[str, tuple[str, str | None]] = {
+    "Driver": ("flwr.compat.server.grid", "Driver"),
+    "Grid": ("flwr.serverapp", "Grid"),
+    "ServerApp": ("flwr.serverapp", "ServerApp"),
+}
+
 
 def __getattr__(name: str) -> Any:
     """Lazily resolve compatibility exports."""
-    if name == "Driver":
-        # pylint: disable=import-outside-toplevel
-        from flwr.compat.server.grid import Driver
-
-        # pylint: enable=import-outside-toplevel
-        globals()[name] = Driver
-        return Driver
-    if name == "Grid":
-        # pylint: disable=import-outside-toplevel
-        from flwr.serverapp import Grid
-
-        # pylint: enable=import-outside-toplevel
-        globals()[name] = Grid
-        return Grid
-    if name == "ServerApp":
-        from flwr.serverapp import ServerApp  # pylint: disable=import-outside-toplevel
-
-        globals()[name] = ServerApp
-        return ServerApp
+    if name in _LAZY_EXPORTS:
+        module_name, attr_name = _LAZY_EXPORTS[name]
+        module = import_module(module_name)
+        value = module if attr_name is None else getattr(module, attr_name)
+        globals()[name] = value
+        return value
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
