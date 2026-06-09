@@ -595,17 +595,21 @@ class InMemoryCoreState(
         """Remove expired task tokens.
 
         Callers must acquire `lock_task_store` before calling this method.
-        Expired tasks are marked as finished with a failed status, and their
-        tokens are removed.
+        Expired starting tasks are moved back to pending. Expired running tasks
+        are marked as finished with a failed status. Tokens are removed in both
+        cases.
         """
         current = now()
         expired_tasks: list[Task] = []
         for task_id, record in list(self.task_token_store.items()):
             if record.active_until < current:
-                # The task is considered expired. Mark it as finished with a failed
-                # status if it's not already finished, and remove the token.
                 task = self.task_store.get(task_id)
-                if task and task.status.status != Status.FINISHED:
+                if task and task.status.status == Status.STARTING:
+                    task.starting_at = ""
+                    task.status.CopyFrom(
+                        TaskStatus(status=Status.PENDING, sub_status="", details="")
+                    )
+                elif task and task.status.status == Status.RUNNING:
                     task.finished_at = record.active_until.isoformat()
                     task.status.CopyFrom(
                         TaskStatus(

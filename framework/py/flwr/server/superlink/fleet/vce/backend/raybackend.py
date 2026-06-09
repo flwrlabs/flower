@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Ray backend for the Fleet API using the Simulation Engine."""
+"""Ray backend for the Fleet API using the Simulation Runtime."""
 
 
 import os
