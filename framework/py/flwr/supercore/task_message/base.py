@@ -24,8 +24,8 @@ from flwr.app.message import ConfigRecord, Message, RecordDict
 from flwr.app.message_type import MessageType
 from flwr.app.metadata import Metadata
 from flwr.common.constant import SUPERLINK_NODE_ID
-from flwr.supercore.task_message.constant import DEFAULT_TASK_MESSAGE_TTL
 from flwr.supercore.date import now
+from flwr.supercore.task_message.constant import DEFAULT_TASK_MESSAGE_TTL
 from flwr.supercore.typing import JSONObject, JSONValue
 from flwr.supercore.utils import strict_json_dumps, strict_json_loads
 
@@ -92,9 +92,7 @@ class TaskMessage(Message, ABC):
         """Validate this task message type's payload."""
 
     @staticmethod
-    def _set_optional(
-        payload: JSONObject, field: str, value: JSONValue | None
-    ) -> None:
+    def _set_optional(payload: JSONObject, field: str, value: JSONValue | None) -> None:
         """Add an optional payload field only when the caller provided a value."""
         if value is not None:
             payload[field] = value
@@ -120,9 +118,7 @@ class TaskMessage(Message, ABC):
     def _validate_optional_bool(cls, payload: JSONObject, field: str) -> None:
         """Validate that an optional payload field is a bool when present."""
         if field in payload and not isinstance(payload[field], bool):
-            raise ValueError(
-                f"{cls.__name__} payload field '{field}' must be a bool."
-            )
+            raise ValueError(f"{cls.__name__} payload field '{field}' must be a bool.")
 
     @classmethod
     def _validate_optional_int(cls, payload: JSONObject, field: str) -> None:
