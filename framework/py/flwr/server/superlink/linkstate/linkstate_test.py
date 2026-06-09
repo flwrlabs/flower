@@ -1909,7 +1909,7 @@ class StateTest(CoreStateTest):
     def test_add_clientapp_runtime_clamps_invalid_values_to_zero(
         self, runtime: float
     ) -> None:
-        """Test that negative/non-finite ClientApp runtime values are treated as zero."""
+        """Test negative/non-finite ClientApp runtime values are treated as zero."""
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
