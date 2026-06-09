@@ -122,8 +122,3 @@ def _parse_results(payload: JSONObject) -> list[JSONObject]:
             }
         )
     return results
-
-
-def create_brave_web_search_provider() -> BraveWebSearchProvider:
-    """Create the Brave web-search provider adapter."""
-    return BraveWebSearchProvider()
