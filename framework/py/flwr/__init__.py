@@ -15,7 +15,8 @@
 """Flower main package."""
 
 
-import importlib
+from importlib import import_module
+from typing import Any
 
 from flwr.supercore.version import package_version as _package_version
 
@@ -31,14 +32,20 @@ __all__ = [
 __version__ = _package_version
 
 
-# Lazy imports for legacy support
-_lazy_imports = {"simulation", "server", "client", "common"}
+_LAZY_EXPORTS: dict[str, tuple[str, str | None]] = {
+    "client": ("flwr.client", None),
+    "common": ("flwr.common", None),
+    "server": ("flwr.server", None),
+    "simulation": ("flwr.simulation", None),
+}
 
 
-def __getattr__(name: str) -> object:
+def __getattr__(name: str) -> Any:
     """Lazy import for legacy support."""
-    if name in _lazy_imports:
-        module = importlib.import_module(f"{__name__}.{name}")
-        globals()[name] = module
-        return module
+    if name in _LAZY_EXPORTS:
+        module_name, attr_name = _LAZY_EXPORTS[name]
+        module = import_module(module_name)
+        value = module if attr_name is None else getattr(module, attr_name)
+        globals()[name] = value
+        return value
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
