@@ -18,6 +18,7 @@
 from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
+from ..compat.server import ServerAppComponents as ServerAppComponents
 from ..compat.server.app import start_server as start_server  # Deprecated
 from ..compat.server.grid import Driver as Driver
 from ..serverapp import Grid as Grid
@@ -29,7 +30,6 @@ from .compat import LegacyContext as LegacyContext
 from .history import History as History
 from .server import Server as Server
 from .server_config import ServerConfig as ServerConfig
-from .serverapp_components import ServerAppComponents as ServerAppComponents
 
 if TYPE_CHECKING:
     from flwr.serverapp import ServerApp as ServerApp

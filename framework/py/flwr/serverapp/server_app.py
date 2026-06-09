@@ -130,7 +130,7 @@ class ServerApp:  # pylint: disable=too-many-instance-attributes
                 "`client_manager` directly to the ServerApp "
                 "constructor is deprecated.",
                 example_message="Pass `ServerApp` arguments wrapped "
-                "in a `flwr.server.ServerAppComponents` object that gets "
+                "in a `flwr.compat.server.ServerAppComponents` object that gets "
                 "returned by a function passed as the `server_fn` argument "
                 "to the `ServerApp` constructor. For example: ",
                 code_example=SERVER_FN_USAGE_EXAMPLE,

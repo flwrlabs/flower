@@ -16,13 +16,10 @@
 
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING
 
 from flwr.app import Context
+from flwr.compat.server.serverapp_components import ServerAppComponents
 from flwr.serverapp.grid import Grid
 
-if TYPE_CHECKING:
-    from flwr.server.serverapp_components import ServerAppComponents
-
-ServerFn = Callable[[Context], "ServerAppComponents"]
+ServerFn = Callable[[Context], ServerAppComponents]
 Workflow = Callable[[Grid, Context], None]
