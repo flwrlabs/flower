@@ -116,27 +116,22 @@ class ModelResponse(TaskMessage):
         )
 
 
-def _validate_model_request_input_field(payload: JSONObject) -> None:
-    """Validate that a model request input is a string or sequence of JSON objects."""
+def _validate_model_request_payload(payload: JSONObject) -> None:
+    """Validate the minimal Responses create-request shape."""
+    require_non_empty_string(payload, "model", owner="ModelRequest")
     if "input" not in payload:
         raise ValueError("ModelRequest payload requires field 'input'.")
 
-    value = payload["input"]
-    if isinstance(value, str):
-        return
-    if not isinstance(value, Sequence) or not all(
-        isinstance(item, dict) for item in value
+    input_value = payload["input"]
+    if not isinstance(input_value, str) and (
+        not isinstance(input_value, Sequence)
+        or not all(isinstance(item, dict) for item in input_value)
     ):
         raise ValueError(
             "ModelRequest payload field 'input' must be a string or sequence "
             "of JSON objects."
         )
 
-
-def _validate_model_request_payload(payload: JSONObject) -> None:
-    """Validate the minimal Responses create-request shape."""
-    require_non_empty_string(payload, "model", owner="ModelRequest")
-    _validate_model_request_input_field(payload)
     require_bool_if_present(payload, "stream", owner="ModelRequest")
 
     require_json_object_sequence(payload, "tools", owner="ModelRequest")

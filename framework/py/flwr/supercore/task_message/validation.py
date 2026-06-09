@@ -50,9 +50,7 @@ def require_non_empty_string(payload: JSONObject, field: str, *, owner: str) -> 
         )
 
 
-def require_string_if_present(
-    payload: JSONObject, field: str, *, owner: str
-) -> None:
+def require_string_if_present(payload: JSONObject, field: str, *, owner: str) -> None:
     """Validate that an optional payload field is a string when present."""
     if field in payload and not isinstance(payload[field], str):
         raise ValueError(f"{owner} payload field '{field}' must be a string.")

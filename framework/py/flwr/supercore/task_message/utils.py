@@ -90,4 +90,3 @@ def task_message_payload_from_content(content: RecordDict) -> JSONObject:
     if not isinstance(payload, dict):
         raise ValueError("Payload JSON must be a JSON object.")
     return cast(JSONObject, payload)
-
