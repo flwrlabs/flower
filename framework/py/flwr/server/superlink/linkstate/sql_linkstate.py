@@ -17,6 +17,7 @@
 # pylint: disable=too-many-lines
 
 import json
+import math
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from logging import ERROR, WARNING
@@ -1349,11 +1350,7 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
     def add_clientapp_runtime(self, run_id: int, runtime: float) -> None:
         """Add ClientApp runtime to the cumulative total for the specified `run_id`."""
-        if (
-            runtime < 0
-            or runtime != runtime
-            or runtime in (float("inf"), float("-inf"))
-        ):
+        if runtime < 0 or not math.isfinite(runtime):
             runtime = 0.0
         sint64_run_id = uint64_to_int64(run_id)
         with self.session():
