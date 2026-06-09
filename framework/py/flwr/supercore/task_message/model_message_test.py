@@ -25,7 +25,7 @@ from flwr.app import ConfigRecord, Message, RecordDict
 from flwr.app.message_type import MessageType
 from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.supercore.corestate.utils_test import create_task_message
-from flwr.supercore.model_message import ModelRequest, ModelResponse
+from flwr.supercore.task_message.model_message import ModelRequest, ModelResponse
 from flwr.supercore.typing import JSONObject
 
 
