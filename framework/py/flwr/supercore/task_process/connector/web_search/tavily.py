@@ -49,15 +49,20 @@ class TavilyWebSearchProvider:
             raise ValueError("web-search requires a non-empty string field 'query'.")
         query = query.strip()
 
-        response = requests.post(
-            TAVILY_SEARCH_URL,
-            headers={
-                "Authorization": f"Bearer {self._api_key}",
-                "Content-Type": "application/json",
-            },
-            json={"query": query},
-            timeout=REQUEST_TIMEOUT,
-        )
+        try:
+            response = requests.post(
+                TAVILY_SEARCH_URL,
+                headers={
+                    "Authorization": f"Bearer {self._api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={"query": query},
+                timeout=REQUEST_TIMEOUT,
+            )
+        except requests.RequestException as exc:
+            raise RuntimeError(
+                f"{TAVILY_WEB_SEARCH_PROVIDER} web-search request failed: {exc}"
+            ) from exc
         if response.status_code >= 400:
             raise RuntimeError(
                 f"{TAVILY_WEB_SEARCH_PROVIDER} web-search request failed: "
@@ -66,10 +71,14 @@ class TavilyWebSearchProvider:
 
         try:
             payload = response.json()
-        except ValueError:
-            payload = {}
+        except ValueError as exc:
+            raise RuntimeError(
+                f"{TAVILY_WEB_SEARCH_PROVIDER} web-search returned invalid JSON."
+            ) from exc
         if not isinstance(payload, dict):
-            payload = {}
+            raise RuntimeError(
+                f"{TAVILY_WEB_SEARCH_PROVIDER} web-search returned invalid JSON."
+            )
 
         return {
             "results": cast(
