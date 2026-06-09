@@ -23,13 +23,13 @@ from flwr.app.message import Message
 from flwr.supercore.task_message.base import TaskMessage
 from flwr.supercore.task_message.constant import DEFAULT_TASK_MESSAGE_TTL
 from flwr.supercore.task_message.validation import (
-    require_bool_if_present,
-    require_int_if_present,
-    require_json_object,
-    require_json_object_sequence,
-    require_non_empty_string,
-    require_string_if_present,
     set_optional,
+    validate_json_object,
+    validate_json_object_sequence,
+    validate_non_empty_string,
+    validate_optional_bool,
+    validate_optional_int,
+    validate_optional_string,
 )
 from flwr.supercore.typing import JSONObject, JSONValue
 
@@ -118,7 +118,7 @@ class ModelResponse(TaskMessage):
 
 def _validate_model_request_payload(payload: JSONObject) -> None:
     """Validate the minimal Responses create-request shape."""
-    require_non_empty_string(payload, "model", owner="ModelRequest")
+    validate_non_empty_string(payload, "model", owner="ModelRequest")
     if "input" not in payload:
         raise ValueError("ModelRequest payload requires field 'input'.")
 
@@ -132,15 +132,15 @@ def _validate_model_request_payload(payload: JSONObject) -> None:
             "of JSON objects."
         )
 
-    require_bool_if_present(payload, "stream", owner="ModelRequest")
+    validate_optional_bool(payload, "stream", owner="ModelRequest")
 
-    require_json_object_sequence(payload, "tools", owner="ModelRequest")
-    require_json_object(payload, "reasoning", owner="ModelRequest", required=False)
+    validate_json_object_sequence(payload, "tools", owner="ModelRequest")
+    validate_json_object(payload, "reasoning", owner="ModelRequest", required=False)
     for field in ("previous_response_id", "instructions"):
-        require_string_if_present(payload, field, owner="ModelRequest")
-    require_int_if_present(payload, "max_output_tokens", owner="ModelRequest")
+        validate_optional_string(payload, field, owner="ModelRequest")
+    validate_optional_int(payload, "max_output_tokens", owner="ModelRequest")
     for field in ("metadata", "text"):
-        require_json_object(payload, field, owner="ModelRequest", required=False)
+        validate_json_object(payload, field, owner="ModelRequest", required=False)
 
 
 def _validate_model_response_payload(payload: JSONObject) -> None:
@@ -148,9 +148,9 @@ def _validate_model_response_payload(payload: JSONObject) -> None:
     if payload.get("object") != "response":
         raise ValueError("ModelResponse payload field 'object' must be 'response'.")
     for field in ("id", "status"):
-        require_string_if_present(payload, field, owner="ModelResponse")
-    require_json_object_sequence(payload, "output", owner="ModelResponse")
-    require_json_object(
+        validate_optional_string(payload, field, owner="ModelResponse")
+    validate_json_object_sequence(payload, "output", owner="ModelResponse")
+    validate_json_object(
         payload,
         "error",
         owner="ModelResponse",

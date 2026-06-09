@@ -31,8 +31,8 @@ def set_optional(payload: JSONObject, field: str, value: JSONValue | None) -> No
         payload[field] = value
 
 
-def require_present(payload: JSONObject, field: str, *, owner: str) -> None:
-    """Require that a payload field exists, without validating its value.
+def validate_present(payload: JSONObject, field: str, *, owner: str) -> None:
+    """Validate that a payload field exists, without validating its value.
 
     Use this when ``None`` is a valid value and type-specific validation happens
     separately.
@@ -41,8 +41,10 @@ def require_present(payload: JSONObject, field: str, *, owner: str) -> None:
         raise ValueError(f"{owner} payload requires field '{field}'.")
 
 
-def require_non_empty_string(payload: JSONObject, field: str, *, owner: str) -> None:
-    """Require that a payload field exists and is a non-empty string."""
+def validate_non_empty_string(
+    payload: JSONObject, field: str, *, owner: str
+) -> None:
+    """Validate that a payload field exists and is a non-empty string."""
     value = payload.get(field)
     if not isinstance(value, str) or not value:
         raise ValueError(
@@ -50,25 +52,27 @@ def require_non_empty_string(payload: JSONObject, field: str, *, owner: str) -> 
         )
 
 
-def require_string_if_present(payload: JSONObject, field: str, *, owner: str) -> None:
+def validate_optional_string(
+    payload: JSONObject, field: str, *, owner: str
+) -> None:
     """Validate that an optional payload field is a string when present."""
     if field in payload and not isinstance(payload[field], str):
         raise ValueError(f"{owner} payload field '{field}' must be a string.")
 
 
-def require_bool_if_present(payload: JSONObject, field: str, *, owner: str) -> None:
+def validate_optional_bool(payload: JSONObject, field: str, *, owner: str) -> None:
     """Validate that an optional payload field is a bool when present."""
     if field in payload and not isinstance(payload[field], bool):
         raise ValueError(f"{owner} payload field '{field}' must be a bool.")
 
 
-def require_int_if_present(payload: JSONObject, field: str, *, owner: str) -> None:
+def validate_optional_int(payload: JSONObject, field: str, *, owner: str) -> None:
     """Validate that an optional payload field is an integer when present."""
     if field in payload and not isinstance(payload[field], int):
         raise ValueError(f"{owner} payload field '{field}' must be an integer.")
 
 
-def require_json_object(
+def validate_json_object(
     payload: JSONObject,
     field: str,
     *,
@@ -95,7 +99,7 @@ def require_json_object(
         raise ValueError(f"{owner} payload field '{field}' must be a JSON object.")
 
 
-def require_json_object_sequence(
+def validate_json_object_sequence(
     payload: JSONObject,
     field: str,
     *,
