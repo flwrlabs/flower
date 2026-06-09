@@ -261,10 +261,10 @@ def run_api(
 
         log(ERROR, "An exception occured!! %s", ex)
         log(ERROR, traceback.format_exc())
-        log(WARN, "Stopping Simulation Engine.")
+        log(WARN, "Stopping Simulation Runtime.")
 
         # Raise exception
-        raise RuntimeError("Simulation Engine crashed.") from ex
+        raise RuntimeError("Simulation Runtime crashed.") from ex
 
     finally:
         # Manually trigger stopping event

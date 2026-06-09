@@ -230,7 +230,7 @@ def run_serverapp_th(
             # Upon completion, trigger stop event if one was passed
             if stop_event is not None:
                 stop_event.set()
-                log(DEBUG, "Triggered stop event for Simulation Engine.")
+                log(DEBUG, "Triggered stop event for Simulation Runtime.")
 
     serverapp_th = threading.Thread(
         target=server_th_with_start_checks,
@@ -356,7 +356,7 @@ def _main_loop(
             if server_app_thread_has_exception.is_set():
                 raise RuntimeError("Exception in ServerApp thread")
 
-    log(DEBUG, "Stopping Simulation Engine now.")
+    log(DEBUG, "Stopping Simulation Runtime now.")
     return SimulationRunResult(context=updated_context, metrics=metrics)
 
 
