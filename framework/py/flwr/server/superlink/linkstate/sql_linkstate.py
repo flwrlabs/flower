@@ -1349,6 +1349,8 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
 
     def add_clientapp_runtime(self, run_id: int, runtime: float) -> None:
         """Add ClientApp runtime to the cumulative total for the specified `run_id`."""
+        if runtime < 0:
+            runtime = 0.0
         sint64_run_id = uint64_to_int64(run_id)
         with self.session():
             # Check if run exists, performing the update only if it does
