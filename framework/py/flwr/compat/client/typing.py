@@ -16,12 +16,10 @@
 
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING
 
 from flwr.app import Context
+from flwr.client.client import Client
 
-if TYPE_CHECKING:
-    from flwr.client.client import Client
 
-ClientFn = Callable[[str], "Client"]
-ClientFnExt = Callable[[Context], "Client"]
+ClientFn = Callable[[str], Client]
+ClientFnExt = Callable[[Context], Client]
