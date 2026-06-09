@@ -53,16 +53,21 @@ class BraveWebSearchProvider:
             raise ValueError("web-search requires a non-empty string field 'query'.")
         query = query.strip()
 
-        response = requests.get(
-            BRAVE_WEB_SEARCH_URL,
-            headers={
-                "Accept": "application/json",
-                "Accept-Encoding": "gzip",
-                "X-Subscription-Token": self._api_key,
-            },
-            params={"q": query},
-            timeout=REQUEST_TIMEOUT,
-        )
+        try:
+            response = requests.get(
+                BRAVE_WEB_SEARCH_URL,
+                headers={
+                    "Accept": "application/json",
+                    "Accept-Encoding": "gzip",
+                    "X-Subscription-Token": self._api_key,
+                },
+                params={"q": query},
+                timeout=REQUEST_TIMEOUT,
+            )
+        except requests.RequestException as exc:
+            raise RuntimeError(
+                f"{BRAVE_WEB_SEARCH_PROVIDER} web-search request failed: {exc}"
+            ) from exc
         if response.status_code >= 400:
             raise RuntimeError(
                 f"{BRAVE_WEB_SEARCH_PROVIDER} web-search request failed: "
@@ -71,10 +76,14 @@ class BraveWebSearchProvider:
 
         try:
             payload = response.json()
-        except ValueError:
-            payload = {}
+        except ValueError as exc:
+            raise RuntimeError(
+                f"{BRAVE_WEB_SEARCH_PROVIDER} web-search returned invalid JSON."
+            ) from exc
         if not isinstance(payload, dict):
-            payload = {}
+            raise RuntimeError(
+                f"{BRAVE_WEB_SEARCH_PROVIDER} web-search returned invalid JSON."
+            )
 
         return {
             "results": cast(
