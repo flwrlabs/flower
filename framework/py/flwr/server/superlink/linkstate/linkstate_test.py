@@ -1903,14 +1903,19 @@ class StateTest(CoreStateTest):
         run = state.get_run_info(run_ids=[run_id])[0]
         assert run.clientapp_runtime == 12.75
 
-    def test_add_clientapp_runtime_treats_negative_runtime_as_zero(self) -> None:
-        """Test that negative ClientApp runtime is stored as zero."""
+    @parameterized.expand(
+        [(-10.5,), (float("nan"),), (float("inf"),), (float("-inf"),)]
+    )  # type: ignore
+    def test_add_clientapp_runtime_clamps_invalid_values_to_zero(
+        self, runtime: float
+    ) -> None:
+        """Test that negative/non-finite ClientApp runtime values are treated as zero."""
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
 
         # Execute
-        state.add_clientapp_runtime(run_id, runtime=-10.5)
+        state.add_clientapp_runtime(run_id, runtime=runtime)
 
         # Assert
         run = state.get_run_info(run_ids=[run_id])[0]
