@@ -20,6 +20,5 @@ from collections.abc import Callable
 from flwr.app import Context
 from flwr.client.client import Client
 
-
 ClientFn = Callable[[str], Client]
 ClientFnExt = Callable[[Context], Client]
