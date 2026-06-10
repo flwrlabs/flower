@@ -16,9 +16,11 @@
 
 
 from .agent import run_agentapp
+from .connector import run_connector
 from .model import run_model
 
 __all__ = [
     "run_agentapp",
+    "run_connector",
     "run_model",
 ]
