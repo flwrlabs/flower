@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Fleet Simulation Engine API."""
+"""Fleet Simulation Runtime API."""
 
 
 import json
@@ -203,7 +203,7 @@ def run_api(
     f_stop: threading.Event,
     metrics: VceMetrics,
 ) -> None:
-    """Run the VCE."""
+    """Run the Simulation Runtime."""
     messageins_queue: Queue[Message] = Queue()
     messageres_queue: Queue[Message] = Queue()
 
@@ -261,10 +261,10 @@ def run_api(
 
         log(ERROR, "An exception occured!! %s", ex)
         log(ERROR, traceback.format_exc())
-        log(WARN, "Stopping Simulation Engine.")
+        log(WARN, "Stopping Simulation Runtime.")
 
         # Raise exception
-        raise RuntimeError("Simulation Engine crashed.") from ex
+        raise RuntimeError("Simulation Runtime crashed.") from ex
 
     finally:
         # Manually trigger stopping event
@@ -291,7 +291,7 @@ def start_vce(
     state_factory: LinkStateFactory | None = None,
     existing_nodes_mapping: NodeToPartitionMapping | None = None,
 ) -> None:
-    """Start Fleet API with the Simulation Engine."""
+    """Start Fleet API with the Simulation Runtime."""
     nodes_mapping = {}
 
     if client_app_attr is not None and client_app is not None:

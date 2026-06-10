@@ -20,3 +20,4 @@ from collections.abc import Callable
 from flwr.app import Context, Message
 
 ClientAppCallable = Callable[[Message, Context], Message]
+Mod = Callable[[Message, Context, ClientAppCallable], Message]

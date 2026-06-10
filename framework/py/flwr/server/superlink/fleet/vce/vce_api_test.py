@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Test Fleet Simulation Engine API."""
+"""Test Fleet Simulation Runtime API."""
 
 
 import threading
@@ -84,7 +84,7 @@ def _make_vce_test_message(run_id: int = 1234, node_id: int = 1) -> Message:
 
 
 def terminate_simulation(f_stop: threading.Event, sleep_duration: int) -> None:
-    """Set event to terminate Simulation Engine after `sleep_duration` seconds."""
+    """Set event to terminate Simulation Runtime after `sleep_duration` seconds."""
     sleep(sleep_duration)
     f_stop.set()
 
@@ -146,7 +146,7 @@ def register_messages_into_state(
         ),
     )
     # Artificially add Messages to state so they can be processed
-    # by the Simulation Engine logic
+    # by the Simulation Runtime logic
     nodes_cycle = cycle(nodes_mapping.keys())  # we have more messages than supernodes
     message_ids: set[str] = set()  # so we can retrieve them later
     expected_results = {}
@@ -203,7 +203,7 @@ def start_and_shutdown(
     duration: int = 0,
     backend_config: str = "{}",
 ) -> None:
-    """Start Simulation Engine and terminate after specified number of seconds.
+    """Start Simulation Runtime and terminate after specified number of seconds.
 
     Some tests need to be terminated by triggering externally an threading.Event. This
     is enabled when passing `duration`>0.
@@ -213,7 +213,7 @@ def start_and_shutdown(
     if duration:
 
         # Setup thread that will set the f_stop event, triggering the termination of all
-        # logic in the Simulation Engine. It will also terminate the Backend.
+        # logic in the Simulation Runtime. It will also terminate the Backend.
         termination_th = threading.Thread(
             target=terminate_simulation, args=(f_stop, duration)
         )
@@ -245,7 +245,10 @@ def start_and_shutdown(
 
 
 def test_worker_records_clientapp_runtime() -> None:
-    """VCE workers should accumulate backend processing time as ClientApp runtime."""
+    """Simulation Runtime workers should accumulate backend processing time.
+
+    The recorded time is accumulated as ClientApp runtime.
+    """
     metrics = VceMetrics()
     f_stop = threading.Event()
     messageins_queue: Queue[Message] = Queue()
@@ -330,12 +333,12 @@ class TestFleetSimulationEngineRayBackend(TestCase):
             start_and_shutdown(nodes_mapping={0: 1})
 
     def test_start_and_shutdown(self) -> None:
-        """Start Simulation Engine Fleet and terminate it."""
+        """Start Simulation Runtime Fleet and terminate it."""
         start_and_shutdown(num_supernodes=50, duration=10)
 
     # pylint: disable=too-many-locals
     def test_start_and_shutdown_with_message_in_state(self) -> None:
-        """Run Simulation Engine with some Message in State.
+        """Run Simulation Runtime with some Message in State.
 
         This test creates a few nodes and submits a few messages that need to be
         executed by the Backend. In order for that to happen the asyncio

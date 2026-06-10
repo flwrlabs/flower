@@ -26,6 +26,7 @@ from typing import Any, cast
 import grpc
 import requests
 
+from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
 from flwr.cli.utils import validate_federation_name
 from flwr.common import now
 from flwr.common.config import (
@@ -169,7 +170,12 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
         verification_dict: dict[str, str] = {}
         note: str | None = None
-        if request.app_spec:
+
+        builtin_agent_fab = try_resolve_builtin_agent_fab(request.app_spec)
+        is_builtin_agent_app = builtin_agent_fab is not None
+        if builtin_agent_fab is not None:
+            fab_file, verification_dict = builtin_agent_fab
+        elif request.app_spec:
             fab_file, verification_dict, note = _get_remote_fab(
                 self.fleet_api_type, request.app_spec, context
             )
@@ -209,10 +215,11 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
             # Derive run type based on the presence of simulation config and apply
             # federation config overrides
-            run_type = RunType.SERVER_APP
+            run_type = RunType.AGENT_APP if is_builtin_agent_app else RunType.SERVER_APP
             resolved_federation_config = None
             runtime = RunTime.DEPLOYMENT
-            if sim_cfg := state.federation_manager.get_simulation_config(federation):
+            sim_cfg = state.federation_manager.get_simulation_config(federation)
+            if sim_cfg and not is_builtin_agent_app:
                 run_type = RunType.SIMULATION
                 runtime = RunTime.SIMULATION
                 resolved_federation_config = SimulationConfig()

@@ -12,15 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""ServerAppComponents for the ServerApp."""
+"""Legacy ServerAppComponents for the ServerApp."""
 
+
+from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from .client_manager import ClientManager
-from .server import Server
-from .server_config import ServerConfig
-from .strategy import Strategy
+if TYPE_CHECKING:
+    from flwr.server.client_manager import ClientManager
+    from flwr.server.server import Server
+    from flwr.server.server_config import ServerConfig
+    from flwr.server.strategy import Strategy
 
 
 @dataclass

@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,17 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower Built-in Mods."""
+"""Private built-in AgentApp implementations."""
 
 
-from .centraldp_mods import adaptiveclipping_mod, fixedclipping_mod
-from .comms_mods import arrays_size_mod, message_size_mod
-from .localdp_mod import LocalDpMod
+from .resolver import try_resolve_builtin_agent_fab
 
 __all__ = [
-    "LocalDpMod",
-    "adaptiveclipping_mod",
-    "arrays_size_mod",
-    "fixedclipping_mod",
-    "message_size_mod",
+    "try_resolve_builtin_agent_fab",
 ]
