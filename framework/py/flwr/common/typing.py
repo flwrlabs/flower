@@ -18,10 +18,38 @@
 from dataclasses import dataclass
 
 from flwr.app.user_config import UserConfig
+from flwr.compat.common import typing as _compat_typing
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Member  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.constant import RunType
+
+# Compatibility shims to avoid breaking `from flwr.commmon.typing import [...]``
+ClientMessage = _compat_typing.ClientMessage
+Code = _compat_typing.Code
+Config = _compat_typing.Config
+DisconnectRes = _compat_typing.DisconnectRes
+EvaluateIns = _compat_typing.EvaluateIns
+EvaluateRes = _compat_typing.EvaluateRes
+FitIns = _compat_typing.FitIns
+FitRes = _compat_typing.FitRes
+GetParametersIns = _compat_typing.GetParametersIns
+GetParametersRes = _compat_typing.GetParametersRes
+GetPropertiesIns = _compat_typing.GetPropertiesIns
+GetPropertiesRes = _compat_typing.GetPropertiesRes
+Metrics = _compat_typing.Metrics
+MetricsAggregationFn = _compat_typing.MetricsAggregationFn
+NDArray = _compat_typing.NDArray
+NDArrayFloat = _compat_typing.NDArrayFloat
+NDArrayInt = _compat_typing.NDArrayInt
+NDArrays = _compat_typing.NDArrays
+Parameters = _compat_typing.Parameters
+Properties = _compat_typing.Properties
+ReconnectIns = _compat_typing.ReconnectIns
+Scalar = _compat_typing.Scalar
+ServerMessage = _compat_typing.ServerMessage
+Status = _compat_typing.Status
+Value = _compat_typing.Value
 
 
 @dataclass
