@@ -24,11 +24,11 @@ from parameterized import parameterized
 
 from flwr.app import ConfigRecord, Message, Metadata, RecordDict
 from flwr.app.message import make_message
-from flwr.common import now
 from flwr.common.constant import ErrorCode
 from flwr.common.typing import Fab, Run
 from flwr.supercore.constant import TaskType
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
+from flwr.supercore.date import now
 from flwr.supercore.object_store import ObjectStoreFactory
 
 from . import InMemoryNodeState, NodeState
