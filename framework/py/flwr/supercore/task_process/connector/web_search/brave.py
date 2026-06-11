@@ -68,9 +68,13 @@ class BraveWebSearchProvider:
                 f"{BRAVE_WEB_SEARCH_PROVIDER} web-search request failed: {exc}"
             ) from exc
         if response.status_code >= 400:
+            try:
+                detail = cast(JSONValue, response.json())
+            except ValueError:
+                detail = response.text
             raise RuntimeError(
                 f"{BRAVE_WEB_SEARCH_PROVIDER} web-search request failed: "
-                f"{response.status_code} {response.text}"
+                f"{response.status_code} {detail}"
             )
 
         try:
