@@ -12,18 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Custom types for Flower clients."""
+"""Custom types for Flower ServerApps."""
 
 
 from collections.abc import Callable
 
-from flwr.app import Context, Message
+from flwr.app import Context
 
-from .client import Client as Client
+from .grid import Grid
 
-# Compatibility
-ClientFn = Callable[[str], Client]
-ClientFnExt = Callable[[Context], Client]
-
-ClientAppCallable = Callable[[Message, Context], Message]
-Mod = Callable[[Message, Context, ClientAppCallable], Message]
+ServerAppCallable = Callable[[Grid, Context], None]
