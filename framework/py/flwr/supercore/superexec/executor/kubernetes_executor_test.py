@@ -457,10 +457,22 @@ def test_config_rejects_capacity_budget_without_resource_pool() -> None:
         _executor_config(active_pod_budget=10)
 
 
+def test_config_rejects_non_positive_active_pod_budget() -> None:
+    """Test active Pod budget must be positive when configured."""
+    with pytest.raises(ValueError, match="Active Pod budget must be positive"):
+        _executor_config(active_pod_budget=0)
+
+
 def test_config_rejects_invalid_capacity_poll_interval() -> None:
     """Test capacity poll interval must be positive."""
     with pytest.raises(ValueError, match="Capacity poll interval must be positive"):
         _executor_config(capacity_poll_interval=0)
+
+
+def test_config_rejects_invalid_capacity_log_interval() -> None:
+    """Test capacity log interval must be positive when provided."""
+    with pytest.raises(ValueError, match="Capacity log interval must be positive"):
+        _executor_config(capacity_log_interval=0)
 
 
 def test_wait_for_capacity_returns_below_budget_without_sleeping() -> None:

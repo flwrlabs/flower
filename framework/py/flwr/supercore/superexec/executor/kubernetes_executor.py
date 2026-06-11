@@ -434,9 +434,9 @@ def _label_selector(labels: dict[str, str]) -> str:
 def _pod_items(pod_list: object) -> list[object]:
     """Return Pod items from a Kubernetes list response."""
     items = _object_field(pod_list, "items")
-    if items is None:
-        return []
-    return list(items)
+    if isinstance(items, Sequence) and not isinstance(items, str):
+        return list(items)
+    return []
 
 
 def _is_active_pod(pod: object) -> bool:
