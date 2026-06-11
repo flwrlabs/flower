@@ -17,7 +17,7 @@
 
 from flwr.compat.common import typing as _compat_typing
 
-# Compatibility shims to avoid breaking `from flwr.commmon.typing import [...]``
+# Compatibility shims to avoid breaking `from flwr.common.typing import [...]`
 ClientMessage = _compat_typing.ClientMessage
 Code = _compat_typing.Code
 Config = _compat_typing.Config
