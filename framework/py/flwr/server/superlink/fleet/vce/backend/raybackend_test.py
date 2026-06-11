@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Test for Ray backend for the Fleet API using the Simulation Engine."""
+"""Test for Ray backend for the Fleet API using the Simulation Runtime."""
 
 
 from collections.abc import Callable

@@ -22,6 +22,7 @@ from typing import Any, TypeVar, cast
 
 import pytest
 
+from flwr import common
 from flwr.app.message import make_message
 from flwr.app.user_config import UserConfig
 from flwr.common.constant import SUPERLINK_NODE_ID
@@ -100,8 +101,8 @@ def test_status_to_proto() -> None:
     code_msg = pb2.Code.OK  # pylint: disable=E1101
     status_msg = pb2.Status(code=code_msg, message="Success")  # pylint: disable=E1101
 
-    code = typing.Code.OK
-    status = typing.Status(code=code, message="Success")
+    code = common.Code.OK
+    status = common.Status(code=code, message="Success")
 
     # Execute
     actual_status_msg = status_to_proto(status=status)
@@ -116,8 +117,8 @@ def test_status_from_proto() -> None:
     code_msg = pb2.Code.OK  # pylint: disable=E1101
     status_msg = pb2.Status(code=code_msg, message="Success")  # pylint: disable=E1101
 
-    code = typing.Code.OK
-    status = typing.Status(code=code, message="Success")
+    code = common.Code.OK
+    status = common.Status(code=code, message="Success")
 
     # Execute
     actual_status = status_from_proto(msg=status_msg)

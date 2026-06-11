@@ -27,7 +27,6 @@ from flwr.client.client import (
     maybe_call_get_properties,
 )
 from flwr.client.numpy_client import NumPyClient
-from flwr.client.typing import ClientFnExt
 from flwr.common import log
 from flwr.common.constant import MessageTypeLegacy
 from flwr.common.recorddict_compat import (
@@ -40,6 +39,7 @@ from flwr.common.recorddict_compat import (
     recorddict_to_getparametersins,
     recorddict_to_getpropertiesins,
 )
+from flwr.compat.client.typing import ClientFnExt
 from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
     ClientMessage,
     Reason,

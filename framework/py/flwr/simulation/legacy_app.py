@@ -27,7 +27,6 @@ from typing import Any
 import ray
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 
-from flwr.client import ClientFnExt
 from flwr.common import EventType, event
 from flwr.common.constant import NODE_ID_NUM_BYTES, SUPERLINK_NODE_ID
 from flwr.common.logger import (
@@ -36,6 +35,7 @@ from flwr.common.logger import (
     warn_deprecated_feature,
     warn_unsupported_feature,
 )
+from flwr.compat.client.typing import ClientFnExt
 from flwr.server.client_manager import ClientManager
 from flwr.server.history import History
 from flwr.server.server import Server, init_defaults, run_fl
@@ -155,9 +155,10 @@ def start_simulation(
 
     actor_scheduling: Optional[Union[str, NodeAffinitySchedulingStrategy]]
         (default: "DEFAULT")
-        Optional string ("DEFAULT" or "SPREAD") for the VCE to choose in which
-        node the actor is placed. If you are an advanced user needed more control
-        you can use lower-level scheduling strategies to pin actors to specific
+        Optional string ("DEFAULT" or "SPREAD") for the Simulation Runtime to
+        choose in which node the actor is placed. If you are an advanced user
+        needing more control, you can use lower-level scheduling strategies to pin
+        actors to specific
         compute nodes (e.g. via NodeAffinitySchedulingStrategy). Please note this
         is an advanced feature. For all details, please refer to the Ray documentation:
         https://docs.ray.io/en/latest/ray-core/scheduling/index.html
