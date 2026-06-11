@@ -20,6 +20,7 @@ from typing import cast
 
 from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.app.message_type import MessageType
+from flwr.client import ClientFnExt
 from flwr.client.client import (
     maybe_call_evaluate,
     maybe_call_fit,
@@ -39,7 +40,6 @@ from flwr.common.recorddict_compat import (
     recorddict_to_getparametersins,
     recorddict_to_getpropertiesins,
 )
-from flwr.compat.client.typing import ClientFnExt
 from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
     ClientMessage,
     Reason,

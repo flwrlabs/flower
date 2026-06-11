@@ -29,7 +29,7 @@ from flwr.app import (
 )
 from flwr.app.message import make_message
 from flwr.clientapp.typing import ClientAppCallable, Mod
-from flwr.common import now
+from flwr.supercore.date import now
 
 from .utils import make_ffn
 

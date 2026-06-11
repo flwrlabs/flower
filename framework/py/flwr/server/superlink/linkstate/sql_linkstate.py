@@ -27,7 +27,7 @@ from sqlalchemy.exc import IntegrityError
 
 from flwr.app import Message
 from flwr.app.user_config import UserConfig
-from flwr.common import log, now
+from flwr.common import log
 from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     MESSAGE_TTL_TOLERANCE,
@@ -46,6 +46,7 @@ from flwr.server.utils.validator import validate_message
 from flwr.supercore.constant import NodeStatus
 from flwr.supercore.corestate.sql_corestate import SqlCoreState, determine_task_status
 from flwr.supercore.corestate.utils import timestamp_to_iso
+from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
