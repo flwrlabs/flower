@@ -28,7 +28,6 @@ import requests
 
 from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
 from flwr.cli.utils import validate_federation_name
-from flwr.common import now
 from flwr.common.config import (
     flatten_dict,
     fuse_dicts,
@@ -126,6 +125,7 @@ from flwr.supercore.constant import (
     RunTime,
     RunType,
 )
+from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, FlowerError, rpc_error_translator
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, uses_nist_ec_curve
