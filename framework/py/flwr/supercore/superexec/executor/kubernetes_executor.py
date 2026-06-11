@@ -161,7 +161,17 @@ class KubernetesExecutor:
 
         last_log_at: float | None = None
         while True:
-            active_pod_count = self._active_pod_count()
+            try:
+                active_pod_count = self._active_pod_count()
+            except Exception:  # pylint: disable=broad-exception-caught
+                log(
+                    WARNING,
+                    "Kubernetes capacity check failed; proceeding without waiting. "
+                    "selector=%s",
+                    _capacity_label_selector(self._config),
+                    exc_info=True,
+                )
+                return
             if active_pod_count < self._config.active_pod_budget:
                 return
 
