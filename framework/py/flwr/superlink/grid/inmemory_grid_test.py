@@ -30,7 +30,6 @@ from flwr.common.constant import (
     Status,
 )
 from flwr.common.serde import message_from_proto
-from flwr.common.typing import Run, RunStatus
 from flwr.server.superlink.linkstate import (
     InMemoryLinkState,
     LinkStateFactory,
@@ -41,6 +40,7 @@ from flwr.server.superlink.linkstate.utils import generate_rand_int_from_bytes
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
 from flwr.supercore.date import now
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import NoOpFederationManager
 
 from .inmemory_grid import InMemoryGrid

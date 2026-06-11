@@ -41,10 +41,10 @@ from flwr.common.constant import (
     ErrorCode,
 )
 from flwr.common.logger import log
-from flwr.common.typing import Run
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.run import Run
 from flwr.superlink.federation import NoOpFederationManager
 
 from .backend import Backend

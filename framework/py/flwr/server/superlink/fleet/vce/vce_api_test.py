@@ -33,7 +33,6 @@ from flwr.clientapp.client_app import LoadClientAppError
 from flwr.common import Config, GetPropertiesIns, MessageTypeLegacy, Scalar
 from flwr.common.constant import SUPERLINK_NODE_ID, Status
 from flwr.common.recorddict_compat import getpropertiesins_to_recorddict
-from flwr.common.typing import Run, RunStatus
 from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 from flwr.server.superlink.fleet.vce.vce_api import (
     NodeToPartitionMapping,
@@ -46,6 +45,7 @@ from flwr.server.superlink.linkstate.in_memory_linkstate import RunRecord
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
 from flwr.supercore.date import now
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import NoOpFederationManager
 
 

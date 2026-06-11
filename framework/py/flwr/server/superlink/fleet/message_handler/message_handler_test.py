@@ -21,7 +21,6 @@ from flwr.app import Metadata, RecordDict
 from flwr.app.message import make_message
 from flwr.common.constant import Status
 from flwr.common.serde import message_to_proto
-from flwr.common.typing import RunStatus
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     PullMessagesRequest,
     PushMessagesRequest,
@@ -29,6 +28,7 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.date import now
+from flwr.supercore.run import RunStatus
 
 from .message_handler import pull_messages, push_messages
 

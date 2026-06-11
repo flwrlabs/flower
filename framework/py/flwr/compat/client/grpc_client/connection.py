@@ -35,7 +35,6 @@ from flwr.common.constant import MessageTypeLegacy
 from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
 from flwr.common.retry_invoker import RetryInvoker
-from flwr.common.typing import Fab, Run
 from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
     ClientMessage,
     Reason,
@@ -43,6 +42,8 @@ from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.transport_pb2_grpc import FlowerServiceStub  # pylint: disable=E0611
 from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
+from flwr.supercore.run import Run
 
 
 @contextmanager

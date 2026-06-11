@@ -19,8 +19,8 @@ from abc import abstractmethod
 from collections.abc import Sequence
 
 from flwr.app import Message
-from flwr.common.typing import Run
 from flwr.supercore.corestate import CoreState
+from flwr.supercore.run import Run
 
 
 class NodeState(CoreState):

@@ -40,20 +40,14 @@ from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.run_pb2 import Run as ProtoRun
 from flwr.supercore.constant import RunType
 from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
+from flwr.supercore.run import Run, RunStatus
 
 from ..app.error import Error
 from ..app.metadata import Metadata
 
 # pylint: enable=E0611
-from . import (
-    Array,
-    ArrayRecord,
-    ConfigRecord,
-    Context,
-    MetricRecord,
-    RecordDict,
-    typing,
-)
+from . import Array, ArrayRecord, ConfigRecord, Context, MetricRecord, RecordDict
 from .serde import (
     array_from_proto,
     array_record_from_proto,
@@ -135,7 +129,7 @@ def test_fab_to_proto() -> None:
         verifications={"fab_test_meta": "fab_test_meta"},
     )
 
-    py_fab = typing.Fab(
+    py_fab = Fab(
         hash_str="fab_test_hash",
         content=b"fab_test_content",
         verifications={"fab_test_meta": "fab_test_meta"},
@@ -155,7 +149,7 @@ def test_fab_from_proto() -> None:
         verifications={"meta_key": "meta_value"},
     )
 
-    py_fab = typing.Fab(
+    py_fab = Fab(
         hash_str="fab_test_hash",
         content=b"fab_test_content",
         verifications={"meta_key": "meta_value"},
@@ -475,7 +469,7 @@ def test_run_serialization_deserialization() -> None:
     """Test serialization and deserialization of Run."""
     # Prepare
     maker = RecordMaker()
-    original = typing.Run(
+    original = Run(
         run_id=1,
         fab_id="lorem",
         fab_version="ipsum",
@@ -485,7 +479,7 @@ def test_run_serialization_deserialization() -> None:
         starting_at="2021-01-02T23:02:11Z",
         running_at="2021-01-03T12:00:50Z",
         finished_at="",
-        status=typing.RunStatus(status="running", sub_status="", details="OK"),
+        status=RunStatus(status="running", sub_status="", details="OK"),
         flwr_aid="user123",
         federation="mock-fed",
         primary_task_id=42,

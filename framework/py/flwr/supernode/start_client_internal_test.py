@@ -23,8 +23,8 @@ import pytest
 from flwr.app import ConfigRecord, Context, Message, RecordDict
 from flwr.app.message import remove_content_from_message
 from flwr.common.constant import TRANSPORT_TYPE_GRPC_RERE, SubStatus
-from flwr.common.typing import Fab
 from flwr.supercore.constant import TaskType
+from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
