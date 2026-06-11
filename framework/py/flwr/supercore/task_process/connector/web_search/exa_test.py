@@ -48,7 +48,7 @@ def test_search_calls_exa_and_returns_parsed_results(
         post_mock,
     )
 
-    result = ExaWebSearchProvider().search({"query": " flower federated learning "})
+    result = ExaWebSearchProvider().search(" flower federated learning ")
 
     assert result == {
         "results": [
