@@ -14,8 +14,6 @@
 # ==============================================================================
 """Tests for the Tavily web-search provider."""
 
-from __future__ import annotations
-
 from unittest.mock import Mock
 
 import pytest
