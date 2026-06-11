@@ -53,9 +53,7 @@ def test_search_calls_tavily_and_returns_parsed_results(
         post_mock,
     )
 
-    result = TavilyWebSearchProvider().search(
-        {"query": " flower federated learning "}
-    )
+    result = TavilyWebSearchProvider().search(" flower federated learning ")
 
     assert result == {
         "results": [

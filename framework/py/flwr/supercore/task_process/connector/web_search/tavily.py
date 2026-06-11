@@ -42,11 +42,10 @@ class TavilyWebSearchProvider:
             )
         self._api_key = api_key
 
-    def search(self, arguments: JSONObject) -> JSONObject:
+    def search(self, query: str) -> JSONObject:
         """Execute one Tavily web-search request."""
-        query = arguments.get("query")
-        if not isinstance(query, str) or not query.strip():
-            raise ValueError("web-search requires a non-empty string field 'query'.")
+        if not query.strip():
+            raise ValueError("web-search requires a non-empty query.")
         query = query.strip()
 
         try:
