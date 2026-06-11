@@ -15,177 +15,41 @@
 """Flower type definitions."""
 
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from enum import Enum
-from typing import Any
-
-import numpy as np
-import numpy.typing as npt
 
 from flwr.app.user_config import UserConfig
+from flwr.compat.common import typing as _compat_typing
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Member  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.constant import RunType
 
-NDArray = npt.NDArray[Any]
-NDArrayInt = npt.NDArray[np.int_]
-NDArrayFloat = npt.NDArray[np.float64]
-NDArrays = list[NDArray]
-
-# The following union type contains Python types corresponding to ProtoBuf types that
-# ProtoBuf considers to be "Scalar Value Types", even though some of them arguably do
-# not conform to other definitions of what a scalar is. Source:
-# https://developers.google.com/protocol-buffers/docs/overview#scalar
-Scalar = bool | bytes | float | int | str
-Value = (
-    bool
-    | bytes
-    | float
-    | int
-    | str
-    | list[bool]
-    | list[bytes]
-    | list[float]
-    | list[int]
-    | list[str]
-)
-
-
-Metrics = dict[str, Scalar]
-MetricsAggregationFn = Callable[[list[tuple[int, Metrics]]], Metrics]
-
-Config = dict[str, Scalar]
-Properties = dict[str, Scalar]
-
-# Value type for user configs
-
-
-class Code(Enum):
-    """Client status codes."""
-
-    OK = 0
-    GET_PROPERTIES_NOT_IMPLEMENTED = 1
-    GET_PARAMETERS_NOT_IMPLEMENTED = 2
-    FIT_NOT_IMPLEMENTED = 3
-    EVALUATE_NOT_IMPLEMENTED = 4
-
-
-@dataclass
-class Status:
-    """Client status."""
-
-    code: Code
-    message: str
-
-
-@dataclass
-class Parameters:
-    """Model parameters."""
-
-    tensors: list[bytes]
-    tensor_type: str
-
-
-@dataclass
-class GetParametersIns:
-    """Parameters request for a client."""
-
-    config: Config
-
-
-@dataclass
-class GetParametersRes:
-    """Response when asked to return parameters."""
-
-    status: Status
-    parameters: Parameters
-
-
-@dataclass
-class FitIns:
-    """Fit instructions for a client."""
-
-    parameters: Parameters
-    config: dict[str, Scalar]
-
-
-@dataclass
-class FitRes:
-    """Fit response from a client."""
-
-    status: Status
-    parameters: Parameters
-    num_examples: int
-    metrics: dict[str, Scalar]
-
-
-@dataclass
-class EvaluateIns:
-    """Evaluate instructions for a client."""
-
-    parameters: Parameters
-    config: dict[str, Scalar]
-
-
-@dataclass
-class EvaluateRes:
-    """Evaluate response from a client."""
-
-    status: Status
-    loss: float
-    num_examples: int
-    metrics: dict[str, Scalar]
-
-
-@dataclass
-class GetPropertiesIns:
-    """Properties request for a client."""
-
-    config: Config
-
-
-@dataclass
-class GetPropertiesRes:
-    """Properties response from a client."""
-
-    status: Status
-    properties: Properties
-
-
-@dataclass
-class ReconnectIns:
-    """ReconnectIns message from server to client."""
-
-    seconds: int | None
-
-
-@dataclass
-class DisconnectRes:
-    """DisconnectRes message from client to server."""
-
-    reason: str
-
-
-@dataclass
-class ServerMessage:
-    """ServerMessage is a container used to hold one instruction message."""
-
-    get_properties_ins: GetPropertiesIns | None = None
-    get_parameters_ins: GetParametersIns | None = None
-    fit_ins: FitIns | None = None
-    evaluate_ins: EvaluateIns | None = None
-
-
-@dataclass
-class ClientMessage:
-    """ClientMessage is a container used to hold one result message."""
-
-    get_properties_res: GetPropertiesRes | None = None
-    get_parameters_res: GetParametersRes | None = None
-    fit_res: FitRes | None = None
-    evaluate_res: EvaluateRes | None = None
+# Compatibility shims to avoid breaking `from flwr.commmon.typing import [...]``
+ClientMessage = _compat_typing.ClientMessage
+Code = _compat_typing.Code
+Config = _compat_typing.Config
+DisconnectRes = _compat_typing.DisconnectRes
+EvaluateIns = _compat_typing.EvaluateIns
+EvaluateRes = _compat_typing.EvaluateRes
+FitIns = _compat_typing.FitIns
+FitRes = _compat_typing.FitRes
+GetParametersIns = _compat_typing.GetParametersIns
+GetParametersRes = _compat_typing.GetParametersRes
+GetPropertiesIns = _compat_typing.GetPropertiesIns
+GetPropertiesRes = _compat_typing.GetPropertiesRes
+Metrics = _compat_typing.Metrics
+MetricsAggregationFn = _compat_typing.MetricsAggregationFn
+NDArray = _compat_typing.NDArray
+NDArrayFloat = _compat_typing.NDArrayFloat
+NDArrayInt = _compat_typing.NDArrayInt
+NDArrays = _compat_typing.NDArrays
+Parameters = _compat_typing.Parameters
+Properties = _compat_typing.Properties
+ReconnectIns = _compat_typing.ReconnectIns
+Scalar = _compat_typing.Scalar
+ServerMessage = _compat_typing.ServerMessage
+Status = _compat_typing.Status
+Value = _compat_typing.Value
 
 
 @dataclass

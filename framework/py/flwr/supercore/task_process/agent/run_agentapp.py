@@ -27,7 +27,11 @@ from flwr.app.exception import AppExitException
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
-from flwr.common.config import get_project_config, get_project_dir
+from flwr.common.config import (
+    get_fused_config_from_dir,
+    get_project_config,
+    get_project_dir,
+)
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, SubStatus
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import flush_logs, log, start_log_uploader, stop_log_uploader
@@ -150,8 +154,9 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         config = get_project_config(app_path)
 
         agent_app_attr = config["tool"]["flwr"]["app"]["components"]["agentapp"]
-        context.run_config = config["tool"]["flwr"]["app"].get("config", {})
-        context.run_config.update(run.override_config)
+        context.run_config = get_fused_config_from_dir(
+            Path(app_path), run.override_config
+        )
 
         agent_input = context.run_config.get(_AGENT_INPUT_KEY)
         if agent_input is not None:

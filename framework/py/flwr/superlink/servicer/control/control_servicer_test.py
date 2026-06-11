@@ -30,7 +30,7 @@ import grpc
 from parameterized import parameterized
 
 from flwr.agentapp.builtin import try_resolve_builtin_agent_fab
-from flwr.common import ConfigRecord, Context, RecordDict, now
+from flwr.app import ConfigRecord, Context, RecordDict
 from flwr.common.constant import (
     NODE_NOT_FOUND_MESSAGE,
     NOOP_ACCOUNT_NAME,
@@ -92,6 +92,7 @@ from flwr.supercore.constant import (
     RunType,
     TaskType,
 )
+from flwr.supercore.date import now
 from flwr.supercore.error import ApiErrorCode, EntitlementError, FlowerError
 from flwr.supercore.error.catalog import API_ERROR_MAP
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes

@@ -21,14 +21,15 @@ from contextlib import contextmanager
 
 from flwr.app import Context
 from flwr.common.logger import warn_deprecated_feature_with_example
+from flwr.compat.server.typing import ServerFn
 from flwr.server.client_manager import ClientManager
 from flwr.server.compat import start_grid
 from flwr.server.server import Server
 from flwr.server.server_config import ServerConfig
 from flwr.server.strategy import Strategy
-from flwr.server.typing import ServerAppCallable, ServerFn
 
 from .grid import Grid
+from .typing import ServerAppCallable
 
 SERVER_FN_USAGE_EXAMPLE = """
 
@@ -129,7 +130,7 @@ class ServerApp:  # pylint: disable=too-many-instance-attributes
                 "`client_manager` directly to the ServerApp "
                 "constructor is deprecated.",
                 example_message="Pass `ServerApp` arguments wrapped "
-                "in a `flwr.server.ServerAppComponents` object that gets "
+                "in a `flwr.compat.server.ServerAppComponents` object that gets "
                 "returned by a function passed as the `server_fn` argument "
                 "to the `ServerApp` constructor. For example: ",
                 code_example=SERVER_FN_USAGE_EXAMPLE,

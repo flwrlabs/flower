@@ -23,7 +23,6 @@ from unittest.mock import Mock
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.common import now
 from flwr.proto.appio_pb2 import PullPendingTasksRequest  # pylint: disable=E0611
 from flwr.supercore.auth import (
     compute_request_body_sha256,
@@ -37,6 +36,7 @@ from flwr.supercore.constant import (
     SUPEREXEC_AUTH_SIGNATURE_HEADER,
     SUPEREXEC_AUTH_TIMESTAMP_HEADER,
 )
+from flwr.supercore.date import now
 from flwr.supercore.interceptors import (
     AUTHENTICATION_FAILED_MESSAGE,
     SuperExecAuthClientInterceptor,
