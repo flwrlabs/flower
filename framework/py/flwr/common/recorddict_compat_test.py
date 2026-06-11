@@ -21,6 +21,21 @@ from copy import deepcopy
 import numpy as np
 import pytest
 
+from flwr.common import (
+    Code,
+    EvaluateIns,
+    EvaluateRes,
+    FitIns,
+    FitRes,
+    GetParametersIns,
+    GetParametersRes,
+    GetPropertiesIns,
+    GetPropertiesRes,
+    NDArrays,
+    Scalar,
+    Status,
+)
+
 from .parameter import ndarrays_to_parameters
 from .recorddict_compat import (
     evaluateins_to_recorddict,
@@ -39,20 +54,6 @@ from .recorddict_compat import (
     recorddict_to_getparametersres,
     recorddict_to_getpropertiesins,
     recorddict_to_getpropertiesres,
-)
-from .typing import (
-    Code,
-    EvaluateIns,
-    EvaluateRes,
-    FitIns,
-    FitRes,
-    GetParametersIns,
-    GetParametersRes,
-    GetPropertiesIns,
-    GetPropertiesRes,
-    NDArrays,
-    Scalar,
-    Status,
 )
 
 
