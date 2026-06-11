@@ -449,7 +449,7 @@ def _is_active_pod(pod: object) -> bool:
         return True
 
     status = _object_field(pod, "status")
-    return _object_field(status, "phase") in {"Pending", "Running"}
+    return _object_field(status, "phase") not in {"Succeeded", "Failed"}
 
 
 def _object_field(value: object, field_name: str) -> object | None:
