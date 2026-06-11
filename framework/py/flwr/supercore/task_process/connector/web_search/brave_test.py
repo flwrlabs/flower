@@ -55,9 +55,7 @@ def test_search_calls_brave_and_returns_parsed_results(
         get_mock,
     )
 
-    result = BraveWebSearchProvider().search(
-        {"query": " flower federated learning "}
-    )
+    result = BraveWebSearchProvider().search(" flower federated learning ")
 
     assert result == {
         "results": [
