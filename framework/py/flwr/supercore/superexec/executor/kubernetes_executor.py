@@ -37,6 +37,12 @@ APPIO_ROOT_CERTIFICATES_FILE_PATH = f"{APPIO_CREDENTIALS_MOUNT_PATH}/ca.crt"
 LAUNCH_ATTEMPT_LABEL = "flower.ai/launch-attempt"
 
 
+class KubernetesPodList(Protocol):
+    """Subset of Kubernetes PodList used by capacity checks."""
+
+    items: Sequence[object]
+
+
 class KubernetesClient(Protocol):
     """Subset of Kubernetes CoreV1Api used by the executor."""
 
@@ -49,7 +55,9 @@ class KubernetesClient(Protocol):
     def delete_namespaced_secret(self, name: str, namespace: str) -> object:
         """Delete a Kubernetes Secret from the selected namespace."""
 
-    def list_namespaced_pod(self, namespace: str, label_selector: str) -> object:
+    def list_namespaced_pod(
+        self, namespace: str, label_selector: str
+    ) -> KubernetesPodList:
         """List Kubernetes Pods in the selected namespace."""
 
 
@@ -431,7 +439,7 @@ def _label_selector(labels: dict[str, str]) -> str:
     return ",".join(f"{key}={value}" for key, value in sorted(labels.items()))
 
 
-def _pod_items(pod_list: object) -> list[object]:
+def _pod_items(pod_list: KubernetesPodList | Mapping[str, object]) -> list[object]:
     """Return Pod items from a Kubernetes list response."""
     items = _object_field(pod_list, "items")
     if isinstance(items, Sequence) and not isinstance(items, str):
