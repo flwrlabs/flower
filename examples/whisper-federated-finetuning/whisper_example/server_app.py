@@ -7,7 +7,7 @@ import torch
 from datasets import load_dataset
 from flwr.app import ArrayRecord, Context, Message, MetricRecord
 from flwr.common.logger import log
-from flwr.common.typing import UserConfig
+from flwr.app.user_config import UserConfig
 from flwr.serverapp import Grid, ServerApp
 from flwr.serverapp.strategy import FedAvg
 from torch.utils.data import DataLoader
