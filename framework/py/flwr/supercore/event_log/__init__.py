@@ -13,4 +13,3 @@
 # limitations under the License.
 # ==============================================================================
 """Event log type definitions."""
-
