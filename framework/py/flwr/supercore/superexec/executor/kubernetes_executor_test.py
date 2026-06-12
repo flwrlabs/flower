@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for SuperExec Kubernetes executor."""
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 from unittest.mock import Mock, call
@@ -28,6 +29,7 @@ from .kubernetes_executor import (
     APPIO_ROOT_CERTIFICATES_FILE_PATH,
     APPIO_TOKEN_FILE_PATH,
     LAUNCH_ATTEMPT_LABEL,
+    CompletedPodSweeper,
     KubernetesExecutor,
     KubernetesExecutorConfig,
     _build_appio_credentials_secret,
@@ -91,11 +93,42 @@ def _appio_root_certificates(
     return _get_appio_root_certificates(spec, config)
 
 
-def _pod(phase: str, deletion_timestamp: str | None = None) -> dict[str, Any]:
-    metadata = {}
+def _task_labels(task_id: int) -> dict[str, str]:
+    return {
+        "app.kubernetes.io/name": "flower",
+        "app.kubernetes.io/component": "taskexecutor",
+        "flower.ai/superexec-task-id": str(task_id),
+        "flower.ai/task-type": "flwr-serverapp",
+    }
+
+
+def _pod(
+    phase: str,
+    deletion_timestamp: str | None = None,
+    *,
+    name: str = _POD_NAME,
+    labels: dict[str, str] | None = None,
+    finished_at: str | None = None,
+) -> dict[str, Any]:
+    metadata: dict[str, Any] = {"name": name}
     if deletion_timestamp is not None:
         metadata["deletionTimestamp"] = deletion_timestamp
-    return {"metadata": metadata, "status": {"phase": phase}}
+    if labels is not None:
+        metadata["labels"] = labels
+
+    status: dict[str, Any] = {"phase": phase}
+    if finished_at is not None:
+        status["containerStatuses"] = [
+            {"state": {"terminated": {"finishedAt": finished_at}}}
+        ]
+    return {"metadata": metadata, "status": status}
+
+
+def _secret(name: str, labels: dict[str, str] | None = None) -> dict[str, Any]:
+    metadata: dict[str, Any] = {"name": name}
+    if labels is not None:
+        metadata["labels"] = labels
+    return {"metadata": metadata}
 
 
 def test_build_appio_credentials_secret_contains_token_and_ca() -> None:
@@ -475,6 +508,12 @@ def test_config_rejects_invalid_capacity_log_interval() -> None:
         _executor_config(capacity_log_interval=0)
 
 
+def test_config_rejects_negative_completed_pod_retention() -> None:
+    """Test completed Pod retention must not be negative."""
+    with pytest.raises(ValueError, match="Completed Pod retention"):
+        _executor_config(completed_pod_retention_seconds=-1)
+
+
 def test_wait_for_capacity_returns_below_budget_without_sleeping() -> None:
     """Test capacity wait returns immediately when the active Pod count fits."""
     client = Mock()
@@ -565,6 +604,181 @@ def test_wait_for_capacity_ignores_terminal_pods_not_terminating() -> None:
     KubernetesExecutor(client=client, config=config).wait_for_capacity()
 
     sleep.assert_not_called()
+
+
+@pytest.mark.parametrize("phase", ["Succeeded", "Failed"])
+def test_sweeper_deletes_terminal_pod_and_matching_secret(phase: str) -> None:
+    """Test cleanup deletes terminal Pods and their credential Secrets."""
+    client = Mock()
+    labels = _task_labels(123)
+    client.list_namespaced_pod.return_value = {"items": [_pod(phase, labels=labels)]}
+    client.list_namespaced_secret.return_value = {
+        "items": [_secret(_SECRET_NAME, labels)]
+    }
+    config = _executor_config(
+        labels={"flower.ai/team": "platform"},
+        resource_pool="gpu-pool",
+    )
+
+    CompletedPodSweeper(client=client, config=config).sweep()
+
+    selector = (
+        "app.kubernetes.io/component=taskexecutor,"
+        "app.kubernetes.io/name=flower,"
+        "flower.ai/resource-pool=gpu-pool,"
+        "flower.ai/team=platform"
+    )
+    client.list_namespaced_pod.assert_called_once_with(
+        "flower-system", label_selector=selector
+    )
+    client.list_namespaced_secret.assert_called_once_with(
+        "flower-system", label_selector=selector
+    )
+    client.delete_namespaced_pod.assert_called_once_with(
+        name=_POD_NAME,
+        namespace="flower-system",
+        grace_period_seconds=0,
+    )
+    client.delete_namespaced_secret.assert_called_once_with(
+        name=_SECRET_NAME, namespace="flower-system"
+    )
+
+
+def test_sweeper_keeps_pending_and_running_pods_and_secrets() -> None:
+    """Test cleanup ignores non-terminal Pods and their credential Secrets."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {
+        "items": [
+            _pod("Pending", name=_POD_NAME, labels=_task_labels(123)),
+            _pod("Running", name=_NEXT_POD_NAME, labels=_task_labels(124)),
+        ]
+    }
+    client.list_namespaced_secret.return_value = {
+        "items": [
+            _secret(_SECRET_NAME, _task_labels(123)),
+            _secret(_NEXT_SECRET_NAME, _task_labels(124)),
+        ]
+    }
+
+    CompletedPodSweeper(client=client, config=_executor_config()).sweep()
+
+    client.delete_namespaced_pod.assert_not_called()
+    client.delete_namespaced_secret.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("finished_at", "expect_deleted"),
+    [
+        ("2026-05-27T18:59:30Z", False),
+        ("2026-05-27T18:58:00Z", True),
+    ],
+)
+def test_sweeper_respects_completed_pod_retention_window(
+    finished_at: str, expect_deleted: bool
+) -> None:
+    """Test cleanup honors the configured completed Pod retention window."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {
+        "items": [
+            _pod(
+                "Succeeded",
+                labels=_task_labels(123),
+                finished_at=finished_at,
+            )
+        ]
+    }
+    client.list_namespaced_secret.return_value = {
+        "items": [_secret(_SECRET_NAME, _task_labels(123))]
+    }
+    config = _executor_config(
+        completed_pod_retention_seconds=60.0,
+        now=lambda: datetime(2026, 5, 27, 19, 0, 0, tzinfo=UTC),
+    )
+
+    CompletedPodSweeper(client=client, config=config).sweep()
+
+    if expect_deleted:
+        client.delete_namespaced_pod.assert_called_once()
+        client.delete_namespaced_secret.assert_called_once()
+    else:
+        client.delete_namespaced_pod.assert_not_called()
+        client.delete_namespaced_secret.assert_not_called()
+
+
+def test_sweeper_deletes_orphaned_per_task_secret() -> None:
+    """Test cleanup deletes a labeled per-task Secret when its Pod is gone."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+    client.list_namespaced_secret.return_value = {
+        "items": [_secret("flwr-taskexecutor-999-appio", _task_labels(999))]
+    }
+
+    CompletedPodSweeper(client=client, config=_executor_config()).sweep()
+
+    client.delete_namespaced_pod.assert_not_called()
+    client.delete_namespaced_secret.assert_called_once_with(
+        name="flwr-taskexecutor-999-appio", namespace="flower-system"
+    )
+
+
+def test_sweeper_deletes_all_matching_secrets_for_terminal_pod() -> None:
+    """Test cleanup deletes all labeled Secrets for a swept terminal Pod."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {
+        "items": [_pod("Succeeded", labels=_task_labels(123))]
+    }
+    client.list_namespaced_secret.return_value = {
+        "items": [
+            _secret(_SECRET_NAME, _task_labels(123)),
+            _secret(_NEXT_SECRET_NAME, _task_labels(123)),
+        ]
+    }
+
+    CompletedPodSweeper(client=client, config=_executor_config()).sweep()
+
+    assert client.delete_namespaced_secret.mock_calls == [
+        call(name=_SECRET_NAME, namespace="flower-system"),
+        call(name=_NEXT_SECRET_NAME, namespace="flower-system"),
+    ]
+
+
+def test_sweeper_keeps_secret_without_taskexecutor_task_label() -> None:
+    """Test cleanup does not delete Secrets missing the task ownership label."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+    client.list_namespaced_secret.return_value = {
+        "items": [
+            _secret(
+                "manual-secret",
+                {
+                    "app.kubernetes.io/name": "flower",
+                    "app.kubernetes.io/component": "taskexecutor",
+                },
+            )
+        ]
+    }
+
+    CompletedPodSweeper(client=client, config=_executor_config()).sweep()
+
+    client.delete_namespaced_secret.assert_not_called()
+
+
+def test_sweeper_tolerates_already_deleted_pod_and_secret() -> None:
+    """Test cleanup treats 404 delete responses as idempotent success."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {
+        "items": [_pod("Failed", labels=_task_labels(123))]
+    }
+    client.list_namespaced_secret.return_value = {
+        "items": [_secret(_SECRET_NAME, _task_labels(123))]
+    }
+    client.delete_namespaced_pod.side_effect = _KubernetesApiError(404, "Not Found")
+    client.delete_namespaced_secret.side_effect = _KubernetesApiError(404, "Not Found")
+
+    CompletedPodSweeper(client=client, config=_executor_config()).sweep()
+
+    client.delete_namespaced_pod.assert_called_once()
+    client.delete_namespaced_secret.assert_called_once()
 
 
 def test_launch_submits_secret_before_pod_and_returns_accepted(
