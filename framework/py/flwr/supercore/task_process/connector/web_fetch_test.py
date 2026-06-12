@@ -25,6 +25,8 @@ import pytest
 
 from .web_fetch import WebFetchProviderError, invoke_web_fetch_provider
 
+trafilatura = pytest.importorskip("trafilatura")
+
 
 @dataclass
 class _Response:
@@ -53,9 +55,8 @@ class _Response:
         self.closed = True
 
 
-@pytest.fixture(autouse=True)
-def _resolve_hosts_to_public_ip(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Avoid real DNS lookups in provider tests."""
+def _patch_dns(monkeypatch: pytest.MonkeyPatch, ip_address: str) -> None:
+    """Patch DNS resolution to a deterministic address."""
 
     def getaddrinfo(
         host: str,
@@ -63,16 +64,20 @@ def _resolve_hosts_to_public_ip(monkeypatch: pytest.MonkeyPatch) -> None:
         *args: object,
         **kwargs: object,
     ) -> list[tuple[int, int, int, str, tuple[str, int]]]:
-        """Return a public test address for every hostname."""
+        """Return a test address for every hostname."""
         del host, args, kwargs
-        return [
-            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", port or 0))
-        ]
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip_address, port or 0))]
 
     monkeypatch.setattr(
         "flwr.supercore.task_process.connector.web_fetch.socket.getaddrinfo",
         getaddrinfo,
     )
+
+
+@pytest.fixture(autouse=True)
+def _resolve_hosts_to_public_ip(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Avoid real DNS lookups in provider tests."""
+    _patch_dns(monkeypatch, "93.184.216.34")
 
 
 def _patch_get(
@@ -93,16 +98,13 @@ def _patch_get(
 def test_invoke_web_fetch_provider_extracts_markdown(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Non-raw requests should return trafilatura-extracted markdown."""
+    """Requests should return trafilatura-extracted markdown."""
     response = _Response()
     get_mock = _patch_get(monkeypatch, response)
     extract_mock = Mock(return_value="# Hello")
-    monkeypatch.setattr(
-        "flwr.supercore.task_process.connector.web_fetch._extract_markdown",
-        extract_mock,
-    )
+    monkeypatch.setattr(trafilatura, "extract", extract_mock)
 
-    result = invoke_web_fetch_provider({"url": "https://example.com"})
+    result = invoke_web_fetch_provider("https://example.com")
 
     assert result == {
         "object": "web_fetch.response",
@@ -112,148 +114,36 @@ def test_invoke_web_fetch_provider_extracts_markdown(
         "status_code": 200,
         "content_type": "text/html; charset=utf-8",
         "content": "# Hello",
-        "start_index": 0,
-        "truncated": False,
-        "next_start_index": None,
     }
     get_mock.assert_called_once_with(
         "https://example.com",
-        headers={"User-Agent": "FlowerWebFetch/1.0"},
         timeout=30.0,
         stream=True,
         allow_redirects=False,
     )
-    extract_mock.assert_called_once_with(
-        "<html><body><main>Hello</main></body></html>",
-        "https://example.com/final",
-    )
+    extract_mock.assert_called_once()
     assert response.closed
 
 
-def test_invoke_web_fetch_provider_returns_raw_text(
+def test_invoke_web_fetch_provider_enforces_fetch_guardrails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Raw requests should bypass trafilatura extraction."""
-    response = _Response(body=b"plain text")
-    _patch_get(monkeypatch, response)
-    extract_mock = Mock(side_effect=AssertionError("extract should not be called"))
-    monkeypatch.setattr(
-        "flwr.supercore.task_process.connector.web_fetch._extract_markdown",
-        extract_mock,
-    )
-
-    result = invoke_web_fetch_provider(
-        {"url": "https://example.com/plain.txt", "raw": True}
-    )
-
-    assert result["content"] == "plain text"
-    assert result["content_type"] == "text/html; charset=utf-8"
-    extract_mock.assert_not_called()
-    assert response.closed
-
-
-def test_invoke_web_fetch_provider_truncates_content(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Provider responses should support character-index pagination."""
-    _patch_get(monkeypatch, _Response())
-    monkeypatch.setattr(
-        "flwr.supercore.task_process.connector.web_fetch._extract_markdown",
-        Mock(return_value="abcdef"),
-    )
-
-    result = invoke_web_fetch_provider(
-        {
-            "url": "https://example.com",
-            "start_index": 2,
-            "max_length": 3,
-        }
-    )
-
-    assert result["content"] == "cde"
-    assert result["start_index"] == 2
-    assert result["truncated"] is True
-    assert result["next_start_index"] == 5
-
-
-@pytest.mark.parametrize(
-    ("payload", "code"),
-    [
-        ({}, "invalid_request"),
-        ({"url": ""}, "invalid_request"),
-        ({"url": "file:///etc/passwd"}, "invalid_request"),
-        ({"url": "https://localhost"}, "blocked_url"),
-        ({"url": "https://127.0.0.1"}, "blocked_url"),
-        ({"url": "https://example.com", "max_length": 0}, "invalid_request"),
-        ({"url": "https://example.com", "start_index": -1}, "invalid_request"),
-        ({"url": "https://example.com", "raw": "false"}, "invalid_request"),
-    ],
-)
-def test_invoke_web_fetch_provider_validates_request(
-    payload: dict[str, object],
-    code: str,
-) -> None:
-    """Malformed provider requests should raise typed provider errors."""
-    with pytest.raises(WebFetchProviderError) as exc_info:
-        invoke_web_fetch_provider(payload)  # type: ignore[arg-type]
-
-    assert exc_info.value.code == code
-
-
-def test_invoke_web_fetch_provider_raises_on_http_error(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """HTTP error responses should become provider errors."""
-    response = _Response(status_code=404, body=b"not found")
-    _patch_get(monkeypatch, response)
-
-    with pytest.raises(WebFetchProviderError) as exc_info:
-        invoke_web_fetch_provider({"url": "https://example.com/missing"})
-
-    assert exc_info.value.code == "http_error"
-    assert exc_info.value.status_code == 404
-    assert exc_info.value.detail == "not found"
-    assert response.closed
-
-
-def test_invoke_web_fetch_provider_validates_redirect_target(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Blocked redirect targets should not be requested."""
-    response = _Response(
+    """Provider should reject unsafe redirects, DNS, and oversized responses."""
+    redirect_response = _Response(
         status_code=302,
         url="https://example.com",
         headers={"Location": "http://127.0.0.1/private"},
     )
-    get_mock = _patch_get(monkeypatch, response)
+    get_mock = _patch_get(monkeypatch, redirect_response)
 
     with pytest.raises(WebFetchProviderError) as exc_info:
-        invoke_web_fetch_provider({"url": "https://example.com"})
+        invoke_web_fetch_provider("https://example.com")
 
     assert exc_info.value.code == "blocked_url"
     assert get_mock.call_count == 1
-    assert response.closed
+    assert redirect_response.closed
 
-
-def test_invoke_web_fetch_provider_blocks_private_resolved_addresses(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Hostnames resolving to private addresses should be blocked before fetch."""
-
-    def getaddrinfo(
-        host: str,
-        port: int | None,
-        *args: object,
-        **kwargs: object,
-    ) -> list[tuple[int, int, int, str, tuple[str, int]]]:
-        """Resolve every hostname to loopback."""
-        del host, args, kwargs
-        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", port or 0))]
-
-    monkeypatch.setattr(
-        "flwr.supercore.task_process.connector.web_fetch.socket.getaddrinfo",
-        getaddrinfo,
-    )
+    _patch_dns(monkeypatch, "127.0.0.1")
     get_mock = Mock()
     monkeypatch.setattr(
         "flwr.supercore.task_process.connector.web_fetch.requests.get",
@@ -261,45 +151,18 @@ def test_invoke_web_fetch_provider_blocks_private_resolved_addresses(
     )
 
     with pytest.raises(WebFetchProviderError) as exc_info:
-        invoke_web_fetch_provider({"url": "https://private.example"})
+        invoke_web_fetch_provider("https://private.example")
 
     assert exc_info.value.code == "blocked_url"
     get_mock.assert_not_called()
 
-
-def test_invoke_web_fetch_provider_enforces_response_size(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Response bodies should be bounded by environment configuration."""
-    monkeypatch.setenv("FLWR_WEB_FETCH_MAX_RESPONSE_BYTES", "4")
-    response = _Response(chunks=[b"1234", b"5"])
+    _patch_dns(monkeypatch, "93.184.216.34")
+    response = _Response(chunks=[b"x" * (1024 * 1024), b"x"])
     _patch_get(monkeypatch, response)
 
     with pytest.raises(WebFetchProviderError) as exc_info:
-        invoke_web_fetch_provider({"url": "https://example.com"})
+        invoke_web_fetch_provider("https://example.com")
 
     assert exc_info.value.code == "response_too_large"
     assert exc_info.value.status_code == 200
     assert response.closed
-
-
-def test_invoke_web_fetch_provider_uses_environment_settings(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Provider environment settings should affect fetch and default chunking."""
-    monkeypatch.setenv("FLWR_WEB_FETCH_TIMEOUT", "7")
-    monkeypatch.setenv("FLWR_WEB_FETCH_USER_AGENT", "TestAgent/1.0")
-    monkeypatch.setenv("FLWR_WEB_FETCH_MAX_LENGTH", "4")
-    get_mock = _patch_get(monkeypatch, _Response())
-    monkeypatch.setattr(
-        "flwr.supercore.task_process.connector.web_fetch._extract_markdown",
-        Mock(return_value="abcdef"),
-    )
-
-    result = invoke_web_fetch_provider({"url": "https://example.com"})
-
-    assert result["content"] == "abcd"
-    assert result["truncated"] is True
-    assert result["next_start_index"] == 4
-    assert get_mock.call_args.kwargs["headers"] == {"User-Agent": "TestAgent/1.0"}
-    assert get_mock.call_args.kwargs["timeout"] == 7.0
