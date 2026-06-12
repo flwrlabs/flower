@@ -17,4 +17,6 @@
 
 from .run_connector import run_connector
 
-__all__ = ["run_connector"]
+__all__ = [
+    "run_connector"
+]
