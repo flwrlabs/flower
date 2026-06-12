@@ -731,10 +731,7 @@ def test_sweeper_keeps_secret_without_credential_secret_name() -> None:
         "items": [
             _secret(
                 "manual-secret",
-                {
-                    "app.kubernetes.io/name": "flower",
-                    "app.kubernetes.io/component": "taskexecutor",
-                },
+                _task_labels(123),
             )
         ]
     }
