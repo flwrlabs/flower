@@ -19,7 +19,8 @@ from __future__ import annotations
 import ipaddress
 import json
 import os
-from urllib.parse import urlparse
+import socket
+from urllib.parse import urljoin, urlparse
 
 import requests
 import trafilatura
@@ -30,7 +31,9 @@ DEFAULT_WEB_FETCH_MAX_LENGTH = 5000
 DEFAULT_WEB_FETCH_MAX_RESPONSE_BYTES = 1024 * 1024
 DEFAULT_WEB_FETCH_TIMEOUT = 30.0
 DEFAULT_WEB_FETCH_USER_AGENT = "FlowerWebFetch/1.0"
+_MAX_REDIRECTS = 10
 _READ_CHUNK_SIZE = 64 * 1024
+_REDIRECT_STATUS_CODES = frozenset({301, 302, 303, 307, 308})
 
 
 class WebFetchProviderError(RuntimeError):
@@ -97,23 +100,15 @@ def invoke_web_fetch_provider(request: JSONObject) -> JSONObject:
     if not user_agent:
         user_agent = DEFAULT_WEB_FETCH_USER_AGENT
 
-    try:
-        response = requests.get(
-            url,
-            headers={"User-Agent": user_agent},
-            timeout=timeout,
-            stream=True,
-        )
-    except requests.RequestException as exc:
-        raise WebFetchProviderError(
-            code="fetch_failed",
-            detail=str(exc),
-        ) from exc
+    response = _fetch_url(
+        url=url,
+        headers={"User-Agent": user_agent},
+        timeout=timeout,
+    )
 
     final_url = url
     try:
-        final_url = response.url or url
-        _get_required_url({"url": final_url})
+        final_url = _get_required_url({"url": response.url or url})
         body = _read_response_body(response, max_response_bytes)
         text = _decode_response_body(response, body)
         if response.status_code >= 400:
@@ -149,6 +144,41 @@ def invoke_web_fetch_provider(request: JSONObject) -> JSONObject:
     }
 
 
+def _fetch_url(
+    *,
+    url: str,
+    headers: dict[str, str],
+    timeout: float,
+) -> requests.Response:
+    """Fetch a URL while validating each redirect target before following it."""
+    current_url = url
+
+    for redirect_count in range(_MAX_REDIRECTS + 1):
+        current_url = _get_required_url({"url": current_url})
+        response = _request_once(url=current_url, headers=headers, timeout=timeout)
+
+        response_url = response.url or current_url
+        if response.status_code not in _REDIRECT_STATUS_CODES:
+            return response
+
+        location = response.headers.get("Location")
+        if not location:
+            return response
+
+        if redirect_count == _MAX_REDIRECTS:
+            response.close()
+            raise WebFetchProviderError(
+                code="too_many_redirects",
+                detail=f"Web fetch exceeded {_MAX_REDIRECTS} redirects.",
+            )
+
+        next_url = urljoin(response_url, location)
+        response.close()
+        current_url = next_url
+
+    raise RuntimeError("This line should never be reached.")
+
+
 def _get_required_url(request: JSONObject) -> str:
     """Return the validated URL from a provider request."""
     raw_url = request.get("url")
@@ -173,6 +203,28 @@ def _get_required_url(request: JSONObject) -> str:
             detail="URL host is not allowed.",
         )
     return url
+
+
+def _request_once(
+    *,
+    url: str,
+    headers: dict[str, str],
+    timeout: float,
+) -> requests.Response:
+    """Request one URL without following redirects."""
+    try:
+        return requests.get(
+            url,
+            headers=headers,
+            timeout=timeout,
+            stream=True,
+            allow_redirects=False,
+        )
+    except requests.RequestException as exc:
+        raise WebFetchProviderError(
+            code="fetch_failed",
+            detail=str(exc),
+        ) from exc
 
 
 def _get_bool(request: JSONObject, field: str, default: bool) -> bool:
@@ -222,7 +274,7 @@ def _get_env_int(name: str, default: int) -> int:
 
 
 def _is_blocked_host(hostname: str) -> bool:
-    """Return whether a hostname is blocked by deterministic local checks."""
+    """Return whether a hostname is blocked by local and DNS checks."""
     normalized = hostname.rstrip(".").lower()
     if normalized == "localhost" or normalized.endswith(".localhost"):
         return True
@@ -230,8 +282,39 @@ def _is_blocked_host(hostname: str) -> bool:
     try:
         ip_address = ipaddress.ip_address(normalized)
     except ValueError:
-        return False
+        ip_address = None
 
+    if ip_address is not None:
+        return _is_blocked_ip_address(ip_address)
+
+    try:
+        address_info = socket.getaddrinfo(
+            normalized,
+            None,
+            type=socket.SOCK_STREAM,
+        )
+    except socket.gaierror as exc:
+        raise WebFetchProviderError(
+            code="fetch_failed",
+            detail=f"Could not resolve URL host: {hostname}",
+        ) from exc
+
+    for addr in address_info:
+        sockaddr = addr[4]
+        try:
+            resolved_ip = ipaddress.ip_address(sockaddr[0])
+        except ValueError:
+            return True
+        if _is_blocked_ip_address(resolved_ip):
+            return True
+
+    return False
+
+
+def _is_blocked_ip_address(
+    ip_address: ipaddress.IPv4Address | ipaddress.IPv6Address,
+) -> bool:
+    """Return whether an IP address is blocked for web fetches."""
     return (
         ip_address.is_private
         or ip_address.is_loopback
@@ -250,8 +333,7 @@ def _read_response_body(response: requests.Response, max_response_bytes: int) ->
         for chunk in chunks:
             if not chunk:
                 continue
-            body.extend(chunk)
-            if len(body) > max_response_bytes:
+            if len(body) + len(chunk) > max_response_bytes:
                 raise WebFetchProviderError(
                     code="response_too_large",
                     status_code=response.status_code,
@@ -260,6 +342,7 @@ def _read_response_body(response: requests.Response, max_response_bytes: int) ->
                         f"({max_response_bytes})."
                     ),
                 )
+            body.extend(chunk)
     except requests.RequestException as exc:
         raise WebFetchProviderError(
             code="fetch_failed",
