@@ -24,6 +24,7 @@ from flwr.supercore.constant import TaskType
 
 from . import kubernetes_executor as kube
 from .kubernetes_executor import (
+    _COMPLETED_POD_SWEEP_INTERVAL_SECONDS,
     APPIO_CREDENTIALS_MOUNT_PATH,
     APPIO_ROOT_CERTIFICATES_FILE_PATH,
     APPIO_TOKEN_FILE_PATH,
@@ -31,7 +32,6 @@ from .kubernetes_executor import (
     CompletedPodSweeper,
     KubernetesExecutor,
     KubernetesExecutorConfig,
-    _COMPLETED_POD_SWEEP_INTERVAL_SECONDS,
     _build_appio_credentials_secret,
     _build_taskexecutor_pod,
     _get_appio_root_certificates,
