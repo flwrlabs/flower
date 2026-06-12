@@ -1,0 +1,19 @@
+#########################################
+ [402] SUPEREXEC_INVALID_EXECUTOR_CONFIG
+#########################################
+
+*************
+ Description
+*************
+
+The SuperExec executor configuration could not be loaded, parsed, or applied for the
+selected executor.
+
+****************
+ How to Resolve
+****************
+
+1. Confirm that the ``--executor-config`` path exists and is readable.
+2. Ensure the file is valid YAML.
+3. Ensure the YAML document is a mapping.
+4. Review the accompanying error message for the exact load or parse failure.
