@@ -15,7 +15,6 @@
 """Handle connector tasks."""
 
 
-from flwr.app import Context
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 
 
@@ -23,7 +22,6 @@ def handle_task(
     stub: ServerAppIoStub,
     task_id: int,
     run_id: int,
-    context: Context,
 ) -> None:
     """Run one connector task request."""
-    del stub, task_id, run_id, context
+    del stub, task_id, run_id

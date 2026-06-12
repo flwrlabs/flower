@@ -17,11 +17,10 @@
 
 import argparse
 from logging import DEBUG, INFO
-from queue import Queue
 
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
-from flwr.common.logger import log, mirror_output_to_queue, restore_output
+from flwr.common.logger import log, restore_output
 from flwr.supercore.task_process import run_connector
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
@@ -30,9 +29,6 @@ def flwr_connector() -> None:
     """Run process-isolated Flower connector task."""
     args = _parse_args_run_flwr_connector().parse_args()
     token = try_obtain_flwr_app_token(args)
-
-    log_queue: Queue[str | None] = Queue()
-    mirror_output_to_queue(log_queue)
 
     log(INFO, "Start `flwr-connector` process")
     log(
@@ -43,7 +39,6 @@ def flwr_connector() -> None:
     )
     run_connector(
         serverappio_api_address=args.serverappio_api_address,
-        log_queue=log_queue,
         token=token,
         insecure=args.insecure,
         certificates=validate_and_resolve_root_certificates(

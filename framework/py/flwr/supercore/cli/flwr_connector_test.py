@@ -51,28 +51,24 @@ def test_parse_flwr_connector_parses_tokenized_invocation() -> None:
     assert args.parent_pid == 1234
 
 
-def test_flwr_connector_parses_args_before_mirroring_output() -> None:
-    """Argument parsing should happen before stdout/stderr redirection."""
+def test_flwr_connector_parses_args_before_runtime_side_effects() -> None:
+    """Argument parsing should happen before runtime side effects."""
 
     class _Parser:
         def parse_args(self) -> SimpleNamespace:
             """Raise a parser error before any side effects happen."""
             raise SystemExit(2)
 
-    mirror_output_to_queue = Mock()
+    run_connector = Mock()
 
     with (
         patch.object(flwr_connector_module, "_parse_args_run_flwr_connector", _Parser),
-        patch.object(
-            flwr_connector_module,
-            "mirror_output_to_queue",
-            mirror_output_to_queue,
-        ),
+        patch.object(flwr_connector_module, "run_connector", run_connector),
         pytest.raises(SystemExit),
     ):
         flwr_connector_module.flwr_connector()
 
-    mirror_output_to_queue.assert_not_called()
+    run_connector.assert_not_called()
 
 
 def test_flwr_connector_forwards_cli_args() -> None:
@@ -90,28 +86,20 @@ def test_flwr_connector_forwards_cli_args() -> None:
             """Return a fixed namespace for CLI forwarding tests."""
             return args
 
-    mirror_output_to_queue = Mock()
     restore_output = Mock()
     run_connector = Mock()
 
     with (
         patch.object(flwr_connector_module, "_parse_args_run_flwr_connector", _Parser),
-        patch.object(
-            flwr_connector_module,
-            "mirror_output_to_queue",
-            mirror_output_to_queue,
-        ),
         patch.object(flwr_connector_module, "restore_output", restore_output),
         patch.object(flwr_connector_module, "run_connector", run_connector),
     ):
         flwr_connector_module.flwr_connector()
 
-    mirror_output_to_queue.assert_called_once()
     restore_output.assert_called_once_with()
     run_connector.assert_called_once()
     kwargs = run_connector.call_args.kwargs
     assert kwargs["serverappio_api_address"] == "127.0.0.1:9091"
-    assert kwargs["log_queue"] is mirror_output_to_queue.call_args.args[0]
     assert kwargs["token"] == "test-token"
     assert kwargs["insecure"] is True
     assert kwargs["certificates"] is None

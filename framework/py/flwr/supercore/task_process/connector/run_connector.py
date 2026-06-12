@@ -18,22 +18,18 @@
 from __future__ import annotations
 
 from logging import DEBUG, ERROR
-from queue import Queue
 
 import grpc
 
-from flwr.app import Context
-from flwr.cli.utils import get_sha256_hash
 from flwr.common.constant import SubStatus
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.grpc import create_channel, on_channel_state_change
-from flwr.common.logger import flush_logs, log, start_log_uploader, stop_log_uploader
+from flwr.common.logger import log
 from flwr.common.retry_invoker import (
     RetryInvoker,
     make_simple_grpc_retry_invoker,
     wrap_stub,
 )
-from flwr.common.serde import context_from_proto, context_to_proto, run_from_proto
 from flwr.common.telemetry import EventType, event
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputRequest,
@@ -51,9 +47,8 @@ from flwr.supercore.interceptors import (
 from .task import handle_task
 
 
-def run_connector(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
+def run_connector(
     serverappio_api_address: str,
-    log_queue: Queue[str | None] | None,
     token: str,
     insecure: bool,
     certificates: bytes | None = None,
@@ -71,9 +66,6 @@ def run_connector(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     )
 
     heartbeat_sender = None
-    log_uploader = None
-    hash_run_id = None
-    context: Context | None = None
     sub_status = SubStatus.FAILED
     details = "Connector task failed with unknown error."
     exit_code = ExitCode.SUCCESS
@@ -90,30 +82,12 @@ def run_connector(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
         log(DEBUG, "[flwr-connector] Pull task input")
         task_input: PullTaskInputResponse = stub.PullTaskInput(PullTaskInputRequest())
 
-        context = context_from_proto(task_input.context)
-        run = run_from_proto(task_input.run)
-        task_id = task_input.task_id
-
-        hash_run_id = get_sha256_hash(run.run_id)
-
-        if log_queue is not None:
-            log_uploader = start_log_uploader(
-                log_queue=log_queue,
-                node_id=0,
-                run_id=run.run_id,
-                stub=stub,
-            )
-
-        event(
-            EventType.FLWR_CONNECTOR_RUN_ENTER,
-            event_details={"run-id-hash": hash_run_id},
-        )
+        event(EventType.FLWR_CONNECTOR_RUN_ENTER)
 
         handle_task(
             stub=stub,
-            task_id=task_id,
-            run_id=run.run_id,
-            context=context,
+            task_id=task_input.task_id,
+            run_id=task_input.run.run_id,
         )
 
         sub_status = SubStatus.COMPLETED
@@ -132,11 +106,7 @@ def run_connector(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
 
         retry_invoker.max_tries = 1
 
-        if log_queue is not None and log_uploader:
-            flush_logs(log_queue)
-
         pushoutput_req = PushTaskOutputRequest(
-            context=context_to_proto(context) if context else None,
             sub_status=sub_status,
             details=details,
         )
@@ -145,22 +115,12 @@ def run_connector(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
         except grpc.RpcError as err:
             log(ERROR, "Failed to push task output: %s", str(err))
 
-        if log_queue is not None and log_uploader:
-            stop_log_uploader(log_queue, log_uploader)
-
         if heartbeat_sender and heartbeat_sender.is_running:
             heartbeat_sender.stop()
 
         channel.close()
 
-    flwr_exit(
-        code=exit_code,
-        event_type=EventType.FLWR_CONNECTOR_RUN_LEAVE,
-        event_details={
-            "run-id-hash": hash_run_id,
-            "success": exit_code == ExitCode.SUCCESS,
-        },
-    )
+    flwr_exit(exit_code, event_type=EventType.FLWR_CONNECTOR_RUN_LEAVE)
 
 
 def _create_serverappio_stub(
