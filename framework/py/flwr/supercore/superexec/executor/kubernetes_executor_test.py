@@ -447,62 +447,6 @@ def test_build_taskexecutor_pod_supports_labels_annotations_and_security() -> No
     assert pod["spec"]["containers"][0]["securityContext"] == container_security_context
 
 
-def test_config_rejects_extra_labels_that_override_stable_labels() -> None:
-    """Test extra labels cannot replace executor-owned stable labels."""
-    with pytest.raises(ValueError, match="must not override stable labels"):
-        _executor_config(labels={"flower.ai/superexec-task-id": "999"})
-
-
-def test_build_taskexecutor_pod_copies_nested_json_config() -> None:
-    """Test rendered Pod JSON does not share nested config objects."""
-    resources = {"requests": {"cpu": "500m", "memory": "1Gi"}}
-    tolerations = [{"key": "flower.ai/taskexecutor", "value": "true"}]
-    config = _executor_config(resources=resources, tolerations=tolerations)
-
-    pod = _as_dict(
-        _build_taskexecutor_pod(
-            _execution_spec(), config, "root-ca", _LAUNCH_ATTEMPT_ID
-        )
-    )
-    pod_resources = _as_dict(pod["spec"]["containers"][0]["resources"])
-    pod_requests = _as_dict(pod_resources["requests"])
-    pod_toleration = _as_dict(pod["spec"]["tolerations"][0])
-
-    pod_requests["cpu"] = "2"
-    pod_toleration["value"] = "pod-only"
-    resources["requests"]["memory"] = "4Gi"
-    tolerations[0]["key"] = "changed"
-
-    assert resources["requests"]["cpu"] == "500m"
-    assert tolerations[0]["value"] == "true"
-    assert pod_resources["requests"]["memory"] == "1Gi"
-    assert pod_toleration["key"] == "flower.ai/taskexecutor"
-
-
-def test_config_rejects_capacity_budget_without_resource_pool() -> None:
-    """Test capacity gating requires an explicit resource pool."""
-    with pytest.raises(ValueError, match="Resource pool must be configured"):
-        _executor_config(active_pod_budget=10)
-
-
-def test_config_rejects_non_positive_active_pod_budget() -> None:
-    """Test active Pod budget must be positive when configured."""
-    with pytest.raises(ValueError, match="Active Pod budget must be positive"):
-        _executor_config(active_pod_budget=0)
-
-
-def test_config_rejects_invalid_capacity_poll_interval() -> None:
-    """Test capacity poll interval must be positive."""
-    with pytest.raises(ValueError, match="Capacity poll interval must be positive"):
-        _executor_config(capacity_poll_interval=0)
-
-
-def test_config_rejects_invalid_capacity_log_interval() -> None:
-    """Test capacity log interval must be positive when provided."""
-    with pytest.raises(ValueError, match="Capacity log interval must be positive"):
-        _executor_config(capacity_log_interval=0)
-
-
 def test_wait_for_capacity_returns_below_budget_without_sleeping() -> None:
     """Test capacity wait returns immediately when the active Pod count fits."""
     client = Mock()

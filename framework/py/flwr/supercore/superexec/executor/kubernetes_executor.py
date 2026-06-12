@@ -73,7 +73,7 @@ class KubernetesClient(Protocol):
         """List Kubernetes Pods in the selected namespace."""
 
 
-@dataclass(frozen=True)
+@dataclass
 class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
     """Configuration needed to build one TaskExecutor Pod and Secret.
 
@@ -89,8 +89,7 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
     image_pull_policy : str | None
         Optional Kubernetes imagePullPolicy for the TaskExecutor container.
     labels : dict[str, str] | None
-        Extra labels added to generated Pods and Secrets. Executor-owned labels
-        cannot be overridden.
+        Extra labels added to generated Pods and Secrets.
     annotations : dict[str, str] | None
         Extra annotations added to generated Pods and Secrets.
     resource_pool : str | None
@@ -135,31 +134,6 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
     capacity_log_interval: float | None = None
     sleep: Callable[[float], None] = time.sleep
     monotonic: Callable[[], float] = time.monotonic
-
-    def __post_init__(self) -> None:
-        """Validate required object-building inputs."""
-        _validate_required_string("Kubernetes namespace", self.namespace)
-        _validate_required_string("TaskExecutor image", self.image)
-        _validate_optional_string(
-            "AppIo root certificates", self.appio_root_certificates
-        )
-        _validate_optional_string("Image pull policy", self.image_pull_policy)
-        _validate_optional_string("Service account name", self.service_account_name)
-        _validate_optional_string("Resource pool", self.resource_pool)
-        _validate_optional_string("Priority class name", self.priority_class_name)
-        if self.labels is not None:
-            _validate_labels(self.labels)
-        if self.active_pod_budget is not None:
-            if self.active_pod_budget <= 0:
-                raise ValueError("Active Pod budget must be positive.")
-            if self.resource_pool is None:
-                raise ValueError(
-                    "Resource pool must be configured when active Pod budget is set."
-                )
-        if self.capacity_poll_interval <= 0:
-            raise ValueError("Capacity poll interval must be positive.")
-        if self.capacity_log_interval is not None and self.capacity_log_interval <= 0:
-            raise ValueError("Capacity log interval must be positive.")
 
 
 class KubernetesExecutor:
@@ -386,11 +360,9 @@ def _build_taskexecutor_pod(
     if config.image_pull_policy is not None:
         container["imagePullPolicy"] = config.image_pull_policy
     if config.resources is not None:
-        container["resources"] = _copy_json_object(config.resources)
+        container["resources"] = config.resources
     if config.container_security_context is not None:
-        container["securityContext"] = _copy_json_object(
-            config.container_security_context
-        )
+        container["securityContext"] = config.container_security_context
 
     pod_spec: JSONObject = {
         "automountServiceAccountToken": False,
@@ -409,17 +381,15 @@ def _build_taskexecutor_pod(
     if config.service_account_name is not None:
         pod_spec["serviceAccountName"] = config.service_account_name
     if config.node_selector is not None:
-        pod_spec["nodeSelector"] = cast(JSONObject, dict(config.node_selector))
+        pod_spec["nodeSelector"] = cast(JSONObject, config.node_selector)
     if config.tolerations is not None:
-        pod_spec["tolerations"] = [
-            _copy_json_object(toleration) for toleration in config.tolerations
-        ]
+        pod_spec["tolerations"] = config.tolerations
     if config.affinity is not None:
-        pod_spec["affinity"] = _copy_json_object(config.affinity)
+        pod_spec["affinity"] = config.affinity
     if config.priority_class_name is not None:
         pod_spec["priorityClassName"] = config.priority_class_name
     if config.pod_security_context is not None:
-        pod_spec["securityContext"] = _copy_json_object(config.pod_security_context)
+        pod_spec["securityContext"] = config.pod_security_context
 
     return {
         "apiVersion": "v1",
@@ -509,7 +479,7 @@ def _metadata(
         "labels": _labels(spec, config, launch_attempt_id),
     }
     if config.annotations is not None:
-        metadata["annotations"] = cast(JSONObject, dict(config.annotations))
+        metadata["annotations"] = cast(JSONObject, config.annotations)
     return metadata
 
 
@@ -517,17 +487,20 @@ def _labels(
     spec: ExecutionSpec, config: KubernetesExecutorConfig, launch_attempt_id: str
 ) -> JSONObject:
     """Return stable labels for Kubernetes objects."""
-    labels: JSONObject = {
-        "app.kubernetes.io/name": "flower",
-        "app.kubernetes.io/component": "taskexecutor",
-        "flower.ai/superexec-task-id": str(spec.task_id),
-        "flower.ai/task-type": spec.task_type.value,
-        LAUNCH_ATTEMPT_LABEL: launch_attempt_id,
-    }
-    if config.resource_pool is not None:
-        labels["flower.ai/resource-pool"] = config.resource_pool
+    labels: JSONObject = {}
     if config.labels is not None:
         labels.update(config.labels)
+    labels.update(
+        {
+            "app.kubernetes.io/name": "flower",
+            "app.kubernetes.io/component": "taskexecutor",
+            "flower.ai/superexec-task-id": str(spec.task_id),
+            "flower.ai/task-type": spec.task_type.value,
+            LAUNCH_ATTEMPT_LABEL: launch_attempt_id,
+        }
+    )
+    if config.resource_pool is not None:
+        labels["flower.ai/resource-pool"] = config.resource_pool
     return labels
 
 
@@ -543,14 +516,15 @@ def _taskexecutor_pool_label_selector(config: KubernetesExecutorConfig) -> str:
 
 def _taskexecutor_pool_labels(config: KubernetesExecutorConfig) -> dict[str, str]:
     """Return labels identifying a scoped TaskExecutor pool."""
-    labels = {
-        "app.kubernetes.io/name": "flower",
-        "app.kubernetes.io/component": "taskexecutor",
-    }
+    labels = dict(config.labels or {})
+    labels.update(
+        {
+            "app.kubernetes.io/name": "flower",
+            "app.kubernetes.io/component": "taskexecutor",
+        }
+    )
     if config.resource_pool is not None:
         labels["flower.ai/resource-pool"] = config.resource_pool
-    if config.labels is not None:
-        labels.update(config.labels)
     return labels
 
 
@@ -608,54 +582,6 @@ def _object_field(value: object, field_name: str) -> object | None:
     if isinstance(value, dict):
         return value.get(field_name)
     return getattr(value, field_name, None)
-
-
-def _validate_labels(labels: dict[str, str]) -> None:
-    """Validate that caller-provided labels do not replace stable labels."""
-    stable_label_names = {
-        "app.kubernetes.io/name",
-        "app.kubernetes.io/component",
-        "flower.ai/superexec-task-id",
-        "flower.ai/task-type",
-        LAUNCH_ATTEMPT_LABEL,
-        "flower.ai/resource-pool",
-    }
-    conflicts = sorted(stable_label_names.intersection(labels))
-    if conflicts:
-        raise ValueError(
-            f"Kubernetes labels must not override stable labels: {conflicts}"
-        )
-
-
-def _validate_required_string(name: str, value: str) -> None:
-    """Validate that a required string field is not empty."""
-    if not value.strip():
-        raise ValueError(f"{name} must not be empty.")
-
-
-def _validate_optional_string(name: str, value: str | None) -> None:
-    """Validate that an optional string field is not empty when provided."""
-    if value is None:
-        return
-    _validate_required_string(name, value)
-
-
-def _copy_json_object(value: object) -> JSONObject:
-    """Return a plain dict/list copy of a JSON object."""
-    # Keep config objects normal and copy only when rendering Kubernetes payloads.
-    # This avoids recursive freeze/thaw while preventing rendered bodies from sharing
-    # mutable nested structures with caller-owned config.
-    return cast(JSONObject, _copy_json_value(value))
-
-
-def _copy_json_value(value: object) -> object:
-    """Return a mutable copy of a JSON-compatible value."""
-    if isinstance(value, Mapping):
-        return {key: _copy_json_value(nested) for key, nested in value.items()}
-    if isinstance(value, Sequence) and not isinstance(value, str):
-        # Normalize tuples and other sequences to JSON lists at the API boundary.
-        return [_copy_json_value(nested) for nested in value]
-    return value
 
 
 def _launch_result_from_exception(exc: Exception) -> LaunchResult:
