@@ -25,7 +25,6 @@ from unittest.mock import patch
 import grpc
 from parameterized import parameterized
 
-from flwr.common import now
 from flwr.common.constant import (
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     NOOP_ACCOUNT_NAME,
@@ -69,6 +68,7 @@ from flwr.server.app import _run_fleet_api_grpc_rere
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_res_message
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
+from flwr.supercore.date import now
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import (
     generate_key_pairs,

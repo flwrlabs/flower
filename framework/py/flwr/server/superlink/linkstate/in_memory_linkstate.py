@@ -25,7 +25,7 @@ from typing import Literal, cast
 
 from flwr.app import Message
 from flwr.app.user_config import UserConfig
-from flwr.common import log, now
+from flwr.common import log
 from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     MESSAGE_TTL_TOLERANCE,
@@ -44,6 +44,7 @@ from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.utils import validate_message
 from flwr.supercore.constant import NodeStatus
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
+from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
 from flwr.superlink.federation import FederationManager
 

@@ -19,7 +19,7 @@ from typing import cast
 
 import numpy as np
 
-from flwr.common.typing import NDArrayFloat, NDArrayInt
+from flwr.common import NDArrayFloat, NDArrayInt
 
 
 def _stochastic_round(arr: NDArrayFloat) -> NDArrayInt:

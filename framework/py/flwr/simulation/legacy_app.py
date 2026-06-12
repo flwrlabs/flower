@@ -155,9 +155,10 @@ def start_simulation(
 
     actor_scheduling: Optional[Union[str, NodeAffinitySchedulingStrategy]]
         (default: "DEFAULT")
-        Optional string ("DEFAULT" or "SPREAD") for the VCE to choose in which
-        node the actor is placed. If you are an advanced user needed more control
-        you can use lower-level scheduling strategies to pin actors to specific
+        Optional string ("DEFAULT" or "SPREAD") for the Simulation Runtime to
+        choose in which node the actor is placed. If you are an advanced user
+        needing more control, you can use lower-level scheduling strategies to pin
+        actors to specific
         compute nodes (e.g. via NodeAffinitySchedulingStrategy). Please note this
         is an advanced feature. For all details, please refer to the Ray documentation:
         https://docs.ray.io/en/latest/ray-core/scheduling/index.html
