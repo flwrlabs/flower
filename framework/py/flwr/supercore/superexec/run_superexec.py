@@ -51,6 +51,7 @@ from flwr.supercore.run import Run
 from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 from .executor import LaunchResult, LaunchResultStatus, get_executor
+from .executor.config import ExecutorConfig
 from .plugin import ExecPlugin
 from .plugin.base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
 
@@ -114,6 +115,7 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
     health_server_address: str | None = None,
     runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
     executor_type: ExecutorType = ExecutorType.SUBPROCESS,
+    executor_config: ExecutorConfig | None = None,
 ) -> None:
     """Run Flower SuperExec.
 
@@ -145,8 +147,14 @@ def run_superexec(  # pylint: disable=R0912,R0913,R0914,R0915,R0917
         Whether runtime dependency installation is allowed.
     executor_type : ExecutorType (default: ExecutorType.SUBPROCESS)
         The executor to use for non-ephemeral app processes.
+    executor_config : Optional[ExecutorConfig] (default: None)
+        Parsed executor configuration.
     """
-    executor = get_executor(executor_type)
+    _ = executor_config
+    try:
+        executor = get_executor(executor_type)
+    except ValueError as err:
+        flwr_exit(ExitCode.SUPEREXEC_INVALID_EXECUTOR_CONFIG, str(err))
 
     interceptors: list[grpc.UnaryUnaryClientInterceptor] = [
         RuntimeVersionClientInterceptor(component_name="SuperExec")
