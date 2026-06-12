@@ -43,6 +43,12 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+class KubernetesList(Protocol):
+    """Subset of Kubernetes list responses used by executor list helpers."""
+
+    items: Sequence[object]
+
+
 class KubernetesClient(Protocol):
     """Subset of Kubernetes CoreV1Api used by the executor."""
 
@@ -55,7 +61,9 @@ class KubernetesClient(Protocol):
     def delete_namespaced_secret(self, name: str, namespace: str) -> object:
         """Delete a Kubernetes Secret from the selected namespace."""
 
-    def list_namespaced_secret(self, namespace: str, label_selector: str) -> object:
+    def list_namespaced_secret(
+        self, namespace: str, label_selector: str
+    ) -> KubernetesList:
         """List Kubernetes Secrets in the selected namespace."""
 
     def delete_namespaced_pod(
@@ -63,7 +71,9 @@ class KubernetesClient(Protocol):
     ) -> object:
         """Delete a Kubernetes Pod in the selected namespace."""
 
-    def list_namespaced_pod(self, namespace: str, label_selector: str) -> object:
+    def list_namespaced_pod(
+        self, namespace: str, label_selector: str
+    ) -> KubernetesList:
         """List Kubernetes Pods in the selected namespace."""
 
 
@@ -526,7 +536,7 @@ def _label_selector(labels: dict[str, str]) -> str:
     return ",".join(f"{key}={value}" for key, value in sorted(labels.items()))
 
 
-def _pod_items(pod_list: object) -> list[object]:
+def _pod_items(pod_list: KubernetesList | Mapping[str, object]) -> list[object]:
     """Return Pod items from a Kubernetes list response."""
     items = _object_field(pod_list, "items")
     if isinstance(items, Sequence) and not isinstance(items, str):
@@ -534,7 +544,7 @@ def _pod_items(pod_list: object) -> list[object]:
     return []
 
 
-def _secret_items(secret_list: object) -> list[object]:
+def _secret_items(secret_list: KubernetesList | Mapping[str, object]) -> list[object]:
     """Return Secret items from a Kubernetes list response."""
     items = _object_field(secret_list, "items")
     if isinstance(items, Sequence) and not isinstance(items, str):
