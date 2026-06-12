@@ -194,8 +194,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 return None
 
             # Insert message
-            columns = ", ".join([f":{key}" for key in data[0]])
-            query = f"INSERT INTO message_ins VALUES({columns})"
+            columns = ", ".join(data[0])
+            values = ", ".join([f":{key}" for key in data[0]])
+            query = f"INSERT INTO message_ins ({columns}) VALUES({values})"
 
             # Only invalid run_id can trigger IntegrityError.
             # This may need to be changed in the future version
@@ -430,8 +431,9 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
                 msg_dict, ["run_id", "src_node_id", "dst_node_id"]
             )
 
-            columns = ", ".join([f":{key}" for key in msg_dict])
-            query = f"INSERT INTO message_res VALUES({columns})"
+            columns = ", ".join(msg_dict)
+            values = ", ".join([f":{key}" for key in msg_dict])
+            query = f"INSERT INTO message_res ({columns}) VALUES({values})"
 
             try:
                 self.query(query, msg_dict)

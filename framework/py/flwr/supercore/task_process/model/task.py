@@ -28,6 +28,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
+from flwr.supercore.message_utils import assign_message_id
 from flwr.supercore.model_message import ModelRequest, ModelResponse
 from flwr.supercore.typing import JSONObject
 from flwr.supercore.utils import strict_json_dumps
@@ -53,7 +54,7 @@ def handle_task(stub: ServerAppIoStub, task_id: int, run_id: int) -> None:
         )
         message.metadata.__dict__["_run_id"] = run_id
         message.metadata.src_task_id = task_id
-        message.metadata.__dict__["_message_id"] = message.object_id
+        assign_message_id(message)
         stub.PushTaskMessage(PushTaskMessageRequest(message=message_to_proto(message)))
 
     # Stream events are exposed through Control.StreamRunEvents.

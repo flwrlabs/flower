@@ -370,8 +370,11 @@ class TestFleetServicer(unittest.TestCase):  # pylint: disable=R0902, R0904
         msg_proto = create_res_message(
             src_node_id=node_id, dst_node_id=SUPERLINK_NODE_ID, run_id=run_id
         )
+        message = message_from_proto(msg_proto)
         request = PushMessagesRequest(
-            node=Node(node_id=node_id), messages_list=[msg_proto]
+            node=Node(node_id=node_id),
+            messages_list=[msg_proto],
+            message_object_trees=[get_object_tree(message)],
         )
 
         with self.assertRaises(grpc.RpcError) as e:

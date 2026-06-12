@@ -70,6 +70,7 @@ from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
+from flwr.supercore.message_utils import assign_message_id, set_message_id
 from flwr.supercore.run import Run
 from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
@@ -251,9 +252,9 @@ def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
             return_type=Message,
         )
 
-        # Set the message ID
-        # The deflated message doesn't contain the message_id (its own object_id)
-        message.metadata.__dict__["_message_id"] = object_tree.object_id
+        # Restore the logical message ID from metadata. The deflated message object
+        # deliberately excludes its own message_id.
+        set_message_id(message, pull_msg_res.messages_list[0].metadata.message_id)
         return message, context, run, fab
     except grpc.RpcError as e:
         log(ERROR, "[PullTaskInput] gRPC error occurred: %s", str(e))
@@ -263,7 +264,7 @@ def pull_task_input(stub: ClientAppIoStub) -> tuple[Message, Context, Run, Fab]:
 def push_message(stub: ClientAppIoStub, message: Message, context: Context) -> None:
     """Push reply message to SuperNode."""
     # Set message ID
-    message.metadata.__dict__["_message_id"] = message.object_id
+    assign_message_id(message)
     proto_message = message_to_proto(remove_content_from_message(message))
 
     with no_object_id_recompute():

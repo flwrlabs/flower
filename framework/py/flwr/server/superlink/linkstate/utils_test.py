@@ -26,6 +26,7 @@ from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.common.serde import message_from_proto
 from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.linkstate.utils import dict_to_message, message_to_dict
+from flwr.supercore.message_utils import get_message_object_id, set_message_object_id
 
 from .utils import (
     build_params,
@@ -105,9 +106,12 @@ class UtilsTest(unittest.TestCase):
         if has_error:
             msg.__dict__["_content"] = None
             msg.__dict__["_error"] = Error(0)
+        msg.metadata.__dict__["_message_id"] = "logical-message-id"
+        set_message_object_id(msg, "stored-object-id")
 
         expected_keys = [
             "message_id",
+            "object_id",
             "group_id",
             "run_id",
             "src_node_id",
@@ -127,6 +131,8 @@ class UtilsTest(unittest.TestCase):
         # Assert
         for key in expected_keys:
             assert key in result
+        assert result["message_id"] == "logical-message-id"
+        assert result["object_id"] == "stored-object-id"
 
         # Execute
         res_msg = dict_to_message(result)
@@ -137,6 +143,7 @@ class UtilsTest(unittest.TestCase):
         else:
             assert res_msg.content == msg.content
         assert res_msg.metadata == msg.metadata
+        assert get_message_object_id(res_msg) == "stored-object-id"
 
     @parameterized.expand(  # type: ignore
         [

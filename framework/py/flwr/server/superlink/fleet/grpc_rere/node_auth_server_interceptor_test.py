@@ -36,6 +36,7 @@ from flwr.common.constant import (
     TIMESTAMP_HEADER,
     TIMESTAMP_TOLERANCE,
 )
+from flwr.common.serde import message_to_proto
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -65,10 +66,11 @@ from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 from flwr.server.app import _run_fleet_api_grpc_rere
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
-from flwr.server.superlink.linkstate.linkstate_test import create_res_message
+from flwr.server.superlink.linkstate.linkstate_test import create_res_message_obj
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
 from flwr.supercore.date import now
 from flwr.supercore.fab import Fab
+from flwr.supercore.inflatable.inflatable_object import get_object_tree
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import (
     generate_key_pairs,
@@ -269,10 +271,14 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
         """Test PushMessages."""
         node_id = self._create_node_in_linkstate()
         run_id = self._create_dummy_run()
-        msg_proto = create_res_message(
+        msg = create_res_message_obj(
             src_node_id=node_id, dst_node_id=SUPERLINK_NODE_ID, run_id=run_id
         )
-        req = PushMessagesRequest(node=Node(node_id=node_id), messages_list=[msg_proto])
+        req = PushMessagesRequest(
+            node=Node(node_id=node_id),
+            messages_list=[message_to_proto(msg)],
+            message_object_trees=[get_object_tree(msg)],
+        )
         return self._push_messages.with_call(request=req, metadata=metadata)
 
     def _test_pull_object(self, metadata: list[Any]) -> Any:

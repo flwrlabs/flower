@@ -30,6 +30,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     get_object_tree,
     no_object_id_recompute,
 )
+from flwr.supercore.message_utils import assign_message_id, set_message_object_id
 from flwr.supercore.object_store import ObjectStore
 from flwr.supercore.run import Run
 
@@ -183,8 +184,8 @@ class InMemoryNodeState(
 
                 # Insert objects of the error reply into the object store
                 with no_object_id_recompute():
-                    # pylint: disable-next=W0212
-                    error_reply.metadata._message_id = error_reply.object_id  # type: ignore
+                    assign_message_id(error_reply)
+                    set_message_object_id(error_reply, error_reply.object_id)
                     object_tree = get_object_tree(error_reply)
                     self.object_store.preregister(msg.metadata.run_id, object_tree)
                     for obj_id, obj in get_all_nested_objects(error_reply).items():

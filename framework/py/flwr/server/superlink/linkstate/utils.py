@@ -32,6 +32,11 @@ from flwr.supercore.corestate.utils import (
     generate_rand_int_from_bytes as corestate_generate_rand_int_from_bytes,
 )
 from flwr.supercore.date import now
+from flwr.supercore.message_utils import (
+    assign_message_id,
+    get_message_object_id,
+    set_message_object_id,
+)
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 # pylint: enable=E0611
@@ -158,7 +163,8 @@ def create_message_error_unavailable_res_message(
             ),
         ),
     )
-    msg.metadata.__dict__["_message_id"] = msg.object_id
+    assign_message_id(msg)
+    set_message_object_id(msg, msg.object_id)
     return msg
 
 
@@ -184,7 +190,8 @@ def create_message_error_unavailable_ins_message(reply_to_message_id: str) -> Me
             reason=MESSAGE_UNAVAILABLE_ERROR_REASON,
         ),
     )
-    msg.metadata.__dict__["_message_id"] = msg.object_id
+    assign_message_id(msg)
+    set_message_object_id(msg, msg.object_id)
     return msg
 
 
@@ -333,6 +340,7 @@ def message_to_dict(message: Message) -> dict[str, Any]:
     """Transform Message to dict."""
     result = {
         "message_id": message.metadata.message_id,
+        "object_id": get_message_object_id(message),
         "group_id": message.metadata.group_id,
         "run_id": message.metadata.run_id,
         "src_node_id": message.metadata.src_node_id,
@@ -356,6 +364,7 @@ def message_to_dict(message: Message) -> dict[str, Any]:
 
 def dict_to_message(message_dict: dict[str, Any]) -> Message:
     """Transform dict to Message."""
+    object_id = message_dict.pop("object_id", None)
     content, error = None, None
     if (b_content := message_dict.pop("content", None)) is not None:
         content = recorddict_from_proto(ProtoRecordDict.FromString(b_content))
@@ -368,4 +377,6 @@ def dict_to_message(message_dict: dict[str, Any]) -> Message:
     )
     msg = make_message(metadata=metadata, content=content, error=error)
     msg.metadata.delivered_at = message_dict.get("delivered_at", "")
+    if object_id is not None:
+        set_message_object_id(msg, object_id)
     return msg

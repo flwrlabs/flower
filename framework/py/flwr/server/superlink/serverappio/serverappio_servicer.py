@@ -70,6 +70,7 @@ from flwr.supercore.inflatable.inflatable_object import (
     no_object_id_recompute,
 )
 from flwr.supercore.interceptors import get_authenticated_task
+from flwr.supercore.message_utils import get_message_object_id, set_message_object_id
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
 from flwr.supercore.servicers import AppIoServicer
 
@@ -146,6 +147,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             # Store objects
             message_objects_to_push = set(store.preregister(run_id, object_tree))
             # Store message
+            set_message_object_id(message, object_tree.object_id)
             message_id: str | None = state.store_message_ins(message=message)
             # This is temporary. We should consider a more robust cleanup
             # mechanism that protects duplicate messages from premature deletion.
@@ -216,7 +218,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
                 )
 
             try:
-                msg_object_id = msg.metadata.message_id
+                msg_object_id = get_message_object_id(msg)
                 obj_tree = store.get_object_tree(msg_object_id)
                 # Add message and object tree to the response
                 messages_list.append(message_to_proto(msg))
@@ -224,7 +226,7 @@ class ServerAppIoServicer(AppIoServicer, serverappio_pb2_grpc.ServerAppIoService
             except NoObjectInStoreError as e:
                 log(ERROR, e.message)
                 # Delete message ins from state
-                state.delete_messages(message_ins_ids={msg_object_id})
+                state.delete_messages(message_ins_ids={msg.metadata.message_id})
 
         return PullAppMessagesResponse(
             messages_list=messages_list, message_object_trees=trees

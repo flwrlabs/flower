@@ -28,6 +28,7 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.date import now
+from flwr.supercore.message_utils import set_message_object_id
 from flwr.supercore.run import RunStatus
 
 from .message_handler import pull_messages, push_messages
@@ -70,6 +71,7 @@ def test_pull_messages_records_traffic_when_messages_found() -> None:
             message_type="query",
         ),
     )
+    set_message_object_id(msg, "object-234")
     request = PullMessagesRequest(node=Node(node_id=2345))
     state = MagicMock()
     state.get_message_ins.return_value = [msg]
@@ -81,7 +83,7 @@ def test_pull_messages_records_traffic_when_messages_found() -> None:
 
     # Assert
     state.get_message_ins.assert_called_once()
-    store.get_object_tree.assert_called_once_with("msg-234")
+    store.get_object_tree.assert_called_once_with("object-234")
     state.store_traffic.assert_called_once()
     # Verify store_traffic was called with run_id=123, bytes_sent > 0, bytes_recv=0
     call_args = state.store_traffic.call_args
@@ -108,9 +110,14 @@ def test_push_messages() -> None:
         ),
     )
 
-    request = PushMessagesRequest(messages_list=[message_to_proto(msg)])
+    object_tree = ObjectTree(object_id="object-id")
+    request = PushMessagesRequest(
+        messages_list=[message_to_proto(msg)],
+        message_object_trees=[object_tree],
+    )
     state = MagicMock()
     store = MagicMock()
+    store.preregister.return_value = []
 
     # Execute
     push_messages(request=request, state=state, store=store)
