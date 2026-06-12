@@ -66,6 +66,7 @@ def test_flwr_model_forwards_cli_args() -> None:
         insecure=True,
         serverappio_api_address="127.0.0.1:9091",
         token="test-token",
+        root_certificates=None,
         parent_pid=321,
         runtime_dependency_install=True,
     )
@@ -87,5 +88,6 @@ def test_flwr_model_forwards_cli_args() -> None:
     kwargs = run_model.call_args.kwargs
     assert kwargs["serverappio_api_address"] == "127.0.0.1:9091"
     assert kwargs["token"] == "test-token"
+    assert kwargs["insecure"] is True
     assert kwargs["certificates"] is None
     assert kwargs["parent_pid"] == 321

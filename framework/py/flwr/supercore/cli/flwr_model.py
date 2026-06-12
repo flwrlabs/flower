@@ -20,21 +20,14 @@ from logging import DEBUG, INFO
 
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.constant import SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS
-from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log, restore_output
 from flwr.supercore.task_process import run_model
+from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 
 def flwr_model() -> None:
     """Run process-isolated Flower model task."""
     args = _parse_args_run_flwr_model().parse_args()
-
-    if not args.insecure:
-        flwr_exit(
-            ExitCode.COMMON_TLS_NOT_SUPPORTED,
-            "`flwr-model` does not support TLS yet.",
-        )
-
     token = try_obtain_flwr_app_token(args)
 
     log(INFO, "Start `flwr-model` process")
@@ -46,7 +39,10 @@ def flwr_model() -> None:
     run_model(
         serverappio_api_address=args.serverappio_api_address,
         token=token,
-        certificates=None,
+        insecure=args.insecure,
+        certificates=validate_and_resolve_root_certificates(
+            args.root_certificates, args.insecure
+        ),
         parent_pid=args.parent_pid,
     )
 
