@@ -14,7 +14,6 @@
 # ==============================================================================
 """Tests for SuperExec Kubernetes executor."""
 
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 from unittest.mock import Mock, call
@@ -32,6 +31,7 @@ from .kubernetes_executor import (
     CompletedPodSweeper,
     KubernetesExecutor,
     KubernetesExecutorConfig,
+    _COMPLETED_POD_SWEEP_INTERVAL_SECONDS,
     _build_appio_credentials_secret,
     _build_taskexecutor_pod,
     _get_appio_root_certificates,
@@ -108,7 +108,6 @@ def _pod(
     *,
     name: str = _POD_NAME,
     labels: dict[str, str] | None = None,
-    finished_at: str | None = None,
 ) -> dict[str, Any]:
     metadata: dict[str, Any] = {"name": name}
     if deletion_timestamp is not None:
@@ -117,10 +116,6 @@ def _pod(
         metadata["labels"] = labels
 
     status: dict[str, Any] = {"phase": phase}
-    if finished_at is not None:
-        status["containerStatuses"] = [
-            {"state": {"terminated": {"finishedAt": finished_at}}}
-        ]
     return {"metadata": metadata, "status": status}
 
 
@@ -508,16 +503,14 @@ def test_config_rejects_invalid_capacity_log_interval() -> None:
         _executor_config(capacity_log_interval=0)
 
 
-def test_config_rejects_negative_completed_pod_retention() -> None:
-    """Test completed Pod retention must not be negative."""
-    with pytest.raises(ValueError, match="Completed Pod retention"):
-        _executor_config(completed_pod_retention_seconds=-1)
-
-
 def test_wait_for_capacity_returns_below_budget_without_sleeping() -> None:
     """Test capacity wait returns immediately when the active Pod count fits."""
     client = Mock()
-    client.list_namespaced_pod.return_value = {"items": [_pod("Running")]}
+    client.list_namespaced_pod.side_effect = [
+        {"items": []},
+        {"items": [_pod("Running")]},
+    ]
+    client.list_namespaced_secret.return_value = {"items": []}
     sleep = Mock()
     config = _executor_config(
         labels={"flower.ai/team": "platform"},
@@ -529,15 +522,8 @@ def test_wait_for_capacity_returns_below_budget_without_sleeping() -> None:
 
     KubernetesExecutor(client=client, config=config).wait_for_capacity()
 
-    client.list_namespaced_pod.assert_called_once_with(
-        "flower-system",
-        label_selector=(
-            "app.kubernetes.io/component=taskexecutor,"
-            "app.kubernetes.io/name=flower,"
-            "flower.ai/resource-pool=gpu-pool,"
-            "flower.ai/team=platform"
-        ),
-    )
+    assert client.list_namespaced_pod.call_count == 2
+    client.list_namespaced_secret.assert_called_once()
     sleep.assert_not_called()
 
 
@@ -545,9 +531,11 @@ def test_wait_for_capacity_sleeps_and_polls_again_at_budget() -> None:
     """Test capacity wait sleeps when the active Pod count reaches the budget."""
     client = Mock()
     client.list_namespaced_pod.side_effect = [
+        {"items": []},
         {"items": [_pod("Pending")]},
         {"items": []},
     ]
+    client.list_namespaced_secret.return_value = {"items": []}
     sleep = Mock()
     config = _executor_config(
         resource_pool="gpu-pool",
@@ -558,7 +546,7 @@ def test_wait_for_capacity_sleeps_and_polls_again_at_budget() -> None:
 
     KubernetesExecutor(client=client, config=config).wait_for_capacity()
 
-    assert client.list_namespaced_pod.call_count == 2
+    assert client.list_namespaced_pod.call_count == 3
     sleep.assert_called_once_with(3.0)
 
 
@@ -566,6 +554,7 @@ def test_wait_for_capacity_counts_pending_running_and_terminating_pods() -> None
     """Test active Pod counting includes phase-active and terminating Pods."""
     client = Mock()
     client.list_namespaced_pod.side_effect = [
+        {"items": []},
         {
             "items": [
                 _pod("Pending"),
@@ -576,6 +565,7 @@ def test_wait_for_capacity_counts_pending_running_and_terminating_pods() -> None
         },
         {"items": []},
     ]
+    client.list_namespaced_secret.return_value = {"items": []}
     sleep = Mock()
     config = _executor_config(
         resource_pool="gpu-pool",
@@ -591,9 +581,11 @@ def test_wait_for_capacity_counts_pending_running_and_terminating_pods() -> None
 def test_wait_for_capacity_ignores_terminal_pods_not_terminating() -> None:
     """Test Succeeded and Failed Pods do not count when they are not terminating."""
     client = Mock()
-    client.list_namespaced_pod.return_value = {
-        "items": [_pod("Succeeded"), _pod("Failed")]
-    }
+    client.list_namespaced_pod.side_effect = [
+        {"items": []},
+        {"items": [_pod("Succeeded"), _pod("Failed")]},
+    ]
+    client.list_namespaced_secret.return_value = {"items": []}
     sleep = Mock()
     config = _executor_config(
         resource_pool="gpu-pool",
@@ -604,6 +596,50 @@ def test_wait_for_capacity_ignores_terminal_pods_not_terminating() -> None:
     KubernetesExecutor(client=client, config=config).wait_for_capacity()
 
     sleep.assert_not_called()
+
+
+def test_wait_for_capacity_sweeps_terminal_pods_before_capacity_check() -> None:
+    """Test capacity wait runs completed Pod cleanup opportunistically."""
+    client = Mock()
+    labels = _task_labels(123)
+    client.list_namespaced_pod.side_effect = [
+        {"items": [_pod("Succeeded", labels=labels)]},
+        {"items": []},
+    ]
+    client.list_namespaced_secret.return_value = {
+        "items": [_secret(_SECRET_NAME, labels)]
+    }
+    config = _executor_config(resource_pool="gpu-pool", active_pod_budget=1)
+
+    KubernetesExecutor(client=client, config=config).wait_for_capacity()
+
+    client.delete_namespaced_pod.assert_called_once_with(
+        name=_POD_NAME,
+        namespace="flower-system",
+        grace_period_seconds=0,
+    )
+    client.delete_namespaced_secret.assert_called_once_with(
+        name=_SECRET_NAME, namespace="flower-system"
+    )
+
+
+def test_wait_for_capacity_throttles_completed_pod_sweeps() -> None:
+    """Test capacity wait does not sweep more often than the internal interval."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+    client.list_namespaced_secret.return_value = {"items": []}
+    config = _executor_config(
+        resource_pool="gpu-pool",
+        active_pod_budget=1,
+        monotonic=Mock(side_effect=[0.0, _COMPLETED_POD_SWEEP_INTERVAL_SECONDS - 1.0]),
+    )
+    executor = KubernetesExecutor(client=client, config=config)
+
+    executor.wait_for_capacity()
+    executor.wait_for_capacity()
+
+    assert client.list_namespaced_pod.call_count == 3
+    client.list_namespaced_secret.assert_called_once()
 
 
 @pytest.mark.parametrize("phase", ["Succeeded", "Failed"])
@@ -666,47 +702,8 @@ def test_sweeper_keeps_pending_and_running_pods_and_secrets() -> None:
     client.delete_namespaced_secret.assert_not_called()
 
 
-@pytest.mark.parametrize(
-    ("finished_at", "expect_deleted"),
-    [
-        ("2026-05-27T18:59:30Z", False),
-        ("2026-05-27T18:58:00Z", True),
-    ],
-)
-def test_sweeper_respects_completed_pod_retention_window(
-    finished_at: str, expect_deleted: bool
-) -> None:
-    """Test cleanup honors the configured completed Pod retention window."""
-    client = Mock()
-    client.list_namespaced_pod.return_value = {
-        "items": [
-            _pod(
-                "Succeeded",
-                labels=_task_labels(123),
-                finished_at=finished_at,
-            )
-        ]
-    }
-    client.list_namespaced_secret.return_value = {
-        "items": [_secret(_SECRET_NAME, _task_labels(123))]
-    }
-    config = _executor_config(
-        completed_pod_retention_seconds=60.0,
-        now=lambda: datetime(2026, 5, 27, 19, 0, 0, tzinfo=UTC),
-    )
-
-    CompletedPodSweeper(client=client, config=config).sweep()
-
-    if expect_deleted:
-        client.delete_namespaced_pod.assert_called_once()
-        client.delete_namespaced_secret.assert_called_once()
-    else:
-        client.delete_namespaced_pod.assert_not_called()
-        client.delete_namespaced_secret.assert_not_called()
-
-
-def test_sweeper_deletes_orphaned_per_task_secret() -> None:
-    """Test cleanup deletes a labeled per-task Secret when its Pod is gone."""
+def test_sweeper_deletes_orphaned_credential_secret() -> None:
+    """Test cleanup deletes a credential Secret when its Pod is gone."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     client.list_namespaced_secret.return_value = {
@@ -721,11 +718,14 @@ def test_sweeper_deletes_orphaned_per_task_secret() -> None:
     )
 
 
-def test_sweeper_deletes_all_matching_secrets_for_terminal_pod() -> None:
-    """Test cleanup deletes all labeled Secrets for a swept terminal Pod."""
+def test_sweeper_keeps_active_retry_secret_for_same_task() -> None:
+    """Test cleanup keeps the Secret for a newer active retry of the same task."""
     client = Mock()
     client.list_namespaced_pod.return_value = {
-        "items": [_pod("Succeeded", labels=_task_labels(123))]
+        "items": [
+            _pod("Succeeded", name=_POD_NAME, labels=_task_labels(123)),
+            _pod("Running", name=_NEXT_POD_NAME, labels=_task_labels(123)),
+        ]
     }
     client.list_namespaced_secret.return_value = {
         "items": [
@@ -738,12 +738,11 @@ def test_sweeper_deletes_all_matching_secrets_for_terminal_pod() -> None:
 
     assert client.delete_namespaced_secret.mock_calls == [
         call(name=_SECRET_NAME, namespace="flower-system"),
-        call(name=_NEXT_SECRET_NAME, namespace="flower-system"),
     ]
 
 
-def test_sweeper_keeps_secret_without_taskexecutor_task_label() -> None:
-    """Test cleanup does not delete Secrets missing the task ownership label."""
+def test_sweeper_keeps_secret_without_credential_secret_name() -> None:
+    """Test cleanup does not delete Secrets without the credential name suffix."""
     client = Mock()
     client.list_namespaced_pod.return_value = {"items": []}
     client.list_namespaced_secret.return_value = {

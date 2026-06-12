@@ -17,7 +17,6 @@
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from logging import INFO, WARNING
 from pathlib import Path
 from typing import Protocol, cast
@@ -36,11 +35,8 @@ APPIO_CREDENTIALS_MOUNT_PATH = "/run/flwr/appio"
 APPIO_TOKEN_FILE_PATH = f"{APPIO_CREDENTIALS_MOUNT_PATH}/token"
 APPIO_ROOT_CERTIFICATES_FILE_PATH = f"{APPIO_CREDENTIALS_MOUNT_PATH}/ca.crt"
 LAUNCH_ATTEMPT_LABEL = "flower.ai/launch-attempt"
-
-
-def _utcnow() -> datetime:
-    """Return the current UTC time."""
-    return datetime.now(UTC)
+_APPIO_CREDENTIAL_SECRET_SUFFIX = "-appio"
+_COMPLETED_POD_SWEEP_INTERVAL_SECONDS = 60.0
 
 
 class KubernetesList(Protocol):
@@ -135,12 +131,10 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
     # Optional Pod field only; service account policy/RBAC is decided elsewhere.
     service_account_name: str | None = None
     active_pod_budget: int | None = None
-    completed_pod_retention_seconds: float = 0.0
     capacity_poll_interval: float = 1.0
     capacity_log_interval: float | None = None
     sleep: Callable[[float], None] = time.sleep
     monotonic: Callable[[], float] = time.monotonic
-    now: Callable[[], datetime] = _utcnow
 
     def __post_init__(self) -> None:
         """Validate required object-building inputs."""
@@ -166,8 +160,6 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
             raise ValueError("Capacity poll interval must be positive.")
         if self.capacity_log_interval is not None and self.capacity_log_interval <= 0:
             raise ValueError("Capacity log interval must be positive.")
-        if self.completed_pod_retention_seconds < 0:
-            raise ValueError("Completed Pod retention must not be negative.")
 
 
 class KubernetesExecutor:
@@ -181,9 +173,12 @@ class KubernetesExecutor:
     ) -> None:
         self._client = client
         self._config = config
+        self._completed_pod_sweeper = CompletedPodSweeper(client=client, config=config)
+        self._last_completed_pod_sweep_at: float | None = None
 
     def wait_for_capacity(self) -> None:
         """Wait until the configured resource pool is below its active Pod budget."""
+        self._sweep_completed_pods_if_due()
         if self._config.active_pod_budget is None:
             return
 
@@ -220,6 +215,27 @@ class KubernetesExecutor:
                     last_log_at = now
 
             self._config.sleep(self._config.capacity_poll_interval)
+
+    def _sweep_completed_pods_if_due(self) -> None:
+        """Run best-effort completed Pod cleanup if the internal throttle allows it."""
+        now = self._config.monotonic()
+        if (
+            self._last_completed_pod_sweep_at is not None
+            and now - self._last_completed_pod_sweep_at
+            < _COMPLETED_POD_SWEEP_INTERVAL_SECONDS
+        ):
+            return
+
+        self._last_completed_pod_sweep_at = now
+        try:
+            self._completed_pod_sweeper.sweep()
+        except Exception:  # pylint: disable=broad-exception-caught
+            log(
+                WARNING,
+                "Kubernetes completed Pod sweep failed; proceeding. selector=%s",
+                _taskexecutor_pool_label_selector(self._config),
+                exc_info=True,
+            )
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Submit the TaskExecutor Pod and credential Secret."""
@@ -271,7 +287,7 @@ class CompletedPodSweeper:
         self._config = config
 
     def sweep(self) -> None:
-        """Delete eligible terminal Pods and orphaned per-task Secrets."""
+        """Delete terminal Pods and orphaned credential Secrets."""
         selector = _taskexecutor_pool_label_selector(self._config)
         pods = _pod_items(
             self._client.list_namespaced_pod(
@@ -283,31 +299,26 @@ class CompletedPodSweeper:
                 self._config.namespace, label_selector=selector
             )
         )
-        remaining_pod_task_ids: set[str] = set()
-        swept_pod_task_ids: set[str] = set()
+        pod_names = {name for pod in pods if (name := _object_name(pod)) is not None}
 
         for pod in pods:
-            task_id = _object_task_id(pod)
-            if task_id is None:
+            pod_name = _object_name(pod)
+            if pod_name is None or not _is_terminal_pod(pod):
                 continue
-            if _is_eligible_terminal_pod(pod, self._config):
-                self._delete_pod(pod)
-                swept_pod_task_ids.add(task_id)
-            else:
-                remaining_pod_task_ids.add(task_id)
+            self._delete_pod(pod_name)
+            self._delete_secret(_credential_secret_name_from_pod_name(pod_name))
 
         for secret in secrets:
-            task_id = _object_task_id(secret)
-            if task_id is None:
+            secret_name = _object_name(secret)
+            if secret_name is None:
                 continue
-            if task_id in swept_pod_task_ids or task_id not in remaining_pod_task_ids:
-                self._delete_secret(secret)
+            pod_name = _pod_name_from_credential_secret_name(secret_name)
+            if pod_name is None or pod_name in pod_names:
+                continue
+            self._delete_secret(secret_name)
 
-    def _delete_pod(self, pod: object) -> None:
+    def _delete_pod(self, name: str) -> None:
         """Delete a Pod, tolerating already-deleted objects."""
-        name = _object_name(pod)
-        if name is None:
-            return
         try:
             self._client.delete_namespaced_pod(
                 name=name,
@@ -317,11 +328,8 @@ class CompletedPodSweeper:
         except Exception as exc:  # pylint: disable=broad-exception-caught
             _raise_unless_not_found(exc)
 
-    def _delete_secret(self, secret: object) -> None:
+    def _delete_secret(self, name: str) -> None:
         """Delete a Secret, tolerating already-deleted objects."""
-        name = _object_name(secret)
-        if name is None:
-            return
         try:
             self._client.delete_namespaced_secret(
                 name=name, namespace=self._config.namespace
@@ -470,7 +478,22 @@ def _pod_name(spec: ExecutionSpec, launch_attempt_id: str) -> str:
 
 def _credential_secret_name(spec: ExecutionSpec, launch_attempt_id: str) -> str:
     """Return the AppIo credential Secret name."""
-    return f"{_pod_name(spec, launch_attempt_id)}-appio"
+    return _credential_secret_name_from_pod_name(_pod_name(spec, launch_attempt_id))
+
+
+def _credential_secret_name_from_pod_name(pod_name: str) -> str:
+    """Return the AppIo credential Secret name for a TaskExecutor Pod name."""
+    return f"{pod_name}{_APPIO_CREDENTIAL_SECRET_SUFFIX}"
+
+
+def _pod_name_from_credential_secret_name(secret_name: str) -> str | None:
+    """Return the owner Pod name encoded in a credential Secret name."""
+    if not secret_name.endswith(_APPIO_CREDENTIAL_SECRET_SUFFIX):
+        return None
+    pod_name = secret_name[: -len(_APPIO_CREDENTIAL_SECRET_SUFFIX)]
+    if not pod_name:
+        return None
+    return pod_name
 
 
 def _metadata(
@@ -565,75 +588,10 @@ def _is_active_pod(pod: object) -> bool:
     return _object_field(status, "phase") not in {"Succeeded", "Failed"}
 
 
-def _is_eligible_terminal_pod(pod: object, config: KubernetesExecutorConfig) -> bool:
-    """Return true if a terminal Pod is old enough for cleanup."""
+def _is_terminal_pod(pod: object) -> bool:
+    """Return true if a Pod reached a terminal phase."""
     status = _object_field(pod, "status")
-    if _object_field(status, "phase") not in {"Succeeded", "Failed"}:
-        return False
-
-    if config.completed_pod_retention_seconds == 0:
-        return True
-
-    terminal_time = _terminal_time(pod)
-    if terminal_time is None:
-        # Without a termination timestamp, a configured retention window cannot
-        # be evaluated safely, so keep the Pod for a later sweep.
-        return False
-
-    elapsed = _as_utc(config.now()) - terminal_time
-    return elapsed.total_seconds() >= config.completed_pod_retention_seconds
-
-
-def _terminal_time(pod: object) -> datetime | None:
-    """Return the latest container termination time for a Pod."""
-    status = _object_field(pod, "status")
-    container_statuses = _object_field(status, "container_statuses")
-    if container_statuses is None:
-        container_statuses = _object_field(status, "containerStatuses")
-    if not isinstance(container_statuses, Sequence) or isinstance(
-        container_statuses, str
-    ):
-        return None
-
-    terminal_times = []
-    for container_status in container_statuses:
-        state = _object_field(container_status, "state")
-        terminated = _object_field(state, "terminated")
-        if terminated is None:
-            continue
-        finished_at = _object_field(terminated, "finished_at")
-        if finished_at is None:
-            finished_at = _object_field(terminated, "finishedAt")
-        terminal_time = _parse_datetime(finished_at)
-        if terminal_time is not None:
-            terminal_times.append(terminal_time)
-    if not terminal_times:
-        return None
-    return max(terminal_times)
-
-
-def _parse_datetime(value: object) -> datetime | None:
-    """Parse Kubernetes timestamp values."""
-    if isinstance(value, datetime):
-        return _as_utc(value)
-    if not isinstance(value, str):
-        return None
-    timestamp = value.strip()
-    if not timestamp:
-        return None
-    if timestamp.endswith("Z"):
-        timestamp = f"{timestamp[:-1]}+00:00"
-    try:
-        return _as_utc(datetime.fromisoformat(timestamp))
-    except ValueError:
-        return None
-
-
-def _as_utc(value: datetime) -> datetime:
-    """Return a timezone-aware UTC datetime."""
-    if value.tzinfo is None:
-        return value.replace(tzinfo=UTC)
-    return value.astimezone(UTC)
+    return _object_field(status, "phase") in {"Succeeded", "Failed"}
 
 
 def _object_name(value: object) -> str | None:
@@ -642,18 +600,6 @@ def _object_name(value: object) -> str | None:
     name = _object_field(metadata, "name")
     if isinstance(name, str) and name.strip():
         return name
-    return None
-
-
-def _object_task_id(value: object) -> str | None:
-    """Return an object's stable TaskExecutor task-id label."""
-    metadata = _object_field(value, "metadata")
-    labels = _object_field(metadata, "labels")
-    if not isinstance(labels, dict):
-        return None
-    task_id = labels.get("flower.ai/superexec-task-id")
-    if isinstance(task_id, str) and task_id.strip():
-        return task_id
     return None
 
 
