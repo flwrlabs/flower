@@ -85,7 +85,7 @@ def invoke_web_fetch_provider(url: str) -> JSONObject:
         response.close()
 
     try:
-        import trafilatura
+        import trafilatura  # pylint: disable=import-outside-toplevel
     except ImportError as exc:
         raise WebFetchProviderError(
             code="missing_dependency",

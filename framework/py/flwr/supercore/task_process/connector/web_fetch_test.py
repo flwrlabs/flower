@@ -29,7 +29,7 @@ trafilatura = pytest.importorskip("trafilatura")
 
 
 @dataclass
-class _Response:
+class _Response:  # pylint: disable=too-many-instance-attributes
     status_code: int = 200
     url: str = "https://example.com/final"
     headers: dict[str, str] = field(
