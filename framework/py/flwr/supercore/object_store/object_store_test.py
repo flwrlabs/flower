@@ -23,7 +23,7 @@ from abc import abstractmethod
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, cast
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from parameterized import parameterized
 from sqlalchemy import Engine, inspect
@@ -418,6 +418,39 @@ class SqlInMemoryObjectStoreTest(ObjectStoreTest):
                     children=[ObjectTree(object_id=child_id)],
                 ),
             )
+
+    def test_mutation_lock_uses_sql_lock_row(
+        self,
+    ) -> None:
+        """Ensure ObjectStore mutations use a transaction-scoped SQL lock."""
+        store = self.object_store_factory()
+        store.query = Mock()  # type: ignore[method-assign]
+
+        store._lock_objectstore_mutation()  # pylint: disable=protected-access
+
+        store.query.assert_any_call(
+            "INSERT INTO objectstore_locks (lock_id, lock_value) "
+            "VALUES (:lock_id, 0) "
+            "ON CONFLICT (lock_id) DO NOTHING",
+            {"lock_id": store._MUTATION_LOCK_ID},  # pylint: disable=W0212
+        )
+        store.query.assert_any_call(
+            "UPDATE objectstore_locks SET lock_value = lock_value "
+            "WHERE lock_id = :lock_id",
+            {"lock_id": store._MUTATION_LOCK_ID},  # pylint: disable=W0212
+        )
+        self.assertEqual(store.query.call_count, 2)
+
+    def test_mutation_session_locks_once(self) -> None:
+        """Ensure nested mutation sessions reuse the transaction-scoped lock."""
+        store = self.object_store_factory()
+        store.query = Mock()  # type: ignore[method-assign]
+
+        with store._mutation_session():  # pylint: disable=protected-access
+            with store._mutation_session():  # pylint: disable=protected-access
+                pass
+
+        self.assertEqual(store.query.call_count, 2)
 
 
 class SqlFileBasedObjectStoreTest(ObjectStoreTest):

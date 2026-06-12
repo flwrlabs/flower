@@ -90,6 +90,11 @@ erDiagram
     INTEGER ref_count
   }
 
+  objectstore_locks {
+    VARCHAR lock_id PK
+    INTEGER lock_value
+  }
+
   run {
     BIGINT bytes_recv "nullable"
     BIGINT bytes_sent "nullable"
