@@ -13,3 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 """Legacy components previously located in ``flwr.server``."""
+
+from .serverapp_components import ServerAppComponents as ServerAppComponents
+
+__all__ = ["ServerAppComponents"]

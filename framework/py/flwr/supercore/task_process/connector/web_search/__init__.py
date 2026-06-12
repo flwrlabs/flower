@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Custom types for Flower clients."""
-
-
-from collections.abc import Callable
-
-from flwr.app import Context, Message
-
-from .client import Client as Client
-
-# Compatibility
-ClientFn = Callable[[str], Client]
-ClientFnExt = Callable[[Context], Client]
-
-ClientAppCallable = Callable[[Message, Context], Message]
-Mod = Callable[[Message, Context, ClientAppCallable], Message]
+"""Built-in web-search connector."""

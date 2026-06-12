@@ -22,10 +22,12 @@ import pytest
 
 from flwr.supercore.constant import TaskType
 
+from . import kubernetes_executor as kube
 from .kubernetes_executor import (
     APPIO_CREDENTIALS_MOUNT_PATH,
     APPIO_ROOT_CERTIFICATES_FILE_PATH,
     APPIO_TOKEN_FILE_PATH,
+    LAUNCH_ATTEMPT_LABEL,
     KubernetesExecutor,
     KubernetesExecutorConfig,
     _build_appio_credentials_secret,
@@ -33,6 +35,22 @@ from .kubernetes_executor import (
     _get_appio_root_certificates,
 )
 from .types import ExecutionSpec, LaunchResultStatus
+
+
+class _KubernetesApiError(Exception):
+    """Minimal Kubernetes client error used by executor tests."""
+
+    def __init__(self, status: int, reason: str) -> None:
+        super().__init__(reason)
+        self.status = status
+
+
+_LAUNCH_ATTEMPT_ID = "abc123def456"
+_NEXT_LAUNCH_ATTEMPT_ID = "def456abc123"
+_POD_NAME = f"flwr-taskexecutor-123-{_LAUNCH_ATTEMPT_ID}"
+_NEXT_POD_NAME = f"flwr-taskexecutor-123-{_NEXT_LAUNCH_ATTEMPT_ID}"
+_SECRET_NAME = f"{_POD_NAME}-appio"
+_NEXT_SECRET_NAME = f"{_NEXT_POD_NAME}-appio"
 
 
 def _execution_spec(**overrides: Any) -> ExecutionSpec:
@@ -80,7 +98,7 @@ def test_build_appio_credentials_secret_contains_token_and_ca() -> None:
 
     secret = _as_dict(
         _build_appio_credentials_secret(
-            spec, config, _appio_root_certificates(spec, config)
+            spec, config, _appio_root_certificates(spec, config), _LAUNCH_ATTEMPT_ID
         )
     )
 
@@ -88,13 +106,14 @@ def test_build_appio_credentials_secret_contains_token_and_ca() -> None:
         "apiVersion": "v1",
         "kind": "Secret",
         "metadata": {
-            "name": "flwr-taskexecutor-123-appio",
+            "name": _SECRET_NAME,
             "namespace": "flower-system",
             "labels": {
                 "app.kubernetes.io/name": "flower",
                 "app.kubernetes.io/component": "taskexecutor",
                 "flower.ai/superexec-task-id": "123",
                 "flower.ai/task-type": "flwr-serverapp",
+                LAUNCH_ATTEMPT_LABEL: _LAUNCH_ATTEMPT_ID,
             },
         },
         "type": "Opaque",
@@ -108,15 +127,18 @@ def test_build_taskexecutor_pod_uses_secret_files_for_credentials() -> None:
     config = _executor_config()
 
     pod = _as_dict(
-        _build_taskexecutor_pod(spec, config, _appio_root_certificates(spec, config))
+        _build_taskexecutor_pod(
+            spec, config, _appio_root_certificates(spec, config), _LAUNCH_ATTEMPT_ID
+        )
     )
     container = pod["spec"]["containers"][0]
 
     assert APPIO_CREDENTIALS_MOUNT_PATH == "/run/flwr/appio"
-    assert pod["metadata"]["name"] == "flwr-taskexecutor-123"
+    assert pod["metadata"]["name"] == _POD_NAME
     assert pod["metadata"]["namespace"] == "flower-system"
     assert container["image"] == "ghcr.io/flwrlabs/taskexecutor:dev"
     assert container["command"] == ["flwr-serverapp"]
+    assert "env" not in container
     assert container["args"] == [
         "--serverappio-api-address",
         "appio.example.com:9092",
@@ -138,7 +160,7 @@ def test_build_taskexecutor_pod_uses_secret_files_for_credentials() -> None:
         {
             "name": "appio-credentials",
             "secret": {
-                "secretName": "flwr-taskexecutor-123-appio",
+                "secretName": _SECRET_NAME,
                 "defaultMode": 0o444,
             },
         }
@@ -154,6 +176,7 @@ def test_build_taskexecutor_pod_supports_clientapp_insecure_args() -> None:
             _execution_spec(task_type=TaskType.CLIENT_APP, insecure=True),
             _executor_config(appio_root_certificates=None),
             None,
+            _LAUNCH_ATTEMPT_ID,
         )
     )
 
@@ -174,9 +197,15 @@ def test_build_taskexecutor_pod_supports_secure_default_trust_store() -> None:
     appio_root_certificates = _appio_root_certificates(spec, config)
 
     secret = _as_dict(
-        _build_appio_credentials_secret(spec, config, appio_root_certificates)
+        _build_appio_credentials_secret(
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+        )
     )
-    pod = _as_dict(_build_taskexecutor_pod(spec, config, appio_root_certificates))
+    pod = _as_dict(
+        _build_taskexecutor_pod(
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+        )
+    )
 
     assert secret["stringData"] == {"token": "task-token"}
     assert pod["spec"]["containers"][0]["args"] == [
@@ -198,9 +227,15 @@ def test_build_taskexecutor_objects_use_execution_spec_root_certificates(
     appio_root_certificates = _appio_root_certificates(spec, config)
 
     secret = _as_dict(
-        _build_appio_credentials_secret(spec, config, appio_root_certificates)
+        _build_appio_credentials_secret(
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+        )
     )
-    pod = _as_dict(_build_taskexecutor_pod(spec, config, appio_root_certificates))
+    pod = _as_dict(
+        _build_taskexecutor_pod(
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+        )
+    )
 
     assert secret["stringData"] == {"token": "task-token", "ca.crt": "spec-root-ca"}
     assert pod["spec"]["containers"][0]["args"] == [
@@ -225,9 +260,15 @@ def test_build_taskexecutor_objects_expand_user_root_certificates_path(
     appio_root_certificates = _appio_root_certificates(spec, config)
 
     secret = _as_dict(
-        _build_appio_credentials_secret(spec, config, appio_root_certificates)
+        _build_appio_credentials_secret(
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+        )
     )
-    pod = _as_dict(_build_taskexecutor_pod(spec, config, appio_root_certificates))
+    pod = _as_dict(
+        _build_taskexecutor_pod(
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+        )
+    )
 
     assert secret["stringData"] == {"token": "task-token", "ca.crt": "home-root-ca"}
     assert pod["spec"]["containers"][0]["args"] == [
@@ -247,6 +288,7 @@ def test_build_taskexecutor_pod_supports_simulation_args() -> None:
             _execution_spec(task_type=TaskType.SIMULATION),
             _executor_config(),
             "root-ca",
+            _LAUNCH_ATTEMPT_ID,
         )
     )
 
@@ -271,6 +313,7 @@ def test_build_taskexecutor_pod_supports_optional_container_config() -> None:
                 service_account_name="flower-superexec",
             ),
             "root-ca",
+            _LAUNCH_ATTEMPT_ID,
         )
     )
     container = pod["spec"]["containers"][0]
@@ -280,19 +323,151 @@ def test_build_taskexecutor_pod_supports_optional_container_config() -> None:
     assert pod["spec"]["serviceAccountName"] == "flower-superexec"
 
 
-def test_launch_submits_secret_before_pod_and_returns_accepted() -> None:
+def test_build_taskexecutor_pod_supports_resources_and_placement() -> None:
+    """Test Pod construction includes resource and placement inputs."""
+    resources = {
+        "requests": {"cpu": "500m", "memory": "1Gi"},
+        "limits": {"cpu": "1", "memory": "2Gi"},
+    }
+    node_selector = {"flower.ai/node-pool": "taskexecutors"}
+    tolerations = [
+        {
+            "key": "flower.ai/taskexecutor",
+            "operator": "Equal",
+            "value": "true",
+            "effect": "NoSchedule",
+        }
+    ]
+    affinity: dict[str, Any] = {
+        "podAntiAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": []}
+    }
+
+    pod = _as_dict(
+        _build_taskexecutor_pod(
+            _execution_spec(),
+            _executor_config(
+                resources=resources,
+                node_selector=node_selector,
+                tolerations=tolerations,
+                affinity=affinity,
+                priority_class_name="taskexecutor-priority",
+            ),
+            "root-ca",
+            _LAUNCH_ATTEMPT_ID,
+        )
+    )
+
+    assert pod["spec"]["containers"][0]["resources"] == resources
+    assert pod["spec"]["nodeSelector"] == node_selector
+    assert pod["spec"]["tolerations"] == tolerations
+    assert pod["spec"]["affinity"] == affinity
+    assert pod["spec"]["priorityClassName"] == "taskexecutor-priority"
+
+
+def test_build_taskexecutor_pod_supports_labels_annotations_and_security() -> None:
+    """Test Pod construction includes object metadata and security fields."""
+    pod_security_context = {
+        "runAsNonRoot": True,
+        "seccompProfile": {"type": "RuntimeDefault"},
+    }
+    container_security_context = {
+        "allowPrivilegeEscalation": False,
+        "capabilities": {"drop": ["ALL"]},
+    }
+    config = _executor_config(
+        labels={"flower.ai/team": "platform"},
+        annotations={"flower.ai/owner": "superexec"},
+        resource_pool="gpu-pool",
+        pod_security_context=pod_security_context,
+        container_security_context=container_security_context,
+    )
+
+    spec = _execution_spec()
+    appio_root_certificates = _appio_root_certificates(spec, config)
+    secret = _as_dict(
+        _build_appio_credentials_secret(
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+        )
+    )
+    pod = _as_dict(
+        _build_taskexecutor_pod(
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+        )
+    )
+
+    expected_labels = {
+        "app.kubernetes.io/name": "flower",
+        "app.kubernetes.io/component": "taskexecutor",
+        "flower.ai/superexec-task-id": "123",
+        "flower.ai/task-type": "flwr-serverapp",
+        LAUNCH_ATTEMPT_LABEL: _LAUNCH_ATTEMPT_ID,
+        "flower.ai/resource-pool": "gpu-pool",
+        "flower.ai/team": "platform",
+    }
+    assert secret["metadata"]["labels"] == expected_labels
+    assert secret["metadata"]["annotations"] == {"flower.ai/owner": "superexec"}
+    assert pod["metadata"]["labels"] == expected_labels
+    assert pod["metadata"]["annotations"] == {"flower.ai/owner": "superexec"}
+    assert pod["spec"]["securityContext"] == pod_security_context
+    assert pod["spec"]["containers"][0]["securityContext"] == container_security_context
+
+
+def test_config_rejects_extra_labels_that_override_stable_labels() -> None:
+    """Test extra labels cannot replace executor-owned stable labels."""
+    with pytest.raises(ValueError, match="must not override stable labels"):
+        _executor_config(labels={"flower.ai/superexec-task-id": "999"})
+
+
+def test_build_taskexecutor_pod_copies_nested_json_config() -> None:
+    """Test rendered Pod JSON does not share nested config objects."""
+    resources = {"requests": {"cpu": "500m", "memory": "1Gi"}}
+    tolerations = [{"key": "flower.ai/taskexecutor", "value": "true"}]
+    config = _executor_config(resources=resources, tolerations=tolerations)
+
+    pod = _as_dict(
+        _build_taskexecutor_pod(
+            _execution_spec(), config, "root-ca", _LAUNCH_ATTEMPT_ID
+        )
+    )
+    pod_resources = _as_dict(pod["spec"]["containers"][0]["resources"])
+    pod_requests = _as_dict(pod_resources["requests"])
+    pod_toleration = _as_dict(pod["spec"]["tolerations"][0])
+
+    pod_requests["cpu"] = "2"
+    pod_toleration["value"] = "pod-only"
+    resources["requests"]["memory"] = "4Gi"
+    tolerations[0]["key"] = "changed"
+
+    assert resources["requests"]["cpu"] == "500m"
+    assert tolerations[0]["value"] == "true"
+    assert pod_resources["requests"]["memory"] == "1Gi"
+    assert pod_toleration["key"] == "flower.ai/taskexecutor"
+
+
+def test_launch_submits_secret_before_pod_and_returns_accepted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Test launch creates the Secret before the Pod and returns accepted."""
     client = Mock()
     config = _executor_config()
     spec = _execution_spec()
+    monkeypatch.setattr(
+        kube, "_new_launch_attempt_id", Mock(return_value=_LAUNCH_ATTEMPT_ID)
+    )
 
     result = KubernetesExecutor(client=client, config=config).launch(spec)
 
     appio_root_certificates = _appio_root_certificates(spec, config)
     secret = _as_dict(
-        _build_appio_credentials_secret(spec, config, appio_root_certificates)
+        _build_appio_credentials_secret(
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+        )
     )
-    pod = _as_dict(_build_taskexecutor_pod(spec, config, appio_root_certificates))
+    pod = _as_dict(
+        _build_taskexecutor_pod(
+            spec, config, appio_root_certificates, _LAUNCH_ATTEMPT_ID
+        )
+    )
     assert result.status == LaunchResultStatus.ACCEPTED
     assert client.mock_calls == [
         call.create_namespaced_secret("flower-system", secret),
@@ -300,33 +475,149 @@ def test_launch_submits_secret_before_pod_and_returns_accepted() -> None:
     ]
 
 
-def test_launch_returns_failed_if_secret_create_fails() -> None:
-    """Test launch fails without creating the Pod if Secret creation fails."""
+def test_launch_generates_distinct_object_names_for_same_task(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test repeated launch calls for one task do not reuse Pod/Secret names."""
     client = Mock()
-    client.create_namespaced_secret.side_effect = RuntimeError("secret denied")
+    monkeypatch.setattr(
+        kube,
+        "_new_launch_attempt_id",
+        Mock(side_effect=[_LAUNCH_ATTEMPT_ID, _NEXT_LAUNCH_ATTEMPT_ID]),
+    )
+    executor = KubernetesExecutor(client=client, config=_executor_config())
+    spec = _execution_spec()
+
+    first_result = executor.launch(spec)
+    second_result = executor.launch(spec)
+
+    assert first_result.status == LaunchResultStatus.ACCEPTED
+    assert second_result.status == LaunchResultStatus.ACCEPTED
+    secret_bodies = [
+        _as_dict(call_args.args[1])
+        for call_args in client.create_namespaced_secret.call_args_list
+    ]
+    pod_bodies = [
+        _as_dict(call_args.args[1])
+        for call_args in client.create_namespaced_pod.call_args_list
+    ]
+
+    assert [secret["metadata"]["name"] for secret in secret_bodies] == [
+        _SECRET_NAME,
+        _NEXT_SECRET_NAME,
+    ]
+    assert [pod["metadata"]["name"] for pod in pod_bodies] == [
+        _POD_NAME,
+        _NEXT_POD_NAME,
+    ]
+    assert [
+        pod["spec"]["volumes"][0]["secret"]["secretName"] for pod in pod_bodies
+    ] == [secret["metadata"]["name"] for secret in secret_bodies]
+    assert [
+        secret["metadata"]["labels"][LAUNCH_ATTEMPT_LABEL] for secret in secret_bodies
+    ] == [_LAUNCH_ATTEMPT_ID, _NEXT_LAUNCH_ATTEMPT_ID]
+
+
+def test_launch_returns_capacity_rejected_if_secret_create_hits_quota() -> None:
+    """Test launch maps Secret quota rejection without creating the Pod."""
+    client = Mock()
+    client.create_namespaced_secret.side_effect = _KubernetesApiError(
+        403, "exceeded quota: object-counts"
+    )
+
+    result = KubernetesExecutor(client=client, config=_executor_config()).launch(
+        _execution_spec()
+    )
+
+    assert result.status == LaunchResultStatus.CAPACITY_REJECTED
+    assert result.message == "_KubernetesApiError: exceeded quota: object-counts"
+    client.create_namespaced_pod.assert_not_called()
+    client.delete_namespaced_secret.assert_not_called()
+
+
+def test_launch_deletes_new_secret_if_pod_create_is_rate_limited(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test Pod capacity rejection cleans up the just-created Secret."""
+    client = Mock()
+    client.create_namespaced_pod.side_effect = _KubernetesApiError(
+        429, "too many requests"
+    )
+    monkeypatch.setattr(
+        kube, "_new_launch_attempt_id", Mock(return_value=_LAUNCH_ATTEMPT_ID)
+    )
+
+    result = KubernetesExecutor(client=client, config=_executor_config()).launch(
+        _execution_spec()
+    )
+
+    assert result.status == LaunchResultStatus.CAPACITY_REJECTED
+    assert result.message == "_KubernetesApiError: too many requests"
+    client.create_namespaced_secret.assert_called_once()
+    client.create_namespaced_pod.assert_called_once()
+    client.delete_namespaced_secret.assert_called_once_with(
+        _SECRET_NAME, "flower-system"
+    )
+
+
+def test_launch_delete_failure_does_not_mask_pod_rejection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test best-effort Secret cleanup failure preserves the launch result."""
+    client = Mock()
+    client.create_namespaced_pod.side_effect = _KubernetesApiError(
+        429, "too many requests"
+    )
+    client.delete_namespaced_secret.side_effect = _KubernetesApiError(
+        500, "delete failed"
+    )
+    monkeypatch.setattr(
+        kube, "_new_launch_attempt_id", Mock(return_value=_LAUNCH_ATTEMPT_ID)
+    )
+
+    result = KubernetesExecutor(client=client, config=_executor_config()).launch(
+        _execution_spec()
+    )
+
+    assert result.status == LaunchResultStatus.CAPACITY_REJECTED
+    assert result.message == "_KubernetesApiError: too many requests"
+    client.delete_namespaced_secret.assert_called_once_with(
+        _SECRET_NAME, "flower-system"
+    )
+
+
+def test_launch_returns_failed_for_clear_non_capacity_failure() -> None:
+    """Test launch maps clear non-capacity API failures to failed."""
+    client = Mock()
+    client.create_namespaced_secret.side_effect = _KubernetesApiError(
+        401, "unauthorized"
+    )
 
     result = KubernetesExecutor(client=client, config=_executor_config()).launch(
         _execution_spec()
     )
 
     assert result.status == LaunchResultStatus.FAILED
-    assert result.message == "RuntimeError: secret denied"
+    assert result.message == "_KubernetesApiError: unauthorized"
     client.create_namespaced_pod.assert_not_called()
 
 
-def test_launch_returns_failed_if_pod_create_fails() -> None:
-    """Test launch fails after Secret creation if Pod creation fails."""
+def test_launch_returns_unknown_for_ambiguous_server_failure() -> None:
+    """Test launch maps ambiguous server failures to unknown."""
     client = Mock()
-    client.create_namespaced_pod.side_effect = RuntimeError("pod denied")
+    client.create_namespaced_pod.side_effect = _KubernetesApiError(
+        503, "service unavailable"
+    )
 
     result = KubernetesExecutor(client=client, config=_executor_config()).launch(
         _execution_spec()
     )
 
-    assert result.status == LaunchResultStatus.FAILED
-    assert result.message == "RuntimeError: pod denied"
+    assert result.status == LaunchResultStatus.UNKNOWN
+    assert result.message == "_KubernetesApiError: service unavailable"
     client.create_namespaced_secret.assert_called_once()
     client.create_namespaced_pod.assert_called_once()
+    client.delete_namespaced_secret.assert_not_called()
 
 
 def test_launch_returns_failed_if_root_certificates_file_cannot_be_read() -> None:

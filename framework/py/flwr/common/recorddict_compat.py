@@ -18,10 +18,9 @@
 from collections.abc import Mapping
 from typing import cast, get_args
 
+from flwr.app import Array, ArrayRecord, ConfigRecord, MetricRecord, RecordDict
 from flwr.app.typing import ConfigRecordValues, MetricRecordValues
-
-from . import Array, ArrayRecord, ConfigRecord, MetricRecord, RecordDict
-from .typing import (
+from flwr.common import (
     Code,
     EvaluateIns,
     EvaluateRes,
