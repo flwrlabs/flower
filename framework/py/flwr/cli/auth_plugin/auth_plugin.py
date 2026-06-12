@@ -18,8 +18,8 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
-from flwr.common.typing import AccountAuthCredentials, AccountAuthLoginDetails
 from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.auth.typing import AccountAuthCredentials, AccountAuthLoginDetails
 
 
 class LoginError(Exception):

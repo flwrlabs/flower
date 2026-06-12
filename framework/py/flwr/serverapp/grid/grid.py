@@ -19,7 +19,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
 from flwr.app import Message, RecordDict
-from flwr.common.typing import Run
+from flwr.supercore.run import Run
 
 
 class Grid(ABC):

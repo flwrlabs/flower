@@ -28,12 +28,12 @@ from flwr.cli.constant import (
     REFRESH_TOKEN_STORE_KEY,
 )
 from flwr.common.constant import ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, AuthnType
-from flwr.common.typing import AccountAuthCredentials, AccountAuthLoginDetails
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetAuthTokensRequest,
     GetAuthTokensResponse,
 )
 from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.auth.typing import AccountAuthCredentials, AccountAuthLoginDetails
 from flwr.supercore.credential_store import get_credential_store
 from flwr.supercore.utils import get_metadata_str
 

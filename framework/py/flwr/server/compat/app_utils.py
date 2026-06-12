@@ -19,8 +19,8 @@ import threading
 from collections.abc import Callable
 from typing import Any
 
-from flwr.common.typing import RunNotRunningException
 from flwr.serverapp.grid import Grid
+from flwr.supercore.run import RunNotRunningException
 
 from ..client_manager import ClientManager
 from .grid_client_proxy import GridClientProxy

@@ -31,10 +31,10 @@ from flwr.cli.typing import SuperLinkConnection
 from flwr.common.config import get_metadata_from_config, parse_config_args
 from flwr.common.constant import FAB_CONFIG_FILE, CliOutputFormat
 from flwr.common.serde import fab_to_proto, user_config_to_proto
-from flwr.common.typing import Fab
 from flwr.proto.control_pb2 import StartRunRequest  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+from flwr.supercore.fab import Fab
 from flwr.supercore.utils import (
     check_federation_format,
     parse_app_spec,

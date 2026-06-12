@@ -28,8 +28,8 @@ from parameterized import parameterized
 
 from flwr.app.message import Array
 from flwr.app.message.arraychunk import ArrayChunk
+from flwr.common import NDArray
 from flwr.common.constant import FLWR_PRIVATE_MAX_ARRAY_CHUNK_SIZE, SType
-from flwr.common.typing import NDArray
 from flwr.supercore.inflatable.inflatable_object import (
     get_object_body,
     get_object_type_from_object_content,

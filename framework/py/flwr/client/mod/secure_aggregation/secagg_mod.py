@@ -16,7 +16,7 @@
 
 
 from flwr.app import Context, Message
-from flwr.client.typing import ClientAppCallable
+from flwr.clientapp.typing import ClientAppCallable
 
 from .secaggplus_mod import secaggplus_mod
 
