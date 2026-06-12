@@ -94,10 +94,15 @@ def _appio_root_certificates(
 
 
 def _task_labels(task_id: int) -> dict[str, str]:
+    labels = _taskexecutor_labels()
+    labels["flower.ai/superexec-task-id"] = str(task_id)
+    return labels
+
+
+def _taskexecutor_labels() -> dict[str, str]:
     return {
         "app.kubernetes.io/name": "flower",
         "app.kubernetes.io/component": "taskexecutor",
-        "flower.ai/superexec-task-id": str(task_id),
         "flower.ai/task-type": "flwr-serverapp",
     }
 
@@ -624,6 +629,39 @@ def test_sweeper_deletes_terminal_pod_and_matching_secret(phase: str) -> None:
     )
 
 
+def test_sweeper_keeps_terminal_pod_without_task_id_label() -> None:
+    """Test cleanup ignores selector-matching Pods without a task-id label."""
+    client = Mock()
+    labels = _taskexecutor_labels()
+    client.list_namespaced_pod.return_value = {
+        "items": [_pod("Succeeded", labels=labels)]
+    }
+    client.list_namespaced_secret.return_value = {
+        "items": [_secret(_SECRET_NAME, labels)]
+    }
+
+    CompletedPodSweeper(client=client, config=_executor_config()).sweep()
+
+    client.delete_namespaced_pod.assert_not_called()
+    client.delete_namespaced_secret.assert_not_called()
+
+
+def test_sweeper_keeps_matching_secret_without_task_id_label() -> None:
+    """Test cleanup ignores derived Secrets without a task-id label."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {
+        "items": [_pod("Succeeded", labels=_task_labels(123))]
+    }
+    client.list_namespaced_secret.return_value = {
+        "items": [_secret(_SECRET_NAME, _taskexecutor_labels())]
+    }
+
+    CompletedPodSweeper(client=client, config=_executor_config()).sweep()
+
+    client.delete_namespaced_pod.assert_called_once()
+    client.delete_namespaced_secret.assert_not_called()
+
+
 def test_sweeper_keeps_pending_and_running_pods_and_secrets() -> None:
     """Test cleanup ignores non-terminal Pods and their credential Secrets."""
     client = Mock()
@@ -699,6 +737,19 @@ def test_sweeper_keeps_secret_without_credential_secret_name() -> None:
                 },
             )
         ]
+    }
+
+    CompletedPodSweeper(client=client, config=_executor_config()).sweep()
+
+    client.delete_namespaced_secret.assert_not_called()
+
+
+def test_sweeper_keeps_orphaned_credential_secret_without_task_id_label() -> None:
+    """Test cleanup ignores orphaned credential Secrets without a task-id label."""
+    client = Mock()
+    client.list_namespaced_pod.return_value = {"items": []}
+    client.list_namespaced_secret.return_value = {
+        "items": [_secret("flwr-taskexecutor-999-appio", _taskexecutor_labels())]
     }
 
     CompletedPodSweeper(client=client, config=_executor_config()).sweep()

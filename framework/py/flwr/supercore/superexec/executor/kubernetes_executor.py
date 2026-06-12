@@ -35,6 +35,7 @@ APPIO_CREDENTIALS_MOUNT_PATH = "/run/flwr/appio"
 APPIO_TOKEN_FILE_PATH = f"{APPIO_CREDENTIALS_MOUNT_PATH}/token"
 APPIO_ROOT_CERTIFICATES_FILE_PATH = f"{APPIO_CREDENTIALS_MOUNT_PATH}/ca.crt"
 LAUNCH_ATTEMPT_LABEL = "flower.ai/launch-attempt"
+_TASK_ID_LABEL = "flower.ai/superexec-task-id"
 _APPIO_CREDENTIAL_SECRET_SUFFIX = "-appio"
 _COMPLETED_POD_SWEEP_INTERVAL_SECONDS = 60.0
 
@@ -274,17 +275,28 @@ class CompletedPodSweeper:
             )
         )
         pod_names = {name for pod in pods if (name := _object_name(pod)) is not None}
+        task_secret_names = {
+            name
+            for secret in secrets
+            if (name := _object_name(secret)) is not None and _has_task_id_label(secret)
+        }
 
         for pod in pods:
             pod_name = _object_name(pod)
-            if pod_name is None or not _is_terminal_pod(pod):
+            if (
+                pod_name is None
+                or not _has_task_id_label(pod)
+                or not _is_terminal_pod(pod)
+            ):
                 continue
             self._delete_pod(pod_name)
-            self._delete_secret(_credential_secret_name_from_pod_name(pod_name))
+            credential_secret_name = _credential_secret_name_from_pod_name(pod_name)
+            if credential_secret_name in task_secret_names:
+                self._delete_secret(credential_secret_name)
 
         for secret in secrets:
             secret_name = _object_name(secret)
-            if secret_name is None:
+            if secret_name is None or not _has_task_id_label(secret):
                 continue
             pod_name = _pod_name_from_credential_secret_name(secret_name)
             if pod_name is None or pod_name in pod_names:
@@ -494,7 +506,7 @@ def _labels(
         {
             "app.kubernetes.io/name": "flower",
             "app.kubernetes.io/component": "taskexecutor",
-            "flower.ai/superexec-task-id": str(spec.task_id),
+            _TASK_ID_LABEL: str(spec.task_id),
             "flower.ai/task-type": spec.task_type.value,
             LAUNCH_ATTEMPT_LABEL: launch_attempt_id,
         }
@@ -575,6 +587,14 @@ def _object_name(value: object) -> str | None:
     if isinstance(name, str) and name.strip():
         return name
     return None
+
+
+def _has_task_id_label(value: object) -> bool:
+    """Return true if an object carries a TaskExecutor task-id label."""
+    metadata = _object_field(value, "metadata")
+    labels = _object_field(metadata, "labels")
+    task_id = _object_field(labels, _TASK_ID_LABEL)
+    return isinstance(task_id, str) and bool(task_id.strip())
 
 
 def _object_field(value: object, field_name: str) -> object | None:
