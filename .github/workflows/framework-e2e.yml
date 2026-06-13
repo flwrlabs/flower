@@ -336,13 +336,6 @@ jobs:
       - name: Bootstrap
         if: ${{ needs.changes.outputs.framework == 'true' }}
         uses: ./.github/actions/bootstrap
-      - name: Install project dependencies
-        if: ${{ needs.changes.outputs.framework == 'true' }}
-        working-directory: examples/${{ matrix.example }}
-        run: |
-          # Replace tensorflow with tensorflow-cpu to avoid GPU warnings in CI
-          sed -i 's/"tensorflow\([^"]*\)"/"tensorflow-cpu\1"/g' pyproject.toml
-          python -m pip install . --extra-index-url https://download.pytorch.org/whl/cpu
       - name: Install Flower from repo
         if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'flwrlabs/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
         run: |
