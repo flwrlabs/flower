@@ -149,6 +149,7 @@ class _SuperExecArgumentParser:
     ) -> argparse.Namespace:
         """Parse arguments after selecting plugin-specific runtime flags."""
         args_to_parse = list(args) if args is not None else sys.argv[1:]
+        # Runtime dependency flags differ by plugin, so inspect plugin type first.
         parser = _build_parser(_parse_plugin_type(args_to_parse))
         parsed = parser.parse_args(args_to_parse, namespace)
         _warn_deprecated_serverapp_runtime_dependency_install(parsed, args_to_parse)
@@ -239,9 +240,8 @@ def _build_parser(plugin_type: str | None) -> argparse.ArgumentParser:
     )
     add_superexec_auth_secret_args(parser)
     add_args_health(parser)
-    if plugin_type == ExecPluginType.CLIENT_APP:
-        add_args_runtime_dependency_install(parser)
-    else:
+    if plugin_type in _SERVERAPP_PLUGIN_TYPES:
+        # ServerApp plugins install dependencies by default and expose opt-out.
         add_args_runtime_dependency_install(
             parser,
             default=True,
@@ -252,6 +252,8 @@ def _build_parser(plugin_type: str | None) -> argparse.ArgumentParser:
                 "to disable it."
             ),
         )
+    else:
+        add_args_runtime_dependency_install(parser)
     return parser
 
 

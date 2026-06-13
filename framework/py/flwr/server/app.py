@@ -242,6 +242,7 @@ def run_superlink() -> None:
                 arg.split("=")[0]
             )  # handles both `--arg val` and `--arg=val`
 
+    # The old opt-in flag is accepted for compatibility, but no longer needed.
     if "--allow-runtime-dependency-installation" in explicit_args:
         log(
             WARN,
@@ -579,6 +580,7 @@ def _get_superexec_command(
     command += ["--appio-api-address", appio_address]
     command += ["--plugin-type", ExecPluginType.SERVER_APP]
     command += ["--parent-pid", str(parent_pid)]
+    # SuperExec defaults ServerApp dependency installation on; pass only opt-out.
     if not runtime_dependency_install:
         command += ["--disable-runtime-dependency-installation"]
     return command
@@ -858,6 +860,7 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Enable supernode authentication.",
     )
+    # SuperLink enables ServerApp dependency installation unless users opt out.
     add_args_runtime_dependency_install(
         parser,
         default=True,
