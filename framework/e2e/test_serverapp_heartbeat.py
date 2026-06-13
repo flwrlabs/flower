@@ -23,7 +23,12 @@ SUPEREXEC_AUTH_SECRET_FILE = "_e2e_superexec_secret.bin"
 
 def run_superlink() -> subprocess.Popen:
     """Run the SuperLink."""
-    cmd = ["flower-superlink", "--insecure"]
+    cmd = [
+        "flower-superlink",
+        "--insecure",
+        # Use preinstalled dependencies
+        "--disable-runtime-dependency-installation",
+    ]
     cmd += ["--database", "tmp.db"]
     cmd += ["--isolation", "process"]
     cmd += ["--superexec-auth-secret-file", SUPEREXEC_AUTH_SECRET_FILE]

@@ -58,6 +58,10 @@ case "$2" in
     ;;
 esac
 
+# These e2e apps are preinstalled by CI; keep the SuperLink harness from creating
+# per-run dependency environments.
+runtime_dependency_install_arg="--disable-runtime-dependency-installation"
+
 # Install Flower app
 pip install -e . --no-deps
 
@@ -81,7 +85,9 @@ else
   echo -e $"\n[tool.flwr.federations.e2e]\naddress = \"127.0.0.1:9093\"\nroot-certificates = \"certificates/ca.crt\"" >> pyproject.toml
 fi
 
-timeout 5m flower-superlink $server_arg $db_arg $rest_arg_superlink $server_auth &
+timeout 5m flower-superlink \
+  $server_arg $db_arg $rest_arg_superlink $server_auth \
+  $runtime_dependency_install_arg &
 sl_pid=$(pgrep -f "flower-superlink")
 sleep 3
 
