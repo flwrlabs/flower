@@ -25,7 +25,10 @@ from typing import Any
 import yaml
 
 from flwr.common import EventType, event
-from flwr.common.args import add_args_runtime_dependency_install
+from flwr.common.args import (
+    RuntimeDependencyInstallHelp,
+    add_args_runtime_dependency_install,
+)
 from flwr.common.constant import ExecPluginType
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
@@ -247,18 +250,20 @@ def _build_parser(plugin_type: str | None) -> argparse.ArgumentParser:
             parser,
             default=True,
             include_disable_flag=True,
-            allow_flag_help=(
-                "Allow runtime installation of app dependencies via `uv sync`. "
-                "This enables installation for `clientapp`. For `serverapp`, "
-                "`simulation`, and `serverapp-ephemeral`, installation is already "
-                "enabled by default, so this flag is deprecated."
+            help_texts=RuntimeDependencyInstallHelp(
+                allow_flag=(
+                    "Allow runtime installation of app dependencies via `uv sync`. "
+                    "This enables installation for `clientapp`. For `serverapp`, "
+                    "`simulation`, and `serverapp-ephemeral`, installation is already "
+                    "enabled by default, so this flag is deprecated."
+                ),
+                disable_flag=(
+                    "Disable runtime installation of app dependencies via `uv sync`. "
+                    "Only valid for `serverapp`, `simulation`, and "
+                    "`serverapp-ephemeral`, where installation is enabled by default."
+                ),
+                default="",
             ),
-            disable_flag_help=(
-                "Disable runtime installation of app dependencies via `uv sync`. "
-                "Only valid for `serverapp`, `simulation`, and "
-                "`serverapp-ephemeral`, where installation is enabled by default."
-            ),
-            default_help="",
         )
     elif plugin_type in _SERVERAPP_PLUGIN_TYPES:
         # ServerApp plugins install dependencies by default and expose opt-out.
@@ -266,10 +271,12 @@ def _build_parser(plugin_type: str | None) -> argparse.ArgumentParser:
             parser,
             default=True,
             include_disable_flag=True,
-            allow_flag_help=(
-                "Deprecated for ServerApp plugins. Use "
-                "`--disable-runtime-dependency-installation` to disable runtime "
-                "dependency installation."
+            help_texts=RuntimeDependencyInstallHelp(
+                allow_flag=(
+                    "Deprecated for ServerApp plugins. Use "
+                    "`--disable-runtime-dependency-installation` to disable runtime "
+                    "dependency installation."
+                ),
             ),
         )
     else:

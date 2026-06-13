@@ -32,6 +32,7 @@ import yaml
 
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH, EventType, event
 from flwr.common.args import (
+    RuntimeDependencyInstallHelp,
     add_args_runtime_dependency_install,
     try_obtain_server_certificates,
 )
@@ -865,9 +866,11 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         parser,
         default=True,
         include_disable_flag=True,
-        allow_flag_help=(
-            "Deprecated. Use `--disable-runtime-dependency-installation` to "
-            "disable runtime dependency installation."
+        help_texts=RuntimeDependencyInstallHelp(
+            allow_flag=(
+                "Deprecated. Use `--disable-runtime-dependency-installation` to "
+                "disable runtime dependency installation."
+            ),
         ),
     )
     parser.add_argument(
