@@ -578,7 +578,9 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         """Expired RUNNING task claims should transition tasks to FINISHED:FAILED."""
         state = self.state_factory()
         fixed_now = now()
-        active_until = fixed_now + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL)
+        active_until = fixed_now + timedelta(
+            seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+        )
         run_id = self.task_run_id(state)
 
         with patch("datetime.datetime") as mock_dt:
@@ -590,9 +592,7 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
             assert token is not None
             self.assertTrue(state.activate_task(task_id))
 
-            mock_dt.now.return_value = fixed_now + timedelta(
-                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
-            )
+            mock_dt.now.return_value = active_until + timedelta(seconds=1)
             self.assertIsNone(state.get_task_by_token(token))
             self.assertFalse(state.acknowledge_task_heartbeat(task_id))
 
@@ -608,6 +608,28 @@ class StateTest(unittest.TestCase):  # pylint: disable=R0904
         )
         self.assertTrue(tasks[0].finished_at)
         self.assertEqual(datetime.fromisoformat(tasks[0].finished_at), active_until)
+
+    def test_activate_task_extends_token_expiration(self) -> None:
+        """Activating a task should give it the regular heartbeat grace period."""
+        state = self.state_factory()
+        fixed_now = now()
+        run_id = self.task_run_id(state)
+
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            task_id = state.create_task(task_type=TaskType.MODEL, run_id=run_id)
+            assert task_id is not None
+            token = state.claim_task(task_id)
+            assert token is not None
+            self.assertTrue(state.activate_task(task_id))
+
+            mock_dt.now.return_value = fixed_now + timedelta(
+                seconds=HEARTBEAT_DEFAULT_INTERVAL + 1
+            )
+            task = state.get_task_by_token(token)
+            self.assertIsNotNone(task)
+            assert task is not None
+            self.assertEqual(task.task_id, task_id)
 
     def test_get_tasks_expires_stale_task_tokens(self) -> None:
         """Reading tasks should expire stale claimed task tokens first."""

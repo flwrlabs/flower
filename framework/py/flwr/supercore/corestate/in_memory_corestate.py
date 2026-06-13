@@ -389,10 +389,16 @@ class InMemoryCoreState(
             if task is None or task.status.status != Status.STARTING:
                 return False
 
-            task.running_at = now().isoformat()
+            activated_at = now()
+            task.running_at = activated_at.isoformat()
             task.status.CopyFrom(
                 TaskStatus(status=Status.RUNNING, sub_status="", details="")
             )
+            record = self.task_token_store.get(task_id)
+            if record is not None:
+                record.active_until = activated_at + timedelta(
+                    seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL
+                )
             return True
 
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
