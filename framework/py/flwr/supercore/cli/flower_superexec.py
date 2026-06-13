@@ -59,7 +59,7 @@ def flower_superexec() -> None:
     """Run `flower-superexec` command."""
     disable_process_dumping(strict=False)
     warn_if_flwr_update_available(process_name="flower-superexec")
-    args = _parse_args()
+    args = _parse_args().parse_args()
 
     # Log the first message after parsing arguments in case of `--help`
     log(INFO, "Starting Flower SuperExec")
@@ -139,16 +139,31 @@ def flower_superexec() -> None:
     )
 
 
-def _parse_args(
-    args: Sequence[str] | None = None,
-    namespace: argparse.Namespace | None = None,
-) -> argparse.Namespace:
-    """Parse `flower-superexec` command line arguments."""
-    args_to_parse = list(args) if args is not None else sys.argv[1:]
-    plugin_type = _parse_plugin_type(args_to_parse)
-    parser = _build_parser(plugin_type)
-    parsed = parser.parse_args(args_to_parse, namespace)
+class _SuperExecArgumentParser:
+    """Plugin-aware argument parser for `flower-superexec`."""
 
+    def parse_args(
+        self,
+        args: Sequence[str] | None = None,
+        namespace: argparse.Namespace | None = None,
+    ) -> argparse.Namespace:
+        """Parse arguments after selecting plugin-specific runtime flags."""
+        args_to_parse = list(args) if args is not None else sys.argv[1:]
+        parser = _build_parser(_parse_plugin_type(args_to_parse))
+        parsed = parser.parse_args(args_to_parse, namespace)
+        _warn_deprecated_serverapp_runtime_dependency_install(parsed, args_to_parse)
+        return parsed
+
+
+def _parse_args() -> _SuperExecArgumentParser:
+    """Return a plugin-aware `flower-superexec` argument parser."""
+    return _SuperExecArgumentParser()
+
+
+def _warn_deprecated_serverapp_runtime_dependency_install(
+    parsed: argparse.Namespace, args_to_parse: Sequence[str]
+) -> None:
+    """Warn if the deprecated ServerApp dependency installation flag is passed."""
     if (
         parsed.plugin_type in _SERVERAPP_PLUGIN_TYPES
         and "--allow-runtime-dependency-installation"
@@ -161,8 +176,6 @@ def _parse_args(
             "is now enabled by default. Use "
             "`--disable-runtime-dependency-installation` to disable it.",
         )
-
-    return parsed
 
 
 def _parse_plugin_type(args: Sequence[str]) -> str | None:

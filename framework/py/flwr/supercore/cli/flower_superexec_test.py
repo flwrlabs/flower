@@ -38,7 +38,7 @@ def test_parse_superexec_version_flag(
 ) -> None:
     """The version flags should print the package version and exit."""
     with pytest.raises(SystemExit) as exc_info:
-        _parse_args([flag])
+        _parse_args().parse_args([flag])
 
     assert exc_info.value.code == 0
     captured = capsys.readouterr()
@@ -102,8 +102,10 @@ def test_flower_superexec_clientapp_allows_missing_secret(
     )
     captured: dict[str, object] = {}
 
-    def _parse_args() -> SimpleNamespace:
-        return args
+    class _Parser:
+        def parse_args(self) -> SimpleNamespace:
+            """Return parsed arguments for the test path."""
+            return args
 
     def _run_superexec(**kwargs: object) -> None:
         captured.update(kwargs)
@@ -113,7 +115,7 @@ def test_flower_superexec_clientapp_allows_missing_secret(
         "warn_if_flwr_update_available",
         lambda **_: None,
     )
-    monkeypatch.setattr(flower_superexec_module, "_parse_args", _parse_args)
+    monkeypatch.setattr(flower_superexec_module, "_parse_args", _Parser)
     monkeypatch.setattr(
         flower_superexec_module,
         "_get_plugin_and_stub_class",
@@ -143,10 +145,12 @@ def test_flower_superexec_serverapp_allows_missing_secret(
         executor=ExecutorType.SUBPROCESS,
     )
 
-    captured: dict[str, object] = {}
+    class _Parser:
+        def parse_args(self) -> SimpleNamespace:
+            """Return parsed arguments for the test path."""
+            return args
 
-    def _parse_args() -> SimpleNamespace:
-        return args
+    captured: dict[str, object] = {}
 
     def _run_superexec(**kwargs: object) -> None:
         captured.update(kwargs)
@@ -156,7 +160,7 @@ def test_flower_superexec_serverapp_allows_missing_secret(
         "warn_if_flwr_update_available",
         lambda **_: None,
     )
-    monkeypatch.setattr(flower_superexec_module, "_parse_args", _parse_args)
+    monkeypatch.setattr(flower_superexec_module, "_parse_args", _Parser)
     monkeypatch.setattr(
         flower_superexec_module,
         "_get_plugin_and_stub_class",
@@ -185,6 +189,8 @@ def test_flower_superexec_passes_executor_to_run_superexec(
         runtime_dependency_install=False,
         executor=ExecutorType.SUBPROCESS,
     )
+    parser = Mock()
+    parser.parse_args.return_value = args
     run_superexec_mock = Mock()
 
     monkeypatch.setattr(
@@ -192,7 +198,9 @@ def test_flower_superexec_passes_executor_to_run_superexec(
         "warn_if_flwr_update_available",
         lambda **_: None,
     )
-    monkeypatch.setattr(flower_superexec_module, "_parse_args", Mock(return_value=args))
+    monkeypatch.setattr(
+        flower_superexec_module, "_parse_args", Mock(return_value=parser)
+    )
     monkeypatch.setattr(
         flower_superexec_module,
         "_get_plugin_and_stub_class",

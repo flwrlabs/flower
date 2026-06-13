@@ -916,17 +916,13 @@ def _add_args_runtime_dependency_install(parser: argparse.ArgumentParser) -> Non
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "--disable-runtime-dependency-installation",
-        action="store_false",
-        dest="runtime_dependency_install",
-        default=True,
+        action="store_false", dest="runtime_dependency_install", default=True,
         help="Disable runtime installation of app dependencies via `uv sync`. "
         "By default, runtime dependency installation is enabled.",
     )
     group.add_argument(
         "--allow-runtime-dependency-installation",
-        action="store_true",
-        dest="runtime_dependency_install",
-        default=True,
+        action="store_true", dest="runtime_dependency_install", default=True,
         help="Deprecated. Runtime dependency installation is enabled by default. "
         "Use `--disable-runtime-dependency-installation` to disable it.",
     )
