@@ -32,8 +32,19 @@ def add_args_runtime_dependency_install(
     default: bool = RUNTIME_DEPENDENCY_INSTALL,
     include_disable_flag: bool = False,
     allow_flag_help: str | None = None,
+    disable_flag_help: str | None = None,
+    default_help: str | None = None,
 ) -> None:
     """Add arguments controlling runtime dependency installation."""
+    default_help = (
+        (
+            "By default, runtime dependency installation is "
+            f"{'enabled' if default else 'disabled'}."
+        )
+        if default_help is None
+        else default_help
+    )
+    default_help = f" {default_help}" if default_help else ""
     add_argument = (
         parser.add_mutually_exclusive_group().add_argument
         if include_disable_flag
@@ -45,17 +56,22 @@ def add_args_runtime_dependency_install(
             action="store_false",
             dest="runtime_dependency_install",
             default=default,
-            help="Disable runtime installation of app dependencies via `uv sync`. "
-            "By default, runtime dependency installation is enabled.",
+            help=(
+                disable_flag_help
+                or "Disable runtime installation of app dependencies via `uv sync`."
+            )
+            + default_help,
         )
     add_argument(
         "--allow-runtime-dependency-installation",
         action="store_true",
         dest="runtime_dependency_install",
         default=default,
-        help=allow_flag_help
-        or "Allow runtime installation of app dependencies via `uv sync`. "
-        "By default, runtime dependency installation is disabled.",
+        help=(
+            allow_flag_help
+            or "Allow runtime installation of app dependencies via `uv sync`."
+        )
+        + default_help,
     )
 
 

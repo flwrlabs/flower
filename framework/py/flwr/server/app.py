@@ -866,8 +866,8 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         default=True,
         include_disable_flag=True,
         allow_flag_help=(
-            "Deprecated. Runtime dependency installation is enabled by default. "
-            "Use `--disable-runtime-dependency-installation` to disable it."
+            "Deprecated. Use `--disable-runtime-dependency-installation` to "
+            "disable runtime dependency installation."
         ),
     )
     parser.add_argument(

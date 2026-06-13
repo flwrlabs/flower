@@ -240,16 +240,35 @@ def _build_parser(plugin_type: str | None) -> argparse.ArgumentParser:
     )
     add_superexec_auth_secret_args(parser)
     add_args_health(parser)
-    if plugin_type in _SERVERAPP_PLUGIN_TYPES:
+    if plugin_type is None:
+        # Generic help should explain the plugin-dependent defaults.
+        add_args_runtime_dependency_install(
+            parser,
+            default=True,
+            include_disable_flag=True,
+            allow_flag_help=(
+                "Allow runtime installation of app dependencies via `uv sync`. "
+                "This enables installation for `clientapp`. For `serverapp`, "
+                "`simulation`, and `serverapp-ephemeral`, installation is already "
+                "enabled by default, so this flag is deprecated."
+            ),
+            disable_flag_help=(
+                "Disable runtime installation of app dependencies via `uv sync`. "
+                "Only valid for `serverapp`, `simulation`, and "
+                "`serverapp-ephemeral`, where installation is enabled by default."
+            ),
+            default_help="",
+        )
+    elif plugin_type in _SERVERAPP_PLUGIN_TYPES:
         # ServerApp plugins install dependencies by default and expose opt-out.
         add_args_runtime_dependency_install(
             parser,
             default=True,
             include_disable_flag=True,
             allow_flag_help=(
-                "Deprecated for ServerApp plugins. Runtime dependency installation is "
-                "enabled by default. Use `--disable-runtime-dependency-installation` "
-                "to disable it."
+                "Deprecated for ServerApp plugins. Use "
+                "`--disable-runtime-dependency-installation` to disable runtime "
+                "dependency installation."
             ),
         )
     else:
