@@ -16,6 +16,8 @@
 
 
 import argparse
+import sys
+from collections.abc import Sequence
 from logging import INFO, WARN
 from pathlib import Path
 from typing import Any
@@ -46,12 +48,18 @@ from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.utils import disable_process_dumping
 from flwr.supercore.version import package_version
 
+_SERVERAPP_PLUGIN_TYPES = {
+    ExecPluginType.SERVER_APP,
+    ExecPluginType.SIMULATION,
+    ExecPluginType.SERVER_APP_EPHEMERAL,
+}
+
 
 def flower_superexec() -> None:
     """Run `flower-superexec` command."""
     disable_process_dumping(strict=False)
     warn_if_flwr_update_available(process_name="flower-superexec")
-    args = _parse_args().parse_args()
+    args = _parse_args()
 
     # Log the first message after parsing arguments in case of `--help`
     log(INFO, "Starting Flower SuperExec")
@@ -131,8 +139,43 @@ def flower_superexec() -> None:
     )
 
 
-def _parse_args() -> argparse.ArgumentParser:
+def _parse_args(
+    args: Sequence[str] | None = None,
+    namespace: argparse.Namespace | None = None,
+) -> argparse.Namespace:
     """Parse `flower-superexec` command line arguments."""
+    args_to_parse = list(args) if args is not None else sys.argv[1:]
+    plugin_type = _parse_plugin_type(args_to_parse)
+    parser = _build_parser(plugin_type)
+    parsed = parser.parse_args(args_to_parse, namespace)
+
+    if (
+        parsed.plugin_type in _SERVERAPP_PLUGIN_TYPES
+        and "--allow-runtime-dependency-installation"
+        in {arg.split("=")[0] for arg in args_to_parse if arg.startswith("--")}
+    ):
+        log(
+            WARN,
+            "The `--allow-runtime-dependency-installation` argument is "
+            "deprecated for ServerApp plugins. Runtime dependency installation "
+            "is now enabled by default. Use "
+            "`--disable-runtime-dependency-installation` to disable it.",
+        )
+
+    return parsed
+
+
+def _parse_plugin_type(args: Sequence[str]) -> str | None:
+    """Parse the plugin type without validating the full command line."""
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--plugin-type", type=str, choices=ExecPluginType.all())
+    parsed, _ = parser.parse_known_args(args)
+    plugin_type = parsed.plugin_type
+    return plugin_type if isinstance(plugin_type, str) else None
+
+
+def _build_parser(plugin_type: str | None) -> argparse.ArgumentParser:
+    """Build the `flower-superexec` parser for the selected plugin type."""
     parser = argparse.ArgumentParser(
         description="Run Flower SuperExec.",
     )
@@ -183,8 +226,35 @@ def _parse_args() -> argparse.ArgumentParser:
     )
     add_superexec_auth_secret_args(parser)
     add_args_health(parser)
-    add_args_runtime_dependency_install(parser)
+    if plugin_type == ExecPluginType.CLIENT_APP:
+        add_args_runtime_dependency_install(parser)
+    else:
+        _add_args_serverapp_runtime_dependency_install(parser)
     return parser
+
+
+def _add_args_serverapp_runtime_dependency_install(
+    parser: argparse.ArgumentParser,
+) -> None:
+    """Add ServerApp plugin runtime dependency installation arguments."""
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--disable-runtime-dependency-installation",
+        action="store_false",
+        dest="runtime_dependency_install",
+        default=True,
+        help="Disable runtime installation of app dependencies via `uv sync`. "
+        "By default, runtime dependency installation is enabled.",
+    )
+    group.add_argument(
+        "--allow-runtime-dependency-installation",
+        action="store_true",
+        dest="runtime_dependency_install",
+        default=True,
+        help="Deprecated for ServerApp plugins. Runtime dependency installation is "
+        "enabled by default. Use `--disable-runtime-dependency-installation` to "
+        "disable it.",
+    )
 
 
 def _get_plugin_and_stub_class(

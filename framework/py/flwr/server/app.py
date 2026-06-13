@@ -576,8 +576,8 @@ def _get_superexec_command(
     command += ["--appio-api-address", appio_address]
     command += ["--plugin-type", ExecPluginType.SERVER_APP]
     command += ["--parent-pid", str(parent_pid)]
-    if runtime_dependency_install:
-        command += ["--allow-runtime-dependency-installation"]
+    if not runtime_dependency_install:
+        command += ["--disable-runtime-dependency-installation"]
     return command
 
 
