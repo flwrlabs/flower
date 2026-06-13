@@ -242,32 +242,17 @@ def _build_parser(plugin_type: str | None) -> argparse.ArgumentParser:
     if plugin_type == ExecPluginType.CLIENT_APP:
         add_args_runtime_dependency_install(parser)
     else:
-        _add_args_serverapp_runtime_dependency_install(parser)
+        add_args_runtime_dependency_install(
+            parser,
+            default=True,
+            include_disable_flag=True,
+            allow_flag_help=(
+                "Deprecated for ServerApp plugins. Runtime dependency installation is "
+                "enabled by default. Use `--disable-runtime-dependency-installation` "
+                "to disable it."
+            ),
+        )
     return parser
-
-
-def _add_args_serverapp_runtime_dependency_install(
-    parser: argparse.ArgumentParser,
-) -> None:
-    """Add ServerApp plugin runtime dependency installation arguments."""
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument(
-        "--disable-runtime-dependency-installation",
-        action="store_false",
-        dest="runtime_dependency_install",
-        default=True,
-        help="Disable runtime installation of app dependencies via `uv sync`. "
-        "By default, runtime dependency installation is enabled.",
-    )
-    group.add_argument(
-        "--allow-runtime-dependency-installation",
-        action="store_true",
-        dest="runtime_dependency_install",
-        default=True,
-        help="Deprecated for ServerApp plugins. Runtime dependency installation is "
-        "enabled by default. Use `--disable-runtime-dependency-installation` to "
-        "disable it.",
-    )
 
 
 def _get_plugin_and_stub_class(

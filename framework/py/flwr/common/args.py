@@ -26,14 +26,35 @@ from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, TRANSPORT_TYPE_REST
 from flwr.common.logger import log
 
 
-def add_args_runtime_dependency_install(parser: argparse.ArgumentParser) -> None:
+def add_args_runtime_dependency_install(
+    parser: argparse.ArgumentParser,
+    *,
+    default: bool = RUNTIME_DEPENDENCY_INSTALL,
+    include_disable_flag: bool = False,
+    allow_flag_help: str | None = None,
+) -> None:
     """Add arguments controlling runtime dependency installation."""
-    parser.add_argument(
+    add_argument = (
+        parser.add_mutually_exclusive_group().add_argument
+        if include_disable_flag
+        else parser.add_argument
+    )
+    if include_disable_flag:
+        add_argument(
+            "--disable-runtime-dependency-installation",
+            action="store_false",
+            dest="runtime_dependency_install",
+            default=default,
+            help="Disable runtime installation of app dependencies via `uv sync`. "
+            "By default, runtime dependency installation is enabled.",
+        )
+    add_argument(
         "--allow-runtime-dependency-installation",
         action="store_true",
         dest="runtime_dependency_install",
-        default=RUNTIME_DEPENDENCY_INSTALL,
-        help="Allow runtime installation of app dependencies via `uv sync`. "
+        default=default,
+        help=allow_flag_help
+        or "Allow runtime installation of app dependencies via `uv sync`. "
         "By default, runtime dependency installation is disabled.",
     )
 

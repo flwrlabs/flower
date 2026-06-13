@@ -31,7 +31,10 @@ import grpc
 import yaml
 
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH, EventType, event
-from flwr.common.args import try_obtain_server_certificates
+from flwr.common.args import (
+    add_args_runtime_dependency_install,
+    try_obtain_server_certificates,
+)
 from flwr.common.constant import (
     AUTHN_TYPE_YAML_KEY,
     AUTHZ_TYPE_YAML_KEY,
@@ -855,7 +858,15 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Enable supernode authentication.",
     )
-    _add_args_runtime_dependency_install(parser)
+    add_args_runtime_dependency_install(
+        parser,
+        default=True,
+        include_disable_flag=True,
+        allow_flag_help=(
+            "Deprecated. Runtime dependency installation is enabled by default. "
+            "Use `--disable-runtime-dependency-installation` to disable it."
+        ),
+    )
     parser.add_argument(
         "--log-file",
         type=str,
@@ -908,23 +919,6 @@ def _add_args_serverappio_api(parser: argparse.ArgumentParser) -> None:
         "the ServerAppIo API server certificate. This is not a client certificate "
         "for mTLS.",
         type=str,
-    )
-
-
-def _add_args_runtime_dependency_install(parser: argparse.ArgumentParser) -> None:
-    """Add SuperLink arguments controlling runtime dependency installation."""
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument(
-        "--disable-runtime-dependency-installation",
-        action="store_false", dest="runtime_dependency_install", default=True,
-        help="Disable runtime installation of app dependencies via `uv sync`. "
-        "By default, runtime dependency installation is enabled.",
-    )
-    group.add_argument(
-        "--allow-runtime-dependency-installation",
-        action="store_true", dest="runtime_dependency_install", default=True,
-        help="Deprecated. Runtime dependency installation is enabled by default. "
-        "Use `--disable-runtime-dependency-installation` to disable it.",
     )
 
 
