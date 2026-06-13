@@ -23,12 +23,7 @@ SUPEREXEC_AUTH_SECRET_FILE = "_e2e_superexec_secret.bin"
 
 def run_superlink() -> subprocess.Popen:
     """Run the SuperLink."""
-    cmd = [
-        "flower-superlink",
-        "--insecure",
-        # Use preinstalled dependencies
-        "--disable-runtime-dependency-installation",
-    ]
+    cmd = ["flower-superlink", "--insecure"]
     cmd += ["--database", "tmp.db"]
     cmd += ["--isolation", "process"]
     cmd += ["--superexec-auth-secret-file", SUPEREXEC_AUTH_SECRET_FILE]
@@ -40,7 +35,13 @@ def run_superlink() -> subprocess.Popen:
 
 def run_superexec() -> subprocess.Popen:
     """Run the SuperExec."""
-    cmd = ["flower-superexec", "--insecure"]
+    cmd = [
+        "flower-superexec",
+        "--insecure",
+        # Use preinstalled dependencies (to avoid heartbeat delays due
+        # to installation of dependencies)
+        "--disable-runtime-dependency-installation",
+    ]
     cmd += ["--appio-api-address", SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS]
     cmd += ["--plugin-type", plugin_type_arg]
     cmd += ["--superexec-auth-secret-file", SUPEREXEC_AUTH_SECRET_FILE]
