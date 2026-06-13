@@ -621,7 +621,7 @@ requires-dist = [
     { name = "pillow", marker = "extra == 'vision'", specifier = ">=12.2.0" },
     { name = "rich", specifier = ">=13.5.0" },
     { name = "seaborn", specifier = ">=0.13.0,<0.14.0" },
-    { name = "torch", marker = "extra == 'audio'", specifier = ">=2.8.0" },
+    { name = "torch", marker = "extra == 'audio'", specifier = ">=2.10.0" },
     { name = "torchcodec", marker = "extra == 'audio'", specifier = ">=0.7.0" },
     { name = "tqdm", specifier = ">=4.66.1,<5.0.0" },
 ]

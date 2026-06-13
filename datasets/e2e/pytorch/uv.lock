@@ -470,8 +470,8 @@ dependencies = [
 requires-dist = [
     { name = "flwr-datasets", extras = ["vision"], editable = "../../" },
     { name = "parameterized", specifier = "==0.9.0" },
-    { name = "torch", specifier = ">=1.12.0,<3.0.0" },
-    { name = "torchvision", specifier = ">=0.19.0,<1.0.0" },
+    { name = "torch", specifier = ">=2.10.0,<3.0.0" },
+    { name = "torchvision", specifier = ">=0.25.0,<1.0.0" },
 ]
 
 [[package]]
@@ -509,7 +509,7 @@ requires-dist = [
     { name = "pillow", marker = "extra == 'vision'", specifier = ">=12.2.0" },
     { name = "rich", specifier = ">=13.5.0" },
     { name = "seaborn", specifier = ">=0.13.0,<0.14.0" },
-    { name = "torch", marker = "extra == 'audio'", specifier = ">=2.8.0" },
+    { name = "torch", marker = "extra == 'audio'", specifier = ">=2.10.0" },
     { name = "torchcodec", marker = "extra == 'audio'", specifier = ">=0.7.0" },
     { name = "tqdm", specifier = ">=4.66.1,<5.0.0" },
 ]

@@ -11,8 +11,8 @@ dependencies = [
     "flwr[simulation]>=1.28.0",
     "flwr-datasets[vision]>=0.6.0",
     "fastai==2.8.4",
-    "torch==2.8.0",
-    "torchvision==0.23.0",
+    "torch==2.10.0",
+    "torchvision==0.25.0",
 ]
 
 [tool.hatch.build.targets.wheel]
