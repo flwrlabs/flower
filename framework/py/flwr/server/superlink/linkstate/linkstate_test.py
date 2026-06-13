@@ -35,7 +35,6 @@ from parameterized import parameterized
 
 from flwr.app import DEFAULT_TTL, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
-from flwr.common import now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
@@ -45,7 +44,6 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.common.typing import Fab
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
@@ -58,6 +56,8 @@ from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLin
 from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, RunType, TaskType
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
+from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.superlink.federation import NoOpFederationManager
@@ -443,9 +443,11 @@ class StateTest(CoreStateTest):
         run_id = create_dummy_run(state)
         task_id = get_primary_task_id(state, run_id)
         assert state.claim_task(task_id) is not None
+        assert state.activate_task(task_id)
 
         # Execute
         # The run should be marked as failed after HEARTBEAT_DEFAULT_INTERVAL
+        # once the primary task is RUNNING.
         patched_dt = now() + timedelta(
             seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
         )
@@ -467,14 +469,15 @@ class StateTest(CoreStateTest):
         assert status.details == "No heartbeat received from the task"
 
     def test_primary_task_expiry_fails_unfinished_run_tasks(self) -> None:
-        """Test unfinished tasks fail when their run's primary task expires."""
+        """Test unfinished tasks fail when their run's RUNNING primary task expires."""
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
         primary_task_id = get_primary_task_id(state, run_id)
-        extra_task_id = state.create_task(task_type="flwr-connector", run_id=run_id)
+        extra_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
         assert extra_task_id is not None
         assert state.claim_task(primary_task_id) is not None
+        assert state.activate_task(primary_task_id)
 
         # Execute: advance time past task claim expiry and trigger cleanup
         patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
@@ -521,7 +524,7 @@ class StateTest(CoreStateTest):
         state = self.state_factory()
         run_id = create_dummy_run(state)
         primary_task_id = get_primary_task_id(state, run_id)
-        extra_task_id = state.create_task(task_type="flwr-connector", run_id=run_id)
+        extra_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
         assert extra_task_id is not None
         assert state.claim_task(primary_task_id) is not None
         if sub_status == SubStatus.COMPLETED:
@@ -553,12 +556,13 @@ class StateTest(CoreStateTest):
         assert state.federation_manager.report_run_usage.call_count == expected_calls
 
     def test_usage_report_hook_called_on_primary_task_expired(self) -> None:
-        """Test report_run_usage hook is called when the primary task expires."""
+        """Test report_run_usage hook is called when a RUNNING primary task expires."""
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
         task_id = get_primary_task_id(state, run_id)
         assert state.claim_task(task_id) is not None
+        assert state.activate_task(task_id)
         state.federation_manager.report_run_usage = Mock()  # type: ignore
         # Execute: advance time past token expiry and trigger cleanup
         patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
@@ -583,7 +587,7 @@ class StateTest(CoreStateTest):
         """Test report_run_usage is not called when a non-primary task expires."""
         state = self.state_factory()
         run_id = create_dummy_run(state)
-        task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
+        task_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
         assert task_id is not None
         assert state.claim_task(task_id) is not None
         state.federation_manager.report_run_usage = Mock()  # type: ignore
@@ -2138,7 +2142,7 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state = self.state_factory()
         run_id = create_dummy_run(state)
         task_id = get_primary_task_id(state, run_id)
-        extra_task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
+        extra_task_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
         assert extra_task_id is not None
         assert state.claim_task(extra_task_id) is not None
 

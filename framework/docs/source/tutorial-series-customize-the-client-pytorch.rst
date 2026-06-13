@@ -134,9 +134,13 @@ execution of the ``ClientApp`` took. We can do this by adding a new metric to th
 for example:
 
 .. code-block:: python
-    :emphasize-lines: 1,8,12,13,20
+    :emphasize-lines: 3,12,16,17,24
 
+    # ... unchanged
+    # add this to the imports
     import time
+
+    # ... unchanged
 
 
     @app.train()
@@ -177,6 +181,8 @@ Let's go ahead and define this in ``task.py``:
 
 .. code-block:: python
 
+    # ... unchanged imports at the top of the file
+    # add this at the bottom of the imports
     from dataclasses import dataclass
 
 
@@ -187,6 +193,9 @@ Let's go ahead and define this in ``task.py``:
         training_time: float
         converged: bool
         training_losses: dict[str, float]  # e.g. { "epoch_1": 0.5, "epoch_2": 0.3 }
+
+
+    # ... unchanged code starting with class Net(nn.Module):
 
 Now, let's see how the ``ClientApp`` can serialize this object, send it to the
 ``ServerApp``, make the strategy deserialize it back to the original object, and use it.
@@ -212,19 +221,25 @@ setup from your existing ``train`` function unchanged.
     complex. ``pickle`` is used here solely for simplicity.
 
 .. code-block:: python
-    :emphasize-lines: 1-2,11,21,23,36
+    :emphasize-lines: 3-5,20-24,27,29,42
 
+    # ... unchanged
+    # add this to the imports
     import pickle
-    import time
+    from pytorchexample.task import TrainProcessMetadata
+    from flwr.app import ConfigRecord
+
+    # ... unchanged
 
 
     @app.train()
     def train(msg: Message, context: Context):
         """Train the model on local data."""
 
+        start_time = time.time()
+
         # ... prepare model, load data, train locally
         # The train function returns the training loss
-        start_time = time.time()
         train_loss = train_fn(...)
         # Construct a TrainProcessMetadata object
         train_metadata = TrainProcessMetadata(
@@ -277,11 +292,15 @@ the ``aggregate_train`` method to deserialize the ``TrainProcessMetadata`` objec
 each client and print the training time and convergence status:
 
 .. code-block:: python
-    :emphasize-lines: 1,8,18,19,21
+    :emphasize-lines: 3-5,12,22-23,25
 
+    # ... make sure you have these imports.
+    # ... Some may exist from previous tutorials
     import pickle
     from dataclasses import asdict
     from typing import Iterable, Optional
+
+    # ... unchanged
 
 
     class CustomFedAdagrad(FedAdagrad):
@@ -303,6 +322,9 @@ each client and print the training time and convergence status:
                     print(asdict(train_meta))
             # Aggregate the ArrayRecords and MetricRecords as usual
             return super().aggregate_train(server_round, replies)
+
+
+    # ... unchanged
 
 Finally, we run the Flower App.
 

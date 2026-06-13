@@ -22,8 +22,8 @@ import grpc
 from cryptography.hazmat.primitives.asymmetric import ec
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.common import now
 from flwr.common.constant import PUBLIC_KEY_HEADER, SIGNATURE_HEADER, TIMESTAMP_HEADER
+from flwr.supercore.date import now
 from flwr.supercore.primitives.asymmetric import public_key_to_bytes, sign_message
 
 

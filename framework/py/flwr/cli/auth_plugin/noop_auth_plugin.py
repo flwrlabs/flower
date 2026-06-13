@@ -17,8 +17,8 @@
 
 from collections.abc import Sequence
 
-from flwr.common.typing import AccountAuthCredentials, AccountAuthLoginDetails
 from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.auth.typing import AccountAuthCredentials, AccountAuthLoginDetails
 
 from .auth_plugin import CliAuthPlugin, LoginError
 

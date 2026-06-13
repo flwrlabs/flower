@@ -17,7 +17,7 @@
 
 import numpy as np
 
-from flwr.common.typing import NDArrayInt
+from flwr.common import NDArrayInt
 
 
 def share_keys_plaintext_concat(

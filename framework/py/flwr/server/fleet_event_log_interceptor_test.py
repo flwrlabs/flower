@@ -27,7 +27,8 @@ from flwr.common.dummy_grpc_handlers_test import (
     get_noop_unary_unary_handler,
 )
 from flwr.common.event_log_plugin import EventLogWriterPlugin
-from flwr.common.typing import AccountInfo, Actor, Event, LogEntry
+from flwr.supercore.auth.typing import AccountInfo
+from flwr.supercore.event_log.typing import Actor, Event, LogEntry
 
 from .fleet_event_log_interceptor import FleetEventLogInterceptor
 

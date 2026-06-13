@@ -25,7 +25,7 @@ import pytest
 import requests
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
-from flwr.common import now
+from flwr.supercore.date import now
 
 from .review import _download_fab, _sign_fab, _submit_review
 

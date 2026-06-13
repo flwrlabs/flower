@@ -32,7 +32,6 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import message_from_proto
-from flwr.common.typing import Fab
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -72,6 +71,7 @@ from flwr.supercore.constant import (
     NodeStatus,
     RunType,
 )
+from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_id,
