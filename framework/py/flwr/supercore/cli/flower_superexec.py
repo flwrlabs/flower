@@ -48,6 +48,7 @@ from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.utils import disable_process_dumping
 from flwr.supercore.version import package_version
 
+# Plugin types that install dependencies by default
 _SERVERAPP_PLUGIN_TYPES = {
     ExecPluginType.SERVER_APP,
     ExecPluginType.SIMULATION,
