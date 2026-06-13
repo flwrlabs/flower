@@ -227,7 +227,6 @@ def _to_json(nodes_info: list[_NodeListType], verbose: bool) -> str:
         nodes_list.append(
             {
                 "node-id": f"{node_id}",
-                "owner-aid": owner_aid,
                 "owner-name": owner_name,
                 "status": status,
                 "created-at": created_at,
