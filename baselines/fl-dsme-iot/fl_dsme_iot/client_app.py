@@ -13,7 +13,6 @@ from fl_dsme_iot.model import train as train_fn
 # Approximate size of Net() in KB: 61,770 params * 4 bytes / 1024
 MODEL_SIZE_KB = 61770 * 4 / 1024
 
-# Flower ClientApp
 app = ClientApp()
 
 
@@ -38,7 +37,6 @@ def train(msg: Message, context: Context):
     num_partitions = int(context.node_config["num-partitions"])
     fl_round = int(msg.content.config_records["config"]["server-round"])
 
-    # Build MAC model and get this client's profile for this round
     mac_model = _build_mac_model(context, num_partitions)
     profile = mac_model.get_client_profile(
         client_id=partition_id,
@@ -47,20 +45,28 @@ def train(msg: Message, context: Context):
     )
     eligible = mac_model.is_eligible(profile, model_size_kb=MODEL_SIZE_KB)
 
-    # Load global model weights
     model = Net()
     arrays = msg.content.array_records["arrays"]
     model.load_state_dict(arrays.to_torch_state_dict())
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+    # Pre-compute values used in both branches so keys are always identical
+    energy_cost = mac_model.energy_per_round_mj(
+        MODEL_SIZE_KB, int(context.run_config["local-epochs"]), profile.cap_mode
+    )
+    bw_frac = mac_model.effective_bandwidth_fraction(
+        partition_id, fl_round, profile.cap_mode
+    )
+
     if not eligible:
         # Energy-depleted: return unchanged weights, num-examples=0
-        # MetricRecord only accepts int or float values (not bool or str)
+        # ALL metric keys must match the active-client branch exactly
         metrics = {
             "train_loss": 0.0,
             "num-examples": 0,
             "skipped": 1,
-            "energy_budget_mj": float(profile.energy_budget_mj),
+            "energy_used_mj": float(energy_cost),
+            "bandwidth_frac": float(bw_frac),
             "cluster_id": float(profile.cluster_id),
             "gts_slots": float(profile.gts_slots),
         }
@@ -75,9 +81,6 @@ def train(msg: Message, context: Context):
     train_loss = train_fn(model, trainloader, local_epochs, device)
 
     # Apply GTS bandwidth mask (top-k sparsification)
-    bw_frac = mac_model.effective_bandwidth_fraction(
-        partition_id, fl_round, profile.cap_mode
-    )
     state_dict = model.state_dict()
     masked = {}
     for key, tensor in state_dict.items():
@@ -90,19 +93,14 @@ def train(msg: Message, context: Context):
             masked[key] = (flat * mask).reshape(tensor.shape)
         else:
             masked[key] = tensor.clone()
-
-    # Load masked weights back into model for ArrayRecord
     model.load_state_dict(masked)
 
-    # MetricRecord: only int or float values allowed
-    energy_used = mac_model.energy_per_round_mj(
-        MODEL_SIZE_KB, local_epochs, profile.cap_mode
-    )
+    # ALL metric keys must match the skipped-client branch exactly
     metrics = {
         "train_loss": float(train_loss),
         "num-examples": int(len(trainloader.dataset)),
         "skipped": 0,
-        "energy_used_mj": float(energy_used),
+        "energy_used_mj": float(energy_cost),
         "bandwidth_frac": float(bw_frac),
         "cluster_id": float(profile.cluster_id),
         "gts_slots": float(profile.gts_slots),

@@ -119,10 +119,13 @@ class DSMEMACModel:
         """Compute one client's energy budget and bandwidth for this round."""
         cluster_id = self._cluster_map[client_id % self.num_clients]
 
-        # Deterministic depletion: ~2.5 mJ/round average drain
-        depletion = fl_round * 2.5
-        # Periodic recharge every 5 rounds (battery/solar harvesting)
-        recharge = 8.0 * (fl_round // 5)
+        # Per-client depletion rate varies by cluster (simulates different
+        # sensor duty cycles). Recharge every 5 rounds (solar harvesting).
+        # Net: some clients deplete below CR threshold after ~10 rounds
+        # but stay above NCR threshold, illustrating SeCAP's benefit.
+        depletion_rate = 1.5 + (cluster_id % 3) * 0.8   # 1.5, 2.3, or 3.1 mJ/round
+        depletion = fl_round * depletion_rate
+        recharge = 5.0 * (fl_round // 5)
         remaining = max(5.0, self.energy_budget - depletion + recharge)
 
         cap_mode = "NCR" if (fl_round % 3 == 0 and cluster_id % 2 == 0) else "CR"
