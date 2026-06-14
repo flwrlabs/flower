@@ -1,127 +1,174 @@
----
-title: title of the paper # TODO
-url: https://arxiv.org/abs/2007.14390 # TODO: update with the link to your paper
-labels: [label1, label2] # TODO: please add between 4 and 10 single-word (maybe two-words) labels (e.g. system heterogeneity, image classification, asynchronous, weight sharing, cross-silo). Do not use "". Remove this comment once you are done.
-dataset: [dataset1, dataset2] # TODO: list of datasets you include in your baseline. Do not use "". Remove this comment once you are done.
----
+# fl-dsme-iot: Federated Learning over IEEE 802.15.4e DSME IoT Networks
 
-> [!IMPORTANT]
-> This is the template for your `README.md`. Please fill-in the information in all areas with a :warning: symbol.
-> Please refer to the [Flower Baselines contribution](https://flower.ai/docs/baselines/how-to-contribute-baselines.html) and [Flower Baselines usage](https://flower.ai/docs/baselines/how-to-use-baselines.html) guides for more details.
-> Please complete the metadata section at the very top of this README. This generates a table at the top of the file that will facilitate indexing baselines.
-> Please remove this [!IMPORTANT] block once you are done with your `README.md` as well as all the `:warning:` symbols and the comments next to them.
+## Overview
 
-> [!IMPORTANT]
-> To help having all baselines similarly formatted and structured, we have included two scripts in `baselines/dev` that when run will format your code and run some tests checking if it's formatted.
-> These checks use standard packages such as `isort`, `black`, `pylint` and others. You as a baseline creator will need to install additional packages. These are already specified in the `pyproject.toml` of
-> your baseline. Follow these steps:
+This Flower Baseline simulates federated learning over a realistic IEEE 802.15.4e DSME (Deterministic and Synchronous Multi-channel Extension) cluster-tree IoT network. 
+Each FL client is an IoT end device whose participation is governed by 
+physical MAC-layer constraints derived from two published papers:
 
-```bash
-# Create a python env
-pyenv virtualenv 3.12.12 baseline
+1. **PSO-DSME** (Anand et al., 2024) — provides the power consumption model(Eq. 3) used to compute each client's energy cost per FL round
+2. **SeCAP** (Anand et al., 2025) — provides the adaptive CAP model that determines GTS slot availability and bandwidth fraction per round
 
-# Activate it
-pyenv activate baseline
+This is the first Flower Baseline to incorporate a physical MAC-layer model for FL client selection and gradient compression.
 
-# Install project including developer packages
-# Note the `-e` this means you install it in editable mode 
-# so even if you change the code you don't need to do `pip install`
-# again. However, if you add a new dependency to `pyproject.toml` you
-# will need to re-run the command below
-pip install -e ".[dev]"
+## Novel Contributions
 
-# Even without modifying or adding new code, you can run your baseline
-# with the placeholder code generated when you did `flwr new`. If you
-# want to test this to familiarise yourself with how flower apps are
-# executed, execute this from the directory where you `pyproject.toml` is:
-flwr run .
+- **Energy-gated client participation**: before training, each client checks whether its remaining energy budget covers the DSME radio + compute cost. Depleted clients 
+return `num-examples=0` and are excluded from aggregation.
+- **GTS bandwidth masking**: after training, each client applies top-k sparsification to its gradient update, retaining only the fraction transmittable within its allocated 
+GTS slots in the CFP.
+- **SeCAP NCR mode**: when queue length exceeds the delay threshold, the coordinator switches to NCR mode (CAP in every superframe), roughly halving the radio energy cost 
+and increasing GTS availability.
+- **DSMEFedAvg**: extends FedAvg to handle rounds where all sampled clients are energy-depleted, keeping the global model unchanged (modelling a DSME beacon interval with 
+no successful transmissions).
 
-# At anypoint during the process of creating your baseline you can 
-# run the formatting script. For this do:
-cd .. # so you are in the `flower/baselines` directory
+## DSME Topology
 
-# Run the formatting script (it will auto-correct issues if possible)
-./dev/format-baseline.sh baseline
+Cluster-tree (BO=6, MO=5, SO=3):
 
-# Then, if the above is all good, run the tests.
-./dev/test-baseline.sh baseline
-```
+4 multi-superframe duration = 2^(MO-SO) = 4 superframes
+CAP slots per superframe: 8
+CFP (GTS) slots per superframe: 7
+4 clusters, 10 IoT end devices total
 
-> [!IMPORTANT]
-> When you open a PR to get the baseline merged into the main Flower repository, the `./dev/test-baseline.sh` script will run. Only if test pass, the baseline can be merged. 
-> Some issues highlighted by the tests script are easier than others to fix. Do not hesitate in reaching out for help to us (e.g. as a comment in your PR) if you are stuck with these.
-> Before opening your PR, please remove the code snippet above as well all the [!IMPORTANT] message blocks. Yes, including this one.
+## About this Baseline
 
-# :warning: *_Title of your baseline_* # Also copy this title to the `description` in the `[project]` section of your `pyproject.toml`.
+**Papers:**
+- Anand, S., Choudhury, N., Ojha, T., Hazarika, A., Dave, J.
+  "Improving Network Efficiency in Clustered Tree Topology through PSO Optimization in IEEE 802.15.4-DSME based IoT Networks." 2024.
+- Anand, S., Gorrela, A., Rahman, R., Choudhury, N., Hazarika, A.,Choudhury, D., Ojha, T. "Delay-Bounded Adaptive MAC for IEEE 802.15.4e DSME Networks: Enhancing Resilience under Bursty and Dynamic IoT Traffic" 2025.
 
-> [!NOTE] 
-> If you use this baseline in your work, please remember to cite the original authors of the paper as well as the Flower paper.
+**Task:** Image classification (CIFAR-10 as proxy for IoT sensor data)
 
-**Paper:** :warning: *_add the URL of the paper page (not to the .pdf). For instance if you link a paper on ArXiv, add here the URL to the abstract page (e.g. [paper](https://arxiv.org/abs/1512.03385)). If your paper is in from a journal or conference proceedings, please follow the same logic._*
+**Model:** Lightweight CNN (~62k parameters, ~241 KB)
 
-**Authors:** :warning: *_list authors of the paper_*
+Conv2d(3,6,5) -> MaxPool -> Conv2d(6,16,5) -> MaxPool -> FC(400,120) -> FC(120,84) -> FC(84,10)
 
-**Abstract:** :warning: *_add here the abstract of the paper you are implementing_*
-
-
-## About this baseline
-
-**What’s implemented:** :warning: *_Concisely describe what experiment(s) (e.g. Figure 1, Table 2, etc.) in the publication can be replicated by running the code. Please only use a few sentences. ”_*
-
-**Datasets:** :warning: *_List the datasets you used (if you used a medium to large dataset, >10GB please also include the sizes of the dataset). We highly recommend using [FlowerDatasets](https://flower.ai/docs/datasets/index.html) to download and partition your dataset. If you have other ways to download the data, you can also use `FlowerDatasets` to partition it._*
-
-**Hardware Setup:** :warning: *_Give some details about the hardware (e.g. a server with 8x V100 32GB and 256GB of RAM) you used to run the experiments for this baseline. Indicate how long it took to run the experiments. Someone out there might not have access to the same resources you have so, could you list the absolute minimum hardware needed to run the experiment in a reasonable amount of time ? (e.g. minimum is 1x 16GB GPU otherwise a client model can’t be trained with a sufficiently large batch size). Could you test this works too?_*
-
-**Contributors:** :warning: *_let the world know who contributed to this baseline. This could be either your name, your name and affiliation at the time, or your GitHub profile name if you prefer. If multiple contributors signed up for this baseline, please list yourself and your colleagues_*
-
+**Dataset:** CIFAR-10, IID partition across 10 clients
 
 ## Experimental Setup
 
-**Task:** :warning: *_what’s the primary task that is being federated? (e.g. image classification, next-word prediction). If you have experiments for several, please list them_*
+| Parameter | Value |
+|-----------|-------|
+| FL rounds | 20 |
+| Clients | 10 IoT end devices |
+| Clusters | 4 (BO=6, MO=5, SO=3) |
+| Fraction train | 0.5 (5 clients sampled per round) |
+| Local epochs | 1 |
+| Learning rate | 0.1 |
+| Batch size | 32 |
+| Energy budget | 60 mJ per client |
+| Base bandwidth fraction | 0.8 |
 
-**Model:** :warning: *_provide details about the model you used in your experiments (if more than use a list). If your model is small, describing it as a table would be :100:. Some FL methods do not use an off-the-shelve model (e.g. ResNet18) instead they create your own. If this is your case, please provide a summary here and give pointers to where in the paper (e.g. Appendix B.4) is detailed._*
+## Environment
 
-**Dataset:** :warning: *_Earlier you listed already the datasets that your baseline uses. Now you should include a breakdown of the details about each of them. Please include information about: how the dataset is partitioned (e.g. LDA with alpha 0.1 as default and all clients have the same number of training examples; or each client gets assigned a different number of samples following a power-law distribution with each client only instances of 2 classes)? if  your dataset is naturally partitioned just state “naturally partitioned”; how many partitions there are (i.e. how many clients)? Please include this an all information relevant about the dataset and its partitioning into a table._*
+Python 3.12
 
-**Training Hyperparameters:** :warning: *_Include a table with all the main hyperparameters in your baseline. Please show them with their default value._*
+flwr[simulation] >= 1.24.0
 
+torch == 2.8.0
 
-## Environment Setup
+torchvision == 0.23.0
 
-:warning: _Specify the steps to create and activate your environment and install the baseline project. Most baselines are expected to require minimal steps as shown below. These instructions should be comprehensive enough so anyone can run them (if non standard, describe them step-by-step)._
+Tested on Apple M1 (CPU only).
 
-:warning: _The dependencies for your baseline are listed in the `pyproject.toml`, extend it with additional packages needed for your baseline._
-
-:warning: _Baselines should use Python 3.12, [pyenv](https://github.com/pyenv/pyenv), and the [virtualenv](https://github.com/pyenv/pyenv-virtualenv) plugging. 
+## Quickstart
 
 ```bash
-# Create the virtual environment
-pyenv virtualenv 3.12.12 <name-of-your-baseline-env>
-
-# Activate it
-pyenv activate <name-of-your-baseline-env>
-
-# Install the baseline
+git clone https://github.com/adap/flower.git
+cd flower/baselines/fl-dsme-iot
 pip install -e .
+flwr run .
 ```
 
-:warning: _If your baseline requires running some script before starting an experiment, please indicate so here_.
+## Results
 
-## Running the Experiments
+20 rounds, 10 clients, CIFAR-10 IID, energy budget 60 mJ:
 
-:warning: _Make sure you have adjusted the `client-resources` in the federation in `pyproject.toml` so your simulation makes the best use of the system resources available._
+| Round | Train Loss | Eval Acc | Avg Energy (mJ) | Avg BW Frac | Notes |
+|-------|-----------|----------|----------------|-------------|-------|
+| 1  | 2.176 | 11.0% | 51.8 | 0.798 | All active (CR mode) |
+| 3  | 2.061 | 17.1% | 39.1 | 0.779 | NCR clients: 39.1 mJ |
+| 5  | 2.033 | 23.7% | 51.8 | 0.781 | |
+| 9  | 2.029 | 24.8% | 20.1 | 0.888 | Full NCR: 20.1 mJ |
+| 10 | 2.009 | 26.4% | 51.8 | 0.763 | |
+| 12 | 2.027 | 23.1% | 20.1 | 0.882 | NCR clients active |
+| 13 | — | 23.1% | — | — | All depleted: model held |
+| 15 | 1.994 | 28.0% | 27.9 | 0.877 | Best eval accuracy |
+| 18 | 1.967 | 25.8% | 20.1 | 0.880 | NCR saves 61% energy |
+| 20 | — | 25.8% | — | — | All depleted: model held |
 
-:warning: _Your baseline implementation should replicate several of the experiments in the original paper. Please include here the exact command(s) needed to run each of those experiments followed by a figure (e.g. a line plot) or table showing the results you obtained when you ran the code. Below is an example of how you can present this. Please add command followed by results for all your experiments._
+**Key observations:**
+- Train loss decreased from **2.18 → 1.97** over active rounds
+- Eval accuracy peaked at **28.0%** (round 15), final **25.8%** (round 20)
+- Rounds 13, 14, 16, 17, 19, 20: all sampled clients energy-depleted —
+  DSMEFedAvg held the global model unchanged (DSME beacon skip)
+- SeCAP NCR mode reduced energy cost from 51.8 mJ → 20.1 mJ (**61% saving**)
+- GTS bandwidth fraction ranged **0.75–0.89** per round
 
-:warning: _You might want to add more hyperparameters and settings for your baseline. You can do so by extending `[tool.flwr.app.config]` in `pyproject.toml`. In addition, you can create a new `.toml` file that can be passed with the `--run-config` command (see below an example) to override several config values **already present** in `pyproject.toml`._
-```bash
-# it is likely that for one experiment you need to override some arguments.
-flwr run . --run-config learning-rate=0.1,coefficient=0.123
+## Configuration
 
-# or you might want to load different `.toml` configs all together:
-flwr run . --run-config <my-big-experiment-config>.toml
+All hyperparameters are set in `pyproject.toml` under `[tool.flwr.app.config]`:
+
+```toml
+num-server-rounds = 20
+fraction-train = 0.5
+local-epochs = 1
+
+# DSME cluster-tree topology
+bo = 6
+mo = 5
+so = 3
+num-clusters = 4
+
+# MAC-layer energy budget per client per FL round (mJ)
+energy-budget-mj = 60.0
+
+# GTS bandwidth constraint
+bandwidth-fraction = 0.8
 ```
 
-:warning: _It is preferable to show a single command (or multiple commands if they belong to the same experiment) and then a table/plot with the expected results, instead of showing all the commands first and then all the results/plots._
-:warning: _If you present plots or other figures, please include either a Jupyter notebook showing how to create them or include a utility function that can be called after the experiments finish running._
-:warning: If you include plots or figures, save them in `.png` format and place them in a new directory named `_static` at the same level as your `README.md`.
+## File Structure
+fl-dsme-iot/
+
+├── fl_dsme_iot/
+
+│   ├── client_app.py    # DSME-gated FL client with energy check + BW mask
+
+│   ├── server_app.py    # DSMEFedAvg: handles all-depleted rounds gracefully
+
+│   ├── dsme_model.py    # MAC-layer energy/bandwidth model (PSO + SeCAP)
+
+│   ├── model.py         # Lightweight CNN for CIFAR-10
+
+│   ├── dataset.py       # CIFAR-10 data loading and partitioning
+
+│   └── strategy.py      # (reserved for future custom strategy extensions)
+
+├── pyproject.toml
+
+└── README.md
+\## Citation
+
+If you use this baseline, please cite:
+
+```bibtex
+@inproceedings{anand2024psodsme,
+  author    = {Anand, Sonali and Choudhury, Nikumani and Ojha, Tamoghna
+               and Hazarika, Anakhi and Dave, Jay},
+  title     = {Improving Network Efficiency in Clustered Tree Topology
+               through {PSO} Optimization in {IEEE} 802.15.4-{DSME}
+               based {IoT} Networks},
+  year      = {2024}
+}
+
+@inproceedings{anand2025secap,
+  author    = {Anand, Sonali and Gorrela, Alekhya and Rahman, Raziur
+               and Choudhury, Nikumani and Hazarika, Anakhi
+               and Choudhury, Dipamani and Ojha, Tamoghna},
+  title     = {Delay-Bounded Adaptive {MAC} for {IEEE} 802.15.4e {DSME}
+               Networks: Enhancing Resilience under Bursty and Dynamic
+               {IoT} Traffic},
+  year      = {2025}
+}
+```
