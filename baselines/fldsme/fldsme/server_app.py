@@ -1,4 +1,4 @@
-"""fl_dsme_iot: ServerApp - PAN Coordinator with energy-aware aggregation."""
+"""fldsme: ServerApp - PAN Coordinator with energy-aware aggregation."""
 
 from collections.abc import Iterable
 
@@ -7,7 +7,7 @@ from flwr.app import ArrayRecord, Context, Message, MetricRecord
 from flwr.serverapp import Grid, ServerApp
 from flwr.serverapp.strategy import FedAvg
 
-from fl_dsme_iot.model import Net
+from fldsme.model import Net
 
 app = ServerApp()
 

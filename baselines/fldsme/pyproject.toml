@@ -8,7 +8,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "fl-dsme-iot"
+name = "fldsme"
 version = "1.0.0"
 description = "Base app to create a Flower Baseline"
 license = "Apache-2.0"
@@ -118,7 +118,7 @@ ignore = ["B024", "B027", "D205", "D209"]
 convention = "numpy"
 
 [tool.hatch.build.targets.wheel]
-packages = ["fl_dsme_iot"]
+packages = ["fldsme"]
 
 [tool.flwr.app]
 publisher = "sonali-anand"
@@ -126,8 +126,8 @@ publisher = "sonali-anand"
 # Point to your ServerApp and ClientApp objects
 # Format: "<module>:<object>"
 [tool.flwr.app.components]
-serverapp = "fl_dsme_iot.server_app:app"
-clientapp = "fl_dsme_iot.client_app:app"
+serverapp = "fldsme.server_app:app"
+clientapp = "fldsme.client_app:app"
 
 # Custom config values accessible via `context.run_config`
 [tool.flwr.app.config]

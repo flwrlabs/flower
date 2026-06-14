@@ -1,4 +1,4 @@
-# fl-dsme-iot: Federated Learning over IEEE 802.15.4e DSME IoT Networks
+# fldsme: Federated Learning over IEEE 802.15.4e DSME IoT Networks
 
 <div align="center">
 
@@ -201,7 +201,7 @@ Total parameters: ~61,770 (~241 KB)
 
 ```bash
 git clone https://github.com/adap/flower.git
-cd flower/baselines/fl-dsme-iot
+cd flower/baselines/fldsme
 
 python3.12 -m venv venv
 source venv/bin/activate
@@ -251,9 +251,9 @@ bandwidth-fraction = 0.8
 
 ## File Structure
 ```
-fl-dsme-iot/
+fldsme/
 
-|-- fl_dsme_iot/
+|-- fldsme/
 |   |-- init.py
 |   |-- client_app.py    # Energy gate + GTS bandwidth mask
 |   |-- server_app.py    # DSMEFedAvg: handles all-depleted rounds

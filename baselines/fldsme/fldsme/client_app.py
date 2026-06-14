@@ -1,14 +1,14 @@
-"""fl_dsme_iot: Flower Baseline - FL over IEEE 802.15.4e DSME IoT Networks."""
+"""fldsme: Flower Baseline - FL over IEEE 802.15.4e DSME IoT Networks."""
 
 import torch
 from flwr.app import ArrayRecord, Context, Message, MetricRecord, RecordDict
 from flwr.clientapp import ClientApp
 
-from fl_dsme_iot.dataset import load_data
-from fl_dsme_iot.dsme_model import DSMEMACModel
-from fl_dsme_iot.model import Net
-from fl_dsme_iot.model import test as test_fn
-from fl_dsme_iot.model import train as train_fn
+from fldsme.dataset import load_data
+from fldsme.dsme_model import DSMEMACModel
+from fldsme.model import Net
+from fldsme.model import test as test_fn
+from fldsme.model import train as train_fn
 
 # Approximate size of Net() in KB: 61,770 params * 4 bytes / 1024
 MODEL_SIZE_KB = 61770 * 4 / 1024
