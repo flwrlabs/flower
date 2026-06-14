@@ -135,6 +135,18 @@ num-server-rounds = 3
 fraction-train = 0.5
 local-epochs = 1
 
+# DSME cluster-tree topology (matches Anand et al. PSO-DSME / SeCAP papers)
+bo = 6
+mo = 5
+so = 3
+num-clusters = 4
+
+# MAC-layer energy budget per client per FL round (mJ)
+energy-budget-mj = 60.0
+
+# GTS bandwidth constraint: base fraction of model transmittable per round
+bandwidth-fraction = 0.8
+
 # Default federation to use when running the app
 
 #######################################################################
