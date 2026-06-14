@@ -250,6 +250,7 @@ bandwidth-fraction = 0.8
 ---
 
 ## File Structure
+```
 fl-dsme-iot/
 
 |-- fl_dsme_iot/
@@ -263,6 +264,7 @@ fl-dsme-iot/
 |   +-- utils.py
 |-- pyproject.toml
 +-- README.md
+```
 
 ---
 
