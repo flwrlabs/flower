@@ -35,6 +35,7 @@ def train(net, trainloader, epochs, device):
     optimizer = torch.optim.SGD(net.parameters(), lr=0.1, momentum=0.9)
     net.train()
     running_loss = 0.0
+    num_batches = 0
     for _ in range(epochs):
         for batch in trainloader:
             images = batch["img"]
@@ -44,8 +45,9 @@ def train(net, trainloader, epochs, device):
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
+            num_batches += 1
 
-    avg_trainloss = running_loss / len(trainloader)
+    avg_trainloss = running_loss / num_batches
     return avg_trainloss
 
 
