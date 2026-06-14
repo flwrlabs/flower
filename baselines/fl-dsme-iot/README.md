@@ -253,25 +253,15 @@ bandwidth-fraction = 0.8
 fl-dsme-iot/
 
 |-- fl_dsme_iot/
-|
 |   |-- init.py
-|
 |   |-- client_app.py    # Energy gate + GTS bandwidth mask
-|
 |   |-- server_app.py    # DSMEFedAvg: handles all-depleted rounds
-|
 |   |-- dsme_model.py    # MAC-layer model: PSO Eq.3 + SeCAP bandwidth
-|
 |   |-- model.py         # Lightweight CNN for CIFAR-10
-|
 |   |-- dataset.py       # CIFAR-10 loading and partitioning
-|
 |   |-- strategy.py      # Reserved for future extensions
-|
 |   +-- utils.py
-|
 |-- pyproject.toml
-|
 +-- README.md
 
 ---
