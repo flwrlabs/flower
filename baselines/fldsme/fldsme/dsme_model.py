@@ -40,7 +40,6 @@ class DSMEMACModel:
         num_clusters: int = 4,
         energy_budget: float = 60.0,
         bandwidth_frac: float = 0.8,
-        seed: int = 42,
     ):
         self.bo = bo
         self.mo = mo
@@ -49,7 +48,6 @@ class DSMEMACModel:
         self.num_clusters = num_clusters
         self.energy_budget = energy_budget
         self.bandwidth_frac = bandwidth_frac
-        self._rng = np.random.default_rng(seed)
         self._cluster_map = {i: i % num_clusters for i in range(num_clients)}
 
     @property
