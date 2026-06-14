@@ -6,9 +6,9 @@ Paper 1 (PSO-DSME): Power model P = 2^(MO-SO)*{Ptx*Ttx+Prx*Trx+Pidle*Tidle}/TMD
 Paper 2 (SeCAP):    Adaptive CAP -> effective service rate changes per round
 """
 
-import numpy as np
 from dataclasses import dataclass
 
+import numpy as np
 
 P_TX_MW = 255.0
 P_RX_MW = 135.0
@@ -54,11 +54,11 @@ class DSMEMACModel:
 
     @property
     def superframe_duration_s(self) -> float:
-        return BASE_SF_SYMBOLS * (2 ** self.so) * SYMBOL_DURATION_S
+        return BASE_SF_SYMBOLS * (2**self.so) * SYMBOL_DURATION_S
 
     @property
     def multisf_duration_s(self) -> float:
-        return BASE_SF_SYMBOLS * (2 ** self.mo) * SYMBOL_DURATION_S
+        return BASE_SF_SYMBOLS * (2**self.mo) * SYMBOL_DURATION_S
 
     def power_consumption_mw(
         self, packet_size_bytes: int = 250, cap_mode: str = "CR"
@@ -67,7 +67,7 @@ class DSMEMACModel:
         data_rate_bps = 650e3
         t_tx = (packet_size_bytes * 8) / data_rate_bps
         t_rx = t_tx * 1.1
-        t_idle = self.superframe_duration_s * (2 ** self.bo + 1)
+        t_idle = self.superframe_duration_s * (2**self.bo + 1)
 
         if cap_mode == "NCR":
             t_idle *= 0.6
@@ -75,9 +75,7 @@ class DSMEMACModel:
         t_md = self.multisf_duration_s
         sf = 2 ** (self.mo - self.so)
 
-        return float(
-            sf * (P_TX_MW * t_tx + P_RX_MW * t_rx + P_IDLE_MW * t_idle) / t_md
-        )
+        return float(sf * (P_TX_MW * t_tx + P_RX_MW * t_rx + P_IDLE_MW * t_idle) / t_md)
 
     def energy_per_round_mj(
         self, model_size_kb: float, n_local_epochs: int = 1, cap_mode: str = "CR"
@@ -113,7 +111,10 @@ class DSMEMACModel:
         return float(np.clip(base + variation, 0.3, 1.0))
 
     def get_client_profile(
-        self, client_id: int, fl_round: int, model_size_kb: float,
+        self,
+        client_id: int,
+        fl_round: int,
+        model_size_kb: float,
         n_local_epochs: int = 1,
     ) -> DSMEClientProfile:
         """Compute one client's energy budget and bandwidth for this round."""
@@ -123,15 +124,16 @@ class DSMEMACModel:
         # sensor duty cycles). Recharge every 5 rounds (solar harvesting).
         # Net: some clients deplete below CR threshold after ~10 rounds
         # but stay above NCR threshold, illustrating SeCAP's benefit.
-        depletion_rate = 1.5 + (cluster_id % 3) * 0.8   # 1.5, 2.3, or 3.1 mJ/round
+        depletion_rate = 1.5 + (cluster_id % 3) * 0.8  # 1.5, 2.3, or 3.1 mJ/round
         depletion = fl_round * depletion_rate
         recharge = 5.0 * (fl_round // 5)
         remaining = max(5.0, self.energy_budget - depletion + recharge)
 
         cap_mode = "NCR" if (fl_round % 3 == 0 and cluster_id % 2 == 0) else "CR"
 
-        gts = max(1, int(7 * self.effective_bandwidth_fraction(
-            client_id, fl_round, cap_mode)))
+        gts = max(
+            1, int(7 * self.effective_bandwidth_fraction(client_id, fl_round, cap_mode))
+        )
 
         return DSMEClientProfile(
             client_id=client_id,
@@ -142,7 +144,9 @@ class DSMEMACModel:
         )
 
     def is_eligible(
-        self, profile: DSMEClientProfile, model_size_kb: float,
+        self,
+        profile: DSMEClientProfile,
+        model_size_kb: float,
         n_local_epochs: int = 1,
     ) -> bool:
         """True if the client has enough energy to participate this round."""

@@ -1,7 +1,8 @@
 """fl_dsme_iot: ServerApp - PAN Coordinator with energy-aware aggregation."""
 
-import torch
 from collections.abc import Iterable
+
+import torch
 from flwr.app import ArrayRecord, Context, Message, MetricRecord
 from flwr.serverapp import Grid, ServerApp
 from flwr.serverapp.strategy import FedAvg
@@ -34,9 +35,7 @@ class DSMEFedAvg(FedAvg):
         for msg in replies_list:
             if not msg.has_error():
                 try:
-                    n = msg.content.metric_records["metrics"].get(
-                        "num-examples", 0
-                    )
+                    n = msg.content.metric_records["metrics"].get("num-examples", 0)
                     total_examples += int(n)
                 except (KeyError, AttributeError):
                     pass
