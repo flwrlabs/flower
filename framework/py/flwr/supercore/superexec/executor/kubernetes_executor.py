@@ -95,9 +95,8 @@ def create_incluster_kubernetes_client() -> KubernetesClient:
         kubernetes_client = importlib.import_module("kubernetes.client")
         kubernetes_config = importlib.import_module("kubernetes.config")
     except ModuleNotFoundError as exc:
-        if exc.name == "kubernetes" or (
-            exc.name is not None and exc.name.startswith("kubernetes.")
-        ):
+        missing_module = exc.name
+        if missing_module in {"kubernetes", "kubernetes.client", "kubernetes.config"}:
             raise RuntimeError(
                 "Kubernetes Python client package is required for the Kubernetes "
                 "executor. Install the official 'kubernetes' package in the "
