@@ -16,6 +16,7 @@
 
 
 from logging import ERROR
+from typing import ClassVar
 
 from flwr.common.logger import log
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
@@ -28,15 +29,23 @@ class ServerAppEphemeralExecPlugin(BaseEphemeralExecPlugin):
     """Simple ephemeral Flower SuperExec plugin for ServerApp processes."""
 
     appio_api_address_arg = "--serverappio-api-address"
+    supported_task_types: ClassVar[frozenset[TaskType]] = frozenset(
+        {
+            TaskType.AGENT_APP,
+            TaskType.MODEL,
+            TaskType.SERVER_APP,
+            TaskType.SIMULATION,
+        }
+    )
 
     def launch_task(self, token: str, task: Task) -> None:  # type: ignore[override]
         """Launch the process to execute the given task using the given token."""
-        # Determine the command to launch based on the task type
-        if task.type == TaskType.SERVER_APP:
-            self.command = "flwr-serverapp"
-        elif task.type == TaskType.SIMULATION:
-            self.command = "flwr-simulation"
-        else:
+        try:
+            task_type = TaskType(task.type)
+        except ValueError:
+            task_type = None
+
+        if task_type not in self.supported_task_types:
             log(
                 ERROR,
                 "Unknown task type '%s' for task_id %d.",
@@ -44,6 +53,8 @@ class ServerAppEphemeralExecPlugin(BaseEphemeralExecPlugin):
                 task.task_id,
             )
             return
+
+        self.command = task_type.value
 
         # Launch the TaskExecutor process
         super().launch_task(token, task)
