@@ -21,6 +21,8 @@ from unittest.mock import Mock
 
 import pytest
 
+from flwr.common.exit import ExitCode
+from flwr.supercore.constant import ExecutorType
 from flwr.supercore.interceptors import (
     RuntimeVersionClientInterceptor,
     SuperExecAuthClientInterceptor,
@@ -108,6 +110,61 @@ def test_run_superexec_adds_runtime_version_interceptor(
 
     assert tuple(type(interceptor) for interceptor in captured["interceptors"]) == (
         expected_interceptor_types
+    )
+
+
+def test_run_superexec_passes_executor_config_to_factory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SuperExec should pass selected executor config to the factory."""
+    channel = Mock()
+    stub = Mock()
+    stub.PullPendingTasks.side_effect = KeyboardInterrupt()
+    executor_config = {"namespace": "flower-system", "image": "taskexecutor:dev"}
+    get_executor = Mock(return_value=Mock())
+
+    monkeypatch.setattr(
+        run_superexec_module, "create_channel", Mock(return_value=channel)
+    )
+    monkeypatch.setattr(run_superexec_module, "register_signal_handlers", Mock())
+    monkeypatch.setattr(run_superexec_module, "wrap_stub", Mock())
+    monkeypatch.setattr(run_superexec_module, "get_executor", get_executor)
+
+    with pytest.raises(KeyboardInterrupt):
+        run_superexec_module.run_superexec(
+            plugin_class=Mock(),
+            stub_class=Mock(return_value=stub),
+            appio_api_address="127.0.0.1:9091",
+            insecure=True,
+            executor_type=ExecutorType.KUBERNETES,
+            executor_config=executor_config,
+        )
+
+    get_executor.assert_called_once_with(
+        ExecutorType.KUBERNETES, executor_config=executor_config
+    )
+
+
+def test_run_superexec_exits_for_invalid_executor_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """SuperExec should exit with executor-config failure before task
+    polling."""
+    flwr_exit = Mock(side_effect=SystemExit())
+    monkeypatch.setattr(run_superexec_module, "flwr_exit", flwr_exit)
+
+    with pytest.raises(SystemExit):
+        run_superexec_module.run_superexec(
+            plugin_class=Mock(),
+            stub_class=Mock(),
+            appio_api_address="127.0.0.1:9091",
+            insecure=True,
+            executor_type=ExecutorType.KUBERNETES,
+        )
+
+    flwr_exit.assert_called_once_with(
+        ExitCode.SUPEREXEC_INVALID_EXECUTOR_CONFIG,
+        "Kubernetes executor requires --executor-config.",
     )
 
 
