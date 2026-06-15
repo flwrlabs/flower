@@ -6,7 +6,7 @@ from typing import cast
 
 import wandb
 from flwr.app import Context, Message, MessageType
-from flwr.client.typing import ClientAppCallable, Mod
+from flwr.clientapp.typing import ClientAppCallable, Mod
 from torch.utils.tensorboard.writer import SummaryWriter
 
 

@@ -20,7 +20,6 @@ from typing import Any
 
 from flwr.app import Error, Message, Metadata
 from flwr.app.message import make_message
-from flwr.common import now
 from flwr.common.constant import HEARTBEAT_PATIENCE, SUPERLINK_NODE_ID, ErrorCode
 from flwr.common.serde import recorddict_from_proto, recorddict_to_proto
 from flwr.common.serde_utils import error_from_proto, error_to_proto
@@ -32,6 +31,7 @@ from flwr.supercore.constant import SYSTEM_MESSAGE_TYPE, RunType, TaskType
 from flwr.supercore.corestate.utils import (
     generate_rand_int_from_bytes as corestate_generate_rand_int_from_bytes,
 )
+from flwr.supercore.date import now
 from flwr.supercore.utils import int64_to_uint64, uint64_to_int64
 
 # pylint: enable=E0611

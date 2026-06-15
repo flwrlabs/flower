@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Metrics collected by the Virtual Client Engine."""
+"""Metrics collected by the Simulation Runtime."""
 
 
 import threading

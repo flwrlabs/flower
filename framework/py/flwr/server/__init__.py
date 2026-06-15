@@ -15,9 +15,13 @@
 """Flower server."""
 
 
+from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
+from ..compat.server import ServerAppComponents as ServerAppComponents
 from ..compat.server.app import start_server as start_server  # Deprecated
+from ..compat.server.grid import Driver as Driver
+from ..serverapp import Grid as Grid
 from . import strategy
 from . import workflow as workflow
 from .client_manager import ClientManager as ClientManager
@@ -26,35 +30,23 @@ from .compat import LegacyContext as LegacyContext
 from .history import History as History
 from .server import Server as Server
 from .server_config import ServerConfig as ServerConfig
-from .serverapp_components import ServerAppComponents as ServerAppComponents
 
 if TYPE_CHECKING:
-    from flwr.compat.server.grid import Driver as Driver
-    from flwr.serverapp import Grid as Grid
     from flwr.serverapp import ServerApp as ServerApp
+
+_LAZY_EXPORTS: dict[str, tuple[str, str | None]] = {
+    "ServerApp": ("flwr.serverapp", "ServerApp"),
+}
 
 
 def __getattr__(name: str) -> Any:
     """Lazily resolve compatibility exports."""
-    if name == "Driver":
-        # pylint: disable=import-outside-toplevel
-        from flwr.compat.server.grid import Driver
-
-        # pylint: enable=import-outside-toplevel
-        globals()[name] = Driver
-        return Driver
-    if name == "Grid":
-        # pylint: disable=import-outside-toplevel
-        from flwr.serverapp import Grid
-
-        # pylint: enable=import-outside-toplevel
-        globals()[name] = Grid
-        return Grid
-    if name == "ServerApp":
-        from flwr.serverapp import ServerApp  # pylint: disable=import-outside-toplevel
-
-        globals()[name] = ServerApp
-        return ServerApp
+    if name in _LAZY_EXPORTS:
+        module_name, attr_name = _LAZY_EXPORTS[name]
+        module = import_module(module_name)
+        value = module if attr_name is None else getattr(module, attr_name)
+        globals()[name] = value
+        return value
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
