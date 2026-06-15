@@ -16,6 +16,7 @@
 
 
 import warnings
+from collections.abc import Hashable, Sequence
 
 import pandas as pd
 
@@ -205,7 +206,7 @@ def compute_frequencies(
 
 
 def _compute_counts(
-    labels: list[int] | list[str], unique_labels: list[int] | list[str]
+    labels: Sequence[Hashable], unique_labels: Sequence[Hashable]
 ) -> pd.Series:
     """Compute the count of labels when taking into account all possible labels.
 
@@ -236,7 +237,7 @@ def _compute_counts(
 
 
 def _compute_frequencies(
-    labels: list[int] | list[str], unique_labels: list[int] | list[str]
+    labels: Sequence[Hashable], unique_labels: Sequence[Hashable]
 ) -> pd.Series:
     """Compute the distribution of labels when taking into account all possible labels.
 
