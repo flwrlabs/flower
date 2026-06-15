@@ -294,6 +294,7 @@ class CompletedPodSweeper:
             if credential_secret_name in task_secret_names:
                 self._delete_secret(credential_secret_name)
 
+        # Delete credential Secrets whose owner Pod is no longer listed.
         for secret in secrets:
             secret_name = _object_name(secret)
             if secret_name is None or not _has_task_id_label(secret):
@@ -502,6 +503,7 @@ def _labels(
     labels: JSONObject = {}
     if config.labels is not None:
         labels.update(config.labels)
+    # Apply executor-owned labels last; selectors and cleanup rely on them.
     labels.update(
         {
             "app.kubernetes.io/name": "flower",

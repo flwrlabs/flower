@@ -25,6 +25,7 @@ from flwr.supercore.constant import TaskType
 from . import kubernetes_executor as kube
 from .kubernetes_executor import (
     _COMPLETED_POD_SWEEP_INTERVAL_SECONDS,
+    _TASK_ID_LABEL,
     APPIO_CREDENTIALS_MOUNT_PATH,
     APPIO_ROOT_CERTIFICATES_FILE_PATH,
     APPIO_TOKEN_FILE_PATH,
@@ -95,7 +96,7 @@ def _appio_root_certificates(
 
 def _task_labels(task_id: int) -> dict[str, str]:
     labels = _taskexecutor_labels()
-    labels["flower.ai/superexec-task-id"] = str(task_id)
+    labels[_TASK_ID_LABEL] = str(task_id)
     return labels
 
 
