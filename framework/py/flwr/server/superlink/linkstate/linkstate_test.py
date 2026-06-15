@@ -647,7 +647,7 @@ class StateTest(CoreStateTest):
         assert datetime.fromisoformat(actual_message_ins.metadata.delivered_at) > dt
         assert actual_message_ins.metadata.ttl > 0
 
-    @parameterized.expand([False, True])
+    @parameterized.expand([(False,), (True,)])  # type: ignore
     def test_store_message_ins_duplicate_same_message_is_idempotent(
         self, deliver_before_retry: bool
     ) -> None:
