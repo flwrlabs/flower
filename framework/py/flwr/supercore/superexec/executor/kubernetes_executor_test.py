@@ -36,6 +36,7 @@ from .kubernetes_executor import (
     _build_appio_credentials_secret,
     _build_taskexecutor_pod,
     _get_appio_root_certificates,
+    create_incluster_kubernetes_client,
 )
 from .types import ExecutionSpec, LaunchResultStatus
 
@@ -54,6 +55,75 @@ _POD_NAME = f"flwr-taskexecutor-123-{_LAUNCH_ATTEMPT_ID}"
 _NEXT_POD_NAME = f"flwr-taskexecutor-123-{_NEXT_LAUNCH_ATTEMPT_ID}"
 _SECRET_NAME = f"{_POD_NAME}-appio"
 _NEXT_SECRET_NAME = f"{_NEXT_POD_NAME}-appio"
+
+
+def test_create_incluster_kubernetes_client_loads_config_before_api(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test in-cluster auth loads before CoreV1Api construction."""
+    core_v1_api = Mock()
+    calls: list[str] = []
+    client_module = Mock()
+    config_module = Mock()
+
+    def core_v1_api_factory() -> object:
+        calls.append("CoreV1Api")
+        return core_v1_api
+
+    def load_incluster_config() -> None:
+        calls.append("load_incluster_config")
+
+    client_module.CoreV1Api.side_effect = core_v1_api_factory
+    config_module.load_incluster_config.side_effect = load_incluster_config
+    modules = {
+        "kubernetes.client": client_module,
+        "kubernetes.config": config_module,
+    }
+    monkeypatch.setattr(kube.importlib, "import_module", modules.__getitem__)
+
+    client = create_incluster_kubernetes_client()
+
+    assert client is core_v1_api
+    assert calls == ["load_incluster_config", "CoreV1Api"]
+
+
+def test_create_incluster_kubernetes_client_fails_if_package_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test missing Kubernetes package raises clear construction error."""
+
+    def import_module(_name: str) -> object:
+        raise ModuleNotFoundError("No module named 'kubernetes'", name="kubernetes")
+
+    monkeypatch.setattr(kube.importlib, "import_module", import_module)
+
+    with pytest.raises(
+        RuntimeError,
+        match="Kubernetes Python client package is required",
+    ):
+        create_incluster_kubernetes_client()
+
+
+def test_create_incluster_kubernetes_client_fails_if_auth_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test unavailable in-cluster auth raises a clear construction error."""
+    client_module = Mock()
+    config_module = Mock()
+    config_module.load_incluster_config.side_effect = RuntimeError("missing host")
+    modules = {
+        "kubernetes.client": client_module,
+        "kubernetes.config": config_module,
+    }
+    monkeypatch.setattr(kube.importlib, "import_module", modules.__getitem__)
+
+    with pytest.raises(
+        RuntimeError,
+        match="Failed to load in-cluster Kubernetes configuration",
+    ):
+        create_incluster_kubernetes_client()
+
+    client_module.CoreV1Api.assert_not_called()
 
 
 def _execution_spec(**overrides: Any) -> ExecutionSpec:
