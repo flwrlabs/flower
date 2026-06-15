@@ -48,7 +48,7 @@ class ServerAppEphemeralExecPlugin(BaseEphemeralExecPlugin):
         if task_type not in self.supported_task_types:
             log(
                 ERROR,
-                "Unknown task type '%s' for task_id %d.",
+                "Unsupported task type '%s' for task_id %d.",
                 task.type,
                 task.task_id,
             )
