@@ -26,7 +26,7 @@ from .base_ephemeral_exec_plugin import BaseEphemeralExecPlugin
 
 
 class ServerAppEphemeralExecPlugin(BaseEphemeralExecPlugin):
-    """Simple ephemeral Flower SuperExec plugin for ServerApp processes."""
+    """Simple ephemeral Flower SuperExec plugin for task processes."""
 
     appio_api_address_arg = "--serverappio-api-address"
     supported_task_types: ClassVar[frozenset[TaskType]] = frozenset(
