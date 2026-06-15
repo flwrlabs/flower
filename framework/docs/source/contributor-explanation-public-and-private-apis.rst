@@ -114,21 +114,18 @@ docs.
 
 We also use this to define the public API of private subpackages. Public, in this
 context, means the API that other ``flwr`` subpackages should use. For example,
-``flwr.server.grid`` is a private subpackage (it's not exported via
-``src/py/flwr/server/__init__.py``'s ``__all__``).
+``flwr.superlink.grid`` is a private subpackage (it's not re-exported via
+``src/py/flwr/superlink/__init__.py``).
 
-Still, the private sub-package ``flwr.server.grid`` defines a "public" API using
-``__all__`` in ``src/py/flwr/server/grid/__init__.py``:
+Still, the private sub-package ``flwr.superlink.grid`` defines a "public" API using
+``__all__`` in ``src/py/flwr/superlink/grid/__init__.py``:
 
 .. code-block:: python
 
-    from .grid import Driver, Grid
     from .grpc_grid import GrpcGrid
     from .inmemory_grid import InMemoryGrid
 
     __all__ = [
-        "Driver",
-        "Grid",
         "GrpcGrid",
         "InMemoryGrid",
     ]
@@ -136,11 +133,11 @@ Still, the private sub-package ``flwr.server.grid`` defines a "public" API using
 The interesting part is that both ``GrpcGrid`` and ``InMemoryGrid`` are never used by
 Flower framework users, only by other parts of the Flower framework codebase. Those
 other parts of the codebase import, for example, ``InMemoryGrid`` using ``from
-flwr.server.driver import InMemoryGrid`` (i.e., the ``InMemoryGrid`` exported via
-``__all__``), not ``from flwr.server.driver.in_memory_driver import InMemoryGrid``
-(``in_memory_driver.py`` is the module containing the actual ``InMemoryGrid`` class
+flwr.superlink.grid import InMemoryGrid`` (i.e., the ``InMemoryGrid`` exported via
+``__all__``), not ``from flwr.superlink.grid.inmemory_grid import InMemoryGrid``
+(``inmemory_grid.py`` is the module containing the actual ``InMemoryGrid`` class
 definition).
 
-This is because ``flwr.server.driver`` defines a public interface for other ``flwr``
-subpackages. This allows codeowners of ``flwr.server.driver`` to refactor the package
+This is because ``flwr.superlink.grid`` defines a public interface for other ``flwr``
+subpackages. This allows codeowners of ``flwr.superlink.grid`` to refactor the package
 without breaking other ``flwr``-internal users.

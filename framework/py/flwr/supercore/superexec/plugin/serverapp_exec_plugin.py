@@ -12,17 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Simple Flower SuperExec plugin for ServerApp."""
+"""Simple Flower SuperExec plugin for task processes."""
 
+
+from flwr.supercore.constant import TaskType
 
 from .base_exec_plugin import BaseExecPlugin
 
 
 class ServerAppExecPlugin(BaseExecPlugin):
-    """Simple Flower SuperExec plugin for ServerApp.
+    """Simple Flower SuperExec plugin for task processes.
 
-    The plugin always selects the first candidate run ID.
+    The plugin always selects the first candidate task.
     """
 
-    command = "flwr-serverapp"
-    appio_api_address_arg = "--serverappio-api-address"
+    suppress_output = True
+    supported_task_types = frozenset(
+        {
+            TaskType.AGENT_APP,
+            TaskType.MODEL,
+            TaskType.SERVER_APP,
+            TaskType.SIMULATION,
+        }
+    )

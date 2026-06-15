@@ -17,6 +17,7 @@
 
 import unittest
 from copy import deepcopy
+from typing import Any
 
 from parameterized import parameterized
 
@@ -27,9 +28,9 @@ from flwr.server.superlink.linkstate.linkstate_test import create_ins_message
 from flwr.server.superlink.linkstate.utils import dict_to_message, message_to_dict
 
 from .utils import (
+    build_params,
     convert_sint64_values_in_dict_to_uint64,
     convert_uint64_values_in_dict_to_sint64,
-    generate_rand_int_from_bytes,
 )
 
 
@@ -92,13 +93,6 @@ class UtilsTest(unittest.TestCase):
         convert_sint64_values_in_dict_to_uint64(input_dict, keys)
         self.assertEqual(input_dict, expected_dict)
 
-    def test_generate_rand_int_from_bytes_unsigned_int(self) -> None:
-        """Test that the generated integer is unsigned (non-negative)."""
-        for num_bytes in range(1, 9):
-            with self.subTest(num_bytes=num_bytes):
-                rand_int = generate_rand_int_from_bytes(num_bytes)
-                self.assertGreaterEqual(rand_int, 0)
-
     @parameterized.expand([(False,), (True,)])  # type: ignore
     def test_message_to_dict_and_back(self, has_error: bool) -> None:
         """Check if all required keys are included in return value."""
@@ -143,3 +137,25 @@ class UtilsTest(unittest.TestCase):
         else:
             assert res_msg.content == msg.content
         assert res_msg.metadata == msg.metadata
+
+    @parameterized.expand(  # type: ignore
+        [
+            # Typical case: multiple values
+            ("a", [10, 20, 30], ":a_0,:a_1,:a_2", {"a_0": 10, "a_1": 20, "a_2": 30}),
+            # Single value
+            ("x", ["hello"], ":x_0", {"x_0": "hello"}),
+            # Empty sequence
+            ("p", [], "", {}),
+        ]
+    )
+    def test_build_params(
+        self,
+        prefix: str,
+        values: list[Any],
+        expected_placeholders: str,
+        expected_params: dict[str, Any],
+    ) -> None:
+        """Test that build_params returns correct placeholders and param dict."""
+        placeholders, params = build_params(values, prefix)
+        self.assertEqual(placeholders, expected_placeholders)
+        self.assertEqual(params, expected_params)

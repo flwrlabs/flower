@@ -2,14 +2,14 @@ Use Baselines
 =============
 
 .. warning::
-  We are changing the way we structure the Flower baselines. While we complete the transition to the new format, you can still find the existing baselines and use them: `baselines (old) <https://github.com/adap/flower/tree/main/baselines/flwr_baselines>`_.
-  Currently, you can make use of baselines for `FedAvg <https://github.com/adap/flower/tree/main/baselines/flwr_baselines/flwr_baselines/publications/fedavg_mnist>`_, `FedOpt <https://github.com/adap/flower/tree/main/baselines/flwr_baselines/flwr_baselines/publications/adaptive_federated_optimization>`_,  and `LEAF-FEMNIST <https://github.com/adap/flower/tree/main/baselines/flwr_baselines/flwr_baselines/publications/leaf/femnist>`_.
+  We are changing the way we structure the Flower baselines. While we complete the transition to the new format, you can still find the existing baselines and use them: `baselines (old) <https://github.com/flwrlabs/flower/tree/main/baselines/flwr_baselines>`_.
+  Currently, you can make use of baselines for `FedAvg <https://github.com/flwrlabs/flower/tree/main/baselines/flwr_baselines/flwr_baselines/publications/fedavg_mnist>`_, `FedOpt <https://github.com/flwrlabs/flower/tree/main/baselines/flwr_baselines/flwr_baselines/publications/adaptive_federated_optimization>`_,  and `LEAF-FEMNIST <https://github.com/flwrlabs/flower/tree/main/baselines/flwr_baselines/flwr_baselines/publications/leaf/femnist>`_.
 
 
 Structure
 ---------
 
-All baselines are available in the directory `baselines <https://github.com/adap/flower/blob/main/baselines>`_ with each baseline directory being fully self-contained in terms of source code. In addition, each baseline uses its very own Python environment as designed by the contributors of such baseline in order to replicate the experiments in the paper. Each baseline directory contains the following structure: 
+All baselines are available in the directory `baselines <https://github.com/flwrlabs/flower/blob/main/baselines>`_ with each baseline directory being fully self-contained in terms of source code. In addition, each baseline uses its very own Python environment as designed by the contributors of such baseline in order to replicate the experiments in the paper. Each baseline directory contains the following structure: 
 
 .. code-block:: shell
 
@@ -122,7 +122,7 @@ To use Flower Baselines you need first to install :code:`pyenv` and, depending o
 
 .. code-block:: bash
 
-    git clone https://github.com/adap/flower.git && cd flower
+    git clone https://github.com/flwrlabs/flower.git && cd flower
 
 2. Navigate inside the directory of the baseline you'd like to run
 3. Follow the :code:`[Environment Setup]` instructions in the :code:`README.md`. 

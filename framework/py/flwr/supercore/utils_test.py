@@ -22,15 +22,38 @@ import pytest
 import requests
 from parameterized import parameterized
 
+from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
+
 from .utils import (
+    MetadataLookupError,
+    find_metadata_keys,
+    get_metadata_bytes,
+    get_metadata_str,
+    get_metadata_str_checked,
     humanize_bytes,
     humanize_duration,
     int64_to_uint64,
     mask_string,
     parse_app_spec,
     request_download_link,
+    simulation_config_from_json,
+    simulation_config_to_json,
+    strict_json_dumps,
+    strict_json_loads,
     uint64_to_int64,
 )
+
+
+def test_find_metadata_keys() -> None:
+    """Return the subset of requested keys present in metadata."""
+    assert find_metadata_keys(
+        [
+            ("x-token", "value"),
+            ("x-trace-id", "abc"),
+            ("x-token", "other"),
+        ],
+        ("x-token", "missing"),
+    ) == {"x-token"}
 
 
 def test_mask_string() -> None:
@@ -42,6 +65,95 @@ def test_mask_string() -> None:
     assert mask_string("") == ""
     assert mask_string("1234567890", head=2, tail=3) == "12...890"
     assert mask_string("1234567890", head=5, tail=4) == "12345...7890"
+
+
+def test_strict_json_loads() -> None:
+    """Parse valid JSON values."""
+    assert strict_json_loads('{"key":[1,true,null]}') == {"key": [1, True, None]}
+
+
+def test_strict_json_loads_rejects_non_finite_numbers() -> None:
+    """Reject Python's non-standard JSON number constants."""
+    with pytest.raises(ValueError, match="non-finite number NaN"):
+        strict_json_loads('{"key":NaN}')
+
+
+def test_strict_json_dumps() -> None:
+    """Serialize valid JSON values."""
+    assert strict_json_dumps({"key": [1, True, None]}, compact=True) == (
+        '{"key":[1,true,null]}'
+    )
+
+
+def test_strict_json_dumps_rejects_non_finite_numbers() -> None:
+    """Reject non-finite floating-point values."""
+    with pytest.raises(ValueError, match="Out of range float values"):
+        strict_json_dumps({"key": float("nan")})
+
+
+@pytest.mark.parametrize(
+    ("metadata", "key", "expected"),
+    [
+        ([("x-token", "value")], "x-token", "value"),
+        (
+            [
+                ("x-token", ""),
+            ],
+            "x-token",
+            None,
+        ),
+        ([("x-token", "value"), ("x-token", "other")], "x-token", None),
+        ([("x-token", b"value")], "x-token", None),
+    ],
+)
+def test_get_metadata_str(
+    metadata: list[tuple[str, str | bytes]], key: str, expected: str | None
+) -> None:
+    """Return exactly one non-empty string value of the expected type."""
+    assert get_metadata_str(metadata, key) == expected
+
+
+@pytest.mark.parametrize(
+    ("metadata", "key", "expected_value", "expected_error"),
+    [
+        ([("x-token", "value")], "x-token", "value", None),
+        ([("x-token", "")], "x-token", None, "empty"),
+        ([("x-token", "value"), ("x-token", "other")], "x-token", None, "duplicate"),
+        ([("x-token", b"value")], "x-token", None, "wrong_type"),
+        ([("other", "value")], "x-token", None, "missing"),
+    ],
+)
+def test_get_metadata_str_checked(
+    metadata: list[tuple[str, str | bytes]],
+    key: str,
+    expected_value: str | None,
+    expected_error: str | None,
+) -> None:
+    """Preserve metadata validation outcomes for callers that need them."""
+    value, error_type = None, None
+    try:
+        value = get_metadata_str_checked(metadata, key)
+    except MetadataLookupError as e:
+        error_type = e.error_type
+
+    assert value == expected_value
+    assert error_type == expected_error
+
+
+@pytest.mark.parametrize(
+    ("metadata", "key", "expected"),
+    [
+        ([("x-bin", b"value")], "x-bin", b"value"),
+        ([("x-bin", b"")], "x-bin", None),
+        ([("x-bin", b"value"), ("x-bin", b"other")], "x-bin", None),
+        ([("x-bin", "value")], "x-bin", None),
+    ],
+)
+def test_get_metadata_bytes(
+    metadata: list[tuple[str, str | bytes]], key: str, expected: bytes | None
+) -> None:
+    """Return exactly one non-empty bytes value of the expected type."""
+    assert get_metadata_bytes(metadata, key) == expected
 
 
 @parameterized.expand(  # type: ignore
@@ -142,12 +254,14 @@ def test_request_download_link_all_scenarios(
                     "verifications": [
                         {"public_key_id": "key1", "sig": "abc", "algo": "ed25519"}
                     ],
+                    "note": "Compatibility fallback applied.",
                 },
             },
             "assert": lambda out: (
                 out[0] == "https://example.ai/fab.fab"
                 and isinstance(out[1], list)
                 and out[1][0]["public_key_id"] == "key1"
+                and out[2] == "Compatibility fallback applied."
             ),
         },
         {
@@ -158,7 +272,8 @@ def test_request_download_link_all_scenarios(
                 "json": {"fab_url": "https://example.ai/fab.fab"},
             },
             "assert": lambda out: out[0] == "https://example.ai/fab.fab"
-            and out[1] is None,
+            and out[1] is None
+            and out[2] is None,
         },
         {
             "name": "http_404_not_found",
@@ -256,11 +371,91 @@ def test_request_download_link_all_scenarios(
             if case["name"] == "http_404_not_found":
                 assert app_id in msg
         else:
-            # Expect a (fab_url, verifications) tuple
-            result: tuple[str, list[dict[str, str]] | None] = request_download_link(
-                app_id, app_version, in_url, out_url
+            # Expect a (fab_url, verifications, note) tuple
+            result: tuple[str, list[dict[str, str]] | None, str | None] = (
+                request_download_link(app_id, app_version, in_url, out_url)
             )
             assert case["assert"](result), f"Assertion failed for {case['name']}"
+
+
+def test_simulation_config_to_json_includes_unset_optional_fields() -> None:
+    """Serialize simulation config with unset optional fields as null."""
+    config = SimulationConfig(
+        num_supernodes=10,
+        client_resources_num_cpus=2,
+        client_resources_num_gpus=0.25,
+        backend="ray",
+        verbose=True,
+    )
+
+    assert simulation_config_to_json(config) == {
+        "num_supernodes": 10,
+        "client_resources_num_cpus": 2,
+        "client_resources_num_gpus": 0.25,
+        "backend": "ray",
+        "verbose": True,
+        "init_args_num_cpus": None,
+        "init_args_num_gpus": None,
+        "init_args_logging_level": None,
+        "init_args_log_to_driver": None,
+    }
+
+
+def test_simulation_config_from_json_preserves_falsey_optional_values() -> None:
+    """Deserialize optional values without dropping explicit zero/false settings."""
+    payload = {
+        "num_supernodes": 5,
+        "client_resources_num_cpus": 1,
+        "client_resources_num_gpus": 0.0,
+        "backend": "ray",
+        "verbose": False,
+        "init_args_num_cpus": 4,
+        "init_args_num_gpus": 0,
+        "init_args_logging_level": "",
+        "init_args_log_to_driver": False,
+    }
+
+    config = simulation_config_from_json(payload)
+
+    assert config.num_supernodes == 5
+    assert config.client_resources_num_cpus == 1
+    assert config.client_resources_num_gpus == 0.0
+    assert config.backend == "ray"
+    assert not config.verbose
+    assert config.init_args_num_cpus == 4
+    assert config.init_args_num_gpus == 0
+    assert config.init_args_logging_level == ""
+    assert not config.init_args_log_to_driver
+    assert config.HasField("init_args_num_cpus")
+    assert config.HasField("init_args_num_gpus")
+    assert config.HasField("init_args_logging_level")
+    assert config.HasField("init_args_log_to_driver")
+
+
+def test_simulation_config_json_round_trip_preserves_presence() -> None:
+    """Round-trip simulation config JSON without inventing optional fields."""
+    original = SimulationConfig(
+        num_supernodes=12,
+        client_resources_num_cpus=3,
+        client_resources_num_gpus=1.5,
+        backend="ray",
+        verbose=False,
+        init_args_num_gpus=2,
+    )
+
+    restored = simulation_config_from_json(simulation_config_to_json(original))
+
+    assert restored == original
+    assert not restored.HasField("init_args_num_cpus")
+    assert restored.HasField("init_args_num_gpus")
+    assert not restored.HasField("init_args_logging_level")
+    assert not restored.HasField("init_args_log_to_driver")
+
+
+def test_simulation_config_from_json_rejects_unknown_fields() -> None:
+    """Reject unknown JSON keys when deserializing simulation configs."""
+    with pytest.raises(ValueError, match="unknown_field"):
+        simulation_config_from_json({"unknown_field": 1})
 
 
 @parameterized.expand(  # type: ignore

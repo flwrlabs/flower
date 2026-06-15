@@ -19,6 +19,8 @@ import {
   type InitProgressReport,
   type MLCEngineInterface,
 } from '@mlc-ai/web-llm';
+
+import { getAvailableRAM } from '../env';
 import {
   ChatResponseResult,
   FailureCode,
@@ -30,9 +32,8 @@ import {
   Tool,
   ToolChoice,
 } from '../typing';
-import { getAvailableRAM } from '../env';
-import { BaseEngine } from './engine';
 import { getEngineModelConfig } from './common/model';
+import { BaseEngine } from './engine';
 
 async function runQuery(
   engine: MLCEngineInterface,

@@ -27,15 +27,14 @@ import typer
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
-from flwr.common import now
-from flwr.common.config import get_flwr_dir
 from flwr.supercore.constant import PLATFORM_API_URL, SUPERGRID_ADDRESS
+from flwr.supercore.date import now
 from flwr.supercore.primitives.asymmetric_ed25519 import (
     create_message_to_sign,
     load_private_key,
     sign_message,
 )
-from flwr.supercore.utils import parse_app_spec, request_download_link
+from flwr.supercore.utils import get_flwr_home, parse_app_spec, request_download_link
 from flwr.supercore.version import package_version as flwr_version
 
 from ..auth_plugin.oidc_cli_plugin import OidcCliPlugin
@@ -56,7 +55,7 @@ def review(
     ],
 ) -> None:
     """Download a FAB for <APP-ID>, unpack it for manual review, and upon confirmation
-    sign & submit the review to the Platform."""
+    sign & submit the review to Flower Hub."""
     auth_plugin = load_cli_auth_plugin_from_connection(SUPERGRID_ADDRESS)
 
     auth_plugin.load_tokens()
@@ -76,7 +75,12 @@ def review(
     typer.secho("Downloading FAB... ", fg=typer.colors.BLUE)
     url = f"{PLATFORM_API_URL}/hub/fetch-fab"
     try:
-        presigned_url, _ = request_download_link(app_id, app_version, url, "fab_url")
+        presigned_url, _, note = request_download_link(
+            app_id, app_version, url, "fab_url"
+        )
+
+        if note:
+            typer.secho(f"Note: {note}", fg=typer.colors.YELLOW, err=True)
 
         fab_bytes = _download_fab(presigned_url)
 
@@ -152,8 +156,7 @@ def review(
 
 def _create_review_dir() -> Path:
     """Create a directory for reviewing code."""
-    home = get_flwr_dir()
-    review_dir = home / "reviews"
+    review_dir = get_flwr_home() / "reviews"
     review_dir.mkdir(parents=True, exist_ok=True)
     return review_dir
 
@@ -184,7 +187,7 @@ def _sign_fab(
 def _submit_review(
     app_id: str, app_version: str, signature: bytes, signed_at: int, token: str
 ) -> None:
-    """Submit review to Flower Platform API."""
+    """Submit review to Flower Hub."""
     signature_b64 = base64.urlsafe_b64encode(signature).rstrip(b"=").decode("ascii")
     url = f"{PLATFORM_API_URL}/hub/apps/signature"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}

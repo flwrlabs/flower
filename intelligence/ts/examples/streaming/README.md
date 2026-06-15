@@ -9,7 +9,7 @@ tags: [node, minimal, streaming, typescript]
 You must first download the example with the following command:
 
 ```bash
-git clone --depth=1 https://github.com/adap/flower.git _tmp && mv _tmp/intelligence/ts/examples/streaming . && rm -rf _tmp && cd streaming
+git clone --depth=1 https://github.com/flwrlabs/flower.git _tmp && mv _tmp/intelligence/ts/examples/streaming . && rm -rf _tmp && cd streaming
 ```
 
 You can then install the project dependencies with:

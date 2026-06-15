@@ -17,9 +17,10 @@
 
 import hashlib
 import json
+import os
 import re
 import sys
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from io import StringIO
 from pathlib import Path
@@ -33,17 +34,13 @@ from rich.console import Console
 
 from flwr.cli.typing import SuperLinkConnection
 from flwr.common.constant import (
-    ACCESS_TOKEN_KEY,
-    AUTHN_TYPE_JSON_KEY,
     FEDERATION_NOT_FOUND_MESSAGE,
-    FEDERATION_NOT_SPECIFIED_MESSAGE,
     NO_ACCOUNT_AUTH_MESSAGE,
     NO_ARTIFACT_PROVIDER_MESSAGE,
     NODE_NOT_FOUND_MESSAGE,
     PUBLIC_KEY_ALREADY_IN_USE_MESSAGE,
     PUBLIC_KEY_NOT_VALID,
     PULL_UNFINISHED_RUN_MESSAGE,
-    REFRESH_TOKEN_KEY,
     RUN_ID_NOT_FOUND_MESSAGE,
     AuthnType,
     CliOutputFormat,
@@ -54,12 +51,23 @@ from flwr.common.grpc import (
     on_channel_state_change,
 )
 from flwr.common.logger import print_json_error, redirect_output, restore_output
+from flwr.proto.control_pb2_grpc import ControlStub  # pylint: disable=E0611
+from flwr.supercore.constant import (
+    APP_PUBLISH_EXCLUDE_PATTERNS,
+    APP_PUBLISH_INCLUDE_PATTERNS,
+    MAX_DIR_DEPTH,
+    MAX_NAME_LENGTH,
+)
 from flwr.supercore.credential_store import get_credential_store
+from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
+from flwr.supercore.utils import is_valid_name
 
 from .auth_plugin import CliAuthPlugin, get_cli_plugin_class
 from .cli_account_auth_interceptor import CliAccountAuthInterceptor
 from .config_utils import load_certificate_in_connection
 from .constant import AUTHN_TYPE_STORE_KEY
+from .flower_config import read_superlink_connection
+from .local_superlink import ensure_local_superlink
 
 
 def print_json_to_stdout(data: str | Any) -> None:
@@ -72,6 +80,25 @@ def print_json_to_stdout(data: str | Any) -> None:
         Console(file=sys.__stdout__).print_json(data)
     else:
         Console(file=sys.__stdout__).print_json(data=data)
+
+
+def _format_grpc_error(err: grpc.RpcError) -> str:
+    """Return a user-facing message from a gRPC error.
+
+    This function parses FlowerError JSON in `err.details()` when present, otherwise
+    falls back to the raw gRPC details string.
+    """
+    err_message = cast(str, err.details())  # pylint: disable=E1101
+    try:
+        parsed = json.loads(err_message)
+        if isinstance(parsed, dict) and "public_message" in parsed:
+            msg = str(parsed["public_message"])
+            if details := parsed.get("public_details"):
+                msg += f"\n{details}"
+            return msg
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return err_message
 
 
 @contextmanager  # docsig: ignore=SIG503
@@ -190,25 +217,16 @@ def prompt_options(text: str, options: list[str]) -> str:
     return result
 
 
-def is_valid_project_name(name: str) -> bool:
-    """Check if the given string is a valid Python project name.
-
-    A valid project name must start with a letter and can only contain letters, digits,
-    and hyphens.
-    """
-    if not name:
-        return False
-
-    # Check if the first character is a letter
-    if not name[0].isalpha():
-        return False
-
-    # Check if the rest of the characters are valid (letter, digit, or dash)
-    for char in name[1:]:
-        if not (char.isalnum() or char in "-"):
-            return False
-
-    return True
+def validate_project_name(name: str, target: str) -> None:
+    """Validate a project-related name and raise ValueError if invalid."""
+    valid, _ = is_valid_name(name)
+    if not valid:
+        raise ValueError(
+            f'{target} "{name}" is invalid, '
+            "a valid app name must start with a letter, "
+            "and can only contain letters, digits, and hyphens. The name "
+            f"must also be no longer than {MAX_NAME_LENGTH} characters."
+        )
 
 
 def get_sha256_hash(file_path_or_int: Path | int) -> str:
@@ -287,17 +305,24 @@ def load_cli_auth_plugin_from_connection(
         ) from None
 
 
-def require_superlink_address(connection: SuperLinkConnection) -> str:
-    """Return the SuperLink address or exit if it is not configured."""
-    if connection.address is None:
-        cmd = click.get_current_context().command.name
-        raise click.ClickException(
-            f"`flwr {cmd}` currently works with a SuperLink. Ensure that the "
-            "correct SuperLink (Control API) address is provided SuperLink connection "
-            "you are using. Check your Flower configuration file. You may use `flwr "
-            "config list` to see its location in the file system."
-        )
-    return connection.address
+def get_executed_command() -> str:
+    """Get the full command path from the current Click context.
+
+    Traverses up the Click context hierarchy to build the complete command path.
+
+    Returns
+    -------
+    str
+        The full command path including the "flwr" prefix.
+    """
+    ctx: click.Context | None = click.get_current_context()
+    cmd_parts = []
+    while ctx is not None:
+        if ctx.info_name:
+            cmd_parts.append(ctx.info_name)
+        ctx = ctx.parent
+    cmd_parts.reverse()
+    return " ".join(cmd_parts)
 
 
 def init_channel_from_connection(
@@ -317,7 +342,8 @@ def init_channel_from_connection(
     grpc.Channel
         Configured gRPC channel with authentication interceptors.
     """
-    address = require_superlink_address(connection)
+    connection = ensure_local_superlink(connection)
+    address = cast(str, connection.address)
 
     root_certificates_bytes = load_certificate_in_connection(connection)
 
@@ -333,20 +359,57 @@ def init_channel_from_connection(
         insecure=connection.insecure,
         root_certificates=root_certificates_bytes,
         max_message_length=GRPC_MAX_MESSAGE_LENGTH,
-        interceptors=[CliAccountAuthInterceptor(auth_plugin)],
+        interceptors=[
+            RuntimeVersionClientInterceptor(component_name="flwr CLI"),
+            CliAccountAuthInterceptor(auth_plugin),
+        ],
     )
     channel.subscribe(on_channel_state_change)
     return channel
 
 
-@contextmanager
-def flwr_cli_grpc_exc_handler() -> Iterator[None]:  # pylint: disable=too-many-branches
+@contextmanager  # docsig: disable=SIG503
+def cli_output_control_stub(
+    superlink: str | None,
+    output_format: str = CliOutputFormat.DEFAULT,
+) -> Iterator[tuple[ControlStub, bool]]:
+    """Manage CLI output handling and Control API stub lifecycle.
+
+    Parameters
+    ----------
+    superlink : str | None
+        Name of the SuperLink connection.
+    output_format : str
+        Output format for CLI rendering.
+
+    Yields
+    ------
+    tuple[ControlStub, bool]
+        A tuple of (ControlStub, is_json), where `is_json` indicates JSON output.
+    """
+    with cli_output_handler(output_format=output_format) as is_json:
+        superlink_connection = read_superlink_connection(superlink)
+        channel = init_channel_from_connection(superlink_connection)
+        try:
+            yield ControlStub(channel), is_json
+        finally:
+            channel.close()
+
+
+@contextmanager  # docsig: disable=SIG503
+def flwr_cli_grpc_exc_handler(  # pylint: disable=too-many-branches
+    custom_handler: Callable[[grpc.RpcError], None] | None = None,
+) -> Iterator[None]:
     """Context manager to handle specific gRPC errors.
 
-    Catches grpc.RpcError exceptions with UNAUTHENTICATED, UNIMPLEMENTED,
-    UNAVAILABLE, PERMISSION_DENIED, NOT_FOUND, and FAILED_PRECONDITION statuses,
-    informs the user, and exits the application. All other exceptions will be
-    allowed to escape.
+    Catches grpc.RpcError exceptions and translates them into user-friendly messages
+    based on the error code and details.
+
+    Parameters
+    ----------
+    custom_handler : Callable[[grpc.RpcError], None] | None (default: None)
+        Optional custom handler called with the caught gRPC error before applying
+        default Flower CLI error handling.
 
     Yields
     ------
@@ -356,83 +419,72 @@ def flwr_cli_grpc_exc_handler() -> Iterator[None]:  # pylint: disable=too-many-b
     Raises
     ------
     click.ClickException
-        On handled gRPC error statuses with appropriate exit code.
-    grpc.RpcError
-        For unhandled gRPC error statuses.
+        For handled gRPC errors, with user-friendly messages. Or raw gRPC error details
+        will be shown.
     """
     try:
         yield
     except grpc.RpcError as e:
+        if custom_handler is not None:
+            custom_handler(e)
+        # pylint: disable-next=E1101
+        details = _format_grpc_error(e)
         if e.code() == grpc.StatusCode.UNAUTHENTICATED:
             raise click.ClickException(
                 "Authentication failed. Please run `flwr login`"
                 " to authenticate and try again."
             ) from None
         if e.code() == grpc.StatusCode.UNIMPLEMENTED:
-            if e.details() == NO_ACCOUNT_AUTH_MESSAGE:  # pylint: disable=E1101
+            if details == NO_ACCOUNT_AUTH_MESSAGE:
                 raise click.ClickException(
                     "Account authentication is not enabled on this SuperLink."
                 ) from None
-            if e.details() == NO_ARTIFACT_PROVIDER_MESSAGE:  # pylint: disable=E1101
+            if details == NO_ARTIFACT_PROVIDER_MESSAGE:
                 raise click.ClickException(
                     "The SuperLink does not support `flwr pull` command."
                 ) from None
-            raise click.ClickException(
-                "The SuperLink cannot process this request. Please verify that "
-                "you set the address to its Control API endpoint correctly in your "
-                "SuperLink connection in your Flower Configuration file. You may use "
-                "`flwr config list` to see its location in the file system. "
-                "Additonally, ensure that the Flower versions used by the CLI and "
-                "SuperLink are compatible."
-            ) from None
+            raise click.ClickException(details) from None
         if e.code() == grpc.StatusCode.PERMISSION_DENIED:
-            # pylint: disable-next=E1101
-            raise click.ClickException(f"Permission denied.\n{e.details()}") from None
+            # Skip showing "Permission denied." when details already contain
+            # a user-friendly message.
+            msg = "Permission denied." if details == "" else f"{details}"
+            raise click.ClickException(msg) from None
         if e.code() == grpc.StatusCode.UNAVAILABLE:
             raise click.ClickException(
                 "Connection to the SuperLink is unavailable. Please check your network "
                 "connection and 'address' in the SuperLink connection configuration."
             ) from None
         if e.code() == grpc.StatusCode.NOT_FOUND:
-            if e.details() == RUN_ID_NOT_FOUND_MESSAGE:  # pylint: disable=E1101
+            if details == RUN_ID_NOT_FOUND_MESSAGE:
                 raise click.ClickException("Run ID not found.") from None
-            if e.details() == NODE_NOT_FOUND_MESSAGE:  # pylint: disable=E1101
+            if details == NODE_NOT_FOUND_MESSAGE:
                 raise click.ClickException(
                     "Node ID not found for this account."
                 ) from None
         if e.code() == grpc.StatusCode.FAILED_PRECONDITION:
-            if e.details() == PULL_UNFINISHED_RUN_MESSAGE:  # pylint: disable=E1101
+            if details == PULL_UNFINISHED_RUN_MESSAGE:
                 raise click.ClickException(
                     "Run is not finished yet. Artifacts can only be pulled after "
                     "the run is finished. You can check the run status with `flwr ls`."
                 ) from None
-            if (
-                e.details() == PUBLIC_KEY_ALREADY_IN_USE_MESSAGE
-            ):  # pylint: disable=E1101
+            if details == PUBLIC_KEY_ALREADY_IN_USE_MESSAGE:
                 raise click.ClickException(
                     "The provided public key is already in use by another SuperNode."
                 ) from None
-            if e.details() == PUBLIC_KEY_NOT_VALID:  # pylint: disable=E1101
+            if details == PUBLIC_KEY_NOT_VALID:
                 raise click.ClickException(
                     "The provided public key is invalid. Please provide a valid "
                     "NIST EC public key."
                 ) from None
-            if e.details() == FEDERATION_NOT_SPECIFIED_MESSAGE:  # pylint: disable=E1101
-                raise click.ClickException(
-                    "No federation specified. "
-                    "Please use the `--federation` flag or set a default federation "
-                    "in your SuperLink connection configuration."
-                ) from None
             patten = re.compile(FEDERATION_NOT_FOUND_MESSAGE.replace("%s", "(.+)"))
-            if m := patten.match(e.details()):  # pylint: disable=E1101
+            if m := patten.match(details):
                 raise click.ClickException(
                     f"Federation '{m.group(1)}' does not exist. "
                     "Please verify the federation name and try again."
                 ) from None
 
-            # Log details from grpc error directly
-            raise click.ClickException(f"{e.details()}") from None
-        raise
+        # Log details from grpc error directly
+        raise click.ClickException(details) from None
 
 
 def build_pathspec(patterns: Iterable[str]) -> pathspec.PathSpec:
@@ -480,28 +532,96 @@ def load_gitignore_patterns(file: Path | bytes) -> list[str]:
         return []
 
 
-def validate_credentials_content(creds_path: Path) -> str:
-    """Load and validate the credentials file content.
+def depth_of(relative_path: Path) -> int:
+    """Return the directory depth of a relative path."""
+    return max(0, len(relative_path.parts) - 1)
 
-    Ensures required keys exist:
-      - AUTHN_TYPE_JSON_KEY
-      - ACCESS_TOKEN_KEY
-      - REFRESH_TOKEN_KEY
+
+def collect_files(root: Path) -> dict[str, Path]:
+    """Collect all files under the root directory and return a mapping of relative POSIX
+    paths to absolute Paths.
+
+    Symlinks (both files and directories) are ignored, and only paths that resolve
+    within ``root`` are included. The traversal uses ``os.walk`` with
+    ``followlinks=False`` so symlinked directories are never entered. The relative
+    paths are in POSIX format (using forward slashes) for consistency across platforms.
     """
-    try:
-        creds: dict[str, str] = json.loads(creds_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as err:
-        raise click.ClickException(
-            f"Invalid credentials file at '{creds_path}': {err}"
-        ) from err
+    resolved_root = root.resolve()
+    files: dict[str, Path] = {}
+    for dirpath, _, filenames in os.walk(root, followlinks=False):
+        for filename in filenames:
+            path = Path(dirpath) / filename
+            # Skip symlink files
+            if path.is_symlink():
+                continue
+            # Skip paths that resolve outside the root directory
+            if not path.resolve().is_relative_to(resolved_root):
+                continue
+            relative_path = path.relative_to(root).as_posix()
+            files[relative_path] = path
+    return files
 
-    required_keys = [AUTHN_TYPE_JSON_KEY, ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY]
-    missing = [key for key in required_keys if key not in creds]
 
-    if missing:
-        raise click.ClickException(
-            f"Credentials file '{creds_path}' is missing "
-            f"required key(s): {', '.join(missing)}. Please log in again."
-        )
+def filter_paths_for_publish(
+    files: Mapping[str, Path | bytes],
+) -> dict[str, Path | bytes]:
+    """Filter paths for app publishing, using publish-specific include/exclude rules.
 
-    return creds[ACCESS_TOKEN_KEY]
+    Parameters
+    ----------
+    files : Mapping[str, Path | bytes]
+        Mapping of POSIX-style relative paths to file contents (as Path or bytes).
+
+    Returns
+    -------
+    dict[str, Path | bytes]
+        Filtered mapping of paths to contents that match publish include/exclude rules.
+
+    Raises
+    ------
+    ValueError
+        Raised if any path exceeds the maximum directory depth.
+    """
+    # Load gitignore patterns if exists
+    gitignore_patterns = tuple(load_gitignore_patterns(files.get(".gitignore", b"")))
+    gitignore_spec = build_pathspec(gitignore_patterns)
+
+    # Build include/exclude pathspecs for app publish
+    include_spec = build_pathspec(APP_PUBLISH_INCLUDE_PATTERNS)
+    exclude_spec = build_pathspec(APP_PUBLISH_EXCLUDE_PATTERNS)
+
+    # Apply filtering
+    filtered_paths = include_spec.match_files(files.keys())
+    filtered_paths = exclude_spec.match_files(filtered_paths, negate=True)
+    filtered_paths = gitignore_spec.match_files(filtered_paths, negate=True)
+
+    # Collect filtered files and check directory depth
+    ret_files = {}
+    for rel_pth in cast(Iterable[str], filtered_paths):
+        if depth_of(Path(rel_pth)) > MAX_DIR_DEPTH:
+            raise ValueError(
+                f"'{rel_pth}' in the project exceeds the maximum directory depth "
+                f"of {MAX_DIR_DEPTH}. Consider refactoring your project structure to "
+                "reduce nesting."
+            )
+        ret_files[rel_pth] = files[rel_pth]
+    return ret_files
+
+
+def validate_federation_name(name: str) -> tuple[bool, str]:
+    """Validate a federation name based on specific security and formatting rules.
+
+    The same validation rules as project names are applied.
+
+    Parameters
+    ----------
+    name : str
+        The federation name to validate.
+
+    Returns
+    -------
+        tuple: (bool, str)
+               - A boolean indicating if the name is valid (True/False).
+               - A string containing a success message or a detailed error message.
+    """
+    return is_valid_name(name)

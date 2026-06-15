@@ -1,0 +1,96 @@
+name: Ping Stale Under Discussion GitHub Issues
+
+on:
+  schedule:
+    - cron: '0 8 * * *'  # Daily at 08:00 UTC
+  workflow_dispatch:
+
+jobs:
+  ping-stale-issues:
+    runs-on: ubuntu-22.04
+    permissions:
+      issues: read
+    env:
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID_SUPPORT_GITHUB_PRS }}
+    steps:
+      - name: Ping stale Under Discussion issues via Slack
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const org = owner;
+            const now = new Date();
+            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+            const query = `repo:${owner}/${repo} is:issue is:open comments:>=1 no:milestone`;
+            const { data } = await github.rest.search.issuesAndPullRequests({
+              q: query,
+              per_page: 100,
+            });
+
+            const staleIssues = [];
+
+            for (const issue of data.items) {
+              if (issue.pull_request) continue;
+
+              const updatedAt = new Date(issue.updated_at);
+              if (updatedAt >= sevenDaysAgo) {
+                console.log(`Skipping #${issue.number}: updated recently`);
+                continue;
+              }
+
+              staleIssues.push(issue);
+            }
+
+            if (staleIssues.length === 0) {
+              console.log("No stale issues to report.");
+              return;
+            }
+
+            let table = [
+              "| Issue | Title | Assignees |",
+              "|-------|-------|-----------|"
+            ];
+
+            for (const issue of staleIssues) {
+              const number = `#${issue.number}`;
+              const title = issue.title.length > 40 ? issue.title.slice(0, 37) + "..." : issue.title;
+
+              let orgAssignees = [];
+              for (const assignee of issue.assignees) {
+                const login = assignee.login;
+                const { status } = await github.rest.orgs.checkMembershipForUser({
+                  org,
+                  username: login,
+                }).catch(() => ({ status: 404 }));
+
+                if (status === 204) {
+                  orgAssignees.push(`@${login}`);
+                }
+              }
+
+              const assignees = orgAssignees.length > 0
+                ? orgAssignees.join(", ")
+                : "@WilliamLindskog";
+
+              table.push(`| ${number} | ${title} | ${assignees} |`);
+            }
+
+            const slackText = `*Stale Under Discussion GitHub Issues (no activity in 7+ days)*\n\n\`\`\`\n${table.join("\n")}\n\`\`\`\n\nPlease review or update issue status.`;
+
+            console.log("Sending Slack message...");
+
+            await fetch("https://slack.com/api/chat.postMessage", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                channel: process.env.SLACK_CHANNEL_ID,
+                text: slackText,
+              }),
+            });

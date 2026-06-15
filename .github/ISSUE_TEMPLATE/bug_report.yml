@@ -10,7 +10,7 @@ body:
     attributes:
       value: >
         #### Before submitting a bug, please make sure the issue hasn't been already
-        addressed by searching through [the past issues](https://github.com/adap/flower/issues).
+        addressed by searching through [the past issues](https://github.com/flwrlabs/flower/issues).
         Please also go through the Flower Slack channel if a similar behavior already appeared and a solution was already given.
 
   - type: textarea

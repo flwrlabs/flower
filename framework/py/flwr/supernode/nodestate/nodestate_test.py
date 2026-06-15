@@ -15,23 +15,27 @@
 """Tests all NodeState implementations have to conform to."""
 
 
+import hashlib
 from datetime import timedelta
 from typing import Any
 from unittest.mock import patch
 
 from parameterized import parameterized
 
-from flwr.common import ConfigRecord, Context, Message, Metadata, RecordDict, now
+from flwr.app import ConfigRecord, Message, Metadata, RecordDict
+from flwr.app.message import make_message
 from flwr.common.constant import ErrorCode
-from flwr.common.message import make_message
-from flwr.common.typing import Run
+from flwr.supercore.constant import TaskType
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
+from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.run import Run
 
 from . import InMemoryNodeState, NodeState
 
 
-class StateTest(CoreStateTest):
+class StateTest(CoreStateTest):  # pylint: disable=R0904
     """Test all state implementations."""
 
     # This is to True in each child class
@@ -44,6 +48,13 @@ class StateTest(CoreStateTest):
     def state_factory(self) -> NodeState:
         """Provide state implementation to test."""
         raise NotImplementedError()
+
+    def _claim_client_task(self, run_id: int) -> int:
+        """Create and claim a ClientApp task for the given run."""
+        task_id = self.state.create_task(task_type=TaskType.CLIENT_APP, run_id=run_id)
+        assert task_id is not None
+        assert self.state.claim_task(task_id) is not None
+        return task_id
 
     def test_get_set_node_id(self) -> None:
         """Test set_node_id."""
@@ -76,23 +87,30 @@ class StateTest(CoreStateTest):
         # Assert
         self.assertEqual(retrieved, run)
 
-    def test_store_and_get_context(self) -> None:
-        """Test storing and retrieving a context."""
-        # Prepare
-        ctx = Context(
-            run_id=99,
-            node_id=1,
-            node_config={"key1": "value1"},
-            state=RecordDict({"cfg": ConfigRecord({"key2": "value2"})}),
-            run_config={"key3": "value3"},
-        )
-        self.state.store_context(ctx)
+    def test_store_and_get_fab(self) -> None:
+        """Test storing and retrieving a FAB."""
+        content = b"fab-content"
+        fab = Fab(hashlib.sha256(content).hexdigest(), content, {"meta": "data"})
 
-        # Execute
-        retrieved = self.state.get_context(99)
+        fab_hash = self.state.store_fab(fab)
+        retrieved = self.state.get_fab(fab_hash)
 
-        # Assert
-        self.assertEqual(retrieved, ctx)
+        self.assertIsNotNone(retrieved)
+        assert retrieved is not None
+        self.assertEqual(retrieved.hash_str, fab_hash)
+        self.assertEqual(retrieved.content, fab.content)
+        self.assertEqual(retrieved.verifications, fab.verifications)
+
+        # Retrieved FAB should be a defensive copy.
+        retrieved.verifications["meta"] = "mutated"
+        reloaded = self.state.get_fab(fab_hash)
+        self.assertIsNotNone(reloaded)
+        assert reloaded is not None
+        self.assertEqual(reloaded.verifications, {"meta": "data"})
+
+        # Also verify write-time hash validation rejects mismatched hashes.
+        with self.assertRaisesRegex(ValueError, "FAB hash mismatch"):
+            self.state.store_fab(Fab("not-the-content-hash", b"fab-content", {}))
 
     def test_store_and_get_message_basic(self) -> None:
         """Test storing and retrieving a message."""
@@ -163,41 +181,19 @@ class StateTest(CoreStateTest):
         self.assertNotIn("msg1", msg_ids)
         self.assertIn("msg2", msg_ids)
 
-    def test_get_run_ids_with_pending_messages(self) -> None:
-        """Test retrieving run IDs with pending messages."""
-        # Prepare: store messages for runs 1, 2, and 3
-        # Run 1 has a pending message, run 2 has a token, run 3 has a reply,
-        # run 4 has a retrieved message (not pending),
-        #  and run 5 was assigned a token but was later deleted due to
-        # `flwr-clientapp` finishing the handling of a message.
-        self.state.store_message(make_dummy_message(1, False, "msg1"))
-        self.state.store_message(make_dummy_message(2, False, "msg2"))
-        self.state.store_message(make_dummy_message(3, True, "msg3"))
-        self.state.store_message(make_dummy_message(4, False, "msg4"))
-        self.state.store_message(make_dummy_message(5, False, "msg5"))
-        self.state.get_messages(run_ids=[4])
-        self.state.create_token(2)
-        self.state.create_token(5)
-        self.state.delete_token(5)
-
-        # Execute
-        run_ids = self.state.get_run_ids_with_pending_messages()
-
-        # Assert: run 1 and run 5 should be returned
-        self.assertEqual(set(run_ids), {1, 5})
-
-    def test_get_error_reply_when_token_expires(self) -> None:
-        """Test that error replies are created when tokens expire."""
-        # Prepare: Create a token for a run
+    def test_get_error_reply_when_running_task_claim_expires(self) -> None:
+        """Test that error replies are created when running task claims expire."""
+        # Prepare: Create a running task for a run
         run_id = 110
         created_at = now()
-        token = self.state.create_token(run_id)
-        assert token is not None
+        task_id = self._claim_client_task(run_id)
+        assert self.state.activate_task(task_id)
 
         # Prepare: store and retrieve a message for the run
         msg = make_dummy_message(run_id=run_id)
         self.state.store_message(msg)
         assert self.state.get_messages(run_ids=[run_id])
+        self.state.record_message_processing_start(msg.metadata.message_id)
 
         # Execute: retrieve
         with patch("datetime.datetime") as mock_datetime:
@@ -212,6 +208,9 @@ class StateTest(CoreStateTest):
         self.assertEqual(replies[0].metadata.reply_to_message_id, msg.object_id)
         self.assertTrue(replies[0].has_error())
         self.assertEqual(replies[0].error.code, ErrorCode.CLIENT_APP_CRASHED)
+        self.assertGreater(
+            self.state.get_message_processing_duration(msg.metadata.message_id), 0.0
+        )
 
     def test_record_message_processing_timing(self) -> None:
         """Test recording message processing start and end times."""

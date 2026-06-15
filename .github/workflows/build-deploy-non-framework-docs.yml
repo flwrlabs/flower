@@ -1,0 +1,77 @@
+name: Build and deploy baselines, examples, datasets, hub, and model docs
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLWR_TELEMETRY_ENABLED: 0
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-22.04
+    name: Build and deploy (non-framework)
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Check copyright line
+        run: ./dev/test-copyright.sh
+      - name: Bootstrap
+        uses: ./.github/actions/bootstrap
+      - name: Install pandoc
+        run: sudo apt install pandoc
+      - name: Install docs dependencies
+        run: |
+          cd framework
+          uv sync --locked --all-groups
+          uv pip install -e ../datasets
+      - name: Install devtool dependencies
+        run: |
+          cd dev
+          uv sync --locked
+      - name: Update HTML theme options
+        run: |
+          cd dev
+          uv run --no-sync python -m devtool.update_html_themes
+      - name: Build baselines docs
+        run: |
+          cd framework
+          uv run --no-sync ../dev/build-baseline-docs.sh
+      - name: Build examples docs
+        run: |
+          cd dev
+          uv run --no-sync python -m devtool.build_example_docs
+      - name: Build datasets docs
+        run: |
+          cd framework
+          uv run --no-sync ../datasets/dev/build-flwr-datasets-docs.sh
+      - name: Build hub docs
+        run: |
+          cd framework
+          uv run --no-sync ../dev/build-hub-docs.sh
+      - name: Build model docs
+        run: |
+          # Reuse the framework docs environment for the shared Sphinx toolchain.
+          cd framework
+          uv run --no-sync ../dev/build-model-docs.sh
+      - name: Deploy docs
+        if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.DOCS_AWS_DEFAULT_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.DOCS_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.DOCS_AWS_SECRET_KEY_ID }}
+        run: |
+          aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./baselines/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/baselines
+          aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./examples/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/examples
+          aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./datasets/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/datasets
+          aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./hub/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/hub
+          aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./model/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/model

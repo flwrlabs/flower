@@ -21,19 +21,13 @@ Paper: arxiv.org/pdf/1909.06335.pdf
 from collections.abc import Callable, Iterable
 from logging import INFO
 
-from flwr.common import (
-    Array,
-    ArrayRecord,
-    ConfigRecord,
-    Message,
-    MetricRecord,
-    NDArrays,
-    RecordDict,
-    log,
-)
-from flwr.server import Grid
+import numpy as np
+
+from flwr.app import Array, ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
+from flwr.common import NDArrays, log
 
 from ..exception import AggregationError
+from ..grid import Grid
 from .fedavg import FedAvg
 
 
@@ -186,7 +180,7 @@ class FedAvgM(FedAvg):
 
             # SGD and convert back to ArrayRecord
             updated_array_list = [
-                Array(old - self.server_learning_rate * pg)
+                Array(np.asarray(old - self.server_learning_rate * pg))
                 for old, pg in zip(ndarrays, pseudo_gradient, strict=True)
             ]
             aggregated_arrays = ArrayRecord(

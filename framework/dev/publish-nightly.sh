@@ -15,21 +15,41 @@
 # limitations under the License.
 # ==============================================================================
 
-set -e
+# Fail as soon as a command errors, an unset variable is used, or a pipeline fails.
+set -euo pipefail
+
+# The password/token is required. The username is optional because token-based
+# repositories commonly use "__token__", which this script provides by default.
+if [[ -z "${PYPI_REPOSITORY_PASSWORD:-}" ]]; then
+    echo "Missing required configuration: PYPI_REPOSITORY_PASSWORD" >&2
+    exit 1
+fi
+
+# Move from framework/dev to framework so uv can find pyproject.toml.
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../
 
-# This script will build and publish a nightly release of Flower under the condition
-# that at least one commit was made in the last 24 hours.
-# It will rename the package name in the pyproject.toml to from "flwr" to "flwr-nightly".
-# The version name in the pyproject.toml will be appended with "-dev" and the current date.
-# The result will be a release on PyPi of the package "flwr-nightly" of version e.g.
-# "0.1.1.dev20200716" as seen at https://pypi.org/project/flwr-nightly/
-
+# Nightlies are only published if there was repository activity in the last 24
+# hours. The CI checkout is disposable, so it is safe to rewrite pyproject.toml
+# before building: "flwr" becomes "flwr-nightly" and the current date is appended
+# to the version, for example "1.2.3.dev20260514".
 if [[ $(git log --since="24 hours ago" --pretty=oneline) ]]; then
     sed -i -E "s/^name = \"(.+)\"/name = \"\1-nightly\"/" pyproject.toml
     sed -i -E "s/^version = \"(.+)\"/version = \"\1.dev$(date '+%Y%m%d')\"/" pyproject.toml
-    python -m poetry build
-    python -m poetry publish -u __token__ -p $PYPI_TOKEN
+
+    # Build both publishable Python artifacts from the rewritten metadata.
+    uv build --clear
+
+    # Store publish options in an array so usernames, passwords, and URLs are
+    # passed to uv as separate arguments even if they contain shell metacharacters.
+    publish_args=(--username "${PYPI_REPOSITORY_USERNAME:-__token__}" --password "${PYPI_REPOSITORY_PASSWORD}")
+    if [[ -n "${PYPI_REPOSITORY_URL:-}" ]]; then
+        # When a repository URL is configured, publish there instead of using
+        # uv's default PyPI endpoint.
+        publish_args=(--publish-url "${PYPI_REPOSITORY_URL}" "${publish_args[@]}")
+    fi
+
+    # Publish the artifacts from the explicit build step above.
+    uv publish "${publish_args[@]}" dist/*
 else
     echo "There were no commits in the last 24 hours."
 fi

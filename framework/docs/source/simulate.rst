@@ -15,4 +15,5 @@ Problem-oriented how-to guides show step-by-step how to achieve a specific goal.
 .. toctree::
     :titlesonly:
 
+    how-to-run-flower-locally
     how-to-run-simulations

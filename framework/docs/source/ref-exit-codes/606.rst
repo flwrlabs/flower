@@ -1,0 +1,27 @@
+####################################
+ [606] RUNTIME_VERSION_INCOMPATIBLE
+####################################
+
+*************
+ Description
+*************
+
+The Flower runtime versions are incompatible.
+
+****************
+ How to Resolve
+****************
+
+Check the error message for details. It may tell you which Flower version is required.
+
+If a specific version is shown, install that version:
+
+.. code-block:: shell
+
+    $ pip install flwr==<version>
+
+Otherwise, upgrade Flower:
+
+.. code-block:: shell
+
+    $ pip install -U flwr

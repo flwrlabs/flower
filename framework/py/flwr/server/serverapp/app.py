@@ -23,24 +23,24 @@ from queue import Queue
 import grpc
 
 from flwr.app.exception import AppExitException
+from flwr.app.message import Context, RecordDict
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
-from flwr.common.args import add_args_flwr_app_common
+from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.config import (
-    get_flwr_dir,
     get_fused_config_from_dir,
     get_project_config,
     get_project_dir,
 )
 from flwr.common.constant import (
+    RUNTIME_DEPENDENCY_INSTALL,
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
-    ExecPluginType,
-    Status,
     SubStatus,
 )
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import (
+    flush_logs,
     log,
     mirror_output_to_queue,
     restore_output,
@@ -52,52 +52,32 @@ from flwr.common.serde import (
     context_to_proto,
     fab_from_proto,
     run_from_proto,
-    run_status_to_proto,
 )
 from flwr.common.telemetry import EventType, event
-from flwr.common.typing import RunNotRunningException, RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    PullAppInputsRequest,
-    PullAppInputsResponse,
-    PushAppOutputsRequest,
+    PullTaskInputRequest,
+    PullTaskInputResponse,
+    PushTaskOutputRequest,
 )
-from flwr.proto.run_pb2 import UpdateRunStatusRequest  # pylint: disable=E0611
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
-from flwr.server.grid.grpc_grid import GrpcGrid
 from flwr.server.run_serverapp import run as run_
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
-from flwr.supercore.superexec.plugin import ServerAppExecPlugin
-from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning
+from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
+from flwr.supercore.superexec.dependency_installer import (
+    cleanup_app_runtime_environment,
+    install_app_dependencies,
+)
+from flwr.supercore.tls import validate_and_resolve_root_certificates
+from flwr.superlink.grid import GrpcGrid
 
 
 def flwr_serverapp() -> None:
     """Run process-isolated Flower ServerApp."""
+    args = _parse_args_run_flwr_serverapp().parse_args()
+    token = try_obtain_flwr_app_token(args)
+
     # Capture stdout/stderr
     log_queue: Queue[str | None] = Queue()
     mirror_output_to_queue(log_queue)
-
-    args = _parse_args_run_flwr_serverapp().parse_args()
-
-    if not args.insecure:
-        flwr_exit(
-            ExitCode.COMMON_TLS_NOT_SUPPORTED,
-            "`flwr-serverapp` does not support TLS yet.",
-        )
-
-    # Disallow long-running `flwr-serverapp` processes
-    if args.token is None:
-        run_with_deprecation_warning(
-            cmd="flwr-serverapp",
-            plugin_type=ExecPluginType.SERVER_APP,
-            plugin_class=ServerAppExecPlugin,
-            stub_class=ServerAppIoStub,
-            appio_api_address=args.serverappio_api_address,
-            flwr_dir=args.flwr_dir,
-            parent_pid=args.parent_pid,
-            warn_run_once=args.run_once,
-        )
-        return
 
     log(INFO, "Start `flwr-serverapp` process")
     log(
@@ -109,97 +89,75 @@ def flwr_serverapp() -> None:
     run_serverapp(
         serverappio_api_address=args.serverappio_api_address,
         log_queue=log_queue,
-        token=args.token,
-        flwr_dir=args.flwr_dir,
-        certificates=None,
+        token=token,
+        insecure=args.insecure,
+        certificates=validate_and_resolve_root_certificates(
+            args.root_certificates, args.insecure
+        ),
         parent_pid=args.parent_pid,
+        runtime_dependency_install=args.runtime_dependency_install,
     )
 
     # Restore stdout/stderr
     restore_output()
 
 
-def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
+def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     serverappio_api_address: str,
     log_queue: Queue[str | None],
     token: str,
-    flwr_dir: str | None = None,
+    insecure: bool,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
+    runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
     """Run Flower ServerApp process."""
     # Monitor the main process in case of SIGKILL
     if parent_pid is not None:
         start_parent_process_monitor(parent_pid)
 
+    # Initialize the GrpcGrid
+    grid = GrpcGrid(
+        serverappio_service_address=serverappio_api_address,
+        insecure=insecure,
+        root_certificates=certificates,
+        token=token,
+    )
+
     # Initialize variables for exit handler
-    flwr_dir_ = get_flwr_dir(flwr_dir)
     log_uploader = None
     hash_run_id = None
     run = None
-    run_status = None
+    sub_status = SubStatus.FAILED
+    details = "Task failed with unknown error."
     heartbeat_sender = None
-    grid = None
-    context = None
+    context: Context | None = None
+    runtime_env_dir: Path | None = None
     exit_code = ExitCode.SUCCESS
-
-    def on_exit() -> None:
-        # Set Grpc max retries to 1 to avoid blocking on exit
-        if grid:
-            grid._retry_invoker.max_tries = 1
-
-        # Stop heartbeat sender
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
-
-        # Stop log uploader for this run and upload final logs
-        if log_uploader:
-            stop_log_uploader(log_queue, log_uploader)
-
-        # Update run status
-        if run and run_status and grid:
-            try:
-                req = UpdateRunStatusRequest(
-                    run_id=run.run_id, run_status=run_status_to_proto(run_status)
-                )
-                grid._stub.UpdateRunStatus(req)
-            except grpc.RpcError:
-                pass
-
-        # Close the Grpc connection
-        if grid:
-            grid.close()
 
     # Register signal handlers for graceful shutdown
     register_signal_handlers(
         event_type=EventType.FLWR_SERVERAPP_RUN_LEAVE,
-        exit_message="Run stopped by user.",
-        exit_handlers=[on_exit],
+        exit_message="Task stopped by user.",
     )
 
     try:
-        # Initialize the GrpcGrid
-        grid = GrpcGrid(
-            serverappio_service_address=serverappio_api_address,
-            root_certificates=certificates,
-        )
+        # Set up heartbeat sender
+        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(grid._stub))
+        heartbeat_sender.start()
 
-        # Pull ServerAppInputs from LinkState
-        try:
-            log(DEBUG, "[flwr-serverapp] Pull ServerAppInputs")
-            req = PullAppInputsRequest(token=token)
-            res: PullAppInputsResponse = grid._stub.PullAppInputs(req)
-        except grpc.RpcError as ex:
-            if ex.code() == grpc.StatusCode.FAILED_PRECONDITION:
-                raise RuntimeError("Failed to start the run.") from ex
-            raise
+        # Pull task input from SuperLink
+        log(DEBUG, "[flwr-serverapp] Pull task input")
+        req = PullTaskInputRequest()
+        res: PullTaskInputResponse = grid._stub.PullTaskInput(req)
+
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
         fab = fab_from_proto(res.fab)
 
         hash_run_id = get_sha256_hash(run.run_id)
 
-        grid.set_run(run.run_id)
+        grid.set_run(run)
 
         # Start log uploader for this run
         log_uploader = start_log_uploader(
@@ -210,11 +168,34 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         )
 
         log(DEBUG, "[flwr-serverapp] Start FAB installation.")
-        install_from_fab(fab.content, flwr_dir=flwr_dir_, skip_prompt=True)
+        install_from_fab(fab.content, skip_prompt=True)
 
         fab_id, fab_version = get_fab_metadata(fab.content)
 
-        app_path = str(get_project_dir(fab_id, fab_version, fab.hash_str, flwr_dir_))
+        app_path = str(get_project_dir(fab_id, fab_version, fab.hash_str))
+
+        if runtime_dependency_install:
+            log(DEBUG, "[flwr-serverapp] Installing app dependencies.")
+            runtime_env_dir = install_app_dependencies(
+                app_path,
+                launch_id=token,
+                run_id=run.run_id,
+                index_context={
+                    "component": "serverapp",
+                    "project_dir": app_path,
+                    "run_id": run.run_id,
+                    "launch_id": token,
+                    "fab_id": run.fab_id,
+                    "fab_version": run.fab_version,
+                    "fab_hash": fab.hash_str,
+                },
+            )
+        else:
+            log(
+                DEBUG,
+                "[flwr-serverapp] Runtime dependency installation is disabled.",
+            )
+
         config = get_project_config(app_path)
 
         # Obtain server app reference and the run config
@@ -238,51 +219,69 @@ def run_serverapp(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             event_details={"run-id-hash": hash_run_id},
         )
 
-        # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(
-            make_app_heartbeat_fn_grpc(grid._stub, token)
-        )
-        heartbeat_sender.start()
-
         # Load and run the ServerApp with the Grid
-        updated_context = run_(
+        context = run_(
             grid=grid,
             server_app_dir=app_path,
             server_app_attr=server_app_attr,
             context=context,
         )
 
+        # Update sub_status and details for successful completion
+        sub_status = SubStatus.COMPLETED
+        details = ""
+
         # Send resulting context
-        context_proto = context_to_proto(updated_context)
-        log(DEBUG, "[flwr-serverapp] Will push ServerAppOutputs")
-        out_req = PushAppOutputsRequest(
-            token=token, run_id=run.run_id, context=context_proto
-        )
-        _ = grid._stub.PushAppOutputs(out_req)
-
-        run_status = RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
-
-    # Raised when the run is already stopped by the user
-    except RunNotRunningException:
-        log(INFO, "")
-        log(INFO, "Run ID %s stopped.", run.run_id)  # type: ignore[union-attr]
-        log(INFO, "")
-        run_status = None
-        # No need to update the exit code since this is expected behavior
-
-    except RuntimeError:
-        log(ERROR, "Failed to start run.")
-        exit_code = ExitCode.SERVERAPP_RUN_START_REJECTED
+        # Temporarily disable pushing resulting context to servicer
+        context.state = RecordDict()
 
     except Exception as ex:  # pylint: disable=broad-exception-caught
         exc_entity = "ServerApp"
         log(ERROR, "%s raised an exception", exc_entity, exc_info=ex)
-        run_status = RunStatus(Status.FINISHED, SubStatus.FAILED, str(ex))
+
+        # Update sub_status and details based on the exception
+        sub_status = SubStatus.FAILED
+        details = f"ServerApp failed with exception: {str(ex)}"
 
         # Set exit code
         exit_code = ExitCode.SERVERAPP_EXCEPTION  # General exit code
         if isinstance(ex, AppExitException):
             exit_code = ex.exit_code
+
+    finally:
+        log(DEBUG, "[flwr-serverapp] Will push ServerApp task output")
+
+        # Set Grpc max retries to 1 to avoid blocking on exit
+        grid._retry_invoker.max_tries = 1
+
+        # Upload any remaining logs before pushing final output
+        if log_uploader:
+            flush_logs(log_queue)
+
+        # Push final status and context (if available)
+        pushoutput_req = PushTaskOutputRequest(
+            context=context_to_proto(context) if context else None,
+            sub_status=sub_status,
+            details=details,
+        )
+        try:
+            grid._stub.PushTaskOutput(pushoutput_req)
+        except grpc.RpcError as err:
+            log(ERROR, "Failed to push task output: %s", str(err))
+
+        # Stop log uploader for this run and upload final logs
+        if log_uploader:
+            stop_log_uploader(log_queue, log_uploader)
+
+        # Stop heartbeat sender
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+
+        # Close the Grpc connection
+        grid.close()
+
+        # Clean up run-scoped runtime environment, if any.
+        cleanup_app_runtime_environment(runtime_env_dir)
 
     flwr_exit(
         code=exit_code,

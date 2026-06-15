@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+      - "release/framework-*"
   pull_request:
     branches:
       - main
+      - "release/framework-*"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
@@ -42,17 +44,20 @@ jobs:
       - uses: actions/checkout@v5
       - name: Bootstrap
         uses: ./.github/actions/bootstrap
-      - name: Install dependencies (mandatory only)
+      - name: Install dependencies
         run: |
           cd framework
-          python -m poetry install --all-extras
-          python -m pip install -U setuptools==80.9.0
+          uv sync --locked --all-extras --all-groups
       - name: Build wheel
-        run: ./framework/dev/build.sh
+        run: |
+          cd framework
+          uv run --no-sync ./dev/build.sh
       - name: Test wheel
-        run: ./framework/dev/test-wheel.sh
+        run: |
+          cd framework
+          uv run --no-sync ./dev/test-wheel.sh
       - name: Upload wheel
-        if: ${{ github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
+        if: ${{ github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
         id: upload
         env:
           AWS_DEFAULT_REGION: ${{ secrets.ARTIFACT_AWS_DEFAULT_REGION }}
@@ -79,7 +84,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13"]
         directory: [e2e-bare-auth]
         connection: [secure, insecure]
         engine: [deployment-engine, simulation-engine]
@@ -87,12 +92,7 @@ jobs:
         exclude:
           - connection: insecure
             authentication: client-auth
-    name: |
-      Control API / 
-      Python ${{ matrix.python-version }} /
-      ${{ matrix.connection }} / 
-      ${{ matrix.authentication }} / 
-      ${{ matrix.engine }} 
+    name: Control API / Python ${{ matrix.python-version }} / ${{ matrix.connection }} / ${{ matrix.authentication }} / ${{ matrix.engine }}
     defaults:
       run:
         working-directory: framework/e2e/${{ matrix.directory }}
@@ -103,9 +103,8 @@ jobs:
         uses: ./.github/actions/bootstrap
         with:
           python-version: ${{ matrix.python-version }}
-          poetry-skip: 'true'
       - name: Install Flower from repo
-        if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'adap/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
+        if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'flwrlabs/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
         working-directory: ./framework
         run: |
           if [[ "${{ matrix.engine }}" == "simulation-engine" ]]; then
@@ -114,7 +113,7 @@ jobs:
             python -m pip install .
           fi
       - name: Download and install Flower wheel from artifact store
-        if: ${{ needs.changes.outputs.framework == 'true' && github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
+        if: ${{ needs.changes.outputs.framework == 'true' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
         run: |
           # Define base URL for wheel file
           WHEEL_URL="https://${{ env.ARTIFACT_BUCKET }}/py/${{ needs.wheel.outputs.dir }}/${{ needs.wheel.outputs.short_sha }}/${{ needs.wheel.outputs.whl_path }}"
@@ -124,10 +123,10 @@ jobs:
             python -m pip install "${WHEEL_URL}"
           fi
       - name: >
-          Run Control API test / 
-          ${{ matrix.connection }} / 
-          ${{ matrix.authentication }} / 
-          ${{ matrix.engine }} 
+          Run Control API test /
+          ${{ matrix.connection }} /
+          ${{ matrix.authentication }} /
+          ${{ matrix.engine }}
         if: ${{ needs.changes.outputs.framework == 'true' }}
         working-directory: framework/e2e/${{ matrix.directory }}
         run: ./../test_control_api.sh "${{ matrix.connection }}" "${{ matrix.authentication}}" "${{ matrix.engine }}"
@@ -156,20 +155,20 @@ jobs:
           - directory: e2e-pytorch
             e2e: e2e_pytorch
             dataset: |
-              from torchvision.datasets import CIFAR10
-              CIFAR10('./data', download=True)
+              from datasets import load_dataset
+              load_dataset('uoft-cs/cifar10')
 
           - directory: e2e-tensorflow
             e2e: e2e_tensorflow
             dataset: |
-              import tensorflow as tf
-              tf.keras.datasets.cifar10.load_data()
+              from datasets import load_dataset
+              load_dataset('uoft-cs/cifar10')
 
           - directory: e2e-opacus
             e2e: e2e_opacus
             dataset: |
-              from torchvision.datasets import CIFAR10
-              CIFAR10('./data', download=True)
+              from datasets import load_dataset
+              load_dataset('uoft-cs/cifar10')
 
           - directory: e2e-pytorch-lightning
             e2e: e2e_pytorch_lightning
@@ -203,11 +202,11 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' }}
         uses: actions/setup-python@v6
         with:
-          python-version: '3.10'
+          python-version: "3.11"
       - name: Install build tools
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: |
-            python -m pip install -U pip==23.3.1
+          python -m pip install -U pip==26.0.1
         shell: bash
       # Using approach described here for Python location caching:
       # https://blog.allenai.org/python-caching-in-github-actions-e9452698e98d
@@ -222,9 +221,10 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: python -m pip install --upgrade . --extra-index-url https://download.pytorch.org/whl/cpu
       - name: Install Flower wheel from artifact store
-        if: ${{ needs.changes.outputs.framework == 'true' && github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
+        if: ${{ needs.changes.outputs.framework == 'true' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
         run: |
-          python -m pip install https://${{ env.ARTIFACT_BUCKET }}/py/${{ needs.wheel.outputs.dir }}/${{ needs.wheel.outputs.short_sha }}/${{ needs.wheel.outputs.whl_path }}
+          WHEEL_URL="https://${{ env.ARTIFACT_BUCKET }}/py/${{ needs.wheel.outputs.dir }}/${{ needs.wheel.outputs.short_sha }}/${{ needs.wheel.outputs.whl_path }}"
+          python -m pip install "flwr[simulation] @ ${WHEEL_URL}"
       - name: Download dataset
         if: ${{ needs.changes.outputs.framework == 'true' && matrix.dataset }}
         run: python -c "${{ matrix.dataset }}"
@@ -267,7 +267,17 @@ jobs:
     needs: [changes, wheel]
     strategy:
       matrix:
-        strat: ["FedMedian", "FedTrimmedAvg", "QFedAvg", "FaultTolerantFedAvg", "FedAvgM", "FedAdam", "FedAdagrad", "FedYogi"]
+        strat:
+          [
+            "FedMedian",
+            "FedTrimmedAvg",
+            "QFedAvg",
+            "FaultTolerantFedAvg",
+            "FedAvgM",
+            "FedAdam",
+            "FedAdagrad",
+            "FedYogi"
+          ]
 
     name: Strategy / ${{ matrix.strat }}
 
@@ -283,11 +293,12 @@ jobs:
       - name: Install dependencies
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: |
-          python -m poetry install
+          python -m pip install --upgrade .
       - name: Install Flower wheel from artifact store
-        if: ${{ needs.changes.outputs.framework == 'true' && github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
+        if: ${{ needs.changes.outputs.framework == 'true' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
         run: |
-          python -m pip install https://${{ env.ARTIFACT_BUCKET }}/py/${{ needs.wheel.outputs.dir }}/${{ needs.wheel.outputs.short_sha }}/${{ needs.wheel.outputs.whl_path }}
+          WHEEL_URL="https://${{ env.ARTIFACT_BUCKET }}/py/${{ needs.wheel.outputs.dir }}/${{ needs.wheel.outputs.short_sha }}/${{ needs.wheel.outputs.whl_path }}"
+          python -m pip install "flwr[simulation] @ ${WHEEL_URL}"
       - name: Cache Datasets
         if: ${{ needs.changes.outputs.framework == 'true' }}
         uses: actions/cache@v4
@@ -317,7 +328,6 @@ jobs:
           - example: quickstart-jax
           - example: quickstart-sklearn
           - example: quickstart-numpy
-          - example: quickstart-pytorch-deprecated
 
     name: App / ${{ matrix.example }}
 
@@ -326,41 +336,42 @@ jobs:
       - name: Bootstrap
         if: ${{ needs.changes.outputs.framework == 'true' }}
         uses: ./.github/actions/bootstrap
-      - name: Install Flower from repo
-        if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'adap/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
-        run: |
-          cd framework
-          python -m pip install .
-      - name: Install Flower wheel from artifact store
-        if: ${{ needs.changes.outputs.framework == 'true' && github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
-        run: |
-          python -m pip install https://${{ env.ARTIFACT_BUCKET }}/py/${{ needs.wheel.outputs.dir }}/${{ needs.wheel.outputs.short_sha }}/${{ needs.wheel.outputs.whl_path }}
       - name: Install project dependencies
         if: ${{ needs.changes.outputs.framework == 'true' }}
         working-directory: examples/${{ matrix.example }}
         run: |
-          sed -i 's/"flwr\[[^]]*\][^"]*", *//g' pyproject.toml
           # Replace tensorflow with tensorflow-cpu to avoid GPU warnings in CI
           sed -i 's/"tensorflow\([^"]*\)"/"tensorflow-cpu\1"/g' pyproject.toml
-          pip install flwr[simulation]
-          pip install .  --extra-index-url https://download.pytorch.org/whl/cpu
+          python -m pip install . --extra-index-url https://download.pytorch.org/whl/cpu
+      - name: Install Flower from repo
+        if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'flwrlabs/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
+        run: |
+          cd framework
+          python -m pip install .
+      - name: Install Flower wheel from artifact store
+        if: ${{ needs.changes.outputs.framework == 'true' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
+        run: |
+          WHEEL_URL="https://${{ env.ARTIFACT_BUCKET }}/py/${{ needs.wheel.outputs.dir }}/${{ needs.wheel.outputs.short_sha }}/${{ needs.wheel.outputs.whl_path }}"
+          python -m pip install "flwr[simulation] @ ${WHEEL_URL}"
       - name: Run project
         if: ${{ needs.changes.outputs.framework == 'true' }}
         working-directory: examples/${{ matrix.example }}
         run: |
-          flwr run --run-config num-server-rounds=1 2>&1 | tee flwr_output.log 
-          if grep -q "ERROR" flwr_output.log; then
+          flwr run --run-config num-server-rounds=1 --stream 2>&1 | tee flwr_output.log 
+          output=$(flwr ls --format=json)
+          if ! echo "$output" | jq -e '.success == true and (.runs | length) == 1 and .runs[0].status == "finished:completed"' > /dev/null; then
+            echo "Unexpected flwr ls output:"
+            echo "$output"
             exit 1
           fi
-
 
   pull-app:
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     needs: [changes, wheel]
     env:
-      ACCOUNT: 'flwrlabs'
-      APP_NAME: 'numpy-ci'
+      ACCOUNT: "flwrlabs"
+      APP_NAME: "numpy-ci"
 
     name: flwr new @
 
@@ -370,14 +381,15 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' }}
         uses: ./.github/actions/bootstrap
       - name: Install Flower from repo
-        if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'adap/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
+        if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'flwrlabs/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
         run: |
           cd framework
           python -m pip install .
       - name: Install Flower wheel from artifact store
-        if: ${{ needs.changes.outputs.framework == 'true' && github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
+        if: ${{ needs.changes.outputs.framework == 'true' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
         run: |
-          python -m pip install https://${{ env.ARTIFACT_BUCKET }}/py/${{ needs.wheel.outputs.dir }}/${{ needs.wheel.outputs.short_sha }}/${{ needs.wheel.outputs.whl_path }}
+          WHEEL_URL="https://${{ env.ARTIFACT_BUCKET }}/py/${{ needs.wheel.outputs.dir }}/${{ needs.wheel.outputs.short_sha }}/${{ needs.wheel.outputs.whl_path }}"
+          python -m pip install "flwr[simulation] @ ${WHEEL_URL}"
       - name: Create project and install it
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: |
@@ -388,8 +400,11 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: |
           cd $APP_NAME
-          flwr run . --run-config num-server-rounds=1 2>&1 | tee flwr_output.log 
-          if grep -q "ERROR" flwr_output.log; then
+          flwr run . --run-config num-server-rounds=1 --stream 2>&1 | tee flwr_output.log 
+          output=$(flwr ls --format=json)
+          if ! echo "$output" | jq -e '.success == true and (.runs | length) == 1 and .runs[0].status == "finished:completed"' > /dev/null; then
+            echo "Unexpected flwr ls output:"
+            echo "$output"
             exit 1
           fi
 
@@ -400,13 +415,8 @@ jobs:
     strategy:
       matrix:
         framework: ["numpy"]
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
-
-    name: |
-      Build & Install /
-      Python ${{ matrix.python-version }} /
-      ${{ matrix.framework }}
-
+        python-version: ["3.11", "3.12", "3.13"]
+    name: Build & Install / Python ${{ matrix.python-version }} / ${{ matrix.framework }}
     steps:
       - uses: actions/checkout@v5
       - name: Bootstrap
@@ -414,16 +424,16 @@ jobs:
         uses: ./.github/actions/bootstrap
         with:
           python-version: ${{ matrix.python-version }}
-          poetry-skip: 'true'
       - name: Install Flower from repo
-        if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'adap/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
+        if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'flwrlabs/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
         run: |
           cd framework
           python -m pip install .
       - name: Install Flower wheel from artifact store
-        if: ${{ needs.changes.outputs.framework == 'true' && github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
+        if: ${{ needs.changes.outputs.framework == 'true' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
         run: |
-          python -m pip install https://${{ env.ARTIFACT_BUCKET }}/py/${{ needs.wheel.outputs.dir }}/${{ needs.wheel.outputs.short_sha }}/${{ needs.wheel.outputs.whl_path }}
+          WHEEL_URL="https://${{ env.ARTIFACT_BUCKET }}/py/${{ needs.wheel.outputs.dir }}/${{ needs.wheel.outputs.short_sha }}/${{ needs.wheel.outputs.whl_path }}"
+          python -m pip install "flwr[simulation] @ ${WHEEL_URL}"
       - name: Create project, build, and install it
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: |
@@ -445,12 +455,7 @@ jobs:
         connection: [insecure]
         engine: [deployment-engine, simulation-engine]
         authentication: [no-auth]
-    name: |
-      NumPy ${{ matrix.numpy-version }} / 
-      Python ${{ matrix.python-version }} /
-      ${{ matrix.connection }} / 
-      ${{ matrix.authentication }} / 
-      ${{ matrix.engine }} 
+    name: NumPy ${{ matrix.numpy-version }} / Python ${{ matrix.python-version }} / ${{ matrix.connection }} / ${{ matrix.authentication }} / ${{ matrix.engine }}
     defaults:
       run:
         working-directory: framework/e2e/${{ matrix.directory }}
@@ -461,9 +466,8 @@ jobs:
         uses: ./.github/actions/bootstrap
         with:
           python-version: ${{ matrix.python-version }}
-          poetry-skip: 'true'
       - name: Install Flower from repo
-        if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'adap/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
+        if: ${{ needs.changes.outputs.framework == 'true' && (github.repository != 'flwrlabs/flower' || github.event.pull_request.head.repo.fork || github.actor == 'dependabot[bot]') }}
         working-directory: ./framework
         run: |
           if [[ "${{ matrix.engine }}" == "simulation-engine" ]]; then
@@ -472,7 +476,7 @@ jobs:
             python -m pip install . "numpy>=${{ matrix.numpy-version }},<2.0"
           fi
       - name: Download and install Flower wheel from artifact store
-        if: ${{ needs.changes.outputs.framework == 'true' && github.repository == 'adap/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
+        if: ${{ needs.changes.outputs.framework == 'true' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]' }}
         run: |
           # Define base URL for wheel file
           WHEEL_URL="https://${{ env.ARTIFACT_BUCKET }}/py/${{ needs.wheel.outputs.dir }}/${{ needs.wheel.outputs.short_sha }}/${{ needs.wheel.outputs.whl_path }}"
@@ -482,10 +486,10 @@ jobs:
             python -m pip install "${WHEEL_URL}" "numpy>=${{ matrix.numpy-version }},<2.0"
           fi
       - name: >
-          Run Flower - NumPy 1.26 test / 
-          ${{ matrix.connection }} / 
-          ${{ matrix.authentication }} / 
-          ${{ matrix.engine }} 
+          Run Flower - NumPy 1.26 test /
+          ${{ matrix.connection }} /
+          ${{ matrix.authentication }} /
+          ${{ matrix.engine }}
         if: ${{ needs.changes.outputs.framework == 'true' }}
         working-directory: framework/e2e/${{ matrix.directory }}
         run: ./../test_control_api.sh "${{ matrix.connection }}" "${{ matrix.authentication}}" "${{ matrix.engine }}"
@@ -496,7 +500,7 @@ jobs:
       PYTHONIOENCODING: utf-8
     timeout-minutes: 10
     needs: [changes, wheel]
-  
+
     name: Windows compatibility test
 
     steps:
@@ -505,10 +509,10 @@ jobs:
         if: ${{ needs.changes.outputs.framework == 'true' }}
         uses: actions/setup-python@v6
         with:
-          python-version: '3.10'
+          python-version: "3.11"
       - name: Install build tools
         if: ${{ needs.changes.outputs.framework == 'true' }}
-        run: python -m pip install -U pip==23.3.1
+        run: python -m pip install -U pip==26.0.1
       - name: Install dependencies
         if: ${{ needs.changes.outputs.framework == 'true' }}
         run: |
@@ -527,14 +531,10 @@ jobs:
     strategy:
       matrix:
         engine: [deployment, simulation]
-        python-version: ["3.10"]
+        python-version: ["3.11"]
 
     if: ${{ needs.changes.outputs.framework == 'true' }}
-
-    name: |
-      ServerApp/run heartbeat test with ${{ matrix.engine }} runtime /
-      Python ${{ matrix.python-version }}
-
+    name: ServerApp/run heartbeat test with ${{ matrix.engine }} runtime / Python ${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@v5
       - name: Set up Python
@@ -542,11 +542,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install build tools
-        run: python -m pip install -U pip==23.3.1
-      - name: Overwrite ping interval and patience
-        run: |
-          sed -i 's/\(HEARTBEAT_DEFAULT_INTERVAL *= *\).*/\120/' framework/py/flwr/common/constant.py
-          sed -i 's/\(HEARTBEAT_PATIENCE *= *\).*/\11/' framework/py/flwr/common/constant.py
+        run: python -m pip install -U pip==26.0.1
       - name: Install dependencies
         run: |
           cd framework

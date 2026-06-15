@@ -21,20 +21,19 @@ from pathlib import Path
 
 from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.common.config import (
-    get_flwr_dir,
     get_metadata_from_config,
     get_project_config,
     get_project_dir,
 )
 from flwr.common.logger import log
 from flwr.common.object_ref import load_app, validate
+from flwr.supercore.utils import get_flwr_home
 
 
 def get_load_client_app_fn(
     default_app_ref: str,
     app_path: str | None,
     multi_app: bool,
-    flwr_dir: str | None = None,
 ) -> Callable[[str, str, str], ClientApp]:
     """Get the load_client_app_fn function.
 
@@ -82,16 +81,14 @@ def get_load_client_app_fn(
         # If multi-app feature is enabled
         else:
             try:
-                runtime_app_dir = get_project_dir(
-                    fab_id, fab_version, fab_hash, get_flwr_dir(flwr_dir)
-                )
+                runtime_app_dir = get_project_dir(fab_id, fab_version, fab_hash)
                 config = get_project_config(runtime_app_dir)
             except Exception as e:
                 raise LoadClientAppError(
                     "Failed to load ClientApp."
                     "Possible reasons for error include mismatched "
                     "`fab_id`, `fab_version`, or `fab_hash` in "
-                    f"{str(get_flwr_dir(flwr_dir).resolve())}."
+                    f"{str(get_flwr_home().resolve())}."
                 ) from e
 
             # Set app reference

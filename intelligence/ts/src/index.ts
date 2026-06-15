@@ -14,7 +14,6 @@
 // =============================================================================
 
 export { FlowerIntelligence } from './flowerintelligence';
-export { FailureCode } from './typing';
 export type {
   ChatOptions,
   ChatResponseResult,
@@ -35,3 +34,4 @@ export type {
   ToolParameterProperty,
   Usage,
 } from './typing';
+export { FailureCode } from './typing';

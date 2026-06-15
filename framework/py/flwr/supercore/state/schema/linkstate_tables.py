@@ -16,18 +16,20 @@
 
 
 from sqlalchemy import (
-    TIMESTAMP,
+    BigInteger,
     Column,
     Float,
     ForeignKey,
     Index,
-    Integer,
     LargeBinary,
     MetaData,
     String,
     Table,
     UniqueConstraint,
+    text,
 )
+
+from flwr.supercore.constant import RunType
 
 
 def create_linkstate_metadata() -> MetaData:
@@ -40,7 +42,7 @@ def create_linkstate_metadata() -> MetaData:
     Table(
         "node",
         metadata,
-        Column("node_id", Integer, unique=True),
+        Column("node_id", BigInteger, unique=True),
         Column("owner_aid", String),
         Column("owner_name", String),
         Column("status", String),
@@ -48,7 +50,7 @@ def create_linkstate_metadata() -> MetaData:
         Column("last_activated_at", String, nullable=True),
         Column("last_deactivated_at", String, nullable=True),
         Column("unregistered_at", String, nullable=True),
-        Column("online_until", TIMESTAMP, nullable=True),
+        Column("online_until", Float, nullable=True),
         Column("heartbeat_interval", Float),
         Column("public_key", LargeBinary, unique=True),
         # Indexes
@@ -66,23 +68,22 @@ def create_linkstate_metadata() -> MetaData:
     Table(
         "run",
         metadata,
-        Column("run_id", Integer, unique=True),
+        Column("run_id", BigInteger, unique=True),
         Column("fab_id", String),
         Column("fab_version", String),
         Column("fab_hash", String),
         Column("override_config", String),
-        Column("pending_at", String),
-        Column("starting_at", String),
-        Column("running_at", String),
-        Column("finished_at", String),
-        Column("sub_status", String),
-        Column("details", String),
+        Column("usage_reported_at", String, nullable=False, server_default=text("''")),
         Column("federation", String),
-        Column("federation_options", LargeBinary),
+        Column("primary_task_id", BigInteger, nullable=False),
+        Column("federation_config", String),
+        Column("run_type", String, nullable=False, server_default=RunType.SERVER_APP),
+        Column("series_id", BigInteger, nullable=True),
         Column("flwr_aid", String),
-        Column("bytes_sent", Integer, server_default="0"),
-        Column("bytes_recv", Integer, server_default="0"),
+        Column("bytes_sent", BigInteger, server_default="0"),
+        Column("bytes_recv", BigInteger, server_default="0"),
         Column("clientapp_runtime", Float, server_default="0.0"),
+        Index("idx_run_series_id", "series_id"),
     )
 
     # --------------------------------------------------------------------------
@@ -92,8 +93,8 @@ def create_linkstate_metadata() -> MetaData:
         "logs",
         metadata,
         Column("timestamp", Float),
-        Column("run_id", Integer, ForeignKey("run.run_id")),
-        Column("node_id", Integer),
+        Column("run_id", BigInteger, ForeignKey("run.run_id")),
+        Column("node_id", BigInteger),
         Column("log", String),
         # Composite PK
         UniqueConstraint("timestamp", "run_id", "node_id"),
@@ -105,7 +106,7 @@ def create_linkstate_metadata() -> MetaData:
     Table(
         "context",
         metadata,
-        Column("run_id", Integer, ForeignKey("run.run_id"), unique=True),
+        Column("run_id", BigInteger, ForeignKey("run.run_id"), unique=True),
         Column("context", LargeBinary),
     )
 
@@ -117,9 +118,9 @@ def create_linkstate_metadata() -> MetaData:
         metadata,
         Column("message_id", String, unique=True),
         Column("group_id", String),
-        Column("run_id", Integer, ForeignKey("run.run_id")),
-        Column("src_node_id", Integer),
-        Column("dst_node_id", Integer),
+        Column("run_id", BigInteger, ForeignKey("run.run_id")),
+        Column("src_node_id", BigInteger),
+        Column("dst_node_id", BigInteger),
         Column("reply_to_message_id", String),
         Column("created_at", Float),
         Column("delivered_at", String),
@@ -137,9 +138,9 @@ def create_linkstate_metadata() -> MetaData:
         metadata,
         Column("message_id", String, unique=True),
         Column("group_id", String),
-        Column("run_id", Integer, ForeignKey("run.run_id")),
-        Column("src_node_id", Integer),
-        Column("dst_node_id", Integer),
+        Column("run_id", BigInteger, ForeignKey("run.run_id")),
+        Column("src_node_id", BigInteger),
+        Column("dst_node_id", BigInteger),
         Column("reply_to_message_id", String),
         Column("created_at", Float),
         Column("delivered_at", String),
@@ -147,6 +148,11 @@ def create_linkstate_metadata() -> MetaData:
         Column("message_type", String),
         Column("content", LargeBinary, nullable=True),
         Column("error", LargeBinary, nullable=True),
+        Index(
+            "idx_message_res_reply_to_message_id_unique",
+            "reply_to_message_id",
+            unique=True,
+        ),
     )
 
     return metadata

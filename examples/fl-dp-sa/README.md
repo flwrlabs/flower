@@ -8,16 +8,22 @@ framework: [torch, torchvision]
 
 This example demonstrates a federated learning setup using the Flower, incorporating central differential privacy (DP) with client-side fixed clipping and secure aggregation (SA). It is intended for a small number of rounds for demonstration purposes.
 
-This example is similar to the [quickstart-pytorch example](https://github.com/adap/flower/tree/main/examples/quickstart-pytorch) and extends it by integrating central differential privacy and secure aggregation. For more details on differential privacy and secure aggregation in Flower, please refer to the documentation [here](https://flower.ai/docs/framework/how-to-use-differential-privacy.html) and [here](https://flower.ai/docs/framework/contributor-ref-secure-aggregation-protocols.html).
+This example is similar to the [quickstart-pytorch example](https://flower.ai/apps/flwrlabs/quickstart-pytorch/) and extends it by integrating central differential privacy and secure aggregation. For more details on differential privacy and secure aggregation in Flower, please refer to the documentation [here](https://flower.ai/docs/framework/how-to-use-differential-privacy.html) and [here](https://flower.ai/docs/framework/contributor-ref-secure-aggregation-protocols.html).
 
 ## Set up the project
 
-### Clone the project
+### Fetch the app
 
-Start by cloning the example project:
+Install Flower:
 
 ```shell
-git clone --depth=1 https://github.com/adap/flower.git && mv flower/examples/fl-dp-sa . && rm -rf flower && cd fl-dp-sa
+pip install flwr
+```
+
+Fetch the app:
+
+```shell
+flwr new @flwrlabs/fl-dp-sa
 ```
 
 This will create a new directory called `fl-dp-sa` containing the following files:
@@ -50,39 +56,16 @@ You can run your Flower project in both _simulation_ and _deployment_ mode witho
 > [!NOTE]
 > Check the [Simulation Engine documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) to learn more about Flower simulations and how to optimize them.
 
-This example is designed to run with 100 virtual clients. Let's first locate the Flower Configuration file and create a SuperLink connection with 100 clients.
-
-Locate the Flower Configuration file:
-
-```shell
-flwr config list
-```
-
-```console
-# Example output:
-Flower Config file: /path/to/your/.flwr/config.toml
-SuperLink connections:
- supergrid
- local (default)
-```
-
-Create a new `Superlink` connection:
-
-```TOML
-[superlink.local-xl]
-options.num-supernodes = 100
-```
-
-Finally, run the app by passing the name of the SuperLink connection you just created.
+This example is designed to run with 100 virtual `SuperNodes`. First we need to change the configuration of the Simulation Runtime (which by default uses 10 nodes). This guide assumes your default `SuperLink` connection points to one ready for simulations. If you aren't sure, please refer to the [How-to run Flower locally](https://flower.ai/docs/framework/how-to-run-flower-locally.html) guide.
 
 ```bash
-flwr run . local-xl
+flwr federation simulation-config --num-supernodes=100
 ```
 
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example:
 
 ```bash
-flwr run . --run-config "noise-multiplier=0.1 clipping-norm=5"
+flwr run . --run-config "noise-multiplier=0.1 clipping-norm=5"  --stream
 ```
 
 ### Run with the Deployment Engine

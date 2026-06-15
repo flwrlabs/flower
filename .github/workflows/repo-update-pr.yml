@@ -1,0 +1,19 @@
+name: Update PR from `main`
+
+on:
+  push:
+    branches:
+      - 'main'
+jobs:
+  autoupdate:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Automatically update mergeable PRs
+        uses: adRise/update-pr-branch@v0.10.2
+        with:
+          token: ${{ secrets.FLWRMACHINE_TOKEN }}
+          base: 'main'
+          required_approval_count: 1
+          require_passed_checks: true
+          sort: 'created'
+          direction: 'desc'

@@ -13,9 +13,9 @@
 // limitations under the License.
 // =============================================================================
 
-import path from 'path';
 import os from 'os';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import path from 'path';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // --- In-memory file system ---
 // This object will simulate our file system.

@@ -4,11 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quickstart-xgboost"
-version = "1.0.1"
+version = "1.1.4"
 description = "Federated Learning with XGBoost and Flower (Quickstart Example)"
-license = "Apache-2.0"
+license = {file = "LICENSE"}
 dependencies = [
-    "flwr[simulation]>=1.26.1",
+    "flwr[simulation]>=1.28.0",
     "flwr-datasets>=0.6.0",
     "xgboost>=2.0.0",
 ]
@@ -18,6 +18,8 @@ packages = ["."]
 
 [tool.flwr.app]
 publisher = "flwrlabs"
+fab-format-version = 1
+flwr-version-target = "1.31.0"
 
 [tool.flwr.app.components]
 serverapp = "quickstart_xgboost.server_app:app"
@@ -28,6 +30,7 @@ num-server-rounds = 3
 fraction-train = 0.1
 fraction-evaluate = 0.1
 local-epochs = 1
+save-model = false
 
 # XGBoost parameters
 params.objective = "binary:logistic"
@@ -38,4 +41,3 @@ params.nthread = 16
 params.num-parallel-tree = 1
 params.subsample = 1
 params.tree-method = "hist"
-
