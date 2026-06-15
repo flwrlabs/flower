@@ -75,6 +75,11 @@ from flwr.supercore.interceptors import (
     create_clientappio_superexec_auth_server_interceptor,
     create_clientappio_token_auth_server_interceptor,
 )
+from flwr.supercore.message_utils import (
+    assign_message_id,
+    get_message_object_id,
+    set_message_object_id,
+)
 from flwr.supercore.object_store import ObjectStore, ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric_ed25519 import (
     create_message_to_sign,
@@ -311,7 +316,8 @@ def _insert_message(msg: Message, state: NodeState, store: ObjectStore) -> None:
     """Insert a message into the NodeState and ObjectStore."""
     with no_object_id_recompute():
         # Store message in state
-        msg.metadata.__dict__["_message_id"] = msg.object_id  # Set message_id
+        assign_message_id(msg)
+        set_message_object_id(msg, msg.object_id)
         state.store_message(msg)
 
         # Preregister objects in ObjectStore
@@ -438,6 +444,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
         obj_ids_to_pull = object_store.preregister(run_id, object_tree)
 
         # Store the message in the state (note this message has no content)
+        set_message_object_id(message, object_tree.object_id)
         state.store_message(message)
 
         try:
@@ -450,7 +457,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                 object_store.put(obj_id, obj_contents.pop(obj_id))
 
             # Confirm that the message was received
-            confirm_message_received(run_id, message.metadata.message_id)
+            confirm_message_received(run_id, object_tree.object_id)
             log(INFO, "Received successfully")
         except Exception as err:  # pylint: disable=broad-except
             log(
@@ -460,7 +467,7 @@ def _pull_and_store_message(  # pylint: disable=too-many-positional-arguments,R0
                 err,
             )
             state.delete_messages(message_ids=[message.metadata.message_id])
-            object_store.delete(message.metadata.message_id)
+            object_store.delete(get_message_object_id(message))
             state.finish_task(
                 task_id,
                 sub_status=SubStatus.FAILED,
@@ -518,7 +525,7 @@ def _push_messages(
         )
 
         # Get the object tree for the message
-        object_tree = object_store.get_object_tree(message.metadata.message_id)
+        object_tree = object_store.get_object_tree(get_message_object_id(message))
 
         # Define the iterator for yielding object contents
         # This will yield (object_id, content) pairs
@@ -581,7 +588,7 @@ def _push_messages(
             # Delete all its objects from the ObjectStore
             # No need to delete objects of the message it replies to, as it is
             # already deleted when the ClientApp calls `ConfirmMessageReceived`
-            object_store.delete(message.metadata.message_id)
+            object_store.delete(get_message_object_id(message))
 
 
 @contextmanager

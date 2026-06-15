@@ -21,6 +21,7 @@ import unittest
 from contextlib import AbstractContextManager
 from typing import Any
 from unittest.mock import Mock, patch
+from uuid import UUID
 
 import grpc
 from parameterized import parameterized
@@ -112,14 +113,19 @@ class TestGrpcGrid(unittest.TestCase):
         msg1 = self._prep_message(Message(RecordDict(), 0, "query.A"))
         msg2 = self._prep_message(Message(RecordDict(), 0, "query.B"))
 
-        msgs = [msg1, msg2]
-        # The seconds ObjectIDs doesn't contain the object ID of the emtpy RecordDict
-        # because it is the same as the one in msg1.
-        mock_response = Mock(
-            message_ids=[msg1.object_id, msg2.object_id],
-            objects_to_push=[msg1.object_id, RecordDict().object_id, msg2.object_id],
-        )
-        self.mock_stub.PushMessages.return_value = mock_response
+        msgs = iter([msg1, msg2])
+
+        def push_messages(req: PushAppMessagesRequest) -> Mock:
+            return Mock(
+                message_ids=[msg.metadata.message_id for msg in req.messages_list],
+                objects_to_push=[
+                    req.message_object_trees[0].object_id,
+                    RecordDict().object_id,
+                    req.message_object_trees[1].object_id,
+                ],
+            )
+
+        self.mock_stub.PushMessages.side_effect = push_messages
         self.mock_stub.PushObject.return_value = Mock(stored=True)
 
         # Execute
@@ -131,9 +137,15 @@ class TestGrpcGrid(unittest.TestCase):
         self.assertEqual(len(args), 1)
         self.assertEqual(len(kwargs), 0)
         self.assertIsInstance(args[0], PushAppMessagesRequest)
-        self.assertEqual(msg_ids, [msg1.object_id, msg2.object_id])
-        for message in args[0].messages_list:
+        self.assertEqual(
+            msg_ids, [message.metadata.message_id for message in args[0].messages_list]
+        )
+        for message, object_tree in zip(
+            args[0].messages_list, args[0].message_object_trees, strict=True
+        ):
             self.assertEqual(message.metadata.run_id, 61016)
+            UUID(message.metadata.message_id)
+            self.assertNotEqual(message.metadata.message_id, object_tree.object_id)
 
     def test_pull_messages_with_given_message_ids(self) -> None:
         """Test pulling messages with specific message IDs."""

@@ -73,6 +73,7 @@ from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
+from flwr.supercore.message_utils import assign_message_id, set_message_id
 from flwr.supercore.run import Run
 
 ERROR_MESSAGE_PUSH_MESSAGES_RESOURCE_EXHAUSTED = """
@@ -279,19 +280,20 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
         # Construct Messages
         run_id = cast(Run, self._run).run_id
         message_ids: list[str] = []
-        if not messages:
+        message_list = list(messages)
+        if not message_list:
             return message_ids
         try:
             with no_object_id_recompute():
-                for msg in messages:
+                for msg in message_list:
                     # Populate metadata
                     msg.metadata.__dict__["_run_id"] = run_id
                     msg.metadata.__dict__["_src_node_id"] = self.node.node_id
-                    msg.metadata.__dict__["_message_id"] = msg.object_id
+                    assign_message_id(msg)
                     # Check message
                     self._check_message(msg)
                 # Try pushing messages and their objects
-                message_ids = self._try_push_messages(run_id, messages)
+                message_ids = self._try_push_messages(run_id, message_list)
 
         except grpc.RpcError as e:
             if e.code() == grpc.StatusCode.RESOURCE_EXHAUSTED:  # pylint: disable=E1101
@@ -370,13 +372,18 @@ class GrpcGrid(Grid):  # pylint: disable=too-many-instance-attributes
                 # Confirm that the message has been received
                 self._stub.ConfirmMessageReceived(
                     ConfirmMessageReceivedRequest(
-                        node=self.node, run_id=run_id, message_object_id=msg_id
+                        node=self.node,
+                        run_id=run_id,
+                        message_object_id=msg_tree.object_id,
                     )
                 )
                 message = cast(
-                    Message, inflate_object_from_contents(msg_id, all_object_contents)
+                    Message,
+                    inflate_object_from_contents(
+                        msg_tree.object_id, all_object_contents
+                    ),
                 )
-                message.metadata.__dict__["_message_id"] = msg_id
+                set_message_id(message, msg_id)
                 inflated_msgs.append(message)
 
             return inflated_msgs

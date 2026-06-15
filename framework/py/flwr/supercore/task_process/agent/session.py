@@ -31,6 +31,7 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
+from flwr.supercore.message_utils import assign_message_id
 from flwr.supercore.model_message import ModelRequest, ModelResponse
 from flwr.supercore.typing import JSONObject, JSONValue
 
@@ -109,7 +110,7 @@ class RuntimeAgentResponses(AgentResponses):
         """Push one task message and return its message ID."""
         message.metadata.__dict__["_run_id"] = self._run_id
         message.metadata.src_task_id = self._task_id
-        message.metadata.__dict__["_message_id"] = message.object_id
+        assign_message_id(message)
         self._stub.PushTaskMessage(
             PushTaskMessageRequest(message=message_to_proto(message))
         )

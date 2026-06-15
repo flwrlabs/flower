@@ -63,6 +63,7 @@ from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=
 from flwr.server.superlink.linkstate import LinkState
 from flwr.server.superlink.utils import check_abort
 from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
+from flwr.supercore.message_utils import get_message_object_id, set_message_object_id
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStore
 from flwr.supercore.run import InvalidRunStatusException, Run
 
@@ -148,7 +149,7 @@ def pull_messages(  # pylint: disable=too-many-locals
     for msg in message_list:
         try:
             # Retrieve Message object tree from ObjectStore
-            msg_object_id = msg.metadata.message_id
+            msg_object_id = get_message_object_id(msg)
             obj_tree = store.get_object_tree(msg_object_id)
 
             # Add Message and its object tree to the response
@@ -161,7 +162,7 @@ def pull_messages(  # pylint: disable=too-many-locals
         except NoObjectInStoreError as e:
             log(ERROR, e.message)
             # Delete message ins from state
-            state.delete_messages(message_ins_ids={msg_object_id})
+            state.delete_messages(message_ins_ids={msg.metadata.message_id})
 
     response = PullMessagesResponse(messages_list=msg_proto, message_object_trees=trees)
 
@@ -188,6 +189,7 @@ def push_messages(
     """Push Messages handler."""
     # Convert Message from proto
     msg = message_from_proto(message_proto=request.messages_list[0])
+    object_tree = request.message_object_trees[0]
     run_id = msg.metadata.run_id
 
     # Record incoming traffic size
@@ -204,10 +206,9 @@ def push_messages(
         raise InvalidRunStatusException(abort_msg)
 
     # Store Message object to descendants mapping and preregister objects
-    objects_to_push: set[str] = set()
-    for object_tree in request.message_object_trees:
-        objects_to_push |= set(store.preregister(run_id, object_tree))
+    objects_to_push = set(store.preregister(run_id, object_tree))
     # Store Message in State
+    set_message_object_id(msg, object_tree.object_id)
     message_id: str | None = state.store_message_res(message=msg)
     # This is temporary. We should consider a more robust cleanup
     # mechanism that protects duplicate messages from premature deletion.
@@ -217,7 +218,7 @@ def push_messages(
         and state.get_run_status({run_id})[run_id].status == Status.FINISHED
     ):
         # The request currently contains only one message and its object tree.
-        store.delete(request.message_object_trees[0].object_id)
+        store.delete(object_tree.object_id)
         objects_to_push.clear()
 
     # Build response

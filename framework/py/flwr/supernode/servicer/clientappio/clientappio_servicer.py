@@ -52,6 +52,7 @@ from flwr.proto.message_pb2 import (
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse
 from flwr.supercore.inflatable.inflatable_object import UnexpectedObjectContentError
 from flwr.supercore.interceptors import get_authenticated_task
+from flwr.supercore.message_utils import get_message_object_id, set_message_object_id
 from flwr.supercore.object_store import NoObjectInStoreError, ObjectStoreFactory
 from flwr.supercore.servicers import AppIoServicer
 from flwr.supernode.nodestate import NodeState, NodeStateFactory
@@ -202,7 +203,7 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         state.record_message_processing_start(message_id=message.metadata.message_id)
 
         # Retrieve the object tree for the message
-        object_tree = store.get_object_tree(message.metadata.message_id)
+        object_tree = store.get_object_tree(get_message_object_id(message))
 
         return PullAppMessagesResponse(
             messages_list=[message_to_proto(message)],
@@ -223,18 +224,21 @@ class ClientAppIoServicer(AppIoServicer, clientappio_pb2_grpc.ClientAppIoService
         state = self.state_factory.state()
         store = self.objectstore_factory.store()
 
+        message_proto = request.messages_list[0]
+        object_tree = request.message_object_trees[0]
+
         # Record message processing end time
         state.record_message_processing_end(
-            message_id=request.messages_list[0].metadata.reply_to_message_id
+            message_id=message_proto.metadata.reply_to_message_id
         )
 
         # Store Message object to descendants mapping and preregister objects
-        objects_to_push: set[str] = set()
-        for object_tree in request.message_object_trees:
-            objects_to_push |= set(store.preregister(run_id, object_tree))
+        objects_to_push = set(store.preregister(run_id, object_tree))
 
         # Save the message to the state
-        state.store_message(message_from_proto(request.messages_list[0]))
+        message = message_from_proto(message_proto)
+        set_message_object_id(message, object_tree.object_id)
+        state.store_message(message)
         return PushAppMessagesResponse(objects_to_push=objects_to_push)
 
     def PushObject(
