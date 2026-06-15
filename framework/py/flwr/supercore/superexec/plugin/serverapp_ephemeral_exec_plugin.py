@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Simple ephemeral Flower SuperExec plugin for ServerApp."""
+"""Simple ephemeral Flower SuperExec plugin for task processes."""
 
 
 from logging import ERROR
