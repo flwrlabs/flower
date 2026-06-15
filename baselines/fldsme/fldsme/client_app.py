@@ -80,19 +80,29 @@ def train(msg: Message, context: Context):
     local_epochs = context.run_config["local-epochs"]
     train_loss = train_fn(model, trainloader, local_epochs, device)
 
-    # Apply GTS bandwidth mask (top-k sparsification)
-    state_dict = model.state_dict()
+    # Apply GTS bandwidth mask (top-k sparsification on the update delta).
+    # We sparsify the UPDATE (trained - global), not the absolute weights.
+    # Zeroing absolute weights would corrupt the model (P1 bot review fix).
+    # Reconstruct as: global_weights + sparse_update for FedAvg aggregation.
+    global_state = arrays.to_torch_state_dict()   # received global weights
+    trained_state = model.state_dict()             # locally trained weights
     masked = {}
-    for key, tensor in state_dict.items():
-        flat = tensor.flatten().clone()
-        n_keep = max(1, int(len(flat) * bw_frac))
-        if n_keep < len(flat):
-            _, idx = torch.topk(flat.abs(), n_keep)
-            mask = torch.zeros_like(flat)
-            mask[idx] = 1.0
-            masked[key] = (flat * mask).reshape(tensor.shape)
+    for key in trained_state:
+        global_tensor  = global_state[key].float()
+        trained_tensor = trained_state[key].float()
+        update = (trained_tensor - global_tensor).flatten().clone()
+        n_keep = max(1, int(len(update) * bw_frac))
+        if n_keep < len(update):
+            # Keep only the largest-magnitude update components
+            _, idx = torch.topk(update.abs(), n_keep)
+            sparse_update = torch.zeros_like(update)
+            sparse_update[idx] = update[idx]
         else:
-            masked[key] = tensor.clone()
+            sparse_update = update
+        # Reconstruct: global + sparse update (same dtype as original)
+        masked[key] = (
+            global_tensor + sparse_update.reshape(global_tensor.shape)
+        ).to(trained_state[key].dtype)
     model.load_state_dict(masked)
 
     # ALL metric keys must match the skipped-client branch exactly
