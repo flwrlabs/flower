@@ -16,7 +16,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import yaml
@@ -29,51 +28,33 @@ ExecutorConfig = dict[object, object]
 class ExecutorConfigError(ValueError):
     """Raised when executor config loading fails."""
 
-    def __init__(self, path: str | None, errors: Sequence[str]) -> None:
-        message = "Failed to load executor config"
-        if path is not None:
-            message += f" from '{path}'"
-        bullets = "\n".join(f"- {error}" for error in errors)
-        super().__init__(f"{message}:\n{bullets}")
-
 
 def load_executor_config(path: str, executor_type: ExecutorType) -> ExecutorConfig:
     """Load executor config for the selected executor."""
+    message_prefix = f"Failed to load executor config from '{path}': "
     if executor_type == ExecutorType.SUBPROCESS:
         raise ExecutorConfigError(
-            path,
-            ["subprocess executor does not support --executor-config."],
+            f"{message_prefix}subprocess executor does not support --executor-config."
         )
-    raw_config = _load_yaml(path)
-    if raw_config is None:
-        raise ExecutorConfigError(path, ["file must not be empty."])
-    if not isinstance(raw_config, Mapping):
-        raise ExecutorConfigError(path, ["root must be a mapping."])
 
-    return dict(raw_config)
-
-
-def _load_yaml(path: str) -> object:
     try:
-        with open(Path(path).expanduser(), encoding="utf-8") as file:
-            return yaml.safe_load(file)
+        with Path(path).expanduser().open(encoding="utf-8") as file:
+            raw_config = yaml.safe_load(file)
     except FileNotFoundError as exc:
-        raise ExecutorConfigError(path, ["file does not exist."]) from exc
+        raise ExecutorConfigError(f"{message_prefix}file does not exist.") from exc
     except OSError as exc:
         message = exc.strerror or str(exc)
         raise ExecutorConfigError(
-            path, [f"file could not be read: {message}."]
+            f"{message_prefix}file could not be read: {message}."
         ) from exc
     except yaml.YAMLError as exc:
-        raise ExecutorConfigError(path, [_yaml_error_message(exc)]) from exc
+        raise ExecutorConfigError(
+            f"{message_prefix}file must contain valid YAML."
+        ) from exc
 
+    if raw_config is None:
+        raise ExecutorConfigError(f"{message_prefix}file must not be empty.")
+    if not isinstance(raw_config, dict):
+        raise ExecutorConfigError(f"{message_prefix}root must be a mapping.")
 
-def _yaml_error_message(exc: yaml.YAMLError) -> str:
-    problem = getattr(exc, "problem", None)
-    mark = getattr(exc, "problem_mark", None)
-    if problem is not None and mark is not None:
-        return (
-            "file must contain valid YAML near "
-            f"line {mark.line + 1}, column {mark.column + 1}: {problem}."
-        )
-    return "file must contain valid YAML."
+    return dict(raw_config)
