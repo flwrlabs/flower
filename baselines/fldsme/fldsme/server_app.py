@@ -105,38 +105,50 @@ class DSMEFedAvg(FedAvg):
         """Aggregate train replies, skipping all-depleted rounds."""
         replies_list = list(replies)
 
-        # Count total examples across all non-error replies
-        total_examples = 0
+        # Separate valid replies from error replies first.
+        # Only valid replies (no error, metric_records accessible) count
+        # toward the DSME energy-depletion check. Error replies are passed
+        # through to FedAvg's _check_and_log_replies for proper logging.
+        valid_replies = []
+        error_replies = []
         for msg in replies_list:
-            if not msg.has_error():
-                try:
-                    n = msg.content.metric_records["metrics"].get(
-                        "num-examples", 0
-                    )
-                    total_examples += int(n)
-                except (KeyError, AttributeError):
-                    pass
+            if msg.has_error():
+                error_replies.append(msg)
+                continue
+            try:
+                _ = msg.content.metric_records["metrics"]
+                valid_replies.append(msg)
+            except (KeyError, AttributeError):
+                error_replies.append(msg)
 
-        if total_examples == 0:
-            # All clients energy-depleted: hold global model unchanged.
-            # Models a DSME beacon interval with no successful transmissions.
-            # Return None arrays (keep current model) but a MetricRecord so
-            # skipped rounds still appear in experiment logs with correct
-            # DSME participation statistics (fixes P2 bot review).
-            n_sampled = sum(1 for msg in replies_list if not msg.has_error())
-            print(
-                f"\n[Round {server_round}] All sampled clients energy-depleted."
-                " Keeping current global model (DSME beacon interval skipped).\n"
+        # Only enter the DSME all-depleted path when there is at least one
+        # valid reply (i.e. a client successfully reported num-examples=0).
+        # If all replies are errors, fall through to FedAvg which will log
+        # the failures correctly via _check_and_log_replies.
+        if valid_replies:
+            total_examples = sum(
+                int(msg.content.metric_records["metrics"].get("num-examples", 0))
+                for msg in valid_replies
             )
-            return None, MetricRecord({
-                "train_loss":      0.0,
-                "energy_used_mj":  0.0,
-                "bandwidth_frac":  0.0,
-                "gts_slots":       0.0,
-                "active_clients":  0.0,
-                "skipped_clients": float(n_sampled),
-                "total_sampled":   float(n_sampled),
-            })
+
+            if total_examples == 0:
+                # All clients energy-depleted: hold global model unchanged.
+                # Models a DSME beacon interval with no successful transmissions.
+                n_valid = len(valid_replies)
+                print(
+                    f"\n[Round {server_round}] All {n_valid} valid clients "
+                    "energy-depleted. Keeping current global model "
+                    "(DSME beacon interval skipped).\n"
+                )
+                return None, MetricRecord({
+                    "train_loss":      0.0,
+                    "energy_used_mj":  0.0,
+                    "bandwidth_frac":  0.0,
+                    "gts_slots":       0.0,
+                    "active_clients":  0.0,
+                    "skipped_clients": float(n_valid),
+                    "total_sampled":   float(len(replies_list)),
+                })
 
         return super().aggregate_train(server_round, iter(replies_list))
 
