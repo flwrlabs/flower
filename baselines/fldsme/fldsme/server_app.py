@@ -148,7 +148,8 @@ def main(grid: Grid, context: Context) -> None:
     fraction_train: float = float(context.run_config["fraction-train"])
 
     global_model = Net()
-    arrays = ArrayRecord(global_model.state_dict())
+    initial_state_dict = global_model.state_dict()   # keep reference for fallback
+    arrays = ArrayRecord(initial_state_dict)
 
     strategy = DSMEFedAvg(
         fraction_train=fraction_train,
@@ -163,5 +164,15 @@ def main(grid: Grid, context: Context) -> None:
     )
 
     print("\nSaving final model to disk...")
-    state_dict = result.arrays.to_torch_state_dict()
+    # result.arrays may be empty if every train round was skipped
+    # (all clients energy-depleted every round). Fall back to the
+    # initial global model so the saved file is always a valid model.
+    if result.arrays is not None and len(result.arrays) > 0:
+        state_dict = result.arrays.to_torch_state_dict()
+    else:
+        print(
+            "Warning: all training rounds were skipped. "
+            "Saving initial global model as final_model.pt."
+        )
+        state_dict = initial_state_dict
     torch.save(state_dict, "final_model.pt")
