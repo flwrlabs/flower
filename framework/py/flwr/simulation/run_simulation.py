@@ -40,7 +40,6 @@ from flwr.common.logger import (
     warn_deprecated_feature,
     warn_deprecated_feature_with_example,
 )
-from flwr.common.typing import Run
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.run_serverapp import run as _run
 from flwr.server.superlink.fleet import vce
@@ -59,6 +58,7 @@ from flwr.supercore.constant import (
     NOOP_FEDERATION,
 )
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.run import Run
 from flwr.superlink.federation import NoOpFederationManager
 from flwr.superlink.grid import InMemoryGrid
 

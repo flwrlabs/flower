@@ -18,9 +18,9 @@
 import grpc
 
 from flwr.common.constant import Status, SubStatus
-from flwr.common.typing import RunStatus
 from flwr.server.superlink.linkstate import LinkState
 from flwr.supercore.object_store import ObjectStore
+from flwr.supercore.run import RunStatus
 
 _STATUS_TO_MSG = {
     Status.PENDING: "Run is pending.",

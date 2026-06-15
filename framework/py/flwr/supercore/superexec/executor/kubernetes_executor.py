@@ -14,9 +14,10 @@
 # ==============================================================================
 """Kubernetes executor for SuperExec TaskExecutor processes."""
 
-from collections.abc import Mapping, Sequence
+import time
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from logging import WARNING
+from logging import INFO, WARNING
 from pathlib import Path
 from typing import Protocol, cast
 from uuid import uuid4
@@ -36,6 +37,12 @@ APPIO_ROOT_CERTIFICATES_FILE_PATH = f"{APPIO_CREDENTIALS_MOUNT_PATH}/ca.crt"
 LAUNCH_ATTEMPT_LABEL = "flower.ai/launch-attempt"
 
 
+class KubernetesPodList(Protocol):
+    """Subset of Kubernetes PodList used by capacity checks."""
+
+    items: Sequence[object]
+
+
 class KubernetesClient(Protocol):
     """Subset of Kubernetes CoreV1Api used by the executor."""
 
@@ -47,6 +54,11 @@ class KubernetesClient(Protocol):
 
     def delete_namespaced_secret(self, name: str, namespace: str) -> object:
         """Delete a Kubernetes Secret from the selected namespace."""
+
+    def list_namespaced_pod(
+        self, namespace: str, label_selector: str
+    ) -> KubernetesPodList:
+        """List Kubernetes Pods in the selected namespace."""
 
 
 @dataclass(frozen=True)
@@ -106,6 +118,11 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
     container_security_context: JSONObject | None = None
     # Optional Pod field only; service account policy/RBAC is decided elsewhere.
     service_account_name: str | None = None
+    active_pod_budget: int | None = None
+    capacity_poll_interval: float = 1.0
+    capacity_log_interval: float | None = None
+    sleep: Callable[[float], None] = time.sleep
+    monotonic: Callable[[], float] = time.monotonic
 
     def __post_init__(self) -> None:
         """Validate required object-building inputs."""
@@ -120,6 +137,17 @@ class KubernetesExecutorConfig:  # pylint: disable=too-many-instance-attributes
         _validate_optional_string("Priority class name", self.priority_class_name)
         if self.labels is not None:
             _validate_labels(self.labels)
+        if self.active_pod_budget is not None:
+            if self.active_pod_budget <= 0:
+                raise ValueError("Active Pod budget must be positive.")
+            if self.resource_pool is None:
+                raise ValueError(
+                    "Resource pool must be configured when active Pod budget is set."
+                )
+        if self.capacity_poll_interval <= 0:
+            raise ValueError("Capacity poll interval must be positive.")
+        if self.capacity_log_interval is not None and self.capacity_log_interval <= 0:
+            raise ValueError("Capacity log interval must be positive.")
 
 
 class KubernetesExecutor:
@@ -135,10 +163,43 @@ class KubernetesExecutor:
         self._config = config
 
     def wait_for_capacity(self) -> None:
-        """Return immediately.
+        """Wait until the configured resource pool is below its active Pod budget."""
+        if self._config.active_pod_budget is None:
+            return
 
-        Kubernetes capacity checks are not implemented yet.
-        """
+        last_log_at: float | None = None
+        while True:
+            try:
+                active_pod_count = self._active_pod_count()
+            except Exception:  # pylint: disable=broad-exception-caught
+                log(
+                    WARNING,
+                    "Kubernetes capacity check failed; proceeding without waiting. "
+                    "selector=%s",
+                    _capacity_label_selector(self._config),
+                    exc_info=True,
+                )
+                return
+            if active_pod_count < self._config.active_pod_budget:
+                return
+
+            if self._config.capacity_log_interval is not None:
+                now = self._config.monotonic()
+                if (
+                    last_log_at is None
+                    or now - last_log_at >= self._config.capacity_log_interval
+                ):
+                    log(
+                        INFO,
+                        "Waiting for Kubernetes TaskExecutor capacity: "
+                        "%s active Pods, budget %s, selector %s",
+                        active_pod_count,
+                        self._config.active_pod_budget,
+                        _capacity_label_selector(self._config),
+                    )
+                    last_log_at = now
+
+            self._config.sleep(self._config.capacity_poll_interval)
 
     def launch(self, spec: ExecutionSpec) -> LaunchResult:
         """Submit the TaskExecutor Pod and credential Secret."""
@@ -167,6 +228,14 @@ class KubernetesExecutor:
             return result
 
         return LaunchResult.accepted()
+
+    def _active_pod_count(self) -> int:
+        """Return the active TaskExecutor Pod count for the configured pool."""
+        pod_list = self._client.list_namespaced_pod(
+            self._config.namespace,
+            label_selector=_capacity_label_selector(self._config),
+        )
+        return sum(1 for pod in _pod_items(pod_list) if _is_active_pod(pod))
 
 
 def _build_appio_credentials_secret(
@@ -345,6 +414,57 @@ def _labels(
     if config.labels is not None:
         labels.update(config.labels)
     return labels
+
+
+def _capacity_label_selector(config: KubernetesExecutorConfig) -> str:
+    """Return the label selector used for resource-pool capacity checks."""
+    return _label_selector(_capacity_labels(config))
+
+
+def _capacity_labels(config: KubernetesExecutorConfig) -> dict[str, str]:
+    """Return labels identifying the constrained TaskExecutor pool."""
+    labels = {
+        "app.kubernetes.io/name": "flower",
+        "app.kubernetes.io/component": "taskexecutor",
+    }
+    if config.resource_pool is not None:
+        labels["flower.ai/resource-pool"] = config.resource_pool
+    if config.labels is not None:
+        labels.update(config.labels)
+    return labels
+
+
+def _label_selector(labels: dict[str, str]) -> str:
+    """Return a Kubernetes equality label selector."""
+    return ",".join(f"{key}={value}" for key, value in sorted(labels.items()))
+
+
+def _pod_items(pod_list: KubernetesPodList | Mapping[str, object]) -> list[object]:
+    """Return Pod items from a Kubernetes list response."""
+    items = _object_field(pod_list, "items")
+    if isinstance(items, Sequence) and not isinstance(items, str):
+        return list(items)
+    return []
+
+
+def _is_active_pod(pod: object) -> bool:
+    """Return true if a Pod counts against best-effort launch capacity."""
+    metadata = _object_field(pod, "metadata")
+    deletion_timestamp = _object_field(metadata, "deletion_timestamp")
+    if deletion_timestamp is None:
+        deletion_timestamp = _object_field(metadata, "deletionTimestamp")
+    if deletion_timestamp is not None:
+        return True
+
+    status = _object_field(pod, "status")
+    return _object_field(status, "phase") not in {"Succeeded", "Failed"}
+
+
+def _object_field(value: object, field_name: str) -> object | None:
+    """Return a field from a Kubernetes dict or model object."""
+    if isinstance(value, dict):
+        return value.get(field_name)
+    return getattr(value, field_name, None)
 
 
 def _validate_labels(labels: dict[str, str]) -> None:

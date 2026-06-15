@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Brave-backed web-search adapter."""
+"""Exa-backed web-search adapter."""
 
 
 import os
@@ -23,47 +23,40 @@ import requests
 
 from flwr.supercore.typing import JSONObject, JSONValue
 
-BRAVE_WEB_SEARCH_PROVIDER = "brave"
-BRAVE_WEB_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
-BRAVE_SEARCH_API_KEY_ENV = "BRAVE_SEARCH_API_KEY"
-BRAVE_FALLBACK_API_KEY_ENV = "BRAVE_API_KEY"
+EXA_WEB_SEARCH_PROVIDER = "exa"
+EXA_SEARCH_URL = "https://api.exa.ai/search"
+EXA_API_KEY_ENV = "EXA_API_KEY"
 REQUEST_TIMEOUT = 60.0
 
 
-class BraveWebSearchProvider:
-    """Brave Search API adapter."""
+class ExaWebSearchProvider:
+    """Exa Search API adapter."""
 
     def __init__(self) -> None:
-        api_key = os.getenv(BRAVE_SEARCH_API_KEY_ENV, "").strip()
+        api_key = os.getenv(EXA_API_KEY_ENV, "").strip()
         if not api_key:
-            api_key = os.getenv(BRAVE_FALLBACK_API_KEY_ENV, "").strip()
-        if not api_key:
-            raise RuntimeError(
-                f"Environment variable {BRAVE_SEARCH_API_KEY_ENV} is required "
-                f"({BRAVE_FALLBACK_API_KEY_ENV} is also accepted)."
-            )
+            raise RuntimeError(f"Environment variable {EXA_API_KEY_ENV} is required.")
         self._api_key = api_key
 
     def search(self, query: str) -> JSONObject:
-        """Execute one Brave web-search request."""
+        """Execute one Exa web-search request."""
         if not query.strip():
             raise ValueError("web-search requires a non-empty query.")
         query = query.strip()
 
         try:
-            response = requests.get(
-                BRAVE_WEB_SEARCH_URL,
+            response = requests.post(
+                EXA_SEARCH_URL,
                 headers={
-                    "Accept": "application/json",
-                    "Accept-Encoding": "gzip",
-                    "X-Subscription-Token": self._api_key,
+                    "Content-Type": "application/json",
+                    "x-api-key": self._api_key,
                 },
-                params={"q": query},
+                json={"query": query},
                 timeout=REQUEST_TIMEOUT,
             )
         except requests.RequestException as exc:
             raise RuntimeError(
-                f"{BRAVE_WEB_SEARCH_PROVIDER} web-search request failed: {exc}"
+                f"{EXA_WEB_SEARCH_PROVIDER} web-search request failed: {exc}"
             ) from exc
         if response.status_code >= 400:
             try:
@@ -71,7 +64,7 @@ class BraveWebSearchProvider:
             except ValueError:
                 detail = response.text
             raise RuntimeError(
-                f"{BRAVE_WEB_SEARCH_PROVIDER} web-search request failed: "
+                f"{EXA_WEB_SEARCH_PROVIDER} web-search request failed: "
                 f"{response.status_code} {detail}"
             )
 
@@ -79,11 +72,11 @@ class BraveWebSearchProvider:
             payload = response.json()
         except ValueError as exc:
             raise RuntimeError(
-                f"{BRAVE_WEB_SEARCH_PROVIDER} web-search returned invalid JSON."
+                f"{EXA_WEB_SEARCH_PROVIDER} web-search returned invalid JSON."
             ) from exc
         if not isinstance(payload, dict):
             raise RuntimeError(
-                f"{BRAVE_WEB_SEARCH_PROVIDER} web-search returned invalid JSON."
+                f"{EXA_WEB_SEARCH_PROVIDER} web-search returned invalid JSON."
             )
 
         return {
@@ -95,14 +88,9 @@ class BraveWebSearchProvider:
 
 
 def _parse_results(payload: JSONObject) -> list[JSONObject]:
-    web = payload.get("web")
-    if not isinstance(web, dict):
-        return []
-
-    raw_results = web.get("results")
+    raw_results = payload.get("results")
     if not isinstance(raw_results, list):
         return []
-
     results: list[JSONObject] = []
     for item in raw_results:
         if not isinstance(item, dict):
@@ -113,8 +101,9 @@ def _parse_results(payload: JSONObject) -> list[JSONObject]:
             continue
         if not isinstance(url, str) or not url.strip():
             continue
-        snippet = item.get("description")
-        published_at = item.get("page_age")
+
+        snippet = item.get("summary")
+        published_at = item.get("publishedDate")
         results.append(
             {
                 "title": title.strip(),

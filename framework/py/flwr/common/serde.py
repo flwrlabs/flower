@@ -53,9 +53,10 @@ from flwr.proto.transport_pb2 import (
     ServerMessage,
     Status,
 )
+from flwr.supercore.fab import Fab
+from flwr.supercore.run import Run, RunStatus
 
 # pylint: enable=E0611
-from . import typing
 from .constant import INT64_MAX_VALUE
 from .serde_utils import (
     error_from_proto,
@@ -511,16 +512,16 @@ def recorddict_from_proto(recorddict_proto: ProtoRecordDict) -> RecordDict:
 # === FAB ===
 
 
-def fab_to_proto(fab: typing.Fab) -> ProtoFab:
+def fab_to_proto(fab: Fab) -> ProtoFab:
     """Create a proto Fab object from a Python Fab."""
     return ProtoFab(
         hash_str=fab.hash_str, content=fab.content, verifications=fab.verifications
     )
 
 
-def fab_from_proto(fab: ProtoFab) -> typing.Fab:
+def fab_from_proto(fab: ProtoFab) -> Fab:
     """Create a Python Fab object from a proto Fab."""
-    return typing.Fab(fab.hash_str, fab.content, dict(fab.verifications))
+    return Fab(fab.hash_str, fab.content, dict(fab.verifications))
 
 
 # === User configs ===
@@ -632,7 +633,7 @@ def context_from_proto(context_proto: ProtoContext) -> Context:
 # === Run messages ===
 
 
-def run_to_proto(run: typing.Run) -> ProtoRun:
+def run_to_proto(run: Run) -> ProtoRun:
     """Serialize `Run` to ProtoBuf."""
     proto = ProtoRun(
         run_id=run.run_id,
@@ -658,9 +659,9 @@ def run_to_proto(run: typing.Run) -> ProtoRun:
     return proto
 
 
-def run_from_proto(run_proto: ProtoRun) -> typing.Run:
+def run_from_proto(run_proto: ProtoRun) -> Run:
     """Deserialize `Run` from ProtoBuf."""
-    run = typing.Run(
+    run = Run(
         run_id=run_proto.run_id,
         fab_id=run_proto.fab_id,
         fab_version=run_proto.fab_version,
@@ -688,7 +689,7 @@ def run_from_proto(run_proto: ProtoRun) -> typing.Run:
 # === Run status ===
 
 
-def run_status_to_proto(run_status: typing.RunStatus) -> ProtoRunStatus:
+def run_status_to_proto(run_status: RunStatus) -> ProtoRunStatus:
     """Serialize `RunStatus` to ProtoBuf."""
     return ProtoRunStatus(
         status=run_status.status,
@@ -697,9 +698,9 @@ def run_status_to_proto(run_status: typing.RunStatus) -> ProtoRunStatus:
     )
 
 
-def run_status_from_proto(run_status_proto: ProtoRunStatus) -> typing.RunStatus:
+def run_status_from_proto(run_status_proto: ProtoRunStatus) -> RunStatus:
     """Deserialize `RunStatus` from ProtoBuf."""
-    return typing.RunStatus(
+    return RunStatus(
         status=run_status_proto.status,
         sub_status=run_status_proto.sub_status,
         details=run_status_proto.details,
