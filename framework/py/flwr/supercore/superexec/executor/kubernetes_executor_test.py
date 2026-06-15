@@ -14,6 +14,7 @@
 # ==============================================================================
 """Tests for SuperExec Kubernetes executor."""
 
+import importlib
 from pathlib import Path
 from typing import Any, cast
 from unittest.mock import Mock, call
@@ -79,7 +80,7 @@ def test_create_incluster_kubernetes_client_loads_config_before_api(
         "kubernetes.client": client_module,
         "kubernetes.config": config_module,
     }
-    monkeypatch.setattr(kube.importlib, "import_module", modules.__getitem__)
+    monkeypatch.setattr(importlib, "import_module", modules.__getitem__)
 
     client = create_incluster_kubernetes_client()
 
@@ -95,7 +96,7 @@ def test_create_incluster_kubernetes_client_fails_if_package_missing(
     def import_module(_name: str) -> object:
         raise ModuleNotFoundError("No module named 'kubernetes'", name="kubernetes")
 
-    monkeypatch.setattr(kube.importlib, "import_module", import_module)
+    monkeypatch.setattr(importlib, "import_module", import_module)
 
     with pytest.raises(
         RuntimeError,
@@ -115,7 +116,7 @@ def test_create_incluster_kubernetes_client_fails_if_auth_unavailable(
         "kubernetes.client": client_module,
         "kubernetes.config": config_module,
     }
-    monkeypatch.setattr(kube.importlib, "import_module", modules.__getitem__)
+    monkeypatch.setattr(importlib, "import_module", modules.__getitem__)
 
     with pytest.raises(
         RuntimeError,
