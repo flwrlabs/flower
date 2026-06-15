@@ -14,12 +14,13 @@
 # ==============================================================================
 """Kubernetes executor for SuperExec TaskExecutor processes."""
 
+import importlib
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from logging import INFO, WARNING
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Any, Protocol, cast
 from uuid import uuid4
 
 from flwr.common.logger import log
@@ -86,6 +87,34 @@ class KubernetesClient(Protocol):
         self, namespace: str, label_selector: str
     ) -> KubernetesList:
         """List Kubernetes Pods in the selected namespace."""
+
+
+def create_incluster_kubernetes_client() -> KubernetesClient:
+    """Create a KubernetesClient backed by in-cluster ServiceAccount auth."""
+    try:
+        kubernetes_client = importlib.import_module("kubernetes.client")
+        kubernetes_config = importlib.import_module("kubernetes.config")
+    except ModuleNotFoundError as exc:
+        if exc.name == "kubernetes" or (
+            exc.name is not None and exc.name.startswith("kubernetes.")
+        ):
+            raise RuntimeError(
+                "Kubernetes Python client package is required for the Kubernetes "
+                "executor. Install the official 'kubernetes' package in the "
+                "SuperExec environment."
+            ) from exc
+        raise
+
+    try:
+        cast(Any, kubernetes_config).load_incluster_config()
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        raise RuntimeError(
+            "Failed to load in-cluster Kubernetes configuration for the Kubernetes "
+            "executor. Run SuperExec in a Kubernetes Pod with ServiceAccount "
+            "credentials."
+        ) from exc
+
+    return cast(KubernetesClient, cast(Any, kubernetes_client).CoreV1Api())
 
 
 @dataclass
