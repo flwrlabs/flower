@@ -161,7 +161,7 @@ EXIT_CODE_HELP = {
         "Failed to load the SuperExec authentication secret."
     ),
     ExitCode.SUPEREXEC_INVALID_EXECUTOR_CONFIG: (
-        "Failed to load or apply the SuperExec executor configuration."
+        "Failed to select, load, or apply the SuperExec executor configuration."
     ),
     # FlowerCLI-specific exit codes (500-599)
     ExitCode.FLWRCLI_NODE_AUTH_PUBLIC_KEY_INVALID: (
