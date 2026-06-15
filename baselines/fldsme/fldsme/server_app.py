@@ -120,11 +120,23 @@ class DSMEFedAvg(FedAvg):
         if total_examples == 0:
             # All clients energy-depleted: hold global model unchanged.
             # Models a DSME beacon interval with no successful transmissions.
+            # Return None arrays (keep current model) but a MetricRecord so
+            # skipped rounds still appear in experiment logs with correct
+            # DSME participation statistics (fixes P2 bot review).
+            n_sampled = sum(1 for msg in replies_list if not msg.has_error())
             print(
                 f"\n[Round {server_round}] All sampled clients energy-depleted."
                 " Keeping current global model (DSME beacon interval skipped).\n"
             )
-            return None, None
+            return None, MetricRecord({
+                "train_loss":      0.0,
+                "energy_used_mj":  0.0,
+                "bandwidth_frac":  0.0,
+                "gts_slots":       0.0,
+                "active_clients":  0.0,
+                "skipped_clients": float(n_sampled),
+                "total_sampled":   float(n_sampled),
+            })
 
         return super().aggregate_train(server_round, iter(replies_list))
 
