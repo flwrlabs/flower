@@ -69,6 +69,11 @@ from .constant import AUTHN_TYPE_STORE_KEY
 from .flower_config import read_superlink_connection
 from .local_superlink import ensure_local_superlink
 
+SUPERLINK_UNAVAILABLE_MESSAGE = (
+    "Connection to the SuperLink is unavailable. Please check your network "
+    "connection and 'address' in the SuperLink connection configuration."
+)
+
 
 def print_json_to_stdout(data: str | Any) -> None:
     """Print JSON data to stdout, bypassing any output redirection.
@@ -450,10 +455,7 @@ def flwr_cli_grpc_exc_handler(  # pylint: disable=too-many-branches
             msg = "Permission denied." if details == "" else f"{details}"
             raise click.ClickException(msg) from None
         if e.code() == grpc.StatusCode.UNAVAILABLE:
-            raise click.ClickException(
-                "Connection to the SuperLink is unavailable. Please check your network "
-                "connection and 'address' in the SuperLink connection configuration."
-            ) from None
+            raise click.ClickException(SUPERLINK_UNAVAILABLE_MESSAGE) from None
         if e.code() == grpc.StatusCode.NOT_FOUND:
             if details == RUN_ID_NOT_FOUND_MESSAGE:
                 raise click.ClickException("Run ID not found.") from None

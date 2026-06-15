@@ -45,6 +45,7 @@ from flwr.supercore.utils import (
 
 from ..log import start_stream
 from ..utils import (
+    SUPERLINK_UNAVAILABLE_MESSAGE,
     cli_output_handler,
     flwr_cli_grpc_exc_handler,
     init_channel_from_connection,
@@ -52,12 +53,8 @@ from ..utils import (
 )
 
 CONN_REFRESH_PERIOD = 60  # Connection refresh period for log streaming (seconds)
-CONTROL_API_READY_TIMEOUT = 30
-CONTROL_API_READY_CHECK_INTERVAL = 1
-CONTROL_API_UNAVAILABLE_MESSAGE = (
-    "Connection to the SuperLink is unavailable. Please check your network "
-    "connection and 'address' in the SuperLink connection configuration."
-)
+CONTROL_API_READY_TIMEOUT_SECONDS = 30
+CONTROL_API_READY_CHECK_INTERVAL_SECONDS = 1
 
 
 # pylint: disable-next=too-many-locals, too-many-branches, R0913, R0917
@@ -184,7 +181,6 @@ def _run_with_control_api(
 
     try:
         channel = init_channel_from_connection(superlink_connection)
-        _wait_for_control_api_channel(channel)
         stub = ControlStub(channel)
 
         # Build FAB if local app
@@ -209,6 +205,7 @@ def _run_with_control_api(
             app_spec=app_spec or "",
         )
         with flwr_cli_grpc_exc_handler():
+            _wait_for_control_api_channel(channel)
             res = stub.StartRun(req)
 
         if res.HasField("note"):
@@ -250,8 +247,8 @@ def _run_with_control_api(
 
 def _wait_for_control_api_channel(
     channel: grpc.Channel,
-    timeout: float = CONTROL_API_READY_TIMEOUT,
-    check_interval: float = CONTROL_API_READY_CHECK_INTERVAL,
+    timeout: float = CONTROL_API_READY_TIMEOUT_SECONDS,
+    check_interval: float = CONTROL_API_READY_CHECK_INTERVAL_SECONDS,
 ) -> None:
     """Wait for the Control API channel to become ready before submitting a run."""
     deadline = time.monotonic() + timeout
@@ -259,7 +256,7 @@ def _wait_for_control_api_channel(
     while True:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            raise click.ClickException(CONTROL_API_UNAVAILABLE_MESSAGE)
+            raise click.ClickException(SUPERLINK_UNAVAILABLE_MESSAGE)
         try:
             future.result(timeout=min(check_interval, remaining))
             return
