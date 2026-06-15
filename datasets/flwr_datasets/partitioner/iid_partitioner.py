@@ -20,12 +20,20 @@ from flwr_datasets.partitioner.partitioner import Partitioner
 
 
 class IidPartitioner(Partitioner):
-    """Partitioner creates each partition sampled randomly from the dataset.
+    """Partitioner creates IID partitions from a dataset.
+
+    By default, partitions are contiguous shards of the dataset to preserve historical
+    behavior. Set ``shuffle=True`` to shuffle the dataset once before sharding. This is
+    useful for local datasets sorted by class or another target column.
 
     Parameters
     ----------
     num_partitions : int
         The total number of partitions that the data will be divided into.
+    shuffle : bool
+        Whether to shuffle the dataset before sharding. The default is ``False``.
+    seed : Optional[int]
+        Seed used for dataset shuffling when ``shuffle`` is set to ``True``.
 
     Examples
     --------
@@ -37,11 +45,16 @@ class IidPartitioner(Partitioner):
     >>> partition = fds.load_partition(0)
     """
 
-    def __init__(self, num_partitions: int) -> None:
+    def __init__(
+        self, num_partitions: int, shuffle: bool = False, seed: int | None = 42
+    ) -> None:
         super().__init__()
         if num_partitions <= 0:
             raise ValueError("The number of partitions must be greater than zero.")
         self._num_partitions = num_partitions
+        self._shuffle = shuffle
+        self._seed = seed
+        self._shuffled_dataset: datasets.Dataset | None = None
 
     def load_partition(self, partition_id: int) -> datasets.Dataset:
         """Load a single IID partition based on the partition index.
@@ -56,7 +69,8 @@ class IidPartitioner(Partitioner):
         dataset_partition : Dataset
             single dataset partition
         """
-        return self.dataset.shard(
+        dataset = self._dataset_to_partition()
+        return dataset.shard(
             num_shards=self._num_partitions, index=partition_id, contiguous=True
         )
 
@@ -64,3 +78,11 @@ class IidPartitioner(Partitioner):
     def num_partitions(self) -> int:
         """Total number of partitions."""
         return self._num_partitions
+
+    def _dataset_to_partition(self) -> datasets.Dataset:
+        """Return the dataset used for sharding."""
+        if not self._shuffle:
+            return self.dataset
+        if self._shuffled_dataset is None:
+            self._shuffled_dataset = self.dataset.shuffle(seed=self._seed)
+        return self._shuffled_dataset
