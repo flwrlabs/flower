@@ -88,8 +88,10 @@ def train(msg: Message, context: Context):
     trained_state = model.state_dict()             # locally trained weights
     masked = {}
     for key in trained_state:
-        global_tensor  = global_state[key].float()
         trained_tensor = trained_state[key].float()
+        # Move global tensor to same device as trained tensor to avoid
+        # CUDA/CPU mismatch when train_fn runs on GPU (P2 bot review fix).
+        global_tensor  = global_state[key].float().to(trained_tensor.device)
         update = (trained_tensor - global_tensor).flatten().clone()
         n_keep = max(1, int(len(update) * bw_frac))
         if n_keep < len(update):
