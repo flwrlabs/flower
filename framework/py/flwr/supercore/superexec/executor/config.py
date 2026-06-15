@@ -23,7 +23,7 @@ import yaml
 
 from flwr.supercore.constant import ExecutorType
 
-ExecutorConfig = dict[str, object]
+ExecutorConfig = dict[object, object]
 
 
 class ExecutorConfigError(ValueError):
