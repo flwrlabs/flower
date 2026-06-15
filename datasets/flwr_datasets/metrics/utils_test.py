@@ -16,18 +16,20 @@
 
 
 import unittest
+from math import log2, sqrt
 
 import pandas as pd
 from parameterized import parameterized, parameterized_class
 
 import datasets
 from datasets import ClassLabel
-from flwr_datasets.metrics.utils import (
-    _compute_counts,
-    _compute_frequencies,
+from flwr_datasets.metrics import (
     compute_counts,
     compute_frequencies,
+    compute_hellinger_distances,
+    compute_jensen_shannon_distances,
 )
+from flwr_datasets.metrics.utils import _compute_counts, _compute_frequencies
 from flwr_datasets.partitioner import IidPartitioner
 
 
@@ -194,6 +196,138 @@ class TestPrivateMetricsUtils(unittest.TestCase):
         unique_labels = [1, 1, 2, 3]
         with self.assertRaises(ValueError):
             _compute_frequencies(labels, unique_labels)
+
+
+class TestDistributionDistanceMetrics(unittest.TestCase):
+    """Test distribution distance metrics."""
+
+    def test_distances_are_zero_for_matching_partition_distributions(self) -> None:
+        """Test distances are zero when partitions match the full distribution."""
+        dataset = datasets.Dataset.from_dict(
+            {"feature": list(range(4)), "label": [0, 1, 0, 1]}
+        )
+        iid_partitioner = IidPartitioner(num_partitions=2)
+        iid_partitioner.dataset = dataset
+        expected_hellinger = pd.Series(
+            [0.0, 0.0],
+            index=pd.Index([0, 1], name="Partition ID"),
+            name="Hellinger distance",
+        )
+        expected_jensen_shannon = pd.Series(
+            [0.0, 0.0],
+            index=pd.Index([0, 1], name="Partition ID"),
+            name="Jensen-Shannon distance",
+        )
+
+        pd.testing.assert_series_equal(
+            compute_hellinger_distances(iid_partitioner, column_name="label"),
+            expected_hellinger,
+        )
+        pd.testing.assert_series_equal(
+            compute_jensen_shannon_distances(iid_partitioner, column_name="label"),
+            expected_jensen_shannon,
+        )
+
+    def test_hellinger_distances_for_label_skew(self) -> None:
+        """Test Hellinger distance for fully skewed label partitions."""
+        dataset = datasets.Dataset.from_dict(
+            {"feature": list(range(20)), "label": [0] * 10 + [1] * 10}
+        )
+        iid_partitioner = IidPartitioner(num_partitions=2)
+        iid_partitioner.dataset = dataset
+        expected_distance = sqrt((1 - sqrt(0.5)) ** 2 + (sqrt(0.5)) ** 2) / sqrt(2)
+        expected = pd.Series(
+            [expected_distance, expected_distance],
+            index=pd.Index([0, 1], name="Partition ID"),
+            name="Hellinger distance",
+        )
+
+        distances = compute_hellinger_distances(iid_partitioner, column_name="label")
+
+        pd.testing.assert_series_equal(distances, expected)
+
+    def test_jensen_shannon_distances_for_label_skew(self) -> None:
+        """Test Jensen-Shannon distance for fully skewed label partitions."""
+        dataset = datasets.Dataset.from_dict(
+            {"feature": list(range(20)), "label": [0] * 10 + [1] * 10}
+        )
+        iid_partitioner = IidPartitioner(num_partitions=2)
+        iid_partitioner.dataset = dataset
+        divergence = 0.5 * (
+            log2(1 / 0.75) + 0.5 * log2(0.5 / 0.75) + 0.5 * log2(0.5 / 0.25)
+        )
+        expected_distance = sqrt(divergence)
+        expected = pd.Series(
+            [expected_distance, expected_distance],
+            index=pd.Index([0, 1], name="Partition ID"),
+            name="Jensen-Shannon distance",
+        )
+
+        distances = compute_jensen_shannon_distances(
+            iid_partitioner, column_name="label"
+        )
+
+        pd.testing.assert_series_equal(distances, expected)
+
+    def test_distances_with_binned_continuous_target(self) -> None:
+        """Test distances on continuous targets after binning."""
+        dataset = datasets.Dataset.from_dict(
+            {"feature": list(range(4)), "target": [0.1, 0.2, 0.8, 0.9]}
+        )
+        iid_partitioner = IidPartitioner(num_partitions=2)
+        iid_partitioner.dataset = dataset
+        expected_distance = sqrt((1 - sqrt(0.5)) ** 2 + (sqrt(0.5)) ** 2) / sqrt(2)
+        expected = pd.Series(
+            [expected_distance, expected_distance],
+            index=pd.Index([0, 1], name="Partition ID"),
+            name="Hellinger distance",
+        )
+
+        distances = compute_hellinger_distances(
+            iid_partitioner, column_name="target", bins=2
+        )
+
+        pd.testing.assert_series_equal(distances, expected)
+
+    def test_distances_respect_max_num_partitions(self) -> None:
+        """Test max_num_partitions limits the returned partition distances."""
+        dataset = datasets.Dataset.from_dict(
+            {"feature": list(range(20)), "label": [0] * 10 + [1] * 10}
+        )
+        iid_partitioner = IidPartitioner(num_partitions=2)
+        iid_partitioner.dataset = dataset
+
+        distances = compute_hellinger_distances(
+            iid_partitioner, column_name="label", max_num_partitions=1
+        )
+
+        self.assertEqual(list(distances.index), [0])
+
+    def test_jensen_shannon_distance_rejects_invalid_base(self) -> None:
+        """Test invalid logarithm bases raise ValueError."""
+        dataset = datasets.Dataset.from_dict(
+            {"feature": list(range(4)), "label": [0, 1, 0, 1]}
+        )
+        iid_partitioner = IidPartitioner(num_partitions=2)
+        iid_partitioner.dataset = dataset
+
+        with self.assertRaises(ValueError):
+            compute_jensen_shannon_distances(
+                iid_partitioner, column_name="label", base=1
+            )
+
+    def test_distances_reject_invalid_max_num_partitions(self) -> None:
+        """Test invalid max_num_partitions raises ValueError."""
+        dataset = datasets.Dataset.from_dict(
+            {"feature": list(range(4)), "label": [0, 1, 0, 1]}
+        )
+        iid_partitioner = IidPartitioner(num_partitions=2)
+        iid_partitioner.dataset = dataset
+
+        with self.assertRaises(ValueError):
+            compute_hellinger_distances(
+                iid_partitioner, column_name="label", max_num_partitions=0
+            )
 
 
 if __name__ == "__main__":

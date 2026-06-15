@@ -82,6 +82,7 @@ Flower Datasets library supports:
 - **Partitioning datasets** - choose one of the implemented partitioning schemes or create your own.
 - **Creating centralized datasets** - leave parts of the dataset unpartitioned (e.g. for centralized evaluation)
 - **Visualization of the partitioned datasets** - visualize the label distribution of the partitioned dataset (and compare the results on different parameters of the same partitioning schemes, different datasets, different partitioning schemes, or any mix of them)
+- **Measuring partition skew** - compute label-distribution counts, frequencies, and distance metrics such as Hellinger and Jensen-Shannon distances.
 
 .. note::
 
