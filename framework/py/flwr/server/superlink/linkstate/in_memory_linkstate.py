@@ -51,6 +51,8 @@ from flwr.superlink.federation import FederationManager
 from .utils import (
     check_node_availability_for_in_message,
     generate_rand_int_from_bytes,
+    is_same_message_ins,
+    message_to_dict,
     primary_task_type_from_run_type,
     verify_found_message_replies,
     verify_message_ids,
@@ -148,6 +150,19 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
         message_id = message.metadata.message_id
         with self.lock:
+            existing = self.message_ins_store.get(message_id)
+            if existing:
+                if is_same_message_ins(
+                    message_to_dict(existing), message_to_dict(message)
+                ):
+                    return message_id
+                log(
+                    ERROR,
+                    "Failed to store Message: conflicting duplicate message_id %s.",
+                    message_id,
+                )
+                return None
+
             # Validate run_id
             if message.metadata.run_id not in self.run_ids:
                 log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)

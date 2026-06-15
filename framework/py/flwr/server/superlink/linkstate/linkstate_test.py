@@ -647,6 +647,69 @@ class StateTest(CoreStateTest):
         assert datetime.fromisoformat(actual_message_ins.metadata.delivered_at) > dt
         assert actual_message_ins.metadata.ttl > 0
 
+    @parameterized.expand([False, True])
+    def test_store_message_ins_duplicate_same_message_is_idempotent(
+        self, deliver_before_retry: bool
+    ) -> None:
+        """Test duplicate store_message_ins with the same Message is idempotent."""
+        # Prepare
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=node_id,
+                run_id=run_id,
+            )
+        )
+        retry_msg = message_from_proto(message_to_proto(msg))
+
+        # Execute
+        first_message_id = state.store_message_ins(message=msg)
+        if deliver_before_retry:
+            delivered = state.get_message_ins(node_id=node_id, limit=1)
+            assert len(delivered) == 1
+            assert delivered[0].metadata.delivered_at != ""
+        second_message_id = state.store_message_ins(message=retry_msg)
+
+        # Assert
+        assert first_message_id == msg.metadata.message_id
+        assert second_message_id == msg.metadata.message_id
+        assert state.num_message_ins() == 1
+
+    def test_store_message_ins_duplicate_conflicting_message_fails(self) -> None:
+        """Test duplicate store_message_ins with different content fails."""
+        # Prepare
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        other_node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=node_id,
+                run_id=run_id,
+            )
+        )
+        conflicting_msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID,
+                dst_node_id=other_node_id,
+                run_id=run_id,
+            )
+        )
+        conflicting_msg.metadata.__dict__["_message_id"] = msg.metadata.message_id
+
+        # Execute
+        first_message_id = state.store_message_ins(message=msg)
+        second_message_id = state.store_message_ins(message=conflicting_msg)
+
+        # Assert
+        assert first_message_id == msg.metadata.message_id
+        assert second_message_id is None
+        assert state.num_message_ins() == 1
+
     def test_store_message_ins_invalid_node_id(self) -> None:
         """Test store_message_ins with invalid node_id."""
         # Prepare

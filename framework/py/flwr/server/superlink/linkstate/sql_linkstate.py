@@ -66,6 +66,7 @@ from .utils import (
     convert_uint64_values_in_dict_to_sint64,
     dict_to_message,
     generate_rand_int_from_bytes,
+    is_same_message_ins,
     message_to_dict,
     primary_task_type_from_run_type,
     verify_found_message_replies,
@@ -164,43 +165,76 @@ class SqlLinkState(LinkState, SqlCoreState):  # pylint: disable=R0904
             )
             return None
 
-        with self.session():
-            # Validate run_id
-            run_row = self._lock_run(message.metadata.run_id, require_unfinished=True)
-            if not run_row:
-                log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
-                return None
-            federation: str = run_row["federation"]
-
-            # Validate destination node ID
-            query = """SELECT node_id FROM node WHERE node_id = :node_id
-                       AND status IN (:online, :offline)"""
+        def get_existing_message() -> dict[str, Any] | None:
             rows = self.query(
-                query,
-                {
-                    "node_id": data[0]["dst_node_id"],
-                    "online": NodeStatus.ONLINE,
-                    "offline": NodeStatus.OFFLINE,
-                },
+                "SELECT * FROM message_ins WHERE message_id = :message_id",
+                {"message_id": data[0]["message_id"]},
             )
-            if not rows or not self.federation_manager.has_node(
-                message.metadata.dst_node_id, federation
-            ):
-                log(
-                    ERROR,
-                    "Invalid destination node ID for Message: %s",
-                    message.metadata.dst_node_id,
+            return rows[0] if rows else None
+
+        def handle_duplicate_message() -> str | None:
+            existing = get_existing_message()
+            if existing and is_same_message_ins(existing, data[0]):
+                return message.metadata.message_id
+            log(
+                ERROR,
+                "Failed to store Message: conflicting duplicate message_id %s.",
+                message.metadata.message_id,
+            )
+            return None
+
+        existing_message = get_existing_message()
+        if existing_message:
+            if is_same_message_ins(existing_message, data[0]):
+                return message.metadata.message_id
+            log(
+                ERROR,
+                "Failed to store Message: conflicting duplicate message_id %s.",
+                message.metadata.message_id,
+            )
+            return None
+
+        try:
+            with self.session():
+                # Validate run_id
+                run_row = self._lock_run(
+                    message.metadata.run_id, require_unfinished=True
                 )
-                return None
+                if not run_row:
+                    log(
+                        ERROR, "Invalid run ID for Message: %s", message.metadata.run_id
+                    )
+                    return None
+                federation: str = run_row["federation"]
 
-            # Insert message
-            columns = ", ".join([f":{key}" for key in data[0]])
-            query = f"INSERT INTO message_ins VALUES({columns})"
+                # Validate destination node ID
+                query = """SELECT node_id FROM node WHERE node_id = :node_id
+                           AND status IN (:online, :offline)"""
+                rows = self.query(
+                    query,
+                    {
+                        "node_id": data[0]["dst_node_id"],
+                        "online": NodeStatus.ONLINE,
+                        "offline": NodeStatus.OFFLINE,
+                    },
+                )
+                if not rows or not self.federation_manager.has_node(
+                    message.metadata.dst_node_id, federation
+                ):
+                    log(
+                        ERROR,
+                        "Invalid destination node ID for Message: %s",
+                        message.metadata.dst_node_id,
+                    )
+                    return None
 
-            # Only invalid run_id can trigger IntegrityError.
-            # This may need to be changed in the future version
-            # with more integrity checks.
-            self.query(query, data[0])
+                # Insert message
+                columns = ", ".join([f":{key}" for key in data[0]])
+                query = f"INSERT INTO message_ins VALUES({columns})"
+
+                self.query(query, data[0])
+        except IntegrityError:
+            return handle_duplicate_message()
 
         return message.metadata.message_id
 
