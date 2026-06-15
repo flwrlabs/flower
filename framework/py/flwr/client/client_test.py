@@ -27,9 +27,9 @@ from flwr.common import (
     GetParametersRes,
     GetPropertiesIns,
     GetPropertiesRes,
+    Parameters,
     Status,
 )
-from flwr.common.typing import Parameters
 
 from .client import (
     Client,

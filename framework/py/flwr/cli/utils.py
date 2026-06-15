@@ -34,8 +34,6 @@ from rich.console import Console
 
 from flwr.cli.typing import SuperLinkConnection
 from flwr.common.constant import (
-    ACCESS_TOKEN_KEY,
-    AUTHN_TYPE_JSON_KEY,
     FEDERATION_NOT_FOUND_MESSAGE,
     NO_ACCOUNT_AUTH_MESSAGE,
     NO_ARTIFACT_PROVIDER_MESSAGE,
@@ -43,7 +41,6 @@ from flwr.common.constant import (
     PUBLIC_KEY_ALREADY_IN_USE_MESSAGE,
     PUBLIC_KEY_NOT_VALID,
     PULL_UNFINISHED_RUN_MESSAGE,
-    REFRESH_TOKEN_KEY,
     RUN_ID_NOT_FOUND_MESSAGE,
     AuthnType,
     CliOutputFormat,
@@ -609,33 +606,6 @@ def filter_paths_for_publish(
             )
         ret_files[rel_pth] = files[rel_pth]
     return ret_files
-
-
-def validate_credentials_content(creds_path: Path) -> str:
-    """Load and validate the credentials file content.
-
-    Ensures required keys exist:
-      - AUTHN_TYPE_JSON_KEY
-      - ACCESS_TOKEN_KEY
-      - REFRESH_TOKEN_KEY
-    """
-    try:
-        creds: dict[str, str] = json.loads(creds_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as err:
-        raise click.ClickException(
-            f"Invalid credentials file at '{creds_path}': {err}"
-        ) from err
-
-    required_keys = [AUTHN_TYPE_JSON_KEY, ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY]
-    missing = [key for key in required_keys if key not in creds]
-
-    if missing:
-        raise click.ClickException(
-            f"Credentials file '{creds_path}' is missing "
-            f"required key(s): {', '.join(missing)}. Please log in again."
-        )
-
-    return creds[ACCESS_TOKEN_KEY]
 
 
 def validate_federation_name(name: str) -> tuple[bool, str]:

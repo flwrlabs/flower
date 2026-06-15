@@ -35,7 +35,6 @@ from flwr.common.serde import (
     message_to_proto,
     run_from_proto,
 )
-from flwr.common.typing import Fab, Run
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -56,6 +55,7 @@ from flwr.proto.heartbeat_pb2 import (  # pylint: disable=E0611
 from flwr.proto.message_pb2 import ObjectTree  # pylint: disable=E0611
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
+from flwr.supercore.fab import Fab
 from flwr.supercore.heartbeat import HeartbeatSender
 from flwr.supercore.inflatable.inflatable_protobuf_utils import (
     make_confirm_message_received_fn_protobuf,
@@ -64,6 +64,7 @@ from flwr.supercore.inflatable.inflatable_protobuf_utils import (
 )
 from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
+from flwr.supercore.run import Run
 
 from .grpc_adapter import GrpcAdapter
 from .node_auth_client_interceptor import NodeAuthClientInterceptor

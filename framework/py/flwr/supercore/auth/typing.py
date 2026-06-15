@@ -1,4 +1,4 @@
-# Copyright 2025 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Custom types for Flower servers."""
+"""Flower account authentication type definitions."""
 
 
-from collections.abc import Callable
+from dataclasses import dataclass
 
-from flwr.app import Context
-from flwr.serverapp.grid import Grid
 
-from .serverapp_components import ServerAppComponents
+@dataclass
+class AccountAuthLoginDetails:
+    """Account authentication login details."""
 
-ServerAppCallable = Callable[[Grid, Context], None]
-Workflow = Callable[[Grid, Context], None]
-ServerFn = Callable[[Context], ServerAppComponents]
+    authn_type: str
+    device_code: str
+    verification_uri_complete: str
+    expires_in: int
+    interval: int
+
+
+@dataclass
+class AccountAuthCredentials:
+    """Account authentication tokens."""
+
+    access_token: str
+    refresh_token: str
+
+
+@dataclass
+class AccountInfo:
+    """User information for event log."""
+
+    flwr_aid: str | None
+    account_name: str | None

@@ -164,13 +164,13 @@ class EventType(str, Enum):
     FLWR_MODEL_RUN_ENTER = auto()
     FLWR_MODEL_RUN_LEAVE = auto()
 
-    # --- Simulation Engine ------------------------------------------------------------
+    # --- Simulation Runtime -----------------------------------------------------------
 
     # Python API: `run_simulation`
     PYTHON_API_RUN_SIMULATION_ENTER = auto()
     PYTHON_API_RUN_SIMULATION_LEAVE = auto()
 
-    # --- Deployment Engine ------------------------------------------------------------
+    # --- Deployment Runtime -----------------------------------------------------------
 
     # CLI: `flower-superlink`
     RUN_SUPERLINK_ENTER = auto()

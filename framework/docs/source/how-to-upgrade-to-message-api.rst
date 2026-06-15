@@ -177,8 +177,9 @@ focused, we will use a simple example and assume we are federating a PyTorch mod
 .. code-block:: python
 
     from flwr.common import Context  # Deprecated, import from flwr.app instead
+    from flwr.compat.server import ServerAppComponents
     from flwr.server import ServerApp  # Deprecated, import from flwr.serverapp instead
-    from flwr.server import ServerAppComponents, ServerConfig, start_server
+    from flwr.server import ServerConfig, start_server
     from flwr.server.strategy import FedAvg
 
 

@@ -20,9 +20,9 @@ from collections.abc import Sequence
 from typing import Literal
 
 from flwr.app import Context, Message
-from flwr.common.typing import Fab
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
+from flwr.supercore.fab import Fab
 
 from ..object_store import ObjectStore
 
