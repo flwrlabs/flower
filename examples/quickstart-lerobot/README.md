@@ -8,7 +8,7 @@ framework: [lerobot]
 
 This is an introductory example to using [🤗LeRobot](https://huggingface.co/lerobot) with [🌼Flower](https://flower.ai/). It demonstrates that it is feasible to collaboratively train a robotics AI model in remote environments with their local data and then aggregated it in a shared model.
 
-In this example, we will federate the training of a [Diffusion](https://arxiv.org/abs/2303.04137) policy on the [PushT](https://huggingface.co/datasets/lerobot/pusht/tree/v1.3) dataset. The data will be downloaded and partitioned using [Flower Datasets](https://flower.ai/docs/datasets/). This example runs best when a GPU is available.
+In this example, we will federate the training of a [Diffusion](https://arxiv.org/abs/2303.04137) policy on the [PushT](https://huggingface.co/datasets/lerobot/pusht/tree/v1.3) dataset. The data will be downloaded and partitioned using [Flower Datasets](https://flower.ai/docs/datasets/), which selects episode IDs that are then loaded via `LeRobotDataset`. This example runs best when a GPU is available.
 
 ![](_static/render_compose.gif)
 
@@ -33,7 +33,6 @@ quickstart-lerobot
 │   ├── client_app.py   # Defines your ClientApp
 │   ├── server_app.py   # Defines your ServerApp
 │   ├── task.py         # Defines your model, training and data loading
-│   ├── lerobot_federated_dataset.py   # Defines the dataset
 │   └── configs/		# configuration files
 │ 		├── env/        	# gym environment config
 │   	├── policy/			# policy config
@@ -54,6 +53,7 @@ pip install -e .
 ### Choose training parameters
 
 You can leave the default parameters for an initial quick test. It will run for 50 rounds sampling 4 clients per round. However for best results, total number of training rounds should be at least 100,000. You can achieve this for example by setting `num-server-rounds=500` and `local_epochs=200` in the `pyproject.toml`.
+Evaluation happens every `eval-every` rounds (default: `5`).
 
 ## Run the Example
 
@@ -88,7 +88,7 @@ flwr run . local-gpu
 You can also override some of the settings for your `ClientApp` and `ServerApp` defined in `pyproject.toml`. For example
 
 ```bash
-flwr run . local-gpu --run-config "num-server-rounds=5 fraction-fit=0.1"
+flwr run . local-simulation-gpu --run-config "num-server-rounds=5 fraction-fit=0.1 eval-every=1"
 ```
 
 ### Result output
@@ -104,7 +104,7 @@ outputs/date_time/
 │	│	└── client_1
 │   ...
 │   └── round_n   	# local client model checkpoint
-└── global_model # Each subdirectory contains the global model of a round
+└── global_model # Each subdirectory contains the global model + processors for a round
 	├── round_1
 	...
 	└── round_n
