@@ -1,9 +1,26 @@
-html, body{
-    font-family: Montserrat,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,Noto Sans,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji;
+html,
+body {
+    font-family: var(
+        --font-stack,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        Segoe UI,
+        Roboto,
+        Helvetica Neue,
+        Arial,
+        Noto Sans,
+        sans-serif,
+        Apple Color Emoji,
+        Segoe UI Emoji,
+        Segoe UI Symbol,
+        Noto Color Emoji
+    );
 }
 
 .mermaid {
-    background: #f8f8f8
+    background: #f8f8f8;
 }
 
 /* Main content titles */
@@ -13,7 +30,7 @@ article h3,
 article h4,
 article h5,
 article h6 {
-  font-family: "Montserrat", sans-serif;
+  font-family: inherit;
   font-weight: 600;
 }
 
@@ -21,7 +38,8 @@ article h1 { font-size: 2.2rem; }
 article h2 { font-size: 1.8rem; }
 article h3 { font-size: 1.45rem; }
 
-img.only-light, img.only-dark {
+article img.only-light,
+article img.only-dark {
     display: block;
     margin-left: auto;
     margin-right: auto;
