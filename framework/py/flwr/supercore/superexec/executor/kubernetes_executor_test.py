@@ -500,8 +500,8 @@ def test_wait_for_capacity_sleeps_and_polls_again_at_budget() -> None:
     sleep.assert_called_once_with(3.0)
 
 
-def test_wait_for_capacity_counts_pending_running_and_terminating_pods() -> None:
-    """Test active Pod counting includes phase-active and terminating Pods."""
+def test_wait_for_capacity_counts_pending_running_and_terminating_active_pods() -> None:
+    """Test active Pod counting includes non-terminal terminating Pods."""
     client = Mock()
     client.list_namespaced_pod.side_effect = [
         {"items": []},
@@ -509,8 +509,8 @@ def test_wait_for_capacity_counts_pending_running_and_terminating_pods() -> None
             "items": [
                 _pod("Pending"),
                 _pod("Running"),
-                _pod("Succeeded", deletion_timestamp="2026-05-26T18:30:00Z"),
-                _pod("Failed", deletion_timestamp="2026-05-26T18:31:00Z"),
+                _pod("Pending", deletion_timestamp="2026-05-26T18:30:00Z"),
+                _pod("Running", deletion_timestamp="2026-05-26T18:31:00Z"),
             ]
         },
         {"items": []},
@@ -528,12 +528,17 @@ def test_wait_for_capacity_counts_pending_running_and_terminating_pods() -> None
     sleep.assert_called_once_with(1.0)
 
 
-def test_wait_for_capacity_ignores_terminal_pods_not_terminating() -> None:
-    """Test Succeeded and Failed Pods do not count when they are not terminating."""
+def test_wait_for_capacity_ignores_terminal_pods_even_when_terminating() -> None:
+    """Test terminal Pods do not count after cleanup requests deletion."""
     client = Mock()
     client.list_namespaced_pod.side_effect = [
         {"items": []},
-        {"items": [_pod("Succeeded"), _pod("Failed")]},
+        {
+            "items": [
+                _pod("Succeeded", deletion_timestamp="2026-05-26T18:30:00Z"),
+                _pod("Failed", deletion_timestamp="2026-05-26T18:31:00Z"),
+            ]
+        },
     ]
     client.list_namespaced_secret.return_value = {"items": []}
     sleep = Mock()

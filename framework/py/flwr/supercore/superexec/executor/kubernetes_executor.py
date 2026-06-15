@@ -565,6 +565,10 @@ def _secret_items(secret_list: KubernetesList | Mapping[str, object]) -> list[ob
 
 def _is_active_pod(pod: object) -> bool:
     """Return true if a Pod counts against best-effort launch capacity."""
+    status = _object_field(pod, "status")
+    if _object_field(status, "phase") in {"Succeeded", "Failed"}:
+        return False
+
     metadata = _object_field(pod, "metadata")
     deletion_timestamp = _object_field(metadata, "deletion_timestamp")
     if deletion_timestamp is None:
@@ -572,7 +576,6 @@ def _is_active_pod(pod: object) -> bool:
     if deletion_timestamp is not None:
         return True
 
-    status = _object_field(pod, "status")
     return _object_field(status, "phase") not in {"Succeeded", "Failed"}
 
 
