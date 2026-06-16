@@ -168,7 +168,7 @@ class EventType(str, Enum):
     FLWR_CONNECTOR_RUN_ENTER = auto()
     FLWR_CONNECTOR_RUN_LEAVE = auto()
 
-    # --- Simulation Runtime ------------------------------------------------------------
+    # --- Simulation Runtime -----------------------------------------------------------
 
     # Python API: `run_simulation`
     PYTHON_API_RUN_SIMULATION_ENTER = auto()
