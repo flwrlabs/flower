@@ -25,7 +25,8 @@ from flwr.common.config import (
     get_fused_config_from_dir,
     get_fused_config_from_fab,
 )
-from flwr.common.typing import Fab, Run
+from flwr.supercore.fab import Fab
+from flwr.supercore.run import Run
 
 
 @dataclass()

@@ -26,7 +26,6 @@ from threading import Lock
 from typing import Literal, cast
 
 from flwr.app import Context, Message
-from flwr.common import now
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -37,9 +36,10 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.logger import log
-from flwr.common.typing import Fab
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
+from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
 
 from ..object_store import ObjectStore
 from .corestate import CoreState
@@ -595,17 +595,21 @@ class InMemoryCoreState(
         """Remove expired task tokens.
 
         Callers must acquire `lock_task_store` before calling this method.
-        Expired tasks are marked as finished with a failed status, and their
-        tokens are removed.
+        Expired starting tasks are moved back to pending. Expired running tasks
+        are marked as finished with a failed status. Tokens are removed in both
+        cases.
         """
         current = now()
         expired_tasks: list[Task] = []
         for task_id, record in list(self.task_token_store.items()):
             if record.active_until < current:
-                # The task is considered expired. Mark it as finished with a failed
-                # status if it's not already finished, and remove the token.
                 task = self.task_store.get(task_id)
-                if task and task.status.status != Status.FINISHED:
+                if task and task.status.status == Status.STARTING:
+                    task.starting_at = ""
+                    task.status.CopyFrom(
+                        TaskStatus(status=Status.PENDING, sub_status="", details="")
+                    )
+                elif task and task.status.status == Status.RUNNING:
                     task.finished_at = record.active_until.isoformat()
                     task.status.CopyFrom(
                         TaskStatus(

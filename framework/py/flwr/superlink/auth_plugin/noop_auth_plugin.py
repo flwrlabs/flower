@@ -20,7 +20,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID, AuthnType
-from flwr.common.typing import (
+from flwr.supercore.auth.typing import (
     AccountAuthCredentials,
     AccountAuthLoginDetails,
     AccountInfo,

@@ -214,6 +214,7 @@ class TaskType(StrEnum):
 TASK_TYPE_TO_APPIO_API_ADDRESS_ARG: dict[TaskType, str] = {
     TaskType.AGENT_APP: "--serverappio-api-address",
     TaskType.CLIENT_APP: "--clientappio-api-address",
+    TaskType.CONNECTOR: "--serverappio-api-address",
     TaskType.MODEL: "--serverappio-api-address",
     TaskType.SERVER_APP: "--serverappio-api-address",
     TaskType.SIMULATION: "--serverappio-api-address",
@@ -221,6 +222,7 @@ TASK_TYPE_TO_APPIO_API_ADDRESS_ARG: dict[TaskType, str] = {
 TASK_TYPE_TO_COMMAND: dict[TaskType, str] = {
     TaskType.AGENT_APP: "flwr-agentapp",
     TaskType.CLIENT_APP: "flwr-clientapp",
+    TaskType.CONNECTOR: "flwr-connector",
     TaskType.MODEL: "flwr-model",
     TaskType.SERVER_APP: "flwr-serverapp",
     TaskType.SIMULATION: "flwr-simulation",
