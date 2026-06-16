@@ -20,12 +20,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from flwr.app.message import Message
-from flwr.supercore.task_message.base import TaskMessage
-from flwr.supercore.task_message.constant import DEFAULT_TASK_MESSAGE_TTL
+from flwr.supercore.json_message.base import JSONMessage
+from flwr.supercore.json_message.constant import DEFAULT_TASK_MESSAGE_TTL
 from flwr.supercore.typing import JSONObject, JSONValue
 
 
-class ModelRequest(TaskMessage):
+class ModelRequest(JSONMessage):
     """Task-routed model request in Open Responses create-request shape."""
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
@@ -49,15 +49,16 @@ class ModelRequest(TaskMessage):
             "model": model,
             "input": input_,
             "stream": stream,
+            "tools": tools,
+            "tool_choice": tool_choice,
+            "reasoning": reasoning,
+            "previous_response_id": previous_response_id,
+            "instructions": instructions,
+            "max_output_tokens": max_output_tokens,
+            "metadata": metadata,
+            "text": text,
         }
-        self._set_optional(payload, "tools", tools)
-        self._set_optional(payload, "tool_choice", tool_choice)
-        self._set_optional(payload, "reasoning", reasoning)
-        self._set_optional(payload, "previous_response_id", previous_response_id)
-        self._set_optional(payload, "instructions", instructions)
-        self._set_optional(payload, "max_output_tokens", max_output_tokens)
-        self._set_optional(payload, "metadata", metadata)
-        self._set_optional(payload, "text", text)
+        payload = self._remove_none(payload)
 
         super().__init__(
             dst_task_id=dst_task_id,
@@ -98,7 +99,7 @@ class ModelRequest(TaskMessage):
             cls._validate_optional_json_object(payload, field)
 
 
-class ModelResponse(TaskMessage):
+class ModelResponse(JSONMessage):
     """Task-routed model response in Open Responses object shape."""
 
     def __init__(
@@ -121,10 +122,7 @@ class ModelResponse(TaskMessage):
     @classmethod
     def from_message(cls, message: Message) -> ModelResponse:
         """Parse a generic message into a model response."""
-        return cls._from_message(
-            message,
-            require_reply_to_message_id=True,
-        )
+        return cls._from_message(message)
 
     @classmethod
     def _validate_payload(cls, payload: JSONObject) -> None:

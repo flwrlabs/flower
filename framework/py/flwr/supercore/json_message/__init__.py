@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""SuperCore task-routed messages."""
+"""SuperCore task-routed JSON messages."""
