@@ -54,13 +54,95 @@ Evidence is written under the selected output directory:
 | Path | Purpose |
 | --- | --- |
 | `summary.json` | Machine-readable result and details. |
+| `invocation.json` | Redacted invocation, cwd/repo context, selected profile, and run settings. |
 | `events.jsonl` | Ordered harness events. |
+| `task-lineage.json` | Seeded run to TaskExecutor Pod and credential Secret mapping. |
+| `taskexecutor-pods.json` | Full redacted TaskExecutor Pod object snapshot. |
+| `taskexecutor-secrets.redacted.json` | Redacted per-task Secret evidence with key names and byte lengths. |
+| `final-state.json` | Pre-cleanup resource counts and object summaries for the run selectors. |
+| `proof-checklist.json` | Reviewer-facing map from claims to artifact fields, with out-of-scope claims. |
 | `objects/real-launch.yaml` | Rendered SuperLink, executor config, and SuperExec objects. |
 | `objects/seed-job.yaml` | Rendered seed ConfigMap and Job. |
 | `objects/pods.json` | Observed TaskExecutor Pod list and phases. |
 | `diagnostics/commands.txt` | Planned or executed host commands. |
 | `diagnostics/taskexecutor-logs.txt` | Captured TaskExecutor logs. |
 | `diagnostics/cleanup.txt` | Cleanup defaults and the namespace delete command. |
+
+## How The Evidence Proves Correctness
+
+Use this section when reviewing an evidence directory without rerunning the
+harness. The generated `proof-checklist.json` contains the same claim-to-file
+map in machine-readable form.
+
+1. Confirm the run was real and from the expected source tree.
+
+   Open `invocation.json` and check:
+
+   - `mode` is `local-k8s-launch-path`;
+   - `dry_run` is `false`;
+   - `repo.branch` and `repo.sha` match the checkout under review;
+   - `equivalent_argv` shows the harness mode, output directory, namespace,
+     images, `--execute`, `--apply-manifests`, and `--import-images`.
+
+2. Confirm SuperExec was actually configured to use the Kubernetes executor.
+
+   Open `objects/real-launch.yaml` and inspect the SuperExec Pod. Its container
+   args must include `--executor kubernetes` and `--executor-config
+   /etc/flower/executor-config.yaml`. The ConfigMap in the same file should
+   contain the executor config used to render TaskExecutor Pods, including the
+   namespace, image, resource pool, and harness-run label.
+
+3. Confirm one deterministic ServerApp task was seeded through AppIo.
+
+   Open `objects/seed-job.yaml` and check that the Job runs
+   `/opt/flower-local-k8s/seed_run.py` against the SuperLink Control API.
+   Then check `summary.json` and `task-lineage.json`: `seed_run_id` and
+   `seeded_run_id` should be present and should match.
+
+4. Confirm the Kubernetes executor created the TaskExecutor Pod.
+
+   Open `task-lineage.json`. Each task record should have a `pod_name`,
+   `pod_uid`, `task_id`, `launch_attempt`, `resource_pool`, and
+   `credential_secret_name`. Then open `taskexecutor-pods.json` and find the
+   same Pod. Its labels should include:
+
+   - `app.kubernetes.io/component: taskexecutor`;
+   - `flower.ai/harness-run`;
+   - `flower.ai/superexec-task-id`;
+   - `flower.ai/launch-attempt`;
+   - `flower.ai/resource-pool`.
+
+   The Pod spec should show the TaskExecutor command, `--token-file
+   /run/flwr/appio/token`, and a Secret volume mounted at `/run/flwr/appio`.
+
+5. Confirm the credential Secret existed without exposing the token.
+
+   Open `taskexecutor-secrets.redacted.json`. The matching Secret should have
+   the same task labels as the Pod, a `token` entry in `data_keys`, useful byte
+   length evidence in `data_byte_lengths`, and `redacted: true`. The file must
+   not contain the token value.
+
+6. Confirm the TaskExecutor actually ran the probe ServerApp.
+
+   Open `diagnostics/taskexecutor-logs.txt` and look for
+   `K8s launch probe ServerApp ran`. The verifier requires this marker. Also
+   check `taskexecutor-pods.json` or `summary.json` for Pod phase `Succeeded`.
+
+7. Confirm the final state was captured before broad namespace cleanup.
+
+   Open `final-state.json`. It records the Pod, Secret, Job, Service, and
+   Namespace observation commands plus resource counts before namespace
+   deletion. This proves what remained at the end of the proof stage. It does
+   not claim executor-owned completed Pod or Secret cleanup; that is deliberately
+   out of scope for this slice.
+
+8. Confirm the verifier accepted the bundle.
+
+   The wrapper runs `framework/dev/k8s/verify_evidence.py` after the harness.
+   A passing report should show `Verification: PASSED`, one TaskExecutor Pod,
+   one lineage record, one credential Secret record, final state Pod/Secret
+   counts, a `Succeeded` phase, and a successful cleanup command when cleanup
+   was required.
 
 ## What Is Tested
 
