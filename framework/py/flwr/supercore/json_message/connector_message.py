@@ -25,7 +25,7 @@ from flwr.supercore.typing import JSONObject, JSONValue
 class ConnectorRequest(JSONMessage):
     """Task-routed connector request."""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         *,
         dst_task_id: int,
@@ -59,7 +59,7 @@ class ConnectorRequest(JSONMessage):
 class ConnectorResponse(JSONMessage):
     """Task-routed connector response."""
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         *,
         dst_task_id: int,

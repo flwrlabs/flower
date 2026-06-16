@@ -83,9 +83,7 @@ def test_connector_response_builds_and_parses_payload() -> None:
     """ConnectorResponse should carry and parse the connector response payload."""
     name = "web_search"
     call_id = "call_123"
-    output: JSONObject = {
-        "results": [{"title": "Flower", "url": "https://flower.ai"}]
-    }
+    output: JSONObject = {"results": [{"title": "Flower", "url": "https://flower.ai"}]}
     error: JSONObject | None = None
     payload: JSONObject = {
         "name": name,
