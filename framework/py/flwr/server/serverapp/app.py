@@ -28,6 +28,7 @@ from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
+from flwr.common.app_import_error import format_app_import_error_message
 from flwr.common.config import (
     get_fused_config_from_dir,
     get_project_config,
@@ -134,6 +135,7 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     context: Context | None = None
     runtime_env_dir: Path | None = None
     exit_code = ExitCode.SUCCESS
+    exit_message: str | None = None
 
     # Register signal handlers for graceful shutdown
     register_signal_handlers(
@@ -235,6 +237,17 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         # Temporarily disable pushing resulting context to servicer
         context.state = RecordDict()
 
+    except ImportError as ex:
+        exc_entity = "ServerApp"
+        log(ERROR, "%s raised an exception", exc_entity, exc_info=ex)
+
+        sub_status = SubStatus.FAILED
+        details = format_app_import_error_message(
+            "ServerApp", ex, runtime_dependency_install
+        )
+        exit_message = details
+        exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
+
     except Exception as ex:  # pylint: disable=broad-exception-caught
         exc_entity = "ServerApp"
         log(ERROR, "%s raised an exception", exc_entity, exc_info=ex)
@@ -285,6 +298,7 @@ def run_serverapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
 
     flwr_exit(
         code=exit_code,
+        message=exit_message,
         event_type=EventType.FLWR_SERVERAPP_RUN_LEAVE,
         event_details={
             "run-id-hash": hash_run_id,

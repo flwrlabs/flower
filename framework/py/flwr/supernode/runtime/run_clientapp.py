@@ -25,6 +25,7 @@ from flwr.app.message import remove_content_from_message
 from flwr.cli.install import install_from_fab
 from flwr.clientapp.client_app import ClientApp, LoadClientAppError
 from flwr.clientapp.utils import get_load_client_app_fn
+from flwr.common.app_import_error import format_app_import_error_message
 from flwr.common.config import get_project_dir
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL, ErrorCode, SubStatus
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
@@ -115,6 +116,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     details = "ClientApp task failed due to unknown reason"
     runtime_env_dir = None
     exit_code = ExitCode.SUCCESS
+    exit_message: str | None = None
 
     register_signal_handlers(
         event_type=EventType.FLWR_CLIENTAPP_RUN_LEAVE,
@@ -175,6 +177,22 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
             sub_status = SubStatus.COMPLETED
             details = ""
 
+        except ImportError as ex:
+            # Don't update/change NodeState
+            reason = format_app_import_error_message(
+                "ClientApp", ex, runtime_dependency_install
+            )
+            log(ERROR, "ClientApp raised an exception", exc_info=ex)
+
+            reply_message = Message(
+                Error(code=ErrorCode.LOAD_CLIENT_APP_EXCEPTION, reason=reason),
+                reply_to=message,
+            )
+            sub_status = SubStatus.FAILED
+            details = reason
+            exit_message = reason
+            exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
+
         except Exception as ex:  # pylint: disable=broad-exception-caught
             # Don't update/change NodeState
 
@@ -222,6 +240,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
     flwr_exit(
         code=exit_code,
+        message=exit_message,
         event_type=EventType.FLWR_CLIENTAPP_RUN_LEAVE,
     )
 

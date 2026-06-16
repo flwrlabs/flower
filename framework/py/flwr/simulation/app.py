@@ -28,6 +28,7 @@ from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
 from flwr.common import EventType, event
 from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
+from flwr.common.app_import_error import format_app_import_error_message
 from flwr.common.config import (
     get_fused_config_from_dir,
     get_project_config,
@@ -170,6 +171,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     metrics = VceMetrics()
     runtime_env_dir = None
     exit_code = ExitCode.SUCCESS
+    exit_message: str | None = None
 
     register_signal_handlers(
         event_type=EventType.FLWR_SIMULATION_RUN_LEAVE,
@@ -288,6 +290,16 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         sub_status = SubStatus.COMPLETED
         details = ""
 
+    except ImportError as ex:
+        exc_entity = "Simulation"
+        log(ERROR, "%s raised an exception", exc_entity, exc_info=ex)
+        sub_status = SubStatus.FAILED
+        details = format_app_import_error_message(
+            "ServerApp or ClientApp", ex, runtime_dependency_install
+        )
+        exit_message = details
+        exit_code = ExitCode.COMMON_APP_IMPORT_ERROR
+
     except Exception as ex:  # pylint: disable=broad-exception-caught
         exc_entity = "Simulation"
         log(ERROR, "%s raised an exception", exc_entity, exc_info=ex)
@@ -330,6 +342,7 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
     flwr_exit(
         code=exit_code,
+        message=exit_message,
         event_type=EventType.FLWR_SIMULATION_RUN_LEAVE,
         event_details={
             "run-id-hash": run_id_hash,

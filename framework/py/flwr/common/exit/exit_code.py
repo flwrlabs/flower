@@ -66,6 +66,7 @@ class ExitCode:
     COMMON_PATH_INVALID = 604
     COMMON_TLS_SERVER_CERTIFICATES_INVALID = 605
     RUNTIME_VERSION_INCOMPATIBLE = 606
+    COMMON_APP_IMPORT_ERROR = 607
 
     # Simulation exit codes (700-799)
     SIMULATION_EXCEPTION = 700
@@ -190,6 +191,9 @@ To use the REST API, install `flwr` with the `rest` extra:
     ExitCode.RUNTIME_VERSION_INCOMPATIBLE: (
         "Upgrade your Flower version to the required version, or contact the server "
         "administrator."
+    ),
+    ExitCode.COMMON_APP_IMPORT_ERROR: (
+        "A ServerApp or ClientApp failed to import a required module."
     ),
     # Simulation exit codes (700-799)
     ExitCode.SIMULATION_EXCEPTION: (
