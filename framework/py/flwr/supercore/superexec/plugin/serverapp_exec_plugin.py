@@ -30,6 +30,7 @@ class ServerAppExecPlugin(BaseExecPlugin):
     supported_task_types = frozenset(
         {
             TaskType.AGENT_APP,
+            TaskType.CONNECTOR,
             TaskType.MODEL,
             TaskType.SERVER_APP,
             TaskType.SIMULATION,
