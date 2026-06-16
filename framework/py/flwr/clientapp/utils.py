@@ -85,7 +85,7 @@ def get_load_client_app_fn(
                 config = get_project_config(runtime_app_dir)
             except Exception as e:
                 raise LoadClientAppError(
-                    "Failed to load ClientApp."
+                    "Failed to load ClientApp. "
                     "Possible reasons for error include mismatched "
                     "`fab_id`, `fab_version`, or `fab_hash` in "
                     f"{str(get_flwr_home().resolve())}."

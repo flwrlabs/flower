@@ -43,7 +43,7 @@ from ..utils import (
     print_json_to_stdout,
 )
 
-_NodeListType = tuple[int, str, str, str, str, str, str, str, float]
+_NodeListType = tuple[int, str, str, str, str, str, str, float]
 
 
 def ls(  # pylint: disable=R0914, R0913, R0917
@@ -128,7 +128,6 @@ def _format_nodes(
         formatted_nodes.append(
             (
                 node.node_id,
-                node.owner_aid,
                 node.owner_name,
                 node.status,
                 _format_datetime(node.registered_at),
@@ -158,7 +157,6 @@ def _to_table(nodes_info: list[_NodeListType], verbose: bool) -> Table:
     for row in nodes_info:
         (
             node_id,
-            _,
             owner_name,
             status,
             _,
@@ -211,7 +209,6 @@ def _to_json(nodes_info: list[_NodeListType], verbose: bool) -> str:
     for row in nodes_info:
         (
             node_id,
-            owner_aid,
             owner_name,
             status,
             created_at,
@@ -227,7 +224,6 @@ def _to_json(nodes_info: list[_NodeListType], verbose: bool) -> str:
         nodes_list.append(
             {
                 "node-id": f"{node_id}",
-                "owner-aid": owner_aid,
                 "owner-name": owner_name,
                 "status": status,
                 "created-at": created_at,
