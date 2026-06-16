@@ -16,7 +16,7 @@
 
 
 from flwr.app import Context, Message
-from flwr.client.typing import ClientAppCallable, Mod
+from flwr.clientapp.typing import ClientAppCallable, Mod
 
 
 def make_ffn(ffn: ClientAppCallable, mods: list[Mod]) -> ClientAppCallable:

@@ -22,7 +22,6 @@ from typing import Any
 import grpc
 from google.protobuf.message import Message as GrpcMessage
 
-from flwr.common import now
 from flwr.common.constant import (
     PUBLIC_KEY_HEADER,
     SIGNATURE_HEADER,
@@ -35,6 +34,7 @@ from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     RegisterNodeFleetRequest,
 )
 from flwr.server.superlink.linkstate import LinkStateFactory
+from flwr.supercore.date import now
 from flwr.supercore.primitives.asymmetric import bytes_to_public_key, verify_signature
 from flwr.supercore.utils import get_metadata_bytes, get_metadata_str
 
