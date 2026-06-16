@@ -19,8 +19,8 @@ from logging import INFO
 
 import numpy as np
 
-from flwr.app.message import Context, Message
-from flwr.client.typing import ClientAppCallable
+from flwr.app import Context, Message
+from flwr.clientapp.typing import ClientAppCallable
 from flwr.common.logger import log
 
 

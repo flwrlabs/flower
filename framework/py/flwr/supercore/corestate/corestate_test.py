@@ -24,7 +24,6 @@ from unittest.mock import patch
 
 from parameterized import parameterized
 
-from flwr.common import now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
@@ -34,6 +33,7 @@ from flwr.common.constant import (
 )
 from flwr.proto.task_pb2 import TaskEvent, TaskStatus  # pylint: disable=E0611
 from flwr.supercore.constant import TaskType
+from flwr.supercore.date import now
 
 from . import CoreState
 from .utils_test import create_task_message

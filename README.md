@@ -47,13 +47,17 @@ Flower's goal is to make federated learning accessible to everyone. This series 
 
 0. **[What is Federated Learning?](https://flower.ai/docs/framework/main/en/tutorial-series-what-is-federated-learning.html)**
 
-1. **[An Introduction to Federated Learning](https://flower.ai/docs/framework/main/en/tutorial-series-get-started-with-flower-pytorch.html)**
+1. **[Get started with Flower](https://flower.ai/docs/framework/main/en/tutorial-series-get-started-with-flower.html)**
 
-2. **[Using Strategies in Federated Learning](https://flower.ai/docs/framework/main/en/tutorial-series-use-a-federated-learning-strategy-pytorch.html)**
+2. **[Write your first Flower App](https://flower.ai/docs/framework/main/en/tutorial-series-write-your-first-flower-app.html)**
 
-3. **[Customize a Flower Strategy](https://flower.ai/docs/framework/main/en/tutorial-series-build-a-strategy-from-scratch-pytorch.html)**
+3. **[Write your first Flower App with PyTorch](https://flower.ai/docs/framework/main/en/tutorial-series-write-your-first-flower-app-pytorch.html)**
 
-4. **[Communicate Custom Messages](https://flower.ai/docs/framework/main/en/tutorial-series-customize-the-client-pytorch.html)**
+4. **[Use a federated learning strategy](https://flower.ai/docs/framework/main/en/tutorial-series-use-a-federated-learning-strategy-pytorch.html)**
+
+5. **[Customize a Flower Strategy](https://flower.ai/docs/framework/main/en/tutorial-series-build-a-strategy-from-scratch-pytorch.html)**
+
+6. **[Communicate Custom Messages](https://flower.ai/docs/framework/main/en/tutorial-series-customize-the-client-pytorch.html)**
 
 Stay tuned, more tutorials are coming soon. Topics include **Privacy and Security in Federated Learning**, and **Scaling Federated Learning**.
 

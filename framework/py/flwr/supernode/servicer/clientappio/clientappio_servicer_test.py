@@ -22,7 +22,6 @@ from parameterized import parameterized
 
 from flwr.app import Context
 from flwr.app.message import make_message
-from flwr.common import typing
 from flwr.common.constant import SubStatus
 from flwr.common.serde import context_to_proto, fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker
@@ -44,11 +43,13 @@ from flwr.proto.message_pb2 import (  # pylint:disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import Run as ProtoRun  # pylint:disable=E0611
+from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
     iterate_object_tree,
 )
+from flwr.supercore.run import Run
 from flwr.supernode.runtime.run_clientapp import (
     pull_task_input,
     push_message,
@@ -77,7 +78,7 @@ class TestClientAppIoServicer(unittest.TestCase):
             metadata=self.maker.metadata(),
             content=self.maker.recorddict(3, 2, 1),
         )
-        mock_fab = typing.Fab(
+        mock_fab = Fab(
             hash_str="abc123#$%",
             content=b"\xf3\xf5\xf8\x98",
             verifications={"ab12#$%": "abc123#$%"},
@@ -185,7 +186,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         task_id = 123
         request = PullTaskInputRequest()
 
-        run = typing.Run.create_empty(run_id=run_id)
+        run = Run.create_empty(run_id=run_id)
         run.fab_id = "mock/mock"
         run.fab_version = "v1.0.0"
         run.fab_hash = "fab-hash"
@@ -199,7 +200,7 @@ class TestClientAppIoServicer(unittest.TestCase):
             run_config={"runconfig1": 6.1},
             series_id=run.series_id,
         )
-        fab = typing.Fab(
+        fab = Fab(
             hash_str="fab-hash",
             content=b"fab-content",
             verifications={"sig": "value"},
@@ -224,7 +225,7 @@ class TestClientAppIoServicer(unittest.TestCase):
         """PushTaskOutput should finish the authenticated task."""
         run_id = 61016
         task_id = 123
-        run = typing.Run.create_empty(run_id=run_id)
+        run = Run.create_empty(run_id=run_id)
         run.series_id = 777
         app_context = Context(
             run_id=run_id,

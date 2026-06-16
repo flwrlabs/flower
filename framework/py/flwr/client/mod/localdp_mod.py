@@ -21,7 +21,7 @@ import numpy as np
 
 from flwr.app.message import Context, Message
 from flwr.app.message_type import MessageType
-from flwr.client.typing import ClientAppCallable
+from flwr.clientapp.typing import ClientAppCallable
 from flwr.common import ndarrays_to_parameters, parameters_to_ndarrays
 from flwr.common import recorddict_compat as compat
 from flwr.common.differential_privacy import (

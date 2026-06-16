@@ -128,6 +128,8 @@ def _try_obtain_telemetry_event() -> EventType | None:
         return EventType.FLWR_AGENTAPP_RUN_LEAVE
     if sys.argv[0].endswith("flwr-model"):
         return EventType.FLWR_MODEL_RUN_LEAVE
+    if sys.argv[0].endswith("flwr-connector"):
+        return EventType.FLWR_CONNECTOR_RUN_LEAVE
     if sys.argv[0].endswith("flwr-serverapp"):
         return EventType.FLWR_SERVERAPP_RUN_LEAVE
     if sys.argv[0].endswith("flwr-clientapp"):

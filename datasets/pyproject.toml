@@ -54,7 +54,7 @@ dependencies = [
 
 [project.optional-dependencies]
 vision = ["pillow>=12.2.0"]
-audio = ["torch>=2.8.0", "torchcodec>=0.7.0"]
+audio = ["torch>=2.10.0", "torchcodec>=0.7.0"]
 
 [project.scripts]
 # `flwr-datasets` CLI

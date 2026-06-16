@@ -20,8 +20,8 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 from flwr.common.constant import RUNTIME_DEPENDENCY_INSTALL
-from flwr.common.typing import Run
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.supercore.run import Run
 from flwr.supercore.superexec.executor import Executor, LaunchResult
 
 
