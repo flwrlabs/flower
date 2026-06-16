@@ -39,6 +39,7 @@ from flwr.common.constant import (
     FEDERATION_NOT_FOUND_MESSAGE,
     HEARTBEAT_DEFAULT_INTERVAL,
     LOG_STREAM_INTERVAL,
+    NOOP_ACCOUNT_NAME,
     NO_ACCOUNT_AUTH_MESSAGE,
     NO_ARTIFACT_PROVIDER_MESSAGE,
     NODE_NOT_FOUND_MESSAGE,
@@ -119,6 +120,8 @@ from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkState, LinkStateFactory
 from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
+    DEFAULT_FEDERATION_DESCRIPTION,
+    DEFAULT_FEDERATION_NAME,
     NOOP_FEDERATION,
     PLATFORM_API_URL,
     ActionType,
@@ -198,6 +201,10 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         with rpc_error_translator(context, rpc_name):
             # Check (1) federation exists and (2) the flwr_aid is a member
             federation = request.federation or NOOP_FEDERATION
+            if request.federation:
+                _ensure_default_federation_exists(
+                    state, _get_account(context), federation
+                )
             if not state.federation_manager.exists(federation):
                 if request.federation:
                     raise FlowerError(
@@ -651,6 +658,8 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         # Init link state
         state = self.linkstate_factory.state()
 
+        _ensure_default_federation_exists(state, _get_account(context))
+
         # Get federations the account is a member of
         federations = state.federation_manager.get_federations(_get_flwr_aid(context))
 
@@ -678,6 +687,7 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
         # Ensure flwr_aid is a member of the requested federation
         flwr_aid = _get_flwr_aid(context)
         federation = request.federation_name
+        _ensure_default_federation_exists(state, _get_account(context), federation)
         if not state.federation_manager.has_member(flwr_aid, federation):
             context.abort(
                 grpc.StatusCode.FAILED_PRECONDITION,
@@ -771,6 +781,13 @@ class ControlServicer(control_pb2_grpc.ControlServicer):
 
             # Init link state
             state = self.linkstate_factory.state()
+
+            account = _get_account(context)
+            if request.federation_name == _get_default_federation_name(account):
+                raise FlowerError(
+                    ApiErrorCode.FORBIDDEN_ACTION,
+                    "The default federation cannot be archived.",
+                )
 
             # Archive federation
             state.federation_manager.archive_federation(
@@ -1070,6 +1087,42 @@ class FederationNotSpecified(FlowerError):
         super().__init__(
             ApiErrorCode.FEDERATION_NOT_SPECIFIED, "No federation specified in request."
         )
+
+
+def _get_default_federation_name(account: AccountInfo) -> str | None:
+    """Return the default federation name for an authenticated account."""
+    if account.account_name == NOOP_ACCOUNT_NAME:
+        return NOOP_FEDERATION
+    return f"@{account.account_name}/{DEFAULT_FEDERATION_NAME}"
+
+
+def _ensure_default_federation_exists(
+    state: LinkState, account: AccountInfo, requested_federation: str | None = None
+) -> None:
+    """Create the account default federation if it is missing."""
+    federation = _get_default_federation_name(account)
+    if (
+        federation is None
+        or (requested_federation is not None and requested_federation != federation)
+        or state.federation_manager.exists(federation)
+    ):
+        return
+
+    try:
+        federation_name = state.federation_manager.create_federation(
+            flwr_aid=cast(str, account.flwr_aid),
+            name=federation,
+            description=DEFAULT_FEDERATION_DESCRIPTION,
+            simulation=True,
+        ).name
+        log(INFO, "Created default federation '%s'.", federation_name)
+    except FlowerError as ex:
+        if (
+            ex.code == ApiErrorCode.FEDERATION_ALREADY_EXISTS
+            and state.federation_manager.exists(federation)
+        ):
+            return
+        raise
 
 
 def _validate_federation_and_node_in_request(

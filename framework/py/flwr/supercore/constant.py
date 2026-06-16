@@ -102,6 +102,8 @@ MIME_MAP = {
 MAX_NAME_LENGTH = 32  # max length for app names; also used for federation names
 
 # Constants for federations
+DEFAULT_FEDERATION_DESCRIPTION = "Default workspace federation."
+DEFAULT_FEDERATION_NAME = "workspace"
 NOOP_FEDERATION = f"@{NOOP_ACCOUNT_NAME}/default"
 NOOP_FEDERATION_DESCRIPTION = "A federation for testing and development purposes."
 DEFAULT_SIMULATION_CONFIG = SimulationConfig(

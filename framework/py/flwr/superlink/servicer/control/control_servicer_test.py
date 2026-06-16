@@ -83,7 +83,10 @@ from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import TaskEvent  # pylint: disable=E0611
 from flwr.server.superlink.linkstate import LinkStateFactory
+from flwr.supercore.auth.typing import AccountInfo
 from flwr.supercore.constant import (
+    DEFAULT_FEDERATION_DESCRIPTION,
+    DEFAULT_FEDERATION_NAME,
     FLWR_IN_MEMORY_DB_NAME,
     NOOP_FEDERATION,
     ActionType,
@@ -111,6 +114,7 @@ from flwr.superlink.servicer.control.control_account_auth_interceptor import (
 
 from .control_servicer import (
     ControlServicer,
+    _ensure_default_federation_exists,
     _format_verification,
     _validate_federation_and_node_in_request,
     _validate_federation_membership_in_request,
@@ -167,6 +171,34 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             run_ids=run_ids or [],
         )
 
+    @parameterized.expand(
+        [
+            (False, True),
+            (True, False),
+        ]
+    )
+    def test_ensure_default_federation_exists(
+        self, exists: bool, should_create: bool
+    ) -> None:
+        """Test default federation creation helper."""
+        state = Mock()
+        state.federation_manager.exists.return_value = exists
+        account = AccountInfo(flwr_aid="aid-default", account_name="javier")
+        federation = f"@javier/{DEFAULT_FEDERATION_NAME}"
+
+        _ensure_default_federation_exists(state, account, federation)
+
+        state.federation_manager.exists.assert_called_once_with(federation)
+        if should_create:
+            state.federation_manager.create_federation.assert_called_once_with(
+                flwr_aid="aid-default",
+                name=federation,
+                description=DEFAULT_FEDERATION_DESCRIPTION,
+                simulation=True,
+            )
+        else:
+            state.federation_manager.create_federation.assert_not_called()
+
     def test_start_run(self) -> None:
         """Test StartRun method of ControlServicer."""
         # Prepare
@@ -187,6 +219,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             patch(
                 "flwr.superlink.servicer.control.control_servicer.get_metadata_from_config"
             ) as mock_get_metadata_from_config,
+            patch(
+                "flwr.superlink.servicer.control.control_servicer."
+                "_ensure_default_federation_exists"
+            ) as mock_ensure_default_federation_exists,
         ):
             mock_get_metadata_from_config.return_value = (fab_id, fab_version)
             response = self.servicer.StartRun(request, Mock())
@@ -207,6 +243,10 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         assert run_context is not None
         self.assertEqual(run_context.run_id, response.run_id)
         self.assertEqual(run_context.series_id, response.series_id)
+        mock_ensure_default_federation_exists.assert_called_once()
+        self.assertEqual(
+            mock_ensure_default_federation_exists.call_args.args[2], NOOP_FEDERATION
+        )
 
     def test_start_run_uses_existing_series_id(self) -> None:
         """Test StartRun links the run to an existing run series."""
@@ -813,13 +853,23 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
         request = ShowFederationRequest(federation_name=NOOP_FEDERATION)
 
         # Execute
-        response: ShowFederationResponse = self.servicer.ShowFederation(request, Mock())
+        with patch(
+            "flwr.superlink.servicer.control.control_servicer."
+            "_ensure_default_federation_exists"
+        ) as mock_ensure_default_federation_exists:
+            response: ShowFederationResponse = self.servicer.ShowFederation(
+                request, Mock()
+            )
         retrieved_timestamp = datetime.fromisoformat(response.now).timestamp()
 
         # Assert
         self.assertLess(abs(retrieved_timestamp - now().timestamp()), 1e-3)
         self.assertEqual(response.federation.name, NOOP_FEDERATION)
         self.assertFalse(response.federation.simulation)
+        mock_ensure_default_federation_exists.assert_called_once()
+        self.assertEqual(
+            mock_ensure_default_federation_exists.call_args.args[2], NOOP_FEDERATION
+        )
 
     def test_list_federations_includes_simulation_flag(self) -> None:
         """Test ListFederations surfaces the federation simulation flag."""
@@ -834,12 +884,17 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             authn_plugin=NoOpControlAuthnPlugin(Mock(), False),
         )
 
-        response: ListFederationsResponse = servicer.ListFederations(
-            ListFederationsRequest(), Mock()
-        )
+        with patch(
+            "flwr.superlink.servicer.control.control_servicer."
+            "_ensure_default_federation_exists"
+        ) as mock_ensure_default_federation_exists:
+            response: ListFederationsResponse = servicer.ListFederations(
+                ListFederationsRequest(), Mock()
+            )
 
         self.assertEqual(len(response.federations), 1)
         self.assertTrue(response.federations[0].simulation)
+        mock_ensure_default_federation_exists.assert_called_once()
 
     def test_create_federation_success(self) -> None:
         """Test CreateFederation succeeds when federation_manager.create_federation
@@ -982,6 +1037,13 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             return_value=None,
         ) as mock_archive:
             response = self.servicer.ArchiveFederation(request, Mock())
+            context = Mock()
+            context.abort.side_effect = grpc.RpcError()
+            with self.assertRaises(grpc.RpcError):
+                self.servicer.ArchiveFederation(
+                    ArchiveFederationRequest(federation_name=NOOP_FEDERATION),
+                    context,
+                )
 
         # Assert
         mock_archive.assert_called_once_with(
@@ -989,6 +1051,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             name="test-federation",
         )
         self.assertIsNotNone(response)
+        _assert_abort_with_flwr_err(context, ApiErrorCode.FORBIDDEN_ACTION)
 
     def test_archive_federation_fails_on_manager_error(self) -> None:
         """Test ArchiveFederation aborts when federation_manager.archive_federation
