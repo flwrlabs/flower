@@ -166,3 +166,22 @@ def test_invoke_web_fetch_provider_enforces_fetch_guardrails(
     assert exc_info.value.code == "response_too_large"
     assert exc_info.value.status_code == 200
     assert response.closed
+
+
+@pytest.mark.parametrize("blocked_url", ["https://100.64.0.1", "https://224.0.0.1"])
+def test_invoke_web_fetch_provider_blocks_non_public_ip_literals(
+    monkeypatch: pytest.MonkeyPatch,
+    blocked_url: str,
+) -> None:
+    """Provider should reject non-public IP literals before fetching."""
+    get_mock = Mock()
+    monkeypatch.setattr(
+        "flwr.supercore.task_process.connector.web_fetch.requests.get",
+        get_mock,
+    )
+
+    with pytest.raises(WebFetchProviderError) as exc_info:
+        invoke_web_fetch_provider(blocked_url)
+
+    assert exc_info.value.code == "blocked_url"
+    get_mock.assert_not_called()

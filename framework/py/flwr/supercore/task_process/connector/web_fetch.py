@@ -17,13 +17,12 @@
 from __future__ import annotations
 
 import ipaddress
-import json
 import socket
 from urllib.parse import urljoin, urlparse
 
 import requests
 
-from flwr.supercore.typing import JSONObject, JSONValue
+from flwr.supercore.typing import JSONObject
 
 _MAX_RESPONSE_BYTES = 1024 * 1024
 _TIMEOUT = 30.0
@@ -39,17 +38,14 @@ class WebFetchProviderError(RuntimeError):
         self,
         *,
         code: str,
-        detail: JSONValue,
+        detail: str,
         status_code: int | None = None,
     ) -> None:
         """Initialize the provider error."""
         self.code = code
         self.status_code = status_code
         self.detail = detail
-        if isinstance(detail, str):
-            formatted_detail = detail
-        else:
-            formatted_detail = json.dumps(detail, separators=(",", ":"))
+        formatted_detail = detail
         if status_code is not None:
             formatted_detail = f"{status_code} {formatted_detail}"
 
@@ -116,6 +112,7 @@ def _fetch_url(url: str) -> requests.Response:
     for redirect_count in range(_MAX_REDIRECTS + 1):
         current_url = _validate_url(current_url)
         try:
+            # Follow redirects manually so every hop is validated before connect.
             response = requests.get(
                 current_url,
                 timeout=_TIMEOUT,
@@ -157,14 +154,13 @@ def _validate_url(url: str) -> str:
         )
 
     parsed = urlparse(url)
-    hostname = parsed.hostname
+    hostname = parsed.hostname.rstrip(".").lower() if parsed.hostname else None
     if parsed.scheme not in {"http", "https"} or hostname is None:
         raise WebFetchProviderError(
             code="invalid_request",
             detail="URL must use the http or https scheme.",
         )
 
-    hostname = hostname.rstrip(".").lower()
     if hostname == "localhost" or hostname.endswith(".localhost"):
         raise WebFetchProviderError(
             code="blocked_url",
@@ -172,32 +168,25 @@ def _validate_url(url: str) -> str:
         )
 
     try:
-        ip_addresses = [ipaddress.ip_address(hostname)]
+        ip_addresses = {ipaddress.ip_address(hostname)}
     except ValueError:
         try:
-            ip_addresses = [
+            # DNS can hide private targets behind public-looking hostnames.
+            ip_addresses = {
                 ipaddress.ip_address(addr[4][0])
                 for addr in socket.getaddrinfo(
                     hostname,
                     None,
                     type=socket.SOCK_STREAM,
                 )
-            ]
+            }
         except socket.gaierror as exc:
             raise WebFetchProviderError(
                 code="fetch_failed",
                 detail=f"Could not resolve URL host: {hostname}",
             ) from exc
 
-    if any(
-        ip_address.is_private
-        or ip_address.is_loopback
-        or ip_address.is_link_local
-        or ip_address.is_multicast
-        or ip_address.is_reserved
-        or ip_address.is_unspecified
-        for ip_address in ip_addresses
-    ):
+    if any(ip_addr.is_multicast or not ip_addr.is_global for ip_addr in ip_addresses):
         raise WebFetchProviderError(
             code="blocked_url",
             detail="URL host is not allowed.",
