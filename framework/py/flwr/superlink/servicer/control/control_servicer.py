@@ -1089,7 +1089,7 @@ class FederationNotSpecified(FlowerError):
         )
 
 
-def _get_default_federation_name(account: AccountInfo) -> str | None:
+def _get_default_federation_name(account: AccountInfo) -> str:
     """Return the default federation name for an authenticated account."""
     if account.account_name == NOOP_ACCOUNT_NAME:
         return NOOP_FEDERATION
@@ -1102,10 +1102,8 @@ def _ensure_default_federation_exists(
     """Create the account default federation if it is missing."""
     federation = _get_default_federation_name(account)
     if (
-        federation is None
-        or (requested_federation is not None and requested_federation != federation)
-        or state.federation_manager.exists(federation)
-    ):
+        requested_federation is not None and requested_federation != federation
+    ) or state.federation_manager.exists(federation):
         return
 
     try:

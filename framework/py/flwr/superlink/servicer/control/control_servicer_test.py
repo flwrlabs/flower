@@ -171,7 +171,7 @@ class TestControlServicer(unittest.TestCase):  # pylint: disable=R0904
             run_ids=run_ids or [],
         )
 
-    @parameterized.expand(
+    @parameterized.expand(  # type: ignore
         [
             (False, True),
             (True, False),
