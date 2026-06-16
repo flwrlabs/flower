@@ -25,7 +25,8 @@ pip install flwr-datasets[vision]
 Flower Datasets library supports:
 * **downloading datasets** - choose the dataset from Hugging Face's `datasets`,
 * **partitioning datasets** - customize the partitioning scheme,
-* **creating centralized datasets** - leave parts of the dataset unpartitioned (e.g. for centralized evaluation).
+* **creating centralized datasets** - leave parts of the dataset unpartitioned (e.g. for centralized evaluation),
+* **measuring partition skew** - compute label-distribution counts, frequencies, and categorical distance metrics.
 
 Thanks to using Hugging Face's `datasets` used under the hood, Flower Datasets integrates with the following popular formats/frameworks:
 * Hugging Face,
@@ -81,5 +82,13 @@ centralized_data = fds.load_split("test")
 If a local dataset is sorted by label or another target column, use
 `IidPartitioner(num_partitions=100, shuffle=True, seed=42)` to shuffle the dataset
 once before sharding it.
+
+To inspect categorical partition skew, use `flwr_datasets.metrics`:
+
+```
+from flwr_datasets.metrics import compute_hellinger_distances
+
+distances = compute_hellinger_distances(partitioner, column_name="label")
+```
 
 For more details, please refer to the specific how-to guides or tutorials. They showcase customization and more advanced features.

@@ -22,12 +22,8 @@ from parameterized import parameterized, parameterized_class
 
 import datasets
 from datasets import ClassLabel
-from flwr_datasets.metrics.utils import (
-    _compute_counts,
-    _compute_frequencies,
-    compute_counts,
-    compute_frequencies,
-)
+from flwr_datasets.metrics import compute_counts, compute_frequencies
+from flwr_datasets.metrics.utils import _compute_counts, _compute_frequencies
 from flwr_datasets.partitioner import IidPartitioner
 
 

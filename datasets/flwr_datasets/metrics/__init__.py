@@ -15,9 +15,18 @@
 """Metrics package."""
 
 
-from flwr_datasets.metrics.utils import compute_counts, compute_frequencies
+from flwr_datasets.metrics.distances import (
+    compute_hellinger_distances,
+    compute_jensen_shannon_distances,
+)
+from flwr_datasets.metrics.utils import (
+    compute_counts,
+    compute_frequencies,
+)
 
 __all__ = [
     "compute_counts",
     "compute_frequencies",
+    "compute_hellinger_distances",
+    "compute_jensen_shannon_distances",
 ]
