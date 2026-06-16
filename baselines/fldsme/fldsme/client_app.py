@@ -37,13 +37,20 @@ def train(msg: Message, context: Context):
     num_partitions = int(context.node_config["num-partitions"])
     fl_round = int(msg.content.config_records["config"]["server-round"])
 
+    local_epochs = context.run_config["local-epochs"]
+
     mac_model = _build_mac_model(context, num_partitions)
     profile = mac_model.get_client_profile(
         client_id=partition_id,
         fl_round=fl_round,
         model_size_kb=MODEL_SIZE_KB,
+        n_local_epochs=int(local_epochs),
     )
-    eligible = mac_model.is_eligible(profile, model_size_kb=MODEL_SIZE_KB)
+    eligible = mac_model.is_eligible(
+        profile,
+        model_size_kb=MODEL_SIZE_KB,
+        n_local_epochs=int(local_epochs),
+    )
 
     model = Net()
     arrays = msg.content.array_records["arrays"]
@@ -77,7 +84,6 @@ def train(msg: Message, context: Context):
 
     # Load local data and train
     trainloader, _ = load_data(partition_id, num_partitions)
-    local_epochs = context.run_config["local-epochs"]
     train_loss = train_fn(model, trainloader, local_epochs, device)
 
     # Apply GTS bandwidth mask (top-k sparsification on the update delta).
