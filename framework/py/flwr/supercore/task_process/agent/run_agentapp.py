@@ -48,8 +48,13 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
     PullTaskInputResponse,
     PushTaskOutputRequest,
 )
+from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
+from flwr.supercore.heartbeat import (
+    TaskHeartbeat,
+    TaskHeartbeatConfig,
+    create_task_heartbeat_grpc,
+)
 from flwr.supercore.superexec.dependency_installer import (
     cleanup_app_runtime_environment,
     install_app_dependencies,
@@ -89,7 +94,7 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     hash_run_id = None
     sub_status = SubStatus.FAILED
     details = "Task failed with unknown error."
-    heartbeat_sender = None
+    heartbeat: TaskHeartbeat | None = None
     context: Context | None = None
     runtime_env_dir: Path | None = None
     exit_code = ExitCode.SUCCESS
@@ -100,8 +105,17 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
     )
 
     try:
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(grid._stub))
-        heartbeat_sender.start()
+        heartbeat = create_task_heartbeat_grpc(
+            TaskHeartbeatConfig(
+                appio_service_address=serverappio_api_address,
+                insecure=insecure,
+                root_certificates=certificates,
+                token=token,
+                component_name="flwr-agentapp",
+            ),
+            ServerAppIoStub,
+        )
+        heartbeat.start()
 
         log(DEBUG, "[flwr-agentapp] Pull task input")
         res: PullTaskInputResponse = grid._stub.PullTaskInput(PullTaskInputRequest())
@@ -233,8 +247,8 @@ def run_agentapp(  # pylint: disable=R0912, R0913, R0914, R0915, R0917, W0212
         if log_uploader:
             stop_log_uploader(log_queue, log_uploader)
 
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
+        if heartbeat:
+            heartbeat.close()
 
         grid.close()
 

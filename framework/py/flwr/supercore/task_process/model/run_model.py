@@ -38,7 +38,11 @@ from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.supercore.app_utils import start_parent_process_monitor
-from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
+from flwr.supercore.heartbeat import (
+    TaskHeartbeat,
+    TaskHeartbeatConfig,
+    create_task_heartbeat_grpc,
+)
 from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
@@ -65,7 +69,7 @@ def run_model(
     )
 
     # Initialize variables for exit handler
-    heartbeat_sender = None
+    heartbeat: TaskHeartbeat | None = None
     sub_status = SubStatus.FAILED
     details = "Model task failed with unknown error."
     exit_code = ExitCode.SUCCESS
@@ -77,8 +81,17 @@ def run_model(
 
     try:
         # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
-        heartbeat_sender.start()
+        heartbeat = create_task_heartbeat_grpc(
+            TaskHeartbeatConfig(
+                appio_service_address=serverappio_api_address,
+                insecure=certificates is None,
+                root_certificates=certificates,
+                token=token,
+                component_name="flwr-model",
+            ),
+            ServerAppIoStub,
+        )
+        heartbeat.start()
 
         # Pull task input from SuperLink
         log(DEBUG, "[flwr-model] Pull task input")
@@ -123,8 +136,8 @@ def run_model(
             log(ERROR, "Failed to push task output: %s", str(err))
 
         # Stop heartbeat sender
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
+        if heartbeat:
+            heartbeat.close()
 
         # Close the Grpc connection
         channel.close()

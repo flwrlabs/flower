@@ -51,7 +51,11 @@ from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.fab import Fab
-from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
+from flwr.supercore.heartbeat import (
+    TaskHeartbeat,
+    TaskHeartbeatConfig,
+    create_task_heartbeat_grpc,
+)
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
@@ -107,7 +111,7 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
     wrap_stub(stub, retry_invoker)
 
     # Initialize variables for exit handler
-    heartbeat_sender = None
+    heartbeat: TaskHeartbeat | None = None
     message = None
     reply_message = None
     context: Context | None = None
@@ -123,8 +127,17 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
 
     try:
         # Start task heartbeat
-        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(stub))
-        heartbeat_sender.start()
+        heartbeat = create_task_heartbeat_grpc(
+            TaskHeartbeatConfig(
+                appio_service_address=clientappio_api_address,
+                insecure=insecure,
+                root_certificates=certificates,
+                token=token,
+                component_name="flwr-clientapp",
+            ),
+            ClientAppIoStub,
+        )
+        heartbeat.start()
 
         # Pull Message, Context, Run and FAB from SuperNode
         message, context, run, fab = pull_task_input(stub)
@@ -214,8 +227,8 @@ def run_clientapp(  # pylint: disable=R0913, R0914, R0915, R0917
         )
 
         # Stop heartbeat sender
-        if heartbeat_sender is not None and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
+        if heartbeat:
+            heartbeat.close()
         channel.close()
 
         cleanup_app_runtime_environment(runtime_env_dir)

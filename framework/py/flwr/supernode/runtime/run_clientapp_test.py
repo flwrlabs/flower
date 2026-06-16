@@ -55,7 +55,9 @@ class TestRunClientApp(unittest.TestCase):
         """`run_clientapp` should not report success after AppIO gRPC failures."""
         with (
             patch("flwr.supernode.runtime.run_clientapp.create_channel") as channel,
-            patch("flwr.supernode.runtime.run_clientapp.HeartbeatSender"),
+            patch(
+                "flwr.supernode.runtime.run_clientapp.create_task_heartbeat_grpc"
+            ) as create_heartbeat,
             patch(
                 "flwr.supernode.runtime.run_clientapp.pull_task_input",
                 side_effect=grpc.RpcError,
@@ -67,6 +69,8 @@ class TestRunClientApp(unittest.TestCase):
                 run_clientapp("127.0.0.1:9094", insecure=True, token="test-token")
 
         channel.return_value.subscribe.assert_called_once()
+        create_heartbeat.return_value.start.assert_called_once()
+        create_heartbeat.return_value.close.assert_called_once()
         flwr_exit.assert_called_once()
         self.assertEqual(
             flwr_exit.call_args.kwargs["code"],
