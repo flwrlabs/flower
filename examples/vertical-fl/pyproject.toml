@@ -13,7 +13,7 @@ dependencies = [
     "pandas==2.3.3",
     "numpy>=1.26.0",
     "scikit-learn>=1.6.1",
-    "torch>=2.8.0",
+    "torch>=2.10.0",
 ]
 
 [tool.hatch.build.targets.wheel]
