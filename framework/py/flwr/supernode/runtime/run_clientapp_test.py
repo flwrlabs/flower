@@ -16,17 +16,20 @@
 
 
 import unittest
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import grpc
 
+from flwr.app import Message, Metadata, RecordDict
+from flwr.app.message import make_message
 from flwr.common.exit import ExitCode
 from flwr.supercore.interceptors import (
     AppIoTokenClientInterceptor,
     RuntimeVersionClientInterceptor,
 )
 
-from .run_clientapp import run_clientapp
+from .run_clientapp import pull_task_input, run_clientapp
 
 
 class TestRunClientApp(unittest.TestCase):
@@ -71,4 +74,63 @@ class TestRunClientApp(unittest.TestCase):
         self.assertEqual(
             flwr_exit.call_args.kwargs["code"],
             ExitCode.CLIENTAPP_COMMUNICATION_ERROR,
+        )
+
+    def test_pull_task_input_preserves_transport_message_id(self) -> None:
+        """`pull_task_input` should preserve the SuperNode-tracked message ID."""
+        stub = Mock()
+        context = SimpleNamespace(run_id=1, node_id=2)
+        run = object()
+        fab = object()
+        stub.PullTaskInput.return_value = SimpleNamespace(
+            context=object(),
+            run=object(),
+            fab=object(),
+        )
+        stub.PullMessage.return_value = SimpleNamespace(
+            messages_list=[
+                SimpleNamespace(
+                    metadata=SimpleNamespace(message_id="instruction-message-id")
+                )
+            ],
+            message_object_trees=[SimpleNamespace(object_id="object-tree-id")],
+        )
+        inflated_message = make_message(
+            Metadata(
+                run_id=1,
+                message_id="object-tree-id",
+                src_node_id=0,
+                dst_node_id=2,
+                reply_to_message_id="",
+                group_id="",
+                created_at=0.0,
+                ttl=1.0,
+                message_type="train",
+            ),
+            RecordDict(),
+        )
+
+        with (
+            patch(
+                "flwr.supernode.runtime.run_clientapp.context_from_proto",
+                return_value=context,
+            ),
+            patch(
+                "flwr.supernode.runtime.run_clientapp.run_from_proto", return_value=run
+            ),
+            patch(
+                "flwr.supernode.runtime.run_clientapp.fab_from_proto", return_value=fab
+            ),
+            patch(
+                "flwr.supernode.runtime.run_clientapp.pull_and_inflate_object_from_tree",
+                return_value=inflated_message,
+            ),
+        ):
+            message, _, _, _ = pull_task_input(stub)
+
+        reply = Message(content=RecordDict(), reply_to=message)
+        self.assertEqual(message.metadata.message_id, "instruction-message-id")
+        self.assertEqual(
+            reply.metadata.reply_to_message_id,
+            "instruction-message-id",
         )
