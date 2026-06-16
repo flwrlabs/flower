@@ -21,7 +21,6 @@ from typing import Any
 
 import grpc
 
-from flwr.common.typing import AccountInfo
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetAuthTokensRequest,
     GetAuthTokensResponse,
@@ -32,6 +31,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StreamLogsRequest,
     StreamLogsResponse,
 )
+from flwr.supercore.auth.typing import AccountInfo
 from flwr.superlink.auth_plugin import ControlAuthnPlugin, ControlAuthzPlugin
 
 Request = (

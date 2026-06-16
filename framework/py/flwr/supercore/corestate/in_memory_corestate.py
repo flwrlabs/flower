@@ -26,7 +26,6 @@ from threading import Lock
 from typing import Literal, cast
 
 from flwr.app import Context, Message
-from flwr.common import now
 from flwr.common.constant import (
     FLWR_TASK_TOKEN_LENGTH,
     HEARTBEAT_DEFAULT_INTERVAL,
@@ -37,9 +36,10 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.logger import log
-from flwr.common.typing import Fab
 from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskEvent, TaskStatus  # pylint: disable=E0611
+from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
 
 from ..object_store import ObjectStore
 from .corestate import CoreState

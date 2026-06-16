@@ -20,7 +20,12 @@ from typing import Any
 
 from flwr.supercore.version import package_version as _package_version
 
-from . import agentapp, app, clientapp, serverapp
+from . import agentapp, app
+from . import client as client
+from . import clientapp
+from . import common as common
+from . import server as server
+from . import serverapp
 
 __all__ = [
     "agentapp",
@@ -33,9 +38,6 @@ __version__ = _package_version
 
 
 _LAZY_EXPORTS: dict[str, tuple[str, str | None]] = {
-    "client": ("flwr.client", None),
-    "common": ("flwr.common", None),
-    "server": ("flwr.server", None),
     "simulation": ("flwr.simulation", None),
 }
 
