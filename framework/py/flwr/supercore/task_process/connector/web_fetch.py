@@ -50,13 +50,10 @@ class WebFetchProviderError(RuntimeError):
             formatted_detail = detail
         else:
             formatted_detail = json.dumps(detail, separators=(",", ":"))
-        if status_code is None:
-            super().__init__(f"Web fetch provider request failed: {formatted_detail}")
-        else:
-            super().__init__(
-                f"Web fetch provider request failed: {status_code} "
-                f"{formatted_detail}"
-            )
+        if status_code is not None:
+            formatted_detail = f"{status_code} {formatted_detail}"
+
+        super().__init__(f"Web fetch provider request failed: {formatted_detail}")
 
 
 def invoke_web_fetch_provider(url: str) -> JSONObject:
