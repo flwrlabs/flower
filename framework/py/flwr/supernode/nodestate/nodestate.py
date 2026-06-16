@@ -150,10 +150,10 @@ class NodeState(CoreState):
         message_id : str
             The ID of the message associated with the end time.
 
-        Raises
-        ------
-        ValueError
-            If the message ID is not found.
+        Notes
+        -----
+        This method is best-effort. Implementations should log and return if
+        the message processing start time is unavailable.
         """
 
     @abstractmethod
@@ -168,10 +168,6 @@ class NodeState(CoreState):
         Returns
         -------
         float
-            The processing duration in seconds.
-
-        Raises
-        ------
-        ValueError
-            If the message ID is not found, or if start/end times are missing.
+            The processing duration in seconds, or 0.0 if the duration could
+            not be calculated.
         """
