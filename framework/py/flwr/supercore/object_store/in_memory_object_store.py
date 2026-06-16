@@ -170,8 +170,9 @@ class InMemoryObjectStore(ObjectStore):
             if (object_entry := self.store.get(object_id)) is None:
                 return
 
-            # Delete the object if it has no references left
-            if object_entry.ref_count == 0:
+            # Delete the object if it has no references left and is not shared
+            # by multiple runs.
+            if object_entry.ref_count == 0 and len(object_entry.runs) <= 1:
                 del self.store[object_id]
 
                 # Remove the object from the run's mapping
@@ -197,6 +198,8 @@ class InMemoryObjectStore(ObjectStore):
 
                 # Remove the run ID from the object's runs
                 object_entry.runs.discard(run_id)
+                if object_entry.runs:
+                    continue
 
                 # Only message objects are allowed to have a `ref_count` of 0,
                 # and every message object must have a `ref_count` of 0
