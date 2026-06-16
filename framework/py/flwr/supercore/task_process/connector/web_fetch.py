@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import codecs
 import ipaddress
 import socket
 from urllib.parse import urljoin, urlparse
@@ -64,10 +65,12 @@ def invoke_web_fetch_provider(url: str) -> JSONObject:
     try:
         final_url = _validate_url(response.url or url)
         body = _read_response_body(response)
-        text = body.decode(
-            response.encoding or response.apparent_encoding or "utf-8",
-            errors="replace",
-        )
+        encoding = response.encoding or "utf-8"
+        try:
+            codecs.lookup(encoding)
+        except LookupError:
+            encoding = "utf-8"
+        text = body.decode(encoding, errors="replace")
         if response.status_code >= 400:
             raise WebFetchProviderError(
                 code="http_error",
@@ -153,8 +156,14 @@ def _validate_url(url: str) -> str:
             detail="URL must not be empty.",
         )
 
-    parsed = urlparse(url)
-    hostname = parsed.hostname.rstrip(".").lower() if parsed.hostname else None
+    try:
+        parsed = urlparse(url)
+        hostname = parsed.hostname.rstrip(".").lower() if parsed.hostname else None
+    except ValueError as exc:
+        raise WebFetchProviderError(
+            code="invalid_request",
+            detail="URL must use the http or https scheme.",
+        ) from exc
     if parsed.scheme not in {"http", "https"} or hostname is None:
         raise WebFetchProviderError(
             code="invalid_request",
