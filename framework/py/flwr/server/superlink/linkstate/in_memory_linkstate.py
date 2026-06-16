@@ -51,8 +51,6 @@ from flwr.superlink.federation import FederationManager
 from .utils import (
     check_node_availability_for_in_message,
     generate_rand_int_from_bytes,
-    is_same_message_ins,
-    message_to_dict,
     primary_task_type_from_run_type,
     verify_found_message_replies,
     verify_message_ids,
@@ -149,51 +147,39 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
             return None
 
         message_id = message.metadata.message_id
-        stored_message_id: str | None = message_id
         with self.lock:
-            existing = self.message_ins_store.get(message_id)
-            if existing:
-                if not is_same_message_ins(
-                    message_to_dict(existing), message_to_dict(message)
-                ):
-                    log(
-                        ERROR,
-                        "Failed to store Message: conflicting duplicate message_id %s.",
-                        message_id,
-                    )
-                    stored_message_id = None
+            if message_id in self.message_ins_store:
+                return message_id
 
             # Validate run_id
-            elif message.metadata.run_id not in self.run_ids or self._is_finished_run(
+            if message.metadata.run_id not in self.run_ids or self._is_finished_run(
                 message.metadata.run_id
             ):
                 log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
-                stored_message_id = None
-            else:
-                federation = self.run_ids[message.metadata.run_id].run.federation
+                return None
 
-                # Validate destination node ID
-                dst_node = self.nodes.get(message.metadata.dst_node_id)
-                if (
-                    # Node must exist
-                    dst_node is None
-                    # Node must be online or offline
-                    or dst_node.status not in (NodeStatus.ONLINE, NodeStatus.OFFLINE)
-                    # Node must belong to the same federation
-                    or not self.federation_manager.has_node(
-                        dst_node.node_id, federation
-                    )
-                ):
-                    log(
-                        ERROR,
-                        "Invalid destination node ID for Message: %s",
-                        message.metadata.dst_node_id,
-                    )
-                    stored_message_id = None
-                else:
-                    self.message_ins_store[message_id] = message
+            federation = self.run_ids[message.metadata.run_id].run.federation
 
-        return stored_message_id
+            # Validate destination node ID
+            dst_node = self.nodes.get(message.metadata.dst_node_id)
+            if (
+                # Node must exist
+                dst_node is None
+                # Node must be online or offline
+                or dst_node.status not in (NodeStatus.ONLINE, NodeStatus.OFFLINE)
+                # Node must belong to the same federation
+                or not self.federation_manager.has_node(dst_node.node_id, federation)
+            ):
+                log(
+                    ERROR,
+                    "Invalid destination node ID for Message: %s",
+                    message.metadata.dst_node_id,
+                )
+                return None
+
+            self.message_ins_store[message_id] = message
+
+        return message_id
 
     def _check_stored_messages(self, message_ids: set[str]) -> None:
         """Check and delete the message if it's invalid."""

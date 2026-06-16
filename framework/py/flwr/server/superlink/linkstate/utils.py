@@ -354,40 +354,6 @@ def message_to_dict(message: Message) -> dict[str, Any]:
     return result
 
 
-MESSAGE_INS_IDENTITY_FIELDS = (
-    "message_id",
-    "group_id",
-    "run_id",
-    "src_node_id",
-    "dst_node_id",
-    "reply_to_message_id",
-    "created_at",
-    "ttl",
-    "message_type",
-    "content",
-    "error",
-)
-
-
-def is_same_message_ins(existing: dict[str, Any], incoming: dict[str, Any]) -> bool:
-    """Return True if two instruction-message rows describe the same message.
-
-    ``delivered_at`` is intentionally excluded because delivery is mutable state.
-    A retried PushMessages request can race with SuperNode delivery and still be
-    idempotent.
-    """
-    for field in MESSAGE_INS_IDENTITY_FIELDS:
-        existing_value = existing.get(field)
-        incoming_value = incoming.get(field)
-        if isinstance(existing_value, memoryview):
-            existing_value = existing_value.tobytes()
-        if isinstance(incoming_value, memoryview):
-            incoming_value = incoming_value.tobytes()
-        if existing_value != incoming_value:
-            return False
-    return True
-
-
 def dict_to_message(message_dict: dict[str, Any]) -> Message:
     """Transform dict to Message."""
     content, error = None, None
