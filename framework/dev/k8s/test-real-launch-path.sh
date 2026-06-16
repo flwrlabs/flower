@@ -16,7 +16,7 @@
 # ==============================================================================
 #
 # User-facing documentation:
-#   framework/dev/kubernetes-executor-k3d-real-launch-path.md
+#   framework/dev/k8s/README.md
 
 set -euo pipefail
 
@@ -26,10 +26,10 @@ image_tag="${IMAGE_TAG:-dev}"
 base_image="${BASE_IMAGE:-flwr/base:${image_tag}}"
 superlink_image="${SUPERLINK_IMAGE:-flwr/superlink:${image_tag}}"
 superexec_image="${SUPEREXEC_IMAGE:-flwr/superexec:${image_tag}}"
-cluster_name="${CLUSTER_NAME:-flower-f7}"
-namespace="${NAMESPACE:-flower-f7}"
+cluster_name="${CLUSTER_NAME:-flower-local-k8s}"
+namespace="${NAMESPACE:-flower-local-k8s}"
 timeout_seconds="${TIMEOUT_SECONDS:-600}"
-output_dir="${OUTPUT_DIR:-${TMPDIR:-/tmp}/flower-f7c-k3d-$(date +%Y%m%d-%H%M%S)}"
+output_dir="${OUTPUT_DIR:-${TMPDIR:-/tmp}/flower-local-k8s-$(date +%Y%m%d-%H%M%S)}"
 platform="${PLATFORM:-}"
 python_image="${PYTHON_IMAGE:-}"
 kubernetes_package="${KUBERNETES_PACKAGE:-}"
@@ -38,14 +38,14 @@ cleanup=true
 
 usage() {
   cat <<EOF
-Build local runtime images, configure k3d, run the F7c real launch-path
+Build local runtime images, configure k3d, run the local k8s launch-path
 harness, and verify the resulting evidence.
 
 Documentation:
-  framework/dev/kubernetes-executor-k3d-real-launch-path.md
+  framework/dev/k8s/README.md
 
 Usage:
-  framework/dev/test-kubernetes-executor-k3d-real-launch-path.sh [options]
+  framework/dev/k8s/test-real-launch-path.sh [options]
 
 Options:
   --output-dir DIR          Evidence output directory
@@ -169,7 +169,7 @@ for command in docker k3d kubectl uv python; do
   fi
 done
 
-echo "=== F7c Kubernetes executor real k3d test ==="
+echo "=== local k8s launch-path test ==="
 echo "Cluster: ${cluster_name}"
 echo "Namespace: ${namespace}"
 echo "Evidence: ${output_dir}"
@@ -201,7 +201,7 @@ else
 fi
 
 harness_args=(
-  --mode real-launch-path
+  --mode local-k8s-launch-path
   --output-dir "${output_dir}"
   --execute
   --create-cluster
@@ -222,24 +222,24 @@ else
   verify_args+=(--no-require-cleanup)
 fi
 
-echo "=== Running F7c harness ==="
+echo "=== Running local k8s launch-path harness ==="
 set +e
-python "${script_dir}/kubernetes_executor_harness.py" "${harness_args[@]}"
+python "${script_dir}/harness.py" "${harness_args[@]}"
 harness_status="$?"
 set -e
 echo
 
-echo "=== Verifying F7c evidence ==="
+echo "=== Verifying local k8s launch-path evidence ==="
 set +e
-python "${script_dir}/verify-kubernetes-executor-harness.py" "${verify_args[@]}"
+python "${script_dir}/verify_evidence.py" "${verify_args[@]}"
 verify_status="$?"
 set -e
 
 if [[ "${harness_status}" -ne 0 || "${verify_status}" -ne 0 ]]; then
   echo
-  echo "F7c k3d test failed. Evidence is available at ${output_dir}" >&2
+  echo "local k8s launch-path test failed. Evidence is available at ${output_dir}" >&2
   exit 1
 fi
 
 echo
-echo "F7c k3d test passed. Evidence is available at ${output_dir}"
+echo "local k8s launch-path test passed. Evidence is available at ${output_dir}"

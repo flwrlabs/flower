@@ -18,7 +18,7 @@
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-framework_dir="$(cd "${script_dir}/.." >/dev/null 2>&1 && pwd)"
+framework_dir="$(cd "${script_dir}/../.." >/dev/null 2>&1 && pwd)"
 
 image_tag="${IMAGE_TAG:-dev}"
 base_image="${BASE_IMAGE:-flwr/base:${image_tag}}"
@@ -44,7 +44,7 @@ A separate TaskExecutor image is intentionally out of scope. Use the built
 SuperExec image as the TaskExecutor runtime image for the local k3d harness.
 
 Usage:
-  framework/dev/build-local-runtime-images.sh [options]
+  framework/dev/k8s/build-local-runtime-images.sh [options]
 
 Options:
   --tag TAG                 Tag used for default image names (default: ${image_tag})

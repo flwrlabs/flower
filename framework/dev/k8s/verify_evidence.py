@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Verify and present F7c Kubernetes executor harness evidence."""
+"""Verify and present local k8s launch-path harness evidence."""
 
 from __future__ import annotations
 
@@ -23,13 +23,13 @@ import json
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-_SERVERAPP_MARKER = "F7 probe ServerApp ran"
+_SERVERAPP_MARKER = "K8s launch probe ServerApp ran"
 
 
 def verify_evidence(
     evidence_dir: str | Path, *, require_cleanup: bool = True
 ) -> tuple[list[str], str]:
-    """Verify an F7c evidence bundle and return failures plus a report."""
+    """Verify a local k8s launch-path evidence bundle."""
     evidence_path = Path(evidence_dir)
     summary_path = evidence_path / "summary.json"
     taskexecutor_logs_path = evidence_path / "diagnostics" / "taskexecutor-logs.txt"
@@ -37,7 +37,7 @@ def verify_evidence(
     failures: list[str] = []
     if not summary_path.is_file():
         return [f"summary.json not found under {evidence_path}"], (
-            f"F7c k3d verification failed\nEvidence: {evidence_path}\n"
+            f"local k8s launch-path verification failed\nEvidence: {evidence_path}\n"
         )
 
     summary = _read_json(summary_path, failures)
@@ -45,8 +45,8 @@ def verify_evidence(
 
     _expect(summary.get("status") == "passed", "summary status is not passed", failures)
     _expect(
-        summary.get("result") == "real-launch-path",
-        "summary result is not real-launch-path",
+        summary.get("result") == "local-k8s-launch-path",
+        "summary result is not local-k8s-launch-path",
         failures,
     )
     _expect(not summary.get("failures"), "summary contains failures", failures)
@@ -153,7 +153,7 @@ def _format_report(
         else "not requested"
     )
     lines = [
-        "=== F7c k3d verification ===",
+        "=== local k8s launch-path verification ===",
         f"Evidence: {evidence_path}",
         f"Status: {summary.get('status')}",
         f"Result: {summary.get('result')}",
@@ -194,7 +194,7 @@ def _sequence(value: object) -> Sequence[object]:
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Verify and summarize F7c Kubernetes executor harness evidence."
+        description="Verify and summarize local k8s launch-path harness evidence."
     )
     parser.add_argument(
         "evidence_dir",
