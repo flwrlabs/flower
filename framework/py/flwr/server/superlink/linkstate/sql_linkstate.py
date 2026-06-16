@@ -38,7 +38,6 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
@@ -48,6 +47,7 @@ from flwr.supercore.corestate.sql_corestate import SqlCoreState, determine_task_
 from flwr.supercore.corestate.utils import timestamp_to_iso
 from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
+from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.state.schema.corestate_tables import create_corestate_metadata
 from flwr.supercore.state.schema.linkstate_tables import create_linkstate_metadata
 from flwr.supercore.utils import (

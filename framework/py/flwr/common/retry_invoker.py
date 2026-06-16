@@ -31,11 +31,11 @@ import grpc
 from flwr.client.grpc_rere_client.grpc_adapter import GrpcAdapter
 from flwr.common.constant import MAX_RETRY_DELAY
 from flwr.common.logger import log
-from flwr.common.typing import RunNotRunningException
 from flwr.proto.clientappio_pb2_grpc import ClientAppIoStub
 from flwr.proto.fleet_pb2_grpc import FleetStub
 from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.supercore.constant import FORCE_EXIT_TIMEOUT_SECONDS
+from flwr.supercore.run import RunNotRunningException
 
 
 def exponential(

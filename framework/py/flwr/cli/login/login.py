@@ -23,12 +23,12 @@ import typer
 from flwr.cli.auth_plugin import LoginError, NoOpCliAuthPlugin
 from flwr.cli.constant import FEDERATION_CONFIG_HELP_MESSAGE
 from flwr.cli.utils import init_channel_from_connection
-from flwr.common.typing import AccountAuthLoginDetails
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetLoginDetailsRequest,
     GetLoginDetailsResponse,
 )
 from flwr.proto.control_pb2_grpc import ControlStub
+from flwr.supercore.auth.typing import AccountAuthLoginDetails
 
 from ..config_migration import migrate, warn_if_federation_config_overrides
 from ..flower_config import read_superlink_connection

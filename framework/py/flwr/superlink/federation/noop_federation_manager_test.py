@@ -21,7 +21,6 @@ import pytest
 from parameterized import parameterized
 
 from flwr.common.constant import NOOP_ACCOUNT_NAME, NOOP_FLWR_AID
-from flwr.common.typing import Federation, Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.federation_pb2 import Account, Member  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
@@ -32,7 +31,9 @@ from flwr.supercore.constant import (
     ActionType,
 )
 from flwr.supercore.error import ApiErrorCode, FlowerError
+from flwr.supercore.run import Run, RunStatus
 from flwr.supercore.typing import ActionContext
+from flwr.superlink.federation.typing import Federation
 
 from .noop_federation_manager import NoOpFederationManager
 

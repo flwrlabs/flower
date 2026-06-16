@@ -30,7 +30,6 @@ from flwr.common.dummy_grpc_handlers_test import (
     get_noop_unary_stream_handler,
     get_noop_unary_unary_handler,
 )
-from flwr.common.typing import AccountInfo
 from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     GetAuthTokensRequest,
     GetLoginDetailsRequest,
@@ -39,6 +38,7 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
     StopRunRequest,
     StreamLogsRequest,
 )
+from flwr.supercore.auth.typing import AccountInfo
 
 from .control_account_auth_interceptor import (
     ControlAccountAuthInterceptor,
