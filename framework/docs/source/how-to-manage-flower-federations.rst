@@ -32,6 +32,12 @@ In this how-to guide, you will:
 - Learn how to see the federations you are part of.
 - Learn how to display information about a specific federation.
 
+.. note::
+
+    This guide covers inspecting federations through the Flower CLI when using a
+    self-hosted SuperLink. To create and manage federations in the SuperGrid dashboard,
+    see :doc:`how-to-create-and-manage-federations`.
+
 ******************
  List Federations
 ******************

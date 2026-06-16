@@ -554,7 +554,7 @@ FastAI, Huggingface, etc.) should you need reference code.
 
 For a complete PyTorch example that goes into depth on various Flower components, see
 the `Get started with Flower
-<https://flower.ai/docs/framework/tutorial-series-get-started-with-flower-pytorch.html>`_
+<https://flower.ai/docs/framework/tutorial-series-write-your-first-flower-app-pytorch.html>`_
 tutorial. While we expect this guide will help most users get migrated quickly to the
 Flower ecosystem, certain complex OpenFL workloads may require more clarification or
 help. If you have further questions, `join the Flower Slack

@@ -17,7 +17,7 @@
 
 import numpy as np
 
-from flwr.common import ArrayRecord
+from flwr.app import ArrayRecord
 
 from .fedtrimmedavg import FedTrimmedAvg
 from .strategy_utils_test import create_mock_reply

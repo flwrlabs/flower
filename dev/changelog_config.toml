@@ -13,6 +13,7 @@ project = [
     "glossary",
     "intelligence",
     "hub",
+    "model",
 ]
 
 scope = "skip"

@@ -56,6 +56,7 @@ SERVERAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ServerAppIo/GetNodes": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/CreateTask": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PushTaskMessage": MethodTokenPolicy.token_required(),
+    "/flwr.proto.ServerAppIo/PushTaskEvents": MethodTokenPolicy.token_required(),
     "/flwr.proto.ServerAppIo/PullTaskMessage": MethodTokenPolicy.token_required(),
 }
 
@@ -75,5 +76,6 @@ CLIENTAPPIO_METHOD_AUTH_POLICY: dict[str, MethodTokenPolicy] = {
     "/flwr.proto.ClientAppIo/PullMessage": MethodTokenPolicy.token_required(),
     "/flwr.proto.ClientAppIo/CreateTask": MethodTokenPolicy.token_required(),
     "/flwr.proto.ClientAppIo/PushTaskMessage": MethodTokenPolicy.token_required(),
+    "/flwr.proto.ClientAppIo/PushTaskEvents": MethodTokenPolicy.token_required(),
     "/flwr.proto.ClientAppIo/PullTaskMessage": MethodTokenPolicy.token_required(),
 }

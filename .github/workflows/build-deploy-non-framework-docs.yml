@@ -1,4 +1,4 @@
-name: Build and deploy baselines, examples, datasets, and hub docs
+name: Build and deploy baselines, examples, datasets, hub, and model docs
 
 on:
   push:
@@ -58,6 +58,11 @@ jobs:
         run: |
           cd framework
           uv run --no-sync ../dev/build-hub-docs.sh
+      - name: Build model docs
+        run: |
+          # Reuse the framework docs environment for the shared Sphinx toolchain.
+          cd framework
+          uv run --no-sync ../dev/build-model-docs.sh
       - name: Deploy docs
         if: ${{ github.ref == 'refs/heads/main' && github.repository == 'flwrlabs/flower' && !github.event.pull_request.head.repo.fork }}
         env:
@@ -69,3 +74,4 @@ jobs:
           aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./examples/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/examples
           aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./datasets/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/datasets
           aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./hub/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/hub
+          aws s3 sync --delete --exclude ".*" --exclude "v/*" --cache-control "no-cache" ./model/docs/build/html/ s3://${{ secrets.DOCS_AWS_BUCKET_NAME }}/docs/model

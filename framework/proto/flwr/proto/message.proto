@@ -34,6 +34,7 @@ message Context {
   map<string, Scalar> node_config = 3;
   RecordDict state = 4;
   map<string, Scalar> run_config = 5;
+  uint64 series_id = 6;
 }
 
 message Metadata {

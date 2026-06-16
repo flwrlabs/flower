@@ -100,8 +100,10 @@ class Context(google.protobuf.message.Message):
     NODE_CONFIG_FIELD_NUMBER: builtins.int
     STATE_FIELD_NUMBER: builtins.int
     RUN_CONFIG_FIELD_NUMBER: builtins.int
+    SERIES_ID_FIELD_NUMBER: builtins.int
     run_id: builtins.int
     node_id: builtins.int
+    series_id: builtins.int
     @property
     def node_config(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, flwr.proto.transport_pb2.Scalar]: ...
     @property
@@ -116,9 +118,10 @@ class Context(google.protobuf.message.Message):
         node_config: collections.abc.Mapping[builtins.str, flwr.proto.transport_pb2.Scalar] | None = ...,
         state: flwr.proto.recorddict_pb2.RecordDict | None = ...,
         run_config: collections.abc.Mapping[builtins.str, flwr.proto.transport_pb2.Scalar] | None = ...,
+        series_id: builtins.int = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["state", b"state"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["node_config", b"node_config", "node_id", b"node_id", "run_config", b"run_config", "run_id", b"run_id", "state", b"state"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["node_config", b"node_config", "node_id", b"node_id", "run_config", b"run_config", "run_id", b"run_id", "series_id", b"series_id", "state", b"state"]) -> None: ...
 
 global___Context = Context
 

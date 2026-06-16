@@ -22,13 +22,15 @@ from unittest.mock import patch
 
 from parameterized import parameterized
 
-from flwr.common import ConfigRecord, Context, Message, Metadata, RecordDict, now
+from flwr.app import ConfigRecord, Message, Metadata, RecordDict
+from flwr.app.message import make_message
 from flwr.common.constant import ErrorCode
-from flwr.common.message import make_message
-from flwr.common.typing import Fab, Run
 from flwr.supercore.constant import TaskType
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
+from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.run import Run
 
 from . import InMemoryNodeState, NodeState
 
@@ -110,24 +112,6 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         with self.assertRaisesRegex(ValueError, "FAB hash mismatch"):
             self.state.store_fab(Fab("not-the-content-hash", b"fab-content", {}))
 
-    def test_store_and_get_context(self) -> None:
-        """Test storing and retrieving a context."""
-        # Prepare
-        ctx = Context(
-            run_id=99,
-            node_id=1,
-            node_config={"key1": "value1"},
-            state=RecordDict({"cfg": ConfigRecord({"key2": "value2"})}),
-            run_config={"key3": "value3"},
-        )
-        self.state.store_context(ctx)
-
-        # Execute
-        retrieved = self.state.get_context(99)
-
-        # Assert
-        self.assertEqual(retrieved, ctx)
-
     def test_store_and_get_message_basic(self) -> None:
         """Test storing and retrieving a message."""
         # Prepare
@@ -197,12 +181,13 @@ class StateTest(CoreStateTest):  # pylint: disable=R0904
         self.assertNotIn("msg1", msg_ids)
         self.assertIn("msg2", msg_ids)
 
-    def test_get_error_reply_when_task_claim_expires(self) -> None:
-        """Test that error replies are created when task claims expire."""
-        # Prepare: Create a claimed task for a run
+    def test_get_error_reply_when_running_task_claim_expires(self) -> None:
+        """Test that error replies are created when running task claims expire."""
+        # Prepare: Create a running task for a run
         run_id = 110
         created_at = now()
-        self._claim_client_task(run_id)
+        task_id = self._claim_client_task(run_id)
+        assert self.state.activate_task(task_id)
 
         # Prepare: store and retrieve a message for the run
         msg = make_dummy_message(run_id=run_id)

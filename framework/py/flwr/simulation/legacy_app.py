@@ -50,33 +50,6 @@ from flwr.simulation.ray_transport.ray_actor import (
 )
 from flwr.simulation.ray_transport.ray_client_proxy import RayActorClientProxy
 
-INVALID_ARGUMENTS_START_SIMULATION = """
-INVALID ARGUMENTS ERROR
-
-Invalid Arguments in method:
-
-`start_simulation(
-    *,
-    client_fn: ClientFn,
-    num_clients: int,
-    clients_ids: Optional[List[str]] = None,
-    client_resources: Optional[Dict[str, float]] = None,
-    server: Optional[Server] = None,
-    config: ServerConfig = None,
-    strategy: Optional[Strategy] = None,
-    client_manager: Optional[ClientManager] = None,
-    ray_init_args: Optional[Dict[str, Any]] = None,
-) -> None:`
-
-REASON:
-    Method requires:
-        - Either `num_clients`[int] or `clients_ids`[List[str]]
-        to be set exclusively.
-        OR
-        - `len(clients_ids)` == `num_clients`
-
-"""
-
 NodeToPartitionMapping = dict[int, int]
 
 
@@ -182,9 +155,10 @@ def start_simulation(
 
     actor_scheduling: Optional[Union[str, NodeAffinitySchedulingStrategy]]
         (default: "DEFAULT")
-        Optional string ("DEFAULT" or "SPREAD") for the VCE to choose in which
-        node the actor is placed. If you are an advanced user needed more control
-        you can use lower-level scheduling strategies to pin actors to specific
+        Optional string ("DEFAULT" or "SPREAD") for the Simulation Runtime to
+        choose in which node the actor is placed. If you are an advanced user
+        needing more control, you can use lower-level scheduling strategies to pin
+        actors to specific
         compute nodes (e.g. via NodeAffinitySchedulingStrategy). Please note this
         is an advanced feature. For all details, please refer to the Ray documentation:
         https://docs.ray.io/en/latest/ray-core/scheduling/index.html
@@ -260,7 +234,7 @@ def start_simulation(
 
     # Initialize Ray
     ray.init(**ray_init_args)
-    cluster_resources = ray.cluster_resources()
+    cluster_resources = ray.cluster_resources()  # type: ignore[no-untyped-call]
     log(
         INFO,
         "Flower VCE: Ray initialized with resources: %s",

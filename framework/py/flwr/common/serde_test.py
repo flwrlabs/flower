@@ -22,9 +22,10 @@ from typing import Any, TypeVar, cast
 
 import pytest
 
+from flwr import common
+from flwr.app.message import make_message
 from flwr.app.user_config import UserConfig
 from flwr.common.constant import SUPERLINK_NODE_ID
-from flwr.common.message import make_message
 
 # pylint: disable=E0611
 from flwr.proto import transport_pb2 as pb2
@@ -39,20 +40,14 @@ from flwr.proto.recorddict_pb2 import RecordDict as ProtoRecordDict
 from flwr.proto.run_pb2 import Run as ProtoRun
 from flwr.supercore.constant import RunType
 from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
+from flwr.supercore.run import Run, RunStatus
 
 from ..app.error import Error
 from ..app.metadata import Metadata
 
 # pylint: enable=E0611
-from . import (
-    Array,
-    ArrayRecord,
-    ConfigRecord,
-    Context,
-    MetricRecord,
-    RecordDict,
-    typing,
-)
+from . import Array, ArrayRecord, ConfigRecord, Context, MetricRecord, RecordDict
 from .serde import (
     array_from_proto,
     array_record_from_proto,
@@ -100,8 +95,8 @@ def test_status_to_proto() -> None:
     code_msg = pb2.Code.OK  # pylint: disable=E1101
     status_msg = pb2.Status(code=code_msg, message="Success")  # pylint: disable=E1101
 
-    code = typing.Code.OK
-    status = typing.Status(code=code, message="Success")
+    code = common.Code.OK
+    status = common.Status(code=code, message="Success")
 
     # Execute
     actual_status_msg = status_to_proto(status=status)
@@ -116,8 +111,8 @@ def test_status_from_proto() -> None:
     code_msg = pb2.Code.OK  # pylint: disable=E1101
     status_msg = pb2.Status(code=code_msg, message="Success")  # pylint: disable=E1101
 
-    code = typing.Code.OK
-    status = typing.Status(code=code, message="Success")
+    code = common.Code.OK
+    status = common.Status(code=code, message="Success")
 
     # Execute
     actual_status = status_from_proto(msg=status_msg)
@@ -134,7 +129,7 @@ def test_fab_to_proto() -> None:
         verifications={"fab_test_meta": "fab_test_meta"},
     )
 
-    py_fab = typing.Fab(
+    py_fab = Fab(
         hash_str="fab_test_hash",
         content=b"fab_test_content",
         verifications={"fab_test_meta": "fab_test_meta"},
@@ -154,7 +149,7 @@ def test_fab_from_proto() -> None:
         verifications={"meta_key": "meta_value"},
     )
 
-    py_fab = typing.Fab(
+    py_fab = Fab(
         hash_str="fab_test_hash",
         content=b"fab_test_content",
         verifications={"meta_key": "meta_value"},
@@ -458,6 +453,7 @@ def test_context_serialization_deserialization() -> None:
         node_config=maker.user_config(),
         state=maker.recorddict(1, 1, 1),
         run_config=maker.user_config(),
+        series_id=123,
     )
 
     # Execute
@@ -473,7 +469,7 @@ def test_run_serialization_deserialization() -> None:
     """Test serialization and deserialization of Run."""
     # Prepare
     maker = RecordMaker()
-    original = typing.Run(
+    original = Run(
         run_id=1,
         fab_id="lorem",
         fab_version="ipsum",
@@ -483,7 +479,7 @@ def test_run_serialization_deserialization() -> None:
         starting_at="2021-01-02T23:02:11Z",
         running_at="2021-01-03T12:00:50Z",
         finished_at="",
-        status=typing.RunStatus(status="running", sub_status="", details="OK"),
+        status=RunStatus(status="running", sub_status="", details="OK"),
         flwr_aid="user123",
         federation="mock-fed",
         primary_task_id=42,
@@ -491,6 +487,7 @@ def test_run_serialization_deserialization() -> None:
         bytes_recv=1024,
         clientapp_runtime=3.14,
         run_type=RunType.SIMULATION,
+        series_id=123,
     )
 
     # Execute

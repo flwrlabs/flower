@@ -22,7 +22,7 @@ from unittest.mock import Mock
 import numpy as np
 from parameterized import parameterized
 
-from flwr.common import ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
+from flwr.app import ArrayRecord, ConfigRecord, Message, MetricRecord, RecordDict
 from flwr.proto.message_pb2 import (  # pylint: disable=E0611
     PullObjectRequest,
     PullObjectResponse,

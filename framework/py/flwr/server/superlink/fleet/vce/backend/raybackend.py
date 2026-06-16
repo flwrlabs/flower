@@ -12,22 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Ray backend for the Fleet API using the Simulation Engine."""
+"""Ray backend for the Fleet API using the Simulation Runtime."""
 
 
 import os
 import sys
 from collections.abc import Callable
 from logging import DEBUG, ERROR
+from typing import Any
 
 import ray
 
+from flwr.app.message import Context, Message
 from flwr.clientapp.client_app import ClientApp
 from flwr.common.constant import PARTITION_ID_KEY
-from flwr.common.context import Context
 from flwr.common.logger import log
-from flwr.common.message import Message
-from flwr.common.typing import ConfigRecordValues
 from flwr.simulation.ray_transport.ray_actor import BasicActorPool, ClientAppActor
 from flwr.simulation.ray_transport.utils import enable_tf_gpu_growth
 
@@ -103,10 +102,7 @@ class RayBackend(Backend):
     def init_ray(self, backend_config: BackendConfig) -> None:
         """Intialises Ray if not already initialised."""
         if not ray.is_initialized():
-            ray_init_args: dict[
-                str,
-                ConfigRecordValues,
-            ] = {}
+            ray_init_args: dict[str, Any] = {}
 
             if backend_config.get(self.init_args_key):
                 for k, v in backend_config[self.init_args_key].items():

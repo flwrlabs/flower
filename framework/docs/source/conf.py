@@ -22,10 +22,10 @@ sys.path.insert(0, os.path.dirname(__file__))
 from conf_base import *  # noqa: F403
 
 # The full version of the next release, including alpha/beta/rc tags
-release = "1.31.0"
+release = "1.32.0"
 # The current released version
 rst_prolog = """
-.. |stable_flwr_version| replace:: 1.31.0
+.. |stable_flwr_version| replace:: 1.32.0
 .. The SuperLink Docker image digest is version-independent and does not necessarily track |stable_flwr_version|.
 .. |stable_flwr_superlink_docker_digest| replace:: 4b317d5b6030710b476f4dbfab2c3a33021ad40a0fcfa54d7edd45e0c51d889c
 .. |ubuntu_version| replace:: 24.04
@@ -41,6 +41,7 @@ redirects = {
     **redirects,  # Keep existing redirects from conf_base.py
     # Renamed pages
     "how-to-authenticate-users": "how-to-authenticate-accounts.html",
+    "tutorial-get-started-with-flower-pytorch.html": "tutorial-series-write-your-first-flower-app-pytorch.html",
     # Restructuring: contributor references
     "secagg": "explanation-ref-secure-aggregation-protocols.html",
 }

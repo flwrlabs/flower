@@ -19,18 +19,19 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from threading import Lock, RLock
 
-from flwr.common import Context, Error, Message, now
+from flwr.app import Error, Message
 from flwr.common.constant import ErrorCode
-from flwr.common.typing import Run
 from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.supercore.constant import MESSAGE_TIME_ENTRY_MAX_AGE_SECONDS, TaskType
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
+from flwr.supercore.date import now
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
     no_object_id_recompute,
 )
 from flwr.supercore.object_store import ObjectStore
+from flwr.supercore.run import Run
 
 from .nodestate import NodeState
 
@@ -70,9 +71,6 @@ class InMemoryNodeState(
         # Store run ID to Run mapping
         self.run_store: dict[int, Run] = {}
         self.lock_run_store = Lock()
-        # Store run ID to Context mapping
-        self.ctx_store: dict[int, Context] = {}
-        self.lock_ctx_store = Lock()
         # Store msg ID to TimeEntry mapping
         self.time_store: dict[str, TimeEntry] = {}
         self.lock_time_store = Lock()
@@ -169,16 +167,6 @@ class InMemoryNodeState(
         """Retrieve a run by its ID."""
         with self.lock_run_store:
             return self.run_store.get(run_id)
-
-    def store_context(self, context: Context) -> None:
-        """Store a context."""
-        with self.lock_ctx_store:
-            self.ctx_store[context.run_id] = context
-
-    def get_context(self, run_id: int) -> Context | None:
-        """Retrieve a context by its run ID."""
-        with self.lock_ctx_store:
-            return self.ctx_store.get(run_id)
 
     def _store_error_replies(self, run_ids: set[int]) -> None:
         """Insert error replies for retrieved messages associated with run IDs."""

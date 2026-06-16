@@ -117,6 +117,12 @@ class ClientAppIoStub:
     ]
     """Push task message"""
 
+    PushTaskEvents: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushTaskEventsRequest,
+        flwr.proto.appio_pb2.PushTaskEventsResponse,
+    ]
+    """Push task events"""
+
     PullTaskMessage: grpc.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullTaskMessageRequest,
         flwr.proto.appio_pb2.PullTaskMessageResponse,
@@ -227,6 +233,12 @@ class ClientAppIoAsyncStub:
         flwr.proto.appio_pb2.PushTaskMessageResponse,
     ]
     """Push task message"""
+
+    PushTaskEvents: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.appio_pb2.PushTaskEventsRequest,
+        flwr.proto.appio_pb2.PushTaskEventsResponse,
+    ]
+    """Push task events"""
 
     PullTaskMessage: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.appio_pb2.PullTaskMessageRequest,
@@ -360,6 +372,14 @@ class ClientAppIoServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.appio_pb2.PushTaskMessageResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushTaskMessageResponse]]:
         """Push task message"""
+
+    @abc.abstractmethod
+    def PushTaskEvents(
+        self,
+        request: flwr.proto.appio_pb2.PushTaskEventsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.appio_pb2.PushTaskEventsResponse, collections.abc.Awaitable[flwr.proto.appio_pb2.PushTaskEventsResponse]]:
+        """Push task events"""
 
     @abc.abstractmethod
     def PullTaskMessage(

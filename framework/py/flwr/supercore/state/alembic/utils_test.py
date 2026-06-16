@@ -16,12 +16,12 @@
 
 
 import unittest
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from alembic import command
 from alembic.autogenerate import compare_metadata
@@ -76,6 +76,28 @@ class TestAlembicRun(unittest.TestCase):
         """Create a SQLAlchemy engine for a test database."""
         db_path = self.temp_path / db_name
         return create_engine(f"sqlite:///{db_path}")
+
+    def create_mock_engine(self, dialect_name: str) -> tuple[MagicMock, MagicMock]:
+        """Create a mock SQLAlchemy engine and connection."""
+        engine = MagicMock()
+        connection = MagicMock(spec=Connection)
+        engine.dialect.name = dialect_name
+        engine.connect.return_value.__enter__.return_value = connection
+        return engine, connection
+
+    def create_advisory_lock_event_recorder(
+        self, events: list[str]
+    ) -> Callable[[object, object], None]:
+        """Return a side effect that records advisory lock SQL statements."""
+
+        def record_event(statement: object, _params: object) -> None:
+            sql = str(statement)
+            if "pg_advisory_lock" in sql:
+                events.append("lock")
+            if "pg_advisory_unlock" in sql:
+                events.append("unlock")
+
+        return record_event
 
     def upgrade_to_revision(self, engine: Engine, revision: str) -> None:
         """Upgrade the test database to the specified Alembic revision."""
@@ -175,6 +197,70 @@ class TestAlembicRun(unittest.TestCase):
             self.assertFalse(check_migrations_pending(engine))
         finally:
             engine.dispose()
+
+    @patch("flwr.supercore.state.alembic.utils._run_migration_workflow")
+    def test_run_migrations_uses_postgresql_advisory_lock(
+        self, mock_run_migrations: MagicMock
+    ) -> None:
+        """Ensure PostgreSQL migrations are serialized with an advisory lock."""
+        # Prepare
+        events: list[str] = []
+        engine, connection = self.create_mock_engine("postgresql")
+        connection.in_transaction.return_value = True
+        connection.execute.side_effect = self.create_advisory_lock_event_recorder(
+            events
+        )
+        connection.commit.side_effect = lambda: events.append("commit")
+        mock_run_migrations.side_effect = lambda _engine, _bind: events.append(
+            "migrate"
+        )
+
+        # Execute
+        run_migrations(engine)
+
+        # Assert
+        self.assertEqual(
+            events, ["lock", "commit", "migrate", "commit", "unlock", "commit"]
+        )
+        self.assertEqual(connection.commit.call_count, 3)
+        mock_run_migrations.assert_called_once_with(engine, connection)
+
+    @patch("flwr.supercore.state.alembic.utils._run_migration_workflow")
+    def test_run_migrations_releases_postgresql_advisory_lock_on_error(
+        self, mock_run_migrations: MagicMock
+    ) -> None:
+        """Ensure PostgreSQL advisory locks are released when migrations fail."""
+        # Prepare
+        events: list[str] = []
+        engine, connection = self.create_mock_engine("postgresql")
+        connection.in_transaction.return_value = True
+        connection.execute.side_effect = self.create_advisory_lock_event_recorder(
+            events
+        )
+        mock_run_migrations.side_effect = RuntimeError("migration failed")
+
+        # Execute & Assert
+        with self.assertRaisesRegex(RuntimeError, "migration failed"):
+            run_migrations(engine)
+
+        self.assertEqual(events, ["lock", "unlock"])
+        connection.rollback.assert_called_once_with()
+        mock_run_migrations.assert_called_once_with(engine, connection)
+
+    @patch("flwr.supercore.state.alembic.utils._run_migration_workflow")
+    def test_run_migrations_does_not_lock_non_postgresql_backends(
+        self, mock_run_migrations: MagicMock
+    ) -> None:
+        """Ensure non-PostgreSQL backends keep the existing migration behavior."""
+        # Prepare
+        engine, _ = self.create_mock_engine("sqlite")
+
+        # Execute
+        run_migrations(engine)
+
+        # Assert
+        engine.connect.assert_not_called()
+        mock_run_migrations.assert_called_once_with(engine, engine)
 
     def test_migrated_schema_matches_metadata(self) -> None:
         """Verify that migrations match current SQLAlchemy metadata."""

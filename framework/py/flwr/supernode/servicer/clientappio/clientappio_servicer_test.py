@@ -20,9 +20,9 @@ from unittest.mock import Mock, patch
 
 from parameterized import parameterized
 
-from flwr.common import Context, typing
+from flwr.app import Context
+from flwr.app.message import make_message
 from flwr.common.constant import SubStatus
-from flwr.common.message import make_message
 from flwr.common.serde import context_to_proto, fab_to_proto, message_to_proto
 from flwr.common.serde_test import RecordMaker
 from flwr.proto.appio_pb2 import (  # pylint:disable=E0611
@@ -43,11 +43,13 @@ from flwr.proto.message_pb2 import (  # pylint:disable=E0611
     PushObjectResponse,
 )
 from flwr.proto.run_pb2 import Run as ProtoRun  # pylint:disable=E0611
+from flwr.supercore.fab import Fab
 from flwr.supercore.inflatable.inflatable_object import (
     get_all_nested_objects,
     get_object_tree,
     iterate_object_tree,
 )
+from flwr.supercore.run import Run
 from flwr.supernode.runtime.run_clientapp import (
     pull_task_input,
     push_message,
@@ -76,7 +78,7 @@ class TestClientAppIoServicer(unittest.TestCase):
             metadata=self.maker.metadata(),
             content=self.maker.recorddict(3, 2, 1),
         )
-        mock_fab = typing.Fab(
+        mock_fab = Fab(
             hash_str="abc123#$%",
             content=b"\xf3\xf5\xf8\x98",
             verifications={"ab12#$%": "abc123#$%"},
@@ -184,10 +186,11 @@ class TestClientAppIoServicer(unittest.TestCase):
         task_id = 123
         request = PullTaskInputRequest()
 
-        run = typing.Run.create_empty(run_id=run_id)
+        run = Run.create_empty(run_id=run_id)
         run.fab_id = "mock/mock"
         run.fab_version = "v1.0.0"
         run.fab_hash = "fab-hash"
+        run.series_id = 777
 
         app_context = Context(
             run_id=run_id,
@@ -195,14 +198,15 @@ class TestClientAppIoServicer(unittest.TestCase):
             node_config={"nodeconfig1": 4.2},
             state=self.maker.recorddict(1, 1, 1),
             run_config={"runconfig1": 6.1},
+            series_id=run.series_id,
         )
-        fab = typing.Fab(
+        fab = Fab(
             hash_str="fab-hash",
             content=b"fab-content",
             verifications={"sig": "value"},
         )
 
-        self.mock_state.get_context.return_value = app_context
+        self.mock_state.get_run_series_context.return_value = app_context
         self.mock_state.get_run.return_value = run
         self.mock_state.get_fab.return_value = fab
 
@@ -214,23 +218,28 @@ class TestClientAppIoServicer(unittest.TestCase):
             response = self.servicer.PullTaskInput(request, Mock())
 
         self.assertIsInstance(response, PullTaskInputResponse)
+        self.mock_state.get_run_series_context.assert_called_once_with(run.series_id)
         self.mock_state.activate_task.assert_called_once_with(task_id=task_id)
 
     def test_servicer_push_task_output_finishes_task(self) -> None:
         """PushTaskOutput should finish the authenticated task."""
         run_id = 61016
         task_id = 123
+        run = Run.create_empty(run_id=run_id)
+        run.series_id = 777
         app_context = Context(
             run_id=run_id,
             node_id=1,
             node_config={"nodeconfig1": 4.2},
             state=self.maker.recorddict(1, 1, 1),
             run_config={"runconfig1": 6.1},
+            series_id=run.series_id,
         )
         request = PushTaskOutputRequest(
             context=context_to_proto(app_context),
             sub_status=SubStatus.COMPLETED,
         )
+        self.mock_state.get_run.return_value = run
 
         with patch(
             "flwr.supernode.servicer.clientappio.clientappio_servicer."
@@ -240,7 +249,9 @@ class TestClientAppIoServicer(unittest.TestCase):
             response = self.servicer.PushTaskOutput(request, Mock())
 
         self.assertIsInstance(response, PushTaskOutputResponse)
-        self.mock_state.store_context.assert_called_once()
+        self.mock_state.set_run_series_context.assert_called_once()
+        args, _ = self.mock_state.set_run_series_context.call_args
+        self.assertEqual(args[0], run.series_id)
         self.mock_state.finish_task.assert_called_once()
         finish_task_kwargs = self.mock_state.finish_task.call_args.kwargs
         self.assertEqual(finish_task_kwargs["task_id"], task_id)

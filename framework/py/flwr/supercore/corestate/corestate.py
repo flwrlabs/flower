@@ -19,14 +19,15 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Literal
 
-from flwr.common import Message
-from flwr.common.typing import Fab
-from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
+from flwr.app import Context, Message
+from flwr.proto.runseries_pb2 import RunSeries  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskEvent  # pylint: disable=E0611
+from flwr.supercore.fab import Fab
 
 from ..object_store import ObjectStore
 
 
-class CoreState(ABC):
+class CoreState(ABC):  # pylint: disable=R0904
     """Abstract base class for core state."""
 
     @property
@@ -41,6 +42,95 @@ class CoreState(ABC):
     @abstractmethod
     def get_fab(self, fab_hash: str) -> Fab | None:
         """Return the FAB for the given hash, if present."""
+
+    @abstractmethod
+    def get_run_series(
+        self,
+        *,
+        series_ids: Sequence[int] | None = None,
+        federations: Sequence[str] | None = None,
+        updated_before: str | None = None,
+        limit: int | None = None,
+    ) -> Sequence[RunSeries]:
+        """Return RunSeries metadata, optionally filtered by the given filters.
+
+        - If a filter is set to None, it is ignored.
+        - If multiple filters are provided, they are combined using AND logic.
+        - Within each filter, provided values are combined using OR logic.
+
+        Parameters
+        ----------
+        series_ids : Optional[Sequence[int]] (default: None)
+            Sequence of RunSeries IDs to filter by.
+        federations : Optional[Sequence[str]] (default: None)
+            Sequence of federation names to filter by.
+        updated_before : str | None (default: None)
+            If set, return only RunSeries updated before this ISO timestamp.
+        limit : int | None (default: None)
+            Maximum number of RunSeries records to return. If `None`, no limit is
+            applied.
+
+        Returns
+        -------
+        Sequence[RunSeries]
+            RunSeries records ordered by `updated_at` descending.
+        """
+
+    @abstractmethod
+    def get_run_series_context(self, series_id: int) -> Context | None:
+        """Return the shared Context for the specified RunSeries, if present.
+
+        Parameters
+        ----------
+        series_id : int
+            The ID of the RunSeries for which to retrieve shared context.
+
+        Returns
+        -------
+        Context | None
+            The shared RunSeries context, or `None` if no context is stored.
+        """
+
+    @abstractmethod
+    def set_run_series_context(self, series_id: int, context: Context) -> None:
+        """Set the shared Context for the specified RunSeries.
+
+        Parameters
+        ----------
+        series_id : int
+            The ID of the RunSeries for which to persist shared context.
+        context : Context
+            The shared context to store.
+        """
+
+    @abstractmethod
+    def store_run_in_series(
+        self,
+        run_id: int,
+        federation: str,
+        series_id: int | None,
+    ) -> int | None:
+        """Store a run in a run series and return the series ID.
+
+        Parameters
+        ----------
+        run_id : int
+            Run ID to associate with the run series.
+        federation : str
+            Federation the run series belongs to.
+        series_id : int | None
+            Caller-provided series ID. If `None`, a new series ID is generated
+            and creation is attempted. If set, the matching series must already
+            exist and belong to `federation`.
+
+        Returns
+        -------
+        int | None
+            The ID of the run series the run was stored in, or `None` if a
+            new run series could not be created, the caller-provided run
+            series is invalid, or the run could not be associated with the
+            run series.
+        """
 
     @abstractmethod
     def add_task_log(self, task_id: int, log_message: str) -> None:
@@ -289,6 +379,51 @@ class CoreState(ABC):
         -------
         Sequence[Message]
             A sequence of matching messages.
+        """
+
+    @abstractmethod
+    def store_task_events(
+        self,
+        events: Sequence[TaskEvent],
+    ) -> bool:
+        """Store task-produced run events.
+
+        Parameters
+        ----------
+        events : Sequence[TaskEvent]
+            Task events to store. Event IDs and timestamps are assigned by the
+            CoreState implementation. Event payloads are validated before any
+            events are stored, so one invalid event payload rejects the whole
+            batch.
+
+        Returns
+        -------
+        bool
+            True if the events were stored, otherwise False.
+        """
+
+    @abstractmethod
+    def get_task_events(
+        self,
+        *,
+        run_id: int | None = None,
+        after_task_event_id: int | None = None,
+    ) -> Sequence[TaskEvent]:
+        """Return task-produced run events matching the filters.
+
+        Parameters
+        ----------
+        run_id : Optional[int] (default: None)
+            If set, return only events for this run. If set to `None`, return
+            events for all runs.
+        after_task_event_id : Optional[int] (default: None)
+            Return only events with an ID greater than this cursor. If set to
+            `None`, retrieve all events.
+
+        Returns
+        -------
+        Sequence[TaskEvent]
+            Task events ordered by ID.
         """
 
     @abstractmethod

@@ -137,7 +137,7 @@ def test_configure_superlink_log_file(tmp_path: Path) -> None:
                 h
                 for h in FLOWER_LOGGER.handlers
                 if isinstance(h, TimedRotatingFileHandler)
-                and Path(h.baseFilename).resolve() == path
+                and Path(h.baseFilename).resolve() == path  # pylint: disable=no-member
             ),
             None,
         )
@@ -179,7 +179,7 @@ def test_configure_superlink_log_file_idempotent(tmp_path: Path) -> None:
             h
             for h in FLOWER_LOGGER.handlers
             if isinstance(h, TimedRotatingFileHandler)
-            and Path(h.baseFilename).resolve() == path
+            and Path(h.baseFilename).resolve() == path  # pylint: disable=no-member
         ]
         assert len(handlers) == 1
     finally:

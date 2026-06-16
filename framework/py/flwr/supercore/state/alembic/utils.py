@@ -14,15 +14,15 @@
 # ==============================================================================
 """Helpers for running and validating Alembic migrations."""
 
-
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from logging import INFO
 from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import MetaData, create_engine, inspect, pool
-from sqlalchemy.engine import Engine
+from sqlalchemy import MetaData, create_engine, inspect, pool, text
+from sqlalchemy.engine import Connection, Engine
 
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
@@ -32,6 +32,7 @@ from flwr.supercore.state.schema.objectstore_tables import create_objectstore_me
 
 # Type alias for metadata provider functions
 MetadataProvider = Callable[[], MetaData]
+MigrationBind = Engine | Connection
 
 # Registry for additional metadata providers (e.g., from ee module)
 _metadata_providers: list[MetadataProvider] = []
@@ -43,6 +44,8 @@ ALEMBIC_DIR = Path(__file__).resolve().parent
 ALEMBIC_VERSION_TABLE = "alembic_version"
 FLWR_STATE_BASELINE_REVISION = "8e65d8ae60b0"  # Never change this
 FLWR_STATE_LATEST_REVISIONS = "heads"
+_POSTGRESQL_MIGRATION_LOCK_NAMESPACE = 0x466C5752  # "FlWR"
+_POSTGRESQL_MIGRATION_LOCK_ID = 0x4D494752  # "MIGR"
 
 
 def register_metadata_provider(provider: MetadataProvider) -> None:
@@ -120,6 +123,12 @@ def get_combined_metadata() -> MetaData:
 
 
 def run_migrations(engine: Engine) -> None:
+    """Run pending Alembic migrations under the configured database guard."""
+    with _migration_bind(engine) as bind:
+        _run_migration_workflow(engine, bind)
+
+
+def _run_migration_workflow(engine: Engine, bind: MigrationBind) -> None:
     """Run pending Alembic migrations, handling pre-Alembic legacy databases.
 
     Expected scenarios:
@@ -129,14 +138,17 @@ def run_migrations(engine: Engine) -> None:
     - If DB is pre-Alembic and schema matches baseline: stamp, then upgrade.
     """
     config = build_alembic_config(engine)
-    has_version_table = _has_alembic_version_table(engine)
+    if bind is not engine:
+        config.attributes["connection"] = bind
+
+    has_version_table = _has_alembic_version_table(bind)
 
     # Standard database with version tracking: just upgrade.
     if has_version_table:
         command.upgrade(config, FLWR_STATE_LATEST_REVISIONS)
         return
 
-    table_names = _get_user_table_names(engine)
+    table_names = _get_user_table_names(bind)
 
     # Empty/new database: run all migrations from scratch.
     if not table_names:
@@ -145,7 +157,7 @@ def run_migrations(engine: Engine) -> None:
 
     # Pre-Alembic database detected without version tracking: verify database matches
     # baseline schema before stamping version and upgrading.
-    is_valid, error_msg = _verify_legacy_schema_matches_baseline(engine)
+    is_valid, error_msg = _verify_legacy_schema_matches_baseline(bind)
 
     # This is an edge case and unlikely to happen since SuperLink requires a specific
     # schema to operate normally.
@@ -165,9 +177,47 @@ def run_migrations(engine: Engine) -> None:
         "before upgrading.",
         FLWR_STATE_BASELINE_REVISION,
     )
-    stamp_existing_database(engine, FLWR_STATE_BASELINE_REVISION)
+    command.stamp(config, FLWR_STATE_BASELINE_REVISION)
     command.upgrade(config, FLWR_STATE_LATEST_REVISIONS)
     log(INFO, "Flower state database stamped and upgraded successfully!")
+
+
+@contextmanager
+def _migration_bind(engine: Engine) -> Iterator[MigrationBind]:
+    """Guard schema migrations for backends that need cross-process serialization."""
+    if engine.dialect.name != "postgresql":
+        yield engine
+        return
+
+    lock_params = {
+        "namespace": _POSTGRESQL_MIGRATION_LOCK_NAMESPACE,
+        "lock_id": _POSTGRESQL_MIGRATION_LOCK_ID,
+    }
+
+    with engine.connect() as connection:
+        log(INFO, "Acquiring PostgreSQL advisory lock for Flower state migrations.")
+        connection.execute(
+            text("SELECT pg_advisory_lock(:namespace, :lock_id)"),
+            lock_params,
+        )
+        connection.commit()
+        migration_failed = False
+        try:
+            yield connection
+        except BaseException:
+            migration_failed = True
+            if connection.in_transaction():
+                connection.rollback()
+            raise
+        finally:
+            if not migration_failed and connection.in_transaction():
+                connection.commit()
+            connection.execute(
+                text("SELECT pg_advisory_unlock(:namespace, :lock_id)"),
+                lock_params,
+            )
+            connection.commit()
+            log(INFO, "Released PostgreSQL advisory lock for Flower state migrations.")
 
 
 def build_alembic_config(engine: Engine) -> Config:
@@ -190,17 +240,17 @@ def build_alembic_config(engine: Engine) -> Config:
     return config
 
 
-def _get_user_table_names(engine: Engine) -> set[str]:
-    """Return non-internal table names for the given engine."""
-    inspector = inspect(engine)
+def _get_user_table_names(bind: MigrationBind) -> set[str]:
+    """Return non-internal table names for the given migration bind."""
+    inspector = inspect(bind)
     table_names = set(inspector.get_table_names())
     # Exclude SQLite internal tables (for example, sqlite_sequence)
     return {name for name in table_names if not name.startswith("sqlite_")}
 
 
-def _has_alembic_version_table(engine: Engine) -> bool:
+def _has_alembic_version_table(bind: MigrationBind) -> bool:
     """Return True if the Alembic version table exists."""
-    inspector = inspect(engine)
+    inspector = inspect(bind)
     return inspector.has_table(ALEMBIC_VERSION_TABLE)
 
 
@@ -248,7 +298,7 @@ def _get_baseline_metadata() -> MetaData:
     return baseline_metadata
 
 
-def _verify_legacy_schema_matches_baseline(engine: Engine) -> tuple[bool, str]:
+def _verify_legacy_schema_matches_baseline(bind: MigrationBind) -> tuple[bool, str]:
     """Verify legacy schema matches baseline tables and columns.
 
     Only missing tables/columns are reported as errors.
@@ -258,7 +308,7 @@ def _verify_legacy_schema_matches_baseline(engine: Engine) -> tuple[bool, str]:
     tuple[bool, str]
         (is_valid, error_message). If valid, error_message is empty.
     """
-    inspector = inspect(engine)
+    inspector = inspect(bind)
 
     # Get the baseline schema by running migrations up to the baseline revision
     # in a temporary database and reflecting its schema

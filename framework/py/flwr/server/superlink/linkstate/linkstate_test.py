@@ -33,8 +33,8 @@ from uuid import uuid4
 
 from parameterized import parameterized
 
+from flwr.app import DEFAULT_TTL, Error, Message, RecordDict
 from flwr.app.user_config import UserConfig
-from flwr.common import DEFAULT_TTL, Context, Error, Message, RecordDict, now
 from flwr.common.constant import (
     HEARTBEAT_DEFAULT_INTERVAL,
     HEARTBEAT_PATIENCE,
@@ -44,7 +44,6 @@ from flwr.common.constant import (
     SubStatus,
 )
 from flwr.common.serde import message_from_proto, message_to_proto
-from flwr.common.typing import Fab
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
 # pylint: disable=E0611
@@ -57,6 +56,8 @@ from flwr.server.superlink.linkstate import InMemoryLinkState, LinkState, SqlLin
 from flwr.supercore.constant import NOOP_FEDERATION, NodeStatus, RunType, TaskType
 from flwr.supercore.corestate import CoreState
 from flwr.supercore.corestate.corestate_test import StateTest as CoreStateTest
+from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
 from flwr.supercore.object_store.object_store_factory import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
 from flwr.superlink.federation import NoOpFederationManager
@@ -160,6 +161,46 @@ class StateTest(CoreStateTest):
         assert run.federation == "health-federation"
         assert run.override_config["test_key"] == "test_value"
         assert run.flwr_aid == "i1r9f"
+        assert run.series_id > 0
+
+    def test_create_run_uses_existing_series_id(self) -> None:
+        """Test create_run links the run to an existing run series."""
+        # Prepare
+        state = self.state_factory()
+        initial_run_id = create_dummy_run(state, federation="health-federation")
+        series_id = state.get_run_info(run_ids=[initial_run_id])[0].series_id
+
+        # Execute
+        run_id = create_dummy_run(
+            state,
+            federation="health-federation",
+            series_id=series_id,
+        )
+
+        # Assert
+        run = state.get_run_info(run_ids=[run_id])[0]
+        self.assertEqual(run.series_id, series_id)
+
+    def test_create_run_reuses_series_id_in_same_federation(self) -> None:
+        """Test multiple runs can link to the same federation run series."""
+        # Prepare
+        state = self.state_factory()
+
+        # Execute
+        run_id_1 = create_dummy_run(
+            state,
+            federation="health-federation",
+        )
+        first_run = state.get_run_info(run_ids=[run_id_1])[0]
+        run_id_2 = create_dummy_run(
+            state,
+            federation="health-federation",
+            series_id=first_run.series_id,
+        )
+
+        # Assert
+        runs = state.get_run_info(run_ids=[run_id_1, run_id_2])
+        self.assertEqual({run.series_id for run in runs}, {first_run.series_id})
 
     def test_create_run_creates_primary_task(self) -> None:
         """Creating a run should also create its primary task."""
@@ -402,9 +443,11 @@ class StateTest(CoreStateTest):
         run_id = create_dummy_run(state)
         task_id = get_primary_task_id(state, run_id)
         assert state.claim_task(task_id) is not None
+        assert state.activate_task(task_id)
 
         # Execute
         # The run should be marked as failed after HEARTBEAT_DEFAULT_INTERVAL
+        # once the primary task is RUNNING.
         patched_dt = now() + timedelta(
             seconds=HEARTBEAT_PATIENCE * HEARTBEAT_DEFAULT_INTERVAL + 1
         )
@@ -425,6 +468,78 @@ class StateTest(CoreStateTest):
         assert status.sub_status == SubStatus.FAILED
         assert status.details == "No heartbeat received from the task"
 
+    def test_primary_task_expiry_fails_unfinished_run_tasks(self) -> None:
+        """Test unfinished tasks fail when their run's RUNNING primary task expires."""
+        # Prepare
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        primary_task_id = get_primary_task_id(state, run_id)
+        extra_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        assert extra_task_id is not None
+        assert state.claim_task(primary_task_id) is not None
+        assert state.activate_task(primary_task_id)
+
+        # Execute: advance time past task claim expiry and trigger cleanup
+        patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = patched_dt
+            state.get_run_status({run_id})
+
+        # Assert
+        tasks = {task.task_id: task for task in state.get_tasks(run_ids=[run_id])}
+        primary_task = tasks[primary_task_id]
+        extra_task = tasks[extra_task_id]
+        assert primary_task.status.status == Status.FINISHED
+        assert primary_task.status.sub_status == SubStatus.FAILED
+        assert extra_task.status.status == Status.FINISHED
+        assert extra_task.status.sub_status == SubStatus.FAILED
+        assert extra_task.status.details == "Task failed because the run expired"
+        assert extra_task.finished_at == primary_task.finished_at
+
+    @parameterized.expand(
+        [
+            (
+                SubStatus.COMPLETED,
+                SubStatus.FAILED,
+                "Task failed because the run finished",
+            ),
+            (
+                SubStatus.FAILED,
+                SubStatus.FAILED,
+                "Task failed because the run finished",
+            ),
+            (
+                SubStatus.STOPPED,
+                SubStatus.STOPPED,
+                "Task stopped because the run was stopped",
+            ),
+        ]
+    )  # type: ignore
+    def test_run_tasks_finished_on_finish_task(
+        self, sub_status: str, run_sub_status: str, run_details: str
+    ) -> None:
+        """Run tasks must share the primary task's finished_at when finish_task is
+        called."""
+        # Prepare
+        state = self.state_factory()
+        run_id = create_dummy_run(state)
+        primary_task_id = get_primary_task_id(state, run_id)
+        extra_task_id = state.create_task(task_type=TaskType.CONNECTOR, run_id=run_id)
+        assert extra_task_id is not None
+        assert state.claim_task(primary_task_id) is not None
+        if sub_status == SubStatus.COMPLETED:
+            assert state.activate_task(primary_task_id)
+
+        # Execute
+        assert state.finish_task(primary_task_id, sub_status, "done")
+
+        # Assert: run task finished_at matches primary task finished_at
+        tasks = {task.task_id: task for task in state.get_tasks(run_ids=[run_id])}
+        extra_task = tasks[extra_task_id]
+        assert extra_task.finished_at == tasks[primary_task_id].finished_at
+        assert extra_task.status.sub_status == run_sub_status
+        assert extra_task.status.details == run_details
+
     @parameterized.expand([(1,), (2,), (3,)])  # type: ignore
     def test_usage_report_hook_called_on_each_successful_transition(
         self, num_transitions: int
@@ -441,12 +556,13 @@ class StateTest(CoreStateTest):
         assert state.federation_manager.report_run_usage.call_count == expected_calls
 
     def test_usage_report_hook_called_on_primary_task_expired(self) -> None:
-        """Test report_run_usage hook is called when the primary task expires."""
+        """Test report_run_usage hook is called when a RUNNING primary task expires."""
         # Prepare
         state = self.state_factory()
         run_id = create_dummy_run(state)
         task_id = get_primary_task_id(state, run_id)
         assert state.claim_task(task_id) is not None
+        assert state.activate_task(task_id)
         state.federation_manager.report_run_usage = Mock()  # type: ignore
         # Execute: advance time past token expiry and trigger cleanup
         patched_dt = now() + timedelta(seconds=HEARTBEAT_DEFAULT_INTERVAL + 1)
@@ -467,28 +583,11 @@ class StateTest(CoreStateTest):
 
         state.federation_manager.report_run_usage.assert_called_once()
 
-    def test_stop_run_after_primary_task_finished(self) -> None:
-        """Stopping a run after primary task completion stops secondary tasks."""
-        state = self.state_factory()
-        run_id = create_dummy_run(state)
-        primary_task_id = get_primary_task_id(state, run_id)
-        secondary_task_id = state.create_task(TaskType.SERVER_APP, run_id)
-        assert secondary_task_id is not None
-        assert state.claim_task(primary_task_id) is not None
-        assert state.activate_task(primary_task_id)
-        assert state.finish_task(primary_task_id, SubStatus.COMPLETED, "")
-
-        assert state.stop_run(run_id)
-
-        tasks = {task.task_id: task for task in state.get_tasks(run_ids=[run_id])}
-        assert tasks[primary_task_id].status.sub_status == SubStatus.COMPLETED
-        assert tasks[secondary_task_id].status.sub_status == SubStatus.STOPPED
-
     def test_usage_report_hook_not_called_on_non_primary_task_expired(self) -> None:
         """Test report_run_usage is not called when a non-primary task expires."""
         state = self.state_factory()
         run_id = create_dummy_run(state)
-        task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
+        task_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
         assert task_id is not None
         assert state.claim_task(task_id) is not None
         state.federation_manager.report_run_usage = Mock()  # type: ignore
@@ -1614,6 +1713,40 @@ class StateTest(CoreStateTest):
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 1
 
+    def test_store_message_res_rejects_duplicate_reply(self) -> None:
+        """Test store_message_res rejects a second reply for one Message."""
+        # Prepare
+        state = self.state_factory()
+        node_id = create_dummy_node(state)
+        run_id = create_dummy_run(state)
+
+        msg = message_from_proto(
+            create_ins_message(
+                src_node_id=SUPERLINK_NODE_ID, dst_node_id=node_id, run_id=run_id
+            )
+        )
+        ins_msg_id = state.store_message_ins(msg)
+        assert ins_msg_id
+
+        ins_msg = state.get_message_ins(node_id=node_id, limit=1)[0]
+        first_res_msg = Message(RecordDict(), reply_to=ins_msg)
+        first_res_msg.metadata._message_id = str(uuid4())  # type: ignore
+        second_res_msg = Message(RecordDict(), reply_to=ins_msg)
+        second_res_msg.metadata._message_id = str(uuid4())  # type: ignore
+
+        # Execute
+        first_res_msg_id = state.store_message_res(first_res_msg)
+        second_res_msg_id = state.store_message_res(second_res_msg)
+
+        # Assert
+        assert first_res_msg_id == first_res_msg.metadata.message_id
+        assert second_res_msg_id is None
+        assert state.num_message_res() == 1
+
+        reply_msg = state.get_message_res({ins_msg_id})
+        assert len(reply_msg) == 1
+        assert reply_msg[0].metadata.message_id == first_res_msg_id
+
     def test_store_message_res_fail_if_dst_src_node_id_mismatch(self) -> None:
         """Test store_message_res to fail if there is a mismatch between the dst_node_id
         of orginal Message and the src_node_id of the reply Message."""
@@ -1644,64 +1777,6 @@ class StateTest(CoreStateTest):
         assert msg_res_id is None
         assert state.num_message_ins() == 1
         assert state.num_message_res() == 0
-
-    def test_get_set_serverapp_context(self) -> None:
-        """Test get and set serverapp context."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        context = Context(
-            run_id=1,
-            node_id=SUPERLINK_NODE_ID,
-            node_config={"mock": "mock"},
-            state=RecordDict(),
-            run_config={"test": "test"},
-        )
-        run_id = create_dummy_run(state)
-
-        # Execute
-        init = state.get_serverapp_context(run_id)
-        state.set_serverapp_context(run_id, context)
-        retrieved_context = state.get_serverapp_context(run_id)
-
-        # Assert
-        assert init is None
-        assert retrieved_context == context
-
-    def test_set_serverapp_context_after_finished_run(self) -> None:
-        """Context can be persisted after normal task completion."""
-        state: LinkState = self.state_factory()
-        run_id = create_dummy_run(state)
-        task_id = get_primary_task_id(state, run_id)
-        context = Context(
-            run_id=run_id,
-            node_id=SUPERLINK_NODE_ID,
-            node_config={},
-            state=RecordDict(),
-            run_config={},
-        )
-
-        assert state.claim_task(task_id) is not None
-        assert state.activate_task(task_id)
-        assert state.finish_task(task_id, SubStatus.COMPLETED, "done")
-        state.set_serverapp_context(run_id, context)
-
-        assert state.get_serverapp_context(run_id) == context
-
-    def test_set_context_invalid_run_id(self) -> None:
-        """Test set_serverapp_context with invalid run_id."""
-        # Prepare
-        state: LinkState = self.state_factory()
-        context = Context(
-            run_id=1,
-            node_id=1234,
-            node_config={"mock": "mock"},
-            state=RecordDict(),
-            run_config={"test": "test"},
-        )
-
-        # Execute and assert
-        with self.assertRaises(ValueError):
-            state.set_serverapp_context(61016, context)  # Invalid run_id
 
     def test_create_run_with_and_without_federation_config(self) -> None:
         """Test that run federation config is stored on the run."""
@@ -1931,6 +2006,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
     federation_config: SimulationConfig | None = None,
     flwr_aid: str | None = "mock_flwr_aid",
     run_type: str = RunType.SERVER_APP,
+    series_id: int | None = None,
 ) -> int:
     """Create a dummy run."""
     return state.create_run(
@@ -1942,6 +2018,7 @@ def create_dummy_run(  # pylint: disable=too-many-positional-arguments
         federation_config=federation_config,
         flwr_aid=flwr_aid,
         run_type=run_type,
+        series_id=series_id,
     )
 
 
@@ -2065,7 +2142,7 @@ class SqlInMemoryStateTest(StateTest, unittest.TestCase):
         state = self.state_factory()
         run_id = create_dummy_run(state)
         task_id = get_primary_task_id(state, run_id)
-        extra_task_id = state.create_task(task_type="flwr-serverapp", run_id=run_id)
+        extra_task_id = state.create_task(task_type=TaskType.SERVER_APP, run_id=run_id)
         assert extra_task_id is not None
         assert state.claim_task(extra_task_id) is not None
 
@@ -2223,6 +2300,45 @@ class SqlFileBasedTest(SqlInMemoryStateTest):
 
             # Assert
             assert sum(len(res) for res in results if res is not None) == 1
+
+    def test_acknowledge_node_heartbeat_does_not_revive_deleted_node(self) -> None:
+        """Ensure a heartbeat cannot move an unregistered node back online."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Prepare
+            db_path = self._shared_sql_database(tmpdir)
+            states = self._create_shared_sql_states(db_path)
+            heartbeat_state = states[0]
+            delete_state = states[1]
+            node_id = create_dummy_node(heartbeat_state, activate=False)
+            original_query = heartbeat_state.query
+            did_delete = False
+
+            def delete_before_heartbeat_update(
+                query: str, data: Any = None
+            ) -> list[dict[str, Any]]:
+                nonlocal did_delete
+                normalized_query = " ".join(query.split())
+                if not did_delete and normalized_query.startswith(
+                    "UPDATE node SET online_until"
+                ):
+                    did_delete = True
+                    delete_state.delete_node("mock_flwr_aid", node_id)
+                return original_query(query, data)
+
+            heartbeat_state.query = (  # type: ignore[method-assign]
+                delete_before_heartbeat_update
+            )
+
+            # Execute
+            acknowledged = heartbeat_state.acknowledge_node_heartbeat(
+                node_id, heartbeat_interval=30
+            )
+
+            # Assert
+            assert did_delete
+            assert not acknowledged
+            node = heartbeat_state.get_node_info(node_ids=[node_id])[0]
+            assert node.status == NodeStatus.UNREGISTERED
 
     # pylint: disable-next=too-many-locals
     def test_get_message_ins_distributes_available_work_under_contention(self) -> None:

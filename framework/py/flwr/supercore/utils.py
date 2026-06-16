@@ -23,7 +23,7 @@ import sys
 from collections.abc import Iterable, Sequence
 from logging import WARN
 from pathlib import Path
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal, TypeVar, cast
 
 import requests
 
@@ -33,6 +33,7 @@ from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable
 from flwr.supercore.version import package_version as flwr_version
 
 from .constant import APP_ID_PATTERN, APP_VERSION_PATTERN, MAX_NAME_LENGTH
+from .typing import JSONValue
 
 T = TypeVar("T", str, bytes)
 PR_SET_DUMPABLE = 4  # from /usr/include/linux/prctl.h
@@ -58,6 +59,33 @@ class MetadataLookupError(Exception):
         else:
             message = f"Metadata key '{key}' has an unknown error: {error_type}."
         super().__init__(message)
+
+
+def _reject_non_finite_strict_json(value: str) -> None:
+    """Reject JSON constants that are not valid JSON values."""
+    raise ValueError(f"Strict JSON value contains non-finite number {value}.")
+
+
+def strict_json_loads(raw: str | bytes | bytearray) -> JSONValue:
+    """Parse a strict JSON value.
+
+    Strict JSON values reject Python's non-standard ``NaN`` and ``Infinity``
+    number constants.
+    """
+    return cast(
+        JSONValue,
+        json.loads(raw, parse_constant=_reject_non_finite_strict_json),
+    )
+
+
+def strict_json_dumps(value: JSONValue, *, compact: bool = False) -> str:
+    """Serialize a strict JSON value.
+
+    Strict JSON values reject non-finite floating-point values.
+    """
+    if compact:
+        return json.dumps(value, separators=(",", ":"), allow_nan=False)
+    return json.dumps(value, allow_nan=False)
 
 
 def mask_string(value: str, head: int = 4, tail: int = 4) -> str:

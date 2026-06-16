@@ -503,6 +503,33 @@ def test_validate_pyproject_toml() -> None:
     assert not warnings
 
 
+def test_validate_pyproject_toml_agentapp_only() -> None:
+    """Test that validate_config accepts AgentApp-only components."""
+    config = {
+        "project": {
+            "name": "fedgpt",
+            "version": "1.0.0",
+            "description": "",
+            "license": "",
+            "authors": [],
+        },
+        "tool": {
+            "flwr": {
+                "app": {
+                    "publisher": "flwrlabs",
+                    "components": {"agentapp": "flwr.cli.run:run"},
+                },
+            },
+        },
+    }
+
+    is_valid, errors, warnings = validate_config(config)
+
+    assert is_valid
+    assert not errors
+    assert not warnings
+
+
 def test_validate_pyproject_toml_with_fab_format_version_derives_metadata() -> None:
     """Test fab-format-version=1 succeeds without mutating authored metadata."""
     config: dict[str, Any] = {

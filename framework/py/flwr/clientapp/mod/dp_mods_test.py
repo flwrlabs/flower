@@ -17,17 +17,17 @@
 
 import numpy as np
 
-from flwr.app.message_type import MessageType
-from flwr.common import (
+from flwr.app import (
     Array,
     ArrayRecord,
     ConfigRecord,
     Context,
     Message,
     MetricRecord,
-    NDArray,
     RecordDict,
 )
+from flwr.app.message_type import MessageType
+from flwr.common import NDArray
 from flwr.common.differential_privacy_constants import KEY_CLIPPING_NORM, KEY_NORM_BIT
 
 from .centraldp_mods import adaptiveclipping_mod, fixedclipping_mod

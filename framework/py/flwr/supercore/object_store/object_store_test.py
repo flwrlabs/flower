@@ -15,12 +15,15 @@
 """Tests for ObjectStore."""
 
 
+import sqlite3
 import tempfile
 import threading
 import unittest
 from abc import abstractmethod
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
-from typing import cast
+from typing import Any, cast
+from unittest.mock import patch
 
 from parameterized import parameterized
 from sqlalchemy import Engine, inspect
@@ -479,3 +482,38 @@ class SqlFileBasedObjectStoreTest(ObjectStoreTest):
 
         self.assertEqual(store.get(child.object_id), child.deflate())
         self.assertEqual(store.get(new_parent.object_id), new_parent.deflate())
+
+    def test_put_raises_if_object_deleted_before_update(self) -> None:
+        """A concurrent delete before the write must not report put success."""
+        store = self.object_store_factory()
+        obj = CustomDataClass(data=b"test_value")
+        object_content = obj.deflate()
+        object_id = get_object_id(object_content)
+        store.preregister(self.run_id, get_object_tree(obj))
+
+        should_delete = True
+        original_query = store.query
+
+        def delete_before_update(
+            query: str,
+            data: Sequence[dict[str, Any]] | dict[str, Any] | None = None,
+        ) -> list[dict[str, Any]]:
+            nonlocal should_delete
+            normalized_query = " ".join(query.split())
+            if should_delete and normalized_query.startswith(
+                "UPDATE objects SET content = :content"
+            ):
+                should_delete = False
+                with sqlite3.connect(self.temp_file.name) as conn:
+                    conn.execute("PRAGMA foreign_keys = ON")
+                    conn.execute(
+                        "DELETE FROM objects WHERE object_id = ? AND ref_count = 0",
+                        (object_id,),
+                    )
+            return original_query(query, data)
+
+        with patch.object(store, "query", side_effect=delete_before_update):
+            with self.assertRaises(NoObjectInStoreError):
+                store.put(object_id, object_content)
+
+        self.assertIsNone(store.get(object_id))

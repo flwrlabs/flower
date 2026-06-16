@@ -20,7 +20,7 @@ from typing import cast
 
 import numpy as np
 
-from .typing import NDArray, NDArrays, Parameters
+from flwr.compat.common.typing import NDArray, NDArrays, Parameters
 
 
 def ndarrays_to_parameters(ndarrays: NDArrays) -> Parameters:

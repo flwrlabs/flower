@@ -19,6 +19,8 @@ from typing import Any, TypeVar, cast
 
 from google.protobuf.message import Message as GrpcMessage
 
+from flwr.app.message.typeddict import TypedDict
+
 # pylint: disable=E0611
 from flwr.proto.error_pb2 import Error as ProtoError
 from flwr.proto.message_pb2 import Metadata as ProtoMetadata
@@ -34,7 +36,6 @@ from flwr.proto.recorddict_pb2 import (
 from ..app.error import Error
 from ..app.metadata import Metadata
 from .constant import INT64_MAX_VALUE
-from .record.typeddict import TypedDict
 
 # pylint: enable=E0611
 

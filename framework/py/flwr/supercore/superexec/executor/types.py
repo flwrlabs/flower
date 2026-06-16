@@ -14,7 +14,6 @@
 # ==============================================================================
 """Executor types for SuperExec TaskExecutor processes."""
 
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -36,6 +35,16 @@ class ExecutionSpec:  # pylint: disable=too-many-instance-attributes
     runtime_dependency_install: bool
     parent_pid: int | None
     suppress_output: bool
+    task_id: int
+
+    def __post_init__(self) -> None:
+        """Validate fields required by all executors."""
+        if not isinstance(self.task_id, int) or self.task_id <= 0:
+            raise ValueError("ExecutionSpec requires a positive integer task_id.")
+        if not self.appio_api_address.strip():
+            raise ValueError("ExecutionSpec requires an AppIo API address.")
+        if not self.token.strip():
+            raise ValueError("ExecutionSpec requires a task token.")
 
 
 class LaunchResultStatus(StrEnum):

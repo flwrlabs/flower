@@ -23,7 +23,8 @@ Paper: proceedings.neurips.cc/paper/2017/file/f4b9ec30ad9f68f89b29639786cb62ef-P
 from collections.abc import Callable
 from logging import INFO
 
-from flwr.common import MetricRecord, RecordDict, log
+from flwr.app import MetricRecord, RecordDict
+from flwr.common import log
 
 from .multikrum import MultiKrum
 

@@ -14,12 +14,11 @@
 # ==============================================================================
 """Tests for SuperExec base plugin launch behavior."""
 
-
 from typing import cast
 from unittest.mock import Mock, patch
 
-from flwr.common.typing import Run
 from flwr.supercore.constant import TaskType
+from flwr.supercore.run import Run
 from flwr.supercore.superexec.executor import ExecutionSpec
 from flwr.supercore.superexec.plugin.base_exec_plugin import BaseExecPlugin
 from flwr.supercore.superexec.plugin.clientapp_exec_plugin import ClientAppExecPlugin
@@ -148,6 +147,7 @@ def test_launch_task_forwards_runtime_dependency_install_flag() -> None:
     spec = _execution_spec_from_executor(executor)
     assert spec.runtime_dependency_install is True
     assert spec.parent_pid == 1234
+    assert spec.task_id == 7
 
 
 def test_launch_task_skips_optional_runtime_flags_by_default() -> None:

@@ -24,11 +24,11 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from google.protobuf.message import Message as GrpcMessage
 from requests.exceptions import ConnectionError as RequestsConnectionError
 
+from flwr.app.message import Message, remove_content_from_message
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.constant import HEARTBEAT_DEFAULT_INTERVAL
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
-from flwr.common.message import Message, remove_content_from_message
 from flwr.common.retry_invoker import RetryInvoker
 from flwr.common.serde import (
     fab_from_proto,
@@ -36,7 +36,6 @@ from flwr.common.serde import (
     message_to_proto,
     run_from_proto,
 )
-from flwr.common.typing import Fab, Run
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -67,6 +66,7 @@ from flwr.proto.message_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
 from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
+from flwr.supercore.fab import Fab
 from flwr.supercore.heartbeat import HeartbeatSender
 from flwr.supercore.inflatable.inflatable_protobuf_utils import (
     make_confirm_message_received_fn_protobuf,
@@ -74,6 +74,7 @@ from flwr.supercore.inflatable.inflatable_protobuf_utils import (
     make_push_object_fn_protobuf,
 )
 from flwr.supercore.primitives.asymmetric import generate_key_pairs, public_key_to_bytes
+from flwr.supercore.run import Run
 
 try:
     import requests

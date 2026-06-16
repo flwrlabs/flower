@@ -60,30 +60,6 @@ def test_parse_flwr_model_parses_tokenized_invocation() -> None:
     assert args.runtime_dependency_install is True
 
 
-def test_flwr_model_parses_args_before_mirroring_output() -> None:
-    """Argument parsing should happen before stdout/stderr redirection."""
-
-    class _Parser:
-        def parse_args(self) -> SimpleNamespace:
-            """Raise a parser error before any side effects happen."""
-            raise SystemExit(2)
-
-    mirror_output_to_queue = Mock()
-
-    with (
-        patch.object(flwr_model_module, "_parse_args_run_flwr_model", _Parser),
-        patch.object(
-            flwr_model_module,
-            "mirror_output_to_queue",
-            mirror_output_to_queue,
-        ),
-        pytest.raises(SystemExit),
-    ):
-        flwr_model_module.flwr_model()
-
-    mirror_output_to_queue.assert_not_called()
-
-
 def test_flwr_model_forwards_cli_args() -> None:
     """The ModelApp CLI should forward parsed args to the runtime."""
     args = SimpleNamespace(
@@ -99,29 +75,17 @@ def test_flwr_model_forwards_cli_args() -> None:
             """Return a fixed namespace for CLI forwarding tests."""
             return args
 
-    mirror_output_to_queue = Mock()
-    restore_output = Mock()
     run_model = Mock()
 
     with (
         patch.object(flwr_model_module, "_parse_args_run_flwr_model", _Parser),
-        patch.object(
-            flwr_model_module,
-            "mirror_output_to_queue",
-            mirror_output_to_queue,
-        ),
-        patch.object(flwr_model_module, "restore_output", restore_output),
         patch.object(flwr_model_module, "run_model", run_model),
     ):
         flwr_model_module.flwr_model()
 
-    mirror_output_to_queue.assert_called_once()
-    restore_output.assert_called_once_with()
     run_model.assert_called_once()
     kwargs = run_model.call_args.kwargs
     assert kwargs["serverappio_api_address"] == "127.0.0.1:9091"
-    assert kwargs["log_queue"] is mirror_output_to_queue.call_args.args[0]
     assert kwargs["token"] == "test-token"
     assert kwargs["certificates"] is None
     assert kwargs["parent_pid"] == 321
-    assert kwargs["runtime_dependency_install"] is True

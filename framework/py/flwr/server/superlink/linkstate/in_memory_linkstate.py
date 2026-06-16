@@ -23,8 +23,9 @@ from datetime import UTC, datetime
 from logging import ERROR, WARNING
 from typing import Literal, cast
 
+from flwr.app import Message
 from flwr.app.user_config import UserConfig
-from flwr.common import Context, Message, log, now
+from flwr.common import log
 from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     MESSAGE_TTL_TOLERANCE,
@@ -35,7 +36,6 @@ from flwr.common.constant import (
     Status,
     SubStatus,
 )
-from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
@@ -43,7 +43,9 @@ from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.utils import validate_message
 from flwr.supercore.constant import NodeStatus
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
+from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
+from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import FederationManager
 
 from .utils import (
@@ -82,7 +84,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
         # Map run_id to RunRecord
         self.run_ids: dict[int, RunRecord] = {}
-        self.contexts: dict[int, Context] = {}
         self.message_ins_store: dict[str, Message] = {}
         self.message_res_store: dict[str, Message] = {}
         self.message_ins_id_to_message_res_id: dict[str, str] = {}
@@ -268,6 +269,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 )
                 return None
 
+            if msg_ins_id in self.message_ins_id_to_message_res_id:
+                log(
+                    ERROR,
+                    "Failed to store Message reply: duplicate reply for "
+                    "reply_to_message_id %s.",
+                    msg_ins_id,
+                )
+                return None
+
             # Fail if the Message TTL exceeds the
             # expiration time of the Message it replies to.
             # Condition: ins_metadata.created_at + ins_metadata.ttl ≥
@@ -392,27 +402,18 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
     def stop_run(self, run_id: int) -> bool:
         """Stop a run and clean up its messages and objects."""
-        update_success = False
-        for task in self.get_tasks(run_ids=[run_id]):
-            update_success |= self.finish_task(task.task_id, SubStatus.STOPPED, "")
-
-        if not update_success:
+        # Check if the run exists
+        run_record = self.run_ids.get(run_id)
+        if run_record is None:
             return False
 
-        with self.lock:
-            message_ids = {
-                message_id
-                for message_id, message in self.message_ins_store.items()
-                if message.metadata.run_id == run_id
-            }
-            for message_id in message_ids:
-                self.message_ins_store.pop(message_id, None)
-                if message_id in self.message_ins_id_to_message_res_id:
-                    message_res_id = self.message_ins_id_to_message_res_id.pop(
-                        message_id
-                    )
-                    self.message_res_store.pop(message_res_id, None)
+        # Stop the run's primary task, which will cascade to stop all its tasks
+        primary_task_id = cast(int, run_record.run.primary_task_id)
+        if not self.finish_task(primary_task_id, SubStatus.STOPPED, ""):
+            return False
 
+        # Clean up messages and their objects related to the run
+        self.delete_messages(self.get_message_ids_from_run_id(run_id))
         self.object_store.delete_objects_in_run(run_id)
         return True
 
@@ -595,7 +596,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 return None
             return node_id
 
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
+    # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
     def create_run(
         self,
         fab_id: str | None,
@@ -606,6 +607,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         run_type: str,
+        series_id: int | None = None,
     ) -> int:
         """Create a new run."""
         task_type = primary_task_type_from_run_type(run_type)
@@ -619,7 +621,19 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 TASK_ID_NUM_BYTES,
                 exclude=set(self.task_store),
             )
-            pending_at = now().isoformat()
+            current = now().isoformat()
+            resolved_series_id = self.store_run_in_series(
+                run_id=run_id,
+                federation=federation,
+                series_id=series_id,
+            )
+            if resolved_series_id is None:
+                log(ERROR, "Unexpected run series membership failure.")
+                return 0
+            self._refresh_run_series_context(
+                run_id=run_id,
+                series_id=resolved_series_id,
+            )
             run_record = RunRecord(
                 run=Run(
                     run_id=run_id,
@@ -643,6 +657,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     bytes_recv=0,
                     clientapp_runtime=0.0,
                     run_type=run_type,
+                    series_id=resolved_series_id,
                 ),
                 federation_config=federation_config,
             )
@@ -660,7 +675,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     sub_status="",
                     details="",
                 ),
-                pending_at=pending_at,
+                pending_at=current,
                 fab_hash=fab_hash,
                 model_ref=None,
                 connector_ref=None,
@@ -758,17 +773,71 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 if run_id in self.run_ids
             }
 
+    def _finish_run_tasks(
+        self, run_primary_pairs: list[tuple[int, int]], sub_status: str, details: str
+    ) -> None:
+        """Finish all unfinished tasks of the run for the given run/primary-task pairs.
+
+        Each task's ``finished_at`` is copied from its run's primary task.
+        """
+        for run_id, primary_task_id in run_primary_pairs:
+            primary_task = self.task_store.get(primary_task_id)
+            if primary_task is None:
+                continue
+            finished_at = primary_task.finished_at
+            for task in self.task_store.values():
+                if task.run_id == run_id and task.status.status != Status.FINISHED:
+                    task.finished_at = finished_at
+                    task.status.status = Status.FINISHED
+                    task.status.sub_status = sub_status
+                    task.status.details = details
+                    if record := self.task_token_store.pop(task.task_id, None):
+                        self.task_token_to_task_id.pop(record.token, None)
+
     def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
         """Move an unfinished task to finished."""
         result = super().finish_task(task_id, sub_status, details)
         if result and self._is_primary_task(task_id):
+            with self.lock_task_store:
+                task = self.task_store.get(task_id)
+                if task is not None:
+                    # Stop all tasks of the run when the run is stopped
+                    if sub_status == SubStatus.STOPPED:
+                        finish_sub_status = SubStatus.STOPPED
+                        finish_details = "Task stopped because the run was stopped"
+                    # Otherwise, fail all tasks of the run
+                    else:
+                        finish_sub_status = SubStatus.FAILED
+                        finish_details = "Task failed because the run finished"
+                    self._finish_run_tasks(
+                        [(task.run_id, task_id)],
+                        sub_status=finish_sub_status,
+                        details=finish_details,
+                    )
             self.federation_manager.report_run_usage()
         return result
 
     def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
-        """Report usage when an expired task is the primary task of its run."""
-        if any(self._is_primary_task(task.task_id) for task in tasks):
-            self.federation_manager.report_run_usage()
+        """Fail unfinished tasks for runs whose primary task expired and report usage.
+
+        When an expired task is the primary task of a run, this hook marks all
+        unfinished tasks in that run as finished with FAILED status, removes any
+        associated task tokens, and reports run usage.
+        """
+        pairs = [
+            (task.run_id, task.task_id)
+            for task in tasks
+            if self._is_primary_task(task.task_id)
+        ]
+        if not pairs:
+            return
+
+        self._finish_run_tasks(
+            pairs,
+            sub_status=SubStatus.FAILED,
+            details="Task failed because the run expired",
+        )
+        self.federation_manager.report_run_usage()
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
@@ -798,17 +867,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 node.heartbeat_interval = heartbeat_interval
                 return True
             return False
-
-    def get_serverapp_context(self, run_id: int) -> Context | None:
-        """Get the context for the specified `run_id`."""
-        return self.contexts.get(run_id)
-
-    def set_serverapp_context(self, run_id: int, context: Context) -> None:
-        """Set the context for the specified `run_id`."""
-        with self.lock:
-            if run_id not in self.run_ids:
-                raise ValueError(f"Run {run_id} not found")
-            self.contexts[run_id] = context
 
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`."""
