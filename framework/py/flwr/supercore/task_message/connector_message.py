@@ -20,11 +20,6 @@ from __future__ import annotations
 from flwr.app.message import Message
 from flwr.supercore.task_message.base import TaskMessage
 from flwr.supercore.task_message.constant import DEFAULT_TASK_MESSAGE_TTL
-from flwr.supercore.task_message.validation import (
-    require_json_object,
-    require_non_empty_string,
-    require_present,
-)
 from flwr.supercore.typing import JSONObject, JSONValue
 
 
@@ -45,7 +40,6 @@ class ConnectorRequest(TaskMessage):
             "call_id": call_id,
             "arguments": arguments,
         }
-        _validate_connector_request_payload(payload)
         super().__init__(
             dst_task_id=dst_task_id,
             payload=payload,
@@ -55,10 +49,17 @@ class ConnectorRequest(TaskMessage):
     @classmethod
     def from_message(cls, message: Message) -> ConnectorRequest:
         """Parse a generic message into a connector request."""
-        return cls._from_message(
-            message,
-            validate_payload=_validate_connector_request_payload,
-        )
+        return cls._from_message(message)
+
+    @classmethod
+    def _validate_payload(cls, payload: JSONObject) -> None:
+        """Validate the connector request payload shape."""
+        cls._validate_non_empty_string(payload, "name")
+        cls._validate_non_empty_string(payload, "call_id")
+        if not isinstance(payload.get("arguments"), dict):
+            raise ValueError(
+                f"{cls.__name__} payload requires a JSON object field 'arguments'."
+            )
 
 
 class ConnectorResponse(TaskMessage):
@@ -84,7 +85,6 @@ class ConnectorResponse(TaskMessage):
             "output": output,
             "error": error,
         }
-        _validate_connector_response_payload(payload)
         super().__init__(
             dst_task_id=dst_task_id,
             payload=payload,
@@ -97,37 +97,26 @@ class ConnectorResponse(TaskMessage):
         """Parse a generic message into a connector response."""
         return cls._from_message(
             message,
-            validate_payload=_validate_connector_response_payload,
             require_reply_to_message_id=True,
-            reply_to_message_id_error="ConnectorResponse requires reply_to_message_id.",
         )
 
+    @classmethod
+    def _validate_payload(cls, payload: JSONObject) -> None:
+        """Validate the connector response payload shape."""
+        cls._validate_non_empty_string(payload, "name")
+        cls._validate_non_empty_string(payload, "call_id")
 
-def _validate_connector_request_payload(payload: JSONObject) -> None:
-    """Validate the connector request payload shape."""
-    require_non_empty_string(payload, "name", owner="ConnectorRequest")
-    require_non_empty_string(payload, "call_id", owner="ConnectorRequest")
-    require_json_object(payload, "arguments", owner="ConnectorRequest")
+        for field in ("output", "error"):
+            if field not in payload:
+                raise ValueError(f"{cls.__name__} payload requires field '{field}'.")
 
-
-def _validate_connector_response_payload(payload: JSONObject) -> None:
-    """Validate the connector response payload shape."""
-    require_non_empty_string(payload, "name", owner="ConnectorResponse")
-    require_non_empty_string(payload, "call_id", owner="ConnectorResponse")
-
-    require_present(payload, "output", owner="ConnectorResponse")
-    require_present(payload, "error", owner="ConnectorResponse")
-
-    error = payload["error"]
-    require_json_object(
-        payload,
-        "error",
-        owner="ConnectorResponse",
-        required=False,
-        allow_none=True,
-    )
-    if error is not None and payload["output"] is not None:
-        raise ValueError(
-            "ConnectorResponse payload field 'output' must be null when "
-            "'error' is set."
-        )
+        error = payload["error"]
+        if error is not None and not isinstance(error, dict):
+            raise ValueError(
+                f"{cls.__name__} payload field 'error' must be a JSON object."
+            )
+        if error is not None and payload["output"] is not None:
+            raise ValueError(
+                f"{cls.__name__} payload field 'output' must be null when "
+                "'error' is set."
+            )
