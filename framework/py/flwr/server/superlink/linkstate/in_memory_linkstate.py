@@ -16,41 +16,42 @@
 
 
 import threading
-from bisect import bisect_right
 from collections import defaultdict
 from collections.abc import Sequence
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 from logging import ERROR, WARNING
-from typing import Literal
+from typing import Literal, cast
 
+from flwr.app import Message
 from flwr.app.user_config import UserConfig
-from flwr.common import Context, Message, log, now
+from flwr.common import log
 from flwr.common.constant import (
     HEARTBEAT_PATIENCE,
     MESSAGE_TTL_TOLERANCE,
     NODE_ID_NUM_BYTES,
-    RUN_FAILURE_DETAILS_NO_HEARTBEAT,
     RUN_ID_NUM_BYTES,
     SUPERLINK_NODE_ID,
+    TASK_ID_NUM_BYTES,
     Status,
     SubStatus,
 )
-from flwr.common.typing import Run, RunStatus
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
+from flwr.proto.task_pb2 import Task, TaskStatus  # pylint: disable=E0611
 from flwr.server.superlink.linkstate.linkstate import LinkState
 from flwr.server.utils import validate_message
 from flwr.supercore.constant import NodeStatus
 from flwr.supercore.corestate.in_memory_corestate import InMemoryCoreState
+from flwr.supercore.date import now
 from flwr.supercore.object_store.object_store import ObjectStore
+from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import FederationManager
 
 from .utils import (
     check_node_availability_for_in_message,
     generate_rand_int_from_bytes,
-    has_valid_sub_status,
-    is_valid_transition,
+    primary_task_type_from_run_type,
     verify_found_message_replies,
     verify_message_ids,
 )
@@ -83,7 +84,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
         # Map run_id to RunRecord
         self.run_ids: dict[int, RunRecord] = {}
-        self.contexts: dict[int, Context] = {}
         self.message_ins_store: dict[str, Message] = {}
         self.message_res_store: dict[str, Message] = {}
         self.message_ins_id_to_message_res_id: dict[str, str] = {}
@@ -102,6 +102,34 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """Get the FederationManager instance."""
         return self._federation_manager
 
+    def _get_run(self, run_id: int) -> Run:
+        """Return run metadata with lifecycle fields from its primary task."""
+        run = self.run_ids[run_id].run
+        task = self.task_store[cast(int, run.primary_task_id)]
+        return replace(
+            run,
+            pending_at=task.pending_at,
+            starting_at=task.starting_at,
+            running_at=task.running_at,
+            finished_at=task.finished_at,
+            status=RunStatus(
+                status=task.status.status,
+                sub_status=task.status.sub_status,
+                details=task.status.details,
+            ),
+        )
+
+    def _is_primary_task(self, task_id: int) -> bool:
+        """Return True if the task is the primary task of its run."""
+        task = self.task_store.get(task_id)
+        if task is None:
+            return False
+        return self.run_ids[task.run_id].run.primary_task_id == task_id
+
+    def _is_finished_run(self, run_id: int) -> bool:
+        """Return True if the run has finished."""
+        return self._get_run(run_id).status.status == Status.FINISHED
+
     def store_message_ins(self, message: Message) -> str | None:
         """Store one Message."""
         # Validate message
@@ -109,11 +137,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         if any(errors):
             log(ERROR, errors)
             return None
-        # Validate run_id
-        if message.metadata.run_id not in self.run_ids:
-            log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
-            return None
-        federation = self.run_ids[message.metadata.run_id].run.federation
         # Validate source node ID
         if message.metadata.src_node_id != SUPERLINK_NODE_ID:
             log(
@@ -122,25 +145,35 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 message.metadata.src_node_id,
             )
             return None
-        # Validate destination node ID
-        dst_node = self.nodes.get(message.metadata.dst_node_id)
-        if (
-            # Node must exist
-            dst_node is None
-            # Node must be online or offline
-            or dst_node.status not in (NodeStatus.ONLINE, NodeStatus.OFFLINE)
-            # Node must belong to the same federation
-            or not self.federation_manager.has_node(dst_node.node_id, federation)
-        ):
-            log(
-                ERROR,
-                "Invalid destination node ID for Message: %s",
-                message.metadata.dst_node_id,
-            )
-            return None
 
         message_id = message.metadata.message_id
         with self.lock:
+            # Validate run_id
+            if message.metadata.run_id not in self.run_ids:
+                log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
+                return None
+            if self._is_finished_run(message.metadata.run_id):
+                log(ERROR, "Invalid run ID for Message: %s", message.metadata.run_id)
+                return None
+            federation = self.run_ids[message.metadata.run_id].run.federation
+
+            # Validate destination node ID
+            dst_node = self.nodes.get(message.metadata.dst_node_id)
+            if (
+                # Node must exist
+                dst_node is None
+                # Node must be online or offline
+                or dst_node.status not in (NodeStatus.ONLINE, NodeStatus.OFFLINE)
+                # Node must belong to the same federation
+                or not self.federation_manager.has_node(dst_node.node_id, federation)
+            ):
+                log(
+                    ERROR,
+                    "Invalid destination node ID for Message: %s",
+                    message.metadata.dst_node_id,
+                )
+                return None
+
             self.message_ins_store[message_id] = message
 
         # Return the new message_id
@@ -236,6 +269,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 )
                 return None
 
+            if msg_ins_id in self.message_ins_id_to_message_res_id:
+                log(
+                    ERROR,
+                    "Failed to store Message reply: duplicate reply for "
+                    "reply_to_message_id %s.",
+                    msg_ins_id,
+                )
+                return None
+
             # Fail if the Message TTL exceeds the
             # expiration time of the Message it replies to.
             # Condition: ins_metadata.created_at + ins_metadata.ttl ≥
@@ -258,13 +300,15 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 )
                 return None
 
-        # Validate run_id
-        if res_metadata.run_id != ins_metadata.run_id:
-            log(ERROR, "`metadata.run_id` is invalid")
-            return None
+            # Validate run_id
+            if res_metadata.run_id != ins_metadata.run_id:
+                log(ERROR, "`metadata.run_id` is invalid")
+                return None
+            if self._is_finished_run(res_metadata.run_id):
+                log(ERROR, "Invalid run ID for Message: %s", res_metadata.run_id)
+                return None
 
-        message_id = message.metadata.message_id
-        with self.lock:
+            message_id = message.metadata.message_id
             self.message_res_store[message_id] = message
             self.message_ins_id_to_message_res_id[msg_ins_id] = message_id
 
@@ -356,6 +400,23 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
         return message_id_list
 
+    def stop_run(self, run_id: int) -> bool:
+        """Stop a run and clean up its messages and objects."""
+        # Check if the run exists
+        run_record = self.run_ids.get(run_id)
+        if run_record is None:
+            return False
+
+        # Stop the run's primary task, which will cascade to stop all its tasks
+        primary_task_id = cast(int, run_record.run.primary_task_id)
+        if not self.finish_task(primary_task_id, SubStatus.STOPPED, ""):
+            return False
+
+        # Clean up messages and their objects related to the run
+        self.delete_messages(self.get_message_ids_from_run_id(run_id))
+        self.object_store.delete_objects_in_run(run_id)
+        return True
+
     def num_message_ins(self) -> int:
         """Calculate the number of instruction Messages in store.
 
@@ -380,7 +441,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         """Create, store in the link state, and return `node_id`."""
         # Sample a random int64 as node_id
         node_id = generate_rand_int_from_bytes(
-            NODE_ID_NUM_BYTES, exclude=[SUPERLINK_NODE_ID, 0]
+            NODE_ID_NUM_BYTES, exclude={SUPERLINK_NODE_ID, 0}
         )
 
         with self.lock:
@@ -518,7 +579,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     if node.online_until <= current_ts:
                         node.status = NodeStatus.OFFLINE
                         node.last_deactivated_at = datetime.fromtimestamp(
-                            node.online_until, tz=timezone.utc
+                            node.online_until, tz=UTC
                         ).isoformat()
 
     def get_node_id_by_public_key(self, public_key: bytes) -> int | None:
@@ -535,7 +596,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 return None
             return node_id
 
-    # pylint: disable=too-many-arguments,too-many-positional-arguments
+    # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
     def create_run(
         self,
         fab_id: str | None,
@@ -546,46 +607,81 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         run_type: str,
+        series_id: int | None = None,
     ) -> int:
         """Create a new run."""
-        # Sample a random int64 as run_id
-        with self.lock:
-            run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
+        task_type = primary_task_type_from_run_type(run_type)
 
-            if run_id not in self.run_ids:
-                run_record = RunRecord(
-                    run=Run(
-                        run_id=run_id,
-                        fab_id=fab_id if fab_id else "",
-                        fab_version=fab_version if fab_version else "",
-                        fab_hash=fab_hash if fab_hash else "",
-                        override_config=override_config,
-                        pending_at=now().isoformat(),
-                        starting_at="",
-                        running_at="",
-                        finished_at="",
-                        status=RunStatus(
-                            status=Status.PENDING,
-                            sub_status="",
-                            details="",
-                        ),
-                        flwr_aid=flwr_aid if flwr_aid else "",
-                        federation=federation,
-                        bytes_sent=0,
-                        bytes_recv=0,
-                        clientapp_runtime=0.0,
-                        run_type=run_type,
+        with self.lock_task_store, self.lock:
+            run_id = generate_rand_int_from_bytes(
+                RUN_ID_NUM_BYTES,
+                exclude=set(self.run_ids),
+            )
+            task_id = generate_rand_int_from_bytes(
+                TASK_ID_NUM_BYTES,
+                exclude=set(self.task_store),
+            )
+            current = now().isoformat()
+            resolved_series_id = self.store_run_in_series(
+                run_id=run_id,
+                federation=federation,
+                series_id=series_id,
+            )
+            if resolved_series_id is None:
+                log(ERROR, "Unexpected run series membership failure.")
+                return 0
+            self._refresh_run_series_context(
+                run_id=run_id,
+                series_id=resolved_series_id,
+            )
+            run_record = RunRecord(
+                run=Run(
+                    run_id=run_id,
+                    fab_id=fab_id if fab_id else "",
+                    fab_version=fab_version if fab_version else "",
+                    fab_hash=fab_hash if fab_hash else "",
+                    override_config=override_config,
+                    pending_at="",
+                    starting_at="",
+                    running_at="",
+                    finished_at="",
+                    status=RunStatus(
+                        status=Status.PENDING,
+                        sub_status="",
+                        details="",
                     ),
-                    federation_config=federation_config,
-                )
-                self.run_ids[run_id] = run_record
-                # Add run_id to the flwr_aid_to_run_ids mapping if flwr_aid is provided
-                if flwr_aid:
-                    self.flwr_aid_to_run_ids[flwr_aid].add(run_id)
+                    flwr_aid=flwr_aid if flwr_aid else "",
+                    federation=federation,
+                    primary_task_id=task_id,
+                    bytes_sent=0,
+                    bytes_recv=0,
+                    clientapp_runtime=0.0,
+                    run_type=run_type,
+                    series_id=resolved_series_id,
+                ),
+                federation_config=federation_config,
+            )
+            self.run_ids[run_id] = run_record
+            # Add run_id to the flwr_aid_to_run_ids mapping if flwr_aid is provided
+            if flwr_aid:
+                self.flwr_aid_to_run_ids[flwr_aid].add(run_id)
 
-                return run_id
-        log(ERROR, "Unexpected run creation failure.")
-        return 0
+            self.task_store[task_id] = Task(
+                task_id=task_id,
+                type=task_type,
+                run_id=run_id,
+                status=TaskStatus(
+                    status=Status.PENDING,
+                    sub_status="",
+                    details="",
+                ),
+                pending_at=current,
+                fab_hash=fab_hash,
+                model_ref=None,
+                connector_ref=None,
+            )
+
+            return run_id
 
     def get_run_info(
         self,
@@ -599,8 +695,8 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
         limit: int | None = None,
     ) -> Sequence[Run]:
         """Retrieve information about runs based on the specified filters."""
-        # Clean up expired tokens; this will flag inactive runs as needed
-        self._cleanup_expired_tokens()
+        with self.lock_task_store:
+            self._cleanup_expired_task_tokens_locked()
 
         with self.lock:
             # Build candidate set and apply each filter as an AND condition.
@@ -620,7 +716,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 matched_run_ids &= {
                     run_id
                     for run_id in matched_run_ids
-                    if self.run_ids[run_id].run.status.status in status_set
+                    if self._get_run(run_id).status.status in status_set
                 }
 
             # Filter by Flower Account IDs
@@ -643,7 +739,7 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                     if self.run_ids[run_id].run.federation in federation_set
                 }
 
-            runs = [self.run_ids[run_id].run for run_id in matched_run_ids]
+            runs = [self._get_run(run_id) for run_id in matched_run_ids]
 
             if order_by is not None:
                 runs = sorted(
@@ -667,64 +763,81 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
 
     def get_run_status(self, run_ids: set[int]) -> dict[int, RunStatus]:
         """Retrieve the statuses for the specified runs."""
-        # Clean up expired tokens; this will flag inactive runs as needed
-        self._cleanup_expired_tokens()
+        with self.lock_task_store:
+            self._cleanup_expired_task_tokens_locked()
 
         with self.lock:
             return {
-                run_id: self.run_ids[run_id].run.status
+                run_id: self._get_run(run_id).status
                 for run_id in set(run_ids)
                 if run_id in self.run_ids
             }
 
-    def update_run_status(self, run_id: int, new_status: RunStatus) -> bool:
-        """Update the status of the run with the specified `run_id`."""
-        # Clean up expired tokens; this will flag inactive runs as needed
-        self._cleanup_expired_tokens()
+    def _finish_run_tasks(
+        self, run_primary_pairs: list[tuple[int, int]], sub_status: str, details: str
+    ) -> None:
+        """Finish all unfinished tasks of the run for the given run/primary-task pairs.
 
-        with self.lock:
-            # Check if the run_id exists
-            if run_id not in self.run_ids:
-                log(ERROR, "`run_id` is invalid")
-                return False
+        Each task's ``finished_at`` is copied from its run's primary task.
+        """
+        for run_id, primary_task_id in run_primary_pairs:
+            primary_task = self.task_store.get(primary_task_id)
+            if primary_task is None:
+                continue
+            finished_at = primary_task.finished_at
+            for task in self.task_store.values():
+                if task.run_id == run_id and task.status.status != Status.FINISHED:
+                    task.finished_at = finished_at
+                    task.status.status = Status.FINISHED
+                    task.status.sub_status = sub_status
+                    task.status.details = details
+                    if record := self.task_token_store.pop(task.task_id, None):
+                        self.task_token_to_task_id.pop(record.token, None)
 
-        with self.run_ids[run_id].lock:
-            # Check if the status transition is valid
-            current_status = self.run_ids[run_id].run.status
-            if not is_valid_transition(current_status, new_status):
-                log(
-                    ERROR,
-                    'Invalid status transition: from "%s" to "%s"',
-                    current_status.status,
-                    new_status.status,
-                )
-                return False
-
-            # Check if the sub-status is valid
-            if not has_valid_sub_status(current_status):
-                log(
-                    ERROR,
-                    'Invalid sub-status "%s" for status "%s"',
-                    current_status.sub_status,
-                    current_status.status,
-                )
-                return False
-
-            # Update the run status
-            current = now()
-            run_record = self.run_ids[run_id]
-            if new_status.status == Status.STARTING:
-                run_record.run.starting_at = current.isoformat()
-            elif new_status.status == Status.RUNNING:
-                run_record.run.running_at = current.isoformat()
-            elif new_status.status == Status.FINISHED:
-                run_record.run.finished_at = current.isoformat()
-            run_record.run.status = new_status
-
-        # Report usage if the run is marked as finished after the update
-        if new_status.status == Status.FINISHED:
+    def finish_task(self, task_id: int, sub_status: str, details: str) -> bool:
+        """Move an unfinished task to finished."""
+        result = super().finish_task(task_id, sub_status, details)
+        if result and self._is_primary_task(task_id):
+            with self.lock_task_store:
+                task = self.task_store.get(task_id)
+                if task is not None:
+                    # Stop all tasks of the run when the run is stopped
+                    if sub_status == SubStatus.STOPPED:
+                        finish_sub_status = SubStatus.STOPPED
+                        finish_details = "Task stopped because the run was stopped"
+                    # Otherwise, fail all tasks of the run
+                    else:
+                        finish_sub_status = SubStatus.FAILED
+                        finish_details = "Task failed because the run finished"
+                    self._finish_run_tasks(
+                        [(task.run_id, task_id)],
+                        sub_status=finish_sub_status,
+                        details=finish_details,
+                    )
             self.federation_manager.report_run_usage()
-        return True
+        return result
+
+    def _on_task_tokens_expired(self, tasks: list[Task]) -> None:
+        """Fail unfinished tasks for runs whose primary task expired and report usage.
+
+        When an expired task is the primary task of a run, this hook marks all
+        unfinished tasks in that run as finished with FAILED status, removes any
+        associated task tokens, and reports run usage.
+        """
+        pairs = [
+            (task.run_id, task.task_id)
+            for task in tasks
+            if self._is_primary_task(task.task_id)
+        ]
+        if not pairs:
+            return
+
+        self._finish_run_tasks(
+            pairs,
+            sub_status=SubStatus.FAILED,
+            details="Task failed because the run expired",
+        )
+        self.federation_manager.report_run_usage()
 
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
@@ -754,68 +867,6 @@ class InMemoryLinkState(LinkState, InMemoryCoreState):  # pylint: disable=R0902,
                 node.heartbeat_interval = heartbeat_interval
                 return True
             return False
-
-    def _on_tokens_expired(self, expired_records: list[tuple[int, float]]) -> None:
-        """Transition runs with expired tokens to failed status.
-
-        Parameters
-        ----------
-        expired_records : list[tuple[int, float]]
-            List of tuples containing (run_id, active_until timestamp)
-            for expired tokens.
-        """
-        updated = False
-        for run_id, active_until in expired_records:
-            if not (run_record := self.run_ids.get(run_id)):
-                continue
-            with run_record.lock:
-                if run_record.run.finished_at:
-                    continue
-                run_record.run.status = RunStatus(
-                    status=Status.FINISHED,
-                    sub_status=SubStatus.FAILED,
-                    details=RUN_FAILURE_DETAILS_NO_HEARTBEAT,
-                )
-                active_until_dt = datetime.fromtimestamp(active_until, tz=timezone.utc)
-                run_record.run.finished_at = active_until_dt.isoformat()
-                updated = True
-
-        # Report usage for runs that have been marked as failed due to expired tokens
-        if updated:
-            self.federation_manager.report_run_usage()
-
-    def get_serverapp_context(self, run_id: int) -> Context | None:
-        """Get the context for the specified `run_id`."""
-        return self.contexts.get(run_id)
-
-    def set_serverapp_context(self, run_id: int, context: Context) -> None:
-        """Set the context for the specified `run_id`."""
-        if run_id not in self.run_ids:
-            raise ValueError(f"Run {run_id} not found")
-        self.contexts[run_id] = context
-
-    def add_serverapp_log(self, run_id: int, log_message: str) -> None:
-        """Add a log entry to the serverapp logs for the specified `run_id`."""
-        if run_id not in self.run_ids:
-            raise ValueError(f"Run {run_id} not found")
-        run = self.run_ids[run_id]
-        with run.log_lock:
-            run.logs.append((now().timestamp(), log_message))
-
-    def get_serverapp_log(
-        self, run_id: int, after_timestamp: float | None
-    ) -> tuple[str, float]:
-        """Get the serverapp logs for the specified `run_id`."""
-        if run_id not in self.run_ids:
-            raise ValueError(f"Run {run_id} not found")
-        run = self.run_ids[run_id]
-        if after_timestamp is None:
-            after_timestamp = 0.0
-        with run.log_lock:
-            # Find the index where the timestamp would be inserted
-            index = bisect_right(run.logs, (after_timestamp, ""))
-            latest_timestamp = run.logs[-1][0] if index < len(run.logs) else 0.0
-            return "".join(log for _, log in run.logs[index:]), latest_timestamp
 
     def store_traffic(self, run_id: int, *, bytes_sent: int, bytes_recv: int) -> None:
         """Store traffic data for the specified `run_id`."""

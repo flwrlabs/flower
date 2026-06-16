@@ -19,12 +19,13 @@ import abc
 from collections.abc import Sequence
 from typing import Literal
 
+from flwr.app import Context, Message, RecordDict
 from flwr.app.user_config import UserConfig
-from flwr.common import Context, Message
-from flwr.common.typing import Run, RunStatus
+from flwr.common.constant import SUPERLINK_NODE_ID
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 from flwr.proto.node_pb2 import NodeInfo  # pylint: disable=E0611
 from flwr.supercore.corestate import CoreState
+from flwr.supercore.run import Run, RunStatus
 from flwr.superlink.federation import FederationManager
 
 
@@ -135,6 +136,14 @@ class LinkState(CoreState):  # pylint: disable=R0904
     @abc.abstractmethod
     def get_message_ids_from_run_id(self, run_id: int) -> set[str]:
         """Get all instruction Message IDs for the given run_id."""
+
+    @abc.abstractmethod
+    def stop_run(self, run_id: int) -> bool:
+        """Stop a run and clean up run-scoped messages and objects.
+
+        Returns True if at least one unfinished task in the run transitioned to
+        stopped, otherwise False.
+        """
 
     @abc.abstractmethod
     def create_node(
@@ -258,6 +267,7 @@ class LinkState(CoreState):  # pylint: disable=R0904
         federation_config: SimulationConfig | None,
         flwr_aid: str | None,
         run_type: str,
+        series_id: int | None = None,
     ) -> int:
         """Create a new run.
 
@@ -279,6 +289,10 @@ class LinkState(CoreState):  # pylint: disable=R0904
             Flower Account ID of the creator.
         run_type : str
             The type of run being created.
+        series_id : int | None (default: None)
+            Optional run series ID. If `None`, a new run series is created for
+            the federation. If set, the series must already exist and belong to
+            the federation.
 
         Returns
         -------
@@ -357,23 +371,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         """
 
     @abc.abstractmethod
-    def update_run_status(self, run_id: int, new_status: RunStatus) -> bool:
-        """Update the status of the run with the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run.
-        new_status : RunStatus
-            The new status to be assigned to the run.
-
-        Returns
-        -------
-        bool
-            True if the status update is successful; False otherwise.
-        """
-
-    @abc.abstractmethod
     def acknowledge_node_heartbeat(
         self, node_id: int, heartbeat_interval: float
     ) -> bool:
@@ -397,69 +394,6 @@ class LinkState(CoreState):  # pylint: disable=R0904
         -------
         is_acknowledged : bool
             True if the heartbeat is successfully acknowledged; otherwise, False.
-        """
-
-    @abc.abstractmethod
-    def get_serverapp_context(self, run_id: int) -> Context | None:
-        """Get the context for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run for which to retrieve the context.
-
-        Returns
-        -------
-        Optional[Context]
-            The context associated with the specified `run_id`, or `None` if no context
-            exists for the given `run_id`.
-        """
-
-    @abc.abstractmethod
-    def set_serverapp_context(self, run_id: int, context: Context) -> None:
-        """Set the context for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run for which to set the context.
-        context : Context
-            The context to be associated with the specified `run_id`.
-        """
-
-    @abc.abstractmethod
-    def add_serverapp_log(self, run_id: int, log_message: str) -> None:
-        """Add a log entry to the ServerApp logs for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run for which to add a log entry.
-        log_message : str
-            The log entry to be added to the ServerApp logs.
-        """
-
-    @abc.abstractmethod
-    def get_serverapp_log(
-        self, run_id: int, after_timestamp: float | None
-    ) -> tuple[str, float]:
-        """Get the ServerApp logs for the specified `run_id`.
-
-        Parameters
-        ----------
-        run_id : int
-            The identifier of the run for which to retrieve the ServerApp logs.
-
-        after_timestamp : Optional[float]
-            Retrieve logs after this timestamp. If set to `None`, retrieve all logs.
-
-        Returns
-        -------
-        tuple[str, float]
-            A tuple containing:
-            - The ServerApp logs associated with the specified `run_id`.
-            - The timestamp of the latest log entry in the returned logs.
-              Returns `0` if no logs are returned.
         """
 
     @abc.abstractmethod
@@ -493,3 +427,21 @@ class LinkState(CoreState):  # pylint: disable=R0904
         runtime : float
             The runtime in seconds to add to the `run_id`'s cumulative total.
         """
+
+    def _refresh_run_series_context(
+        self,
+        run_id: int,
+        series_id: int,
+    ) -> None:
+        """Initialize or refresh the Context for a run series."""
+        context = Context(
+            run_id=run_id,
+            node_id=SUPERLINK_NODE_ID,
+            node_config={},
+            state=RecordDict(),
+            run_config={},
+            series_id=series_id,
+        )
+        if existing_context := self.get_run_series_context(series_id):
+            context.state = existing_context.state
+        self.set_run_series_context(series_id=series_id, context=context)

@@ -18,14 +18,15 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from flwr.app import Context, RecordDict
 from flwr.app.user_config import UserConfig
-from flwr.common import Context, RecordDict
 from flwr.common.config import (
     get_fused_config,
     get_fused_config_from_dir,
     get_fused_config_from_fab,
 )
-from flwr.common.typing import Fab, Run
+from flwr.supercore.fab import Fab
+from flwr.supercore.run import Run
 
 
 @dataclass()

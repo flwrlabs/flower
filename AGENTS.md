@@ -33,3 +33,41 @@ When reviewing a PR, output:
 - Consistency concerns
 - Whether the PR should be split
 - A brief overall verdict
+
+## Development Patterns
+
+### Database Migrations
+
+Python services with databases use Alembic:
+
+```bash
+cd framework
+uv run --no-sync --python=3.11.14 python -m dev.generate_migration "Description"
+```
+
+For Alembic-backed services, do not write a new migration file from scratch when
+the intended change is a schema diff. Help the user use
+`python -m dev.generate_migration` from the `framework/` directory instead, then
+review the generated revision and make only the minimal adjustments needed. This
+helps avoid schema drift between SQLAlchemy models and committed migrations.
+
+The migration generator is Alembic-branch aware. It upgrades the temporary
+database to all heads, then autogenerates a revision against the selected branch
+head. The default branch head is `flwr@head`; these commands are equivalent:
+
+```bash
+cd framework
+uv run --no-sync --python=3.11.14 python -m dev.generate_migration "Widen integer columns"
+```
+
+```bash
+cd framework
+uv run --no-sync --python=3.11.14 python -m dev.generate_migration --head flwr@head "Widen integer columns"
+```
+
+After autogeneration:
+
+- Confirm the new revision has the intended `down_revision`.
+- Confirm the generated operations match the SQLAlchemy metadata change.
+- Review generated `batch_alter_table` blocks for SQLite compatibility.
+- Update generated schema documentation if table metadata changed.

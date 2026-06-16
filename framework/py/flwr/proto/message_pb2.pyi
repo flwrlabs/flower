@@ -100,8 +100,10 @@ class Context(google.protobuf.message.Message):
     NODE_CONFIG_FIELD_NUMBER: builtins.int
     STATE_FIELD_NUMBER: builtins.int
     RUN_CONFIG_FIELD_NUMBER: builtins.int
+    SERIES_ID_FIELD_NUMBER: builtins.int
     run_id: builtins.int
     node_id: builtins.int
+    series_id: builtins.int
     @property
     def node_config(self) -> google.protobuf.internal.containers.MessageMap[builtins.str, flwr.proto.transport_pb2.Scalar]: ...
     @property
@@ -116,9 +118,10 @@ class Context(google.protobuf.message.Message):
         node_config: collections.abc.Mapping[builtins.str, flwr.proto.transport_pb2.Scalar] | None = ...,
         state: flwr.proto.recorddict_pb2.RecordDict | None = ...,
         run_config: collections.abc.Mapping[builtins.str, flwr.proto.transport_pb2.Scalar] | None = ...,
+        series_id: builtins.int = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["state", b"state"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["node_config", b"node_config", "node_id", b"node_id", "run_config", b"run_config", "run_id", b"run_id", "state", b"state"]) -> None: ...
+    def ClearField(self, field_name: typing.Literal["node_config", b"node_config", "node_id", b"node_id", "run_config", b"run_config", "run_id", b"run_id", "series_id", b"series_id", "state", b"state"]) -> None: ...
 
 global___Context = Context
 
@@ -135,6 +138,8 @@ class Metadata(google.protobuf.message.Message):
     TTL_FIELD_NUMBER: builtins.int
     MESSAGE_TYPE_FIELD_NUMBER: builtins.int
     CREATED_AT_FIELD_NUMBER: builtins.int
+    SRC_TASK_ID_FIELD_NUMBER: builtins.int
+    DST_TASK_ID_FIELD_NUMBER: builtins.int
     run_id: builtins.int
     message_id: builtins.str
     src_node_id: builtins.int
@@ -144,6 +149,8 @@ class Metadata(google.protobuf.message.Message):
     ttl: builtins.float
     message_type: builtins.str
     created_at: builtins.float
+    src_task_id: builtins.int
+    dst_task_id: builtins.int
     def __init__(
         self,
         *,
@@ -156,8 +163,15 @@ class Metadata(google.protobuf.message.Message):
         ttl: builtins.float = ...,
         message_type: builtins.str = ...,
         created_at: builtins.float = ...,
+        src_task_id: builtins.int | None = ...,
+        dst_task_id: builtins.int | None = ...,
     ) -> None: ...
-    def ClearField(self, field_name: typing.Literal["created_at", b"created_at", "dst_node_id", b"dst_node_id", "group_id", b"group_id", "message_id", b"message_id", "message_type", b"message_type", "reply_to_message_id", b"reply_to_message_id", "run_id", b"run_id", "src_node_id", b"src_node_id", "ttl", b"ttl"]) -> None: ...
+    def HasField(self, field_name: typing.Literal["_dst_task_id", b"_dst_task_id", "_src_task_id", b"_src_task_id", "dst_task_id", b"dst_task_id", "src_task_id", b"src_task_id"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing.Literal["_dst_task_id", b"_dst_task_id", "_src_task_id", b"_src_task_id", "created_at", b"created_at", "dst_node_id", b"dst_node_id", "dst_task_id", b"dst_task_id", "group_id", b"group_id", "message_id", b"message_id", "message_type", b"message_type", "reply_to_message_id", b"reply_to_message_id", "run_id", b"run_id", "src_node_id", b"src_node_id", "src_task_id", b"src_task_id", "ttl", b"ttl"]) -> None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_dst_task_id", b"_dst_task_id"]) -> typing.Literal["dst_task_id"] | None: ...
+    @typing.overload
+    def WhichOneof(self, oneof_group: typing.Literal["_src_task_id", b"_src_task_id"]) -> typing.Literal["src_task_id"] | None: ...
 
 global___Metadata = Metadata
 

@@ -57,6 +57,18 @@ class ControlStub:
     ]
     """flwr ls command"""
 
+    ListRunSeries: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListRunSeriesRequest,
+        flwr.proto.control_pb2.ListRunSeriesResponse,
+    ]
+    """List run series"""
+
+    GetRunSeries: grpc.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.GetRunSeriesRequest,
+        flwr.proto.control_pb2.GetRunSeriesResponse,
+    ]
+    """Get run series"""
+
     GetLoginDetails: grpc.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.GetLoginDetailsRequest,
         flwr.proto.control_pb2.GetLoginDetailsResponse,
@@ -206,6 +218,18 @@ class ControlAsyncStub:
         flwr.proto.control_pb2.ListRunsResponse,
     ]
     """flwr ls command"""
+
+    ListRunSeries: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.ListRunSeriesRequest,
+        flwr.proto.control_pb2.ListRunSeriesResponse,
+    ]
+    """List run series"""
+
+    GetRunSeries: grpc.aio.UnaryUnaryMultiCallable[
+        flwr.proto.control_pb2.GetRunSeriesRequest,
+        flwr.proto.control_pb2.GetRunSeriesResponse,
+    ]
+    """Get run series"""
 
     GetLoginDetails: grpc.aio.UnaryUnaryMultiCallable[
         flwr.proto.control_pb2.GetLoginDetailsRequest,
@@ -364,6 +388,22 @@ class ControlServicer(metaclass=abc.ABCMeta):
         context: _ServicerContext,
     ) -> typing.Union[flwr.proto.control_pb2.ListRunsResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListRunsResponse]]:
         """flwr ls command"""
+
+    @abc.abstractmethod
+    def ListRunSeries(
+        self,
+        request: flwr.proto.control_pb2.ListRunSeriesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.ListRunSeriesResponse, collections.abc.Awaitable[flwr.proto.control_pb2.ListRunSeriesResponse]]:
+        """List run series"""
+
+    @abc.abstractmethod
+    def GetRunSeries(
+        self,
+        request: flwr.proto.control_pb2.GetRunSeriesRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[flwr.proto.control_pb2.GetRunSeriesResponse, collections.abc.Awaitable[flwr.proto.control_pb2.GetRunSeriesResponse]]:
+        """Get run series"""
 
     @abc.abstractmethod
     def GetLoginDetails(

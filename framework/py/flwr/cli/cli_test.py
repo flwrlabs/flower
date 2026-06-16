@@ -15,7 +15,10 @@
 """Tests for the CLI."""
 
 
-from typing import Any
+import importlib
+import inspect
+from types import SimpleNamespace
+from typing import Annotated, Any, get_args, get_origin
 from unittest.mock import patch
 
 import pytest
@@ -25,6 +28,9 @@ from flwr.supercore.version import package_version
 
 from . import app as app_module
 from .app import app
+
+run_module = importlib.import_module("flwr.cli.run.run")
+run_command = run_module.run
 
 runner = CliRunner()
 
@@ -69,6 +75,26 @@ def test_run_command() -> None:
     assert result.exit_code == 0
     assert "Usage:" in result.output
     assert "run" in result.output
+
+
+def test_run_command_accepts_remote_app_spec() -> None:
+    """Remote app specs should stay as raw strings instead of path-normalized values."""
+    app_annotation = inspect.signature(run_command).parameters["app"].annotation
+    assert get_origin(app_annotation) is Annotated
+    assert get_args(app_annotation)[0] is str
+
+    with (
+        patch("flwr.cli.app.warn_if_flwr_update_available"),
+        patch.object(run_module, "read_superlink_connection") as mock_read_connection,
+        patch.object(run_module, "_run_with_control_api") as mock_run_with_control_api,
+    ):
+        mock_read_connection.return_value = SimpleNamespace(federation=None)
+
+        result = runner.invoke(app, ["run", "@flwrlabs/quickstart-numpy"])
+
+    assert result.exit_code == 0
+    assert mock_run_with_control_api.call_args is not None
+    assert mock_run_with_control_api.call_args.args[-1] == "@flwrlabs/quickstart-numpy"
 
 
 def test_build_command() -> None:

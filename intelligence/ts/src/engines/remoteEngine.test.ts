@@ -13,17 +13,33 @@
 // limitations under the License.
 // =============================================================================
 
-import { assert, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, assert, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CryptographyHandler } from './remoteEngine/cryptoHandler';
 import { getTimestamp } from './remoteEngine/cryptoUtils';
 import { KeyManager } from './remoteEngine/keyManager';
 import { NetworkService } from './remoteEngine/networkService';
 
-const API_KEY = process.env.FI_API_KEY ?? '';
-const REMOTE_URL = process.env.FI_DEV_REMOTE_URL ?? '';
+const API_KEY = process.env.FI_API_KEY ?? 'test-api-key';
+const REMOTE_URL = process.env.FI_DEV_REMOTE_URL ?? 'https://example.test';
 const STRING_TIMESTAMP = '2025-03-06T13:19:47.353034';
 const INT_TIMESTAMP = 1741267187353;
+const EXPIRES_AT = '2099-01-01T00:00:00.000000';
+
+let serverPublicKeyBase64 = '';
+
+async function exportTestServerPublicKey(): Promise<string> {
+  const keyPair = await crypto.subtle.generateKey(
+    {
+      name: 'ECDH',
+      namedCurve: 'P-384',
+    },
+    true,
+    ['deriveBits']
+  );
+  const exportedKey = await crypto.subtle.exportKey('spki', keyPair.publicKey);
+  return btoa(String.fromCharCode(...new Uint8Array(exportedKey)));
+}
 
 vi.mock('./constants', () => ({
   DEFAULT_MODEL: 'meta/llama3.2-1b/instruct-fp16',
@@ -32,6 +48,37 @@ vi.mock('./constants', () => ({
   SDK: 'TS',
   ALLOWED_ROLES: ['system', 'assistant', 'user'],
 }));
+
+beforeAll(async () => {
+  serverPublicKeyBase64 = await exportTestServerPublicKey();
+});
+
+beforeEach(() => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((input: URL | RequestInfo) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.endsWith('/v1/encryption/public-key')) {
+        return new Response(
+          JSON.stringify({ expires_at: EXPIRES_AT, encryption_id: 'test-encryption-id' }),
+          { status: 200 }
+        );
+      }
+      if (url.endsWith('/v1/encryption/server-public-key')) {
+        return new Response(
+          JSON.stringify({ expires_at: EXPIRES_AT, public_key_base64: serverPublicKeyBase64 }),
+          { status: 200 }
+        );
+      }
+      return new Response('', { status: 404, statusText: 'Not Found' });
+    })
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('CryptographyHandler', () => {
   let cryptographyHandler: CryptographyHandler;

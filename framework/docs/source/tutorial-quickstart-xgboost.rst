@@ -129,7 +129,6 @@ With default arguments, you will see streamed output like this:
     INFO :      Final results:
     INFO :              ServerApp-side Evaluate Metrics:
     INFO :              {}
-    Saving final model to disk...
 
 You can also override the parameters defined in the ``[tool.flwr.app.config]`` section
 in the ``pyproject.toml`` like this:
@@ -157,6 +156,7 @@ file:
     fraction-train = 0.1
     fraction-evaluate = 0.1
     local-epochs = 1
+    save-model = false
 
     # XGBoost parameters
     params.objective = "binary:logistic"
@@ -415,16 +415,17 @@ After that, the execution of the strategy is launched when invoking its
             num_rounds=num_rounds,
         )
 
-        # Save final model to disk
-        bst = xgb.Booster(params=params)
-        global_model = bytearray(result.arrays["0"].numpy().tobytes())
+        if context.run_config["save-model"]:
+            # Save final model to disk
+            bst = xgb.Booster(params=params)
+            global_model = bytearray(result.arrays["0"].numpy().tobytes())
 
-        # Load global model into booster
-        bst.load_model(global_model)
+            # Load global model into booster
+            bst.load_model(global_model)
 
-        # Save model
-        print("\nSaving final model to disk...")
-        bst.save_model("final_model.json")
+            # Save model
+            print("\nSaving final model to disk...")
+            bst.save_model("final_model.json")
 
 Note the ``start`` method of the strategy returns a |result_link|_ object. This object
 contains all the relevant information about the FL process, including the final model

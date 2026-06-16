@@ -15,7 +15,13 @@
 # limitations under the License.
 # ==============================================================================
 
-set -e
+set -euo pipefail
+
+if [[ -z "${PYPI_REPOSITORY_PASSWORD:-}" ]]; then
+  echo "Missing required configuration: PYPI_REPOSITORY_PASSWORD" >&2
+  exit 1
+fi
+
 cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/../
 
-uv publish --token "${PYPI_TOKEN}"
+uv publish --token "${PYPI_REPOSITORY_PASSWORD}"

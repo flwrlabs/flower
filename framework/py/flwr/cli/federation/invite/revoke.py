@@ -31,8 +31,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.control_pb2_grpc import ControlStub
 
-from ..error_handlers import handle_invite_grpc_error
-
 
 def revoke(
     account: Annotated[
@@ -73,7 +71,7 @@ def _revoke_invitation(
     is_json: bool,
 ) -> None:
     """Send a revoke invitation request."""
-    with flwr_cli_grpc_exc_handler(handle_invite_grpc_error):
+    with flwr_cli_grpc_exc_handler():
         _: RevokeInvitationResponse = stub.RevokeInvitation(request)
 
     if is_json:

@@ -50,7 +50,6 @@ torchvision = "0.23.0"
 [tool.poetry.dev-dependencies]
 isort = "==5.13.2"
 black = "==24.2.0"
-docformatter = "==1.7.5"
 mypy = "==1.4.1"
 pylint = "==2.8.2"
 flake8 = "==3.9.2"
@@ -106,10 +105,6 @@ disallow_untyped_calls = false
 module = "torch.*"
 follow_imports = "skip"
 follow_imports_for_stubs = true
-
-[tool.docformatter]
-wrap-summaries = 88
-wrap-descriptions = 88
 
 [tool.ruff]
 target-version = "py38"

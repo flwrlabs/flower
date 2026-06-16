@@ -16,25 +16,15 @@
 
 import re
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any
-
-_toml: Any
-
-try:
-    import tomllib
-
-    _toml = tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
-    import tomli
-
-    _toml = tomli
 
 
 def _load_config() -> dict[str, Any]:
     config_path = Path(__file__).resolve().parent.parent / "changelog_config.toml"
     with config_path.open("rb") as file:
-        config: dict[str, Any] = _toml.load(file)
+        config: dict[str, Any] = tomllib.load(file)
         return config
 
 

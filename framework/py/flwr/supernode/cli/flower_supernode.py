@@ -26,7 +26,10 @@ from cryptography.hazmat.primitives.serialization import load_ssh_private_key
 from cryptography.hazmat.primitives.serialization.ssh import load_ssh_public_key
 
 from flwr.common import EventType, event
-from flwr.common.args import try_obtain_root_certificates
+from flwr.common.args import (
+    add_args_runtime_dependency_install,
+    try_obtain_root_certificates,
+)
 from flwr.common.config import parse_config_args
 from flwr.common.constant import (
     CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS,
@@ -39,7 +42,12 @@ from flwr.common.constant import (
 )
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
+from flwr.supercore.auth import (
+    add_superexec_auth_secret_args,
+    load_superexec_auth_secret,
+)
 from flwr.supercore.grpc_health import add_args_health
+from flwr.supercore.tls import try_obtain_optional_appio_server_certificates
 from flwr.supercore.update_check import warn_if_flwr_update_available
 from flwr.supercore.version import package_version
 from flwr.supernode.start_client_internal import start_client_internal
@@ -59,7 +67,28 @@ def flower_supernode() -> None:
     if trusted_entities:
         _validate_public_keys_ed25519(trusted_entities)
     root_certificates = try_obtain_root_certificates(args, args.superlink)
+    clientappio_certificates = try_obtain_optional_appio_server_certificates(args)
     authentication_keys = _try_setup_client_authentication(args)
+    superexec_auth_secret = None
+    if args.superexec_auth_secret_file is not None:
+        log(
+            WARN,
+            "EXPERIMENTAL: SuperExec authentication is experimental and "
+            "may change in future releases.",
+        )
+    if (
+        args.isolation == ISOLATION_MODE_PROCESS
+        and args.superexec_auth_secret_file is not None
+    ):
+        try:
+            superexec_auth_secret = load_superexec_auth_secret(
+                secret_file=args.superexec_auth_secret_file,
+            )
+        except ValueError as err:
+            flwr_exit(
+                ExitCode.SUPEREXEC_AUTH_SECRET_LOAD_FAILED,
+                f"Failed to load SuperExec auth secret: {err}",
+            )
 
     # Warn if authentication keys are provided but transport is not grpc-rere
     if authentication_keys is not None and args.transport != TRANSPORT_TYPE_GRPC_RERE:
@@ -83,8 +112,14 @@ def flower_supernode() -> None:
         ),
         isolation=args.isolation,
         clientappio_api_address=args.clientappio_api_address,
+        clientappio_certificates=clientappio_certificates,
+        clientappio_root_certificates_path=(
+            args.appio_ssl_ca_certfile if clientappio_certificates is not None else None
+        ),
         health_server_address=args.health_server_address,
         trusted_entities=trusted_entities,
+        superexec_auth_secret=superexec_auth_secret,
+        runtime_dependency_install=args.runtime_dependency_install,
     )
 
 
@@ -120,6 +155,27 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
         f"By default, it is set to {CLIENTAPPIO_API_DEFAULT_SERVER_ADDRESS}.",
     )
     parser.add_argument(
+        "--appio-ssl-certfile",
+        help="ClientAppIo API server TLS certificate file (as a path str) "
+        "to create a secure connection. The certificate must include SANs for "
+        "the AppIO API address used by SuperExec.",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
+        "--appio-ssl-keyfile",
+        help="ClientAppIo API server TLS private key file (as a path str) "
+        "to create a secure connection.",
+        type=str,
+    )
+    parser.add_argument(
+        "--appio-ssl-ca-certfile",
+        help="Path to the PEM-encoded CA certificate file used by SuperExec to verify "
+        "the ClientAppIo API server certificate. This is not a client certificate "
+        "for mTLS.",
+        type=str,
+    )
+    parser.add_argument(
         "--trusted-entities",
         type=Path,
         default=None,
@@ -131,6 +187,8 @@ def _parse_args_run_supernode() -> argparse.ArgumentParser:
             "fpk_UUID2: 'ssh-ed25519 <key2> [comment2]' }"
         ),
     )
+    add_superexec_auth_secret_args(parser)
+    add_args_runtime_dependency_install(parser)
     add_args_health(parser)
 
     return parser
@@ -170,8 +228,8 @@ def _parse_args_common(parser: argparse.ArgumentParser) -> None:
         "--root-certificates",
         metavar="ROOT_CERT",
         type=str,
-        help="Specifies the path to the PEM-encoded root certificate file for "
-        "establishing secure HTTPS connections.",
+        help="Path to a PEM-encoded root CA certificate (or CA bundle) used to verify "
+        "the server's TLS certificate. This is not a client certificate for mTLS.",
     )
     parser.add_argument(
         "--superlink",

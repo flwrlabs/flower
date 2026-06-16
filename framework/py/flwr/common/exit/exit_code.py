@@ -35,11 +35,14 @@ class ExitCode:
     SUPERLINK_INVALID_ARGS = 104
     SUPERLINK_DATABASE_SCHEMA_MISMATCH = 105
 
-    # ServerApp-specific exit codes (200-299)
+    # ServerApp-specific exit codes (200-249)
     SERVERAPP_STRATEGY_PRECONDITION_UNMET = 200
     SERVERAPP_EXCEPTION = 201
     SERVERAPP_STRATEGY_AGGREGATION_ERROR = 202
     SERVERAPP_RUN_START_REJECTED = 203
+
+    # ClientApp-specific exit codes (250-299)
+    CLIENTAPP_COMMUNICATION_ERROR = 250
 
     # SuperNode-specific exit codes (300-399)
     SUPERNODE_REST_ADDRESS_INVALID = 300
@@ -50,6 +53,7 @@ class ExitCode:
 
     # SuperExec-specific exit codes (400-499)
     SUPEREXEC_INVALID_PLUGIN_CONFIG = 400
+    SUPEREXEC_AUTH_SECRET_LOAD_FAILED = 401
 
     # FlowerCLI-specific exit codes (500-599)
     FLWRCLI_NODE_AUTH_PUBLIC_KEY_INVALID = 500
@@ -58,10 +62,17 @@ class ExitCode:
     COMMON_ADDRESS_INVALID = 600
     COMMON_MISSING_EXTRA_REST = 601
     COMMON_TLS_NOT_SUPPORTED = 602
+    COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE = 603
+    COMMON_PATH_INVALID = 604
+    COMMON_TLS_SERVER_CERTIFICATES_INVALID = 605
+    RUNTIME_VERSION_INCOMPATIBLE = 606
 
     # Simulation exit codes (700-799)
     SIMULATION_EXCEPTION = 700
     SIMULATION_MISSING_EXTRA = 701
+
+    # Task process exit codes (800-899)
+    TASK_PROC_EXCEPTION = 800
 
     def __new__(cls) -> ExitCode:
         """Prevent instantiation."""
@@ -98,7 +109,7 @@ EXIT_CODE_HELP = {
         "SuperLink. Please refer to the documentation for guidance on how to resolve "
         "this issue."
     ),
-    # ServerApp-specific exit codes (200-299)
+    # ServerApp-specific exit codes (200-249)
     ExitCode.SERVERAPP_STRATEGY_PRECONDITION_UNMET: (
         "The strategy received replies that cannot be aggregated. Please ensure all "
         "replies returned by ClientApps have one `ArrayRecord` (none when replies are "
@@ -117,6 +128,10 @@ EXIT_CODE_HELP = {
         "The SuperLink rejected the request to start the run. This may occur if the "
         "run has been stopped, the run ID or FAB is invalid, or the run failed to "
         "start within the allowed time."
+    ),
+    # ClientApp-specific exit codes (250-299)
+    ExitCode.CLIENTAPP_COMMUNICATION_ERROR: (
+        "The ClientApp could not communicate with the ClientAppIo API."
     ),
     # SuperNode-specific exit codes (300-399)
     ExitCode.SUPERNODE_REST_ADDRESS_INVALID: (
@@ -141,6 +156,9 @@ EXIT_CODE_HELP = {
     ExitCode.SUPEREXEC_INVALID_PLUGIN_CONFIG: (
         "The YAML configuration for the SuperExec plugin is invalid."
     ),
+    ExitCode.SUPEREXEC_AUTH_SECRET_LOAD_FAILED: (
+        "Failed to load the SuperExec authentication secret."
+    ),
     # FlowerCLI-specific exit codes (500-599)
     ExitCode.FLWRCLI_NODE_AUTH_PUBLIC_KEY_INVALID: (
         "Node authentication requires a valid elliptic curve public key in the "
@@ -160,6 +178,19 @@ To use the REST API, install `flwr` with the `rest` extra:
     `pip install "flwr[rest]"`.
 """,
     ExitCode.COMMON_TLS_NOT_SUPPORTED: "Please use the '--insecure' flag.",
+    ExitCode.COMMON_TLS_ROOT_CERTIFICATES_INCOMPATIBLE: (
+        "The '--root-certificates' option cannot be used together with '--insecure'."
+    ),
+    ExitCode.COMMON_PATH_INVALID: (
+        "The provided path is invalid or does not point to the expected file."
+    ),
+    ExitCode.COMMON_TLS_SERVER_CERTIFICATES_INVALID: (
+        "TLS server certificate configuration is incomplete or invalid."
+    ),
+    ExitCode.RUNTIME_VERSION_INCOMPATIBLE: (
+        "Upgrade your Flower version to the required version, or contact the server "
+        "administrator."
+    ),
     # Simulation exit codes (700-799)
     ExitCode.SIMULATION_EXCEPTION: (
         "An unhandled exception occurred when running the simulation."
@@ -171,4 +202,8 @@ To use simulation with the Ray backend, install `flwr` with the `simulation` ext
 
     `pip install "flwr[simulation]"`.
 """,
+    # Task process exit codes (800-899)
+    ExitCode.TASK_PROC_EXCEPTION: (
+        "An unhandled exception occurred in a task process."
+    ),
 }

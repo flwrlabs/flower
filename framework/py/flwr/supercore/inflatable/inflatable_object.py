@@ -215,11 +215,6 @@ def get_object_children_ids_from_object_content(object_content: bytes) -> list[s
     return get_object_head_values_from_object_content(object_content)[1]
 
 
-def get_object_body_len_from_object_content(object_content: bytes) -> int:
-    """Return length of the object body."""
-    return get_object_head_values_from_object_content(object_content)[2]
-
-
 def get_object_head_values_from_object_content(
     object_content: bytes,
 ) -> tuple[str, list[str], int]:

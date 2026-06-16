@@ -10,7 +10,7 @@
  Python version
 ****************
 
-Flower requires at least `Python 3.10 <https://docs.python.org/3.10/>`_.
+Flower requires at least `Python 3.11 <https://docs.python.org/3.11/>`_.
 
 ************************
  Install stable release

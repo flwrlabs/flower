@@ -31,7 +31,10 @@ import grpc
 import yaml
 
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH, EventType, event
-from flwr.common.args import try_obtain_server_certificates
+from flwr.common.args import (
+    add_args_runtime_dependency_install,
+    try_obtain_server_certificates,
+)
 from flwr.common.constant import (
     AUTHN_TYPE_YAML_KEY,
     AUTHZ_TYPE_YAML_KEY,
@@ -59,12 +62,19 @@ from flwr.proto.fleet_pb2_grpc import (  # pylint: disable=E0611
 from flwr.proto.grpcadapter_pb2_grpc import add_GrpcAdapterServicer_to_server
 from flwr.server.fleet_event_log_interceptor import FleetEventLogInterceptor
 from flwr.supercore.address import parse_address, resolve_bind_address
+from flwr.supercore.auth import (
+    add_superexec_auth_secret_args,
+    load_superexec_auth_secret,
+)
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME
-from flwr.supercore.ffs import FfsFactory
 from flwr.supercore.grpc_health import add_args_health, run_health_server_grpc_no_tls
+from flwr.supercore.interceptors import create_fleet_runtime_version_server_interceptor
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.tls import (
+    get_client_tls_args,
+    try_obtain_optional_appio_server_certificates,
+)
 from flwr.supercore.update_check import warn_if_flwr_update_available
-from flwr.supercore.utils import get_flwr_home
 from flwr.supercore.version import package_version
 from flwr.superlink.artifact_provider import ArtifactProvider
 from flwr.superlink.auth_plugin import (
@@ -84,7 +94,6 @@ from .superlink.fleet.grpc_rere.node_auth_server_interceptor import (
 from .superlink.linkstate import LinkStateFactory
 from .superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
 
-BASE_DIR = get_flwr_home() / "superlink" / "ffs"
 P = TypeVar("P", ControlAuthnPlugin, ControlAuthzPlugin)
 
 
@@ -96,6 +105,8 @@ try:
         get_control_event_log_writer_plugins,
         get_ee_artifact_provider,
         get_ee_federation_manager,
+        get_ee_linkstate_factory,
+        get_ee_objectstore_factory,
         get_fleet_event_log_writer_plugins,
     )
 except ImportError:
@@ -132,6 +143,18 @@ except ImportError:
         """Return the EE FederationManager."""
         raise NotImplementedError("No federation manager is currently supported.")
 
+    def get_ee_objectstore_factory(database: str) -> ObjectStoreFactory:
+        """Return an EE ObjectStoreFactory for supported non-SQLite database URLs."""
+        raise NotImplementedError("No additional state backends are supported.")
+
+    def get_ee_linkstate_factory(
+        database: str,
+        federation_manager: FederationManager,
+        objectstore_factory: ObjectStoreFactory,
+    ) -> LinkStateFactory:
+        """Return an EE LinkStateFactory for supported non-SQLite database URLs."""
+        raise NotImplementedError("No additional state backends are supported.")
+
 
 def get_control_authn_plugins() -> dict[str, type[ControlAuthnPlugin]]:
     """Return all Control API authentication plugins."""
@@ -152,6 +175,36 @@ def get_federation_manager(is_simulation: bool = False) -> FederationManager:
         return federation_manager
     except NotImplementedError:
         return NoOpFederationManager(simulation=is_simulation)
+
+
+def _is_non_sqlite_database_url(database: str) -> bool:
+    """Return whether the database argument is a non-SQLite URL."""
+    normalized = database.strip().lower()
+    return "://" in normalized and not normalized.startswith("sqlite://")
+
+
+def _get_objectstore_linkstate_factories(
+    database: str,
+    federation_manager: FederationManager,
+) -> tuple[ObjectStoreFactory, LinkStateFactory]:
+    """Return ObjectStore and LinkState factories for the selected DB backend."""
+    if _is_non_sqlite_database_url(database):
+        try:
+            objectstore_factory = get_ee_objectstore_factory(database)
+            state_factory = get_ee_linkstate_factory(
+                database, federation_manager, objectstore_factory
+            )
+            return objectstore_factory, state_factory
+        except NotImplementedError as exc:
+            raise ValueError(
+                "Unsupported value for `--database`. The Flower framework supports "
+                "`:flwr-in-memory:`, `:memory:`, SQLite file paths, and `sqlite://` "
+                "URLs (including `sqlite:///:memory:`)."
+            ) from exc
+
+    objectstore_factory = ObjectStoreFactory(database)
+    state_factory = LinkStateFactory(database, federation_manager, objectstore_factory)
+    return objectstore_factory, state_factory
 
 
 # pylint: disable=too-many-branches, too-many-locals, too-many-statements
@@ -217,7 +270,34 @@ def run_superlink() -> None:
         health_server_address, _, _ = _format_address(args.health_server_address)
 
     # Obtain certificates
-    certificates = try_obtain_server_certificates(args)
+    certificates, appio_certificates = _obtain_superlink_certificates(args)
+
+    # Load SuperExec auth secret
+    superexec_auth_secret: bytes | None = None
+    if args.superexec_auth_secret_file is not None:
+        log(
+            WARN,
+            "EXPERIMENTAL: SuperExec authentication is experimental and "
+            "may change in future releases.",
+        )
+    if args.isolation == ISOLATION_MODE_SUBPROCESS:
+        if args.superexec_auth_secret_file is not None:
+            log(
+                WARN,
+                "SuperExec auth secret is ignored in subprocess isolation mode.",
+            )
+    else:
+        # Enable SuperExec auth in process mode when secret is provided
+        if args.superexec_auth_secret_file is not None:
+            try:
+                superexec_auth_secret = load_superexec_auth_secret(
+                    secret_file=args.superexec_auth_secret_file,
+                )
+            except ValueError as err:
+                flwr_exit(
+                    ExitCode.SUPERLINK_INVALID_ARGS,
+                    f"Failed to load SuperExec authentication secret: {err}",
+                )
 
     # Disable the account auth TLS check if args.disable_oidc_tls_cert_verification is
     # provided
@@ -298,24 +378,21 @@ def run_superlink() -> None:
     # Load Federation Manager
     federation_manager = get_federation_manager(is_simulation=args.simulation)
 
-    # Initialize ObjectStoreFactory
-    objectstore_factory = ObjectStoreFactory(args.database)
+    # Initialize backend ObjectStoreFactory and StateFactory
+    try:
+        objectstore_factory, state_factory = _get_objectstore_linkstate_factories(
+            args.database, federation_manager
+        )
+    except ValueError as err:
+        flwr_exit(ExitCode.SUPERLINK_INVALID_ARGS, str(err))
 
-    # Initialize StateFactory
-    state_factory = LinkStateFactory(
-        args.database, federation_manager, objectstore_factory
-    )
     state_factory.state()  # Force initialization before starting servers
-
-    # Initialize FfsFactory
-    ffs_factory = FfsFactory(args.storage_dir)
 
     # Start Control API
     is_simulation = args.simulation
     control_server: grpc.Server = run_control_api_grpc(
         address=control_address,
         state_factory=state_factory,
-        ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
         certificates=certificates,
         authn_plugin=authn_plugin,
@@ -331,9 +408,9 @@ def run_superlink() -> None:
     serverappio_server: grpc.Server = run_serverappio_api_grpc(
         address=serverappio_address,
         state_factory=state_factory,
-        ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
-        certificates=None,  # ServerAppIo API doesn't support SSL yet
+        certificates=appio_certificates,
+        superexec_auth_secret=superexec_auth_secret,
     )
     grpc_servers.append(serverappio_server)
 
@@ -378,7 +455,6 @@ def run_superlink() -> None:
                     args.ssl_keyfile,
                     args.ssl_certfile,
                     state_factory,
-                    ffs_factory,
                     objectstore_factory,
                     num_workers,
                 ),
@@ -398,7 +474,6 @@ def run_superlink() -> None:
             fleet_server = _run_fleet_api_grpc_rere(
                 address=fleet_address,
                 state_factory=state_factory,
-                ffs_factory=ffs_factory,
                 objectstore_factory=objectstore_factory,
                 enable_supernode_auth=enable_supernode_auth,
                 certificates=certificates,
@@ -409,7 +484,6 @@ def run_superlink() -> None:
             fleet_server = _run_fleet_api_grpc_adapter(
                 address=fleet_address,
                 state_factory=state_factory,
-                ffs_factory=ffs_factory,
                 objectstore_factory=objectstore_factory,
                 certificates=certificates,
             )
@@ -422,10 +496,13 @@ def run_superlink() -> None:
         # bound_address contains the actual address when the port is set to :0
         # which means let the OS choose a free port.
         appio_address = resolve_bind_address(serverappio_server.bound_address)
-        command = ["flower-superexec", "--insecure"]
-        command += ["--appio-api-address", appio_address]
-        command += ["--plugin-type", ExecPluginType.SERVER_APP]
-        command += ["--parent-pid", str(os.getpid())]
+        command = _get_superexec_command(
+            appio_address=appio_address,
+            appio_certificates=appio_certificates,
+            appio_root_certificates_path=args.appio_ssl_ca_certfile,
+            parent_pid=os.getpid(),
+            runtime_dependency_install=args.runtime_dependency_install,
+        )
         # pylint: disable-next=consider-using-with
         subprocess.Popen(command)
 
@@ -459,6 +536,44 @@ def _format_address(address: str) -> tuple[str, str, int]:
         )
     host, port, is_v6 = parsed_address
     return (f"[{host}]:{port}" if is_v6 else f"{host}:{port}", host, port)
+
+
+def _obtain_superlink_certificates(
+    args: argparse.Namespace,
+) -> tuple[tuple[bytes, bytes, bytes] | None, tuple[bytes, bytes, bytes] | None]:
+    """Return Fleet/Control and ServerAppIo certificate tuples."""
+    if args.insecure:
+        log(
+            WARN,
+            "Option `--insecure` was set. Starting insecure HTTP server with "
+            "unencrypted communication (TLS disabled). Proceed only if you understand "
+            "the risks.",
+        )
+        return None, None
+    certificates = try_obtain_server_certificates(args)
+    appio_certificates = try_obtain_optional_appio_server_certificates(args)
+    return certificates, appio_certificates
+
+
+def _get_superexec_command(
+    appio_address: str,
+    appio_certificates: tuple[bytes, bytes, bytes] | None,
+    appio_root_certificates_path: str | None,
+    parent_pid: int,
+    runtime_dependency_install: bool,
+) -> list[str]:
+    """Return the auto-launched SuperExec command for ServerApp subprocesses."""
+    command = ["flower-superexec"]
+    command += get_client_tls_args(
+        insecure=appio_certificates is None,
+        root_certificates_path=appio_root_certificates_path,
+    )
+    command += ["--appio-api-address", appio_address]
+    command += ["--plugin-type", ExecPluginType.SERVER_APP]
+    command += ["--parent-pid", str(parent_pid)]
+    if runtime_dependency_install:
+        command += ["--allow-runtime-dependency-installation"]
+    return command
 
 
 def _load_control_auth_plugins(
@@ -552,17 +667,18 @@ def _try_obtain_fleet_event_log_writer_plugin() -> EventLogWriterPlugin | None:
 def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917
     address: str,
     state_factory: LinkStateFactory,
-    ffs_factory: FfsFactory,
     objectstore_factory: ObjectStoreFactory,
     enable_supernode_auth: bool,
     certificates: tuple[bytes, bytes, bytes] | None,
     interceptors: Sequence[grpc.ServerInterceptor] | None = None,
 ) -> grpc.Server:
     """Run Fleet API (gRPC, request-response)."""
+    interceptors = list(interceptors or [])
+    interceptors.append(create_fleet_runtime_version_server_interceptor())
+
     # Create Fleet API gRPC server
     fleet_servicer = FleetServicer(
         state_factory=state_factory,
-        ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
         enable_supernode_auth=enable_supernode_auth,
     )
@@ -589,7 +705,6 @@ def _run_fleet_api_grpc_rere(  # pylint: disable=R0913, R0917
 def _run_fleet_api_grpc_adapter(
     address: str,
     state_factory: LinkStateFactory,
-    ffs_factory: FfsFactory,
     objectstore_factory: ObjectStoreFactory,
     certificates: tuple[bytes, bytes, bytes] | None,
 ) -> grpc.Server:
@@ -597,7 +712,6 @@ def _run_fleet_api_grpc_adapter(
     # Create Fleet API gRPC server
     fleet_servicer = GrpcAdapterServicer(
         state_factory=state_factory,
-        ffs_factory=ffs_factory,
         objectstore_factory=objectstore_factory,
         enable_supernode_auth=False,
     )
@@ -627,7 +741,6 @@ def _run_fleet_api_rest(
     ssl_keyfile: str | None,
     ssl_certfile: str | None,
     state_factory: LinkStateFactory,
-    ffs_factory: FfsFactory,
     objectstore_factory: ObjectStoreFactory,
     num_workers: int,
 ) -> None:
@@ -643,7 +756,6 @@ def _run_fleet_api_rest(
 
     # See: https://www.starlette.io/applications/#accessing-the-app-instance
     fast_api_app.state.STATE_FACTORY = state_factory
-    fast_api_app.state.FFS_FACTORY = ffs_factory
     fast_api_app.state.OBJECTSTORE_FACTORY = objectstore_factory
 
     uvicorn.run(
@@ -691,21 +803,21 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--ssl-certfile",
-        help="Fleet API server SSL certificate file (as a path str) "
-        "to create a secure connection.",
+        help="Server TLS certificate file for Fleet API and Control API "
+        "(as a path str) to create a secure connection.",
         type=str,
         default=None,
     )
     parser.add_argument(
         "--ssl-keyfile",
-        help="Fleet API server SSL private key file (as a path str) "
-        "to create a secure connection.",
+        help="Server TLS private key file for Fleet API and Control API "
+        "(as a path str) to create a secure connection.",
         type=str,
     )
     parser.add_argument(
         "--ssl-ca-certfile",
-        help="Fleet API server SSL CA certificate file (as a path str) "
-        "to create a secure connection.",
+        help="Server TLS CA certificate file for Fleet API and Control API "
+        "(as a path str) to create a secure connection.",
         type=str,
     )
     parser.add_argument(
@@ -729,11 +841,6 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         default=FLWR_IN_MEMORY_DB_NAME,
     )
     parser.add_argument(
-        "--storage-dir",
-        help="The base directory to store the objects for the Flower File System.",
-        default=BASE_DIR,
-    )
-    parser.add_argument(
         "--auth-list-public-keys",
         type=str,
         help="This argument is deprecated and will be removed in a future release.",
@@ -743,6 +850,7 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Enable supernode authentication.",
     )
+    add_args_runtime_dependency_install(parser)
     parser.add_argument(
         "--log-file",
         type=str,
@@ -762,6 +870,7 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         default=7,
         help="Maximum number of rotated SuperLink log files to keep.",
     )
+    add_superexec_auth_secret_args(parser)
 
 
 def _add_args_serverappio_api(parser: argparse.ArgumentParser) -> None:
@@ -773,6 +882,27 @@ def _add_args_serverappio_api(parser: argparse.ArgumentParser) -> None:
         help="ServerAppIo API (gRPC) server address (IPv4, IPv6, or a domain name). "
         "`--simulationio-api-address` is accepted as a deprecated alias. "
         f"By default, it is set to {SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS}.",
+    )
+    parser.add_argument(
+        "--appio-ssl-certfile",
+        help="ServerAppIo API server TLS certificate file (as a path str) "
+        "to create a secure connection. The certificate must include SANs for "
+        "the AppIO API address used by SuperExec.",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
+        "--appio-ssl-keyfile",
+        help="ServerAppIo API server TLS private key file (as a path str) "
+        "to create a secure connection.",
+        type=str,
+    )
+    parser.add_argument(
+        "--appio-ssl-ca-certfile",
+        help="Path to the PEM-encoded CA certificate file used by SuperExec to verify "
+        "the ServerAppIo API server certificate. This is not a client certificate "
+        "for mTLS.",
+        type=str,
     )
 
 

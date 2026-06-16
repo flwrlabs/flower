@@ -40,6 +40,24 @@ def test_parse_supernode_version_flag(
     assert captured.out == f"Flower version: {package_version}\n"
 
 
+def test_parse_supernode_appio_tls_args() -> None:
+    """SuperNode should parse AppIO-specific TLS args for ClientAppIo."""
+    args = _parse_args_run_supernode().parse_args(
+        [
+            "--appio-ssl-certfile",
+            "appio-cert.pem",
+            "--appio-ssl-keyfile",
+            "appio-key.pem",
+            "--appio-ssl-ca-certfile",
+            "appio-ca.pem",
+        ]
+    )
+
+    assert args.appio_ssl_certfile == "appio-cert.pem"
+    assert args.appio_ssl_keyfile == "appio-key.pem"
+    assert args.appio_ssl_ca_certfile == "appio-ca.pem"
+
+
 def test_flower_supernode_checks_for_update(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

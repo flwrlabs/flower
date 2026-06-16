@@ -15,15 +15,9 @@ Only a basic understanding of data science and Python programming is assumed.
 .. tip::
 
     `Star Flower on GitHub <https://github.com/flwrlabs/flower>`__ ⭐️ and join the
-    Flower community on Flower Discuss and the Flower Slack to connect, ask questions,
-    and get help:
-
-    - `Join Flower Discuss <https://discuss.flower.ai/>`__ We'd love to hear from you in
-      the ``Introduction`` topic! If anything is unclear, post in ``Flower Help -
-      Beginners``.
-    - `Join Flower Slack <https://flower.ai/join-slack>`__ We'd love to hear from you in
-      the ``#introductions`` channel! If anything is unclear, head over to the
-      ``#questions`` channel.
+    Flower community on `Flower Discuss <https://discuss.flower.ai/>`__ or `Flower Slack
+    <https://flower.ai/join-slack>`__ to introduce yourself, ask questions, and get
+    help.
 
 Let's get started!
 
@@ -357,10 +351,11 @@ workload, any ML framework, and any programming language.
 ***************
 
 Congratulations, you just learned the basics of federated learning and how it relates to
-the classic (centralized) machine learning!
+classic centralized machine learning.
 
-In the next part of this tutorial, we are going to build a first federated learning
-system with Flower.
+In the next tutorial, you will take the first practical step with Flower: create a
+simulated federation on SuperGrid, run an existing Flower App from Flower Hub, and use
+the SuperGrid dashboard to follow the run and inspect its logs.
 
 ************
  Next steps
@@ -373,6 +368,6 @@ Flower Discuss <https://discuss.flower.ai>`__) and on Slack (`Join Slack
 There's a dedicated ``#questions`` Slack channel if you need help, but we'd also love to
 hear who you are in ``#introductions``!
 
-The `Flower Federated Learning Tutorial - Part 1
-<https://flower.ai/docs/framework/tutorial-get-started-with-flower-pytorch.html>`__
-shows how to build a simple federated learning system with PyTorch and Flower.
+The :doc:`Flower Collaborative AI Tutorial - Part 1: Get started with Flower
+<tutorial-series-get-started-with-flower>` shows how to create your first federation on
+SuperGrid and run a Flower App without writing code.

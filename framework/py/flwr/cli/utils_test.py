@@ -16,7 +16,6 @@
 
 
 import hashlib
-import json
 import os
 import tempfile
 import unittest
@@ -27,23 +26,22 @@ from unittest.mock import Mock, patch
 import click
 import grpc
 import pytest
+from parameterized import parameterized
 
 from flwr.cli.constant import (
     LOCAL_CONTROL_API_ADDRESS,
     LOCAL_SUPERLINK_ADDRESS_MAGIC_VALUE,
 )
 from flwr.cli.typing import SuperLinkConnection, SuperLinkSimulationOptions
-from flwr.common.constant import (
-    ACCESS_TOKEN_KEY,
-    AUTHN_TYPE_JSON_KEY,
-    FLWR_DIR,
-    REFRESH_TOKEN_KEY,
-)
+from flwr.common.constant import FLWR_DIR
 from flwr.common.grpc import GRPC_MAX_MESSAGE_LENGTH
-from flwr.supercore.constant import MAX_DIR_DEPTH
+from flwr.supercore.constant import MAX_DIR_DEPTH, MAX_NAME_LENGTH
+from flwr.supercore.interceptors import RuntimeVersionClientInterceptor
 
 from .utils import (
+    _format_grpc_error,
     build_pathspec,
+    cli_output_handler,
     collect_files,
     depth_of,
     filter_paths_for_publish,
@@ -52,8 +50,24 @@ from .utils import (
     get_sha256_hash,
     init_channel_from_connection,
     load_gitignore_patterns,
-    validate_credentials_content,
+    validate_federation_name,
 )
+
+
+class _GrpcErrorWithDetails:
+    """Test helper object carrying a gRPC-like details string."""
+
+    def __init__(self, details: str) -> None:
+        self._details = details
+
+    def details(self) -> str:
+        """Return the stored gRPC details string."""
+        return self._details
+
+
+def _grpc_error_with_details(details: str) -> grpc.RpcError:
+    """Return a grpc.RpcError-compatible test helper with a details method."""
+    return cast(grpc.RpcError, _GrpcErrorWithDetails(details))
 
 
 class TestGetSHA256Hash(unittest.TestCase):
@@ -139,19 +153,6 @@ class TestGetSHA256Hash(unittest.TestCase):
         # Execute & assert
         with self.assertRaises(FileNotFoundError):
             get_sha256_hash(nonexistent_path)
-
-
-def test_validate_credentials_content_success(tmp_path: Path) -> None:
-    """Test the credentials content loading."""
-    creds = {
-        AUTHN_TYPE_JSON_KEY: "userpass",
-        ACCESS_TOKEN_KEY: "abc",
-        REFRESH_TOKEN_KEY: "def",
-    }
-    path = tmp_path / "creds.json"
-    path.write_text(json.dumps(creds), encoding="utf-8")
-    token = validate_credentials_content(path)
-    assert token == "abc"
 
 
 def test_load_gitignore_patterns(tmp_path: Path) -> None:
@@ -240,7 +241,10 @@ def test_init_channel_from_connection_uses_resolved_connection() -> None:
     assert kwargs["insecure"] is True
     assert kwargs["root_certificates"] is None
     assert kwargs["max_message_length"] == GRPC_MAX_MESSAGE_LENGTH
-    assert len(kwargs["interceptors"]) == 1
+    assert len(kwargs["interceptors"]) == 2
+    assert isinstance(kwargs["interceptors"][0], RuntimeVersionClientInterceptor)
+    # pylint: disable-next=protected-access
+    assert kwargs["interceptors"][0]._metadata.component_name == "flwr CLI"
     channel.subscribe.assert_called_once()
 
 
@@ -260,6 +264,32 @@ def test_custom_grpc_err_handler() -> None:
             raise grpc_error
 
     mock_handler.assert_called_once_with(grpc_error)
+
+
+def test_format_grpc_error_uses_json_message_field() -> None:
+    """Structured Flower errors combine public message and details."""
+    err = _grpc_error_with_details(
+        '{"public_message": "request failed", '
+        '"public_details": "missing entitlement", "code": 400}'
+    )
+
+    assert _format_grpc_error(err) == "request failed\nmissing entitlement"
+
+
+def test_format_grpc_error_falls_back_to_plain_string() -> None:
+    """Non-JSON errors fall back to their normal string form."""
+    err = _grpc_error_with_details("plain failure")
+
+    assert _format_grpc_error(err) == "plain failure"
+
+
+def test_cli_output_handler_raises_click_exception_for_json_error() -> None:
+    """cli_output_handler preserves the original ClickException text."""
+    with pytest.raises(click.ClickException, match="request failed") as exc_info:
+        with cli_output_handler():
+            raise click.ClickException('{"message": "request failed", "code": 400}')
+
+    assert exc_info.value.message == '{"message": "request failed", "code": 400}'
 
 
 @pytest.mark.parametrize(
@@ -445,3 +475,43 @@ def test_filter_paths_for_publish_max_depth_exceeded(
 def test_filter_paths_for_publish_empty() -> None:
     """Empty input returns empty output."""
     assert not filter_paths_for_publish({})
+
+
+@parameterized.expand(  # type: ignore
+    [
+        ("federation123", True, ""),  # alphanumeric
+        ("test-federation", True, ""),  # hyphenated
+        ("f" * MAX_NAME_LENGTH, True, ""),  # exactly_max_length
+        (
+            "f" * (MAX_NAME_LENGTH + 1),
+            False,
+            f"Must be no longer than {MAX_NAME_LENGTH} characters.",
+        ),  # too_long
+        ("", False, "Cannot be empty."),  # empty
+        ("-federation", False, "Must start with a letter."),  # starts_with_symbol
+        (
+            "test federation",
+            False,
+            "Can only contain letters, digits, and hyphens.",
+        ),  # contains_space
+        ("Testfederation", True, ""),  # uppercase allowed
+        (
+            "test_federation",
+            False,
+            "Can only contain letters, digits, and hyphens.",
+        ),  # invalid_symbol
+        (
+            "Test Federation!",
+            False,
+            "Can only contain letters, digits, and hyphens.",
+        ),  # multiple_violations
+    ]
+)
+def test_validate_federation_name(
+    name: str, expected_valid: bool, expected_message: str
+) -> None:
+    """Test federation name validator function."""
+    valid, message = validate_federation_name(name)
+
+    assert valid is expected_valid
+    assert message == expected_message

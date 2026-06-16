@@ -83,7 +83,6 @@ With default arguments you will see streamed output like this:
     INFO :      Final results:
     INFO :          ServerApp-side Evaluate Metrics:
     INFO :          {}
-    Saving final model to disk...
 
 You can also override the parameters defined in the ``[tool.flwr.app.config]`` section
 in ``pyproject.toml`` like this:

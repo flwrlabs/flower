@@ -39,9 +39,6 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - name: Bootstrap
         uses: ./.github/actions/bootstrap
-        with:
-          uv-skip: "false"
-          poetry-skip: "true"
       - name: Verify lockfiles are up-to-date
         shell: bash
         run: |

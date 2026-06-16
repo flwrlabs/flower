@@ -16,7 +16,7 @@
 
 
 import datetime
-import tempfile
+import hashlib
 import unittest
 from collections.abc import Callable
 from typing import Any
@@ -25,7 +25,6 @@ from unittest.mock import patch
 import grpc
 from parameterized import parameterized
 
-from flwr.common import now
 from flwr.common.constant import (
     FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
     NOOP_ACCOUNT_NAME,
@@ -36,9 +35,7 @@ from flwr.common.constant import (
     SYSTEM_TIME_TOLERANCE,
     TIMESTAMP_HEADER,
     TIMESTAMP_TOLERANCE,
-    Status,
 )
-from flwr.common.typing import RunStatus
 from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     ActivateNodeRequest,
@@ -70,7 +67,8 @@ from flwr.server.app import _run_fleet_api_grpc_rere
 from flwr.server.superlink.linkstate.linkstate_factory import LinkStateFactory
 from flwr.server.superlink.linkstate.linkstate_test import create_res_message
 from flwr.supercore.constant import FLWR_IN_MEMORY_DB_NAME, NOOP_FEDERATION, RunType
-from flwr.supercore.ffs import FfsFactory
+from flwr.supercore.date import now
+from flwr.supercore.fab import Fab
 from flwr.supercore.object_store import ObjectStoreFactory
 from flwr.supercore.primitives.asymmetric import (
     generate_key_pairs,
@@ -97,16 +95,12 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
             FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), objectstore_factory
         )
         self.state = state_factory.state()
-        self.tmp_dir = tempfile.TemporaryDirectory()  # pylint: disable=R1732
-        ffs_factory = FfsFactory(self.tmp_dir.name)
-        self.ffs = ffs_factory.ffs()
         self.store = objectstore_factory.store()
 
         self._server_interceptor = NodeAuthServerInterceptor(state_factory)
         self._server: grpc.Server = _run_fleet_api_grpc_rere(
             FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
             state_factory,
-            ffs_factory,
             objectstore_factory,
             self.enable_node_auth,
             None,
@@ -173,8 +167,6 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
     def tearDown(self) -> None:
         """Clean up grpc server."""
         self._server.stop(None)
-        # Cleanup the temp directory
-        self.tmp_dir.cleanup()
 
     def _make_metadata(self) -> list[Any]:
         """Create metadata with signature and timestamp."""
@@ -252,14 +244,25 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
         req = PullMessagesRequest(node=Node(node_id=node_id))
         return self._pull_messages.with_call(request=req, metadata=metadata)
 
-    def _create_dummy_run(self, running: bool = True) -> int:
+    def _create_dummy_run(
+        self, running: bool = True, fab_hash: str | None = None
+    ) -> int:
         """Create a dummy run in linkstate and return the run_id."""
         run_id = self.state.create_run(
-            "", "", "", {}, NOOP_FEDERATION, None, "", RunType.SERVER_APP
+            "",
+            "",
+            fab_hash,
+            {},
+            NOOP_FEDERATION,
+            None,
+            "",
+            RunType.SERVER_APP,
         )
         if running:
-            self.state.update_run_status(run_id, RunStatus(Status.STARTING, "", ""))
-            self.state.update_run_status(run_id, RunStatus(Status.RUNNING, "", ""))
+            run = self.state.get_run_info(run_ids=[run_id])[0]
+            assert run.primary_task_id is not None
+            assert self.state.claim_task(run.primary_task_id) is not None
+            assert self.state.activate_task(run.primary_task_id)
         return run_id
 
     def _test_push_messages(self, metadata: list[Any]) -> Any:
@@ -316,9 +319,12 @@ class TestNodeAuthServerInterceptor(unittest.TestCase):  # pylint: disable=R0902
 
     def _test_get_fab(self, metadata: list[Any]) -> Any:
         """Test GetFab."""
-        fab_hash = self.ffs.put(b"mock fab content", {})
+        fab_content = b"mock fab content"
+        fab_hash = self.state.store_fab(
+            Fab(hashlib.sha256(fab_content).hexdigest(), fab_content, {})
+        )
         node_id = self._create_node_in_linkstate()
-        run_id = self._create_dummy_run()
+        run_id = self._create_dummy_run(fab_hash=fab_hash)
         req = GetFabRequest(
             node=Node(node_id=node_id),
             run_id=run_id,

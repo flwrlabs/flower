@@ -23,6 +23,7 @@ from unittest.mock import Mock
 
 import click
 import pytest
+import typer
 
 from .new import download_remote_app_via_api
 
@@ -70,7 +71,7 @@ def test_download_remote_app_via_api_rejects_zip_slip(
     monkeypatch.setattr(
         new_module,
         "request_download_link",
-        lambda *_args, **_kwargs: ("https://example.invalid/fake.zip", None),
+        lambda *_args, **_kwargs: ("https://example.invalid/fake.zip", None, None),
     )
     monkeypatch.setattr(
         new_module.requests,
@@ -80,3 +81,54 @@ def test_download_remote_app_via_api_rejects_zip_slip(
 
     with pytest.raises(click.ClickException, match="Unsafe path in FAB archive"):
         download_remote_app_via_api("@account/app==1.2.3")
+
+
+def test_download_remote_app_via_api_surfaces_platform_api_warning(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Print compatibility warnings returned by Platform API."""
+
+    def _zip_bytes(entries: list[tuple[str, bytes]]) -> bytes:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for name, content in entries:
+                zf.writestr(name, content)
+        return buf.getvalue()
+
+    app_zip = _zip_bytes([("app/README.md", b"hello")])
+    mock_response = Mock(content=app_zip, raise_for_status=lambda: None)
+    messages: list[tuple[str, bool]] = []
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        new_module,
+        "request_download_link",
+        lambda *_args, **_kwargs: (
+            "https://example.invalid/fake.zip",
+            None,
+            "Using app version 1.0.0 because the latest published version "
+            "requires a newer Flower version.",
+        ),
+    )
+    monkeypatch.setattr(
+        new_module.requests,
+        "get",
+        lambda *_args, **_kwargs: mock_response,
+    )
+    monkeypatch.setattr(
+        typer,
+        "secho",
+        lambda message, *args, **kwargs: messages.append(
+            (str(message), bool(kwargs.get("err", False)))
+        ),
+    )
+    monkeypatch.setattr(new_module, "print_success_prompt", lambda *_args: None)
+
+    download_remote_app_via_api("@account/app==1.2.3")
+
+    assert (
+        "Note: Using app version 1.0.0 because the latest published version "
+        "requires a newer Flower version.",
+        True,
+    ) in messages

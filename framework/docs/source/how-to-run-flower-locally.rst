@@ -127,10 +127,16 @@ This stops the run only. It does **not** stop the background local SuperLink pro
 The managed local SuperLink keeps its files in ``$FLWR_HOME/local-superlink/``:
 
 - ``state.db`` stores the local SuperLink state
-- ``ffs/`` stores SuperLink file artifacts
 - ``superlink.log`` stores the local SuperLink process output
 
 These files persist across local runs until you remove them yourself.
+
+.. note::
+
+    Starting with Flower 1.29 FABs are stored in SuperLink state instead of a separate
+    local ``ffs/`` directory. This is a breaking change: legacy filesystem FAB data is
+    not migrated, and older runs that depended on that storage are not recoverable after
+    upgrade without manual migration.
 
 .. _stop-background-local-superlink:
 

@@ -23,7 +23,7 @@ from typing import cast
 
 import numpy as np
 
-from flwr.common import Array, ArrayRecord, Message, MetricRecord
+from flwr.app import Array, ArrayRecord, Message, MetricRecord
 
 from .fedavg import FedAvg
 

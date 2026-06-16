@@ -33,8 +33,6 @@ from flwr.proto.control_pb2 import (  # pylint: disable=E0611
 from flwr.proto.control_pb2_grpc import ControlStub
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
 
-from .error_handlers import handle_invite_grpc_error
-
 
 def simulation_config(  # pylint: disable=R0913,R0917,W0613,R0914
     federation: Annotated[
@@ -183,7 +181,7 @@ def _configure_federation_for_simulation(
     is_json: bool,
 ) -> None:
     """Send a request to configure a federation for simulation."""
-    with flwr_cli_grpc_exc_handler(handle_invite_grpc_error):
+    with flwr_cli_grpc_exc_handler():
         _: ConfigureSimulationFederationResponse = stub.ConfigureSimulationFederation(
             request
         )

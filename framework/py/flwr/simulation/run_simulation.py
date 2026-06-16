@@ -22,15 +22,17 @@ import logging
 import platform
 import threading
 import traceback
+from dataclasses import dataclass
 from logging import DEBUG, ERROR, INFO, WARNING
 from queue import Empty, Queue
 from typing import Any, cast
 
+from flwr.app import Context, RecordDict
 from flwr.app.user_config import UserConfig
 from flwr.cli.utils import get_sha256_hash
 from flwr.clientapp import ClientApp
-from flwr.common import Context, EventType, RecordDict, event, log, now
-from flwr.common.constant import RUN_ID_NUM_BYTES, Status
+from flwr.common import EventType, event, log
+from flwr.common.constant import RUN_ID_NUM_BYTES, TASK_ID_NUM_BYTES
 from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import (
     set_logger_propagation,
@@ -38,15 +40,15 @@ from flwr.common.logger import (
     warn_deprecated_feature,
     warn_deprecated_feature_with_example,
 )
-from flwr.common.typing import Run, RunStatus
-from flwr.server.grid import Grid, InMemoryGrid
+from flwr.proto.task_pb2 import Task  # pylint: disable=E0611
 from flwr.server.run_serverapp import run as _run
-from flwr.server.server_app import ServerApp
 from flwr.server.superlink.fleet import vce
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
-from flwr.server.superlink.linkstate import LinkStateFactory
+from flwr.server.superlink.fleet.vce.metrics import VceMetrics
+from flwr.server.superlink.linkstate import InMemoryLinkState, LinkStateFactory
 from flwr.server.superlink.linkstate.in_memory_linkstate import RunRecord
 from flwr.server.superlink.linkstate.utils import generate_rand_int_from_bytes
+from flwr.serverapp import Grid, ServerApp
 from flwr.simulation.ray_transport.utils import (
     enable_tf_gpu_growth as enable_gpu_growth,
 )
@@ -56,7 +58,17 @@ from flwr.supercore.constant import (
     NOOP_FEDERATION,
 )
 from flwr.supercore.object_store import ObjectStoreFactory
+from flwr.supercore.run import Run
 from flwr.superlink.federation import NoOpFederationManager
+from flwr.superlink.grid import InMemoryGrid
+
+
+@dataclass(frozen=True)
+class SimulationRunResult:
+    """Result returned after a Simulation Runtime run."""
+
+    context: Context
+    metrics: VceMetrics
 
 
 def _replace_keys(d: Any, match: str, target: str) -> Any:
@@ -93,7 +105,7 @@ def run_simulation(
     enable_tf_gpu_growth: bool = False,
     verbose_logging: bool = False,
 ) -> None:
-    r"""Run a Flower App using the Simulation Engine.
+    r"""Run a Flower App using the Simulation Runtime.
 
     Parameters
     ----------
@@ -118,7 +130,7 @@ def run_simulation(
         for values parsed to initialisation of backend, `client_resources`
         to define the resources for clients, and `actor` to define the actor
         parameters. Values supported in <value> are those included by
-        `flwr.common.typing.ConfigRecordValues`.
+        `flwr.app.ConfigRecordValues`.
 
     enable_tf_gpu_growth : bool (default: False)
         A boolean to indicate whether to enable GPU growth on the main thread. This is
@@ -192,7 +204,7 @@ def run_serverapp_th(
     ) -> None:
         """Run SeverApp, after check if GPU memory growth has to be set.
 
-        Upon exception, trigger stop event for Simulation Engine.
+        Upon exception, trigger stop event for Simulation Runtime.
         """
         try:
             if tf_gpu_growth:
@@ -218,7 +230,7 @@ def run_serverapp_th(
             # Upon completion, trigger stop event if one was passed
             if stop_event is not None:
                 stop_event.set()
-                log(DEBUG, "Triggered stop event for Simulation Engine.")
+                log(DEBUG, "Triggered stop event for Simulation Runtime.")
 
     serverapp_th = threading.Thread(
         target=server_th_with_start_checks,
@@ -252,8 +264,9 @@ def _main_loop(
     server_app: ServerApp | None = None,
     server_app_attr: str | None = None,
     server_app_context: Context | None = None,
-) -> Context:
-    """Start ServerApp on a separate thread, then launch Simulation Engine."""
+    metrics: VceMetrics | None = None,
+) -> SimulationRunResult:
+    """Start ServerApp on a separate thread, then launch Simulation Runtime."""
     # Initialize StateFactory
     state_factory = LinkStateFactory(
         FLWR_IN_MEMORY_DB_NAME, NoOpFederationManager(), ObjectStoreFactory()
@@ -264,6 +277,8 @@ def _main_loop(
     server_app_thread_has_exception = threading.Event()
     serverapp_th = None
     success = True
+    if metrics is None:
+        metrics = VceMetrics()
     if server_app_context is None:
         server_app_context = Context(
             run_id=run.run_id,
@@ -274,12 +289,14 @@ def _main_loop(
         )
     updated_context = server_app_context
     try:
-        # Register run
+        # Use InMemoryLinkState to pre-register the run with its primary task
         log(DEBUG, "Pre-registering run with id %s", run.run_id)
-        run.status = RunStatus(Status.RUNNING, "", "")
-        run.starting_at = now().isoformat()
-        run.running_at = run.starting_at
-        state_factory.state().run_ids[run.run_id] = RunRecord(run=run)  # type: ignore
+        state = cast(InMemoryLinkState, state_factory.state())
+        state.run_ids[run.run_id] = RunRecord(run=run)
+        primary_task_id = cast(int, run.primary_task_id)
+        state.task_store[primary_task_id] = Task(
+            task_id=primary_task_id, run_id=run.run_id
+        )
 
         # Initialize Grid
         grid = InMemoryGrid(state_factory=state_factory)
@@ -299,7 +316,7 @@ def _main_loop(
             ctx_queue=output_context_queue,
         )
 
-        # Start Simulation Engine
+        # Start Simulation Runtime
         vce.start_vce(
             num_supernodes=num_supernodes,
             client_app_attr=client_app_attr,
@@ -311,6 +328,7 @@ def _main_loop(
             state_factory=state_factory,
             f_stop=f_stop,
             run=run,
+            metrics=metrics,
         )
 
         updated_context = output_context_queue.get(timeout=3)
@@ -335,12 +353,11 @@ def _main_loop(
             },
         )
         if serverapp_th:
-            serverapp_th.join(timeout=5)
             if server_app_thread_has_exception.is_set():
                 raise RuntimeError("Exception in ServerApp thread")
 
-    log(DEBUG, "Stopping Simulation Engine now.")
-    return updated_context
+    log(DEBUG, "Stopping Simulation Runtime now.")
+    return SimulationRunResult(context=updated_context, metrics=metrics)
 
 
 # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
@@ -359,8 +376,9 @@ def _run_simulation(
     enable_tf_gpu_growth: bool = False,
     verbose_logging: bool = False,
     is_app: bool = False,
-) -> Context:
-    """Launch the Simulation Engine."""
+    metrics: VceMetrics | None = None,
+) -> SimulationRunResult:
+    """Launch the Simulation Runtime."""
     if backend_config is None:
         backend_config = {}
     elif backend_config:
@@ -422,7 +440,9 @@ def _run_simulation(
     # If no `Run` object is set, create one
     if run is None:
         run_id = generate_rand_int_from_bytes(RUN_ID_NUM_BYTES)
+        task_id = generate_rand_int_from_bytes(TASK_ID_NUM_BYTES)
         run = Run.create_empty(run_id=run_id)
+        run.primary_task_id = task_id
         run.federation = NOOP_FEDERATION
 
     args = (
@@ -439,6 +459,7 @@ def _run_simulation(
         server_app,
         server_app_attr,
         server_app_context,
+        metrics,
     )
     # Detect if there is an Asyncio event loop already running.
     # If yes, disable logger propagation. In environmnets
@@ -460,5 +481,5 @@ def _run_simulation(
             # Set logger propagation to False to prevent duplicated log output in Colab.
             logger = set_logger_propagation(logger, False)
 
-        updated_context = _main_loop(*args)
-    return updated_context
+        simulation_result = _main_loop(*args)
+    return simulation_result

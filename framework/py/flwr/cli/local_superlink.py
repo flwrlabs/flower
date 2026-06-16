@@ -77,15 +77,13 @@ def ensure_local_superlink(connection: SuperLinkConnection) -> SuperLinkConnecti
     return connection
 
 
-def _get_local_superlink_paths() -> tuple[Path, Path, Path]:
-    """Return (database_path, storage_dir, log_file_path) for local SuperLink."""
+def _get_local_superlink_paths() -> tuple[Path, Path]:
+    """Return (database_path, log_file_path) for local SuperLink."""
     runtime_dir = get_flwr_home() / "local-superlink"
     database_path = runtime_dir / "state.db"
-    storage_dir = runtime_dir / "ffs"
     log_file_path = runtime_dir / "superlink.log"
     log_file_path.parent.mkdir(parents=True, exist_ok=True)
-    storage_dir.mkdir(parents=True, exist_ok=True)
-    return database_path, storage_dir, log_file_path
+    return database_path, log_file_path
 
 
 def _is_local_superlink_started() -> bool:
@@ -104,7 +102,7 @@ def _is_local_superlink_started() -> bool:
 
 def _start_local_superlink(in_memory: bool = False) -> None:
     """Start a managed local SuperLink in simulation mode and wait for readiness."""
-    database_path, storage_dir, log_file_path = _get_local_superlink_paths()
+    database_path, log_file_path = _get_local_superlink_paths()
 
     typer.secho(
         f"Starting local SuperLink on {LOCAL_CONTROL_API_ADDRESS}...",
@@ -121,8 +119,6 @@ def _start_local_superlink(in_memory: bool = False) -> None:
         LOCAL_CONTROL_API_ADDRESS,
         "--serverappio-api-address",
         "127.0.0.1:0",  # Let the OS choose a free port
-        "--storage-dir",
-        str(storage_dir),
         "--log-file",
         str(log_file_path),
         "--log-rotation-interval-hours",

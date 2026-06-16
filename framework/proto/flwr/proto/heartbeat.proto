@@ -25,7 +25,3 @@ message SendNodeHeartbeatRequest {
   double heartbeat_interval = 2;
 }
 message SendNodeHeartbeatResponse { bool success = 1; }
-
-// App Heartbeat messages
-message SendAppHeartbeatRequest { string token = 1; }
-message SendAppHeartbeatResponse { bool success = 1; }

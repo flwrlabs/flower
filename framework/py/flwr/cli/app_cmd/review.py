@@ -27,8 +27,8 @@ import typer
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
-from flwr.common import now
 from flwr.supercore.constant import PLATFORM_API_URL, SUPERGRID_ADDRESS
+from flwr.supercore.date import now
 from flwr.supercore.primitives.asymmetric_ed25519 import (
     create_message_to_sign,
     load_private_key,
@@ -75,7 +75,12 @@ def review(
     typer.secho("Downloading FAB... ", fg=typer.colors.BLUE)
     url = f"{PLATFORM_API_URL}/hub/fetch-fab"
     try:
-        presigned_url, _ = request_download_link(app_id, app_version, url, "fab_url")
+        presigned_url, _, note = request_download_link(
+            app_id, app_version, url, "fab_url"
+        )
+
+        if note:
+            typer.secho(f"Note: {note}", fg=typer.colors.YELLOW, err=True)
 
         fab_bytes = _download_fab(presigned_url)
 

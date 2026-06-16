@@ -156,13 +156,21 @@ class EventType(str, Enum):
     FLWR_CLIENTAPP_RUN_ENTER = auto()
     FLWR_CLIENTAPP_RUN_LEAVE = auto()
 
-    # --- Simulation Engine ------------------------------------------------------------
+    # CLI: flwr-agentapp
+    FLWR_AGENTAPP_RUN_ENTER = auto()
+    FLWR_AGENTAPP_RUN_LEAVE = auto()
+
+    # CLI: flwr-model
+    FLWR_MODEL_RUN_ENTER = auto()
+    FLWR_MODEL_RUN_LEAVE = auto()
+
+    # --- Simulation Runtime -----------------------------------------------------------
 
     # Python API: `run_simulation`
     PYTHON_API_RUN_SIMULATION_ENTER = auto()
     PYTHON_API_RUN_SIMULATION_LEAVE = auto()
 
-    # --- Deployment Engine ------------------------------------------------------------
+    # --- Deployment Runtime -----------------------------------------------------------
 
     # CLI: `flower-superlink`
     RUN_SUPERLINK_ENTER = auto()
@@ -217,7 +225,7 @@ def create_event(event_type: EventType, event_details: dict[str, Any] | None) ->
     if event_details is None:
         event_details = {}
 
-    date = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
+    date = datetime.datetime.now(tz=datetime.UTC).isoformat()
     context = {
         "partner": state["partner"],
         "source": state["source"],

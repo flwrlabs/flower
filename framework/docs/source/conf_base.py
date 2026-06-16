@@ -16,7 +16,9 @@
 
 import datetime
 import os
+import shutil
 import sys
+from pathlib import Path
 
 from git import Repo
 from packaging.version import InvalidVersion, Version
@@ -26,6 +28,9 @@ from packaging.version import InvalidVersion, Version
 # This file only contains a selection of the most common options. For a full
 # list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
+
+# "This file is the shared base conf for all version docs. For any changes that 
+# only apply to a specific version and onwards, please put in the conf.py"
 
 
 # Fixing path issue for autodoc, in case `flwr` project is not installed.
@@ -117,6 +122,12 @@ extensions = [
 
 # Generate .rst files
 autosummary_generate = True
+
+# ``sphinx.ext.autosummary`` writes generated API pages into ``source/ref-api``.
+# The directory is ignored by Git, so stale pages from older builds can survive
+# locally and Sphinx will still read them as source files. Clean it before each
+# build so only pages generated from the current public API are included.
+shutil.rmtree(Path(__file__).parent / "ref-api", ignore_errors=True)
 
 # Document ONLY the objects from __all__ (present in __init__ files).
 # It will be done recursively starting from flwr.__init__

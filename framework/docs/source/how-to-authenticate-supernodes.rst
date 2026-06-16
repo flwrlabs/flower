@@ -48,6 +48,12 @@ enabled:
     :doc:`how-to-enable-tls-connections` guide and extends it to introduce node
     authentication to the SuperLink ↔ SuperNode connection.
 
+.. note::
+
+    This guide covers CLI-managed SuperNode authentication for a self-hosted SuperLink.
+    To register SuperNodes in the SuperGrid dashboard and add them to a deployment
+    federation, see :doc:`how-to-connect-supernodes-to-supergrid`.
+
 .. tip::
 
     Checkout the `Flower Authentication
@@ -86,6 +92,11 @@ directory of your app (e.g. a directory generated earlier via ``flwr new``).
 To launch a SuperLink with SuperNode authentication enabled, you need to provide three
 aditional files in addition to the certificates needed for the TLS connections. Recall
 that the authentication feature can only be enabled in the presence of TLS.
+
+.. note::
+
+    To enable TLS also for the AppIo API on SuperLink, please refer to :ref:`Launching
+    the SuperLink with TLS <launching-the-superlink-with-tls>`.
 
 .. code-block:: bash
     :emphasize-lines: 5
@@ -184,6 +195,11 @@ proceed and laucnh the SuperNodes.
 Connecting a SuperNode to a SuperLink that has node authentication enabled requires
 passing one additional argument (i.e. the private key of the SuperNode) in addition to
 the TLS certificate.
+
+.. note::
+
+    To enable TLS also for the AppIo API on SuperNodes, please refer to :ref:`Launching
+    the SuperNodes with TLS <connecting-the-supernodes-with-tls>`.
 
 .. code-block:: bash
     :emphasize-lines: 6

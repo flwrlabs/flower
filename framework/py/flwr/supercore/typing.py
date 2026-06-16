@@ -15,9 +15,16 @@
 """Flower SuperCore type definitions."""
 
 
+from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import TypeAlias
 
 from flwr.supercore.constant import RunTime
+
+JSONScalar: TypeAlias = bool | float | int | str | None
+JSONArray: TypeAlias = Sequence["JSONValue"]
+JSONValue: TypeAlias = JSONScalar | dict[str, "JSONValue"] | JSONArray
+JSONObject: TypeAlias = dict[str, JSONValue]
 
 
 @dataclass(frozen=True)

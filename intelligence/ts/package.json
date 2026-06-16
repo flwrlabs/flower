@@ -19,6 +19,15 @@
   },
   "author": "The Flower Authors <hello@flower.ai>",
   "version": "0.2.6",
+  "packageManager": "pnpm@10.25.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "onnxruntime-node",
+      "protobufjs",
+      "sharp"
+    ]
+  },
   "type": "module",
   "main": "./dist/flowerintelligence.cjs.js",
   "module": "./dist/flowerintelligence.es.js",

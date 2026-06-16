@@ -15,9 +15,27 @@
 """Shared auth policy definitions."""
 
 
-from .policy import SERVERAPPIO_METHOD_AUTH_POLICY, MethodTokenPolicy
+from .policy import (
+    CLIENTAPPIO_METHOD_AUTH_POLICY,
+    SERVERAPPIO_METHOD_AUTH_POLICY,
+    MethodTokenPolicy,
+)
+from .superexec import (
+    compute_request_body_sha256,
+    compute_superexec_signature,
+    derive_auth_secret,
+    verify_superexec_signature,
+)
+from .superexec_secret import add_superexec_auth_secret_args, load_superexec_auth_secret
 
 __all__ = [
+    "CLIENTAPPIO_METHOD_AUTH_POLICY",
     "MethodTokenPolicy",
     "SERVERAPPIO_METHOD_AUTH_POLICY",
+    "add_superexec_auth_secret_args",
+    "compute_request_body_sha256",
+    "compute_superexec_signature",
+    "derive_auth_secret",
+    "load_superexec_auth_secret",
+    "verify_superexec_signature",
 ]

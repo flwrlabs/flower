@@ -7,7 +7,7 @@ name = "e2e-strategies"
 version = "1.0.0"
 description = "Keras Federated Learning strategy E2E tests with Flower"
 license = "Apache-2.0"
-requires-python = ">=3.10,<3.11"
+requires-python = ">=3.11,<4.0"
 dependencies = [
     "flwr[simulation] @ {root:parent:parent:uri}",
     "tensorflow-cpu>=2.18.0",

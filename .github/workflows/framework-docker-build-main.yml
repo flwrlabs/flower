@@ -1,67 +1,152 @@
+# Copyright 2026 Flower Labs GmbH. All Rights Reserved.
 name: Framework Build Docker Images Main Branch
 
 on:
   push:
     branches:
-      - 'main'
+      - main
+    paths:
+      - "framework/**"
+      - ".github/workflows/_docker-build.yml"
+      - ".github/workflows/framework-docker-build-main.yml"
+  workflow_dispatch:
+    inputs:
+      flower-repo-ref:
+        description: "Flower repository ref to sync before building."
+        required: false
+        default: main
+      docker-image-tag:
+        description: "Docker tag to publish."
+        required: false
+        default: unstable
+      docker-registry:
+        description: "Docker registry host. Defaults to vars.DOCKER_IMAGE_REGISTRY."
+        required: false
+        default: ""
+      docker-registry-user:
+        description: "Docker registry username. Defaults to vars.DOCKER_IMAGE_REGISTRY_USER."
+        required: false
+        default: ""
+      docker-image-namespace:
+        description: "Docker image namespace."
+        required: false
+        default: ""
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOCKER_REGISTRY: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY }}
+  DOCKER_IMAGE_REGISTRY_USER: ${{ inputs.docker-registry-user || vars.DOCKER_IMAGE_REGISTRY_USER }}
+  DOCKER_IMAGE_NAMESPACE: ${{ inputs.docker-image-namespace || vars.DOCKER_IMAGE_NAMESPACE }}
+  FLOWER_REPO_REF: ${{ inputs.flower-repo-ref || 'main' }}
+  DOCKER_IMAGE_TAG: ${{ inputs.docker-image-tag || 'unstable' }}
 
 jobs:
-  parameters:
-    if: github.repository == 'flwrlabs/flower'
+  prepare-docker-build-matrix:
+    if: ${{ github.repository_owner == 'flwrlabs' }}
     name: Collect docker build parameters
     runs-on: ubuntu-22.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     outputs:
       pip-version: ${{ steps.versions.outputs.pip-version }}
       setuptools-version: ${{ steps.versions.outputs.setuptools-version }}
-      matrix: ${{ steps.versions.outputs.matrix }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - uses: ./.github/actions/bootstrap
         id: bootstrap
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y patch rsync
+
+      - name: Prepare framework
+        run: ./framework/dev/prepare-framework.sh
+
+      - name: Validate Docker publishing configuration
+        run: |
+          if [ -z "${DOCKER_REGISTRY}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_REGISTRY" >&2
+            exit 1
+          fi
+          if [ -z "${DOCKER_IMAGE_REGISTRY_USER}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_REGISTRY_USER" >&2
+            exit 1
+          fi
+          if [ -z "${DOCKER_IMAGE_NAMESPACE}" ]; then
+            echo "Missing required configuration: DOCKER_IMAGE_NAMESPACE" >&2
+            exit 1
+          fi
 
       - id: versions
         run: |
           echo "pip-version=${{ steps.bootstrap.outputs.pip-version }}" >> "$GITHUB_OUTPUT"
           echo "setuptools-version=${{ steps.bootstrap.outputs.setuptools-version }}" >> "$GITHUB_OUTPUT"
+
+      - id: matrix
+        run: |
           FLWR_VERSION_REF="git+${{ github.server_url }}/${{ github.repository }}.git@${{ github.sha }}#subdirectory=framework"
-          python framework/dev/build-docker-image-matrix.py --flwr-version "${FLWR_VERSION_REF}" --matrix unstable > matrix.json
-          echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
+          python framework/dev/build-docker-image-matrix.py --flwr-version "${FLWR_VERSION_REF}" --matrix unstable > matrix.raw.json
+          python framework/dev/release/resolve-docker-matrix.py \
+            --input matrix.raw.json \
+            --output matrix.json \
+            --docker-image-namespace "${DOCKER_IMAGE_NAMESPACE}" \
+            --tag "${DOCKER_IMAGE_TAG}"
+          echo "matrix=$(cat matrix.json)" >> "$GITHUB_OUTPUT"
 
   build-docker-base-images:
     name: Build base images
-    if: github.repository == 'flwrlabs/flower'
     uses: ./.github/workflows/_docker-build.yml
-    needs: parameters
+    needs: prepare-docker-build-matrix
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.parameters.outputs.matrix).base }}
+      matrix: ${{ fromJson(needs.prepare-docker-build-matrix.outputs.matrix).base }}
     with:
-      namespace-repository: ${{ matrix.images.namespace_repository }}
+      registry: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY }}
+      # Compose a fully qualified repository from host + namespace/repository.
+      image-repository: ${{ format('{0}/{1}', inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY, matrix.images.namespace_repository) }}
       file-dir: ${{ matrix.images.file_dir }}
+      context: .
+      dockerfile: ${{ matrix.images.file_dir }}/Dockerfile
+      prepare-framework: true
+      patch-base-dockerfiles: true
+      flower-repo-ref: ${{ inputs.flower-repo-ref || 'main' }}
       build-args: |
-        PIP_VERSION=${{ needs.parameters.outputs.pip-version }}
-        SETUPTOOLS_VERSION=${{ needs.parameters.outputs.setuptools-version }}
+        PIP_VERSION=${{ needs.prepare-docker-build-matrix.outputs.pip-version }}
+        SETUPTOOLS_VERSION=${{ needs.prepare-docker-build-matrix.outputs.setuptools-version }}
         ${{ matrix.images.build_args_encoded }}
       tags: ${{ matrix.images.tags_encoded }}
+      docker-registry-user: ${{ inputs.docker-registry-user || vars.DOCKER_IMAGE_REGISTRY_USER }}
     secrets:
-      dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
-      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+      docker-registry-token: ${{ secrets.DOCKER_IMAGE_REGISTRY_PASSWORD }}
 
   build-docker-binary-images:
     name: Build binary images
-    if: github.repository == 'flwrlabs/flower'
     uses: ./.github/workflows/_docker-build.yml
-    needs: [parameters, build-docker-base-images]
+    needs: [prepare-docker-build-matrix, build-docker-base-images]
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.parameters.outputs.matrix).binary }}
+      matrix: ${{ fromJson(needs.prepare-docker-build-matrix.outputs.matrix).binary }}
     with:
-      namespace-repository: ${{ matrix.images.namespace_repository }}
+      registry: ${{ inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY }}
+      # Compose a fully qualified repository from host + namespace/repository.
+      image-repository: ${{ format('{0}/{1}', inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY, matrix.images.namespace_repository) }}
       file-dir: ${{ matrix.images.file_dir }}
-      build-args: BASE_IMAGE=${{ matrix.images.base_image }}
+      context: .
+      dockerfile: ${{ matrix.images.file_dir }}/Dockerfile
+      prepare-framework: true
+      flower-repo-ref: ${{ inputs.flower-repo-ref || 'main' }}
+      # Keep BASE_REPOSITORY fully qualified so binary builds pull from the same registry.
+      build-args: |
+        BASE_REPOSITORY=${{ format('{0}/{1}/base', inputs.docker-registry || vars.DOCKER_IMAGE_REGISTRY, inputs.docker-image-namespace || vars.DOCKER_IMAGE_NAMESPACE) }}
+        BASE_IMAGE=${{ matrix.images.base_image }}
       tags: ${{ matrix.images.tags_encoded }}
+      docker-registry-user: ${{ inputs.docker-registry-user || vars.DOCKER_IMAGE_REGISTRY_USER }}
     secrets:
-      dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
-      dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+      docker-registry-token: ${{ secrets.DOCKER_IMAGE_REGISTRY_PASSWORD }}

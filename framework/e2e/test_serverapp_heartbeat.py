@@ -18,6 +18,7 @@ use_sim = sys.argv[1] == "simulation" if len(sys.argv) > 1 else False
 superlink_connection = "e2e-sim" if use_sim else "e2e"
 plugin_type_arg = "simulation" if use_sim else "serverapp"
 app_cmd = "flwr-simulation" if use_sim else "flwr-serverapp"
+SUPEREXEC_AUTH_SECRET_FILE = "_e2e_superexec_secret.bin"
 
 
 def run_superlink() -> subprocess.Popen:
@@ -25,6 +26,7 @@ def run_superlink() -> subprocess.Popen:
     cmd = ["flower-superlink", "--insecure"]
     cmd += ["--database", "tmp.db"]
     cmd += ["--isolation", "process"]
+    cmd += ["--superexec-auth-secret-file", SUPEREXEC_AUTH_SECRET_FILE]
     if use_sim:
         cmd += ["--simulation"]
 
@@ -36,6 +38,7 @@ def run_superexec() -> subprocess.Popen:
     cmd = ["flower-superexec", "--insecure"]
     cmd += ["--appio-api-address", SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS]
     cmd += ["--plugin-type", plugin_type_arg]
+    cmd += ["--superexec-auth-secret-file", SUPEREXEC_AUTH_SECRET_FILE]
     return subprocess.Popen(cmd)
 
 
@@ -115,6 +118,9 @@ def main() -> None:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
+
+    with open(SUPEREXEC_AUTH_SECRET_FILE, "wb") as secret_file:
+        secret_file.write(b"e2e-superexec-shared-secret")
 
     # Start the SuperLink
     print("Starting SuperLink...")
@@ -199,6 +205,7 @@ def main() -> None:
     superexec_proc.wait()
     superlink_proc.terminate()
     superlink_proc.wait()
+    os.remove(SUPEREXEC_AUTH_SECRET_FILE)
 
 
 if __name__ == "__main__":

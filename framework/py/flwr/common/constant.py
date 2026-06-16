@@ -37,7 +37,6 @@ SERVERAPPIO_PORT = "9091"
 FLEETAPI_GRPC_RERE_PORT = "9092"
 FLEETAPI_PORT = "9095"
 CONTROL_API_PORT = "9093"
-SIMULATIONIO_PORT = "9096"
 # Octets
 SERVER_OCTET = "0.0.0.0"
 CLIENT_OCTET = "127.0.0.1"
@@ -53,8 +52,6 @@ FLEET_API_GRPC_BIDI_DEFAULT_ADDRESS = (
 )
 FLEET_API_REST_DEFAULT_ADDRESS = f"{SERVER_OCTET}:{FLEETAPI_PORT}"
 CONTROL_API_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{CONTROL_API_PORT}"
-SIMULATIONIO_API_DEFAULT_SERVER_ADDRESS = f"{SERVER_OCTET}:{SIMULATIONIO_PORT}"
-SIMULATIONIO_API_DEFAULT_CLIENT_ADDRESS = f"{CLIENT_OCTET}:{SIMULATIONIO_PORT}"
 
 # Constants for heartbeat
 HEARTBEAT_DEFAULT_INTERVAL = 30
@@ -65,11 +62,12 @@ HEARTBEAT_MIN_INTERVAL = 10
 HEARTBEAT_MAX_INTERVAL = 1800  # 30 minutes
 HEARTBEAT_INTERVAL_INF = 1e300  # Large value, disabling heartbeats
 HEARTBEAT_PATIENCE = 2
-RUN_FAILURE_DETAILS_NO_HEARTBEAT = "No heartbeat received from the run."
 
 # IDs
 RUN_ID_NUM_BYTES = 8
+SERIES_ID_NUM_BYTES = 8
 NODE_ID_NUM_BYTES = 8
+TASK_ID_NUM_BYTES = 8
 
 # Constants for FAB
 APP_DIR = "apps"
@@ -139,17 +137,20 @@ MESSAGE_TTL_TOLERANCE = 1e-1
 ISOLATION_MODE_SUBPROCESS = "subprocess"
 ISOLATION_MODE_PROCESS = "process"
 
+# Runtime dependency installation toggle
+RUNTIME_DEPENDENCY_INSTALL = False
+
 # Log streaming configurations
 CONN_REFRESH_PERIOD = 60  # Stream connection refresh period
 CONN_RECONNECT_INTERVAL = 0.5  # Reconnect interval between two stream connections
 LOG_STREAM_INTERVAL = 0.5  # Log stream interval for `ControlServicer.StreamLogs`
+RUN_EVENTS_STREAM_INTERVAL = 0.5  # Event stream interval for `StreamRunEvents`
 LOG_UPLOAD_INTERVAL = 0.2  # Minimum interval between two log uploads
 
 # Retry configurations
 MAX_RETRY_DELAY = 20  # Maximum delay duration between two consecutive retries.
 
 # Constants for account authentication
-CREDENTIALS_DIR = ".credentials"
 AUTHN_TYPE_JSON_KEY = "authn-type"  # For key name in JSON file
 AUTHN_TYPE_YAML_KEY = "authn_type"  # For key name in YAML file
 ACCESS_TOKEN_KEY = "flwr-oidc-access-token"
@@ -165,9 +166,6 @@ TIMESTAMP_HEADER = "flwr-timestamp"
 TIMESTAMP_TOLERANCE = 300  # General tolerance for timestamp verification
 SYSTEM_TIME_TOLERANCE = 5  # Allowance for system time drift
 
-# Constants for grpc retry
-GRPC_RETRY_MAX_DELAY = 20  # Maximum delay duration between two consecutive retries.
-
 # Constants for ArrayRecord
 GC_THRESHOLD = 200_000_000  # 200 MB
 
@@ -179,15 +177,14 @@ FLWR_PRIVATE_MAX_ARRAY_CHUNK_SIZE = int(
 # Constants for serialization
 INT64_MAX_VALUE = 9223372036854775807  # (1 << 63) - 1
 
-# Constants for `flwr-serverapp` and `flwr-clientapp` CLI commands
-FLWR_APP_TOKEN_LENGTH = 128  # Length of the token used
+# Constants for task-token generation
+FLWR_TASK_TOKEN_LENGTH = 128  # Number of bytes used to generate task tokens
 
 # ControlServicer constants
 RUN_ID_NOT_FOUND_MESSAGE = "Run ID not found"
 NO_ACCOUNT_AUTH_MESSAGE = "ControlServicer initialized without account authentication"
 NO_ARTIFACT_PROVIDER_MESSAGE = "ControlServicer initialized without artifact provider"
 PULL_UNFINISHED_RUN_MESSAGE = "Cannot pull artifacts for an unfinished run"
-SUPERNODE_NOT_CREATED_FROM_CLI_MESSAGE = "Invalid SuperNode credentials"
 PUBLIC_KEY_ALREADY_IN_USE_MESSAGE = "Public key already in use"
 PUBLIC_KEY_NOT_VALID = "The provided public key is not valid"
 NODE_NOT_FOUND_MESSAGE = "Node ID not found for account"
@@ -306,6 +303,7 @@ class ExecPluginType:
     CLIENT_APP = "clientapp"
     SERVER_APP = "serverapp"
     SIMULATION = "simulation"  # Deprecated
+    SERVER_APP_EPHEMERAL = "serverapp-ephemeral"
 
     def __new__(cls) -> ExecPluginType:
         """Prevent instantiation."""

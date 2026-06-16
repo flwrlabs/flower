@@ -20,7 +20,6 @@ jobs:
         uses: ./.github/actions/bootstrap
         with:
           python-version: 3.13
-          poetry-skip: 'true'
       - name: Check PR title format 
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}

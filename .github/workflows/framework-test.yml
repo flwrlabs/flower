@@ -51,7 +51,7 @@ jobs:
         # Latest version which comes cached in the host image can be found here:
         # https://github.com/actions/runner-images/blob/main/images/linux/Ubuntu2204-Readme.md#python
         # In case of a mismatch, the job has to download Python to install it.
-        python: ['3.10', '3.11', '3.12', '3.13']
+        python: ['3.11', '3.12', '3.13']
 
     name: Python ${{ matrix.python }}
 
@@ -64,17 +64,31 @@ jobs:
         uses: ./.github/actions/bootstrap
         with:
           python-version: ${{ matrix.python }}
+      - name: Prepare framework
+        if: ${{ needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true' }}
+        run: ./framework/dev/prepare-framework.sh
       - name: Install dependencies
         if: ${{ needs.changes.outputs.framework == 'true' || needs.changes.outputs.ex_bench == 'true' }}
         run: |
-          cd framework 
-          python -m poetry install --all-extras
+          cd framework
+          uv sync --python=${{ matrix.python }} --locked --all-extras --all-groups
       - name: Check if protos need recompilation
         if: ${{ needs.changes.outputs.framework == 'true' }}
-        run: ./framework/dev/check-protos.sh
-      - name: Lint + Test (isort/black/docformatter/mypy/pylint/flake8/pytest)
+        run: |
+          cd framework
+          uv run --no-sync ./dev/check-protos.sh
+      - name: Check if migrations are up to date
+        if: ${{ needs.changes.outputs.framework == 'true' && matrix.python == '3.11' }}
+        run: |
+          cd framework
+          uv run --no-sync ./dev/check-migrations.sh
+      - name: Lint + Test (isort/black/mypy/pylint/flake8/pytest)
         if: ${{ needs.changes.outputs.framework == 'true' }}
-        run: ./framework/dev/test.sh
+        run: |
+          cd framework
+          uv run --no-sync ./dev/test.sh
       - name: Check benchmarks and examples
         if: ${{ needs.changes.outputs.ex_bench == 'true' }}
-        run: ./dev/test.sh
+        run: |
+          cd framework
+          uv run --no-sync ../dev/test.sh

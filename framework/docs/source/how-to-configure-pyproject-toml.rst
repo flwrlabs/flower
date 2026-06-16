@@ -77,7 +77,7 @@ Here are a few key sections to look out for:
 
         \* Required fields
 
-        These fields follow the standard ``pyproject.toml`` metadata format, commonly used by tools like ``uv``, ``poetry``, and others. Flower reuses these for configuration and packaging.
+        These fields follow the standard ``pyproject.toml`` metadata format, commonly used by tools like ``uv``, ``pip``, and others. Flower reuses these for configuration and packaging.
 
     - ``name``\*: The name of your Flower app.
     - ``version``\*: The current version of your app, used for packaging and distribution. Must follow Semantic Versioning (e.g., "1.0.0").

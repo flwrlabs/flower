@@ -20,24 +20,27 @@ from dataclasses import replace
 from logging import DEBUG, ERROR, INFO
 from queue import Queue
 
+import grpc
+
+from flwr.app.message import Context, RecordDict
 from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
 from flwr.common import EventType, event
-from flwr.common.args import add_args_flwr_app_common
+from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.config import (
     get_fused_config_from_dir,
     get_project_config,
     get_project_dir,
 )
 from flwr.common.constant import (
+    RUNTIME_DEPENDENCY_INSTALL,
     SERVERAPPIO_API_DEFAULT_CLIENT_ADDRESS,
-    ExecPluginType,
-    Status,
     SubStatus,
 )
 from flwr.common.exit import ExitCode, flwr_exit, register_signal_handlers
 from flwr.common.logger import (
+    flush_logs,
     log,
     mirror_output_to_queue,
     restore_output,
@@ -49,25 +52,25 @@ from flwr.common.serde import (
     context_to_proto,
     fab_from_proto,
     run_from_proto,
-    run_status_to_proto,
 )
-from flwr.common.typing import RunStatus
 from flwr.proto.appio_pb2 import (  # pylint: disable=E0611
-    PullAppInputsRequest,
-    PullAppInputsResponse,
-    PushAppOutputsRequest,
+    PullTaskInputRequest,
+    PullTaskInputResponse,
+    PushTaskOutputRequest,
 )
 from flwr.proto.federation_config_pb2 import SimulationConfig  # pylint: disable=E0611
-from flwr.proto.run_pb2 import UpdateRunStatusRequest  # pylint: disable=E0611
-from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 from flwr.server.superlink.fleet.vce.backend.backend import BackendConfig
+from flwr.server.superlink.fleet.vce.metrics import VceMetrics
 from flwr.simulation.run_simulation import _run_simulation
 from flwr.simulation.simulationio_connection import SimulationIoConnection
 from flwr.supercore.app_utils import start_parent_process_monitor
 from flwr.supercore.constant import NOOP_FEDERATION
-from flwr.supercore.heartbeat import HeartbeatSender, make_app_heartbeat_fn_grpc
-from flwr.supercore.superexec.plugin import ServerAppExecPlugin
-from flwr.supercore.superexec.run_superexec import run_with_deprecation_warning
+from flwr.supercore.heartbeat import HeartbeatSender, make_task_heartbeat_fn_grpc
+from flwr.supercore.superexec.dependency_installer import (
+    cleanup_app_runtime_environment,
+    install_app_dependencies,
+)
+from flwr.supercore.tls import validate_and_resolve_root_certificates
 
 
 def _run_simulation_settings(
@@ -105,30 +108,16 @@ def _run_simulation_settings(
 
 def flwr_simulation() -> None:
     """Run process-isolated Flower Simulation."""
+    args = _parse_args_run_flwr_simulation().parse_args()
+    token = try_obtain_flwr_app_token(args)
+
     # Capture stdout/stderr
     log_queue: Queue[str | None] = Queue()
     mirror_output_to_queue(log_queue)
 
-    args = _parse_args_run_flwr_simulation().parse_args()
-
-    if not args.insecure:
-        flwr_exit(
-            ExitCode.COMMON_TLS_NOT_SUPPORTED,
-            "`flwr-simulation` does not support TLS yet.",
-        )
-
-    # Disallow long-running `flwr-simulation` processes
-    if args.token is None:
-        run_with_deprecation_warning(
-            cmd="flwr-simulation",
-            plugin_type=ExecPluginType.SERVER_APP,
-            plugin_class=ServerAppExecPlugin,
-            stub_class=ServerAppIoStub,
-            appio_api_address=args.serverappio_api_address,
-            parent_pid=args.parent_pid,
-            warn_run_once=args.run_once,
-        )
-        return
+    certificates = validate_and_resolve_root_certificates(
+        args.root_certificates, args.insecure
+    )
 
     log(INFO, "Starting Flower Simulation")
     log(
@@ -139,9 +128,11 @@ def flwr_simulation() -> None:
     run_simulation_process(
         serverappio_api_address=args.serverappio_api_address,
         log_queue=log_queue,
-        token=args.token,
-        certificates=None,
+        token=token,
+        insecure=args.insecure,
+        certificates=certificates,
         parent_pid=args.parent_pid,
+        runtime_dependency_install=args.runtime_dependency_install,
     )
 
     # Restore stdout/stderr
@@ -152,8 +143,10 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
     serverappio_api_address: str,
     log_queue: Queue[str | None],
     token: str,
+    insecure: bool,
     certificates: bytes | None = None,
     parent_pid: int | None = None,
+    runtime_dependency_install: bool = RUNTIME_DEPENDENCY_INSTALL,
 ) -> None:
     """Run Flower Simulation process."""
     # Start monitoring the parent process if a PID is provided
@@ -162,43 +155,34 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
 
     conn = SimulationIoConnection(
         serverappio_api_address=serverappio_api_address,
+        insecure=insecure,
         root_certificates=certificates,
+        token=token,
     )
 
     # Initialize variables for finally block
     log_uploader = None
     run_id_hash = None
     heartbeat_sender = None
-    run = None
-    run_status = None
+    sub_status = SubStatus.FAILED
+    details = "Task failed with unknown error."
+    context: Context | None = None
+    metrics = VceMetrics()
+    runtime_env_dir = None
     exit_code = ExitCode.SUCCESS
-
-    def on_exit() -> None:
-        # Stop heartbeat sender
-        if heartbeat_sender and heartbeat_sender.is_running:
-            heartbeat_sender.stop()
-
-        # Stop log uploader for this run and upload final logs
-        if log_uploader:
-            stop_log_uploader(log_queue, log_uploader)
-
-        # Update run status
-        if run and run_status:
-            run_status_proto = run_status_to_proto(run_status)
-            conn._stub.UpdateRunStatus(
-                UpdateRunStatusRequest(run_id=run.run_id, run_status=run_status_proto)
-            )
 
     register_signal_handlers(
         event_type=EventType.FLWR_SIMULATION_RUN_LEAVE,
-        exit_message="Run stopped by user.",
-        exit_handlers=[on_exit],
+        exit_message="Task stopped by user.",
     )
 
     try:
+        # Set up heartbeat sender
+        heartbeat_sender = HeartbeatSender(make_task_heartbeat_fn_grpc(conn._stub))
+        heartbeat_sender.start()
+
         # Pull SimulationInputs from LinkState
-        req = PullAppInputsRequest(token=token)
-        res: PullAppInputsResponse = conn._stub.PullAppInputs(req)
+        res: PullTaskInputResponse = conn._stub.PullTaskInput(PullTaskInputRequest())
         context = context_from_proto(res.context)
         run = run_from_proto(res.run)
         fab = fab_from_proto(res.fab)
@@ -217,6 +201,26 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
         fab_id, fab_version = get_fab_metadata(fab.content)
 
         app_path = get_project_dir(fab_id, fab_version, fab.hash_str)
+
+        if runtime_dependency_install:
+            log(DEBUG, "Simulation process starts app dependency installation.")
+            runtime_env_dir = install_app_dependencies(
+                app_path,
+                launch_id=token,
+                run_id=run.run_id,
+                index_context={
+                    "component": "simulation",
+                    "project_dir": str(app_path),
+                    "run_id": run.run_id,
+                    "launch_id": token,
+                    "fab_id": run.fab_id,
+                    "fab_version": run.fab_version,
+                    "fab_hash": fab.hash_str,
+                },
+            )
+        else:
+            log(DEBUG, "Simulation runtime dependency installation is disabled.")
+
         config = get_project_config(app_path)
 
         # Get ClientApp and SeverApp components
@@ -259,14 +263,8 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             },
         )
 
-        # Set up heartbeat sender
-        heartbeat_sender = HeartbeatSender(
-            make_app_heartbeat_fn_grpc(conn._stub, token)
-        )
-        heartbeat_sender.start()
-
         # Launch the simulation
-        updated_context = _run_simulation(
+        simulation_result = _run_simulation(
             server_app_attr=server_app_attr,
             client_app_attr=client_app_attr,
             num_supernodes=num_supernodes,
@@ -279,24 +277,56 @@ def run_simulation_process(  # pylint: disable=R0913, R0914, R0915, R0917, W0212
             server_app_context=context,
             is_app=True,
             exit_event=EventType.FLWR_SIMULATION_RUN_LEAVE,
+            metrics=metrics,
         )
+        context = simulation_result.context
 
         # Send resulting context
-        context_proto = context_to_proto(updated_context)
-        out_req = PushAppOutputsRequest(
-            token=token, run_id=run.run_id, context=context_proto
-        )
-        _ = conn._stub.PushAppOutputs(out_req)
+        # Temporarily disable pushing resulting context to SuperLink
+        context.state = RecordDict()
 
-        run_status = RunStatus(Status.FINISHED, SubStatus.COMPLETED, "")
+        sub_status = SubStatus.COMPLETED
+        details = ""
 
     except Exception as ex:  # pylint: disable=broad-exception-caught
         exc_entity = "Simulation"
         log(ERROR, "%s raised an exception", exc_entity, exc_info=ex)
-        run_status = RunStatus(Status.FINISHED, SubStatus.FAILED, str(ex))
+        sub_status = SubStatus.FAILED
+        details = f"Simulation failed with exception: {str(ex)}"
 
         # General exit code
         exit_code = ExitCode.SIMULATION_EXCEPTION
+    finally:
+        log(DEBUG, "[flwr-simulation] Will push Simulation task output")
+
+        # Set Grpc max retries to 1 to avoid blocking on exit
+        conn._retry_invoker.max_tries = 1
+
+        # Upload any remaining logs before pushing final output
+        if log_uploader:
+            flush_logs(log_queue)
+
+        # Push final status and context (if available)
+        out_req = PushTaskOutputRequest(
+            context=context_to_proto(context) if context else None,
+            sub_status=sub_status,
+            details=details,
+            clientapp_runtime=metrics.clientapp_runtime,
+        )
+        try:
+            conn._stub.PushTaskOutput(out_req)
+        except grpc.RpcError as err:
+            log(ERROR, "Failed to push task output: %s", str(err))
+
+        # Stop log uploader for this run and upload final logs
+        if log_uploader:
+            stop_log_uploader(log_queue, log_uploader)
+
+        # Stop heartbeat sender
+        if heartbeat_sender and heartbeat_sender.is_running:
+            heartbeat_sender.stop()
+
+        cleanup_app_runtime_environment(runtime_env_dir)
 
     flwr_exit(
         code=exit_code,
