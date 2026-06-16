@@ -27,8 +27,8 @@ from flwr.cli.config_utils import get_fab_metadata
 from flwr.cli.install import install_from_fab
 from flwr.cli.utils import get_sha256_hash
 from flwr.common import EventType, event
-from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.app_import_error import format_app_import_error_message
+from flwr.common.args import add_args_flwr_app_common, try_obtain_flwr_app_token
 from flwr.common.config import (
     get_fused_config_from_dir,
     get_project_config,

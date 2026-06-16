@@ -33,6 +33,4 @@ def format_app_import_error_message(
             "https://flower.ai/docs/framework/how-to-install-app-dependencies-at-runtime.html"
             " for details."
         )
-    return (
-        f"{app_name} failed to import a module: {import_error_details}. {guidance}"
-    )
+    return f"{app_name} failed to import a module: {import_error_details}. {guidance}"

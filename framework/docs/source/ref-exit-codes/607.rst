@@ -1,14 +1,13 @@
-#############################
+###############################
  [607] COMMON_APP_IMPORT_ERROR
-#############################
+###############################
 
 *************
  Description
 *************
 
-A ServerApp or ClientApp failed to import a required module. This can happen
-because a dependency is missing, or because a module from your app could not be
-found.
+A ServerApp or ClientApp failed to import a required module. This can happen because a
+dependency is missing, or because a module from your app could not be found.
 
 ****************
  How to Resolve
@@ -16,18 +15,17 @@ found.
 
 Check the error message for the missing module.
 
-If the import refers to a module or ``.py`` file in your app, make sure the file
-is included in the app and that the import name is correct.
+If the import refers to a module or ``.py`` file in your app, make sure the file is
+included in the app and that the import name is correct.
 
 If the import refers to a missing library dependency, use the guidance below.
 
-If automatic runtime dependency installation is enabled, add the missing package to
-the app's ``pyproject.toml`` dependencies and run the app again.
+If automatic runtime dependency installation is enabled, add the missing package to the
+app's ``pyproject.toml`` dependencies and run the app again.
 
-If automatic runtime dependency installation is disabled, ensure the Python
-environment where the ServerApp or ClientApp process runs has all required
-dependencies installed.
+If automatic runtime dependency installation is disabled, ensure the Python environment
+where the ServerApp or ClientApp process runs has all required dependencies installed.
 
 Alternatively, enable automatic runtime dependency installation. See
-https://flower.ai/docs/framework/how-to-install-app-dependencies-at-runtime.html
-for details.
+https://flower.ai/docs/framework/how-to-install-app-dependencies-at-runtime.html for
+details.
