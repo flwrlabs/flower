@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower task process components."""
+"""Handle connector tasks."""
 
 
-from .agent import run_agentapp
-from .connector import run_connector
-from .model import run_model
+from flwr.proto.serverappio_pb2_grpc import ServerAppIoStub
 
-__all__ = [
-    "run_agentapp",
-    "run_connector",
-    "run_model",
-]
+
+def handle_task(
+    stub: ServerAppIoStub,
+    task_id: int,
+    run_id: int,
+) -> None:
+    """Run one connector task request."""
+    del stub, task_id, run_id
