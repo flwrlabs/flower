@@ -19,7 +19,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from flwr.app.message import Message
 from flwr.supercore.json_message.base import JSONMessage
 from flwr.supercore.json_message.constant import DEFAULT_TASK_MESSAGE_TTL
 from flwr.supercore.typing import JSONObject, JSONValue
@@ -65,11 +64,6 @@ class ModelRequest(JSONMessage):
             payload=payload,
             ttl=ttl,
         )
-
-    @classmethod
-    def from_message(cls, message: Message) -> ModelRequest:
-        """Parse a generic message into a model request."""
-        return cls._from_message(message)
 
     @classmethod
     def _validate_payload(cls, payload: JSONObject) -> None:
@@ -118,11 +112,6 @@ class ModelResponse(JSONMessage):
             reply_to_message_id=reply_to_message_id,
             ttl=ttl,
         )
-
-    @classmethod
-    def from_message(cls, message: Message) -> ModelResponse:
-        """Parse a generic message into a model response."""
-        return cls._from_message(message)
 
     @classmethod
     def _validate_payload(cls, payload: JSONObject) -> None:

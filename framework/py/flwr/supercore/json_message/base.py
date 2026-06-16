@@ -63,7 +63,7 @@ class JSONMessage(Message, ABC):
         return _payload_from_content(self.content)
 
     @classmethod
-    def _from_message(cls, message: Message) -> Self:
+    def from_message(cls, message: Message) -> Self:
         """Parse a generic message into a typed task message."""
         if not message.has_content():
             raise ValueError("Expected a message with content.")
